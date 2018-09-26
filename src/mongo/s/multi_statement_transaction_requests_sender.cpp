@@ -47,9 +47,8 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     newRequests.reserve(requests.size());
 
     for (auto request : requests) {
-        auto& participant = txnRouter->getOrCreateParticipant(request.shardId);
-        newRequests.emplace_back(request.shardId,
-                                 participant.attachTxnFieldsIfNeeded(request.cmdObj));
+        newRequests.emplace_back(
+            request.shardId, txnRouter->attachTxnFieldsIfNeeded(request.shardId, request.cmdObj));
     }
 
     return newRequests;
@@ -74,14 +73,7 @@ bool MultiStatementTransactionRequestsSender::done() {
 }
 
 AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next() {
-    auto result = _ars.next();
-
-    if (auto txnRouter = TransactionRouter::get(_opCtx)) {
-        auto& participant = txnRouter->getOrCreateParticipant(result.shardId);
-        participant.markAsCommandSent();
-    }
-
-    return result;
+    return _ars.next();
 }
 
 void MultiStatementTransactionRequestsSender::stopRetrying() {

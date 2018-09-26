@@ -73,7 +73,7 @@ protected:
     }
 };
 
-TEST_F(TransactionRouterTest, BasicStartTxn) {
+TEST_F(TransactionRouterTest, StartTxnShouldBeAttachedOnlyOnFirstStatementToParticipant) {
     TxnNumber txnNum{3};
 
     TransactionRouter txnRouter({});
@@ -95,24 +95,16 @@ TEST_F(TransactionRouterTest, BasicStartTxn) {
                                   << txnNum);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
-        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
-        participant.markAsCommandSent();
-    }
-
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator"
@@ -122,31 +114,6 @@ TEST_F(TransactionRouterTest, BasicStartTxn) {
                                << "txnNumber"
                                << txnNum),
                           newCmd);
-    }
-}
-
-TEST_F(TransactionRouterTest, ParticipantMustStartTransactionUntilSentCommand) {
-    TxnNumber txnNum{3};
-
-    TransactionRouter txnRouter({});
-    txnRouter.checkOut();
-    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
-
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        ASSERT(participant.mustStartTransaction());
-    }
-
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        ASSERT(participant.mustStartTransaction());
-        participant.markAsCommandSent();
-        ASSERT_FALSE(participant.mustStartTransaction());
-    }
-
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        ASSERT_FALSE(participant.mustStartTransaction());
     }
 }
 
@@ -176,24 +143,16 @@ TEST_F(TransactionRouterTest, BasicStartTxnWithAtClusterTime) {
 
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
-        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
-        participant.markAsCommandSent();
-    }
-
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator"
@@ -238,17 +197,16 @@ TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcern) {
                                   << txnNum);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
-        participant.markAsCommandSent();
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator"
@@ -273,17 +231,16 @@ TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcern) {
                           << txnNum);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
-        participant.markAsCommandSent();
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "autocommit"
@@ -319,17 +276,16 @@ TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcernWithAtClu
                                   << txnNum);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
-        participant.markAsCommandSent();
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator"
@@ -356,17 +312,16 @@ TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcernWithAtClu
                           << txnNum);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
-        participant.markAsCommandSent();
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "autocommit"
@@ -386,9 +341,9 @@ TEST_F(TransactionRouterTest, StartingNewTxnShouldClearState) {
     txnRouter.computeAtClusterTimeForOneShard(operationContext(), shard1);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("update"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "readConcern"
@@ -425,9 +380,9 @@ TEST_F(TransactionRouterTest, StartingNewTxnShouldClearState) {
                                   << txnNum2);
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
     }
 }
@@ -443,14 +398,16 @@ TEST_F(TransactionRouterTest, FirstParticipantIsCoordinator) {
 
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+        auto& participant = *txnRouter.getParticipant(shard1);
         ASSERT(participant.isCoordinator());
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
     }
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
+        txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+        auto& participant = *txnRouter.getParticipant(shard2);
         ASSERT_FALSE(participant.isCoordinator());
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -462,7 +419,8 @@ TEST_F(TransactionRouterTest, FirstParticipantIsCoordinator) {
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
+        txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+        auto& participant = *txnRouter.getParticipant(shard2);
         ASSERT(participant.isCoordinator());
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
@@ -490,11 +448,11 @@ TEST_F(TransactionRouterTest, DoesNotAttachTxnNumIfAlreadyThere) {
                                   << "autocommit"
                                   << false);
 
-    auto& participant = txnRouter.getOrCreateParticipant(shard1);
-    auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                           << "test"
-                                                           << "txnNumber"
-                                                           << txnNum));
+    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                    BSON("insert"
+                                                         << "test"
+                                                         << "txnNumber"
+                                                         << txnNum));
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
@@ -505,11 +463,11 @@ DEATH_TEST_F(TransactionRouterTest, CrashesIfCmdHasDifferentTxnNumber, "invarian
     txnRouter.checkOut();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
 
-    auto& participant = txnRouter.getOrCreateParticipant(shard1);
-    participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                             << "test"
-                                             << "txnNumber"
-                                             << TxnNumber(10)));
+    txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                      BSON("insert"
+                                           << "test"
+                                           << "txnNumber"
+                                           << TxnNumber(10)));
 }
 
 TEST_F(TransactionRouterTest, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
@@ -521,12 +479,12 @@ TEST_F(TransactionRouterTest, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
 
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"
-                                                               << "readConcern"
-                                                               << BSON("level"
-                                                                       << "snapshot")));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"
+                                                             << "readConcern"
+                                                             << BSON("level"
+                                                                     << "snapshot")));
         ASSERT_BSONOBJ_EQ(BSON("insert"
                                << "test"
                                << "readConcern"
@@ -579,9 +537,9 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
                                   << "txnNumber"
                                   << txnNum);
 
-    auto& participant = txnRouter.getOrCreateParticipant(shard1);
-    auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                           << "test"));
+    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                    BSON("insert"
+                                                         << "test"));
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
@@ -612,9 +570,9 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelButHasAfter
                                   << "txnNumber"
                                   << txnNum);
 
-    auto& participant = txnRouter.getOrCreateParticipant(shard1);
-    auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                           << "test"));
+    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                    BSON("insert"
+                                                         << "test"));
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
@@ -735,7 +693,7 @@ TEST_F(TransactionRouterTest, SendCommitDirectlyForSingleParticipants) {
     auto txnRouter = TransactionRouter::get(opCtx);
 
     txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
-    txnRouter->getOrCreateParticipant(shard1);
+    txnRouter->attachTxnFieldsIfNeeded(shard1, {});
 
     auto future = launchAsync([&] { txnRouter->commitTransaction(operationContext()); });
 
@@ -766,8 +724,8 @@ TEST_F(TransactionRouterTest, SendPrepareAndCoordinateCommitForMultipleParticipa
     auto txnRouter = TransactionRouter::get(opCtx);
 
     txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
-    txnRouter->getOrCreateParticipant(shard1);
-    txnRouter->getOrCreateParticipant(shard2);
+    txnRouter->attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter->attachTxnFieldsIfNeeded(shard2, {});
 
     auto future = launchAsync([&] { txnRouter->commitTransaction(operationContext()); });
 
@@ -822,11 +780,10 @@ TEST_F(TransactionRouterTest, SnapshotErrorsResetAtClusterTime) {
                                        << kInMemoryLogicalTime.asTimestamp());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
-        participant.markAsCommandSent();
     }
 
     // Advance the latest time in the logical clock so the retry attempt will pick a later time.
@@ -845,9 +802,9 @@ TEST_F(TransactionRouterTest, SnapshotErrorsResetAtClusterTime) {
                                << laterTime.asTimestamp());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
     }
 }
@@ -867,9 +824,9 @@ TEST_F(TransactionRouterTest, CannotChangeAtClusterTimeWithoutSnapshotError) {
                                        << kInMemoryLogicalTime.asTimestamp());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
     }
 
@@ -880,9 +837,9 @@ TEST_F(TransactionRouterTest, CannotChangeAtClusterTimeWithoutSnapshotError) {
     txnRouter.setAtClusterTimeToLatestTime(operationContext());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
+                                                        BSON("insert"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
     }
 }
@@ -896,17 +853,8 @@ TEST_F(TransactionRouterTest, SnapshotErrorsClearsAllParticipants) {
 
     // Successfully start a transaction on two shards, selecting one as the coordinator.
 
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        participant.markAsCommandSent();
-        ASSERT_FALSE(participant.mustStartTransaction());
-    }
-
-    {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        participant.markAsCommandSent();
-        ASSERT_FALSE(participant.mustStartTransaction());
-    }
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
 
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -919,10 +867,11 @@ TEST_F(TransactionRouterTest, SnapshotErrorsClearsAllParticipants) {
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        ASSERT(participant.mustStartTransaction());
-        participant.markAsCommandSent();
-        ASSERT_FALSE(participant.mustStartTransaction());
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+        ASSERT_TRUE(newCmd["startTransaction"].trueValue());
+
+        newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+        ASSERT_FALSE(newCmd["startTransaction"].trueValue());
     }
 
     // There is a new coordinator.
@@ -930,9 +879,12 @@ TEST_F(TransactionRouterTest, SnapshotErrorsClearsAllParticipants) {
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
 
     {
-        // Shard1 has not started a transaction.
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        ASSERT(participant.mustStartTransaction());
+        // Shard1 should also attach startTransaction field again.
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+        ASSERT_TRUE(newCmd["startTransaction"].trueValue());
+
+        newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+        ASSERT_FALSE(newCmd["startTransaction"].trueValue());
     }
 }
 
@@ -968,17 +920,21 @@ TEST_F(TransactionRouterTest, ParticipantsRememberStmtIdCreatedAt) {
     // command.
 
     int initialStmtId = 0;
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard1).getStmtIdCreatedAt(), initialStmtId);
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard2).getStmtIdCreatedAt(), initialStmtId);
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+
+    ASSERT_EQ(txnRouter.getParticipant(shard1)->getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard2)->getStmtIdCreatedAt(), initialStmtId);
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
 
     ShardId shard3("shard3");
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard3).getStmtIdCreatedAt(), initialStmtId + 1);
+    txnRouter.attachTxnFieldsIfNeeded(shard3, {});
+    ASSERT_EQ(txnRouter.getParticipant(shard3)->getStmtIdCreatedAt(), initialStmtId + 1);
 
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard1).getStmtIdCreatedAt(), initialStmtId);
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard2).getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard1)->getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard2)->getStmtIdCreatedAt(), initialStmtId);
 
     // Transaction 2 contacts shard3 and shard2 during the first command, then shard1 in the second
     // command.
@@ -988,13 +944,17 @@ TEST_F(TransactionRouterTest, ParticipantsRememberStmtIdCreatedAt) {
     TxnNumber txnNum2{5};
     txnRouter.beginOrContinueTxn(operationContext(), txnNum2, true);
 
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard3).getStmtIdCreatedAt(), initialStmtId);
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard2).getStmtIdCreatedAt(), initialStmtId);
+    txnRouter.attachTxnFieldsIfNeeded(shard3, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+
+    ASSERT_EQ(txnRouter.getParticipant(shard3)->getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard2)->getStmtIdCreatedAt(), initialStmtId);
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum2, false);
 
-    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard1).getStmtIdCreatedAt(), initialStmtId + 1);
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    ASSERT_EQ(txnRouter.getParticipant(shard1)->getStmtIdCreatedAt(), initialStmtId + 1);
 }
 
 TEST_F(TransactionRouterTest, AllParticipantsAndCoordinatorClearedOnStaleErrorOnFirstCommand) {
@@ -1007,8 +967,8 @@ TEST_F(TransactionRouterTest, AllParticipantsAndCoordinatorClearedOnStaleErrorOn
     // Start a transaction on two shards, selecting one as the coordinator, but simulate a
     // re-targeting error from at least one of them.
 
-    txnRouter.getOrCreateParticipant(shard1).markAsCommandSent();
-    txnRouter.getOrCreateParticipant(shard2).markAsCommandSent();
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
 
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -1020,18 +980,21 @@ TEST_F(TransactionRouterTest, AllParticipantsAndCoordinatorClearedOnStaleErrorOn
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard2);
-        ASSERT(participant.mustStartTransaction());
-        participant.markAsCommandSent();
-        ASSERT_FALSE(participant.mustStartTransaction());
+        ASSERT_FALSE(txnRouter.getParticipant(shard2));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+        ASSERT_TRUE(newCmd["startTransaction"].trueValue());
     }
 
     // There is a new coordinator.
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
 
-    // Shard1 has not started a transaction.
-    ASSERT(txnRouter.getOrCreateParticipant(shard1).mustStartTransaction());
+    {
+        // Shard1 has not started a transaction.
+        ASSERT_FALSE(txnRouter.getParticipant(shard1));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+        ASSERT_TRUE(newCmd["startTransaction"].trueValue());
+    }
 }
 
 TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsClearedOnStaleError) {
@@ -1043,7 +1006,7 @@ TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsClearedOnStaleError) {
 
     // First statement successfully targets one shard, selecing it as the coordinator.
 
-    txnRouter.getOrCreateParticipant(shard1).markAsCommandSent();
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
 
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
@@ -1054,15 +1017,15 @@ TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsClearedOnStaleError) {
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
 
-    txnRouter.getOrCreateParticipant(shard2).markAsCommandSent();
-    txnRouter.getOrCreateParticipant(shard3).markAsCommandSent();
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard3, {});
 
     txnRouter.onStaleShardOrDbError("find");
 
     // Shards 2 and 3 must start a transaction, but shard 1 must not.
-    ASSERT_FALSE(txnRouter.getOrCreateParticipant(shard1).mustStartTransaction());
-    ASSERT(txnRouter.getOrCreateParticipant(shard2).mustStartTransaction());
-    ASSERT(txnRouter.getOrCreateParticipant(shard3).mustStartTransaction());
+    ASSERT_FALSE(txnRouter.attachTxnFieldsIfNeeded(shard1, {})["startTransaction"].trueValue());
+    ASSERT_TRUE(txnRouter.attachTxnFieldsIfNeeded(shard2, {})["startTransaction"].trueValue());
+    ASSERT_TRUE(txnRouter.attachTxnFieldsIfNeeded(shard3, {})["startTransaction"].trueValue());
 }
 
 TEST_F(TransactionRouterTest, RetryOnStaleErrorCannotPickNewAtClusterTime) {
@@ -1080,11 +1043,10 @@ TEST_F(TransactionRouterTest, RetryOnStaleErrorCannotPickNewAtClusterTime) {
                                        << kInMemoryLogicalTime.asTimestamp());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("find"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("find"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
-        participant.markAsCommandSent();
     }
 
     // Advance the latest time in the logical clock, simulate a stale config/db error, and verify
@@ -1098,9 +1060,9 @@ TEST_F(TransactionRouterTest, RetryOnStaleErrorCannotPickNewAtClusterTime) {
     txnRouter.setAtClusterTimeToLatestTime(operationContext());
 
     {
-        auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("find"
-                                                               << "test"));
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("find"
+                                                             << "test"));
         ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
     }
 }
@@ -1115,7 +1077,7 @@ TEST_F(TransactionRouterTest, WritesCanOnlyBeRetriedIfFirstOverallCommand) {
     txnRouter.checkOut();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
 
-    txnRouter.getOrCreateParticipant(shard1).markAsCommandSent();
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
 
     for (auto writeCmd : writeCmds) {
         txnRouter.onStaleShardOrDbError(writeCmd);  // Should not throw.
@@ -1169,7 +1131,7 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
     auto txnRouter = TransactionRouter::get(opCtx);
 
     txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
-    txnRouter->getOrCreateParticipant(shard1);
+    txnRouter->attachTxnFieldsIfNeeded(shard1, {});
 
     auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
 
@@ -1201,8 +1163,8 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipants) {
     auto txnRouter = TransactionRouter::get(opCtx);
 
     txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
-    txnRouter->getOrCreateParticipant(shard1);
-    txnRouter->getOrCreateParticipant(shard2);
+    txnRouter->attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter->attachTxnFieldsIfNeeded(shard2, {});
 
     auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
 

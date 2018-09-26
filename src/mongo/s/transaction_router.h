@@ -76,33 +76,15 @@ public:
                              StmtId stmtIdCreatedAt,
                              SharedTransactionOptions sharedOptions);
 
-        enum class State {
-            // Next transaction should include startTransaction.
-            kMustStart,
-            // startTransaction already sent to this participant.
-            kStarted,
-        };
-
         /**
          * Attaches necessary fields if this is participating in a multi statement transaction.
          */
-        BSONObj attachTxnFieldsIfNeeded(BSONObj cmd) const;
+        BSONObj attachTxnFieldsIfNeeded(BSONObj cmd, bool isFirstStatementInThisParticipant) const;
 
         /**
          * True if the participant has been chosen as the coordinator for its transaction.
          */
         bool isCoordinator() const;
-
-        /**
-         * True if the represented shard has not been sent a command with startTransaction=true.
-         */
-        bool mustStartTransaction() const;
-
-        /**
-         * Mark this participant as a node that has been successful sent a command with
-         * startTransaction=true.
-         */
-        void markAsCommandSent();
 
         /**
          * Returns the highest statement id of the command during which this participant was
@@ -111,7 +93,6 @@ public:
         StmtId getStmtIdCreatedAt() const;
 
     private:
-        State _state{State::kMustStart};
         const bool _isCoordinator{false};
 
         // The highest statement id of the request during which this participant was created.
@@ -128,13 +109,20 @@ public:
      */
     void beginOrContinueTxn(OperationContext* opCtx, TxnNumber txnNumber, bool startTransaction);
 
-    /**
-     * Returns the participant for this transaction. Creates a new one if it doesn't exist.
-     */
-    Participant& getOrCreateParticipant(const ShardId& shard);
-
     void checkIn();
     void checkOut();
+
+    /**
+     * Attaches the required transaction related fields for a request to be sent to the given
+     * shard.
+     *
+     * Calling this method has the following side effects:
+     * 1. Potentially selecting a coordinator.
+     * 2. Adding the shard to the list of participants.
+     * 3. Also append fields for first statements (ex. startTransaction, readConcern)
+     *    if the shard was newly added to the list of participants.
+     */
+    BSONObj attachTxnFieldsIfNeeded(const ShardId& shardId, const BSONObj& cmdObj);
 
     /**
      * Updates the transaction state to allow for a retry of the current command on a stale version
@@ -197,6 +185,11 @@ public:
      */
     static TransactionRouter* get(OperationContext* opCtx);
 
+    /**
+     * Returns the participant for this transaction.
+     */
+    boost::optional<Participant&> getParticipant(const ShardId& shard);
+
 private:
     /**
      * Run basic commit for transactions that touched a single shard.
@@ -234,6 +227,11 @@ private:
      * Removes all participants created during the current statement from the participant list.
      */
     void _clearPendingParticipants();
+
+    /**
+     * Creates a new participant for the shard.
+     */
+    Participant& _createParticipant(const ShardId& shard);
 
     const LogicalSessionId _sessionId;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
