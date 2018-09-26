@@ -1,5 +1,5 @@
 // Tests that the $changeStream stage returns an error when run against a standalone mongod.
-// @tags: [requires_sharding]
+// @tags: [requires_sharding, uses_change_streams]
 
 (function() {
     "use strict";

@@ -3,7 +3,7 @@
  * be allowed to be called on a prepared transaction. All other cases should fail with
  * PreparedTransactionInProgress.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

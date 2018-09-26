@@ -11502,6 +11502,563 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: enterprise-rhel-62-64-bit-majority-read-concern-off
+  display_name: "Enterprise RHEL 6.2 (majority read concern off)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
+    test_flags: >-
+      --majorityReadConcern=off
+      --excludeWithAnyTags=requires_majority_read_concern,uses_change_streams,uses_prepare_transaction,uses_multi_shard_transaction,uses_single_shard_transaction
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --release
+      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+      MONGO_DISTMOD=rhel62
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
+    tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+  display_tasks:
+  - *dbtest
+  - *replica_sets_auth
+  - *replica_sets_ese
+  - *sharding
+  - *sharding_auth
+  - *sharding_auth_audit
+  - *sharding_ese
+  - *sharding_last_stable_mongos_and_mixed_shards
+  - *sharding_op_query
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
+  - name: aggregation
+  - name: aggregation_ese
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_mongos_passthrough
+  - name: aggregation_one_shard_sharded_collections
+  - name: aggregation_sharded_collections_passthrough
+  - name: audit
+  - name: auth
+  - name: auth_audit
+  - name: buildscripts_test
+  - name: bulk_gle_passthrough
+  - name: causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_auth
+  - name: sharded_causally_consistent_jscore_passthrough
+  - name: concurrency
+  - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
+  - name: concurrency_replication_multi_stmt_txn
+  - name: concurrency_sharded_replication
+  - name: concurrency_sharded_replication_with_balancer
+  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_and_balancer
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
+  - name: disk_wiredtiger
+  - name: ese
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_write_cmd
+  - name: integration_tests_replset
+  - name: integration_tests_sharded
+  - name: integration_tests_standalone
+  - name: integration_tests_standalone_audit
+  - name: jsCore
+  - name: jsCore_ese
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: jsonSchema
+  - name: aggregation_multiversion_fuzzer
+  - name: aggregation_expression_multiversion_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_replication_session
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_concurrent_sharded_causal_consistency
+  - name: jstestfuzz_concurrent_sharded_continuous_stepdown
+  - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_initsync
+  - name: jstestfuzz_replication_session
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_causal_consistency
+  - name: jstestfuzz_sharded_continuous_stepdown
+  - name: jstestfuzz_sharded_session
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
+  - name: multiversion
+  - name: noPassthroughWithMongod
+  - name: noPassthrough
+  - name: parallel
+  - name: parallel_compatibility
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_only
+  - name: read_only_sharded
+  - name: replica_sets
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_0
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_1
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_2
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_3
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_4
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_5
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_6
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth_misc
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_0
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_1
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_2
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_3
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_4
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_5
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_6
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_misc
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: retryable_writes_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: sasl
+  - name: session_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough
+  - name: sharding_0
+    distros:
+    - rhel62-large
+  - name: sharding_1
+    distros:
+    - rhel62-large
+  - name: sharding_2
+    distros:
+    - rhel62-large
+  - name: sharding_3
+    distros:
+    - rhel62-large
+  - name: sharding_4
+    distros:
+    - rhel62-large
+  - name: sharding_5
+    distros:
+    - rhel62-large
+  - name: sharding_6
+    distros:
+    - rhel62-large
+  - name: sharding_7
+    distros:
+    - rhel62-large
+  - name: sharding_8
+    distros:
+    - rhel62-large
+  - name: sharding_9
+    distros:
+    - rhel62-large
+  - name: sharding_10
+    distros:
+    - rhel62-large
+  - name: sharding_11
+    distros:
+    - rhel62-large
+  - name: sharding_12
+    distros:
+    - rhel62-large
+  - name: sharding_13
+    distros:
+    - rhel62-large
+  - name: sharding_14
+    distros:
+    - rhel62-large
+  - name: sharding_misc
+    distros:
+    - rhel62-large
+  - name: sharding_auth_0
+    distros:
+    - rhel62-large
+  - name: sharding_auth_1
+    distros:
+    - rhel62-large
+  - name: sharding_auth_2
+    distros:
+    - rhel62-large
+  - name: sharding_auth_3
+    distros:
+    - rhel62-large
+  - name: sharding_auth_4
+    distros:
+    - rhel62-large
+  - name: sharding_auth_5
+    distros:
+    - rhel62-large
+  - name: sharding_auth_6
+    distros:
+    - rhel62-large
+  - name: sharding_auth_7
+    distros:
+    - rhel62-large
+  - name: sharding_auth_8
+    distros:
+    - rhel62-large
+  - name: sharding_auth_9
+    distros:
+    - rhel62-large
+  - name: sharding_auth_10
+    distros:
+    - rhel62-large
+  - name: sharding_auth_11
+    distros:
+    - rhel62-large
+  - name: sharding_auth_12
+    distros:
+    - rhel62-large
+  - name: sharding_auth_13
+    distros:
+    - rhel62-large
+  - name: sharding_auth_14
+    distros:
+    - rhel62-large
+  - name: sharding_auth_15
+    distros:
+    - rhel62-large
+  - name: sharding_auth_16
+    distros:
+    - rhel62-large
+  - name: sharding_auth_17
+    distros:
+    - rhel62-large
+  - name: sharding_auth_18
+    distros:
+    - rhel62-large
+  - name: sharding_auth_19
+    distros:
+    - rhel62-large
+  - name: sharding_auth_misc
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_0
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_1
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_2
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_3
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_4
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_5
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_6
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_7
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_8
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_9
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_10
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_11
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_12
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_13
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_14
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_15
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_16
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_17
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_18
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_misc
+    distros:
+    - rhel62-large
+  - name: sharding_ese_0
+    distros:
+    - rhel62-large
+  - name: sharding_ese_1
+    distros:
+    - rhel62-large
+  - name: sharding_ese_2
+    distros:
+    - rhel62-large
+  - name: sharding_ese_3
+    distros:
+    - rhel62-large
+  - name: sharding_ese_4
+    distros:
+    - rhel62-large
+  - name: sharding_ese_5
+    distros:
+    - rhel62-large
+  - name: sharding_ese_6
+    distros:
+    - rhel62-large
+  - name: sharding_ese_7
+    distros:
+    - rhel62-large
+  - name: sharding_ese_8
+    distros:
+    - rhel62-large
+  - name: sharding_ese_9
+    distros:
+    - rhel62-large
+  - name: sharding_ese_10
+    distros:
+    - rhel62-large
+  - name: sharding_ese_11
+    distros:
+    - rhel62-large
+  - name: sharding_ese_12
+    distros:
+    - rhel62-large
+  - name: sharding_ese_13
+    distros:
+    - rhel62-large
+  - name: sharding_ese_14
+    distros:
+    - rhel62-large
+  - name: sharding_ese_15
+    distros:
+    - rhel62-large
+  - name: sharding_ese_16
+    distros:
+    - rhel62-large
+  - name: sharding_ese_17
+    distros:
+    - rhel62-large
+  - name: sharding_ese_18
+    distros:
+    - rhel62-large
+  - name: sharding_ese_19
+    distros:
+    - rhel62-large
+  - name: sharding_ese_20
+    distros:
+    - rhel62-large
+  - name: sharding_ese_misc
+    distros:
+    - rhel62-large
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_last_stable_mongos_and_mixed_shards_0
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_1
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_2
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_3
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_4
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_5
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_6
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_7
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_8
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_9
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_10
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_11
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_misc
+    distros:
+    - rhel62-large
+  - name: sharding_csrs_continuous_config_stepdown
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_0
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_1
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_2
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_3
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_4
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_5
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_6
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_7
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_8
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_9
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_10
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_11
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_misc
+    distros:
+    - rhel62-large
+  - name: slow1
+  - name: serial_run
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: update_fuzzer
+  - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
+    distros:
+    - rhel62-large
+  - name: secondary_reads_passthrough
+    distros:
+    - rhel62-large
+
+- name: enterprise-rhel-62-64-bit-required-majority-read-concern-off
+  display_name: "! Enterprise RHEL 6.2 (majority read concern off)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    <<: *enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
+    burn_in_tests_build_variant: enterprise-rhel-62-64-bit-majority-read-concern-off
+  tasks:
+  # This build variants exists specifically to test that newly added or modified JavaScript tests
+  # are correctly tagged with "requires_majority_read_concern", "uses_change_streams",
+  # "uses_prepare_transaction", "uses_multi_shard_transaction", and "uses_single_shard_transaction"
+  # prior to the changes being pushed. It uses the task list from the
+  # enterprise-rhel-62-64-bit-majority-read-concern-off build variant to determine the resmoke.py
+  # YAML suite configurations to run the tests under. Do not add more tasks to this list.
+  - name: compile_TG
+    requires:
+    - name: burn_in_tests
+    distros:
+    - rhel62-large
+  - name: burn_in_tests
+
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
   modules:

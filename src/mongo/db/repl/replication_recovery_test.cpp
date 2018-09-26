@@ -78,11 +78,22 @@ public:
         _supportsRecoverToStableTimestamp = supports;
     }
 
+    bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _supportsRecoveryTimestamp;
+    }
+
+    void setSupportsRecoveryTimestamp(bool supports) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _supportsRecoveryTimestamp = supports;
+    }
+
 private:
     mutable stdx::mutex _mutex;
     Timestamp _initialDataTimestamp = Timestamp::min();
     boost::optional<Timestamp> _recoveryTimestamp = boost::none;
     bool _supportsRecoverToStableTimestamp = true;
+    bool _supportsRecoveryTimestamp = true;
 };
 
 class ReplicationRecoveryTest : public ServiceContextMongoDTest {
@@ -357,9 +368,9 @@ DEATH_TEST_F(ReplicationRecoveryTest,
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest,
-             RecoveryInvariantsIfStableTimestampAndDoesNotSupportRTT,
+             RecoveryInvariantsIfStableTimestampAndDoesNotSupportRecoveryTimestamp,
              "Invariant failure") {
-    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(false);
+    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(false);
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 

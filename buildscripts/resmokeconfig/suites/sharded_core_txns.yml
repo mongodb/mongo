@@ -87,7 +87,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
     mongod_options:
-      enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1

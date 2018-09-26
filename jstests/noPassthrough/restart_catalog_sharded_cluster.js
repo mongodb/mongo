@@ -1,6 +1,6 @@
 /**
  * Tests restarting the catalog in a sharded cluster on the config server and the shards.
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [requires_replication, requires_sharding, requires_majority_read_concern]
  */
 (function() {
     "use strict";

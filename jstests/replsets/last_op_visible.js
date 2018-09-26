@@ -3,6 +3,7 @@
 // lastOpVisible, and that majority read with afterOpTime of lastOpVisible will return it as well.
 // We then confirm that a writeConcern majority write will be seen as the lastVisibleOp by a
 // majority read.
+// @tags: [requires_majority_read_concern]
 
 load("jstests/replsets/rslib.js");
 

@@ -1,7 +1,7 @@
 /**
  * Tests that we can successfully prepare a prepared transaction.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

@@ -1,7 +1,7 @@
 /**
  * Tests that it is possible to step down a primary while there are transactions in prepare.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

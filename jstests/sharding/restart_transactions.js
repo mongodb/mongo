@@ -2,7 +2,7 @@
  * Verify the states that a multi-statement transaction can be restarted on at the active
  * transaction number for servers in a sharded cluster.
  *
- * @tags: [requires_sharding, uses_transactions]
+ * @tags: [requires_sharding, uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

@@ -2,7 +2,7 @@
  * Test calling reads with various read concerns on a prepared transaction. Snapshot, linearizable
  * and afterClusterTime reads are the only reads that should block on a prepared transaction.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

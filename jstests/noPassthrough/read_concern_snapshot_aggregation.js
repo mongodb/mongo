@@ -38,8 +38,11 @@
     }
 
     // Test that $changeStream is disallowed with transactions.
-    testSnapshotAggFailsWithCode(
-        kCollName, [{$changeStream: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+    // TODO SERVER-37221: Remove the check for 'supportsCommittedReads'.
+    if (sessionDB.serverStatus().storageEngine.supportsCommittedReads) {
+        testSnapshotAggFailsWithCode(
+            kCollName, [{$changeStream: {}}], ErrorCodes.OperationNotSupportedInTransaction);
+    }
 
     // Test that $collStats is disallowed with transactions.
     testSnapshotAggFailsWithCode(

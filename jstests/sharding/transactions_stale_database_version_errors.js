@@ -1,6 +1,6 @@
 // Tests mongos behavior on stale database version errors received in a transaction.
 //
-// @tags: [requires_sharding, uses_transactions]
+// @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
 (function() {
     "use strict";
 

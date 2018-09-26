@@ -1,5 +1,5 @@
 // This test verifies readConcern behavior on a standalone mongod or embedded
-
+// @tags: [requires_majority_read_concern]
 (function() {
     'use strict';
 

@@ -349,8 +349,8 @@ void runCommand(OperationContext* opCtx,
     }
 
     boost::optional<ScopedRouterSession> scopedSession;
-    auto osi = initializeOperationSessionInfo(
-        opCtx, request.body, command->requiresAuth(), true, true, true);
+    auto osi =
+        initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
 
     try {
         if (osi && osi->getAutocommit()) {

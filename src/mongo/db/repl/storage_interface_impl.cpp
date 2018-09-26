@@ -1069,6 +1069,10 @@ bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serv
     return serviceCtx->getStorageEngine()->supportsRecoverToStableTimestamp();
 }
 
+bool StorageInterfaceImpl::supportsRecoveryTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->supportsRecoveryTimestamp();
+}
+
 boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(
     ServiceContext* serviceCtx) const {
     return serviceCtx->getStorageEngine()->getRecoveryTimestamp();

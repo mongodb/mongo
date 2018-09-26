@@ -1,6 +1,7 @@
 // Tests that a change stream's update lookup will use the appropriate read concern. In particular,
 // tests that the update lookup will return a version of the document at least as recent as the
 // change that we're doing the lookup for, and that change will be majority-committed.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

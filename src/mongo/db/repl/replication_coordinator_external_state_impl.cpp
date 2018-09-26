@@ -892,7 +892,7 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
-    return storageEngine->getSnapshotManager();
+    return storageEngine->supportsReadConcernMajority();
 }
 
 bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedByStorageEngine(

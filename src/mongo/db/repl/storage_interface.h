@@ -374,6 +374,11 @@ public:
     virtual bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const = 0;
 
     /**
+     * Returns whether the storage engine can provide a recovery timestamp.
+     */
+    virtual bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const = 0;
+
+    /**
      * Returns the stable timestamp that the storage engine recovered to on startup. If the
      * recovery point was not stable, returns "none".
      */

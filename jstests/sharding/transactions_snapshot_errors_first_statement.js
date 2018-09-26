@@ -6,7 +6,7 @@
 // Runs against an unsharded collection, a sharded collection with all chunks on one shard, and a
 // sharded collection with one chunk on both shards.
 //
-// @tags: [requires_sharding, uses_transactions]
+// @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
 (function() {
     "use strict";
 

@@ -95,6 +95,14 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "perfHist", "perfHist", moe::Unsigned, "number of back runs of perf stats to display");
 
+    // If set to true, storage engine maintains the data history. Else, it won't maintain the data
+    // history. This setting applies only to 'wiredTiger' storage engine.
+    options
+        ->addOptionChaining("replication.enableMajorityReadConcern",
+                            "enableMajorityReadConcern",
+                            moe::Bool,
+                            "enables majority readConcern")
+        .setDefault(moe::Value(true));
     options
         ->addOptionChaining(
             "storage.engine", "storageEngine", moe::String, "what storage engine to use")
@@ -187,6 +195,12 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     storageGlobalParams.dbpath = dbpathString.c_str();
 
     storageGlobalParams.engine = params["storage.engine"].as<string>();
+
+    if (storageGlobalParams.engine == "wiredTiger" &&
+        params.count("replication.enableMajorityReadConcern")) {
+        serverGlobalParams.enableMajorityReadConcern =
+            params["replication.enableMajorityReadConcern"].as<bool>();
+    }
 
     if (params.count("suites")) {
         frameworkGlobalParams.suites = params["suites"].as<vector<string>>();

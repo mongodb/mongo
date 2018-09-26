@@ -1,4 +1,5 @@
 // Test resuming a change stream on a mongos other than the one the change stream was started on.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
     // For supportsMajorityReadConcern().

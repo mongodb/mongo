@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -63,6 +64,10 @@ void WiredTigerSnapshotManager::dropAllSnapshots() {
 }
 
 boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommittedRead() const {
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        return boost::none;
+    }
+
     stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
     return _committedSnapshot;
 }

@@ -316,7 +316,7 @@ public:
     /**
      * See `StorageEngine::setOldestTimestamp`
      */
-    virtual void setOldestTimestamp(Timestamp newOldestTimestamp) {}
+    virtual void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {}
 
     /**
      * See `StorageEngine::isCacheUnderPressure()`
@@ -334,6 +334,13 @@ public:
      * See `StorageEngine::supportsRecoverToStableTimestamp`
      */
     virtual bool supportsRecoverToStableTimestamp() const {
+        return false;
+    }
+
+    /**
+     * See `StorageEngine::supportsRecoveryTimestamp`
+     */
+    virtual bool supportsRecoveryTimestamp() const {
         return false;
     }
 
@@ -367,6 +374,10 @@ public:
      * See `StorageEngine::supportsReadConcernSnapshot`
      */
     virtual bool supportsReadConcernSnapshot() const {
+        return false;
+    }
+
+    virtual bool supportsReadConcernMajority() const {
         return false;
     }
 

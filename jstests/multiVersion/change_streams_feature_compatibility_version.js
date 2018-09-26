@@ -1,6 +1,7 @@
 // Test that a change stream is able to survive an upgrade. This is the most basic test to
 // demonstrate the survival of a stream, presuming the driver will attempt to retry and resume the
 // stream after network errors.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

@@ -303,6 +303,10 @@ public:
         return false;
     }
 
+    bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override {
+        return false;
+    }
+
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override {
         return boost::none;
     }

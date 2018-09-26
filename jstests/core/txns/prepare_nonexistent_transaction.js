@@ -1,7 +1,7 @@
 /**
  * Test error cases when calling prepare on a non-existent transaction.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

@@ -2,7 +2,7 @@
  * Test to ensure that rollback waits for in-progress background index builds to finish before
  * starting the rollback process. Only applies to Recoverable Rollback via WiredTiger checkpoints.
  *
- * @tags: [requires_wiredtiger, requires_journaling]
+ * @tags: [requires_wiredtiger, requires_journaling, requires_majority_read_concern]
  */
 (function() {
     'use strict';

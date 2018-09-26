@@ -1,5 +1,6 @@
 /**
  * Tests readConcern: afterClusterTime behavior in a sharded cluster.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
     "use strict";

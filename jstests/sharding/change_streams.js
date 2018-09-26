@@ -1,4 +1,5 @@
 // Tests the behavior of change streams on sharded collections.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

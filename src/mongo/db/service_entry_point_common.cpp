@@ -624,8 +624,7 @@ void execCommandDatabase(OperationContext* opCtx,
             request.body,
             command->requiresAuth(),
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
-            opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking(),
-            opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
+            opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
 
         evaluateFailCommandFailPoint(opCtx, command->getName());
 

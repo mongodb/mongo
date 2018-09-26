@@ -234,6 +234,15 @@ protected:
             }
         }
         {
+            if (!serverGlobalParams.enableMajorityReadConcern) {
+                if (ops.size() > 0) {
+                    if (auto tsElem = ops.front()["ts"]) {
+                        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
+                            tsElem.timestamp());
+                    }
+                }
+            }
+
             OldClientContext ctx(&_opCtx, ns());
             for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
                 if (0) {

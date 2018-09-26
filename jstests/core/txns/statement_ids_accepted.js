@@ -1,6 +1,6 @@
 // Makes sure all commands which are supposed to take statement ids do.  This should test the
 // commands in the sessionCheckOutWhiteList in service_entry_point_common.cpp.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_prepare_transaction]
 (function() {
     "use strict";
 

@@ -75,6 +75,7 @@ DEFAULTS = {
     "shell_write_mode": None,
     "shuffle": None,
     "stagger_jobs": None,
+    "majority_read_concern": None,  # Default is set on the commandline.
     "storage_engine": None,
     "storage_engine_cache_size_gb": None,
     "tag_file": None,
@@ -332,6 +333,9 @@ SHUFFLE = None
 
 # If true, the launching of jobs is staggered in resmoke.py.
 STAGGER_JOBS = None
+
+# If set to true, it enables read concern majority. Else, read concern majority is disabled.
+MAJORITY_READ_CONCERN = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.

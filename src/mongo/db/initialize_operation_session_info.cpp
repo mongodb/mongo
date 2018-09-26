@@ -43,8 +43,7 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     const BSONObj& requestBody,
     bool requiresAuth,
     bool isReplSetMemberOrMongos,
-    bool supportsDocLocking,
-    bool supportsRecoverToStableTimestamp) {
+    bool supportsDocLocking) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (opCtx->getClient()->isInDirectClient()) {
@@ -119,11 +118,6 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying autocommit=true is not allowed.",
                 !osi.getAutocommit().value());
-
-        uassert(ErrorCodes::IllegalOperation,
-                "Multi-document transactions are only allowed on storage engines that support "
-                "recover to stable timestamp.",
-                supportsRecoverToStableTimestamp);
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "'startTransaction' field requires 'autocommit' field to also be specified",

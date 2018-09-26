@@ -2,7 +2,7 @@
 // use the collection's default collation once it gets to the shards.
 //
 // Collation is only supported with the find command, not with op query.
-// @tags: [requires_find_command]
+// @tags: [requires_find_command, uses_change_streams]
 (function() {
     "use strict";
 

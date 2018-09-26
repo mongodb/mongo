@@ -2,7 +2,7 @@
 // collation, regardless of the collation on the change stream.
 //
 // Collation is only supported with the find command, not with op query.
-// @tags: [requires_find_command]
+// @tags: [requires_find_command, uses_change_streams]
 (function() {
     "use strict";
 

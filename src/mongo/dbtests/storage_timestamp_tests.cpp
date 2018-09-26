@@ -2432,7 +2432,8 @@ class CreateCollectionWithSystemIndex : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -2688,7 +2689,8 @@ public:
     void setupTests() {
         // Only run on storage engines that support snapshot reads.
         auto storageEngine = cc().getServiceContext()->getStorageEngine();
-        if (!storageEngine->supportsReadConcernSnapshot()) {
+        if (!storageEngine->supportsReadConcernSnapshot() ||
+            !mongo::serverGlobalParams.enableMajorityReadConcern) {
             unittest::log() << "Skipping this test suite because storage engine "
                             << storageGlobalParams.engine << " does not support timestamp writes.";
             return;

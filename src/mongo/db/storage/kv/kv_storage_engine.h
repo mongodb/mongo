@@ -137,6 +137,8 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
+    virtual bool supportsRecoveryTimestamp() const override;
+
     virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
@@ -146,6 +148,8 @@ public:
     virtual Timestamp getAllCommittedTimestamp() const override;
 
     bool supportsReadConcernSnapshot() const final;
+
+    bool supportsReadConcernMajority() const final;
 
     virtual void replicationBatchIsComplete() const override;
 

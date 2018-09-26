@@ -11,6 +11,7 @@ env.Library(
         "framework_options.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/unittest/unittest',

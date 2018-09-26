@@ -3,6 +3,7 @@
 // 'documentKey' to include the new shard key, and that a resume token obtained prior to the
 // shardCollection command can be used to resume the stream even after the collection has been
 // sharded.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

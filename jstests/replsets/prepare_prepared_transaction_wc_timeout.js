@@ -2,7 +2,7 @@
  * Tests that when preparing a prepared transaction, we wait for writeConcern if the client optime
  * is behind the prepareTimestamp.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

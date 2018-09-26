@@ -195,9 +195,16 @@ public:
 
     virtual void setOldestTimestampFromStable() override;
 
-    virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
+    /**
+     * Sets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through. If force is true, oldest will be set to the given input value, unmodified, even if
+     * it is backwards in time from the last oldest timestamp (accomodating initial sync).
+     */
+    virtual void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
+
+    virtual bool supportsRecoveryTimestamp() const override;
 
     virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
@@ -228,6 +235,8 @@ public:
     void replicationBatchIsComplete() const override;
 
     bool isCacheUnderPressure(OperationContext* opCtx) const override;
+
+    bool supportsReadConcernMajority() const final;
 
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
@@ -384,13 +393,6 @@ private:
      */
     bool _canRecoverToStableTimestamp() const;
 
-    /**
-     * Sets the oldest timestamp for which the storage engine must maintain snapshot history
-     * through. If force is true, oldest will be set to the given input value, unmodified, even if
-     * it is backwards in time from the last oldest timestamp (accomodating initial sync).
-     */
-    void _setOldestTimestamp(Timestamp newOldestTimestamp, bool force);
-
     WT_CONNECTION* _conn;
     WiredTigerFileVersion _fileVersion;
     WiredTigerEventHandler _eventHandler;
@@ -414,6 +416,14 @@ private:
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;
     bool _readOnly;
+
+    // If _keepDataHistory is true, then the storage engine keeps all history after the stable
+    // timestamp, and WiredTigerKVEngine is responsible for advancing the oldest timestamp. If
+    // _keepDataHistory is false (i.e. majority reads are disabled), then we only keep history after
+    // the "no holes point", and WiredTigerOplogManager is responsible for advancing the oldest
+    // timestamp.
+    const bool _keepDataHistory = true;
+
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
     std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
 

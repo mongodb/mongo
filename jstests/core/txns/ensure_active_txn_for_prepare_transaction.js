@@ -1,7 +1,7 @@
 /**
  * Test that we can't call prepareTransaction if there isn't an active transaction on the session.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
 (function() {

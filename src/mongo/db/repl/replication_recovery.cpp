@@ -242,13 +242,13 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
 
     // If we were passed in a stable timestamp, we are in rollback recovery and should recover from
     // that stable timestamp. Otherwise, we're recovering at startup. If this storage engine
-    // supports recover to stable timestamp, we ask it for the recovery timestamp. If the storage
-    // engine returns a timestamp, we recover from that point. However, if the storage engine
-    // returns "none", the storage engine does not have a stable checkpoint and we must recover from
-    // an unstable checkpoint instead.
-    const bool supportsRecoverToStableTimestamp =
-        _storageInterface->supportsRecoverToStableTimestamp(opCtx->getServiceContext());
-    if (!stableTimestamp && supportsRecoverToStableTimestamp) {
+    // supports recover to stable timestamp or enableMajorityReadConcern=false, we ask it for the
+    // recovery timestamp. If the storage engine returns a timestamp, we recover from that point.
+    // However, if the storage engine returns "none", the storage engine does not have a stable
+    // checkpoint and we must recover from an unstable checkpoint instead.
+    const bool supportsRecoveryTimestamp =
+        _storageInterface->supportsRecoveryTimestamp(opCtx->getServiceContext());
+    if (!stableTimestamp && supportsRecoveryTimestamp) {
         stableTimestamp = _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
     }
 
@@ -260,7 +260,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
                             << appliedThrough.toString());
 
     if (stableTimestamp) {
-        invariant(supportsRecoverToStableTimestamp);
+        invariant(supportsRecoveryTimestamp);
         _recoverFromStableTimestamp(opCtx, *stableTimestamp, appliedThrough, topOfOplog);
     } else {
         _recoverFromUnstableCheckpoint(opCtx, appliedThrough, topOfOplog);
@@ -301,6 +301,20 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         // application and must apply from the appliedThrough to the top of the oplog.
         log() << "Starting recovery oplog application at the appliedThrough: " << appliedThrough
               << ", through the top of the oplog: " << topOfOplog;
+
+        // When `recoverFromOplog` truncates the oplog, that also happens to set the "oldest
+        // timestamp" to the truncation point[1]. `_applyToEndOfOplog` will then perform writes
+        // before the truncation point. Doing so violates the constraint that all updates must be
+        // timestamped newer than the "oldest timestamp". This call will move the "oldest
+        // timestamp" back to the `startPoint`.
+        //
+        // [1] This is arguably incorrect. On rollback for nodes that are not keeping history to
+        // the "majority point", the "oldest timestamp" likely needs to go back in time. The
+        // oplog's `cappedTruncateAfter` method was a convenient location for this logic, which,
+        // unfortunately, conflicts with the usage above.
+        opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
+            appliedThrough.getTimestamp());
+
         _applyToEndOfOplog(opCtx, appliedThrough.getTimestamp(), topOfOplog.getTimestamp());
     }
 

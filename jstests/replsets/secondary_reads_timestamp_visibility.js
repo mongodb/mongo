@@ -58,6 +58,10 @@
 
     let levels = ["local", "available", "majority"];
 
+    if (!primaryDB.serverStatus().storageEngine.supportsCommittedReads) {
+        levels = ["local", "available"];
+    }
+
     // We should see the previous, un-replicated state on the secondary with every readconcern.
     for (let i in levels) {
         print("Checking that no new updates are visible yet for readConcern: " + levels[i]);

@@ -1,5 +1,6 @@
 // Tests that change streams is able to find and return results from new shards which are added
 // during cursor establishment.
+// @tags: [uses_change_streams]
 (function() {
     'use strict';
 

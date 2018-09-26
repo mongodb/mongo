@@ -1,5 +1,6 @@
 /**
  * Test that explained aggregation commands behave correctly with the readConcern option.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
     "use strict";

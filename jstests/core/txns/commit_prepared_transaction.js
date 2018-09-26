@@ -1,7 +1,7 @@
 /**
  * Tests prepared transaction commit support.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

@@ -1,7 +1,7 @@
 /**
  * Tests that a server can still be shut down while it has prepared transactions pending.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";

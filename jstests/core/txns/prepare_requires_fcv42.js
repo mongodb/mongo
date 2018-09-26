@@ -1,7 +1,7 @@
 /**
  * Tests that 'prepareTransaction' only succeeds in FCV 4.2.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 (function() {
     "use strict";
