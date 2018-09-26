@@ -2071,8 +2071,6 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     ASSERT_EQ(planCache.computeKey(*usesPathWithObject), planCache.computeKey(*usesPathWithArray));
     ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
               planCache.computeKey(*usesPathWithArrayContainingObject));
-    ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
-              planCache.computeKey(*usesPathWithEmptyObject));
 
     // The query on 'b' should have a completely different plan cache key (both with and without a
     // wildcard index).
@@ -2093,6 +2091,28 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     ASSERT_EQ(planCacheWithNoIndexes.computeKey(*orQueryAllowed),
               planCacheWithNoIndexes.computeKey(*orQueryNotAllowed));
     ASSERT_NE(planCache.computeKey(*orQueryAllowed), planCache.computeKey(*orQueryNotAllowed));
+}
+
+TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
+    PlanCache planCache;
+    IndexEntry entry(BSON("a.$**" << 1),
+                     false,                       // multikey
+                     false,                       // sparse
+                     false,                       // unique
+                     IndexEntry::Identifier{""},  // name
+                     nullptr,                     // filterExpr
+                     BSONObj());
+    planCache.notifyOfIndexEntries({entry});
+
+    // Equality to empty obj and equality to non-empty obj have different plan cache keys.
+    std::unique_ptr<CanonicalQuery> equalsEmptyObj(canonicalize("{a: {}}"));
+    std::unique_ptr<CanonicalQuery> equalsNonEmptyObj(canonicalize("{a: {b: 1}}"));
+    ASSERT_NE(planCache.computeKey(*equalsEmptyObj), planCache.computeKey(*equalsNonEmptyObj));
+
+    // $in with empty obj and $in with non-empty obj have different plan cache keys.
+    std::unique_ptr<CanonicalQuery> inWithEmptyObj(canonicalize("{a: {$in: [{}]}}"));
+    std::unique_ptr<CanonicalQuery> inWithNonEmptyObj(canonicalize("{a: {$in: [{b: 1}]}}"));
+    ASSERT_NE(planCache.computeKey(*inWithEmptyObj), planCache.computeKey(*inWithNonEmptyObj));
 }
 
 }  // namespace

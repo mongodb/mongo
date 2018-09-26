@@ -1529,6 +1529,13 @@ TEST(QueryPlannerIXSelectTest, WildcardIndexSupportedDoesNotTraverse) {
         parseMatchExpression(fromjson("{x: {$ne: {abc: 1}}}")).get()));
 }
 
+TEST(QueryPlannerIXSelectTest, EqualityToEmptyObjectIsSupportedByWildcardIndex) {
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(
+        parseMatchExpression(fromjson("{x: {}}")).get()));
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(
+        parseMatchExpression(fromjson("{x: {$eq: {}}}")).get()));
+}
+
 TEST(QueryPlannerIXSelectTest, SparseIndexSupported) {
     auto filterAObj = fromjson("{x: null}");
     const auto queryA = parseMatchExpression(filterAObj);

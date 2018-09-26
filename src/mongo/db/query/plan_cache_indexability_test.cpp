@@ -431,12 +431,6 @@ TEST(PlanCacheIndexabilityTest, WildcardDiscriminator) {
     ASSERT_TRUE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 'abc'}")).get()));
 
-    // Querying for object values isn't support by wildcard indexes.
-    ASSERT_FALSE(
-        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {b: 1}}")).get()));
-    ASSERT_FALSE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {}}")).get()));
-    ASSERT_FALSE(
-        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {$lt: {}}}")).get()));
     // Querying for array values isn't supported by wildcard indexes.
     ASSERT_FALSE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: [1, 2, 3]}")).get()));
@@ -460,8 +454,6 @@ TEST(PlanCacheIndexabilityTest, WildcardDiscriminator) {
         parseMatchExpression(fromjson("{a: {$in: [1, [], 's']}}")).get()));
 
     // Objects, non-empty arrays and null inside a $in.
-    ASSERT_FALSE(disc.isMatchCompatibleWithIndex(
-        parseMatchExpression(fromjson("{a: {$in: [1, {}, 's']}}")).get()));
     ASSERT_FALSE(disc.isMatchCompatibleWithIndex(
         parseMatchExpression(fromjson("{a: {$in: [1, {a: 1}, 's']}}")).get()));
     ASSERT_FALSE(disc.isMatchCompatibleWithIndex(
@@ -530,5 +522,55 @@ TEST(PlanCacheIndexabilityTest, WildcardPartialIndexDiscriminator) {
     // discriminated out.
     ASSERT_TRUE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 6}")).get()));
 }
+
+TEST(PlanCacheIndexabilityTest,
+     WildcardIndexDiscriminatesBetweenEqualityToEmptyObjAndOtherObjComparisons) {
+    PlanCacheIndexabilityState state;
+    state.updateDiscriminators({IndexEntry(BSON("a.$**" << 1),
+                                           false,  // multikey
+                                           false,  // sparse
+                                           false,  // unique
+                                           IndexEntry::Identifier{"indexName"},
+                                           nullptr,
+                                           BSONObj())});
+
+    auto discriminatorsA = state.buildWildcardDiscriminators("a");
+    ASSERT_EQ(1U, discriminatorsA.size());
+    ASSERT(discriminatorsA.find("indexName") != discriminatorsA.end());
+
+    const auto disc = discriminatorsA["indexName"];
+
+    // Verify that the discriminator considers equality to empty object compatible.
+    ASSERT_TRUE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {}}")).get()));
+
+    // $lte:{} is a synonym for $eq:{}, and therefore is also compatible.
+    ASSERT_TRUE(
+        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {$lte: {}}}")).get()));
+
+    // An $in with an empty object is compatible.
+    ASSERT_TRUE(disc.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{a: {$in: [1, {}, 's']}}")).get()));
+
+    // Equality to a non-empty object is not compatible.
+    ASSERT_FALSE(
+        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {b: 1}}")).get()));
+
+    // Inequality with an empty object is not compatible.
+    ASSERT_FALSE(
+        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {$lt: {}}}")).get()));
+    ASSERT_FALSE(
+        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {$gt: {}}}")).get()));
+    ASSERT_FALSE(
+        disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {$gte: {}}}")).get()));
+
+    // Inequality with a non-empty object is not compatible.
+    ASSERT_FALSE(disc.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{a: {$gte: {b: 1}}}")).get()));
+
+    // An $in with a non-empty object is not compatible.
+    ASSERT_FALSE(disc.isMatchCompatibleWithIndex(
+        parseMatchExpression(fromjson("{a: {$in: [1, {a: 1}, 's']}}")).get()));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -1573,6 +1573,101 @@ TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMinMaxWithoutHint) {
         fromjson("{x: {$eq: 5}}"), BSONObj(), fromjson("{x: 1}"), fromjson("{x: 10}"));
 }
 
+TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObject) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, a: 1}},"
+        "bounds: {$_path: [['a', 'a', true, true]], a: [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerLTEToEmptyObject) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$lte: {}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, a: 1}},"
+        "bounds: {$_path: [['a', 'a', true, true]], a: [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CannotAnswerInequalityToEmptyObject) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$gte: {}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerWildcardTest, CannotAnswerNotEqualToEmptyObject) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$ne: {}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObjectWhenPathIsMultikey) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
+    runQuery(fromjson("{a: {$eq: {}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, a: 1}},"
+        "bounds: {$_path: [['a', 'a', true, true]], a: [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObjectWithProjectionInKeyPattern) {
+    addWildcardIndex(BSON("a.b.$**" << 1));
+    runQuery(fromjson("{'a.b.c': {$eq: {}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, 'a.b.c': 1}},"
+        "bounds: {$_path: [['a.b.c', 'a.b.c', true, true]], 'a.b.c': [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObjectWithWildcardProjection) {
+    addWildcardIndex(BSON("$**" << 1), {}, BSON("a.b" << 1 << "c.d" << 1));
+    runQuery(fromjson("{'a.b.c': {$eq: {}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, 'a.b.c': 1}},"
+        "bounds: {$_path: [['a.b.c', 'a.b.c', true, true]], 'a.b.c': [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObjectWithinElemMatchObject) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
+    runQuery(fromjson("{a: {$elemMatch: {b: {}}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$elemMatch: {b: {$eq: {}}}}},"
+        "node: {ixscan: {filter: null, pattern: {$_path: 1, 'a.b': 1}},"
+        "bounds: {$_path: [['a.b', 'a.b', true, true]], 'a.b': [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerEqualityToEmptyObjectWithinElemMatchValue) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
+    runQuery(fromjson("{a: {$elemMatch: {$eq: {}}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$elemMatch: {$eq: {}}}},"
+        "node: {ixscan: {filter: null, pattern: {$_path: 1, a: 1}},"
+        "bounds: {$_path: [['a', 'a', true, true]], a: [[{}, {}, true, true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerInContainingEmptyObject) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$in: [2, {}]}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, a: 1}},"
+        "bounds: {$_path: [['a','a',true,true]], a: [[2,2,true,true],[{},{},true,true]]}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CanAnswerInContainingEmptyObjectWhenPathIsMultikey) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
+    runQuery(fromjson("{a: {$in: [2, {}]}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {$_path: 1, a: 1}},"
+        "bounds: {$_path: [['a','a',true,true]], a: [[2,2,true,true],[{},{},true,true]]}}}}");
+}
+
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 
 }  // namespace mongo

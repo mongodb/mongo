@@ -130,7 +130,14 @@ void expandIndex(const IndexEntry& wildcardIndex,
 
 bool canUseWildcardIndex(BSONElement elt, MatchExpression::MatchType matchType) {
     if (elt.type() == BSONType::Object) {
-        return false;
+        // $** indices break nested objects into separate keys, which means we can't naturally
+        // support comparison-to-object predicates. However, there is an exception: empty objects
+        // are indexed like regular leaf values. This means that equality-to-empty-object can be
+        // supported.
+        //
+        // Due to type bracketing, $lte:{} and $eq:{} are semantically equivalent.
+        return elt.embeddedObject().isEmpty() &&
+            (matchType == MatchExpression::EQ || matchType == MatchExpression::LTE);
     }
 
     if (elt.type() == BSONType::Array) {
