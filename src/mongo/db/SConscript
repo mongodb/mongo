@@ -602,8 +602,6 @@ env.CppUnitTest(
     ],
 )
 
-# TODO: This library should probably be folded into catalog_raii,
-# with which it is currently circular.
 env.Library(
     target='db_raii',
     source=[
