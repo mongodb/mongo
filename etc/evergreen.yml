@@ -4002,6 +4002,137 @@ tasks:
         permissions: public-read
         content_type: application/tar
 
+
+- name: embedded_sdk_multiarch_apple_package
+  depends_on:
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-iphoneos-10.2
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-iphonesimulator-10.2
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-appletvos-10.2
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-appletvsimulator-10.2
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-watchos-4.2
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-watchsimulator-4.2
+
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "generate compile expansions"
+    - func: "apply compile expansions"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-iphoneos-10.2/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "iPhoneOS/embedded-sdk.tgz"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-iphonesimulator-10.2/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "iPhoneSimulator/embedded-sdk.tgz"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvos-10.2/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "AppleTVOS/embedded-sdk.tgz"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvsimulator-10.2/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "AppleTVSimulator/embedded-sdk.tgz"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-watchos-4.2/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "WatchOS/embedded-sdk.tgz"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-watchsimulator-4.2/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "WatchSimulator/embedded-sdk.tgz"
+
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          for directory in *OS *Simulator; do
+              pushd $directory
+              tar --include "*/Frameworks*" --include "*/LICENSE*" --strip-components=1 -xf ./embedded-sdk.tgz
+              popd
+          done
+
+          for platform in iPhone AppleTV Watch; do
+              for framework in bson mongoc mongo_embedded mongoc_embedded; do
+                  _OSFile=$(printf ./%sOS/Frameworks/%s.framework/%s $platform $framework $framework)
+                  _SimulatorFile=$(printf ./%sSimulator/Frameworks/%s.framework/%s $platform $framework $framework)
+                  ${compile_env|} xcrun lipo $_OSFile $_SimulatorFile -create -output $_OSFile
+              done
+          done
+
+          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./*OS
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-apple-multiarch/${revision}/${version}.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Embedded SDK Tar Archive"
+
+    # If this is a patch build, blow away the file so our subsequent and optional s3.put
+    # doesn't run. That way, we won't overwrite the latest part in our patches.
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${is_patch}" = "true" ]; then
+            rm -f mongo-embedded-sdk-${version}.tgz
+          fi
+
+    # A second put, this time to -latest, to give devs a reasonable
+    # way to get the most recent build.
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}.tgz"
+        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+
 - name: compile_benchmarks
   depends_on: []
   commands:
@@ -10526,6 +10657,16 @@ buildvariants:
     dump_scons_config_on_failure: true
   tasks:
   - name: embedded_sdk_build_and_test
+
+- name: embedded-sdk-apple-multiarch
+  display_name: "Embedded SDK - Apple Multiarch"
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
+  tasks:
+  - name: embedded_sdk_multiarch_apple_package
 
 - name: embedded-sdk-ubuntu-1604-x86_64
   display_name: "Embedded SDK - Ubuntu 16.04 x86_64"
