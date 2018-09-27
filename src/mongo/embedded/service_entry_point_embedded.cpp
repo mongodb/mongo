@@ -87,6 +87,13 @@ public:
         OperationContext* opCtx) const override {
         return nullptr;
     }
+
+    void appendReplyMetadataOnError(OperationContext* opCtx,
+                                    BSONObjBuilder* metadataBob) const override {}
+
+    void appendReplyMetadata(OperationContext* opCtx,
+                             const OpMsgRequest& request,
+                             BSONObjBuilder* metadataBob) const override {}
 };
 
 DbResponse ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx, const Message& m) {

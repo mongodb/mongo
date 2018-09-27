@@ -20,7 +20,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/shell/mongojs',
         '$BUILD_DIR/mongo/util/md5',
     ],
@@ -155,6 +155,7 @@ if usemozjs:
             '$BUILD_DIR/mongo/db/service_context',
         ],
         LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/client/clientdriver_network',
             '$BUILD_DIR/third_party/shim_mozjs',
         ],
     )

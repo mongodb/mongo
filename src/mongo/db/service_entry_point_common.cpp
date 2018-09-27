@@ -77,15 +77,12 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -248,53 +245,6 @@ private:
     OperationContext* const _opCtx;
     const bool _maintenanceModeSet;
 };
-
-constexpr auto kLastCommittedOpTimeFieldName = "lastCommittedOpTime"_sd;
-
-// Called from the error contexts where request may not be available.
-void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadataBob) {
-    const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-    if (ShardingState::get(opCtx)->enabled() || isConfig) {
-        auto lastCommittedOpTime =
-            repl::ReplicationCoordinator::get(opCtx)->getLastCommittedOpTime();
-        metadataBob->append(kLastCommittedOpTimeFieldName, lastCommittedOpTime.getTimestamp());
-    }
-}
-
-void appendReplyMetadata(OperationContext* opCtx,
-                         const OpMsgRequest& request,
-                         BSONObjBuilder* metadataBob) {
-    const bool isShardingAware = ShardingState::get(opCtx)->enabled();
-    const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
-    if (isReplSet) {
-        // Attach our own last opTime.
-        repl::OpTime lastOpTimeFromClient =
-            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-        replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
-        // For commands from mongos, append some info to help getLastError(w) work.
-        // TODO: refactor out of here as part of SERVER-18236
-        if (isShardingAware || isConfig) {
-            rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                .writeToMetadata(metadataBob)
-                .transitional_ignore();
-        }
-
-        if (isShardingAware || isConfig) {
-            auto lastCommittedOpTime = replCoord->getLastCommittedOpTime();
-            metadataBob->append(kLastCommittedOpTimeFieldName, lastCommittedOpTime.getTimestamp());
-        }
-    }
-
-    // If we're a shard other than the config shard, attach the last configOpTime we know about.
-    if (isShardingAware && !isConfig) {
-        auto opTime = Grid::get(opCtx)->configOpTime();
-        rpc::ConfigServerMetadata(opTime).writeToMetadata(metadataBob);
-    }
-}
 
 /**
  * Given the specified command, returns an effective read concern which should be used or an error
@@ -580,7 +530,7 @@ bool runCommandImpl(OperationContext* opCtx,
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
-    appendReplyMetadata(opCtx, request, &commandBodyBob);
+    behaviors.appendReplyMetadata(opCtx, request, &commandBodyBob);
     appendClusterAndOperationTime(opCtx, &commandBodyBob, &commandBodyBob, startOperationTime);
 
     return ok;
@@ -927,7 +877,7 @@ void execCommandDatabase(OperationContext* opCtx,
         extraFieldsBuilder.appendElements(errorLabels);
 
         BSONObjBuilder metadataBob;
-        appendReplyMetadata(opCtx, request, &metadataBob);
+        behaviors.appendReplyMetadata(opCtx, request, &metadataBob);
 
         // The read concern may not have yet been placed on the operation context, so attempt to
         // parse it here, so if it is valid it can be used to compute the proper operationTime.
@@ -981,7 +931,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
                 throw;
 
             BSONObjBuilder metadataBob;
-            appendReplyMetadataOnError(opCtx, &metadataBob);
+            behaviors.appendReplyMetadataOnError(opCtx, &metadataBob);
 
             BSONObjBuilder extraFieldsBuilder;
             appendClusterAndOperationTime(
@@ -1026,7 +976,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
             execCommandDatabase(opCtx, c, request, replyBuilder.get(), behaviors);
         } catch (const DBException& ex) {
             BSONObjBuilder metadataBob;
-            appendReplyMetadataOnError(opCtx, &metadataBob);
+            behaviors.appendReplyMetadataOnError(opCtx, &metadataBob);
 
             BSONObjBuilder extraFieldsBuilder;
             appendClusterAndOperationTime(

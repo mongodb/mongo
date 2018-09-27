@@ -476,6 +476,7 @@ if not has_option('noshell') and usemozjs:
                     "shell/shell_utils_launcher.cpp",
                 ],
                 LIBDEPS=[
+                    'client/clientdriver_network',
                     'db/catalog/index_key_validate',
                     'db/logical_session_id_helpers',
                     'db/mongohasher',
