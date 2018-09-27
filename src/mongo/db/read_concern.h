@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/base/shim.h"
+
 namespace mongo {
 
 class BSONObj;
@@ -46,14 +48,15 @@ class ReadConcernArgs;
  * perform the wait. If allowAfterClusterTime is false returns an error if afterClusterTime is
  * set on the readConcernArgs.
  */
-Status waitForReadConcern(OperationContext* opCtx,
-                          const repl::ReadConcernArgs& readConcernArgs,
-                          bool allowAfterClusterTime);
+extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
+                           const repl::ReadConcernArgs& readConcernArgs,
+                           bool allowAfterClusterTime)
+                              ->Status) waitForReadConcern;
 
 /*
  * Given a linearizable read command, confirm that
  * current primary is still the true primary of the replica set.
  */
-Status waitForLinearizableReadConcern(OperationContext* opCtx);
+extern MONGO_DECLARE_SHIM((OperationContext * opCtx)->Status) waitForLinearizableReadConcern;
 
 }  // namespace mongo

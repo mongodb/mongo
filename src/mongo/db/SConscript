@@ -783,6 +783,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
         '$BUILD_DIR/mongo/db/service_entry_point_common',
+        'read_concern_d_impl',
     ],
 )
 
@@ -928,9 +929,21 @@ env.Library(
         "storage/storage_options",
     ],
     LIBDEPS_PRIVATE=[
+        "commands/server_status_core",
+        "s/sharding_api_d",
+    ],
+)
+
+env.Library(
+    target="read_concern_d_impl",
+    source=[
+        "read_concern_mongod.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/s/grid",
         "catalog_raii",
-        "commands/server_status_core",
+        "curop",
+        "repl/repl_coordinator_interface",
         "s/sharding_api_d",
     ],
 )
