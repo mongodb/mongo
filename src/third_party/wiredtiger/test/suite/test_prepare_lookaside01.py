@@ -100,7 +100,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
 
         # Close all cursors and sessions, this will cause prepared updates to be
         # rollback-ed
-        for j in range (1, nsessions):
+        for j in range (0, nsessions):
             cursors[j].close()
             sessions[j].close()
 

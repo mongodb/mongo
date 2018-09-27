@@ -68,6 +68,7 @@
  */
 
 #include "test_util.h"
+#include "util.h"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -179,12 +180,13 @@ static const char * const uri_rev = "table:rev";
 #define	SCHEMA_DATA_CHECK	0x0004
 #define	SCHEMA_DROP		0x0008
 #define	SCHEMA_DROP_CHECK	0x0010
-#define	SCHEMA_RENAME		0x0020
-#define	SCHEMA_VERBOSE		0x0040
+#define	SCHEMA_INTEGRATED	0x0020
+#define	SCHEMA_RENAME		0x0040
+#define	SCHEMA_VERBOSE		0x0080
 #define	SCHEMA_ALL					\
 	(SCHEMA_CREATE | SCHEMA_CREATE_CHECK |	\
 	    SCHEMA_DATA_CHECK | SCHEMA_DROP |	\
-	    SCHEMA_DROP_CHECK | SCHEMA_RENAME)
+	    SCHEMA_DROP_CHECK | SCHEMA_INTEGRATED | SCHEMA_RENAME)
 
 extern int __wt_optind;
 extern char *__wt_optarg;
@@ -234,6 +236,8 @@ usage(void)
 	    "newly created tables are checked (requires create)");
 	fprintf(stderr, "  %-5s%-15s%s\n", "", "data_check",
 	    "check contents of files for various ops (requires create)");
+	fprintf(stderr, "  %-5s%-15s%s\n", "", "integrated",
+	    "schema operations are integrated into main table transactions");
 	fprintf(stderr, "  %-5s%-15s%s\n", "", "rename",
 	    "rename tables (requires create)");
 	fprintf(stderr, "  %-5s%-15s%s\n", "", "drop",
@@ -538,6 +542,16 @@ again:
 		testutil_check(rev->insert(rev));
 
 		/*
+		 * If we are not running integrated tests, then we commit the
+		 * transaction now so that schema operations are not part of
+		 * the transaction operations for the main table.  If we are
+		 * running 'integrated' then we'll first do the schema
+		 * operations and commit later.
+		 */
+		if (!F_ISSET(td, SCHEMA_INTEGRATED))
+			testutil_check(session->commit_transaction(session,
+			    NULL));
+		/*
 		 * If we are doing a schema test, generate operations
 		 * for additional tables.  Each table has a 'lifetime'
 		 * of 4 values of the id.
@@ -562,7 +576,13 @@ again:
 				goto again;
 			}
 		}
-		testutil_check(session->commit_transaction(session, NULL));
+		/*
+		 * If schema operations are integrated, commit the transaction
+		 * now that they're complete.
+		 */
+		if (F_ISSET(td, SCHEMA_INTEGRATED))
+			testutil_check(session->commit_transaction(session,
+			    NULL));
 	}
 	/* NOTREACHED */
 }
@@ -725,7 +745,7 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid,
 {
 	char uri[50], uri2[50];
 
-	if (!LF_ISSET(SCHEMA_ALL))
+	if (!LF_ISSET(SCHEMA_ALL) || !LF_ISSET(SCHEMA_INTEGRATED))
 		return;
 
 	if (LF_ISSET(SCHEMA_VERBOSE))
@@ -786,15 +806,14 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid,
 static bool
 check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 {
-	struct sigaction sa;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *meta, *rev;
 	WT_SESSION *session;
 	uint64_t gotid, id;
 	uint64_t *lastid;
 	uint32_t gotth, kvsize, th, threadmap;
-	int ret, status;
-	char buf[4096];
+	int ret;
+	char checkdir[4096], savedir[4096];
 	char *gotkey, *gotvalue, *keybuf, *p;
 	char **large_arr;
 
@@ -806,36 +825,24 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 		large_arr[th] = dcalloc(LARGE_WRITE_SIZE, 1);
 		large_buf(large_arr[th], LARGE_WRITE_SIZE, th, true);
 	}
+	testutil_check(__wt_snprintf(checkdir, sizeof(checkdir),
+	    "%s.CHECK", home));
+	testutil_check(__wt_snprintf(savedir, sizeof(savedir),
+	    "%s.SAVE", home));
 
 	/*
 	 * We make a copy of the directory (possibly using direct IO)
 	 * for recovery and checking, and an identical copy that
 	 * keeps the state of all files before recovery starts.
 	 */
-	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "H='%s'; C=$H.CHECK; S=$H.SAVE; rm -rf $C $S;"
-	    " mkdir $C; for f in `ls $H/`; do "
-	    " dd if=$H/$f of=$C/$f bs=4096 %s >/dev/null 2>&1 || exit 1; done;"
-	    " cp -pr $C $S",
-	    home, directio ? "iflag=direct" : ""));
 	printf(
 	    "Copy database home directory using direct I/O to run recovery,\n"
 	    "along with a saved 'pre-recovery' copy.\n");
-	printf("Shell command: %s\n", buf);
-
-	/* Temporarily turn off the child handler while running 'system' */
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = SIG_DFL;
-	testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-	if ((status = system(buf)) < 0)
-		testutil_die(status, "system: %s", buf);
-	sa.sa_handler = handler;
-	testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-
-	testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.CHECK", home));
+	copy_directory(home, checkdir, directio);
+	copy_directory(checkdir, savedir, false);
 
 	printf("Open database, run recovery and verify content\n");
-	testutil_check(wiredtiger_open(buf, NULL, ENV_CONFIG_REC, &conn));
+	testutil_check(wiredtiger_open(checkdir, NULL, ENV_CONFIG_REC, &conn));
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	testutil_check(session->open_cursor(session, uri_main, NULL, NULL,
 	    &cursor));
@@ -1152,6 +1159,8 @@ main(int argc, char *argv[])
 					LF_SET(SCHEMA_DROP);
 				else if (WT_STREQ(arg, "drop_check"))
 					LF_SET(SCHEMA_DROP_CHECK);
+				else if (WT_STREQ(arg, "integrated"))
+					LF_SET(SCHEMA_INTEGRATED);
 				else if (WT_STREQ(arg, "none"))
 					flags = 0;
 				else if (WT_STREQ(arg, "rename"))
@@ -1199,6 +1208,12 @@ main(int argc, char *argv[])
 	    (LF_ISSET(SCHEMA_DROP_CHECK) &&
 	    !LF_ISSET(SCHEMA_DROP))) {
 		fprintf(stderr, "Schema operations incompatible\n");
+		usage();
+	}
+	if (!LF_ISSET(SCHEMA_INTEGRATED) &&
+	    LF_ISSET(SCHEMA_CREATE_CHECK|SCHEMA_DATA_CHECK|SCHEMA_DROP_CHECK)) {
+		fprintf(stderr, "Schema '*check' options cannot be used "
+		    "without 'integrated'\n");
 		usage();
 	}
 	printf("CONFIG:%s\n", args);

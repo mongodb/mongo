@@ -96,7 +96,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			/* Allocate a WT_UPDATE structure and transaction ID. */
 			WT_ERR(__wt_update_alloc(session,
 			    value, &upd, &upd_size, modify_type));
-			WT_ERR(__wt_txn_modify(session, cbt, upd));
+			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
 			/* Avoid WT_CURSOR.update data copy. */
@@ -167,7 +167,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		if (upd_arg == NULL) {
 			WT_ERR(__wt_update_alloc(session,
 			    value, &upd, &upd_size, modify_type));
-			WT_ERR(__wt_txn_modify(session, cbt, upd));
+			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
 			/* Avoid WT_CURSOR.update data copy. */
@@ -205,8 +205,15 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		    &ins, ins_size, skipdepth, exclusive));
 	}
 
-	if (logged && modify_type != WT_UPDATE_RESERVE)
+	if (logged && modify_type != WT_UPDATE_RESERVE) {
 		WT_ERR(__wt_txn_log_op(session, cbt));
+		/*
+		 * Set the key in the transaction operation to be used incase
+		 * this transaction is prepared to retrieve the update
+		 * corresponding to this operation.
+		 */
+		WT_ERR(__wt_txn_op_set_key(session, key));
+	}
 
 	if (0) {
 err:		/*

@@ -64,7 +64,7 @@ __snapsort(uint64_t *array, uint32_t size)
 
 /*
  * __txn_remove_from_global_table --
- *	Remove the txn id from the global txn table.
+ *	Remove the transaction id from the global transaction table.
  */
 static inline void
 __txn_remove_from_global_table(WT_SESSION_IMPL *session)
@@ -690,7 +690,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UPDATE *upd;
 	uint32_t fileid;
 	u_int i;
-	bool locked, readonly;
+	bool locked, prepare, readonly;
 #ifdef HAVE_TIMESTAMPS
 	wt_timestamp_t prev_commit_timestamp, ts;
 	bool update_timestamp;
@@ -722,8 +722,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		    "version of WiredTiger built with timestamp support");
 #endif
 	}
-	if (F_ISSET(txn, WT_TXN_PREPARE) &&
-	    !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+
+	prepare = F_ISSET(txn, WT_TXN_PREPARE);
+	if (prepare && !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
 		WT_ERR_MSG(session, EINVAL,
 		    "commit_timestamp is required for a prepared transaction");
 
@@ -783,7 +784,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * If this transaction is prepared, then copying values would have been
 	 * done during prepare.
 	 */
-	if (session->ncursors > 0 && !F_ISSET(txn, WT_TXN_PREPARE)) {
+	if (session->ncursors > 0 && !prepare) {
 		WT_DIAGNOSTIC_YIELD;
 		WT_ERR(__wt_session_copy_values(session));
 	}
@@ -824,24 +825,42 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			upd = op->u.op_upd;
 
 			/*
-			 * Switch reserved operations to abort to
-			 * simplify obsolete update list truncation.
+			 * Need to resolve indirect references of transaction
+			 * operation, in case of prepared transaction.
 			 */
-			if (upd->type == WT_UPDATE_RESERVE) {
-				upd->txnid = WT_TXN_ABORTED;
-				break;
+#ifdef HAVE_LONG_RUNNING_PREPARE
+			if (!prepare) {
+#else
+			if (1) {
+#endif
+				/*
+				 * Switch reserved operations to abort to
+				 * simplify obsolete update list truncation.
+				 */
+				if (upd->type == WT_UPDATE_RESERVE) {
+					upd->txnid = WT_TXN_ABORTED;
+					break;
+				}
+
+				/*
+				 * Writes to the lookaside file can be evicted
+				 * as soon as they commit.
+				 */
+				if (conn->cache->las_fileid != 0 &&
+				    fileid == conn->cache->las_fileid) {
+					upd->txnid = WT_TXN_NONE;
+					break;
+				}
+
+#ifdef HAVE_TIMESTAMPS
+				__wt_txn_op_set_timestamp(session, op);
+			} else {
+				WT_ERR(__wt_txn_resolve_prepared_op(
+				    session, op, true));
+#endif
 			}
 
-			/*
-			 * Writes to the lookaside file can be evicted as soon
-			 * as they commit.
-			 */
-			if (conn->cache->las_fileid != 0 &&
-			    fileid == conn->cache->las_fileid) {
-				upd->txnid = WT_TXN_NONE;
-				break;
-			}
-			/* FALLTHROUGH */
+			break;
 		case WT_TXN_OP_REF_DELETE:
 #ifdef HAVE_TIMESTAMPS
 			__wt_txn_op_set_timestamp(session, op);
@@ -1013,6 +1032,9 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 			__wt_timestamp_set(&upd->timestamp, &ts);
 
 			WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
+#ifdef HAVE_LONG_RUNNING_PREPARE
+			op->u.op_upd = NULL;
+#endif
 			break;
 		case WT_TXN_OP_REF_DELETE:
 			__wt_timestamp_set(
@@ -1035,7 +1057,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Clear the transaction's ID from the global table, to facilitate
-	 * prepared data visibility, but not from local txn structure.
+	 * prepared data visibility, but not from local transaction structure.
 	 */
 	if (F_ISSET(txn, WT_TXN_HAS_ID))
 		__txn_remove_from_global_table(session);
@@ -1092,10 +1114,22 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		case WT_TXN_OP_BASIC_ROW:
 		case WT_TXN_OP_INMEM_COL:
 		case WT_TXN_OP_INMEM_ROW:
-			WT_ASSERT(session,
-			    upd->txnid == txn->id ||
-			    upd->txnid == WT_TXN_ABORTED);
-			upd->txnid = WT_TXN_ABORTED;
+			/*
+			 * Need to resolve indirect references of transaction
+			 * operation, in case of prepared transaction.
+			 */
+#ifdef HAVE_LONG_RUNNING_PREPARE
+			if (F_ISSET(txn, WT_TXN_PREPARE))
+				WT_RET(__wt_txn_resolve_prepared_op(
+				    session, op, false));
+			else {
+#else
+			{
+#endif
+				WT_ASSERT(session, upd->txnid == txn->id ||
+				    upd->txnid == WT_TXN_ABORTED);
+				upd->txnid = WT_TXN_ABORTED;
+			}
 			break;
 		case WT_TXN_OP_REF_DELETE:
 			WT_TRET(__wt_delete_page_rollback(session, op->u.ref));
@@ -1250,6 +1284,10 @@ __wt_txn_release_resources(WT_SESSION_IMPL *session)
 	__wt_free(session, txn->mod);
 	txn->mod_alloc = 0;
 	txn->mod_count = 0;
+#ifdef HAVE_DIAGNOSTIC
+	WT_ASSERT(session, txn->multi_update_count == 0);
+	txn->multi_update_count = 0;
+#endif
 }
 
 /*
@@ -1473,6 +1511,8 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	WT_RET(__wt_msg(session, "current ID: %" PRIu64, txn_global->current));
 	WT_RET(__wt_msg(session,
 	    "last running ID: %" PRIu64, txn_global->last_running));
+	WT_RET(__wt_msg(session,
+	    "metadata_pinned ID: %" PRIu64, txn_global->metadata_pinned));
 	WT_RET(__wt_msg(session, "oldest ID: %" PRIu64, txn_global->oldest_id));
 
 #ifdef HAVE_TIMESTAMPS

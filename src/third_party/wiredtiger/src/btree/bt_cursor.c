@@ -471,6 +471,57 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __wt_btcur_search_uncommitted --
+ *	Search and return exact matching records only, including uncommitted
+ *	ones.
+ */
+int
+__wt_btcur_search_uncommitted(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
+
+	btree = cbt->btree;
+	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
+	*updp = upd = NULL;				/* -Wuninitialized */
+
+	WT_RET(btree->type == BTREE_ROW ?
+	    __cursor_row_search(session, cbt, NULL, false) :
+	    __cursor_col_search(session, cbt, NULL));
+
+	/*
+	 * Ideally exact match should be found, as this transaction has
+	 * searched for updates done by itself. But, we cannot be sure of
+	 * finding one, as pre processing of this prepared transaction updates
+	 * could have happened as part of resolving earlier transaction
+	 * operations.
+	 */
+	if (cbt->compare != 0)
+		return (0);
+
+	/*
+	 * Get the uncommitted update from the cursor.
+	 * For column store there will be always a insert structure for updates
+	 * irrespective of fixed length or variable length.
+	 */
+	if (cbt->ins != NULL)
+		upd = cbt->ins->upd;
+	else if (cbt->btree->type == BTREE_ROW) {
+		WT_ASSERT(session,
+		    cbt->btree->type == BTREE_ROW &&
+		    cbt->ref->page->modify != NULL &&
+		    cbt->ref->page->modify->mod_row_update != NULL);
+		upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+	}
+
+	*updp = upd;
+	return (0);
+}
+
+/*
  * __wt_btcur_search --
  *	Search for a matching record in the tree.
  */

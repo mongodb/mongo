@@ -8,13 +8,13 @@
 
 #include "wt_internal.h"
 
+#ifdef HAVE_TIMESTAMPS
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_TXN_TS_ALREADY_LOCKED	0x1u
 #define	WT_TXN_TS_INCLUDE_CKPT		0x2u
 #define	WT_TXN_TS_INCLUDE_OLDEST	0x4u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
-#ifdef HAVE_TIMESTAMPS
 /*
  * __wt_timestamp_to_hex_string --
  *	Convert a timestamp to hex string representation.

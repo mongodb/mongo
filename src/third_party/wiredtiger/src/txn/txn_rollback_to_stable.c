@@ -435,26 +435,32 @@ __txn_rollback_to_stable_btree(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	bool txn_active;
 
-	txn_global = &S2C(session)->txn_global;
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
 	if (!txn_global->has_stable_timestamp)
 		WT_RET_MSG(session, EINVAL,
 		    "rollback_to_stable requires a stable timestamp");
 
 	/*
-	 * Help the user - see if they have any active transactions. I'd
-	 * like to check the transaction running flag, but that would
-	 * require peeking into all open sessions, which isn't really
-	 * kosher.
+	 * Help the user comply with the requirement that there are no
+	 * concurrent operations.  Protect against spurious conflicts with the
+	 * sweep server: we exclude it from running concurrent with rolling
+	 * back the lookaside contents.
 	 */
-	WT_RET(__wt_txn_activity_check(session, &txn_active));
-	if (txn_active)
+	__wt_writelock(session, &conn->cache->las_sweepwalk_lock);
+	ret = __wt_txn_activity_check(session, &txn_active);
+	__wt_writeunlock(session, &conn->cache->las_sweepwalk_lock);
+
+	if (ret == 0 && txn_active)
 		WT_RET_MSG(session, EINVAL,
 		    "rollback_to_stable illegal with active transactions");
 
-	return (0);
+	return (ret);
 }
 #endif
 

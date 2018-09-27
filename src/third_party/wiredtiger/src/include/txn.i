@@ -17,7 +17,7 @@ typedef enum {
 #ifdef HAVE_TIMESTAMPS
 /*
  * __wt_txn_timestamp_flags --
- *	Set txn related timestamp flags.
+ *	Set transaction related timestamp flags.
  */
 static inline void
 __wt_txn_timestamp_flags(WT_SESSION_IMPL *session)
@@ -194,6 +194,261 @@ __wt_timestamp_subone(wt_timestamp_t *ts)
 #endif /* HAVE_TIMESTAMPS */
 
 /*
+ * __wt_txn_op_set_recno --
+ *      Set the latest transaction operation with the given recno.
+ */
+static inline void
+__wt_txn_op_set_recno(WT_SESSION_IMPL *session, uint64_t recno)
+{
+	WT_TXN *txn;
+	WT_TXN_OP *op;
+
+	txn = &session->txn;
+
+	WT_ASSERT(session, txn->mod_count > 0 && recno != WT_RECNO_OOB);
+	op = txn->mod + txn->mod_count - 1;
+
+	if (WT_SESSION_IS_CHECKPOINT(session) ||
+	    F_ISSET(op->btree, WT_BTREE_LOOKASIDE) ||
+	    WT_IS_METADATA(op->btree->dhandle))
+		return;
+
+	WT_ASSERT(session, op->type == WT_TXN_OP_BASIC_COL ||
+	    op->type == WT_TXN_OP_INMEM_COL);
+
+	/*
+	 * Copy the recno into the transaction operation structure, so when
+	 * update is evicted to lookaside, we have a chance of finding it
+	 * again. Even though only prepared updates can be evicted, at this
+	 * stage we don't know whether this transaction will be prepared or
+	 * not, hence we are copying the key for all operations, so that we can
+	 * use this key to fetch the update incase this transaction is
+	 * prepared.
+	 */
+	op->u.op_col.recno = recno;
+}
+
+/*
+ * __wt_txn_op_set_key --
+ *      Set the latest transaction operation with the given key.
+ */
+static inline int
+__wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *key)
+{
+	WT_TXN *txn;
+	WT_TXN_OP *op;
+
+	txn = &session->txn;
+
+	WT_ASSERT(session, txn->mod_count > 0 && key->data != NULL);
+
+	op = txn->mod + txn->mod_count - 1;
+
+	if (WT_SESSION_IS_CHECKPOINT(session) ||
+	    F_ISSET(op->btree, WT_BTREE_LOOKASIDE) ||
+	    WT_IS_METADATA(op->btree->dhandle))
+		return (0);
+
+#ifdef HAVE_LONG_RUNNING_PREPARE
+	WT_ASSERT(session, op->type == WT_TXN_OP_BASIC_ROW ||
+	    op->type == WT_TXN_OP_INMEM_ROW);
+
+	/*
+	 * Copy the key into the transaction operation structure, so when
+	 * update is evicted to lookaside, we have a chance of finding it
+	 * again. Even though only prepared updates can be evicted, at this
+	 * stage we don't know whether this transaction will be prepared or
+	 * not, hence we are copying the key for all operations, so that we can
+	 * use this key to fetch the update incase this transaction is
+	 * prepared.
+	 */
+	return (__wt_buf_set(session, &op->u.op_row.key, key->data, key->size));
+#else
+	WT_UNUSED(key);
+	return (0);
+#endif
+}
+
+/*
+ * __txn_resolve_prepared_update --
+ *      Resolve a prepared update as committed update.
+ */
+static inline void
+__txn_resolve_prepared_update(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+#ifdef HAVE_TIMESTAMPS
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	/*
+	 * In case of a prepared transaction, the order of modification of the
+	 * prepare timestamp to commit timestamp in the update chain will not
+	 * affect the data visibility, a reader will encounter a prepared
+	 * update resulting in prepare conflict.
+	 *
+	 * As updating timestamp might not be an atomic operation, we will
+	 * manage using state.
+	 */
+	upd->prepare_state = WT_PREPARE_LOCKED;
+	WT_WRITE_BARRIER();
+	__wt_timestamp_set(&upd->timestamp, &txn->commit_timestamp);
+	WT_PUBLISH(upd->prepare_state, WT_PREPARE_RESOLVED);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(upd);
+#endif
+}
+
+/*
+ * __wt_txn_resolve_prepared_op --
+ *      Resolve a transaction operation indirect references.
+ *
+ *      In case of prepared transactions, the prepared updates could be evicted
+ *      using cache overflow mechanism. Transaction operations referring to
+ *      these prepared updates would be referring to them using indirect
+ *      references (i.e keys/recnos), which need to be resolved as part of that
+ *      transaction commit/rollback.
+ */
+static inline int
+__wt_txn_resolve_prepared_op(
+    WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_TXN *txn;
+	WT_UPDATE *upd;
+	const char *open_cursor_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
+
+	txn = &session->txn;
+
+	if (op->type == WT_TXN_OP_NONE || op->type == WT_TXN_OP_REF_DELETE ||
+	    op->type == WT_TXN_OP_TRUNCATE_COL ||
+	    op->type == WT_TXN_OP_TRUNCATE_ROW)
+		return (0);
+
+	WT_RET(__wt_open_cursor(session,
+	    op->btree->dhandle->name, NULL, open_cursor_cfg, &cursor));
+
+	/*
+	 * Transaction prepare is cleared temporarily as cursor functions are
+	 * not allowed for prepared transactions.
+	 */
+	F_CLR(txn, WT_TXN_PREPARE);
+	if (op->type == WT_TXN_OP_BASIC_ROW ||
+	    op->type == WT_TXN_OP_INMEM_ROW)
+		__wt_cursor_set_raw_key(cursor, &op->u.op_row.key);
+	else
+		((WT_CURSOR_BTREE *)cursor)->iface.recno =
+		    op->u.op_col.recno;
+	F_SET(txn, WT_TXN_PREPARE);
+
+	WT_WITH_BTREE(session,
+	    op->btree, ret = __wt_btcur_search_uncommitted(
+	    (WT_CURSOR_BTREE *)cursor, &upd));
+	WT_ERR(ret);
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * Do what we can to ensure that finding prepared updates from a key
+	 * is working as expected. In the case where a transaction has updated
+	 * the same key multiple times, it's possible to resolve all updates
+	 * for the key when processing the first op structure, and then have
+	 * eviction free those updates before subsequent ops are processed,
+	 * which means a search could reasonably not find an update in that
+	 * case.
+	 */
+	WT_ASSERT(session, upd != NULL || txn->multi_update_count != 0);
+	if (upd == NULL)
+		--txn->multi_update_count;
+#endif
+
+	op->u.op_upd = upd;
+
+	for (; upd != NULL; upd = upd->next) {
+		 if (upd->txnid != txn->id)
+			continue;
+
+		if (!commit) {
+			upd->txnid = WT_TXN_ABORTED;
+			continue;
+		}
+
+		/*
+		 * Newer updates are inserted at head of update chain, and
+		 * transaction operations are added at the tail of the
+		 * transaction modify chain.
+		 *
+		 * For example, a transaction has modified [k,v] as
+		 * [k, v]  -> [k, u1]   (txn_op : txn_op1)
+		 * [k, u1] -> [k, u2]   (txn_op : txn_op2)
+		 * update chain : u2->u1
+		 * txn_mod      : txn_op1->txn_op2.
+		 *
+		 * Only the key is saved in the transaction operation
+		 * structure, hence we cannot identify whether "txn_op1"
+		 * corresponds to "u2" or "u1" during commit/rollback.
+		 *
+		 * To make things simpler we will handle all the updates
+		 * that match the key saved in a transaction operation in a
+		 * single go. As a result, multiple updates of a key, if any
+		 * will be resolved as part of the first transaction operation
+		 * resolution of that key, and subsequent transaction operation
+		 * resolution of the same key will be effectively
+		 * a no-op.
+		 *
+		 * In the above example, we will resolve "u2" and "u1" as part
+		 * of resolving "txn_op1" and will not do any significant
+		 * thing as part of "txn_op2".
+		 */
+
+#ifdef HAVE_DIAGNOSTIC
+		/*
+		 * When an update is not identified for resolution of a
+		 * transaction operation, it might have been already processed
+		 * during the resolution of a previous update belonging to the
+		 * same key. To ascertain transaction tracks multiple extra
+		 * updates processed in resolution of an transaction operation.
+		 */
+		if (upd->prepare_state == WT_PREPARE_RESOLVED) {
+			WT_ASSERT(session, txn->multi_update_count > 0);
+			--txn->multi_update_count;
+		} else if (upd != op->u.op_upd)
+			++txn->multi_update_count;
+#endif
+
+		if (upd->prepare_state == WT_PREPARE_RESOLVED)
+			break;
+
+		/* Resolve the prepared update to be committed update. */
+		__txn_resolve_prepared_update(session, upd);
+	}
+
+#ifdef HAVE_DIAGNOSTIC
+	upd = op->u.op_upd;
+	/* Ensure that we have not missed any of this transaction updates. */
+	for (; upd != NULL; upd = upd->next) {
+		/*
+		 * Should not have an unprocessed uncommitted update of this
+		 * transaction. For commit, no uncommitted update of this
+		 * transaction should be in prepared state. For rollback, there
+		 * should not be any more uncommitted updates from this
+		 * transaction.
+		 */
+		if (commit && upd->txnid == txn->id)
+			WT_ASSERT(session,
+			    upd->prepare_state != WT_PREPARE_INPROGRESS);
+		else
+			WT_ASSERT(session, upd->txnid != txn->id);
+
+	}
+#endif
+
+err:    WT_TRET(cursor->close(cursor));
+	return (ret);
+}
+
+/*
  * __txn_next_op --
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
@@ -324,22 +579,10 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 		if (op->type == WT_TXN_OP_REF_DELETE)
 			__wt_txn_op_commit_page_del(session, op->u.ref);
 		else {
-			/*
-			 * In case of a prepared transaction, the order of
-			 * modification of the prepare timestamp to the commit
-			 * timestamp in the update chain will not affect the
-			 * data visibility, a reader will encounter a prepared
-			 * update resulting in prepare conflict.
-			 *
-			 * As updating timestamp might not be an atomic
-			 * operation, we will manage using state.
-			 */
 			upd = op->u.op_upd;
-			upd->prepare_state = WT_PREPARE_LOCKED;
-			WT_WRITE_BARRIER();
-			__wt_timestamp_set(
-			    &upd->timestamp, &txn->commit_timestamp);
-			WT_PUBLISH(upd->prepare_state, WT_PREPARE_RESOLVED);
+
+			/* Resolve prepared update to be committed update. */
+			__txn_resolve_prepared_update(session, upd);
 		}
 	} else {
 		/*
@@ -359,14 +602,11 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
-__wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	WT_BTREE *btree;
-	WT_ITEM key;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 
-	btree = S2BT(session);
 	txn = &session->txn;
 
 	if (F_ISSET(txn, WT_TXN_READONLY))
@@ -375,12 +615,12 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 
 	WT_RET(__txn_next_op(session, &op));
 	if (F_ISSET(session, WT_SESSION_LOGGING_INMEM)) {
-		if (btree->type == BTREE_ROW)
+		if (op->btree->type == BTREE_ROW)
 			op->type = WT_TXN_OP_INMEM_ROW;
 		else
 			op->type = WT_TXN_OP_INMEM_COL;
 	} else {
-		if (btree->type == BTREE_ROW)
+		if (op->btree->type == BTREE_ROW)
 			op->type = WT_TXN_OP_BASIC_ROW;
 		else
 			op->type = WT_TXN_OP_BASIC_COL;
@@ -390,42 +630,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 
 #ifdef HAVE_TIMESTAMPS
 	__wt_txn_op_set_timestamp(session, op);
-
-	/*
-	 * TODO:
-	 * Following code block is under #ifdef temporarily, to avoid
-	 * performance penalty. This block will be enabled, once an alternative
-	 * is figured out, or we have to live with this penalty.
-	 */
-#ifdef HAVE_LONG_RUNNING_PREPARE
-	/*
-	 * Transaction operation with timestamp cannot be prepared.
-	 * Copy the key into the transaction op structure, so the update
-	 * can be evicted to lookaside, and we have a chance of finding it
-	 * again. This is only possible for transactions that are in the
-	 * prepared state, but we don't know at this stage if a transaction
-	 * will be prepared or not.
-	 */
-	if (!WT_SESSION_IS_CHECKPOINT(session) &&
-	    !F_ISSET(btree, WT_BTREE_LOOKASIDE) &&
-	    !WT_IS_METADATA(op->btree->dhandle)) {
-		/*
-		 * Store the key, to search the prepared update in case of
-		 * prepared transaction.
-		 */
-		if (btree->type == BTREE_ROW) {
-			WT_RET(__wt_cursor_get_raw_key(&cbt->iface, &key));
-			WT_RET(__wt_buf_set(session,
-			    &op->u.op_row.key, key.data, key.size));
-		} else
-			op->u.op_col.recno = cbt->recno;
-	}
 #endif
-
-#endif
-	WT_UNUSED(btree);
-	WT_UNUSED(cbt);
-	WT_UNUSED(key);
 
 	return (0);
 }
