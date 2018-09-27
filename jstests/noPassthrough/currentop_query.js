@@ -35,7 +35,7 @@
     // zero-batch cursors and only hit the failpoints on the following getMore. This helper takes a
     // generic command object and creates an appropriate filter given the use-case.
     function commandOrOriginatingCommand(cmdObj, isRemoteShardCurOp) {
-        const cmdFieldName = (isRemoteShardCurOp ? "originatingCommand" : "command");
+        const cmdFieldName = (isRemoteShardCurOp ? "cursor.originatingCommand" : "command");
         const cmdFilter = {};
         for (let subFieldName in cmdObj) {
             cmdFilter[`${cmdFieldName}.${subFieldName}`] = cmdObj[subFieldName];
@@ -410,8 +410,8 @@
                 const filter = {
                     "command.getMore":
                         (isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id),
-                    [`originatingCommand.${cmdName}`]:
-                        {$exists: true}, "originatingCommand.comment": "currentop_query"
+                    [`cursor.originatingCommand.${cmdName}`]:
+                        {$exists: true}, "cursor.originatingCommand.comment": "currentop_query"
                 };
 
                 confirmCurrentOpContents({
@@ -436,9 +436,9 @@
                     "command.getMore": {$gt: 0},
                     "command.collection": "currentop_query",
                     "command.batchSize": 2,
-                    "originatingCommand.find": "currentop_query",
-                    "originatingCommand.ntoreturn": 2,
-                    "originatingCommand.comment": "currentop_query"
+                    "cursor.originatingCommand.find": "currentop_query",
+                    "cursor.originatingCommand.ntoreturn": 2,
+                    "cursor.originatingCommand.comment": "currentop_query"
                 };
 
                 confirmCurrentOpContents({
@@ -559,8 +559,8 @@
             currentOpFilter = {
                 "command.getMore":
                     (isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id),
-                "originatingCommand.$truncated": {$regex: truncatedQueryString},
-                "originatingCommand.comment": "currentop_query"
+                "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
+                "cursor.originatingCommand.comment": "currentop_query"
             };
 
             confirmCurrentOpContents({

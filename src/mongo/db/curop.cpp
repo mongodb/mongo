@@ -487,15 +487,19 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
 
     appendAsObjOrString("command", _opDescription, maxQuerySize, builder);
 
-    if (!_originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand", _originatingCommand, maxQuerySize, builder);
-    }
-
     if (!_planSummary.empty()) {
         builder->append("planSummary", _planSummary);
     }
 
     if (_genericCursor) {
+        // This creates a new builder to truncate the object that will go into the curOp output. In
+        // order to make sure the object is not too large but not truncate the comment, we only
+        // truncate the originatingCommand and not the entire cursor.
+        BSONObjBuilder tempObj;
+        appendAsObjOrString(
+            "truncatedObj", _genericCursor->getOriginatingCommand().get(), maxQuerySize, &tempObj);
+        auto originatingCommand = tempObj.done().getObjectField("truncatedObj");
+        _genericCursor->setOriginatingCommand(originatingCommand.getOwned());
         builder->append("cursor", _genericCursor->toBSON());
     }
 

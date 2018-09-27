@@ -373,7 +373,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         assert.gte(adminDB.currentOp({$ownOps: false, $all: true, active: false}).inprog.length, 1);
 
         // Test that collation rules apply to matches on $currentOp output.
-        const matchField = (isRemoteShardCurOp ? "originatingCommand.comment" : "command.comment");
+        const matchField =
+            (isRemoteShardCurOp ? "cursor.originatingCommand.comment" : "command.comment");
         const numExpectedMatches = (isRemoteShardCurOp ? stParams.shards : 1);
 
         assert.eq(

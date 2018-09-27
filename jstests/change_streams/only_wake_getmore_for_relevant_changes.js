@@ -35,7 +35,7 @@ assert.writeOK(db.getCollection("${ shellSentinelCollection.getName() }").insert
 assert.soon(function() {
     return db.currentOp({
                  op: "getmore",
-                 "originatingCommand.comment": "${identifyingComment}",
+                 "cursor.originatingCommand.comment": "${identifyingComment}",
              }).inprog.length > 0;
 });
 

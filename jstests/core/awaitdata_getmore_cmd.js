@@ -163,20 +163,22 @@
         assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
 
         // Wait for the parent shell to start watching for the next document.
-        assert.soon(
-            () => db.currentOp({op: "getmore", "originatingCommand.comment": "uniquifier_comment"})
-                      .inprog.length == 1,
-            () => tojson(db.currentOp().inprog));
+        assert.soon(() => db.currentOp({
+                                op: "getmore",
+                                "cursor.originatingCommand.comment": "uniquifier_comment"
+                            }).inprog.length == 1,
+                    () => tojson(db.currentOp().inprog));
 
         // Now write a non-matching document to the collection.
         assert.writeOK(db.await_data.insert({_id: "no match", x: 0}));
 
         // Make sure the getMore has not ended after a while.
         sleep(2000);
-        assert.eq(db.currentOp({op: "getmore", "originatingCommand.comment": "uniquifier_comment"})
-                      .inprog.length,
-                  1,
-                  tojson(db.currentOp().inprog));
+        assert.eq(
+            db.currentOp({op: "getmore", "cursor.originatingCommand.comment": "uniquifier_comment"})
+                .inprog.length,
+            1,
+            tojson(db.currentOp().inprog));
 
         // Now write a matching document to wake it up.
         assert.writeOK(db.await_data.insert({_id: "match", x: 1}));

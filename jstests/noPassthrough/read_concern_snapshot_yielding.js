@@ -229,7 +229,7 @@
         session.commitTransaction();
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
-    }, {"originatingCommand.filter": {x: 1}});
+    }, {"cursor.originatingCommand.filter": {x: 1}});
 
     // Test aggregate.
     testCommand(function() {
@@ -262,7 +262,7 @@
         session.commitTransaction();
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
-    }, {"originatingCommand.filter": {x: 1}});
+    }, {"cursor.originatingCommand.filter": {x: 1}});
 
     // Test distinct.
     testCommand(function() {
