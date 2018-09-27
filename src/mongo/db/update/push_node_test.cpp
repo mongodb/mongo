@@ -655,16 +655,18 @@ void checkDocumentAndResult(BSONObj updateModifier,
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithSliceValues) {
     struct testData {
-        int sliceValue;
+        long long sliceValue;
         BSONObj resultingDoc;
     };
 
     // We repeat the same test for several different values of $slice.
-    std::vector<testData> testDataList{{-2, fromjson("{a: [1]}")},
+    std::vector<testData> testDataList{{LLONG_MIN, fromjson("{a: [1]}")},
+                                       {-2, fromjson("{a: [1]}")},
                                        {-1, fromjson("{a: [1]}")},
                                        {0, fromjson("{a: []}")},
                                        {1, fromjson("{a: [1]}")},
-                                       {2, fromjson("{a: [1]}")}};
+                                       {2, fromjson("{a: [1]}")},
+                                       {LLONG_MAX, fromjson("{a: [1]}")}};
 
     for (const auto& data : testDataList) {
         auto update = BSON(
