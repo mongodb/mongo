@@ -524,8 +524,7 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
     OpTypeEnum opType = oplogEntry.getOpType();
 
     // For applyOps entries, we process each sub-operation individually.
-    if (opType == OpTypeEnum::kCommand &&
-        oplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+    if (oplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
         try {
             auto subOps = ApplyOps::extractOperations(oplogEntry);
             for (auto& subOp : subOps) {

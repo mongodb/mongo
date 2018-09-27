@@ -543,8 +543,7 @@ void fillWriterVectors(OperationContext* opCtx,
 
         // Extract applyOps operations and fill writers with extracted operations using this
         // function.
-        if (op.isCommand() && op.getCommandType() == OplogEntry::CommandType::kApplyOps &&
-            !op.shouldPrepare()) {
+        if (op.getCommandType() == OplogEntry::CommandType::kApplyOps && !op.shouldPrepare()) {
             try {
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
 
@@ -1180,8 +1179,7 @@ Status multiSyncApply(OperationContext* opCtx,
                 // txnNumber. Thus, we start a new transaction without refreshing state from disk.
                 boost::optional<OperationContextSessionMongodWithoutRefresh> sessionTxnState;
                 if (entry.shouldPrepare() ||
-                    (entry.isCommand() &&
-                     entry.getCommandType() == OplogEntry::CommandType::kAbortTransaction)) {
+                    entry.getCommandType() == OplogEntry::CommandType::kAbortTransaction) {
                     // The update on transaction table may be scheduled to the same writer.
                     invariant(ops->size() <= 2);
                     // Transaction operations are in its own batch, so we can modify their opCtx.

@@ -194,8 +194,7 @@ StatusWith<OplogEntry> OplogEntry::parse(const BSONObj& object) {
     MONGO_UNREACHABLE;
 }
 
-OplogEntry::OplogEntry(BSONObj rawInput)
-    : raw(std::move(rawInput)), _commandType(OplogEntry::CommandType::kNotCommand) {
+OplogEntry::OplogEntry(BSONObj rawInput) : raw(std::move(rawInput)) {
     raw = raw.getOwned();
 
     parseProtected(IDLParserErrorContext("OplogEntryBase"), raw);
@@ -289,8 +288,6 @@ BSONObj OplogEntry::getOperationToApply() const {
 }
 
 OplogEntry::CommandType OplogEntry::getCommandType() const {
-    invariant(isCommand());
-    invariant(_commandType != OplogEntry::CommandType::kNotCommand);
     return _commandType;
 }
 

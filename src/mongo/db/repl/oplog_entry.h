@@ -158,7 +158,7 @@ public:
     BSONObj raw;  // Owned.
 
 private:
-    CommandType _commandType;
+    CommandType _commandType = CommandType::kNotCommand;
 };
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);
