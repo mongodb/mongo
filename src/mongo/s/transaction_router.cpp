@@ -175,8 +175,8 @@ TransactionRouter::Participant::Participant(bool isCoordinator,
       _stmtIdCreatedAt(stmtIdCreatedAt),
       _sharedOptions(sharedOptions) {}
 
-BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd,
-                                                                bool isFirstStatementInThisParticipant) const {
+BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
+    BSONObj cmd, bool isFirstStatementInThisParticipant) const {
     // Perform checks first before calling std::move on cmd.
     auto isTxnCmd = isTransactionCommand(cmd);
 
