@@ -183,8 +183,22 @@ void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
 
 CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
     NamespaceString nss) {
+
+    return loadRoutingTableWithTwoChunksAndTwoShardsImpl(nss, BSON("_id" << 1));
+}
+
+CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsHash(
+    NamespaceString nss) {
+
+    return loadRoutingTableWithTwoChunksAndTwoShardsImpl(nss,
+                                                         BSON("_id"
+                                                              << "hashed"));
+}
+
+CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsImpl(
+    NamespaceString nss, const BSONObj& shardKey) {
     const OID epoch = OID::gen();
-    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+    const ShardKeyPattern shardKeyPattern(shardKey);
 
     auto future = scheduleRoutingInfoRefresh(nss);
 

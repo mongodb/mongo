@@ -39,8 +39,7 @@ enums:
         values:
             kBroadcast: "broadcast"
             kRoundRobin: "roundrobin"
-            kRange: "range"
-            kHash: "hash"
+            kKeyRange: "keyRange"
 
 structs:
   ExchangeSpec:

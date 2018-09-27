@@ -221,7 +221,8 @@ TEST_F(ClusterExchangeTest, GroupFollowedByOutIsEligbleForExchange) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         ASSERT_EQ(boundaries.size(), 3UL);
@@ -250,7 +251,8 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
@@ -282,7 +284,8 @@ TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
@@ -319,7 +322,48 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("x" << 1));
+        ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        ASSERT_EQ(boundaries.size(), 3UL);
+
+        ASSERT_BSONOBJ_EQ(boundaries[0], BSON("x" << MINKEY));
+        ASSERT_BSONOBJ_EQ(boundaries[1], BSON("x" << 0));
+        ASSERT_BSONOBJ_EQ(boundaries[2], BSON("x" << MAXKEY));
+
+        ASSERT_EQ(consumerIds[0], 0);
+        ASSERT_EQ(consumerIds[1], 1);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
+    // Sharded by {_id: "hashed"}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
+    setupNShards(2);
+    loadRoutingTableWithTwoChunksAndTwoShardsHash(kTestOutNss);
+
+    // This would be the merging half of the pipeline if the original pipeline was
+    // [{$sort: {x: 1}},
+    //  {$group: {_id: "$x"}},
+    //  {$out: {to: "sharded_by_id", mode: "replaceDocuments"}}].
+    // No $sort stage appears in the merging half since we'd expect that to be absorbed by the
+    // $mergeCursors and AsyncResultsMerger.
+    auto mergePipe = unittest::assertGet(Pipeline::create(
+        {parse("{$group: {_id: '$x'}}"),
+         DocumentSourceOut::create(kTestOutNss, expCtx(), WriteModeEnum::kModeInsertDocuments)},
+        expCtx()));
+
+    auto future = launchAsync([&] {
+        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
+            operationContext(), mergePipe.get());
+        ASSERT_TRUE(exchangeSpec);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(),
+                          BSON("x"
+                               << "hashed"));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
@@ -385,7 +429,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
@@ -442,7 +487,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
@@ -514,7 +560,8 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
         auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
             operationContext(), mergePipe.get());
         ASSERT_TRUE(exchangeSpec);
-        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kRange);
+        ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
+        ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1 << "_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 3UL);  // One for each shard.
         const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
         const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();

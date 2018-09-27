@@ -236,7 +236,7 @@ TEST_F(DocumentSourceExchangeTest, RangeExchangeNConsumer) {
     ASSERT(nDocs % nConsumers == 0);
 
     ExchangeSpec spec;
-    spec.setPolicy(ExchangePolicyEnum::kRange);
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
     spec.setKey(BSON("a" << 1));
     spec.setBoundaries(boundaries);
     spec.setConsumers(nConsumers);
@@ -301,7 +301,7 @@ TEST_F(DocumentSourceExchangeTest, RangeShardingExchangeNConsumer) {
     ASSERT(nDocs % nConsumers == 0);
 
     ExchangeSpec spec;
-    spec.setPolicy(ExchangePolicyEnum::kRange);
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
     spec.setKey(BSON("a" << 1));
     spec.setBoundaries(boundaries);
     spec.setConsumerIds(consumerIds);
@@ -359,7 +359,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomExchangeNConsumer) {
     ASSERT(nDocs % nConsumers == 0);
 
     ExchangeSpec spec;
-    spec.setPolicy(ExchangePolicyEnum::kRange);
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
     spec.setKey(BSON("a" << 1));
     spec.setBoundaries(boundaries);
     spec.setConsumers(nConsumers);
@@ -426,7 +426,7 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
     ASSERT(nDocs % nConsumers == 0);
 
     ExchangeSpec spec;
-    spec.setPolicy(ExchangePolicyEnum::kHash);
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
     spec.setKey(BSON("a"
                      << "hashed"));
     spec.setBoundaries(boundaries);
@@ -527,7 +527,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidKeyWrongType) {
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
     BSONObj spec = BSON("policy"
-                        << "range"
+                        << "keyRange"
                         << "consumers"
                         << 1
                         << "key"
@@ -544,7 +544,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
     BSONObj spec = BSON("policy"
-                        << "range"
+                        << "keyRange"
                         << "consumers"
                         << 1
                         << "key"
@@ -561,7 +561,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
     BSONObj spec = BSON("policy"
-                        << "range"
+                        << "keyRange"
                         << "consumers"
                         << 1
                         << "key"
@@ -578,7 +578,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
     BSONObj spec = BSON("policy"
-                        << "range"
+                        << "keyRange"
                         << "consumers"
                         << 2
                         << "key"
@@ -612,7 +612,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidPolicyBoundaries) {
 
 TEST_F(DocumentSourceExchangeTest, RejectInvalidConsumerIds) {
     BSONObj spec = BSON("policy"
-                        << "range"
+                        << "keyRange"
                         << "consumers"
                         << 1
                         << "key"

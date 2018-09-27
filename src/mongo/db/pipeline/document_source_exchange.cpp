@@ -85,7 +85,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
         _consumers.emplace_back(std::make_unique<ExchangeBuffer>());
     }
 
-    if (_policy == ExchangePolicyEnum::kRange || _policy == ExchangePolicyEnum::kHash) {
+    if (_policy == ExchangePolicyEnum::kKeyRange) {
         uassert(50900,
                 "Exchange boundaries do not match number of consumers.",
                 _boundaries.size() == _consumerIds.size() + 1);
@@ -283,16 +283,7 @@ size_t Exchange::loadNextBatch() {
                 if (_consumers[target]->appendDocument(std::move(input), _maxBufferSize))
                     return target;
             } break;
-            case ExchangePolicyEnum::kRange: {
-                size_t target = getTargetConsumer(input.getDocument());
-                bool full = _consumers[target]->appendDocument(std::move(input), _maxBufferSize);
-                if (full && _orderPreserving) {
-                    // TODO send the high watermark here.
-                }
-                if (full)
-                    return target;
-            } break;
-            case ExchangePolicyEnum::kHash: {
+            case ExchangePolicyEnum::kKeyRange: {
                 size_t target = getTargetConsumer(input.getDocument());
                 bool full = _consumers[target]->appendDocument(std::move(input), _maxBufferSize);
                 if (full && _orderPreserving) {
@@ -329,7 +320,6 @@ size_t Exchange::getTargetConsumer(const Document& input) {
         }
     }
 
-    // TODO implement hash keys for the hash policy.
     KeyString key{KeyString::Version::V1, kb.obj(), _ordering};
     std::string keyStr{key.getBuffer(), key.getSize()};
 

@@ -82,6 +82,17 @@ protected:
     CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShards(NamespaceString nss);
 
     /**
+     * Same as the above method but the sharding key is hashed.
+     */
+    CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShardsHash(NamespaceString nss);
+
+    /**
+     * The common implementation for any shard key.
+     */
+    CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShardsImpl(
+        NamespaceString nss, const BSONObj& shardKey);
+
+    /**
      * Mocks network responses for loading a sharded database and collection from the config server.
      */
     void expectGetDatabase(NamespaceString nss, std::string primaryShard = "0");

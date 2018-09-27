@@ -338,8 +338,7 @@ boost::optional<ShardedExchangePolicy> walkPipelineBackwardsTrackingShardKey(
         }
         consumerIds.emplace_back(shardToConsumer[chunk.getShardId()]);
     }
-    exchangeSpec.setPolicy(newShardKey.isHashedPattern() ? ExchangePolicyEnum::kHash
-                                                         : ExchangePolicyEnum::kRange);
+    exchangeSpec.setPolicy(ExchangePolicyEnum::kKeyRange);
     exchangeSpec.setKey(newShardKey.toBSON());
     exchangeSpec.setBoundaries(std::move(boundaries));
     exchangeSpec.setConsumers(shardToConsumer.size());

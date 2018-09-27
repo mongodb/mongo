@@ -127,7 +127,7 @@ TestData.disableImplicitSessions = true;
             aggregate: coll.getName(),
             pipeline: [],
             exchange: {
-                policy: "range",
+                policy: "keyRange",
                 consumers: NumberInt(numConsumers),
                 bufferSize: NumberInt(1024),
                 key: {a: 1},
@@ -156,7 +156,7 @@ TestData.disableImplicitSessions = true;
             aggregate: coll.getName(),
             pipeline: [{$match: {a: {$gte: 5000}}}, {$sort: {a: -1}}, {$project: {_id: 0, b: 0}}],
             exchange: {
-                policy: "range",
+                policy: "keyRange",
                 consumers: NumberInt(numConsumers),
                 bufferSize: NumberInt(1024),
                 key: {a: 1},
