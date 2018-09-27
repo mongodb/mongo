@@ -527,7 +527,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
         // some keys to take the Cartesian product with.  If keysToAdd.empty(), we
         // initialize it.
         if (keysToAdd.empty()) {
-            keysToAdd = keysForThisField;
+            keysToAdd = std::move(keysForThisField);
             ++posInIdx;
             continue;
         }
@@ -543,7 +543,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                 updatedKeysToAdd.insert(b.obj());
             }
         }
-        keysToAdd = updatedKeysToAdd;
+        keysToAdd = std::move(updatedKeysToAdd);
         ++posInIdx;
     }
 
@@ -559,7 +559,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
                   << " num keys: " << keysToAdd.size() << " obj inserted: " << redact(obj);
     }
 
-    *keys = keysToAdd;
+    *keys = std::move(keysToAdd);
 }
 
 }  // namespace mongo
