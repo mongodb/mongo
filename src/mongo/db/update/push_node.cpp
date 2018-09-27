@@ -260,7 +260,13 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
         sortChildren(*element, *_sort);
     }
 
-    while (static_cast<long long>(countChildren(*element)) > std::abs(_slice)) {
+    // std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
+    // absolute value of LLONG_MIN cannot be represented in a 'long long'.
+    const auto sliceAbs = _slice == std::numeric_limits<decltype(_slice)>::min()
+        ? std::abs(_slice + 1)
+        : std::abs(_slice);
+
+    while (static_cast<long long>(countChildren(*element)) > sliceAbs) {
         result = ModifyResult::kNormalUpdate;
         if (_slice >= 0) {
             invariant(element->popBack());
