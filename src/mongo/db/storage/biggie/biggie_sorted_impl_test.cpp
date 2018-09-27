@@ -47,8 +47,7 @@ private:
 public:
     SortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique) final {
-        return std::make_unique<SortedDataInterface>(
-            _order, unique, "ident"_sd, "test.biggie", "indexName", BSONObj());
+        return std::make_unique<SortedDataInterface>(_order, unique, "ident"_sd);
     }
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
         //! not correct lol
