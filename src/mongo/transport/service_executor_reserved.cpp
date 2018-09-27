@@ -87,7 +87,7 @@ Status ServiceExecutorReserved::_startWorker() {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
         auto numRunningGuard = MakeGuard([&] {
-            invariant(_numRunningWorkerThreads.subtractAndFetch(1) >= 0);
+            _numRunningWorkerThreads.subtractAndFetch(1);
             _shutdownCondition.notify_one();
         });
 
