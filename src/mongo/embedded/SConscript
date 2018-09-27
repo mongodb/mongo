@@ -69,6 +69,7 @@ env.Library(
         'process_interface_factory_embedded.cpp',
         'replication_coordinator_embedded.cpp',
         'service_entry_point_embedded.cpp',
+        'transaction_coordinator_factory_embedded.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

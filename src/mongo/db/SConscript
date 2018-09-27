@@ -617,6 +617,26 @@ env.Library(
 )
 
 env.Library(
+    target='transaction_coordinator',
+    source=[
+        'transaction_coordinator.cpp',
+        'transaction_coordinator_catalog.cpp',
+        'transaction_coordinator_factory_mongod.cpp',
+        'transaction_coordinator_service.cpp',
+        'transaction_coordinator_commands_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'catalog_raii',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/grid',
+    ]
+)
+
+env.Library(
     target='catalog_raii',
     source=[
         'catalog_raii.cpp',
@@ -626,10 +646,7 @@ env.Library(
         'session.cpp',
         'session_catalog.cpp',
         'single_transaction_stats.cpp',
-        'transaction_coordinator.cpp',
-        'transaction_coordinator_catalog.cpp',
-        'transaction_coordinator_service.cpp',
-        'transaction_coordinator_commands_impl.cpp',
+        'transaction_coordinator_factory.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
         'transaction_history_iterator.cpp',
@@ -640,8 +657,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/s/async_requests_sender',
-        '$BUILD_DIR/mongo/s/grid',
         'catalog/collection',
         'catalog/database',
         'catalog/database_holder',
@@ -652,6 +667,7 @@ env.Library(
         'curop_metrics',
         'dbdirectclient',
         'index/index_access_method',
+        'kill_sessions',
         'logical_session_id',
         'namespace_string',
         'repl/oplog_entry',
@@ -680,7 +696,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
         'auth/authmocks',
-        'catalog_raii',
+        'transaction_coordinator',
     ],
 )
 
@@ -824,6 +840,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+        '$BUILD_DIR/mongo/s/grid',
     ],
 )
 
