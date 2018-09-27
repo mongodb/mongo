@@ -58,12 +58,6 @@ executor:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          # TODO: remove as part of SERVER-36920
-          skipValidationNamespaces:
-          - local.oplog.rs
   - class: CleanEveryN
     n: 20
   fixture:
