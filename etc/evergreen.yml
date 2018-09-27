@@ -3867,7 +3867,7 @@ tasks:
             for arch in arm64-v8a armeabi-v7a x86_64 ; do
                 tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
                 mkdir -p jniLibs/$arch
-                cp ./mongo-embedded-sdk-${version}/lib/*.so jniLibs/$arch
+                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/$arch
                 rm -rf ./mongo-embedded-sdk-${version}
             done
 
@@ -3965,12 +3965,12 @@ tasks:
 
             tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
             mkdir -p jniLibs/linux-x86-64
-            cp ./mongo-embedded-sdk-${version}/lib/*.so jniLibs/linux-x86-64
+            cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/linux-x86-64
             rm -rf ./mongo-embedded-sdk-${version}
 
             tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
             mkdir -p jniLibs/darwin
-            cp ./mongo-embedded-sdk-${version}/lib/*.dylib jniLibs/darwin
+            cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.dylib jniLibs/darwin
             rm -rf ./mongo-embedded-sdk-${version}
 
             ./gradlew clean :jar:build :jar:publishMavenPublicationToLocalRepository
