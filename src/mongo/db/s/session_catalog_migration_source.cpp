@@ -40,6 +40,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
@@ -106,14 +107,14 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
  * Creates a special "write history lost" sentinel oplog entry.
  */
 repl::OplogEntry makeSentinelOplogEntry(OperationSessionInfo sessionInfo, Date_t wallClockTime) {
-    return makeOplogEntry({},                         // optime
-                          hashGenerator.nextInt64(),  // hash
-                          repl::OpTypeEnum::kNoop,    // op type
-                          {},                         // o
-                          Session::kDeadEndSentinel,  // o2
-                          sessionInfo,                // session info
-                          wallClockTime,              // wall clock time
-                          kIncompleteHistoryStmtId);  // statement id
+    return makeOplogEntry({},                                        // optime
+                          hashGenerator.nextInt64(),                 // hash
+                          repl::OpTypeEnum::kNoop,                   // op type
+                          {},                                        // o
+                          TransactionParticipant::kDeadEndSentinel,  // o2
+                          sessionInfo,                               // session info
+                          wallClockTime,                             // wall clock time
+                          kIncompleteHistoryStmtId);                 // statement id
 }
 
 }  // namespace

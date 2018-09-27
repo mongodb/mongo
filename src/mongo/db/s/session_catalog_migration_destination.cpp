@@ -247,20 +247,20 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     invariant(oplogEntry.getWallClockTime());
 
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
-    scopedSession->refreshFromStorageIfNeeded(opCtx);
-    if (!scopedSession->onMigrateBeginOnPrimary(opCtx, result.txnNum, stmtId)) {
+    auto const txnParticipant =
+        TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
+    txnParticipant->refreshFromStorageIfNeeded(opCtx);
+
+    if (!txnParticipant->onMigrateBeginOnPrimary(opCtx, result.txnNum, stmtId)) {
         // Don't continue migrating the transaction history
         return lastResult;
     }
-
-    auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
-    txnParticipant->checkForNewTxnNumber();
 
     BSONObj object(result.isPrePostImage
                        ? oplogEntry.getObject()
                        : BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
-    oplogLink.prevOpTime = scopedSession->getLastWriteOpTime(result.txnNum);
+    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(result.txnNum);
 
     writeConflictRetry(
         opCtx,
@@ -301,7 +301,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
             // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because the
             // next oplog will contain the real operation
             if (!result.isPrePostImage) {
-                scopedSession->onMigrateCompletedOnPrimary(
+                txnParticipant->onMigrateCompletedOnPrimary(
                     opCtx, result.txnNum, {stmtId}, oplogOpTime, *oplogEntry.getWallClockTime());
             }
 

@@ -116,12 +116,13 @@ void onWriteOpCompleted(OperationContext* opCtx,
         return;
 
     if (session) {
-        session->onWriteOpCompletedOnPrimary(opCtx,
-                                             *opCtx->getTxnNumber(),
-                                             std::move(stmtIdsWritten),
-                                             lastStmtIdWriteOpTime,
-                                             lastStmtIdWriteDate,
-                                             txnState);
+        const auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant->onWriteOpCompletedOnPrimary(opCtx,
+                                                    *opCtx->getTxnNumber(),
+                                                    std::move(stmtIdsWritten),
+                                                    lastStmtIdWriteOpTime,
+                                                    lastStmtIdWriteDate,
+                                                    txnState);
     }
 }
 
@@ -186,7 +187,9 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     if (session) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+        const auto txnParticipant = TransactionParticipant::get(opCtx);
+        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 
     OpTimeBundle opTimes;
@@ -250,7 +253,9 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     if (session) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+        const auto txnParticipant = TransactionParticipant::get(opCtx);
+        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 
     OpTimeBundle opTimes;
@@ -934,8 +939,9 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     repl::OplogLink oplogLink;
     sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-    StmtId stmtId(0);
-    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
     // Until we support multiple oplog entries per transaction, prevOpTime should always be null.
     invariant(oplogLink.prevOpTime.isNull());
 
@@ -947,6 +953,8 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
             applyOpsBuilder.append("prepare", true);
         }
         auto applyOpCmd = applyOpsBuilder.done();
+        const StmtId stmtId(0);
+
         auto times = replLogApplyOps(
             opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare, prepareOplogSlot);
 
@@ -969,14 +977,15 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                             const OplogSlot& oplogSlot,
                                             const BSONObj& objectField,
                                             DurableTxnStateEnum durableState) {
-    invariant(session->isLockedTxnNumber(*opCtx->getTxnNumber()));
     const NamespaceString cmdNss{"admin", "$cmd"};
 
     OperationSessionInfo sessionInfo;
     repl::OplogLink oplogLink;
     sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
 
     const StmtId stmtId(1);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);

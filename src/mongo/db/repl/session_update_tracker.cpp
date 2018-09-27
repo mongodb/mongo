@@ -31,11 +31,77 @@
 #include "mongo/db/repl/session_update_tracker.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/session.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {
+namespace {
+
+/**
+ * Constructs a new oplog entry if the given entry has transaction state embedded within in. The new
+ * oplog entry will contain the operation needed to replicate the transaction table.
+ *
+ * Returns boost::none if the given oplog doesn't have any transaction state or does not support
+ * update to the transaction table.
+ */
+boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
+    const repl::OplogEntry& entry) {
+    auto sessionInfo = entry.getOperationSessionInfo();
+    if (!sessionInfo.getTxnNumber()) {
+        return boost::none;
+    }
+
+    invariant(sessionInfo.getSessionId());
+    invariant(entry.getWallClockTime());
+
+    const auto updateBSON = [&] {
+        SessionTxnRecord newTxnRecord;
+        newTxnRecord.setSessionId(*sessionInfo.getSessionId());
+        newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+        newTxnRecord.setLastWriteOpTime(entry.getOpTime());
+        newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
+
+        switch (entry.getCommandType()) {
+            case repl::OplogEntry::CommandType::kApplyOps:
+                newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
+                                                            : DurableTxnStateEnum::kCommitted);
+                break;
+            case repl::OplogEntry::CommandType::kCommitTransaction:
+                newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+                break;
+            case repl::OplogEntry::CommandType::kAbortTransaction:
+                newTxnRecord.setState(DurableTxnStateEnum::kAborted);
+                break;
+            default:
+                break;
+        }
+        return newTxnRecord.toBSON();
+    }();
+
+    return repl::OplogEntry(
+        entry.getOpTime(),
+        0,  // hash
+        repl::OpTypeEnum::kUpdate,
+        NamespaceString::kSessionTransactionsTableNamespace,
+        boost::none,  // uuid
+        false,        // fromMigrate
+        repl::OplogEntry::kOplogVersion,
+        updateBSON,
+        BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON()),
+        {},    // sessionInfo
+        true,  // upsert
+        *entry.getWallClockTime(),
+        boost::none,  // statementId
+        boost::none,  // prevWriteOpTime
+        boost::none,  // preImangeOpTime
+        boost::none   // postImageOpTime
+        );
+}
+
+}  // namespace
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateOrFlush(
     const OplogEntry& entry) {
@@ -96,7 +162,7 @@ std::vector<OplogEntry> SessionUpdateTracker::flushAll() {
     std::vector<OplogEntry> opList;
 
     for (auto&& entry : _sessionsToUpdate) {
-        auto newUpdate = Session::createMatchingTransactionTableUpdate(entry.second);
+        auto newUpdate = createMatchingTransactionTableUpdate(entry.second);
         invariant(newUpdate);
         opList.push_back(std::move(*newUpdate));
     }
@@ -117,7 +183,7 @@ std::vector<OplogEntry> SessionUpdateTracker::_flushForQueryPredicate(
     }
 
     std::vector<OplogEntry> opList;
-    auto updateOplog = Session::createMatchingTransactionTableUpdate(iter->second);
+    auto updateOplog = createMatchingTransactionTableUpdate(iter->second);
     invariant(updateOplog);
     opList.push_back(std::move(*updateOplog));
     _sessionsToUpdate.erase(iter);

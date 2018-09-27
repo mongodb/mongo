@@ -352,9 +352,9 @@ public:
 
         const auto stmtId = 0;
         if (opCtx->getTxnNumber() && !inTransaction) {
-            auto session = OperationContextSession::get(opCtx);
+            const auto txnParticipant = TransactionParticipant::get(opCtx);
             if (auto entry =
-                    session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
+                    txnParticipant->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 parseOplogEntryForFindAndModify(opCtx, args, *entry, &result);

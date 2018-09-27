@@ -1962,13 +1962,12 @@ env.CppUnitTest(
     target='sessions_test',
     source=[
         'session_catalog_test.cpp',
-        'session_test.cpp',
     ],
     LIBDEPS=[
-        'query_exec',
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
-        '$BUILD_DIR/mongo/client/read_preference'
+        'query_exec',
     ],
 )
 
@@ -1976,6 +1975,7 @@ env.CppUnitTest(
     target='transaction_participant_test',
  source=[
         'transaction_participant_test.cpp',
+        'transaction_participant_retryable_writes_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',

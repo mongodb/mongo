@@ -227,24 +227,21 @@ protected:
 
     void bumpTxnNumberFromDifferentOpCtx(const LogicalSessionId& sessionId, TxnNumber newTxnNum) {
         auto func = [sessionId, newTxnNum](OperationContext* opCtx) {
-
             auto session = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, sessionId);
             auto txnParticipant =
                 TransactionParticipant::getFromNonCheckedOutSession(session.get());
 
             // Check that there is a transaction in progress with a lower txnNumber.
             ASSERT(txnParticipant->inMultiDocumentTransaction());
-            ASSERT_LT(session->getActiveTxnNumber(), newTxnNum);
+            ASSERT_LT(txnParticipant->getActiveTxnNumber(), newTxnNum);
 
             // Check that the transaction has some operations, so we can ensure they are cleared.
             ASSERT_GT(txnParticipant->transactionOperationsForTest().size(), 0u);
 
             // Bump the active transaction number on the txnParticipant. This should clear all state
             // from the previous transaction.
-            session->beginOrContinueTxn(opCtx, newTxnNum);
-            ASSERT_EQ(session->getActiveTxnNumber(), newTxnNum);
-
-            txnParticipant->checkForNewTxnNumber();
+            txnParticipant->beginOrContinue(newTxnNum, boost::none, boost::none);
+            ASSERT_EQ(newTxnNum, txnParticipant->getActiveTxnNumber());
             ASSERT_FALSE(txnParticipant->transactionIsAborted());
             ASSERT_EQ(txnParticipant->transactionOperationsForTest().size(), 0u);
         };
@@ -1114,9 +1111,11 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
         auto func = [&](OperationContext* newOpCtx) {
             auto session = SessionCatalog::get(newOpCtx)->getOrCreateSession(
                 newOpCtx, *opCtx()->getLogicalSessionId());
+            auto txnParticipant =
+                TransactionParticipant::getFromNonCheckedOutSession(session.get());
 
             ASSERT_THROWS_CODE(
-                session->onMigrateBeginOnPrimary(newOpCtx, *opCtx()->getTxnNumber() + 1, 1),
+                txnParticipant->beginOrContinue(*opCtx()->getTxnNumber() + 1, false, true),
                 AssertionException,
                 ErrorCodes::PreparedTransactionInProgress);
         };

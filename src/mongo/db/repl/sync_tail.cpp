@@ -73,6 +73,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -82,11 +83,7 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::endl;
-
 namespace repl {
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
@@ -1005,12 +1002,12 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
             bool ok = missingObjReader.connect(*source);
             if (!ok) {
                 warning() << "network problem detected while connecting to the "
-                          << "sync source, attempt " << retryCount << " of " << retryMax << endl;
+                          << "sync source, attempt " << retryCount << " of " << retryMax;
                 continue;  // try again
             }
         } catch (const NetworkException&) {
             warning() << "network problem detected while connecting to the "
-                      << "sync source, attempt " << retryCount << " of " << retryMax << endl;
+                      << "sync source, attempt " << retryCount << " of " << retryMax;
             continue;  // try again
         }
 
@@ -1037,10 +1034,10 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
             }
         } catch (const NetworkException&) {
             warning() << "network problem detected while fetching a missing document from the "
-                      << "sync source, attempt " << retryCount << " of " << retryMax << endl;
+                      << "sync source, attempt " << retryCount << " of " << retryMax;
             continue;  // try again
         } catch (DBException& e) {
-            error() << "assertion fetching missing object: " << redact(e) << endl;
+            error() << "assertion fetching missing object: " << redact(e);
             throw;
         }
 

@@ -54,11 +54,11 @@ private:
 };
 
 /**
- * Similar to OperationContextSessionMongod, but this starts a new transaction unconditionally
- * without refreshing the state from disk. The session reloads the state from disk but
- * the transaction participant will not use the on-disk state to refresh its in-memory state.
+ * Similar to OperationContextSessionMongod, but marks the TransactionParticipant as valid without
+ * refreshing from disk and starts a new transaction unconditionally.
  *
- * This is used for transaction secondary application and recovery.
+ * NOTE: Only used by the replication oplog application logic on secondaries in order to replay
+ * prepared transactions.
  */
 class OperationContextSessionMongodWithoutRefresh {
 public:

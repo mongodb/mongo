@@ -173,7 +173,9 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
 
     const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
         auto& sri = it->second;
-        sri->txnState.invalidate();
+        auto const txnParticipant =
+            TransactionParticipant::getFromNonCheckedOutSession(&sri->txnState);
+        txnParticipant->invalidate();
 
         // We cannot remove checked-out sessions from the cache, because operations expect to find
         // them there to check back in

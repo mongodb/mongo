@@ -35,6 +35,7 @@
 #include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -593,7 +594,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
 
         auto oplog = *nextOplogResult.oplog;
         ASSERT_TRUE(oplog.getObject2());
-        ASSERT_BSONOBJ_EQ(Session::kDeadEndSentinel, *oplog.getObject2());
+        ASSERT_BSONOBJ_EQ(TransactionParticipant::kDeadEndSentinel, *oplog.getObject2());
         ASSERT_TRUE(oplog.getStatementId());
         ASSERT_EQ(kIncompleteHistoryStmtId, *oplog.getStatementId());
         ASSERT_TRUE(oplog.getWallClockTime());

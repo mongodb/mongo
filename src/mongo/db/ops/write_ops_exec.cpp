@@ -511,11 +511,9 @@ WriteResult performInserts(OperationContext* opCtx,
         } else {
             const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
             if (opCtx->getTxnNumber()) {
-                auto session = OperationContextSession::get(opCtx);
-                invariant(session);
                 if (!txnParticipant->inMultiDocumentTransaction() &&
-                    session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
-                                                                     stmtId)) {
+                    txnParticipant->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
+                                                                            stmtId)) {
                     containsRetry = true;
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                     out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
@@ -678,10 +676,9 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
-            auto session = OperationContextSession::get(opCtx);
             if (!txnParticipant->inMultiDocumentTransaction()) {
-                if (auto entry =
-                        session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
+                if (auto entry = txnParticipant->checkStatementExecuted(
+                        opCtx, *opCtx->getTxnNumber(), stmtId)) {
                     containsRetry = true;
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                     out.results.emplace_back(parseOplogEntryForUpdate(*entry));
@@ -821,9 +818,9 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     for (auto&& singleOp : wholeOp.getDeletes()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
-            auto session = OperationContextSession::get(opCtx);
             if (!txnParticipant->inMultiDocumentTransaction() &&
-                session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(), stmtId)) {
+                txnParticipant->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
+                                                                        stmtId)) {
                 containsRetry = true;
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());

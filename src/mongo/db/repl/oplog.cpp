@@ -538,7 +538,9 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     if (session) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+        const auto txnParticipant = TransactionParticipant::get(opCtx);
+        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 
     auto timestamps = stdx::make_unique<Timestamp[]>(count);
@@ -1200,7 +1202,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
         return true;
     }();
-
     invariant(!assignOperationTimestamp || !fieldTs.eoo(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
 
