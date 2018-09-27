@@ -217,6 +217,7 @@ env.Library(
         'user',
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/md5',
     ],
 )

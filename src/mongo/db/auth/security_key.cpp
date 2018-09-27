@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -46,13 +47,25 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/icu.h"
 #include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
+namespace {
+template <typename CredsTarget, typename CredsSource>
+void copyCredentials(CredsTarget&& target, const CredsSource&& source) {
+    target.iterationCount = source[scram::kIterationCountFieldName].Int();
+    target.salt = source[scram::kSaltFieldName].String();
+    target.storedKey = source[scram::kStoredKeyFieldName].String();
+    target.serverKey = source[scram::kServerKeyFieldName].String();
+}
+
+}  // namespace
 
 using std::string;
 
@@ -63,26 +76,35 @@ bool setUpSecurityKey(const string& filename) {
         return false;
     }
 
-    std::string str = std::move(keyString.getValue());
-    const unsigned long long keyLength = str.size();
+    const std::string password = std::move(keyString.getValue());
+    const auto keyLength = password.size();
     if (keyLength < 6 || keyLength > 1024) {
         log() << " security key in " << filename << " has length " << keyLength
               << ", must be between 6 and 1024 chars";
         return false;
     }
 
-    // Generate SCRAM-SHA-1 credentials for the internal user based on
+    auto swSaslPassword = saslPrep(password);
+    if (!swSaslPassword.isOK()) {
+        error() << "Could not prep security key file for SCRAM-SHA-256: "
+                << swSaslPassword.getStatus();
+        return false;
+    }
+
+    // Generate SCRAM-SHA-1/SCRAM-SHA-256 credentials for the internal user based on
     // the keyfile.
     User::CredentialData credentials;
-    const auto password =
-        mongo::createPasswordDigest(internalSecurity.user->getName().getUser().toString(), str);
+    const auto passwordDigest = mongo::createPasswordDigest(
+        internalSecurity.user->getName().getUser().toString(), password);
 
-    auto creds = scram::Secrets<SHA1Block>::generateCredentials(
-        password, saslGlobalParams.scramSHA1IterationCount.load());
-    credentials.scram_sha1.iterationCount = creds[scram::kIterationCountFieldName].Int();
-    credentials.scram_sha1.salt = creds[scram::kSaltFieldName].String();
-    credentials.scram_sha1.storedKey = creds[scram::kStoredKeyFieldName].String();
-    credentials.scram_sha1.serverKey = creds[scram::kServerKeyFieldName].String();
+    copyCredentials(credentials.scram_sha1,
+                    scram::Secrets<SHA1Block>::generateCredentials(
+                        passwordDigest, saslGlobalParams.scramSHA1IterationCount.load()));
+
+    copyCredentials(
+        credentials.scram_sha256,
+        scram::Secrets<SHA256Block>::generateCredentials(
+            swSaslPassword.getValue(), saslGlobalParams.scramSHA256IterationCount.load()));
 
     internalSecurity.user->setCredentials(credentials);
 
@@ -95,7 +117,7 @@ bool setUpSecurityKey(const string& filename) {
                                                << saslCommandUserFieldName
                                                << internalSecurity.user->getName().getUser()
                                                << saslCommandPasswordFieldName
-                                               << password
+                                               << passwordDigest
                                                << saslCommandDigestPasswordFieldName
                                                << false));
     }
