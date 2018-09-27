@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import fnmatch
 import unittest
 
+import buildscripts.resmokelib.parser as parser
 import buildscripts.resmokelib.selector as selector
 import buildscripts.resmokelib.utils.globstar as globstar
 import buildscripts.resmokelib.config
@@ -496,6 +497,27 @@ class TestFilterTests(unittest.TestCase):
             ["dir/subdir1/test12.js", "dir/subdir2/test21.js", "dir/subdir3/a/test3a1.js"],
             selected)
         self.assertEqual(["dir/subdir1/test11.js"], excluded)
+
+    def test_jstest_exclude_with_any_tags(self):
+        config = {
+            "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
+            "exclude_with_any_tags": ["tag2"]
+        }
+        selected, excluded = selector.filter_tests("js_test", config, self.test_file_explorer)
+        self.assertEqual(["dir/subdir1/test11.js", "dir/subdir2/test21.js"], excluded)
+        self.assertEqual(["dir/subdir1/test12.js", "dir/subdir3/a/test3a1.js"], selected)
+
+    def test_filter_temporarily_disabled_tests(self):
+        parser.parse_command_line()
+        test_file_explorer = MockTestFileExplorer()
+        test_file_explorer.tags = {
+            "dir/subdir1/test11.js": ["tag1", "tag2", "__TEMPORARILY_DISABLED__"],
+            "dir/subdir1/test12.js": ["tag3"], "dir/subdir2/test21.js": ["tag2", "tag4"]
+        }
+        config = {"roots": ["dir/subdir1/*.js", "dir/subdir2/*.js"]}
+        selected, excluded = selector.filter_tests("js_test", config, test_file_explorer)
+        self.assertEqual(["dir/subdir1/test11.js"], excluded)
+        self.assertEqual(["dir/subdir1/test12.js", "dir/subdir2/test21.js"], selected)
 
     def test_jstest_force_include(self):
         config = {
