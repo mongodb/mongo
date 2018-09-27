@@ -52,7 +52,7 @@ class StatusWith;
 
 // Using extern constexpr to prevent the compiler from allocating storage as a poor man's c++17
 // inline constexpr variable.
-// TODO delete extern in c++17 because inline is the default for constexper variables.
+// TODO delete extern in c++17 because inline is the default for constexpr variables.
 template <typename T>
 extern constexpr bool isStatusWith = false;
 template <typename T>
@@ -84,8 +84,21 @@ using StatusOrStatusWith = std::conditional_t<std::is_void<T>::value, Status, St
  */
 template <typename T>
 class MONGO_WARN_UNUSED_RESULT_CLASS StatusWith {
+private:
     MONGO_STATIC_ASSERT_MSG(!isStatusOrStatusWith<T>,
                             "StatusWith<Status> and StatusWith<StatusWith<T>> are banned.");
+    // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
+    // aggregate.
+    struct TagTypeBase {
+    protected:
+        TagTypeBase() = default;
+    };
+    // `TagType` is used as a placeholder type in parameter lists for `enable_if` clauses.  They
+    // have to be real parameters, not template parameters, due to MSVC limitations.
+    class TagType : TagTypeBase {
+        TagType() = default;
+        friend StatusWith;
+    };
 
 public:
     using value_type = T;
@@ -114,6 +127,12 @@ public:
      * for the OK case
      */
     StatusWith(T t) : _status(Status::OK()), _t(std::move(t)) {}
+
+    template <typename Alien>
+    StatusWith(Alien&& alien,
+               typename std::enable_if_t<std::is_convertible<Alien, T>::value, TagType> = makeTag(),
+               typename std::enable_if_t<!std::is_same<Alien, T>::value, TagType> = makeTag())
+        : StatusWith(static_cast<T>(std::forward<Alien>(alien))) {}
 
     const T& getValue() const {
         dassert(isOK());
@@ -149,6 +168,12 @@ public:
     void status_with_transitional_ignore() const& noexcept = delete;
 
 private:
+    // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
+    // a static member function that initializes that default parameter.
+    static TagType makeTag() {
+        return {};
+    }
+
     Status _status;
     boost::optional<T> _t;
 };
