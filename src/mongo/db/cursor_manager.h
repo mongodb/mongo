@@ -259,15 +259,6 @@ private:
 
     CursorId allocateCursorId_inlock();
 
-    /**
-     * Creates a generic cursor from a ClientCursor. Can only be called while holding the
-     * CursorManager partition lock. This is neccessary to protect concurrent access to the data
-     * members of 'cursor', as it prevents other threads from pinning this cursor.
-     */
-    GenericCursor buildGenericCursor_inlock(const ClientCursor* cursor) const {
-        return cursor->toGenericCursor();
-    }
-
     ClientCursorPin _registerCursor(
         OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 

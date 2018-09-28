@@ -640,7 +640,7 @@ void CursorManager::appendIdleCursors(AuthorizationSession* ctxAuth,
             if (cursor->_operationUsingCursor) {
                 continue;
             }
-            cursors->emplace_back(buildGenericCursor_inlock(cursor));
+            cursors->emplace_back(cursor->toGenericCursor());
         }
     }
 }
