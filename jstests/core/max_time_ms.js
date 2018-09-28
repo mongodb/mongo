@@ -34,10 +34,11 @@ error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
 // TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases where
-// interrupting javascript execution on the server with a stepdown or timeout causes an
-// InternalError instead, so we also accept that here.
-assert(ErrorCodes.MaxTimeMSExpired == error.code || ErrorCodes.InternalError == error.code,
-       "Failed with error: " + tojson(error));
+// interrupting javascript execution on the server with a stepdown or timeout results in an error
+// code of InternalError or Interrupted instead, so we also accept those here.
+assert.contains(error.code,
+                [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+                "Failed with error: " + tojson(error));
 
 //
 // Simple negative test for query: a ~300ms query with a 10s time limit should not hit the time
@@ -89,10 +90,11 @@ error = assert.throws(function() {
     cursor.next();
 }, [], "expected batch 2 (getmore) to abort due to time limit");
 // TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases where
-// interrupting javascript execution on the server with a stepdown or timeout causes an
-// InternalError instead, so we also accept that here.
-assert(ErrorCodes.MaxTimeMSExpired == error.code || ErrorCodes.InternalError == error.code,
-       "Failed with error: " + tojson(error));
+// interrupting javascript execution on the server with a stepdown or timeout results in an error
+// code of InternalError or Interrupted instead, so we also accept those here.
+assert.contains(error.code,
+                [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+                "Failed with error: " + tojson(error));
 
 //
 // Simple negative test for getmore:
@@ -150,10 +152,11 @@ error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected find() to abort due to time limit");
 // TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases where
-// interrupting javascript execution on the server with a stepdown or timeout causes an
-// InternalError instead, so we also accept that here.
-assert(ErrorCodes.MaxTimeMSExpired == error.code || ErrorCodes.InternalError == error.code,
-       "Failed with error: " + tojson(error));
+// interrupting javascript execution on the server with a stepdown or timeout results in an error
+// code of InternalError or Interrupted instead, so we also accept those here.
+assert.contains(error.code,
+                [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+                "Failed with error: " + tojson(error));
 
 //
 // Many-batch negative test for getmore:
