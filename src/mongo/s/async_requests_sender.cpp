@@ -296,8 +296,14 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
                       str::stream() << "Could not find shard " << shardId);
     }
 
-    auto findHostStatus =
-        shard->getTargeter()->findHostWithMaxWait(readPref, Seconds{20}).getNoThrow(ars->_opCtx);
+    // It shouldn't be necessary to run without interruption here, but there's a subtle race around
+    // exiting early while callbacks hold a reference to this type.  The easiest way to work around
+    // it is to unconditionally block in targeting (for now).
+    auto findHostStatus = ars->_opCtx->runWithoutInterruption([&] {
+        return shard->getTargeter()
+            ->findHostWithMaxWait(readPref, Seconds{20})
+            .getNoThrow(ars->_opCtx);
+    });
 
     if (findHostStatus.isOK())
         shardHostAndPort = std::move(findHostStatus.getValue());
