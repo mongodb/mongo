@@ -62,6 +62,8 @@
 
 namespace mongo {
 
+MONGO_EXPORT_SERVER_PARAMETER(useReadOnceCursorsForIndexBuilds, bool, true);
+
 using std::unique_ptr;
 using std::string;
 using std::endl;
@@ -357,6 +359,15 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
     }
     auto exec =
         _collection->makePlanExecutor(_opCtx, yieldPolicy, Collection::ScanDirection::kForward);
+
+    // Hint to the storage engine that this collection scan should not keep data in the cache.
+    // Do not use read-once cursors for background builds because saveState/restoreState is called
+    // with every insert into the index, which resets the collection scan cursor between every call
+    // to getNextSnapshotted(). With read-once cursors enabled, this can evict data we may need to
+    // read again, incurring a significant performance penalty.
+    // TODO: Enable this for all index builds when SERVER-37268 is complete.
+    bool readOnce = !_buildInBackground && useReadOnceCursorsForIndexBuilds.load();
+    _opCtx->recoveryUnit()->setReadOnce(readOnce);
 
     Snapshotted<BSONObj> objToIndex;
     RecordId loc;
