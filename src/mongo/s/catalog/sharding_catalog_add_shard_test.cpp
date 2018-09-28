@@ -354,7 +354,7 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                 << BSON("w"
                                         << "majority"
                                         << "wtimeout"
-                                        << 15000));
+                                        << 60000));
     ASSERT_BSONOBJ_EQ(expectedBSON,
                       ShardingCatalogManager::get(operationContext())
                           ->createShardIdentityUpsertForAddShard(operationContext(), shardName));

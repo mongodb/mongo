@@ -115,7 +115,7 @@ public:
                 bypassDocumentValidation: false,
                 ordered: true,
                 deletes: [{ q: { ns: "test.user" }, limit: 0 }],
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 60000 },
                 maxTimeMS: 30000
             })"));
 
