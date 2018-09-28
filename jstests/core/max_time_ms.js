@@ -30,7 +30,12 @@ cursor.maxTimeMS(100);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// interrupting javascript execution on the server with a stepdown or timeout results in an error
+// code of InternalError or Interrupted instead, so we also accept those here.
+assert.contains(error.code,
+                [ErrorCodes.ExceededTimeLimit, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+                "Failed with error: " + tojson(error));
 
 //
 // Simple negative test for query: a ~300ms query with a 10s time limit should not hit the time
@@ -80,7 +85,12 @@ error = assert.throws(function() {
     cursor.next();
     cursor.next();
 }, [], "expected batch 2 (getmore) to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// interrupting javascript execution on the server with a stepdown or timeout results in an error
+// code of InternalError or Interrupted instead, so we also accept those here.
+assert.contains(error.code,
+                [ErrorCodes.ExceededTimeLimit, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+                "Failed with error: " + tojson(error));
 
 //
 // Simple negative test for getmore:
@@ -136,7 +146,12 @@ cursor.maxTimeMS(6 * 1000);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected find() to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// interrupting javascript execution on the server with a stepdown or timeout results in an error
+// code of InternalError or Interrupted instead, so we also accept those here.
+assert.contains(error.code,
+                [ErrorCodes.ExceededTimeLimit, ErrorCodes.Interrupted, ErrorCodes.InternalError],
+                "Failed with error: " + tojson(error));
 
 //
 // Many-batch negative test for getmore:
