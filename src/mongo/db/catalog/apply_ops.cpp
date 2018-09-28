@@ -182,6 +182,21 @@ Status _applyOps(OperationContext* opCtx,
                         if (nss.isSystemDotIndexes()) {
                             invariant(opCtx->lockState()->isW());
                             OldClientContext ctx(opCtx, nss.ns());
+
+                            BSONObj indexSpec;
+                            NamespaceString indexNss;
+                            std::tie(indexSpec, indexNss) =
+                                repl::prepForApplyOpsIndexInsert(fieldO, opObj, requestNss);
+
+                            // Vaildate the index spec using the same criteria as IndexBuilder.
+                            if (auto db = ctx.db()) {
+                                if (auto collection = db->getCollection(indexNss)) {
+                                    uassertStatusOK(
+                                        collection->getIndexCatalog()->prepareSpecForCreate(
+                                            opCtx, indexSpec));
+                                }
+                            }
+
                             status =
                                 repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
 
@@ -193,7 +208,6 @@ Status _applyOps(OperationContext* opCtx,
                                 WriteUnitOfWork wuow(opCtx);
                                 auto opObserver = getGlobalServiceContext()->getOpObserver();
                                 invariant(opObserver);
-                                auto indexSpec = fieldO.embeddedObject();
                                 opObserver->onCreateIndex(opCtx, nss.ns(), indexSpec, false);
                                 wuow.commit();
                             }
