@@ -631,9 +631,19 @@ boost::optional<repl::OplogEntry> Session::createMatchingTransactionTableUpdate(
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
 
-        if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-            newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
-                                                        : DurableTxnStateEnum::kCommitted);
+        switch (entry.getCommandType()) {
+            case repl::OplogEntry::CommandType::kApplyOps:
+                newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
+                                                            : DurableTxnStateEnum::kCommitted);
+                break;
+            case repl::OplogEntry::CommandType::kCommitTransaction:
+                newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+                break;
+            case repl::OplogEntry::CommandType::kAbortTransaction:
+                newTxnRecord.setState(DurableTxnStateEnum::kAborted);
+                break;
+            default:
+                break;
         }
         return newTxnRecord.toBSON();
     }();

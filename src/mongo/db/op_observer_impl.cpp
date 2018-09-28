@@ -967,7 +967,8 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
 void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                             Session* const session,
                                             const OplogSlot& oplogSlot,
-                                            const BSONObj& objectField) {
+                                            const BSONObj& objectField,
+                                            DurableTxnStateEnum durableState) {
     invariant(session->isLockedTxnNumber(*opCtx->getTxnNumber()));
     const NamespaceString cmdNss{"admin", "$cmd"};
 
@@ -1007,7 +1008,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
             invariant(oplogSlot.opTime.isNull() || oplogSlot.opTime == oplogOpTime);
 
             onWriteOpCompleted(
-                opCtx, cmdNss, session, {stmtId}, oplogOpTime, wallClockTime, boost::none);
+                opCtx, cmdNss, session, {stmtId}, oplogOpTime, wallClockTime, durableState);
             wuow.commit();
         });
 }
@@ -1029,8 +1030,11 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx,
 
         CommitTransactionOplogObject cmdObj;
         cmdObj.setCommitTimestamp(*commitTimestamp);
-        logCommitOrAbortForPreparedTransaction(
-            opCtx, session, *commitOplogEntryOpTime, cmdObj.toBSON());
+        logCommitOrAbortForPreparedTransaction(opCtx,
+                                               session,
+                                               *commitOplogEntryOpTime,
+                                               cmdObj.toBSON(),
+                                               DurableTxnStateEnum::kCommitted);
     } else {
         invariant(!commitTimestamp);
         const auto stmts = txnParticipant->endTransactionAndRetrieveOperations(opCtx);
@@ -1104,7 +1108,8 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
     TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
     AbortTransactionOplogObject cmdObj;
-    logCommitOrAbortForPreparedTransaction(opCtx, session, OplogSlot(), cmdObj.toBSON());
+    logCommitOrAbortForPreparedTransaction(
+        opCtx, session, OplogSlot(), cmdObj.toBSON(), DurableTxnStateEnum::kAborted);
 }
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
