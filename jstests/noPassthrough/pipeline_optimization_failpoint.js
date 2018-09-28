@@ -17,6 +17,7 @@
         do {
             pop = Random.randInt(100000);
         } while (pops.has(pop));
+        pops.add(pop);
 
         assert.commandWorked(coll.insert({_id: i, city: "Cleveland", pop: pop, state: "OH"}));
     }
