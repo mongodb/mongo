@@ -31,6 +31,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -576,6 +577,7 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
 class BatchWriteExecTransactionTest : public BatchWriteExecTest {
 public:
     const TxnNumber kTxnNumber = 5;
+    const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
 
     void setUp() override {
         BatchWriteExecTest::setUp();
@@ -587,9 +589,14 @@ public:
 
         _scopedSession.emplace(operationContext());
 
+        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
+        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
+        LogicalClock::set(getServiceContext(), std::move(logicalClock));
+
         auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter->checkOut();
         txnRouter->beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        txnRouter->setAtClusterTimeToLatestTime(operationContext());
     }
 
     void tearDown() override {

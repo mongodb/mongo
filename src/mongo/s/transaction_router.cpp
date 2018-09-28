@@ -281,6 +281,25 @@ BSONObj TransactionRouter::attachTxnFieldsIfNeeded(const ShardId& shardId, const
     return txnPart.attachTxnFieldsIfNeeded(cmdObj, true);
 }
 
+void TransactionRouter::_verifyReadConcern() {
+    invariant(!_readConcernArgs.isEmpty());
+
+    if (_readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+        invariant(_atClusterTime);
+        invariant(_atClusterTime != LogicalTime::kUninitialized);
+    }
+}
+
+void TransactionRouter::_verifyParticipantAtClusterTime(const Participant& participant) {
+    if (_readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return;
+    }
+
+    auto participantAtClusterTime = participant.getSharedOptions().atClusterTime;
+    invariant(participantAtClusterTime);
+    invariant(participantAtClusterTime == _atClusterTime);
+}
+
 boost::optional<TransactionRouter::Participant&> TransactionRouter::getParticipant(
     const ShardId& shard) {
     auto iter = _participants.find(shard.toString());
@@ -288,9 +307,9 @@ boost::optional<TransactionRouter::Participant&> TransactionRouter::getParticipa
         return boost::none;
     }
 
-    // TODO SERVER-37223: Once mongos aborts transactions by only sending abortTransaction to
-    // shards that have been successfully contacted we should be able to add an invariant here
-    // to ensure the atClusterTime on the participant matches that on the transaction router.
+    _verifyReadConcern();
+    _verifyParticipantAtClusterTime(iter->second);
+
     return iter->second;
 }
 
@@ -302,12 +321,7 @@ TransactionRouter::Participant& TransactionRouter::_createParticipant(const Shar
         _coordinatorId = shard.toString();
     }
 
-    // The transaction must have been started with a readConcern.
-    invariant(!_readConcernArgs.isEmpty());
-
-    // TODO SERVER-37223: Once mongos aborts transactions by only sending abortTransaction to shards
-    // that have been successfully contacted we should be able to add an invariant here to ensure
-    // that an atClusterTime has been chosen if the read concern level is snapshot.
+    _verifyReadConcern();
 
     auto resultPair = _participants.try_emplace(
         shard.toString(),

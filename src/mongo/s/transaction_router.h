@@ -92,6 +92,13 @@ public:
          */
         StmtId getStmtIdCreatedAt() const;
 
+        /**
+         * Returns the shared transaction options this participant was created with.
+         */
+        const auto& getSharedOptions() const {
+            return _sharedOptions;
+        }
+
     private:
         const bool _isCoordinator{false};
 
@@ -244,6 +251,18 @@ private:
      * Creates a new participant for the shard.
      */
     Participant& _createParticipant(const ShardId& shard);
+
+    /**
+     * Asserts the transaction has a valid read concern and, if the read concern level is snapshot,
+     * has selected a non-null atClusterTime.
+     */
+    void _verifyReadConcern();
+
+    /**
+     * If the transaction's read concern level is snapshot, asserts the participant's atClusterTime
+     * matches the transaction's.
+     */
+    void _verifyParticipantAtClusterTime(const Participant& participant);
 
     const LogicalSessionId _sessionId;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
