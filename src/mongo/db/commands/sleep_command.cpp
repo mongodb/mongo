@@ -68,24 +68,14 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}
 
-    void _sleepInLock(mongo::OperationContext* opCtx,
-                      long long millis,
-                      LockMode mode,
-                      const StringData& ns) {
-        if (ns.empty()) {
-            Lock::GlobalLock lk(opCtx, mode, opCtx->getDeadline(), Lock::InterruptBehavior::kThrow);
-            opCtx->sleepFor(Milliseconds(millis));
-        } else if (nsIsDbOnly(ns)) {
-            uassert(50961, "lockTarget is not a valid namespace", NamespaceString::validDBName(ns));
-            Lock::DBLock lk(opCtx, ns, mode, opCtx->getDeadline());
-            opCtx->sleepFor(Milliseconds(millis));
-        } else {
-            uassert(50962,
-                    "lockTarget is not a valid namespace",
-                    NamespaceString::validCollectionComponent(ns));
-            Lock::CollectionLock lk(opCtx->lockState(), ns, mode, opCtx->getDeadline());
-            opCtx->sleepFor(Milliseconds(millis));
-        }
+    void _sleepInReadLock(mongo::OperationContext* opCtx, long long millis) {
+        Lock::GlobalRead lk(opCtx);
+        opCtx->sleepFor(Milliseconds(millis));
+    }
+
+    void _sleepInWriteLock(mongo::OperationContext* opCtx, long long millis) {
+        Lock::GlobalWrite lk(opCtx);
+        opCtx->sleepFor(Milliseconds(millis));
     }
 
     CmdSleep() : BasicCommand("sleep") {}
@@ -109,17 +99,12 @@ public:
             millis = 10 * 1000;
         }
 
-        StringData lockTarget;
-        if (cmdObj["lockTarget"]) {
-            lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
-        }
-
         if (!cmdObj["lock"]) {
             // Legacy implementation
             if (cmdObj.getBoolField("w")) {
-                _sleepInLock(opCtx, millis, MODE_X, lockTarget);
+                _sleepInWriteLock(opCtx, millis);
             } else {
-                _sleepInLock(opCtx, millis, MODE_S, lockTarget);
+                _sleepInReadLock(opCtx, millis);
             }
         } else {
             uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
@@ -128,10 +113,10 @@ public:
             if (lock == "none") {
                 opCtx->sleepFor(Milliseconds(millis));
             } else if (lock == "w") {
-                _sleepInLock(opCtx, millis, MODE_X, lockTarget);
+                _sleepInWriteLock(opCtx, millis);
             } else {
                 uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
-                _sleepInLock(opCtx, millis, MODE_S, lockTarget);
+                _sleepInReadLock(opCtx, millis);
             }
         }
 

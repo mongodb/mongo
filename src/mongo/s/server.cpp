@@ -408,7 +408,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     startMongoSFTDC();
 
-    Status status = AuthorizationManager::get(serviceContext)->initialize(opCtx.get());
+    Status status = AuthorizationManager::get(serviceContext)->initialize(NULL);
     if (!status.isOK()) {
         error() << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;

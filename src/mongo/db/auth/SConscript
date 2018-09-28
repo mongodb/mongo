@@ -49,7 +49,7 @@ env.Library(
         'authorization_session.cpp',
         'auth_decorations.cpp',
         'user_name.cpp',
-        'role_name.cpp',
+        'role_name.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -313,9 +313,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_parameters',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
     ],
 )
 

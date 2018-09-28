@@ -453,7 +453,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
                                                     BSONObj()));
 
     // Make sure that invalidating the user causes the session to reload its privileges.
-    authzManager->invalidateUserByName(_opCtx.get(), user->getName());
+    authzManager->invalidateUserByName(user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -472,7 +472,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
                  &ignored)
         .transitional_ignore();
     // Make sure that invalidating the user causes the session to reload its privileges.
-    authzManager->invalidateUserByName(_opCtx.get(), user->getName());
+    authzManager->invalidateUserByName(user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -533,7 +533,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Even though the user's privileges have been reduced, since we've configured user
     // document lookup to fail, the authz session should continue to use its known out-of-date
     // privilege data.
-    authzManager->invalidateUserByName(_opCtx.get(), user->getName());
+    authzManager->invalidateUserByName(user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));

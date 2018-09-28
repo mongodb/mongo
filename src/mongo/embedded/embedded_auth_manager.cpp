@@ -101,11 +101,11 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUserByName(OperationContext*, const UserName& user) override {
+    void invalidateUserByName(const UserName& user) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUsersFromDB(OperationContext*, const StringData dbname) override {
+    void invalidateUsersFromDB(const StringData dbname) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -113,7 +113,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUserCache(OperationContext*) override {
+    void invalidateUserCache() override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -129,10 +129,6 @@ public:
     }
 
     std::vector<AuthorizationManager::CachedUserInfo> getUserCacheInfo() const override {
-        UASSERT_NOT_IMPLEMENTED;
-    }
-
-    void setInUserManagementCommand(OperationContext*, bool) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
