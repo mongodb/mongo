@@ -206,10 +206,12 @@ Status waitForReadConcern(OperationContext* opCtx,
                           bool allowAfterClusterTime) {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
-    // waiting for read concern.
+    // waiting for read concern. We don't want to ignore prepare conflicts because snapshot reads
+    // should block on prepared transactions.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (opCtx->getClient()->isInDirectClient() && txnParticipant &&
         txnParticipant->inMultiDocumentTransaction()) {
+        opCtx->recoveryUnit()->setIgnorePrepared(false);
         return Status::OK();
     }
 
@@ -304,6 +306,8 @@ Status waitForReadConcern(OperationContext* opCtx,
     }
 
     if (atClusterTime) {
+        opCtx->recoveryUnit()->setIgnorePrepared(false);
+
         // TODO(SERVER-34620): We should be using Session::setSpeculativeTransactionReadOpTime when
         // doing speculative execution with atClusterTime.
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
@@ -339,12 +343,12 @@ Status waitForReadConcern(OperationContext* opCtx,
     }
 
     // Only snapshot, linearizable and afterClusterTime reads should block on prepared transactions.
-    // We don't ignore prepare conflicts if we are in a direct client in case this overrides
-    // behavior set by a higher-level operation.
     if (readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kLinearizableReadConcern &&
-        !afterClusterTime && !atClusterTime && !opCtx->getClient()->isInDirectClient()) {
+        !afterClusterTime && !atClusterTime) {
         opCtx->recoveryUnit()->setIgnorePrepared(true);
+    } else {
+        opCtx->recoveryUnit()->setIgnorePrepared(false);
     }
 
     return Status::OK();

@@ -211,7 +211,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CreateAndCheckForCachePressure) {
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture,
-       LocalReadOnADocumentBeingPreparedTriggersPrepareConflict) {
+       LocalReadOnADocumentBeingPreparedWithoutIgnoringPreparedTriggersPrepareConflict) {
     // Prepare but don't commit a transaction
     ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
@@ -222,8 +222,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Transaction read default triggers WT_PREPARE_CONFLICT
+    // Transaction read that does not ignore prepare conflicts triggers WT_PREPARE_CONFLICT
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
+    ru2->setIgnorePrepared(false);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
@@ -234,7 +235,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture,
-       AvailableReadOnADocumentBeingPreparedDoesNotTriggerPrepareConflict) {
+       LocalReadOnADocumentBeingPreparedDoesntTriggerPrepareConflict) {
     // Prepare but don't commit a transaction
     ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
@@ -245,10 +246,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Transaction that should ignore prepared transactions won't trigger
-    // WT_PREPARE_CONFLICT
+    // Transaction read default ignores prepare conflicts but should not be able to read
+    // data from the prepared transaction.
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
-    ru2->setIgnorePrepared(true);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);

@@ -47,7 +47,7 @@ public:
     // Whether or not to ignore prepared transactions.
     enum class IgnorePrepared {
         kNoIgnore,  // Do not ignore prepared transactions and return prepare conflicts.
-        kIgnore     // Ignore prepared transactions and show prepared, but uncommitted data.
+        kIgnore     // Ignore prepare conflicts, but don't show prepared data.
     };
 
     // Whether or not to round up to the oldest timestamp when the read timestamp is behind it.
@@ -57,7 +57,7 @@ public:
     };
 
     WiredTigerBeginTxnBlock(WT_SESSION* session,
-                            IgnorePrepared ignorePrepared = IgnorePrepared::kNoIgnore);
+                            IgnorePrepared ignorePrepared = IgnorePrepared::kIgnore);
     WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 

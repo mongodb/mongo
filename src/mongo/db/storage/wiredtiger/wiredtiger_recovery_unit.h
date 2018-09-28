@@ -181,10 +181,10 @@ private:
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;
 
-    // Ignoring prepared transactions will not return prepare conflicts and allow seeing prepared,
-    // but uncommitted data.
+    // Ignoring prepared transactions will not return prepare conflicts and will not allow seeing
+    // prepared data.
     WiredTigerBeginTxnBlock::IgnorePrepared _ignorePrepared{
-        WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore};
+        WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore};
     Timestamp _commitTimestamp;
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
