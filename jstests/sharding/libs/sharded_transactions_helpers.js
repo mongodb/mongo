@@ -19,3 +19,22 @@ function unsetFailCommandOnEachShard(st, numShards) {
             shardConn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
     }
 }
+
+function assertNoSuchTransactionOnAllShards(st, lsid, txnNumber) {
+    st._rs.forEach(function(rs) {
+        assertNoSuchTransactionOnConn(rs.test.getPrimary(), lsid, txnNumber);
+    });
+}
+
+function assertNoSuchTransactionOnConn(conn, lsid, txnNumber) {
+    assert.commandFailedWithCode(conn.getDB("foo").runCommand({
+        find: "bar",
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+                                 ErrorCodes.NoSuchTransaction,
+                                 "expected there to be no active transaction on shard, lsid: " +
+                                     tojson(lsid) + ", txnNumber: " + tojson(txnNumber) +
+                                     ", connection: " + tojson(conn));
+}

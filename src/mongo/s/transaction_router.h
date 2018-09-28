@@ -186,6 +186,12 @@ public:
     std::vector<AsyncRequestsSender::Response> abortTransaction(OperationContext* opCtx);
 
     /**
+     * Sends abort to all shards in the current participant list. Will retry on retryable errors,
+     * but ignores the responses from each shard.
+     */
+    void implicitlyAbortTransaction(OperationContext* opCtx);
+
+    /**
      * Extract the runtimne state attached to the operation context. Returns nullptr if none is
      * attached.
      */

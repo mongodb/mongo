@@ -825,7 +825,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
-        'handle_request_response',
+        'shared_request_handling',
         'introspect',
         'lasterror',
         'query_exec',
@@ -1431,9 +1431,10 @@ env.Library(
 )
 
 env.Library(
-    target='handle_request_response',
+    target='shared_request_handling',
     source=[
         'handle_request_response.cpp',
+        'transaction_validation.cpp',
     ],
     LIBDEPS=[
         'logical_session_cache_impl',

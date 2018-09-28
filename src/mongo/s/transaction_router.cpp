@@ -357,7 +357,6 @@ bool TransactionRouter::_canContinueOnStaleShardOrDbError(StringData cmdName) co
 }
 
 void TransactionRouter::onStaleShardOrDbError(StringData cmdName) {
-    // TODO SERVER-37210: Implicitly abort the entire transaction if this uassert throws.
     uassert(ErrorCodes::NoSuchTransaction,
             "Transaction was aborted due to cluster data placement change",
             _canContinueOnStaleShardOrDbError(cmdName));
@@ -381,7 +380,6 @@ bool TransactionRouter::_canContinueOnSnapshotError() const {
 }
 
 void TransactionRouter::onSnapshotError() {
-    // TODO SERVER-37210: Implicitly abort the entire transaction if this uassert throws.
     uassert(ErrorCodes::NoSuchTransaction,
             "Transaction was aborted due to snapshot error on subsequent transaction statement",
             _canContinueOnSnapshotError());
@@ -634,6 +632,18 @@ ScopedRouterSession::~ScopedRouterSession() {
     auto opCtxSession = TransactionRouter::get(_opCtx);
     invariant(opCtxSession);
     RouterSessionCatalog::get(_opCtx)->checkInSessionState(opCtxSession->getSessionId());
+}
+
+void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
+    if (_participants.empty()) {
+        return;
+    }
+
+    try {
+        abortTransaction(opCtx);
+    } catch (...) {
+        // Ignore any exceptions.
+    }
 }
 
 }  // namespace mongo

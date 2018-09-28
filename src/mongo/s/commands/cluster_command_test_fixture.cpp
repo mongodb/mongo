@@ -158,15 +158,30 @@ void ClusterCommandTestFixture::runCommandInspectRequests(BSONObj cmd,
     future.timed_get(kFutureTimeout);
 }
 
-void ClusterCommandTestFixture::runCommandMaxErrors(BSONObj cmd,
-                                                    ErrorCodes::Error code,
-                                                    bool isTargeted) {
+void ClusterCommandTestFixture::expectAbortTransaction() {
+    onCommandForPoolExecutor([](const executor::RemoteCommandRequest& request) {
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "abortTransaction");
+        return BSON("ok" << 1);
+    });
+}
+
+void ClusterCommandTestFixture::runTxnCommandMaxErrors(BSONObj cmd,
+                                                       ErrorCodes::Error code,
+                                                       bool isTargeted) {
     auto future = launchAsync([&] { runCommand(cmd); });
 
     size_t numRetries =
         isTargeted ? kMaxNumStaleVersionRetries : kMaxNumStaleVersionRetries * numShards;
     for (size_t i = 0; i < numRetries; i++) {
         expectReturnsError(code);
+    }
+
+    // In a transaction, each targeted shard is sent abortTransaction when the router exhausts its
+    // retries.
+    size_t numTargetedShards = isTargeted ? 1 : 2;
+    for (size_t i = 0; i < numTargetedShards; i++) {
+        expectAbortTransaction();
     }
 
     future.timed_get(kFutureTimeout);
@@ -199,13 +214,13 @@ void ClusterCommandTestFixture::testRetryOnSnapshotError(BSONObj targetedCmd,
 void ClusterCommandTestFixture::testMaxRetriesSnapshotErrors(BSONObj targetedCmd,
                                                              BSONObj scatterGatherCmd) {
     // Target one shard.
-    runCommandMaxErrors(_makeCmd(targetedCmd), ErrorCodes::SnapshotUnavailable, true);
-    runCommandMaxErrors(_makeCmd(targetedCmd), ErrorCodes::SnapshotTooOld, true);
+    runTxnCommandMaxErrors(_makeCmd(targetedCmd), ErrorCodes::SnapshotUnavailable, true);
+    runTxnCommandMaxErrors(_makeCmd(targetedCmd), ErrorCodes::SnapshotTooOld, true);
 
     // Target all shards
     if (!scatterGatherCmd.isEmpty()) {
-        runCommandMaxErrors(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotUnavailable, false);
-        runCommandMaxErrors(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotTooOld, false);
+        runTxnCommandMaxErrors(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotUnavailable, false);
+        runTxnCommandMaxErrors(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotTooOld, false);
     }
 }
 

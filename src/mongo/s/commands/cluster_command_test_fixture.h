@@ -55,6 +55,8 @@ protected:
 
     void expectReturnsError(ErrorCodes::Error code);
 
+    void expectAbortTransaction();
+
     DbResponse runCommand(BSONObj cmd);
 
     void runCommandSuccessful(BSONObj cmd, bool isTargeted);
@@ -63,7 +65,7 @@ protected:
 
     void runCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted);
 
-    void runCommandMaxErrors(BSONObj cmd, ErrorCodes::Error code, bool isTargeted);
+    void runTxnCommandMaxErrors(BSONObj cmd, ErrorCodes::Error code, bool isTargeted);
 
     /**
      * Verifies that running the given commands through mongos will succeed.

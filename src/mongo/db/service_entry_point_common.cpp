@@ -73,6 +73,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
@@ -462,14 +463,9 @@ bool runCommandImpl(OperationContext* opCtx,
         }
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        uassert(ErrorCodes::InvalidOptions,
-                "writeConcern is not allowed within a multi-statement transaction",
-                wcResult.usedDefault || !txnParticipant ||
-                    !txnParticipant->inMultiDocumentTransaction() ||
-                    invocation->definition()->getName() == "commitTransaction" ||
-                    invocation->definition()->getName() == "abortTransaction" ||
-                    invocation->definition()->getName() == "prepareTransaction" ||
-                    invocation->definition()->getName() == "doTxn");
+        if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
+            validateWriteConcernForTransaction(wcResult, invocation->definition()->getName());
+        }
 
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 

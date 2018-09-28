@@ -4,6 +4,8 @@
 (function() {
     "use strict";
 
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
     function expectChunks(st, ns, chunks) {
         for (let i = 0; i < chunks.length; i++) {
             assert.eq(chunks[i],
@@ -101,7 +103,10 @@
                                      ErrorCodes.NoSuchTransaction);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-    session.abortTransaction();
+    assertNoSuchTransactionOnAllShards(
+        st, session.getSessionId(), session.getTxnNumber_forTesting());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     //
     // Stale shard version on first command to a new shard should succeed.
@@ -237,12 +242,19 @@
 
     session.startTransaction();
 
-    // Targets Shard0, which is stale and won't refresh its metadata, so mongos should exhaust its
-    // retries and implicitly abort the transaction.
-    assert.commandFailedWithCode(sessionDB.runCommand({find: collName, filter: {_id: -5}}),
+    // Target Shard2, to verify the transaction on it is aborted implicitly later.
+    assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
+
+    // Targets all shards. Shard0 is stale and won't refresh its metadata, so mongos should exhaust
+    // its retries and implicitly abort the transaction.
+    assert.commandFailedWithCode(sessionDB.runCommand({find: collName}),
                                  ErrorCodes.NoSuchTransaction);
 
-    session.abortTransaction();
+    // Verify the shards that did not return an error were also aborted.
+    assertNoSuchTransactionOnAllShards(
+        st, session.getSessionId(), session.getTxnNumber_forTesting());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     assert.commandWorked(st.rs0.getPrimary().adminCommand(
         {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));

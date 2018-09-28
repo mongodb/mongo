@@ -59,7 +59,10 @@
                                                      ErrorCodes.NoSuchTransaction);
             assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-            session.abortTransaction();
+            assertNoSuchTransactionOnAllShards(
+                st, session.getSessionId(), session.getTxnNumber_forTesting());
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                         ErrorCodes.NoSuchTransaction);
         }
     }
 

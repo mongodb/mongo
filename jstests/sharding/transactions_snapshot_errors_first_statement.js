@@ -114,9 +114,13 @@
                                                      ErrorCodes.NoSuchTransaction);
             assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-            session.abortTransaction();
-
             unsetFailCommandOnEachShard(st, numShardsToError);
+
+            assertNoSuchTransactionOnAllShards(
+                st, session.getSessionId(), session.getTxnNumber_forTesting());
+
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                         ErrorCodes.NoSuchTransaction);
         }
     }
 
@@ -162,7 +166,7 @@
 
     // Test only one shard throwing the error when more than one are targeted.
     for (let errorCode of kSnapshotErrors) {
-        runTest(st, collName, 1, errorCode, 2);
+        runTest(st, collName, 1, errorCode, true);
     }
 
     st.stop();

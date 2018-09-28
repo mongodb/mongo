@@ -46,6 +46,7 @@ selector:
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/snapshot_cursor_commands_mongos.js
   - jstests/sharding/transactions_error_labels.js
+  - jstests/sharding/transactions_implicit_abort.js
   - jstests/sharding/transactions_snapshot_errors_first_statement.js
   - jstests/sharding/transactions_snapshot_errors_subsequent_statements.js
   - jstests/sharding/transactions_stale_database_version_errors.js

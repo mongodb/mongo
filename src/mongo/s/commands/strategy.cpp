@@ -57,6 +57,7 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -150,6 +151,44 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
     }
 }
 
+/**
+ * Invokes the given command and aborts the transaction on any non-retryable errors.
+ */
+void invokeInTransactionRouter(OperationContext* opCtx,
+                               CommandInvocation* invocation,
+                               TransactionRouter* txnRouter,
+                               rpc::ReplyBuilderInterface* result) {
+    try {
+        invocation->run(opCtx, result);
+    } catch (const DBException& e) {
+        if (ErrorCodes::isSnapshotError(e.code()) ||
+            ErrorCodes::isNeedRetargettingError(e.code()) ||
+            e.code() == ErrorCodes::StaleDbVersion) {
+            // Don't abort on possibly retryable errors.
+            throw;
+        }
+
+        txnRouter->implicitlyAbortTransaction(opCtx);
+        throw;
+    }
+}
+
+/**
+ * Throws NoSuchTransaction if canRetry is false.
+ */
+void handleCanRetryInTransaction(OperationContext* opCtx,
+                                 TransactionRouter* txnRouter,
+                                 bool canRetry,
+                                 const DBException& ex) {
+    if (!canRetry) {
+        uasserted(ErrorCodes::NoSuchTransaction,
+                  str::stream() << "Transaction " << opCtx->getTxnNumber() << " was aborted after "
+                                << kMaxNumStaleVersionRetries
+                                << " failed retries. The latest attempt failed with: "
+                                << ex.toStatus());
+    }
+}
+
 void execCommandClient(OperationContext* opCtx,
                        CommandInvocation* invocation,
                        const OpMsgRequest& request,
@@ -200,16 +239,10 @@ void execCommandClient(OperationContext* opCtx,
         globalOpCounters.gotCommand();
     }
 
-    StatusWith<WriteConcernOptions> wcResult =
-        WriteConcernOptions::extractWCFromCommand(request.body);
-    if (!wcResult.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(body, wcResult.getStatus());
-        return;
-    }
+    auto wcResult = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body));
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();
-    if (!supportsWriteConcern && !wcResult.getValue().usedDefault) {
+    if (!supportsWriteConcern && !wcResult.usedDefault) {
         // This command doesn't do writes so it should not be passed a writeConcern.
         // If we did not use the default writeConcern, one was provided when it shouldn't have
         // been by the user.
@@ -217,6 +250,10 @@ void execCommandClient(OperationContext* opCtx,
         CommandHelpers::appendCommandStatusNoThrow(
             body, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
         return;
+    }
+
+    if (TransactionRouter::get(opCtx)) {
+        validateWriteConcernForTransaction(wcResult, c->getName());
     }
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -269,20 +306,34 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
+    auto txnRouter = TransactionRouter::get(opCtx);
     if (!supportsWriteConcern) {
-        invocation->run(opCtx, result);
+        if (txnRouter) {
+            invokeInTransactionRouter(opCtx, invocation, txnRouter, result);
+        } else {
+            invocation->run(opCtx, result);
+        }
     } else {
         // Change the write concern while running the command.
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
-        opCtx->setWriteConcern(wcResult.getValue());
+        opCtx->setWriteConcern(wcResult);
 
-        invocation->run(opCtx, result);
+        if (txnRouter) {
+            invokeInTransactionRouter(opCtx, invocation, txnRouter, result);
+        } else {
+            invocation->run(opCtx, result);
+        }
     }
+
     auto body = result->getBodyBuilder();
     bool ok = CommandHelpers::extractOrAppendOk(body);
     if (!ok) {
         c->incrementCommandsFailed();
+
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter->implicitlyAbortTransaction(opCtx);
+        }
     }
 }
 
@@ -406,18 +457,14 @@ void runCommand(OperationContext* opCtx,
 
                 Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNs);
 
-                // Update transaction tracking state for a possible retry. Throws if the transaction
-                // cannot continue.
+                // Update transaction tracking state for a possible retry. Throws and aborts the
+                // transaction if it cannot continue.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    auto abortGuard =
+                        MakeGuard([&] { txnRouter->implicitlyAbortTransaction(opCtx); });
+                    handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
                     txnRouter->onStaleShardOrDbError(commandName);
-                    // TODO SERVER-37210: Implicitly abort the transaction if this uassert throws.
-                    uassert(ErrorCodes::NoSuchTransaction,
-                            str::stream() << "Transaction " << opCtx->getTxnNumber()
-                                          << " was aborted after "
-                                          << kMaxNumStaleVersionRetries
-                                          << " failed retries. The latest attempt failed with: "
-                                          << ex.toStatus(),
-                            canRetry);
+                    abortGuard.Dismiss();
                 }
 
                 if (canRetry) {
@@ -429,18 +476,14 @@ void runCommand(OperationContext* opCtx,
                 Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
                                                                          ex->getVersionReceived());
 
-                // Update transaction tracking state for a possible retry. Throws if the transaction
-                // cannot continue.
+                // Update transaction tracking state for a possible retry. Throws and aborts the
+                // transaction if it cannot continue.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    auto abortGuard =
+                        MakeGuard([&] { txnRouter->implicitlyAbortTransaction(opCtx); });
+                    handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
                     txnRouter->onStaleShardOrDbError(commandName);
-                    // TODO SERVER-37210: Implicitly abort the transaction if this uassert throws.
-                    uassert(ErrorCodes::NoSuchTransaction,
-                            str::stream() << "Transaction " << opCtx->getTxnNumber()
-                                          << " was aborted after "
-                                          << kMaxNumStaleVersionRetries
-                                          << " failed retries. The latest attempt failed with: "
-                                          << ex.toStatus(),
-                            canRetry);
+                    abortGuard.Dismiss();
                 }
 
                 if (canRetry) {
@@ -450,18 +493,14 @@ void runCommand(OperationContext* opCtx,
             } catch (const ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
                 // Simple retry on any type of snapshot error.
 
-                // Update transaction tracking state for a possible retry. Throws if the transaction
-                // cannot continue.
+                // Update transaction tracking state for a possible retry. Throws and aborts the
+                // transaction if it cannot continue.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    auto abortGuard =
+                        MakeGuard([&] { txnRouter->implicitlyAbortTransaction(opCtx); });
+                    handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
                     txnRouter->onSnapshotError();
-                    // TODO SERVER-37210: Implicitly abort the transaction if this uassert throws.
-                    uassert(ErrorCodes::NoSuchTransaction,
-                            str::stream() << "Transaction " << opCtx->getTxnNumber()
-                                          << " was aborted after "
-                                          << kMaxNumStaleVersionRetries
-                                          << " failed retries. The latest attempt failed with: "
-                                          << ex.toStatus(),
-                            canRetry);
+                    abortGuard.Dismiss();
                 }
 
                 if (canRetry) {
