@@ -767,6 +767,7 @@ public:
         shardsvrShardCollectionRequest.setGetUUIDfromPrimaryShard(
             request.getGetUUIDfromPrimaryShard());
 
+        // TODO(SERVER-37354): Remove the 'runWithoutInterruption' block.
         auto cmdResponse = opCtx->runWithoutInterruption([&] {
             return uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
                 opCtx,
