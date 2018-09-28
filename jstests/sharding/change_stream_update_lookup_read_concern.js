@@ -130,18 +130,23 @@
                        newClosestSecondary,
                        {ok: true, secondary: true, tags: {tag: "closestSecondary"}},
                        rst);
+    awaitRSClientHosts(st.s,
+                       originalClosestSecondaryDB.getMongo(),
+                       {ok: true, secondary: true, tags: {tag: "fartherSecondary"}},
+                       rst);
     assert.commandWorked(newClosestSecondaryDB.setProfilingLevel(2));
 
     // Make sure new queries with read preference tag "closestSecondary" go to the new secondary.
-    assert.eq(newClosestSecondaryDB.system.profile.count(), 0);
+    profilerHasZeroMatchingEntriesOrThrow({profileDB: newClosestSecondaryDB, filter: {}});
     assert.eq(mongosColl.find()
                   .readPref("nearest", [{tag: "closestSecondary"}])
                   .comment("testing targeting")
                   .itcount(),
               1);
-    assert.gt(newClosestSecondaryDB.system.profile.count(
-                  {ns: mongosColl.getFullName(), "command.comment": "testing targeting"}),
-              0);
+    profilerHasSingleMatchingEntryOrThrow({
+        profileDB: newClosestSecondaryDB,
+        filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"}
+    });
 
     // Test that the change stream continues on the original host, but the update lookup now targets
     // the new, lagged secondary. Even though it's lagged, the lookup should use 'afterClusterTime'
