@@ -227,11 +227,13 @@ public:
                 }
 
                 outputCollNss = NamespaceString(outDB, finalColShort);
-                uassert(ErrorCodes::InvalidNamespace,
-                        "Invalid output namespace",
-                        outputCollNss.isValid());
             }
+        } else if (outElmt.type() == String) {
+            outputCollNss = NamespaceString(outDB, outElmt.String());
         }
+        uassert(ErrorCodes::InvalidNamespace,
+                "Invalid output namespace",
+                inlineOutput || outputCollNss.isValid());
 
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
@@ -332,21 +334,24 @@ public:
 
         auto splitPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
+        // TODO: take distributed lock to prevent split / migration?
+        try {
+            Strategy::commandOp(
+                opCtx, dbname, shardedCommand, nss.ns(), q, collation, &mrCommandResults);
+        } catch (DBException& e) {
+            e.addContext(str::stream() << "could not run map command on all shards for ns "
+                                       << nss.ns()
+                                       << " and query "
+                                       << q);
+            throw;
+        }
+
+        // Now that the output collections of the first phase ("tmp.mrs.<>") have been created, make
+        // a best effort to drop them if any part of the second phase fails.
+        ON_BLOCK_EXIT([&]() { cleanUp(servers, dbname, shardResultCollection); });
+
         {
             bool ok = true;
-
-            // TODO: take distributed lock to prevent split / migration?
-
-            try {
-                Strategy::commandOp(
-                    opCtx, dbname, shardedCommand, nss.ns(), q, collation, &mrCommandResults);
-            } catch (DBException& e) {
-                e.addContext(str::stream() << "could not run map command on all shards for ns "
-                                           << nss.ns()
-                                           << " and query "
-                                           << q);
-                throw;
-            }
 
             for (const auto& mrResult : mrCommandResults) {
                 // Need to gather list of all servers even if an error happened
@@ -394,8 +399,6 @@ public:
             }
 
             if (!ok) {
-                cleanUp(servers, dbname, shardResultCollection);
-
                 // Add "code" to the top-level response, if the failure of the sharded command
                 // can be accounted to a single error.
                 int code = getUniqueCodeFromCommandResults(mrCommandResults);
@@ -612,8 +615,6 @@ public:
                                   << "; expected that collection to be sharded, but it was not",
                     outputRoutingInfo.cm());
         }
-
-        cleanUp(servers, dbname, shardResultCollection);
 
         if (!ok) {
             errmsg = str::stream() << "MR post processing failed: " << singleResult.toString();

@@ -67,6 +67,8 @@ selector:
   - jstests/sharding/wildcard_index_banned_for_shard_key.js
 # Enable if SERVER-20865 is backported or 4.2 becomes last-stable
   - jstests/sharding/sharding_statistics_server_status.js
+  # Enable if SERVER-36966 is backported or 4.2 becomes last-stable
+  - jstests/sharding/mr_output_sharded_validation.js
 executor:
   config:
     shell_options:

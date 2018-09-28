@@ -87,12 +87,6 @@ selector:
   - jstests/core/index_multikey.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
-  # TODO: SERVER-16605
-  - jstests/core/mr_index.js
-  - jstests/core/mr1.js
-  - jstests/core/mr3.js
-  - jstests/core/mr4.js
-  - jstests/core/mr5.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.
