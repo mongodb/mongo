@@ -1,0 +1,36 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # Transactions are not supported on MongoDB standalone nodes.
+  - jstests/core/txns/**/*.js
+  # This test expects a fixed number of operations. The logical session cache will perform its own
+  # operations, inflating the number of operations and causing the test to fail.
+  - jstests/core/opcounters_write_cmd.js
+  # These tests expect the logical session cache refresh thread to be turned off, so that refreshes
+  # can be triggered deterministically.
+  - jstests/core/list_all_local_sessions.js
+  - jstests/core/list_all_sessions.js
+  - jstests/core/list_local_sessions.js
+  - jstests/core/list_sessions.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        disableLogicalSessionCacheRefresh: false
+        logicalSessionRefreshMillis: 100
