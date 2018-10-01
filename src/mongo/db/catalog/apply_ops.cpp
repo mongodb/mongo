@@ -181,6 +181,15 @@ Status _applyOps(OperationContext* opCtx,
 
                         if (nss.isSystemDotIndexes()) {
                             invariant(opCtx->lockState()->isW());
+
+                            // Disable background index builds when inserting into system.indexes.
+                            // This causes the TempRelease to fail within applyOperation_inlock(),
+                            // leading to the background index being built in the foreground.
+                            // We do not want a background index build because we need to validate
+                            // the index spec and also to avoid issues resulting from any metadata
+                            // changes before the background thread starts.
+                            Lock::GlobalWrite nestedGlobalWriteLock(opCtx->lockState());
+
                             OldClientContext ctx(opCtx, nss.ns());
                             status =
                                 repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
