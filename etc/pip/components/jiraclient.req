@@ -1,2 +1,6 @@
 # TIG jira integration
 jira
+requests-oauth
+PyJWT # https://github.com/pycontribs/jira/issues/247
+cryptography # Needed for oauthlib to use RSAAlgorithm
+# We are omitting pycrypto based on https://github.com/pycontribs/jira/pull/629
