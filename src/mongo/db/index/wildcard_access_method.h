@@ -28,22 +28,22 @@
 
 #pragma once
 
-#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
 /**
- * Class which is responsible for generating and providing access to AllPaths index keys. Any index
+ * Class which is responsible for generating and providing access to Wildcard index keys. Any index
  * created with { "$**": ±1 } or { "path.$**": ±1 } uses this class.
  *
  * $** indexes store a special metadata key for each path in the index that is multikey. This class
  * provides an interface to access the multikey metadata: see getMultikeyPathSet().
  */
-class AllPathsAccessMethod final : public IndexAccessMethod {
+class WildcardAccessMethod final : public IndexAccessMethod {
 public:
-    AllPathsAccessMethod(IndexCatalogEntry* allPathsState, SortedDataInterface* btree);
+    WildcardAccessMethod(IndexCatalogEntry* wildcardState, SortedDataInterface* btree);
 
     /**
      * Returns 'true' if the index should become multikey on the basis of the passed arguments.
@@ -67,6 +67,6 @@ private:
                    BSONObjSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths) const final;
 
-    const AllPathsKeyGenerator _keyGen;
+    const WildcardKeyGenerator _keyGen;
 };
 }  // namespace mongo

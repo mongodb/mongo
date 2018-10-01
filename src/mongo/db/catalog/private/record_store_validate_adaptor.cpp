@@ -35,9 +35,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/index/all_paths_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string.h"
@@ -56,7 +56,7 @@ bool isLargeKeyDisallowed() {
 
 KeyString makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
     const auto multikeyMetadataOrd = Ordering::make(BSON("" << 1 << "" << 1));
-    const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kAllPathsMultikeyMetadataId);
+    const RecordId multikeyMetadataRecordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
     return {KeyString::kLatestVersion, indexKey, multikeyMetadataOrd, multikeyMetadataRecordId};
 }
 }
@@ -171,10 +171,10 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
             results->valid = false;
         }
 
-        const RecordId kAllPathsMultikeyMetadataRecordId{
-            RecordId::ReservedId::kAllPathsMultikeyMetadataId};
-        if (descriptor->getIndexType() == IndexType::INDEX_ALLPATHS &&
-            indexEntry->loc == kAllPathsMultikeyMetadataRecordId) {
+        const RecordId kWildcardMultikeyMetadataRecordId{
+            RecordId::ReservedId::kWildcardMultikeyMetadataId};
+        if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
+            indexEntry->loc == kWildcardMultikeyMetadataRecordId) {
             _indexConsistency->removeMultikeyMetadataPath(
                 makeWildCardMultikeyMetadataKeyString(indexEntry->key), indexNumber);
             numKeys++;
@@ -281,7 +281,7 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
     if (results.valid && !idx->isMultikey(_opCtx) &&
-        idx->getIndexType() != IndexType::INDEX_ALLPATHS && totalKeys > numRecs) {
+        idx->getIndexType() != IndexType::INDEX_WILDCARD && totalKeys > numRecs) {
         std::string err = str::stream()
             << "index " << idx->indexName() << " is not multi-key, but has more entries ("
             << numIndexedKeys << ") than documents in the index (" << numRecs - numLongKeys << ")";

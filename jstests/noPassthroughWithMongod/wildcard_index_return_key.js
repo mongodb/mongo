@@ -7,7 +7,7 @@
 
     load("jstests/aggregation/extras/utils.js");
 
-    const coll = db.all_paths_return_key;
+    const coll = db.wildcard_return_key;
     coll.drop();
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));

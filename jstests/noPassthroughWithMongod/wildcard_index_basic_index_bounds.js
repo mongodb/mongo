@@ -17,7 +17,7 @@
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
-    const coll = db.all_paths_index_bounds;
+    const coll = db.wildcard_index_bounds;
     coll.drop();
 
     // Template document which defines the 'schema' of the documents in the test collection.
@@ -82,7 +82,7 @@
     // been indexed based on the spec; this function will confirm that only the appropriate paths
     // are present in the $** index. Finally, for each match expression it will perform a rooted-$or
     // with one predicate on each expected path, and a rooted $and over all predicates and paths.
-    function runAllPathsIndexTest(keyPattern, pathProjection, expectedPaths) {
+    function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.createIndex(
             keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
@@ -202,24 +202,24 @@
 
     try {
         // Test a $** index that indexes the entire document.
-        runAllPathsIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e', 'b.f']);
+        runWildcardIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e', 'b.f']);
 
         // Test a $** index on a single subtree.
-        runAllPathsIndexTest({'a.$**': 1}, null, ['a']);
-        runAllPathsIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e', 'b.f']);
-        runAllPathsIndexTest({'b.d.$**': 1}, null, ['b.d.e']);
+        runWildcardIndexTest({'a.$**': 1}, null, ['a']);
+        runWildcardIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e', 'b.f']);
+        runWildcardIndexTest({'b.d.$**': 1}, null, ['b.d.e']);
 
         // Test a $** index which includes a subset of paths.
-        runAllPathsIndexTest({'$**': 1}, {a: 1}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e', 'b.f']);
-        runAllPathsIndexTest({'$**': 1}, {'b.d': 1}, ['b.d.e']);
-        runAllPathsIndexTest({'$**': 1}, {a: 1, 'b.d': 1}, ['a', 'b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {a: 1}, ['a']);
+        runWildcardIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e', 'b.f']);
+        runWildcardIndexTest({'$**': 1}, {'b.d': 1}, ['b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {a: 1, 'b.d': 1}, ['a', 'b.d.e']);
 
         // Test a $** index which excludes a subset of paths.
-        runAllPathsIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e', 'b.f']);
-        runAllPathsIndexTest({'$**': 1}, {b: 0}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c', 'b.f']);
-        runAllPathsIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f']);
+        runWildcardIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e', 'b.f']);
+        runWildcardIndexTest({'$**': 1}, {b: 0}, ['a']);
+        runWildcardIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c', 'b.f']);
+        runWildcardIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f']);
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(

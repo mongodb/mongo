@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/index/all_paths_key_generator.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -59,9 +59,9 @@ void popPathComponent(BSONElement elem, bool enclosingObjIsArray, FieldRef* path
 }
 }  // namespace
 
-constexpr StringData AllPathsKeyGenerator::kSubtreeSuffix;
+constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 
-std::unique_ptr<ProjectionExecAgg> AllPathsKeyGenerator::createProjectionExec(
+std::unique_ptr<ProjectionExecAgg> WildcardKeyGenerator::createProjectionExec(
     BSONObj keyPattern, BSONObj pathProjection) {
     // We should never have a key pattern that contains more than a single element.
     invariant(keyPattern.nFields() == 1);
@@ -90,21 +90,21 @@ std::unique_ptr<ProjectionExecAgg> AllPathsKeyGenerator::createProjectionExec(
         ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
 }
 
-AllPathsKeyGenerator::AllPathsKeyGenerator(BSONObj keyPattern,
+WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
                                            BSONObj pathProjection,
                                            const CollatorInterface* collator)
     : _collator(collator), _keyPattern(keyPattern) {
     _projExec = createProjectionExec(keyPattern, pathProjection);
 }
 
-void AllPathsKeyGenerator::generateKeys(BSONObj inputDoc,
+void WildcardKeyGenerator::generateKeys(BSONObj inputDoc,
                                         BSONObjSet* keys,
                                         BSONObjSet* multikeyPaths) const {
     FieldRef rootPath;
-    _traverseAllPaths(_projExec->applyProjection(inputDoc), false, &rootPath, keys, multikeyPaths);
+    _traverseWildcard(_projExec->applyProjection(inputDoc), false, &rootPath, keys, multikeyPaths);
 }
 
-void AllPathsKeyGenerator::_traverseAllPaths(BSONObj obj,
+void WildcardKeyGenerator::_traverseWildcard(BSONObj obj,
                                              bool objIsArray,
                                              FieldRef* path,
                                              BSONObjSet* keys,
@@ -130,7 +130,7 @@ void AllPathsKeyGenerator::_traverseAllPaths(BSONObj obj,
                 if (_addKeyForEmptyLeaf(elem, *path, keys))
                     break;
 
-                _traverseAllPaths(
+                _traverseWildcard(
                     elem.Obj(), elem.type() == BSONType::Array, path, keys, multikeyPaths);
                 break;
 
@@ -143,7 +143,7 @@ void AllPathsKeyGenerator::_traverseAllPaths(BSONObj obj,
     }
 }
 
-bool AllPathsKeyGenerator::_addKeyForNestedArray(BSONElement elem,
+bool WildcardKeyGenerator::_addKeyForNestedArray(BSONElement elem,
                                                  const FieldRef& fullPath,
                                                  bool enclosingObjIsArray,
                                                  BSONObjSet* keys) const {
@@ -155,7 +155,7 @@ bool AllPathsKeyGenerator::_addKeyForNestedArray(BSONElement elem,
     return false;
 }
 
-bool AllPathsKeyGenerator::_addKeyForEmptyLeaf(BSONElement elem,
+bool WildcardKeyGenerator::_addKeyForEmptyLeaf(BSONElement elem,
                                                const FieldRef& fullPath,
                                                BSONObjSet* keys) const {
     invariant(elem.isABSONObj());
@@ -168,10 +168,10 @@ bool AllPathsKeyGenerator::_addKeyForEmptyLeaf(BSONElement elem,
     return false;
 }
 
-void AllPathsKeyGenerator::_addKey(BSONElement elem,
+void WildcardKeyGenerator::_addKey(BSONElement elem,
                                    const FieldRef& fullPath,
                                    BSONObjSet* keys) const {
-    // AllPaths keys are of the form { "": "path.to.field", "": <collation-aware value> }.
+    // Wildcard keys are of the form { "": "path.to.field", "": <collation-aware value> }.
     BSONObjBuilder bob;
     bob.append("", fullPath.dottedField());
     if (elem) {
@@ -182,7 +182,7 @@ void AllPathsKeyGenerator::_addKey(BSONElement elem,
     keys->insert(bob.obj());
 }
 
-void AllPathsKeyGenerator::_addMultiKey(const FieldRef& fullPath, BSONObjSet* multikeyPaths) const {
+void WildcardKeyGenerator::_addMultiKey(const FieldRef& fullPath, BSONObjSet* multikeyPaths) const {
     // Multikey paths are denoted by a key of the form { "": 1, "": "path.to.array" }. The argument
     // 'multikeyPaths' may be nullptr if the access method is being used in an operation which does
     // not require multikey path generation.

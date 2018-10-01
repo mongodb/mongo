@@ -17,13 +17,13 @@
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
-    const coll = db.all_paths_and_text_indexes;
+    const coll = db.wildcard_and_text_indexes;
     coll.drop();
 
-    // Runs a single allPaths query test, confirming that an indexed solution exists, that the $**
+    // Runs a single wildcard query test, confirming that an indexed solution exists, that the $**
     // index on the given 'expectedPath' was used to answer the query, and that the results are
     // identical to those obtained via COLLSCAN.
-    function assertAllPathsQuery(query, expectedPath) {
+    function assertWildcardQuery(query, expectedPath) {
         // Explain the query, and determine whether an indexed solution is available.
         const explainOutput = coll.find(query).explain("executionStats");
         const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
@@ -43,9 +43,9 @@
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
     try {
-        // Build an allPaths index, and verify that it can be used to query for the field '_fts'.
+        // Build a wildcard index, and verify that it can be used to query for the field '_fts'.
         assert.commandWorked(coll.createIndex({"$**": 1}));
-        assertAllPathsQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
+        assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
 
         // Perform the tests below for simple and compound $text indexes.
         for (let textIndex of[{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
@@ -54,7 +54,7 @@
 
             // Confirm that the $** index can still be used to query for the '_fts' field outside of
             // a $text query.
-            assertAllPathsQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
+            assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
 
             // Confirm that $** does not generate a candidate plan for $text search, including cases
             // when the query filter contains a compound field in the $text index.
@@ -80,13 +80,13 @@
             assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
             assert.eq(explainOut.executionStats.nReturned, 3);
 
-            const textOrAllPaths = getPlanStages(explainOut.queryPlanner.winningPlan, "OR").shift();
-            assert.eq(textOrAllPaths.inputStages.length, 2);
-            const textBranch = (textOrAllPaths.inputStages[0].stage === "TEXT" ? 0 : 1);
-            const allPathsBranch = (textBranch + 1) % 2;
-            assert.eq(textOrAllPaths.inputStages[textBranch].stage, "TEXT");
-            assert.eq(textOrAllPaths.inputStages[allPathsBranch].stage, "IXSCAN");
-            assert.eq(textOrAllPaths.inputStages[allPathsBranch].keyPattern, {$_path: 1, _fts: 1});
+            const textOrWildcard = getPlanStages(explainOut.queryPlanner.winningPlan, "OR").shift();
+            assert.eq(textOrWildcard.inputStages.length, 2);
+            const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT" ? 0 : 1);
+            const wildcardBranch = (textBranch + 1) % 2;
+            assert.eq(textOrWildcard.inputStages[textBranch].stage, "TEXT");
+            assert.eq(textOrWildcard.inputStages[wildcardBranch].stage, "IXSCAN");
+            assert.eq(textOrWildcard.inputStages[wildcardBranch].keyPattern, {$_path: 1, _fts: 1});
 
             // Drop the index so that a different text index can be created.
             assert.commandWorked(coll.dropIndex("textIndex"));

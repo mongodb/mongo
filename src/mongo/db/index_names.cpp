@@ -41,7 +41,7 @@ const string IndexNames::GEO_2DSPHERE = "2dsphere";
 const string IndexNames::TEXT = "text";
 const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
-const string IndexNames::ALLPATHS = "allPaths";
+const string IndexNames::WILDCARD = "wildcard";
 
 const StringMap<IndexType> kIndexNameToType = {
     {IndexNames::GEO_2D, INDEX_2D},
@@ -49,7 +49,7 @@ const StringMap<IndexType> kIndexNameToType = {
     {IndexNames::GEO_2DSPHERE, INDEX_2DSPHERE},
     {IndexNames::TEXT, INDEX_TEXT},
     {IndexNames::HASHED, INDEX_HASHED},
-    {IndexNames::ALLPATHS, INDEX_ALLPATHS},
+    {IndexNames::WILDCARD, INDEX_WILDCARD},
 };
 
 // static
@@ -61,7 +61,7 @@ string IndexNames::findPluginName(const BSONObj& keyPattern) {
         if (String == e.type()) {
             return e.String();
         } else if ((fieldName == "$**") || fieldName.endsWith(".$**")) {
-            return IndexNames::ALLPATHS;
+            return IndexNames::WILDCARD;
         } else
             continue;
     }
@@ -74,7 +74,7 @@ bool IndexNames::isKnownName(const string& name) {
     return name == IndexNames::GEO_2D || name == IndexNames::GEO_2DSPHERE ||
         name == IndexNames::GEO_HAYSTACK || name == IndexNames::TEXT ||
         name == IndexNames::HASHED || name == IndexNames::BTREE ||
-        (getTestCommandsEnabled() && name == IndexNames::ALLPATHS);
+        (getTestCommandsEnabled() && name == IndexNames::WILDCARD);
 }
 
 // static

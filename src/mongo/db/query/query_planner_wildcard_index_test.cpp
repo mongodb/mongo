@@ -38,7 +38,7 @@ const std::string kIndexName = "indexName";
  * A specialization of the QueryPlannerTest fixture which makes it easy to present the planner with
  * a view of the available $** indexes.
  */
-class QueryPlannerAllPathsTest : public QueryPlannerTest {
+class QueryPlannerWildcardTest : public QueryPlannerTest {
 protected:
     void setUp() final {
         QueryPlannerTest::setUp();
@@ -48,7 +48,7 @@ protected:
         params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     }
 
-    void addAllPathsIndex(BSONObj keyPattern,
+    void addWildcardIndex(BSONObj keyPattern,
                           const std::set<std::string>& multikeyPathSet = {},
                           BSONObj wildcardProjection = BSONObj{},
                           MatchExpression* partialFilterExpr = nullptr) {
@@ -63,7 +63,7 @@ protected:
         BSONObj infoObj = BSON("wildcardProjection" << wildcardProjection);
 
         params.indices.push_back(IndexEntry{std::move(keyPattern),
-                                            IndexType::INDEX_ALLPATHS,
+                                            IndexType::INDEX_WILDCARD,
                                             isMultikey,
                                             {},  // multikeyPaths
                                             std::move(multikeyFieldRefs),
@@ -80,7 +80,7 @@ protected:
 // Null comparison and existence tests.
 //
 
-TEST_F(QueryPlannerAllPathsTest, ExistsTrueQueriesUseAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, ExistsTrueQueriesUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$exists: true}}"));
@@ -89,7 +89,7 @@ TEST_F(QueryPlannerAllPathsTest, ExistsTrueQueriesUseAllPathsIndexes) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ExistsFalseQueriesDontUseAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, ExistsFalseQueriesDontUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$exists: false}}"));
@@ -98,7 +98,7 @@ TEST_F(QueryPlannerAllPathsTest, ExistsFalseQueriesDontUseAllPathsIndexes) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualsNullQueriesDontUseAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, EqualsNullQueriesDontUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$eq: null}}"));
@@ -107,7 +107,7 @@ TEST_F(QueryPlannerAllPathsTest, EqualsNullQueriesDontUseAllPathsIndexes) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, NotEqualsNullQueriesDontUseAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullQueriesDontUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$ne: null}}"));
@@ -116,7 +116,7 @@ TEST_F(QueryPlannerAllPathsTest, NotEqualsNullQueriesDontUseAllPathsIndexes) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, NotEqualsNullAndExistsQueriesUseAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullAndExistsQueriesUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$ne: null, $exists: true}}"));
@@ -125,7 +125,7 @@ TEST_F(QueryPlannerAllPathsTest, NotEqualsNullAndExistsQueriesUseAllPathsIndexes
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualsNullAndExistsQueriesUseAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, EqualsNullAndExistsQueriesUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$eq: null, $exists: true}}"));
@@ -134,7 +134,7 @@ TEST_F(QueryPlannerAllPathsTest, EqualsNullAndExistsQueriesUseAllPathsIndexes) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EmptyBoundsWithAllPathsIndexes) {
+TEST_F(QueryPlannerWildcardTest, EmptyBoundsWithWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$lte: 5, $gte: 10}}"));
@@ -147,8 +147,8 @@ TEST_F(QueryPlannerAllPathsTest, EmptyBoundsWithAllPathsIndexes) {
 // Multikey planning tests.
 //
 
-TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverMultikeyFieldNoElemMatch) {
-    addAllPathsIndex(BSON("$**" << 1), {"a"});
+TEST_F(QueryPlannerWildcardTest, MultiplePredicatesOverMultikeyFieldNoElemMatch) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$gt: 0, $lt: 9}}"));
 
     assertNumSolutions(2U);
@@ -162,8 +162,8 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverMultikeyFieldNoElemMatch)
         "bounds: {'$_path': [['a','a',true,true]], a: [[0,Infinity,false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverMultikeyFieldWithElemMatch) {
-    addAllPathsIndex(BSON("$**" << 1), {"a"});
+TEST_F(QueryPlannerWildcardTest, MultiplePredicatesOverMultikeyFieldWithElemMatch) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$elemMatch: {$gt: 0, $lt: 9}}}"));
 
     assertNumSolutions(1U);
@@ -173,8 +173,8 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverMultikeyFieldWithElemMatc
         "bounds: {'$_path': [['a','a',true,true]], a: [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNonMultikeyFieldWithMultikeyIndex) {
-    addAllPathsIndex(BSON("$**" << 1), {"b"});
+TEST_F(QueryPlannerWildcardTest, MultiplePredicatesOverNonMultikeyFieldWithMultikeyIndex) {
+    addWildcardIndex(BSON("$**" << 1), {"b"});
     runQuery(fromjson("{a: {$gt: 0, $lt: 9}}"));
 
     assertNumSolutions(1U);
@@ -183,8 +183,8 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNonMultikeyFieldWithMulti
         "bounds: {'$_path': [['a','a',true,true]], a: [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithFirstComponentMultikey) {
-    addAllPathsIndex(BSON("$**" << 1), {"a"});
+TEST_F(QueryPlannerWildcardTest, MultiplePredicatesOverNestedFieldWithFirstComponentMultikey) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{'a.b': {$gt: 0, $lt: 9}}"));
 
     assertNumSolutions(2U);
@@ -198,8 +198,8 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithFirstCompo
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,Infinity,false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithElemMatchObject) {
-    addAllPathsIndex(BSON("$**" << 1), {"a"});
+TEST_F(QueryPlannerWildcardTest, MultiplePredicatesOverNestedFieldWithElemMatchObject) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$elemMatch: {b: {$gt: 0, $lt: 9}}}}"));
 
     assertNumSolutions(1U);
@@ -209,9 +209,9 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithElemMatchO
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest,
+TEST_F(QueryPlannerWildcardTest,
        MultiplePredicatesOverNestedFieldWithElemMatchObjectBothComponentsMultikey) {
-    addAllPathsIndex(BSON("$**" << 1), {"a", "a.b"});
+    addWildcardIndex(BSON("$**" << 1), {"a", "a.b"});
     runQuery(fromjson("{a: {$elemMatch: {b: {$gt: 0, $lt: 9}}}}"));
 
     assertNumSolutions(2U);
@@ -225,8 +225,8 @@ TEST_F(QueryPlannerAllPathsTest,
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,Infinity,false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithTwoElemMatches) {
-    addAllPathsIndex(BSON("$**" << 1), {"a", "a.b"});
+TEST_F(QueryPlannerWildcardTest, MultiplePredicatesOverNestedFieldWithTwoElemMatches) {
+    addWildcardIndex(BSON("$**" << 1), {"a", "a.b"});
     runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {$gt: 0, $lt: 9}}}}}"));
 
     assertNumSolutions(1U);
@@ -236,8 +236,8 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithTwoElemMat
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ElemMatchOnInnermostMultikeyPathPermitsTightBounds) {
-    addAllPathsIndex(BSON("$**" << 1), {"a", "a.b", "a.b.c"});
+TEST_F(QueryPlannerWildcardTest, ElemMatchOnInnermostMultikeyPathPermitsTightBounds) {
+    addWildcardIndex(BSON("$**" << 1), {"a", "a.b", "a.b.c"});
     runQuery(fromjson("{'a.b.c': {$elemMatch: {'d.e.f': {$gt: 0, $lt: 9}}}}"));
 
     assertNumSolutions(1U);
@@ -248,8 +248,8 @@ TEST_F(QueryPlannerAllPathsTest, ElemMatchOnInnermostMultikeyPathPermitsTightBou
         "'a.b.c.d.e.f': [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPredsEligibleForIndexUseGenerateCandidatePlans) {
-    addAllPathsIndex(BSON("a.$**" << 1), {"a.b", "a.c"});
+TEST_F(QueryPlannerWildcardTest, AllPredsEligibleForIndexUseGenerateCandidatePlans) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a.b", "a.c"});
     runQuery(
         fromjson("{'a.b': {$gt: 0, $lt: 9}, 'a.c': {$gt: 11, $lt: 20}, d: {$gt: 31, $lt: 40}}"));
 
@@ -272,8 +272,8 @@ TEST_F(QueryPlannerAllPathsTest, AllPredsEligibleForIndexUseGenerateCandidatePla
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,Infinity,false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, RangeIndexScan) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, RangeIndexScan) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$gt: 0, $lt: 9}}"));
 
     assertNumSolutions(1U);
@@ -283,8 +283,8 @@ TEST_F(QueryPlannerAllPathsTest, RangeIndexScan) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, RangeIndexScanEmptyRange) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, RangeIndexScanEmptyRange) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$gt: 9, $lt: 0}}"));
 
     assertNumSolutions(1U);
@@ -294,8 +294,8 @@ TEST_F(QueryPlannerAllPathsTest, RangeIndexScanEmptyRange) {
         "bounds: {'$_path': [['a','a',true,true]], 'a': []}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, RangeIndexScanMinKeyMaxKey) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, RangeIndexScanMinKeyMaxKey) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$gt: {$minKey: 1}, $lt: {$maxKey: 1}}}"));
 
     assertNumSolutions(1U);
@@ -306,8 +306,8 @@ TEST_F(QueryPlannerAllPathsTest, RangeIndexScanMinKeyMaxKey) {
         "'MaxKey', true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, RangeIndexScanNestedField) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, RangeIndexScanNestedField) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{'a.b': {$gt: 0, $lt: 9}}"));
 
     assertNumSolutions(1U);
@@ -317,8 +317,8 @@ TEST_F(QueryPlannerAllPathsTest, RangeIndexScanNestedField) {
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,9,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualityIndexScan) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, EqualityIndexScan) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$eq: 5}}"));
 
     assertNumSolutions(1U);
@@ -328,8 +328,8 @@ TEST_F(QueryPlannerAllPathsTest, EqualityIndexScan) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualityIndexScanOverNestedField) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, EqualityIndexScanOverNestedField) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{'a.b': {$eq: 5}}"));
 
     assertNumSolutions(1U);
@@ -339,8 +339,8 @@ TEST_F(QueryPlannerAllPathsTest, EqualityIndexScanOverNestedField) {
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[5,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ExprEqCanUseIndex) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, ExprEqCanUseIndex) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
 
     assertNumSolutions(1U);
@@ -349,8 +349,8 @@ TEST_F(QueryPlannerAllPathsTest, ExprEqCanUseIndex) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ExprEqCanUseSparseIndexForEqualityToNull) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$_internalExprEq: null}}"));
 
     assertNumSolutions(1U);
@@ -360,7 +360,7 @@ TEST_F(QueryPlannerAllPathsTest, ExprEqCanUseSparseIndexForEqualityToNull) {
         "[null,null,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, PrefixRegex) {
+TEST_F(QueryPlannerWildcardTest, PrefixRegex) {
     addIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: /^foo/}"));
 
@@ -371,7 +371,7 @@ TEST_F(QueryPlannerAllPathsTest, PrefixRegex) {
         "a: [['foo','fop',true,false], [/^foo/,/^foo/,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, NonPrefixRegex) {
+TEST_F(QueryPlannerWildcardTest, NonPrefixRegex) {
     addIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: /foo/}"));
 
@@ -382,8 +382,8 @@ TEST_F(QueryPlannerAllPathsTest, NonPrefixRegex) {
         "a: [['',{},true,false], [/foo/,/foo/,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, GreaterThan) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, GreaterThan) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$gt: 5}}"));
 
     assertNumSolutions(1U);
@@ -393,8 +393,8 @@ TEST_F(QueryPlannerAllPathsTest, GreaterThan) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,Infinity,false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, GreaterThanEqualTo) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, GreaterThanEqualTo) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$gte: 5}}"));
 
     assertNumSolutions(1U);
@@ -404,8 +404,8 @@ TEST_F(QueryPlannerAllPathsTest, GreaterThanEqualTo) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,Infinity,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, LessThan) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, LessThan) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$lt: 5}}"));
 
     assertNumSolutions(1U);
@@ -415,8 +415,8 @@ TEST_F(QueryPlannerAllPathsTest, LessThan) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity,5,true,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, LessThanEqualTo) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, LessThanEqualTo) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$lte: 5}}"));
 
     assertNumSolutions(1U);
@@ -426,8 +426,8 @@ TEST_F(QueryPlannerAllPathsTest, LessThanEqualTo) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, Mod) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, Mod) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$mod: [2, 0]}}"));
 
     assertNumSolutions(1U);
@@ -437,8 +437,8 @@ TEST_F(QueryPlannerAllPathsTest, Mod) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[NaN,Infinity, true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ExistsTrue) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, ExistsTrue) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{x: {$exists: true}}"));
 
     assertNumSolutions(1U);
@@ -449,16 +449,16 @@ TEST_F(QueryPlannerAllPathsTest, ExistsTrue) {
         "[['MinKey','MaxKey',true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ExistsFalseDoesNotUseIndex) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, ExistsFalseDoesNotUseIndex) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{x: {$exists: false}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AndEqualityWithTwoPredicatesIndexesOnePath) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, AndEqualityWithTwoPredicatesIndexesOnePath) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: 5, b: 10}"));
 
     assertNumSolutions(2U);
@@ -468,8 +468,8 @@ TEST_F(QueryPlannerAllPathsTest, AndEqualityWithTwoPredicatesIndexesOnePath) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, OrEqualityWithTwoPredicatesUsesTwoPaths) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, OrEqualityWithTwoPredicatesUsesTwoPaths) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{$or: [{a: 5}, {b: 10}]}"));
 
     assertNumSolutions(1U);
@@ -482,8 +482,8 @@ TEST_F(QueryPlannerAllPathsTest, OrEqualityWithTwoPredicatesUsesTwoPaths) {
     ;
 }
 
-TEST_F(QueryPlannerAllPathsTest, OrWithOneRegularAndOneAllPathsIndexPathUsesTwoIndexes) {
-    addAllPathsIndex(BSON("a.$**" << 1));
+TEST_F(QueryPlannerWildcardTest, OrWithOneRegularAndOneWildcardIndexPathUsesTwoIndexes) {
+    addWildcardIndex(BSON("a.$**" << 1));
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{$or: [{a: 5}, {b: 10}]}"));
 
@@ -497,8 +497,8 @@ TEST_F(QueryPlannerAllPathsTest, OrWithOneRegularAndOneAllPathsIndexPathUsesTwoI
     ;
 }
 
-TEST_F(QueryPlannerAllPathsTest, BasicSkip) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, BasicSkip) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuerySkipNToReturn(BSON("a" << 5), 8, 0);
 
     assertNumSolutions(1U);
@@ -508,8 +508,8 @@ TEST_F(QueryPlannerAllPathsTest, BasicSkip) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, CoveredSkip) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, CoveredSkip) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuerySortProjSkipNToReturn(fromjson("{a: 5}"), BSONObj(), fromjson("{_id: 0, a: 1}"), 8, 0);
 
     assertNumSolutions(1U);
@@ -519,8 +519,8 @@ TEST_F(QueryPlannerAllPathsTest, CoveredSkip) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, BasicLimit) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, BasicLimit) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuerySkipNToReturn(BSON("a" << 5), 0, -5);
 
     assertNumSolutions(1U);
@@ -530,8 +530,8 @@ TEST_F(QueryPlannerAllPathsTest, BasicLimit) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, BasicCovering) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, BasicCovering) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuerySortProj(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
 
     assertNumSolutions(1U);
@@ -540,8 +540,8 @@ TEST_F(QueryPlannerAllPathsTest, BasicCovering) {
         "bounds: {'$_path': [['x','x',true,true]], x: [[1,Infinity,false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, DottedFieldCovering) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, DottedFieldCovering) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuerySortProj(fromjson("{'a.b': 5}"), BSONObj(), fromjson("{_id: 0, 'a.b': 1}"));
 
     assertNumSolutions(1U);
@@ -551,9 +551,9 @@ TEST_F(QueryPlannerAllPathsTest, DottedFieldCovering) {
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[5,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, CoveredIxscanForCountOnIndexedPath) {
+TEST_F(QueryPlannerWildcardTest, CoveredIxscanForCountOnIndexedPath) {
     params.options = QueryPlannerParams::IS_COUNT;
-    addAllPathsIndex(BSON("$**" << 1));
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: 5}"));
 
     assertNumSolutions(1U);
@@ -562,8 +562,8 @@ TEST_F(QueryPlannerAllPathsTest, CoveredIxscanForCountOnIndexedPath) {
         "bounds: {'$_path': [['a','a',true,true]], 'a': [[5,5,true,true]]}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, InBasic) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, InBasic) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$in: [1, 2]}}"));
 
     assertNumSolutions(1U);
@@ -573,8 +573,8 @@ TEST_F(QueryPlannerAllPathsTest, InBasic) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualsEmptyArray) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, EqualsEmptyArray) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: []}"));
 
     assertNumSolutions(1U);
@@ -584,29 +584,29 @@ TEST_F(QueryPlannerAllPathsTest, EqualsEmptyArray) {
         "[[undefined,undefined,true,true],[[],[],true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualsNonEmptyArray) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, EqualsNonEmptyArray) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: [1]}"));
 
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualsNestedEmptyArray) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, EqualsNestedEmptyArray) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: [[]]}"));
 
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, EqualsArrayWithValue) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, EqualsArrayWithValue) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: [[1]]}"));
 
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, InEmptyArray) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, InEmptyArray) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$in: [[]]}}"));
 
     assertNumSolutions(1U);
@@ -616,22 +616,22 @@ TEST_F(QueryPlannerAllPathsTest, InEmptyArray) {
         "[[undefined,undefined,true,true],[[],[],true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, InNonEmptyArray) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, InNonEmptyArray) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$in: [[1]]}}"));
 
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, InNestedEmptyArray) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, InNestedEmptyArray) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$in: [[[]]]}}"));
 
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, InArrayWithValue) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, InArrayWithValue) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$in: [[[1]]]}}"));
 
     assertHasOnlyCollscan();
@@ -639,8 +639,8 @@ TEST_F(QueryPlannerAllPathsTest, InArrayWithValue) {
 
 // Logically equivalent to the preceding $in query.
 // Indexed solution should be the same.
-TEST_F(QueryPlannerAllPathsTest, InBasicOrEquivalent) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, InBasicOrEquivalent) {
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{$or: [{a: 1}, {a: 2}]}"));
 
     assertNumSolutions(1U);
@@ -650,10 +650,10 @@ TEST_F(QueryPlannerAllPathsTest, InBasicOrEquivalent) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, PartialIndexCanAnswerPredicateOnFilteredField) {
+TEST_F(QueryPlannerWildcardTest, PartialIndexCanAnswerPredicateOnFilteredField) {
     auto filterObj = fromjson("{a: {$gt: 0}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
-    addAllPathsIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
+    addWildcardIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
 
     runQuery(fromjson("{a: {$gte: 5}}"));
     assertNumSolutions(1U);
@@ -677,12 +677,12 @@ TEST_F(QueryPlannerAllPathsTest, PartialIndexCanAnswerPredicateOnFilteredField) 
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, PartialIndexDoesNotAnswerPredicatesExcludedByFilter) {
+TEST_F(QueryPlannerWildcardTest, PartialIndexDoesNotAnswerPredicatesExcludedByFilter) {
     // Must keep 'filterObj' around since match expressions will store pointers into the BSON they
     // were parsed from.
     auto filterObj = fromjson("{a: {$gt: 0}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
-    addAllPathsIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
+    addWildcardIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
 
     runQuery(fromjson("{a: {$gte: -1}}"));
     assertHasOnlyCollscan();
@@ -694,10 +694,10 @@ TEST_F(QueryPlannerAllPathsTest, PartialIndexDoesNotAnswerPredicatesExcludedByFi
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, PartialIndexCanAnswerPredicateOnUnrelatedField) {
+TEST_F(QueryPlannerWildcardTest, PartialIndexCanAnswerPredicateOnUnrelatedField) {
     auto filterObj = fromjson("{a: {$gt: 0}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
-    addAllPathsIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
+    addWildcardIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
 
     // Test when the field query is not included by the partial filter expression.
     runQuery(fromjson("{b: {$gte: -1}, a: {$gte: 5}}"));
@@ -712,10 +712,10 @@ TEST_F(QueryPlannerAllPathsTest, PartialIndexCanAnswerPredicateOnUnrelatedField)
         "bounds: {'$_path': [['a','a',true,true]], a: [[5,Infinity,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, PartialIndexWithExistsTrueFilterCanAnswerExistenceQuery) {
+TEST_F(QueryPlannerWildcardTest, PartialIndexWithExistsTrueFilterCanAnswerExistenceQuery) {
     auto filterObj = fromjson("{x: {$exists: true}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
-    addAllPathsIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
+    addWildcardIndex(BSON("$**" << 1), {}, BSONObj{}, filterExpr.get());
     runQuery(fromjson("{x: {$exists: true}}"));
 
     assertNumSolutions(1U);
@@ -730,7 +730,7 @@ TEST_F(QueryPlannerAllPathsTest, PartialIndexWithExistsTrueFilterCanAnswerExiste
 // Index intersection tests.
 //
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersection) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotParticipateInIndexIntersection) {
     // Enable both AND_SORTED and AND_HASH index intersection for this test.
     params.options |= QueryPlannerParams::INDEX_INTERSECTION;
     internalQueryPlannerEnableHashIntersection.store(true);
@@ -764,7 +764,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
         "{filter: null, pattern: {a:1}}},{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
 
     // Now add a $** index and re-run the tests.
-    addAllPathsIndex(BSON("$**" << 1));
+    addWildcardIndex(BSON("$**" << 1));
 
     // First re-run the AND_SORTED test.
     runQuery(fromjson("{a:10, b:10}"));
@@ -804,17 +804,17 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
 }
 
 //
-// AllPaths and $text index tests.
+// Wildcard and $text index tests.
 //
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextSearch) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotSupplyCandidatePlanForTextSearch) {
+    addWildcardIndex(BSON("$**" << 1));
     addIndex(BSON("a" << 1 << "_fts"
                       << "text"
                       << "_ftsx"
                       << 1));
 
-    // Confirm that the allPaths index generates candidate plans for queries which do not include a
+    // Confirm that the wildcard index generates candidate plans for queries which do not include a
     // $text predicate.
     runQuery(fromjson("{a: 10, b: 10}"));
     assertNumSolutions(2U);
@@ -823,7 +823,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextS
     assertSolutionExists(
         "{fetch: {filter: {a: 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, b: 1}}}}}");
 
-    // Confirm that the allPaths index does not produce any candidate plans when a query includes a
+    // Confirm that the wildcard index does not produce any candidate plans when a query includes a
     // $text predicate, even for non-$text predicates which may be present in the query.
     runQuery(fromjson("{a: 10, b: 10, $text: {$search: 'banana'}}"));
     assertNumSolutions(1U);
@@ -831,10 +831,10 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextS
         "{fetch: {filter: {b: 10}, node: {text: {prefix: {a: 10}, search: 'banana'}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicate) {
-    // AllPaths indexes can't support negation queries because they are sparse, and {a: {$ne: 5}}
+TEST_F(QueryPlannerWildcardTest, WildcardDoesNotSupportNegationPredicate) {
+    // Wildcard indexes can't support negation queries because they are sparse, and {a: {$ne: 5}}
     // will match documents which don't have an "a" field.
-    addAllPathsIndex(BSON("$**" << 1));
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$ne: 5}}"));
     assertHasOnlyCollscan();
 
@@ -842,11 +842,11 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicate) {
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest,
-       AllPathsDoesNotSupportNegationPredicateInsideElemMatchMultiKeyPath) {
-    // Logically, there's no reason a (sparse) allPaths index could not support a negation inside a
+TEST_F(QueryPlannerWildcardTest,
+       WildcardDoesNotSupportNegationPredicateInsideElemMatchMultiKeyPath) {
+    // Logically, there's no reason a (sparse) wildcard index could not support a negation inside a
     // "$elemMatch value", but it is not something we've implemented.
-    addAllPathsIndex(BSON("$**" << 1), {"a"});
+    addWildcardIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
     assertHasOnlyCollscan();
 
@@ -854,11 +854,11 @@ TEST_F(QueryPlannerAllPathsTest,
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicateInsideElemMatch) {
+TEST_F(QueryPlannerWildcardTest, WildcardDoesNotSupportNegationPredicateInsideElemMatch) {
     // Test the case where we use $elemMatch on a path which isn't even multikey. In this case,
     // we'd know up front that the results would be empty, but this is not an optimization we
     // support.
-    addAllPathsIndex(BSON("$**" << 1));
+    addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
     assertHasOnlyCollscan();
 
@@ -870,7 +870,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicateInsideEl
 // Hinting with all paths index tests.
 //
 
-TEST_F(QueryPlannerTest, ChooseAllPathsIndexHint) {
+TEST_F(QueryPlannerTest, ChooseWildcardIndexHint) {
     addIndex(BSON("$**" << 1));
     addIndex(BSON("x" << 1));
 
@@ -880,21 +880,21 @@ TEST_F(QueryPlannerTest, ChooseAllPathsIndexHint) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintByName) {
-    StringData allPaths = "allPaths";
+TEST_F(QueryPlannerTest, ChooseWildcardIndexHintByName) {
+    StringData wildcard = "wildcard";
     CollatorInterface* nullCollator = nullptr;
-    addIndex(BSON("$**" << 1), nullCollator, allPaths);
+    addIndex(BSON("$**" << 1), nullCollator, wildcard);
     addIndex(BSON("x" << 1));
 
     runQueryHint(fromjson("{x: {$eq: 1}}"),
                  BSON("$hint"
-                      << "allPaths"));
+                      << "wildcard"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithPath) {
+TEST_F(QueryPlannerTest, ChooseWildcardIndexHintWithPath) {
     addIndex(BSON("x.$**" << 1));
     addIndex(BSON("x" << 1));
 
@@ -904,7 +904,7 @@ TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithPath) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithOr) {
+TEST_F(QueryPlannerTest, ChooseWildcardIndexHintWithOr) {
     addIndex(BSON("$**" << 1));
     addIndex(BSON("x" << 1 << "y" << 1));
 
@@ -916,7 +916,7 @@ TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithOr) {
         " {ixscan: {pattern: {$_path: 1, y: 1}}}]}}}}");
 }
 
-TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithCompoundIndex) {
+TEST_F(QueryPlannerTest, ChooseWildcardIndexHintWithCompoundIndex) {
     addIndex(BSON("$**" << 1));
     addIndex(BSON("x" << 1 << "y" << 1));
 
@@ -927,7 +927,7 @@ TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithCompoundIndex) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, y: 1}}}}}");
 }
 
-TEST_F(QueryPlannerTest, QueryNotInAllPathsIndexHint) {
+TEST_F(QueryPlannerTest, QueryNotInWildcardIndexHint) {
     addIndex(BSON("a.$**" << 1));
     addIndex(BSON("x" << 1));
 
@@ -935,13 +935,13 @@ TEST_F(QueryPlannerTest, QueryNotInAllPathsIndexHint) {
     assertNumSolutions(0U);
 }
 
-TEST_F(QueryPlannerTest, AllPathsIndexDoesNotExist) {
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotExist) {
     addIndex(BSON("x" << 1));
 
     runInvalidQueryHint(fromjson("{x: {$eq: 1}}"), BSON("$**" << 1));
 }
 
-TEST_F(QueryPlannerTest, AllPathsIndexHintWithPartialFilter) {
+TEST_F(QueryPlannerTest, WildcardIndexHintWithPartialFilter) {
     auto filterObj = fromjson("{a: {$gt: 100}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
     addIndex(BSON("$**" << 1), filterExpr.get());
@@ -950,7 +950,7 @@ TEST_F(QueryPlannerTest, AllPathsIndexHintWithPartialFilter) {
     assertNumSolutions(0U);
 }
 
-TEST_F(QueryPlannerTest, MultipleAllPathsIndexesHintWithPartialFilter) {
+TEST_F(QueryPlannerTest, MultipleWildcardIndexesHintWithPartialFilter) {
     auto filterObj = fromjson("{a: {$gt: 100}, b: {$gt: 100}}");
     auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
     addIndex(BSON("$**" << 1), filterExpr.get());
@@ -959,7 +959,7 @@ TEST_F(QueryPlannerTest, MultipleAllPathsIndexesHintWithPartialFilter) {
     assertNumSolutions(0U);
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportObjectEquality) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportObjectEquality) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {abc: 1}}"));
@@ -974,7 +974,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportObjectEquality) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportObjectInequality) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportObjectInequality) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$lt: {abc: 1}}}"));
@@ -1007,7 +1007,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportObjectInequality) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportInWithUnsupportedValues) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportInWithUnsupportedValues) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$in: [1, 2, 3, {abc: 1}]}}"));
@@ -1018,7 +1018,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportInWithUnsupportedVal
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesSupportElemMatchWithNull) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexesSupportElemMatchWithNull) {
     addIndex(BSON("$**" << 1));
 
     // Simple case.
@@ -1026,14 +1026,14 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesSupportElemMatchWithNull) {
     assertNumSolutions(1U);
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 
-    // null inside an $in inside an $elemMatch is supported by the allPaths index, since it means
+    // null inside an $in inside an $elemMatch is supported by the wildcard index, since it means
     // we're searching for an explicit null value.
     runQuery(fromjson("{x: {$elemMatch: {$in: [1, 2, 3, null]}}}"));
     assertNumSolutions(1U);
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportElemMatchWithUnsupportedValues) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportElemMatchWithUnsupportedValues) {
     runQuery(fromjson("{x: {$elemMatch: {$eq: ['a', 'b', 'c']}}}"));
     assertHasOnlyCollscan();
 
@@ -1045,13 +1045,13 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportElemMatchWithUnsuppo
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportElemMatchObject) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportElemMatchObject) {
     runQuery(fromjson("{x: {$elemMatch: {a: 1}}}"));
     assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexCanProvideNonBlockingSort) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, WildcardIndexCanProvideNonBlockingSort) {
+    addWildcardIndex(BSON("$**" << 1));
 
     runQuerySortProj(fromjson("{a: 1}"), BSON("a" << 1), BSONObj());
     assertNumSolutions(1U);
@@ -1060,9 +1060,9 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexCanProvideNonBlockingSort) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest,
-       AllPathsIndexCanProvideNonBlockingSortWhenFilterIncludesAdditionalFields) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest,
+       WildcardIndexCanProvideNonBlockingSortWhenFilterIncludesAdditionalFields) {
+    addWildcardIndex(BSON("$**" << 1));
 
     runQuerySortProj(fromjson("{a: {$gte: 3}, b: 1}"), BSON("a" << 1), BSONObj());
     assertNumSolutions(2U);
@@ -1079,8 +1079,8 @@ TEST_F(QueryPlannerAllPathsTest,
         "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithElemMatch) {
-    addAllPathsIndex(BSON("$**" << 1), {"a"});
+TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithElemMatch) {
+    addWildcardIndex(BSON("$**" << 1), {"a"});
 
     runQuerySortProj(fromjson("{a: {$elemMatch: {$eq: 1}}}"), BSON("a" << 1), BSONObj());
     assertNumSolutions(1U);
@@ -1091,8 +1091,8 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithElemMatch) 
         "bounds: {'$_path': [['a','a',true,true]], a: [[1, 1, true, true]]}}}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithCompoundSort) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithCompoundSort) {
+    addWildcardIndex(BSON("$**" << 1));
 
     runQuerySortProj(fromjson("{a: {$lte: 3}}"), BSON("a" << 1 << "b" << 1), BSONObj());
     assertNumSolutions(1U);
@@ -1103,8 +1103,8 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithCompoundSor
         "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity, 3, true, true]]}}}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithExistsQueries) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithExistsQueries) {
+    addWildcardIndex(BSON("$**" << 1));
 
     runQuerySortProj(fromjson("{a: {$exists: true}}"), BSON("a" << 1), BSONObj());
     assertNumSolutions(1U);
@@ -1116,7 +1116,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithExistsQueri
         "true]]}}}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFilterNotPresent) {
+TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterNotPresent) {
     // Since there's no filter on the field that we're sorting by, we cannot use an index scan to
     // answer the query as $** indexes are sparse.
     runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
@@ -1125,8 +1125,8 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFilterNotPr
         "{cscan: {dir: 1}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFilterDoesNotIncludeSortKey) {
-    addAllPathsIndex(BSON("$**" << 1));
+TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterDoesNotIncludeSortKey) {
+    addWildcardIndex(BSON("$**" << 1));
 
     runQuerySortProj(fromjson("{b: 1, c: 1}"), fromjson("{a: 1}"), BSONObj());
     assertNumSolutions(2U);
@@ -1142,8 +1142,8 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFilterDoesN
         "bounds: {'$_path': [['c','c',true,true]], c: [[1, 1, true, true]]}}}}}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFieldIsNotIncluded) {
-    addAllPathsIndex(BSON("$**" << 1), {}, BSON("b" << 0));
+TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFieldIsNotIncluded) {
+    addWildcardIndex(BSON("$**" << 1), {}, BSON("b" << 0));
 
     runQuerySortProj(fromjson("{b: 1}"), fromjson("{b: 1}"), BSONObj());
     assertNumSolutions(1U);
@@ -1158,8 +1158,8 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFieldIsNotI
 // Field name or array index tests.
 //
 
-TEST_F(QueryPlannerAllPathsTest, CannotAnswerQueryThroughArrayIndexProjection) {
-    addAllPathsIndex(BSON("$**" << 1), {"a"}, fromjson("{'a.0': 1, 'a.b': 1}"));
+TEST_F(QueryPlannerWildcardTest, CannotAnswerQueryThroughArrayIndexProjection) {
+    addWildcardIndex(BSON("$**" << 1), {"a"}, fromjson("{'a.0': 1, 'a.b': 1}"));
 
     // Queries whose path lies along a projected array index cannot be answered.
     runQuery(fromjson("{'a.0': 10}"));
@@ -1171,8 +1171,8 @@ TEST_F(QueryPlannerAllPathsTest, CannotAnswerQueryThroughArrayIndexProjection) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, CanAnswerQueryOnNonProjectedArrayIndex) {
-    addAllPathsIndex(BSON("$**" << 1), {"a", "c"}, fromjson("{'a.0': 1, b: 1, c: 1}"));
+TEST_F(QueryPlannerWildcardTest, CanAnswerQueryOnNonProjectedArrayIndex) {
+    addWildcardIndex(BSON("$**" << 1), {"a", "c"}, fromjson("{'a.0': 1, b: 1, c: 1}"));
 
     // Queries on fields that are not projected array indices can be answered, even when such a
     // projection is present in the 'starPathsTempName' spec.
@@ -1191,8 +1191,8 @@ TEST_F(QueryPlannerAllPathsTest, CanAnswerQueryOnNonProjectedArrayIndex) {
         "[[10,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldGenerateAllPotentialPathBoundsForArrayIndexQueries) {
-    addAllPathsIndex(BSON("a.$**" << 1), {"a", "a.b"});
+TEST_F(QueryPlannerWildcardTest, ShouldGenerateAllPotentialPathBoundsForArrayIndexQueries) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a", "a.b"});
 
     // A numeric path component immediately following a multikey path may represent an array index,
     // a fieldname, or both. The $** index does not record array indices explicitly, so for all such
@@ -1221,8 +1221,8 @@ TEST_F(QueryPlannerAllPathsTest, ShouldGenerateAllPotentialPathBoundsForArrayInd
         "['a.b.c','a.b.c',true,true]], 'a.0.b.1.c': [[10,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldAddAllPredicatesToFetchFilterForArrayIndexQueries) {
-    addAllPathsIndex(BSON("$**" << 1), {"a", "a.b"});
+TEST_F(QueryPlannerWildcardTest, ShouldAddAllPredicatesToFetchFilterForArrayIndexQueries) {
+    addWildcardIndex(BSON("$**" << 1), {"a", "a.b"});
 
     // Ordinarily, a query such as {'a': {$gt: 0, $lt: 5}} on a multikey field 'a' produces an EXACT
     // IXSCAN on one of the predicates and a FETCH filter on the other. For fieldname-or-array-index
@@ -1302,8 +1302,8 @@ TEST_F(QueryPlannerAllPathsTest, ShouldAddAllPredicatesToFetchFilterForArrayInde
         "[[10,20,false,false]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldOnlyBuildSpecialBoundsForMultikeyPaths) {
-    addAllPathsIndex(BSON("a.$**" << 1), {"a.b", "a.b.c.d"});
+TEST_F(QueryPlannerWildcardTest, ShouldOnlyBuildSpecialBoundsForMultikeyPaths) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a.b", "a.b.c.d"});
 
     // 'a' is not multikey, so 'a.0' refers specifically to a fieldname rather than an array index,
     // and special bounds will not be generated.
@@ -1350,8 +1350,8 @@ TEST_F(QueryPlannerAllPathsTest, ShouldOnlyBuildSpecialBoundsForMultikeyPaths) {
         "['a.b.c.d.e','a.b.c.d.e',true,true]], 'a.b.1.c.d.3.e':[[10,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldGenerateSpecialBoundsForNumericMultikeyPaths) {
-    addAllPathsIndex(BSON("a.$**" << 1), {"a.b", "a.b.0"});
+TEST_F(QueryPlannerWildcardTest, ShouldGenerateSpecialBoundsForNumericMultikeyPaths) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a.b", "a.b.0"});
 
     // 'a.b.0' is itself a multikey path, but since 'a.b' is multikey 'b.0' may refer to an array
     // element of 'b'. We generate special bounds for 'b.0'.
@@ -1380,8 +1380,8 @@ TEST_F(QueryPlannerAllPathsTest, ShouldGenerateSpecialBoundsForNumericMultikeyPa
         "['a.b.1.c','a.b.1.c',true,true]], 'a.b.1.1.c': [[10,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldNotGenerateSpecialBoundsForFieldNamesWithLeadingZeroes) {
-    addAllPathsIndex(BSON("a.$**" << 1), {"a.b"});
+TEST_F(QueryPlannerWildcardTest, ShouldNotGenerateSpecialBoundsForFieldNamesWithLeadingZeroes) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a.b"});
 
     // 'a.b' is multikey, but '01' is not eligible for consideration as a numeric array index; it is
     // always strictly a field name. We therefore do not generate special bounds.
@@ -1392,8 +1392,8 @@ TEST_F(QueryPlannerAllPathsTest, ShouldNotGenerateSpecialBoundsForFieldNamesWith
         "bounds: {'$_path': [['a.b.01','a.b.01',true,true]], 'a.b.01': [[10,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, InitialNumericPathComponentIsAlwaysFieldName) {
-    addAllPathsIndex(BSON("$**" << 1), {"0"}, fromjson("{'0': 1}"));
+TEST_F(QueryPlannerWildcardTest, InitialNumericPathComponentIsAlwaysFieldName) {
+    addWildcardIndex(BSON("$**" << 1), {"0"}, fromjson("{'0': 1}"));
 
     // '0' is multikey, but the first component in a path can never be an array index since it must
     // always be a field name. We therefore do not generate special bounds for '0.b'.
@@ -1412,8 +1412,8 @@ TEST_F(QueryPlannerAllPathsTest, InitialNumericPathComponentIsAlwaysFieldName) {
         "'0.1.b': [[10,10,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldGenerateSpecialBoundsForNullAndExistenceQueries) {
-    addAllPathsIndex(BSON("a.$**" << 1), {"a", "a.b", "a.b.2", "a.b.2.3", "a.b.2.3.4"});
+TEST_F(QueryPlannerWildcardTest, ShouldGenerateSpecialBoundsForNullAndExistenceQueries) {
+    addWildcardIndex(BSON("a.$**" << 1), {"a", "a.b", "a.b.2", "a.b.2.3", "a.b.2.3.4"});
 
     runQuery(fromjson("{'a.0.b': {$exists: true}}"));
     assertNumSolutions(1U);
@@ -1453,8 +1453,8 @@ TEST_F(QueryPlannerAllPathsTest, ShouldGenerateSpecialBoundsForNullAndExistenceQ
         "'a.0.b.2.3.4': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerAllPathsTest, ShouldDeclineToAnswerQueriesThatTraverseTooManyArrays) {
-    addAllPathsIndex(BSON("$**" << 1),
+TEST_F(QueryPlannerWildcardTest, ShouldDeclineToAnswerQueriesThatTraverseTooManyArrays) {
+    addWildcardIndex(BSON("$**" << 1),
                      {"a",
                       "a.b",
                       "a.b.c",

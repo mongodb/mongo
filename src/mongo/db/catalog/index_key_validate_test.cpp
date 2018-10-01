@@ -248,59 +248,59 @@ TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
     }
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsSucceedsOnSubPath) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceedsOnSubPath) {
     TestCommandQueryKnobGuard guard;
     ASSERT_OK(validateKeyPattern(BSON("a.$**" << 1), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsSucceeds) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceeds) {
     TestCommandQueryKnobGuard guard;
     ASSERT_OK(validateKeyPattern(BSON("$**" << 1), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnRepeat) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnRepeat) {
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**.$**" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnSubPathRepeat) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnSubPathRepeat) {
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("a.$**.$**" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnCompound) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnCompound) {
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**" << 1 << "a" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnIncorrectValue) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnIncorrectValue) {
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**" << false), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsWhenValueIsPluginNameWithInvalidKeyName) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithInvalidKeyName) {
     // TODO: Remove test command enabling/disabling in SERVER-36198
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("a"
-                                          << "allPaths"),
+                                          << "wildcard"),
                                      IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsWhenValueIsPluginNameWithValidKeyName) {
+TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithValidKeyName) {
     // TODO: Remove test command enabling/disabling in SERVER-36198
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**"
-                                          << "allPaths"),
+                                          << "wildcard"),
                                      IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);

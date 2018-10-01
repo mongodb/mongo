@@ -13,7 +13,7 @@
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
-    const coll = db.all_paths_collation;
+    const coll = db.wildcard_collation;
     coll.drop();
 
     // Extracts the winning plan for the given query and projection from the explain output.
@@ -22,7 +22,7 @@
     // Runs the given query and confirms that: (1) the $** was used to answer the query, (2) the
     // results produced by the $** index match the given 'expectedResults', and (3) the same output
     // is produced by a COLLSCAN with the same collation.
-    function assertAllPathsIndexAnswersQuery(query, expectedResults, projection) {
+    function assertWildcardIndexAnswersQuery(query, expectedResults, projection) {
         // Verify that the $** index can answer this query.
         const ixScans = getPlanStages(winningPlan(query, (projection || {_id: 0})), "IXSCAN");
         assert.gt(ixScans.length, 0, tojson(coll.find(query).explain()));
@@ -30,9 +30,9 @@
 
         // Assert that the $** index produces the expected results, and that these are the same
         // as those produced by a COLLSCAN with the same collation.
-        const allPathsResults = coll.find(query, (projection || {_id: 0})).toArray();
-        assertArrayEq(allPathsResults, expectedResults);
-        assertArrayEq(allPathsResults,
+        const wildcardResults = coll.find(query, (projection || {_id: 0})).toArray();
+        assertArrayEq(wildcardResults, expectedResults);
+        assertArrayEq(wildcardResults,
                       coll.find(query, (projection || {_id: 0}))
                           .collation({locale: "en_US", strength: 1})
                           .hint({$natural: 1})
@@ -82,11 +82,11 @@
         // Confirm that only the document's values adhere to the case-insensitive collation. The
         // field paths, which are also present in the $** index keys, are evaluated using simple
         // binary comparison; so for instance, path "a.b" does *not* match path "A.B".
-        assertAllPathsIndexAnswersQuery({"a.b": "string"}, [
+        assertWildcardIndexAnswersQuery({"a.b": "string"}, [
             {a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5},
             {a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}
         ]);
-        assertAllPathsIndexAnswersQuery({"A.B": "string"}, [
+        assertWildcardIndexAnswersQuery({"A.B": "string"}, [
             {A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5},
             {A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}
         ]);
@@ -94,16 +94,16 @@
         // All documents in the collection are returned if we query over both upper- and lower-case
         // fieldnames, or when the fieldname has a consistent case across all documents.
         const allDocs = coll.find({}, {_id: 0}).toArray();
-        assertAllPathsIndexAnswersQuery({$or: [{"a.c": "string"}, {"A.C": "string"}]}, allDocs);
-        assertAllPathsIndexAnswersQuery({d: "string"}, allDocs);
+        assertWildcardIndexAnswersQuery({$or: [{"a.c": "string"}, {"A.C": "string"}]}, allDocs);
+        assertWildcardIndexAnswersQuery({d: "string"}, allDocs);
 
         // Confirm that the $** index also differentiates between upper and lower fieldname case
         // when querying fields which do not contain string values.
-        assertAllPathsIndexAnswersQuery({e: 5}, [
+        assertWildcardIndexAnswersQuery({e: 5}, [
             {a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5},
             {a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}
         ]);
-        assertAllPathsIndexAnswersQuery({E: 5}, [
+        assertWildcardIndexAnswersQuery({E: 5}, [
             {A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5},
             {A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}
         ]);
@@ -120,7 +120,7 @@
         // Confirm that attempting to project the virtual $_path field which is present in $** index
         // keys produces a non-covered solution, which nonetheless returns the correct results.
         assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, e: 1, $_path: 1})));
-        assertAllPathsIndexAnswersQuery({e: 5}, [{e: 5}, {e: 5}], {_id: 0, e: 1, $_path: 1});
+        assertWildcardIndexAnswersQuery({e: 5}, [{e: 5}, {e: 5}], {_id: 0, e: 1, $_path: 1});
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});

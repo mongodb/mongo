@@ -4,7 +4,7 @@
     load("jstests/aggregation/extras/utils.js");  // For arrayEq().
     load("jstests/libs/analyze_plan.js");         // For getPlanStages().
 
-    const coll = db.all_paths_nonblocking_sort;
+    const coll = db.wildcard_nonblocking_sort;
 
     // Required in order to build $** indexes.
     assert.commandWorked(
@@ -64,8 +64,4 @@
     checkQueryUsesBlockingSortAndGetsCorrectResults({}, {a: 1});
     checkQueryUsesBlockingSortAndGetsCorrectResults({x: 123}, {a: 1});
     checkQueryUsesBlockingSortAndGetsCorrectResults({excludedField: {$gte: 0}}, {excludedField: 1});
-
-    // TODO SERVER-36444: Remove drop once collection validation works with indexes that have
-    // multikey entries.
-    coll.drop();
 })();

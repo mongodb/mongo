@@ -326,16 +326,16 @@ void encodeIndexability(const MatchExpression* tree,
 
     const IndexToDiscriminatorMap& discriminators =
         indexabilityState.getDiscriminators(tree->path());
-    IndexToDiscriminatorMap allPathsDiscriminators =
-        indexabilityState.buildAllPathsDiscriminators(tree->path());
-    if (discriminators.empty() && allPathsDiscriminators.empty()) {
+    IndexToDiscriminatorMap wildcardDiscriminators =
+        indexabilityState.buildWildcardDiscriminators(tree->path());
+    if (discriminators.empty() && wildcardDiscriminators.empty()) {
         return;
     }
 
     *keyBuilder << kEncodeDiscriminatorsBegin;
     // For each discriminator on this path, append the character '0' or '1'.
     encodeIndexabilityForDiscriminators(tree, discriminators, keyBuilder);
-    encodeIndexabilityForDiscriminators(tree, allPathsDiscriminators, keyBuilder);
+    encodeIndexabilityForDiscriminators(tree, wildcardDiscriminators, keyBuilder);
 
     *keyBuilder << kEncodeDiscriminatorsEnd;
 }

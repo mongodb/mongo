@@ -43,8 +43,8 @@ using namespace unittest;
 static const RecordId kMetadataId = RecordId::minReserved();
 
 static const int kIndexVersion = static_cast<int>(IndexDescriptor::kLatestIndexVersion);
-static const NamespaceString kDefaultNSS{"all_paths_multikey_persistence.test"};
-static const std::string kDefaultIndexName{"all_paths_multikey"};
+static const NamespaceString kDefaultNSS{"wildcard_multikey_persistence.test"};
+static const std::string kDefaultIndexName{"wildcard_multikey"};
 static const BSONObj kDefaultIndexKey = fromjson("{'$**': 1}");
 static const BSONObj kDefaultPathProjection;
 
@@ -58,16 +58,16 @@ std::vector<InsertStatement> toInserts(std::vector<BSONObj> docs) {
     return inserts;
 }
 
-class AllPathsMultikeyPersistenceTestFixture : public unittest::Test {
+class WildcardMultikeyPersistenceTestFixture : public unittest::Test {
 public:
-    AllPathsMultikeyPersistenceTestFixture() {
-        _origAllPathsKnob = internalQueryAllowAllPathsIndexes.load();
+    WildcardMultikeyPersistenceTestFixture() {
+        _origWildcardKnob = internalQueryAllowAllPathsIndexes.load();
         internalQueryAllowAllPathsIndexes.store(true);
         _opCtx = cc().makeOperationContext();
     }
 
-    virtual ~AllPathsMultikeyPersistenceTestFixture() {
-        internalQueryAllowAllPathsIndexes.store(_origAllPathsKnob);
+    virtual ~WildcardMultikeyPersistenceTestFixture() {
+        internalQueryAllowAllPathsIndexes.store(_origWildcardKnob);
         _opCtx.reset();
     }
 
@@ -235,11 +235,11 @@ protected:
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     repl::StorageInterfaceImpl _storage;
-    bool _origAllPathsKnob{false};
+    bool _origWildcardKnob{false};
     int _id{1};
 };
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, RecordMultikeyPathsInBulkIndexBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, RecordMultikeyPathsInBulkIndexBuild) {
     // Create the test collection, add some initial documents, and build a foreground $** index.
     assertSetupEnvironment(false, makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}"}));
 
@@ -254,7 +254,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, RecordMultikeyPathsInBulkIndexBui
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, RecordMultikeyPathsInBackgroundIndexBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, RecordMultikeyPathsInBackgroundIndexBuild) {
     // Create the test collection, add some initial documents, and build a background $** index.
     assertSetupEnvironment(true, makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}"}));
 
@@ -269,7 +269,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, RecordMultikeyPathsInBackgroundIn
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DedupMultikeyPathsInBulkIndexBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DedupMultikeyPathsInBulkIndexBuild) {
     // Create the test collection, add some initial documents, and build a foreground $** index.
     const auto initialDocs =
         makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}", "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}"});
@@ -289,7 +289,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DedupMultikeyPathsInBulkIndexBuil
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DedupMultikeyPathsInBackgroundIndexBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DedupMultikeyPathsInBackgroundIndexBuild) {
     // Create the test collection, add some initial documents, and build a background $** index.
     const auto initialDocs =
         makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}", "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}"});
@@ -309,7 +309,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DedupMultikeyPathsInBackgroundInd
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnPostBuildInsertion) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnPostBuildInsertion) {
     // Create the test collection, add some initial documents, and build a $** index.
     assertSetupEnvironment(false, makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}"}));
 
@@ -332,7 +332,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnPost
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnUpsert) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnUpsert) {
     // Create the test collection, add some initial documents, and build a $** index.
     assertSetupEnvironment(false, makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}"}));
 
@@ -355,7 +355,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnUpse
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnUpdate) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnUpdate) {
     // Create the test collection, add some initial documents, and build a $** index.
     assertSetupEnvironment(false, makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}"}));
 
@@ -387,7 +387,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnUpdate) {
     assertMultikeyPathSetEquals({"b", "b.d.e", "b.d.f", "b.g"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnReplacement) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnReplacement) {
     // Create the test collection, add some initial documents, and build a $** index.
     assertSetupEnvironment(false, makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}"}));
 
@@ -417,7 +417,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnReplacement)
     assertMultikeyPathSetEquals({"b", "b.d.e", "b.d.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotRemoveMultikeyPathsOnDocDeletion) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotRemoveMultikeyPathsOnDocDeletion) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -449,7 +449,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotRemoveMultikeyPathsOnDocDele
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBulkBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBulkBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -470,7 +470,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBulkB
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBackgroundBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBackgroundBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -489,7 +489,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBackg
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBulkBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBulkBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -511,7 +511,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBulkBuild
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBackgroundBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBackgroundBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -533,7 +533,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBackgroun
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -572,7 +572,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBulkBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBulkBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -596,7 +596,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBulkBuil
     assertMultikeyPathSetEquals({"b"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBackgroundBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBackgroundBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -620,7 +620,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBackgrou
     assertMultikeyPathSetEquals({"b"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -659,7 +659,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
     assertMultikeyPathSetEquals({"b"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInInclusionProjection) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInInclusionProjection) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -684,7 +684,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInInclusio
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInExclusionProjection) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInExclusionProjection) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs({"{a: 1, b: [{c: 2}, {d: {e: [3]}}]}",
                                 "{a: 2, b: [{c: 3}, {d: {e: [4]}}]}",
@@ -709,7 +709,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInExclusio
     assertMultikeyPathSetEquals({"b"});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBulkBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBulkBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs(
         {"{a: 1, b: {c: 2, d: {e: 3}}}", "{a: 2, b: {c: 3, d: {e: 4}}}", "{d: {e: {f: 5}}}"});
@@ -729,7 +729,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBu
     assertMultikeyPathSetEquals({});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBackgroundBuild) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBackgroundBuild) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs(
         {"{a: 1, b: {c: 2, d: {e: 3}}}", "{a: 2, b: {c: 3, d: {e: 4}}}", "{d: {e: {f: 5}}}"});
@@ -749,7 +749,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBa
     assertMultikeyPathSetEquals({});
 }
 
-TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexShouldBecomeMultikeyIfArrayIsCreatedByUpdate) {
+TEST_F(WildcardMultikeyPersistenceTestFixture, IndexShouldBecomeMultikeyIfArrayIsCreatedByUpdate) {
     // Create the test collection, add some initial documents, and build a $** index.
     const auto docs = makeDocs(
         {"{a: 1, b: {c: 2, d: {e: 3}}}", "{a: 2, b: {c: 3, d: {e: 4}}}", "{d: {e: {f: 5}}}"});

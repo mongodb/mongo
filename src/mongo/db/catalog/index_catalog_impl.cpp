@@ -595,7 +595,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         }
 
         if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2DSPHERE) &&
-            (pluginName != IndexNames::HASHED) && (pluginName != IndexNames::ALLPATHS)) {
+            (pluginName != IndexNames::HASHED) && (pluginName != IndexNames::WILDCARD)) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "Index type '" << pluginName
                                         << "' does not support collation: "
@@ -605,7 +605,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
     const bool isSparse = spec["sparse"].trueValue();
 
-    if (pluginName == IndexNames::ALLPATHS) {
+    if (pluginName == IndexNames::WILDCARD) {
         if (isSparse) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "Index type '" << pluginName

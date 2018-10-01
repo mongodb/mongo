@@ -45,7 +45,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_allpaths_helpers.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -57,7 +57,7 @@ namespace {
 
 using namespace mongo;
 
-namespace app = ::mongo::all_paths_planning;
+namespace app = ::mongo::wildcard_planning;
 namespace dps = ::mongo::dotted_path_support;
 
 /**
@@ -530,10 +530,10 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
     tn->indexPrefix = prefixBob.obj();
 }
 
-void QueryPlannerAccess::finishAllPathsIndexScanNode(QuerySolutionNode* node,
+void QueryPlannerAccess::finishWildcardIndexScanNode(QuerySolutionNode* node,
                                                      const IndexEntry& plannerIndex) {
     // We should only ever reach this point if we are an IndexScanNode for a $** index.
-    invariant(plannerIndex.type == IndexType::INDEX_ALLPATHS);
+    invariant(plannerIndex.type == IndexType::INDEX_WILDCARD);
     invariant(node && node->getType() == STAGE_IXSCAN);
 
     // Sanity check the QuerySolutionNode's copy of the IndexEntry.
@@ -676,8 +676,8 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
     }
 
     // If this is a $** index, update and populate the keyPattern, bounds, and multikeyPaths.
-    if (index.type == IndexType::INDEX_ALLPATHS) {
-        finishAllPathsIndexScanNode(node, index);
+    if (index.type == IndexType::INDEX_WILDCARD) {
+        finishWildcardIndexScanNode(node, index);
     }
 
     // Find the first field in the scan's bounds that was not filled out.
@@ -1068,12 +1068,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         andResult = std::move(ixscanNodes[0]);
     } else {
         // $** indexes are prohibited from participating in either AND_SORTED or AND_HASH.
-        const bool allPathsIndexInvolvedInIntersection =
+        const bool wildcardIndexInvolvedInIntersection =
             std::any_of(ixscanNodes.begin(), ixscanNodes.end(), [](const auto& ixScan) {
                 return ixScan->getType() == StageType::STAGE_IXSCAN &&
-                    static_cast<IndexScanNode*>(ixScan.get())->index.type == INDEX_ALLPATHS;
+                    static_cast<IndexScanNode*>(ixScan.get())->index.type == INDEX_WILDCARD;
             });
-        if (allPathsIndexInvolvedInIntersection) {
+        if (wildcardIndexInvolvedInIntersection) {
             return nullptr;
         }
 

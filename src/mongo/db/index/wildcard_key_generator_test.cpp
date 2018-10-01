@@ -31,7 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/index/all_paths_key_generator.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -75,8 +75,8 @@ bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actual
 
 // Full-document tests with no projection.
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractTopLevelKey) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractTopLevelKey) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: 1}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}")});
@@ -90,8 +90,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractTopLevelKey) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: {b: 'one', c: 2}}");
 
     auto expectedKeys =
@@ -107,8 +107,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ShouldIndexEmptyObject) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ShouldIndexEmptyObject) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: 1, b: {}}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"), fromjson("{'': 'b', '': {}}")});
@@ -122,8 +122,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ShouldIndexEmptyObject) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUndefined) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUndefined) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{ a: [], b: {c: []}, d: [[], {e: []}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': undefined}"),
@@ -143,8 +143,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUndef
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {d: 3}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
@@ -163,8 +163,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {d: 3}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
@@ -183,8 +183,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {d: 3}], e: []}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
@@ -205,8 +205,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
 
     // Note: the 'e' array is nested within a subdocument in the enclosing 'a' array; it will
     // generate a separate multikey entry 'a.e' and index keys for each of its elements. The raw
@@ -236,8 +236,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
 
     // Tests a mix of multikey paths, various duplicate-key scenarios, and deeply-nested paths.
     auto inputDoc = fromjson(
@@ -275,8 +275,8 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) 
 
 // Single-subtree implicit projection.
 
-TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponent) {
-    AllPathsKeyGenerator keyGen{fromjson("{'g.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponent) {
+    WildcardKeyGenerator keyGen{fromjson("{'g.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -299,8 +299,8 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponen
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathComponents) {
-    AllPathsKeyGenerator keyGen{fromjson("{'g.h.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathComponents) {
+    WildcardKeyGenerator keyGen{fromjson("{'g.h.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -323,8 +323,8 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathCompon
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'g.h.j.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'g.h.j.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -345,8 +345,8 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'a.e.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'a.e.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -371,8 +371,8 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
 
 // Explicit inclusion tests.
 
-TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{g: 1}"), nullptr};
+TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{g: 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -395,8 +395,8 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h': 1}"), nullptr};
+TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h': 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -419,8 +419,8 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h.j': 1}"), nullptr};
+TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h.j': 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -441,8 +441,8 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'a.e': 1}"), nullptr};
+TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'a.e': 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -463,8 +463,8 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
-    AllPathsKeyGenerator keyGen{
+TEST(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
+    WildcardKeyGenerator keyGen{
         fromjson("{'$**': 1}"), fromjson("{'a.b': 1, 'a.c': 1, 'a.e': 1, 'g.h.i': 1}"), nullptr};
 
     auto inputDoc = fromjson(
@@ -491,8 +491,8 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
 
 // Explicit exclusion tests.
 
-TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{g: 0}"), nullptr};
+TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{g: 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -520,8 +520,8 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h': 0}"), nullptr};
+TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h': 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -550,8 +550,8 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h.j': 0}"), nullptr};
+TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'g.h.j': 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -581,8 +581,8 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'a.e': 0}"), nullptr};
+TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'a.e': 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
@@ -614,8 +614,8 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
-    AllPathsKeyGenerator keyGen{
+TEST(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
+    WildcardKeyGenerator keyGen{
         fromjson("{'$**': 1}"), fromjson("{'a.b': 0, 'a.c': 0, 'a.e': 0, 'g.h.i': 0}"), nullptr};
 
     auto inputDoc = fromjson(
@@ -647,8 +647,8 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
 
 // Test _id inclusion and exclusion behaviour.
 
-TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -671,8 +671,8 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
-    AllPathsKeyGenerator keyGen{fromjson("{'a.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
+    WildcardKeyGenerator keyGen{fromjson("{'a.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -693,8 +693,8 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
-    AllPathsKeyGenerator keyGen{fromjson("{'_id.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
+    WildcardKeyGenerator keyGen{fromjson("{'_id.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -712,8 +712,8 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
-    AllPathsKeyGenerator keyGen{fromjson("{'_id.id1.$**': 1}"), {}, nullptr};
+TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
+    WildcardKeyGenerator keyGen{fromjson("{'_id.id1.$**': 1}"), {}, nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -730,8 +730,8 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{a: 1}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{a: 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -752,8 +752,8 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) 
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'_id.id1': 1}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'_id.id1': 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -770,8 +770,8 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) 
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{a: 0}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{a: 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -789,8 +789,8 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) 
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'_id.id1': 0}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{'_id.id1': 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -814,8 +814,8 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) 
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 1, a: 1}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 1, a: 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -838,8 +838,8 @@ TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 0, a: 1}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 0, a: 1}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -860,8 +860,8 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionProjection) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 1, a: 0}"), nullptr};
+TEST(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionProjection) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), fromjson("{_id: 1, a: 0}"), nullptr};
 
     auto inputDoc = fromjson(
         "{_id: {id1: 1, id2: 2}, a: [1, {b: 1, e: [4]}, [6, 7, {f: 8}]], g: {h: {i: 9, k: 12.0}}}");
@@ -883,9 +883,9 @@ TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionP
 
 // Collation tests.
 
-TEST(AllPathsKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
+TEST(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, &collator};
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, &collator};
 
     // Verify that the collation is only applied to String values, but all types are indexed.
     auto dateVal = "{'$date': 1529453450288}"_sd;
@@ -928,8 +928,8 @@ TEST(AllPathsKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
-    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, {}};
+TEST(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
+    WildcardKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, {}};
 
     auto inputDoc = fromjson(
         "{'a.b': 0, '.b': 1, 'b.': 2, a: {'.b': 3, 'b.': 4, 'b.c': 5, 'q': 6}, b: [{'d.e': 7}, {r: "
@@ -950,8 +950,8 @@ TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSubpathInKey) {
-    AllPathsKeyGenerator keyGen{fromjson("{'a.b.$**': 1}"), {}, {}};
+TEST(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSubpathInKey) {
+    WildcardKeyGenerator keyGen{fromjson("{'a.b.$**': 1}"), {}, {}};
 
     auto inputDoc = fromjson("{'a.b': 0}");
 

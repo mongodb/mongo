@@ -1271,9 +1271,9 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
 }
 
 // $** index
-TEST_F(CachePlanSelectionTest, AllPathsIxScan) {
+TEST_F(CachePlanSelectionTest, WildcardIxScan) {
     params.indices.push_back(IndexEntry(BSON("$**" << 1),
-                                        IndexType::INDEX_ALLPATHS,
+                                        IndexType::INDEX_WILDCARD,
                                         false,  // multikey
                                         {},     // multikey paths
                                         {},     // multikeyPathSet
@@ -1966,7 +1966,7 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
               planCache.computeKey(*inContainsStringHasCollation));
 }
 
-TEST(PlanCacheTest, ComputeKeyAllPathsIndex) {
+TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     PlanCache planCache;
     IndexEntry entry(BSON("a.$**" << 1),
                      false,                       // multikey
@@ -2007,8 +2007,8 @@ TEST(PlanCacheTest, ComputeKeyAllPathsIndex) {
     ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
               planCache.computeKey(*usesPathWithEmptyObject));
 
-    // The query on 'b' should have a completely different plan cache key (both with and without an
-    // allPaths index).
+    // The query on 'b' should have a completely different plan cache key (both with and without a
+    // wildcard index).
     ASSERT_NE(planCacheWithNoIndexes.computeKey(*usesPathWithScalar),
               planCacheWithNoIndexes.computeKey(*doesNotUsePath));
     ASSERT_NE(planCache.computeKey(*usesPathWithScalar), planCache.computeKey(*doesNotUsePath));

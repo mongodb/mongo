@@ -68,7 +68,7 @@ namespace {
 
 // Reserved RecordId against which multikey metadata keys are indexed.
 static const RecordId kMultikeyMetadataKeyId =
-    RecordId{RecordId::ReservedId::kAllPathsMultikeyMetadataId};
+    RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId};
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be

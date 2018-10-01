@@ -54,7 +54,7 @@ public:
     /**
      * Enumerates all ids in the reserved range that have been allocated for a specific purpose.
      */
-    enum class ReservedId : int64_t { kAllPathsMultikeyMetadataId = kMinReservedRepr };
+    enum class ReservedId : int64_t { kWildcardMultikeyMetadataId = kMinReservedRepr };
 
     /**
      * Constructs a Null RecordId.

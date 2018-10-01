@@ -559,7 +559,7 @@ TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBound
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1}}}}}");
 }
 
-TEST_F(QueryPlannerTest, StringComparisonWithUnequalCollatorsAndAllPathsIndexResultsInCollscan) {
+TEST_F(QueryPlannerTest, StringComparisonWithUnequalCollatorsAndWildcardIndexResultsInCollscan) {
     CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     addIndex(fromjson("{'$**': 1}"), &alwaysEqualCollator);
 
@@ -570,7 +570,7 @@ TEST_F(QueryPlannerTest, StringComparisonWithUnequalCollatorsAndAllPathsIndexRes
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerTest, StringComparisonWithEqualCollatorsAndAllPathsIndexUsesIndex) {
+TEST_F(QueryPlannerTest, StringComparisonWithEqualCollatorsAndWildcardIndexUsesIndex) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
 
     CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);

@@ -152,9 +152,9 @@ public:
                                                  const std::vector<IndexEntry>& relevantIndices);
 
     /**
-     * Check if this match expression is a leaf and is supported by an allPaths index.
+     * Check if this match expression is a leaf and is supported by a wildcard index.
      */
-    static bool nodeIsSupportedByAllPathsIndex(const MatchExpression* queryExpr);
+    static bool nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr);
 
     /*
      * Return true if the given match expression can use a sparse index, false otherwise. This will
@@ -245,14 +245,14 @@ private:
                                                          const std::vector<IndexEntry>& indices);
 
     /**
-     * This function strips RelevantTag assignments to expanded 'allPaths' indexes, in cases where
+     * This function strips RelevantTag assignments to expanded 'wildcard' indexes, in cases where
      * the assignment is incompatible with the query.
      *
-     * Specifically, if the query has a TEXT node with both 'text' and 'allPaths' indexes present,
-     * then the 'allPaths' index will mark itself as relevant to the '_fts' path reported by the
-     * TEXT node. We therefore remove any such misassigned 'allPaths' tags here.
+     * Specifically, if the query has a TEXT node with both 'text' and 'wildcard' indexes present,
+     * then the 'wildcard' index will mark itself as relevant to the '_fts' path reported by the
+     * TEXT node. We therefore remove any such misassigned 'wildcard' tags here.
      */
-    static void stripInvalidAssignmentsToAllPathsIndexes(MatchExpression* root,
+    static void stripInvalidAssignmentsToWildcardIndexes(MatchExpression* root,
                                                          const std::vector<IndexEntry>& indices);
 
     /**

@@ -28,32 +28,32 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/index/all_paths_access_method.h"
+#include "mongo/db/index/wildcard_access_method.h"
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 
 namespace mongo {
 
-AllPathsAccessMethod::AllPathsAccessMethod(IndexCatalogEntry* allPathsState,
+WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                                            SortedDataInterface* btree)
-    : IndexAccessMethod(allPathsState, btree),
+    : IndexAccessMethod(wildcardState, btree),
       _keyGen(
           _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
 
-bool AllPathsAccessMethod::shouldMarkIndexAsMultikey(const BSONObjSet& keys,
+bool WildcardAccessMethod::shouldMarkIndexAsMultikey(const BSONObjSet& keys,
                                                      const BSONObjSet& multikeyMetadataKeys,
                                                      const MultikeyPaths& multikeyPaths) const {
     return !multikeyMetadataKeys.empty();
 }
 
-void AllPathsAccessMethod::doGetKeys(const BSONObj& obj,
+void WildcardAccessMethod::doGetKeys(const BSONObj& obj,
                                      BSONObjSet* keys,
                                      BSONObjSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths) const {
     _keyGen.generateKeys(obj, keys, multikeyMetadataKeys);
 }
 
-std::set<FieldRef> AllPathsAccessMethod::getMultikeyPathSet(OperationContext* opCtx) const {
+std::set<FieldRef> WildcardAccessMethod::getMultikeyPathSet(OperationContext* opCtx) const {
     auto cursor = newCursor(opCtx);
     // All of the keys storing multikeyness metadata are prefixed by a value of 1. Establish an
     // index cursor which will scan this range.
@@ -70,7 +70,7 @@ std::set<FieldRef> AllPathsAccessMethod::getMultikeyPathSet(OperationContext* op
         // Validate that the key contains the expected RecordId.
         invariant(entry->loc.isReserved());
         invariant(entry->loc.repr() ==
-                  static_cast<int64_t>(RecordId::ReservedId::kAllPathsMultikeyMetadataId));
+                  static_cast<int64_t>(RecordId::ReservedId::kWildcardMultikeyMetadataId));
 
         // Validate that the first piece of the key is the integer 1.
         BSONObjIterator iter(entry->key);

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/planner_allpaths_helpers.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 
 #include <vector>
 
@@ -38,7 +38,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace all_paths_planning {
+namespace wildcard_planning {
 namespace {
 /**
  * Compares the path 'fieldNameOrArrayIndexPath' to 'staticComparisonPath', ignoring any array
@@ -136,7 +136,7 @@ FieldRef pathWithoutSpecifiedComponents(const FieldRef& path,
 }
 }  // namespace
 
-MultikeyPaths buildMultiKeyPathsForExpandedAllPathsIndexEntry(
+MultikeyPaths buildMultiKeyPathsForExpandedWildcardIndexEntry(
     const FieldRef& indexedPath, const std::set<FieldRef>& multikeyPathSet) {
     FieldRef pathToLookup;
     std::set<std::size_t> multikeyPaths;
@@ -155,7 +155,7 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const std::set<std::size
     // The algorithm is unavoidably O(n2^n), but we enforce that 'n' is never more than single
     // digits during the planner's index selection phase.
     const auto potentialArrayIndices = findArrayIndexPathComponents(multikeyPaths, queryPath);
-    invariant(potentialArrayIndices.size() <= kAllPathsMaxArrayIndexTraversalDepth);
+    invariant(potentialArrayIndices.size() <= kWildcardMaxArrayIndexTraversalDepth);
     invariant(potentialArrayIndices.size() < sizeof(size_t) * 8u);
     // We iterate over every value [0..2^n), where 'n' is the size of 'potentialArrayIndices',
     // treating each value as a 'bitMask' of 'n' bits. Each bit in 'bitMask' represents the
@@ -178,13 +178,13 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const std::set<std::size
     return paths;
 }
 
-BoundsTightness applyAllPathsIndexScanBoundsTightness(const IndexEntry& index,
+BoundsTightness applyWildcardIndexScanBoundsTightness(const IndexEntry& index,
                                                       BoundsTightness tightnessIn) {
     // This method should only ever be called for a $** IndexEntry. We expect to be called during
-    // planning, *before* finishAllPathsIndexScanNode has been invoked. The IndexEntry should thus
+    // planning, *before* finishWildcardIndexScanNode has been invoked. The IndexEntry should thus
     // only have a single keyPattern field and multikeyPath entry, but this is sufficient to
     // determine whether it will be necessary to adjust the tightness.
-    invariant(index.type == IndexType::INDEX_ALLPATHS);
+    invariant(index.type == IndexType::INDEX_WILDCARD);
     invariant(index.keyPattern.nFields() == 1);
     invariant(index.multikeyPaths.size() == 1);
 
@@ -217,10 +217,10 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
     // To support $** fieldname-or-array-index semantics, the planner must generate the power set of
     // all paths with and without array indices. Because this is O(2^n), we decline to answer
     // queries that traverse more than 8 levels of array indices.
-    if (arrayIndices.size() > kAllPathsMaxArrayIndexTraversalDepth) {
+    if (arrayIndices.size() > kWildcardMaxArrayIndexTraversalDepth) {
         LOG(2) << "Declining to answer query on field '" << queryPath.dottedField()
                << "' with $** index, as it traverses through more than "
-               << kAllPathsMaxArrayIndexTraversalDepth << " nested array indices.";
+               << kWildcardMaxArrayIndexTraversalDepth << " nested array indices.";
         return false;
     }
     // If 'includedPaths' is empty, then either the $** projection is an exclusion, or no explicit
@@ -245,5 +245,5 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
     return arrayIndices[0] >= includePath->numParts();
 }
 
-}  // namespace all_paths_planning
+}  // namespace wildcard_planning
 }  // namespace mongo

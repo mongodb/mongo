@@ -409,7 +409,7 @@ TEST(PlanCacheIndexabilityTest, CompoundIndexCollationDiscriminator) {
     ASSERT(discriminatorsB.find("a_1_b_1") != discriminatorsB.end());
 }
 
-TEST(PlanCacheIndexabilityTest, AllPathsDiscriminator) {
+TEST(PlanCacheIndexabilityTest, WildcardDiscriminator) {
     PlanCacheIndexabilityState state;
     state.updateDiscriminators({IndexEntry(BSON("a.$**" << 1),
                                            false,  // multikey
@@ -419,10 +419,10 @@ TEST(PlanCacheIndexabilityTest, AllPathsDiscriminator) {
                                            nullptr,
                                            BSONObj())});
 
-    const auto unindexedPathDiscriminators = state.buildAllPathsDiscriminators("notIndexed");
+    const auto unindexedPathDiscriminators = state.buildWildcardDiscriminators("notIndexed");
     ASSERT_EQ(0U, unindexedPathDiscriminators.size());
 
-    auto discriminatorsA = state.buildAllPathsDiscriminators("a");
+    auto discriminatorsA = state.buildWildcardDiscriminators("a");
     ASSERT_EQ(1U, discriminatorsA.size());
     ASSERT(discriminatorsA.find("indexName") != discriminatorsA.end());
 
@@ -431,16 +431,16 @@ TEST(PlanCacheIndexabilityTest, AllPathsDiscriminator) {
     ASSERT_TRUE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 'abc'}")).get()));
 
-    // Querying for object values isn't support by allPaths indexes.
+    // Querying for object values isn't support by wildcard indexes.
     ASSERT_FALSE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {b: 1}}")).get()));
     ASSERT_FALSE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {}}")).get()));
     ASSERT_FALSE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: {$lt: {}}}")).get()));
-    // Querying for array values isn't supported by allPaths indexes.
+    // Querying for array values isn't supported by wildcard indexes.
     ASSERT_FALSE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: [1, 2, 3]}")).get()));
-    // Querying for null isn't supported by allPaths indexes.
+    // Querying for null isn't supported by wildcard indexes.
     ASSERT_FALSE(
         disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: null}")).get()));
 
@@ -470,7 +470,7 @@ TEST(PlanCacheIndexabilityTest, AllPathsDiscriminator) {
         parseMatchExpression(fromjson("{a: {$in: [1, 2, null]}}")).get()));
 }
 
-TEST(PlanCacheIndexabilityTest, AllPathsWithCollationDiscriminator) {
+TEST(PlanCacheIndexabilityTest, WildcardWithCollationDiscriminator) {
     PlanCacheIndexabilityState state;
     IndexEntry entry(BSON("a.$**" << 1),
                      false,  // multikey
@@ -483,10 +483,10 @@ TEST(PlanCacheIndexabilityTest, AllPathsWithCollationDiscriminator) {
     entry.collator = &collator;
     state.updateDiscriminators({entry});
 
-    const auto unindexedPathDiscriminators = state.buildAllPathsDiscriminators("notIndexed");
+    const auto unindexedPathDiscriminators = state.buildWildcardDiscriminators("notIndexed");
     ASSERT_EQ(0U, unindexedPathDiscriminators.size());
 
-    auto discriminatorsA = state.buildAllPathsDiscriminators("a");
+    auto discriminatorsA = state.buildWildcardDiscriminators("a");
     ASSERT_EQ(1U, discriminatorsA.size());
     ASSERT(discriminatorsA.find("indexName") != discriminatorsA.end());
 
@@ -500,7 +500,7 @@ TEST(PlanCacheIndexabilityTest, AllPathsWithCollationDiscriminator) {
         parseMatchExpression(fromjson("{a: \"hello world\"}"), &collator).get()));
 }
 
-TEST(PlanCacheIndexabilityTest, AllPathsPartialIndexDiscriminator) {
+TEST(PlanCacheIndexabilityTest, WildcardPartialIndexDiscriminator) {
     PlanCacheIndexabilityState state;
 
     // Need to keep the filter BSON object around for the duration of the test since the match
@@ -516,7 +516,7 @@ TEST(PlanCacheIndexabilityTest, AllPathsPartialIndexDiscriminator) {
                      BSONObj());
     state.updateDiscriminators({entry});
 
-    auto discriminatorsA = state.buildAllPathsDiscriminators("a");
+    auto discriminatorsA = state.buildWildcardDiscriminators("a");
     ASSERT_EQ(1U, discriminatorsA.size());
     ASSERT(discriminatorsA.find("indexName") != discriminatorsA.end());
 

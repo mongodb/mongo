@@ -11,7 +11,7 @@
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
-    const coll = db.all_paths_multikey_index;
+    const coll = db.wildcard_multikey_index;
     coll.drop();
 
     // Template document which defines the 'schema' of the documents in the test collection.
@@ -60,7 +60,7 @@
     // field in turn. The 'expectedPaths' argument lists the set of paths which we expect to have
     // been indexed based on the spec; this function will confirm that only the appropriate paths
     // are present in the $** index.
-    function runAllPathsIndexTest(keyPattern, pathProjection, expectedPaths) {
+    function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.createIndex(
             keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
@@ -69,16 +69,16 @@
         for (let op of operationList) {
             for (let path of pathList) {
                 const query = {[path]: op.expression};
-                assertAllPathsQuery(query, expectedPaths.includes(path) ? path : null);
+                assertWildcardQuery(query, expectedPaths.includes(path) ? path : null);
             }
         }
     }
 
-    // Runs a single allPaths query test. If 'expectedPath' is non-null, verifies that there is an
+    // Runs a single wildcard query test. If 'expectedPath' is non-null, verifies that there is an
     // indexed solution that uses the $** index with the given path string. If 'expectedPath' is
     // null, verifies that no indexed solution was found. If 'explainStats' is non-empty, verifies
     // that the query's explain output reflects the given stats.
-    function assertAllPathsQuery(query, expectedPath, explainStats = {}) {
+    function assertWildcardQuery(query, expectedPath, explainStats = {}) {
         // Explain the query, and determine whether an indexed solution is available.
         const explainOutput = coll.find(query).explain("executionStats");
         const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
@@ -106,22 +106,22 @@
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
     try {
         // Test a $** index that indexes the entire document.
-        runAllPathsIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e']);
+        runWildcardIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e']);
         // Test a $** index on a single subtree.
-        runAllPathsIndexTest({'a.$**': 1}, null, ['a']);
-        runAllPathsIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e']);
-        runAllPathsIndexTest({'b.c.$**': 1}, null, ['b.c']);
-        runAllPathsIndexTest({'b.d.$**': 1}, null, ['b.d.e']);
+        runWildcardIndexTest({'a.$**': 1}, null, ['a']);
+        runWildcardIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e']);
+        runWildcardIndexTest({'b.c.$**': 1}, null, ['b.c']);
+        runWildcardIndexTest({'b.d.$**': 1}, null, ['b.d.e']);
         // Test a $** index which includes a subset of paths.
-        runAllPathsIndexTest({'$**': 1}, {a: 1}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e']);
-        runAllPathsIndexTest({'$**': 1}, {'b.d': 1}, ['b.d.e']);
-        runAllPathsIndexTest({'$**': 1}, {a: 1, 'b.d': 1}, ['a', 'b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {a: 1}, ['a']);
+        runWildcardIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {'b.d': 1}, ['b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {a: 1, 'b.d': 1}, ['a', 'b.d.e']);
         // Test a $** index which excludes a subset of paths.
-        runAllPathsIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e']);
-        runAllPathsIndexTest({'$**': 1}, {b: 0}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {'b.c': 0}, ['a', 'b.d.e']);
-        runAllPathsIndexTest({'$**': 1}, {a: 0, 'b.c': 0}, ['b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {b: 0}, ['a']);
+        runWildcardIndexTest({'$**': 1}, {'b.c': 0}, ['a', 'b.d.e']);
+        runWildcardIndexTest({'$**': 1}, {a: 0, 'b.c': 0}, ['b.d.e']);
 
         // Sanity check that a few queries which need to be planned specially in the multikey case
         // return the correct results.
@@ -186,17 +186,17 @@
         //
         // We examine the solution's 'nReturned' versus 'totalDocsExamined' to confirm this.
         // totalDocsExamined: [_id:1, _id:2, _id:3, _id:4], nReturned: [_id:2, _id:3, _id:4]
-        assertAllPathsQuery({'a.0.b.1.c': 1},
+        assertWildcardQuery({'a.0.b.1.c': 1},
                             'a.0.b.1.c',
                             {'executionStats.nReturned': 3, 'executionStats.totalDocsExamined': 4});
 
         // Test that we can query a specific field of an array whose fieldname is itself numeric.
-        assertAllPathsQuery({'a.0.1.d': 1},
+        assertWildcardQuery({'a.0.1.d': 1},
                             'a.0.1.d',
                             {'executionStats.nReturned': 1, 'executionStats.totalDocsExamined': 1});
 
         // Test that we can query a primitive value at a specific array index.
-        assertAllPathsQuery({'a.0.b.1.c.2.d.3': 3},
+        assertWildcardQuery({'a.0.b.1.c.2.d.3': 3},
                             'a.0.b.1.c.2.d.3',
                             {'executionStats.nReturned': 1, 'executionStats.totalDocsExamined': 1});
 
@@ -204,9 +204,9 @@
         assert.commandWorked(
             coll.insert({_id: 6, a: [{b: [{c: [{d: [{e: [{f: [{g: [{h: [{i: [1]}]}]}]}]}]}]}]}]}));
         // We can query up to a depth of 8 arrays via specific indices, but not through 9 or more.
-        assertAllPathsQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i': 1},
+        assertWildcardQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i': 1},
                             'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i');
-        assertAllPathsQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i.0': 1}, null);
+        assertWildcardQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i.0': 1}, null);
 
         // Test that fieldname-or-array-index queries do not inappropriately trim predicates; that
         // is, all predicates on the field are added to a FETCH filter above the IXSCAN.
@@ -220,10 +220,10 @@
         assert.commandWorked(coll.insert({_id: 5, a: [4, 5, 6], b: [7, 8, 9], c: {'0': 10}}));
         assert.commandWorked(coll.insert({_id: 6, a: [5, 6, 7], b: [8, 9, 10], c: {'0': 11}}));
 
-        assertAllPathsQuery({"a.0": {$gt: 1, $lt: 4}}, 'a.0', {'executionStats.nReturned': 2});
-        assertAllPathsQuery({"a.1": {$gte: 1, $lte: 4}}, 'a.1', {'executionStats.nReturned': 4});
-        assertAllPathsQuery({"b.2": {$in: [5, 9]}}, 'b.2', {'executionStats.nReturned': 1});
-        assertAllPathsQuery({"c.0": {$in: [10, 11]}}, 'c.0', {'executionStats.nReturned': 2});
+        assertWildcardQuery({"a.0": {$gt: 1, $lt: 4}}, 'a.0', {'executionStats.nReturned': 2});
+        assertWildcardQuery({"a.1": {$gte: 1, $lte: 4}}, 'a.1', {'executionStats.nReturned': 4});
+        assertWildcardQuery({"b.2": {$in: [5, 9]}}, 'b.2', {'executionStats.nReturned': 1});
+        assertWildcardQuery({"c.0": {$in: [10, 11]}}, 'c.0', {'executionStats.nReturned': 2});
 
         // Test that the $** index doesn't trim predicates when planning across multiple nested
         // $and/$or expressions on various fieldname-or-array-index paths.

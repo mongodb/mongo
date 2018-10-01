@@ -36,7 +36,7 @@
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
-namespace all_paths_planning {
+namespace wildcard_planning {
 
 using BoundsTightness = IndexBoundsBuilder::BoundsTightness;
 
@@ -44,13 +44,13 @@ using BoundsTightness = IndexBoundsBuilder::BoundsTightness;
  * Specifies the maximum depth of nested array indices through which a query may traverse before a
  * $** declines to answer it, due to the exponential complexity of the bounds required.
  */
-static constexpr size_t kAllPathsMaxArrayIndexTraversalDepth = 8u;
+static constexpr size_t kWildcardMaxArrayIndexTraversalDepth = 8u;
 
 /**
  * Returns a MultikeyPaths which indicates which components of 'indexedPath' are multikey, by
  * looking up multikeyness in 'multikeyPathSet'.
  */
-MultikeyPaths buildMultiKeyPathsForExpandedAllPathsIndexEntry(
+MultikeyPaths buildMultiKeyPathsForExpandedWildcardIndexEntry(
     const FieldRef& indexedPath, const std::set<FieldRef>& multikeyPathSet);
 
 /**
@@ -71,7 +71,7 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const std::set<std::size
  * predicate. Given an IndexEntry representing an expanded $** index, we apply any necessary changes
  * to the tightness here.
  */
-BoundsTightness applyAllPathsIndexScanBoundsTightness(const IndexEntry& index,
+BoundsTightness applyWildcardIndexScanBoundsTightness(const IndexEntry& index,
                                                       BoundsTightness tightnessIn);
 
 /**
@@ -79,7 +79,7 @@ BoundsTightness applyAllPathsIndexScanBoundsTightness(const IndexEntry& index,
  * by the $** index, true otherwise. Specifically, the $** index cannot answer the query if either
  * of the following scenarios occur:
  *
- * - The query path traverses through more than 'kAllPathsMaxArrayIndexTraversalDepth' nested arrays
+ * - The query path traverses through more than 'kWildcardMaxArrayIndexTraversalDepth' nested arrays
  * via explicit array indices.
  * - The query path lies along a $** projection through an array index.
  *
@@ -97,5 +97,5 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
                                    const std::set<FieldRef>& includedPaths,
                                    const FieldRef& queryPath);
 
-}  // namespace all_paths_planning
+}  // namespace wildcard_planning
 }  // namespace mongo

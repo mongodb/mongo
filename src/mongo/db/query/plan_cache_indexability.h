@@ -96,10 +96,10 @@ public:
     const IndexToDiscriminatorMap& getDiscriminators(StringData path) const;
 
     /**
-     * Construct an IndexToDiscriminator map for the given path, only for the allPaths indexes
+     * Construct an IndexToDiscriminator map for the given path, only for the wildcard indexes
      * which have been included in the indexability state.
      */
-    IndexToDiscriminatorMap buildAllPathsDiscriminators(StringData path) const;
+    IndexToDiscriminatorMap buildWildcardDiscriminators(StringData path) const;
 
     /**
      * Clears discriminators for all paths, and regenerate them from 'indexEntries'.
@@ -114,8 +114,8 @@ private:
      * every possible field that it indexes, so we have to maintain some special context about the
      * index.
      */
-    struct AllPathsIndexDiscriminatorContext {
-        AllPathsIndexDiscriminatorContext(std::unique_ptr<ProjectionExecAgg> proj,
+    struct WildcardIndexDiscriminatorContext {
+        WildcardIndexDiscriminatorContext(std::unique_ptr<ProjectionExecAgg> proj,
                                           std::string name,
                                           const MatchExpression* filter,
                                           const CollatorInterface* coll)
@@ -169,15 +169,15 @@ private:
 
     /**
      * Adds special state for a $** index. When the discriminators are retrieved for a certain
-     * path, appropriate discriminators for the allPaths index will be included if it includes the
+     * path, appropriate discriminators for the wildcard index will be included if it includes the
      * given path.
      */
-    void processAllPathsIndex(const IndexEntry& ie);
+    void processWildcardIndex(const IndexEntry& ie);
 
     // PathDiscriminatorsMap is a map from field path to index name to IndexabilityDiscriminator.
     PathDiscriminatorsMap _pathDiscriminatorsMap;
 
-    std::vector<AllPathsIndexDiscriminatorContext> _allPathsIndexDiscriminators;
+    std::vector<WildcardIndexDiscriminatorContext> _wildcardIndexDiscriminators;
 };
 
 }  // namespace mongo

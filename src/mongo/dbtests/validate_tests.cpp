@@ -66,7 +66,7 @@ public:
           _db(nullptr) {
         _client.createCollection(_ns);
         {
-            _origAllPathsKnob = internalQueryAllowAllPathsIndexes.load();
+            _origWildcardKnob = internalQueryAllowAllPathsIndexes.load();
             internalQueryAllowAllPathsIndexes.store(true);
 
             AutoGetCollection autoGetCollection(&_opCtx, _nss, MODE_X);
@@ -78,7 +78,7 @@ public:
     ~ValidateBase() {
         _client.dropCollection(_ns);
         getGlobalServiceContext()->unsetKillAllOperations();
-        internalQueryAllowAllPathsIndexes.store(_origAllPathsKnob);
+        internalQueryAllowAllPathsIndexes.store(_origWildcardKnob);
     }
 
 protected:
@@ -140,7 +140,7 @@ protected:
     unique_ptr<AutoGetDb> _autoDb;
     Database* _db;
     bool _isInRecordIdOrder;
-    bool _origAllPathsKnob{false};
+    bool _origWildcardKnob{false};
 };
 
 template <bool full, bool background>
@@ -1019,7 +1019,7 @@ public:
 
         // Insert additional multikey path metadata index keys.
         lockDb(MODE_X);
-        const RecordId recordId(RecordId::ReservedId::kAllPathsMultikeyMetadataId);
+        const RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
         IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto sortedDataInterface =
@@ -1139,7 +1139,7 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             const BSONObj indexKey = BSON("" << 1 << ""
                                              << "a");
-            RecordId recordId(RecordId::ReservedId::kAllPathsMultikeyMetadataId);
+            RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
             sortedDataInterface->unindex(&_opCtx, indexKey, recordId, true /* dupsAllowed */);
             wunit.commit();
         }

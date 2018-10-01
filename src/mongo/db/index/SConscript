@@ -19,10 +19,10 @@ env.Library(
 env.Library(
         target='key_generator',
         source=[
-            'all_paths_key_generator.cpp',
             'btree_key_generator.cpp',
             'expression_keys_private.cpp',
             'sort_key_generator.cpp',
+            'wildcard_key_generator.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
@@ -59,12 +59,12 @@ env.Library(
 env.CppUnitTest(
         target='key_generator_test',
         source=[
-            'all_paths_key_generator_test.cpp',
             '2d_key_generator_test.cpp',
             'btree_key_generator_test.cpp',
             'hash_key_generator_test.cpp',
             's2_key_generator_test.cpp',
             'sort_key_generator_test.cpp',
+            'wildcard_key_generator_test.cpp',
         ],
         LIBDEPS=[
             'key_generator',
@@ -101,12 +101,12 @@ env.Library(
     target="index_access_methods",
     source=[
         "2d_access_method.cpp",
-        "all_paths_access_method.cpp",
         "btree_access_method.cpp",
         "fts_access_method.cpp",
         "hash_access_method.cpp",
         "haystack_access_method.cpp",
         "s2_access_method.cpp",
+        "wildcard_access_method.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

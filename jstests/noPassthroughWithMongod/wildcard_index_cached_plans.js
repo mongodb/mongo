@@ -1,5 +1,5 @@
 /**
- * Test that cached plans which use allPaths indexes work.
+ * Test that cached plans which use wildcard indexes work.
  * TODO: SERVER-36198: Move this test back to jstests/core/
  */
 (function() {
@@ -10,7 +10,7 @@
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
 
-    const coll = db.all_paths_cached_plans;
+    const coll = db.wildcard_cached_plans;
     coll.drop();
     assert.commandWorked(coll.createIndex({"b.$**": 1}));
     assert.commandWorked(coll.createIndex({"a": 1}));
@@ -83,7 +83,7 @@
 
     // Check that indexability discriminators work with collations.
     (function() {
-        // Create allPaths index with a collation.
+        // Create wildcard index with a collation.
         assert.eq(coll.drop(), true);
         assert.commandWorked(
             db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 1}}));
@@ -110,7 +110,7 @@
                    queryWithStringExplain.queryPlanner.queryHash);
     })();
 
-    // Check that indexability discriminators work with partial allPaths indexes.
+    // Check that indexability discriminators work with partial wildcard indexes.
     (function() {
         assert.eq(coll.drop(), true);
         assert.commandWorked(db.createCollection(coll.getName()));

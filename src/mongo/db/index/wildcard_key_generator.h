@@ -39,24 +39,24 @@ namespace mongo {
  * pathProjection specs, and for subsequently extracting the set of all path-value pairs for each
  * document.
  */
-class AllPathsKeyGenerator {
+class WildcardKeyGenerator {
 public:
     static constexpr StringData kSubtreeSuffix = ".$**"_sd;
 
     /**
-     * Returns an owned ProjectionExecAgg identical to the one that AllPathsKeyGenerator will use
+     * Returns an owned ProjectionExecAgg identical to the one that WildcardKeyGenerator will use
      * internally when generating the keys for the $** index, as defined by the 'keyPattern' and
      * 'pathProjection' arguments.
      */
     static std::unique_ptr<ProjectionExecAgg> createProjectionExec(BSONObj keyPattern,
                                                                    BSONObj pathProjection);
 
-    AllPathsKeyGenerator(BSONObj keyPattern,
+    WildcardKeyGenerator(BSONObj keyPattern,
                          BSONObj pathProjection,
                          const CollatorInterface* collator);
 
     /**
-     * Applies the appropriate AllPaths projection to the input doc, and then adds one key-value
+     * Applies the appropriate Wildcard projection to the input doc, and then adds one key-value
      * pair to the BSONObjSet 'keys' for each leaf node in the post-projection document:
      *      { '': 'path.to.field', '': <collation-aware-field-value> }
      * Also adds one entry to 'multikeyPaths' for each array encountered in the post-projection
@@ -67,7 +67,7 @@ public:
 
 private:
     // Traverses every path of the post-projection document, adding keys to the set as it goes.
-    void _traverseAllPaths(BSONObj obj,
+    void _traverseWildcard(BSONObj obj,
                            bool objIsArray,
                            FieldRef* path,
                            BSONObjSet* keys,

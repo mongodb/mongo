@@ -40,13 +40,13 @@ class BSONObj;
  * We need to know what 'type' an index is in order to plan correctly.
  */
 enum IndexType {
-    INDEX_ALLPATHS,
     INDEX_BTREE,
     INDEX_2D,
     INDEX_HAYSTACK,
     INDEX_2DSPHERE,
     INDEX_TEXT,
     INDEX_HASHED,
+    INDEX_WILDCARD,
 };
 
 /**
@@ -55,13 +55,13 @@ enum IndexType {
  */
 class IndexNames {
 public:
-    static const std::string ALLPATHS;
     static const std::string BTREE;
     static const std::string GEO_2D;
     static const std::string GEO_2DSPHERE;
     static const std::string GEO_HAYSTACK;
     static const std::string HASHED;
     static const std::string TEXT;
+    static const std::string WILDCARD;
 
     /**
      * Return the first std::string value in the provided object.  For an index key pattern,

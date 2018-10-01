@@ -34,8 +34,8 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/geo/hash.h"
-#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -44,7 +44,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_allpaths_helpers.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 
@@ -52,31 +52,31 @@ namespace mongo {
 
 namespace {
 
-namespace app = ::mongo::all_paths_planning;
+namespace app = ::mongo::wildcard_planning;
 
 std::size_t numPathComponents(StringData path) {
     return FieldRef{path}.numParts();
 }
 
 /**
- * Given a single allPaths index, and a set of fields which are being queried, create 'mock'
+ * Given a single wildcard index, and a set of fields which are being queried, create 'mock'
  * IndexEntry for each of the appropriate fields.
  */
-void expandIndex(const IndexEntry& allPathsIndex,
+void expandIndex(const IndexEntry& wildcardIndex,
                  const stdx::unordered_set<std::string>& fields,
                  vector<IndexEntry>* out) {
     invariant(out);
-    invariant(allPathsIndex.type == INDEX_ALLPATHS);
+    invariant(wildcardIndex.type == INDEX_WILDCARD);
     // Should only have one field of the form {"path.$**" : 1}.
-    invariant(allPathsIndex.keyPattern.nFields() == 1);
+    invariant(wildcardIndex.keyPattern.nFields() == 1);
 
     // $** indexes do not keep the multikey metadata inside the index catalog entry, as the amount
     // of metadata is not bounded. We do not expect IndexEntry objects for $** indexes to have a
     // fixed-size vector of multikey metadata until after they are expanded.
-    invariant(allPathsIndex.multikeyPaths.empty());
+    invariant(wildcardIndex.multikeyPaths.empty());
 
-    const auto projExec = AllPathsKeyGenerator::createProjectionExec(
-        allPathsIndex.keyPattern, allPathsIndex.infoObj.getObjectField("wildcardProjection"));
+    const auto projExec = WildcardKeyGenerator::createProjectionExec(
+        wildcardIndex.keyPattern, wildcardIndex.infoObj.getObjectField("wildcardProjection"));
 
     const auto projectedFields = projExec->applyProjectionToFields(fields);
 
@@ -91,8 +91,8 @@ void expandIndex(const IndexEntry& allPathsIndex,
         // in-memory. Here we convert this set of all multikey paths into a MultikeyPaths vector
         // which will indicate to the downstream planning code which components of 'fieldName' are
         // multikey.
-        auto multikeyPaths = app::buildMultiKeyPathsForExpandedAllPathsIndexEntry(
-            queryPath, allPathsIndex.multikeyPathSet);
+        auto multikeyPaths = app::buildMultiKeyPathsForExpandedWildcardIndexEntry(
+            queryPath, wildcardIndex.multikeyPathSet);
 
         // Check whether a query on the current fieldpath is answerable by the $** index, given any
         // numerical path components that may be present in the path string.
@@ -109,8 +109,8 @@ void expandIndex(const IndexEntry& allPathsIndex,
         invariant(multikeyPaths.size() == 1u);
         const bool isMultikey = !multikeyPaths[0].empty();
 
-        IndexEntry entry(BSON(fieldName << allPathsIndex.keyPattern.firstElement()),
-                         IndexType::INDEX_ALLPATHS,
+        IndexEntry entry(BSON(fieldName << wildcardIndex.keyPattern.firstElement()),
+                         IndexType::INDEX_WILDCARD,
                          isMultikey,
                          std::move(multikeyPaths),
                          // Expanded index entries always use the fixed-size multikey paths
@@ -118,17 +118,17 @@ void expandIndex(const IndexEntry& allPathsIndex,
                          {},
                          true,   // sparse
                          false,  // unique
-                         {allPathsIndex.identifier.catalogName, fieldName},
-                         allPathsIndex.filterExpr,
-                         allPathsIndex.infoObj,
-                         allPathsIndex.collator);
+                         {wildcardIndex.identifier.catalogName, fieldName},
+                         wildcardIndex.filterExpr,
+                         wildcardIndex.infoObj,
+                         wildcardIndex.collator);
 
         invariant("$_path"_sd != fieldName);
         out->push_back(std::move(entry));
     }
 }
 
-bool canUseAllPathsIndex(BSONElement elt, MatchExpression::MatchType matchType) {
+bool canUseWildcardIndex(BSONElement elt, MatchExpression::MatchType matchType) {
     if (elt.type() == BSONType::Object) {
         return false;
     }
@@ -370,7 +370,7 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
     const std::vector<IndexEntry>& relevantIndices) {
     std::vector<IndexEntry> out;
     for (auto&& entry : relevantIndices) {
-        if (entry.type == IndexType::INDEX_ALLPATHS) {
+        if (entry.type == IndexType::INDEX_WILDCARD) {
             expandIndex(entry, fields, &out);
         } else {
             out.push_back(entry);
@@ -513,7 +513,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             }
         }
 
-        if (index.type == IndexType::INDEX_ALLPATHS && !nodeIsSupportedByAllPathsIndex(node)) {
+        if (index.type == IndexType::INDEX_WILDCARD && !nodeIsSupportedByWildcardIndex(node)) {
             return false;
         }
 
@@ -652,8 +652,8 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
     return true;
 }
 
-bool QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(const MatchExpression* queryExpr) {
-    // AllPaths indexes only store index keys for "leaf" nodes in an object. That is, they do not
+bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr) {
+    // Wildcard indexes only store index keys for "leaf" nodes in an object. That is, they do not
     // store keys for nested objects, meaning that any kind of comparison to an object or array
     // cannot be answered by the index (including with a $in).
 
@@ -661,14 +661,14 @@ bool QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(const MatchExpression*
         const ComparisonMatchExpression* cmpExpr =
             static_cast<const ComparisonMatchExpression*>(queryExpr);
 
-        return canUseAllPathsIndex(cmpExpr->getData(), cmpExpr->matchType());
+        return canUseWildcardIndex(cmpExpr->getData(), cmpExpr->matchType());
     } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
         const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
 
         return std::all_of(
             queryExprIn->getEqualities().begin(),
             queryExprIn->getEqualities().end(),
-            [](const BSONElement& elt) { return canUseAllPathsIndex(elt, MatchExpression::EQ); });
+            [](const BSONElement& elt) { return canUseWildcardIndex(elt, MatchExpression::EQ); });
     }
 
     return true;
@@ -766,7 +766,7 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
 // static
 void QueryPlannerIXSelect::stripInvalidAssignments(MatchExpression* node,
                                                    const vector<IndexEntry>& indices) {
-    stripInvalidAssignmentsToAllPathsIndexes(node, indices);
+    stripInvalidAssignmentsToWildcardIndexes(node, indices);
     stripInvalidAssignmentsToTextIndexes(node, indices);
 
     if (MatchExpression::GEO != node->matchType() &&
@@ -955,13 +955,13 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToPartialIndices(
 }
 
 //
-// AllPaths index invalid assignments.
+// Wildcard index invalid assignments.
 //
-void QueryPlannerIXSelect::stripInvalidAssignmentsToAllPathsIndexes(
+void QueryPlannerIXSelect::stripInvalidAssignmentsToWildcardIndexes(
     MatchExpression* root, const vector<IndexEntry>& indices) {
     for (size_t idx = 0; idx < indices.size(); ++idx) {
         // Skip over all indexes except $**.
-        if (indices[idx].type != IndexType::INDEX_ALLPATHS) {
+        if (indices[idx].type != IndexType::INDEX_WILDCARD) {
             continue;
         }
         // If we have a $** index, check whether we have a TEXT node in the MatchExpression tree.

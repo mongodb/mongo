@@ -87,7 +87,7 @@ struct IndexEntry {
         std::string catalogName;
 
         // A string used for disambiguating multiple IndexEntries with the same catalogName (such
-        // as in the case with an allPaths index).
+        // as in the case with a wildcard index).
         std::string disambiguator;
     };
 

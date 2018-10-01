@@ -388,7 +388,7 @@ private:
 
     static void finishTextNode(QuerySolutionNode* node, const IndexEntry& index);
 
-    static void finishAllPathsIndexScanNode(QuerySolutionNode* node, const IndexEntry& index);
+    static void finishWildcardIndexScanNode(QuerySolutionNode* node, const IndexEntry& index);
 
     /**
      * Add the filter 'match' to the query solution node 'node'. Takes

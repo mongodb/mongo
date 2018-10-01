@@ -32,7 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/index/all_paths_key_generator.h"
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_internal_expr_eq.h"
@@ -112,11 +112,11 @@ void PlanCacheIndexabilityState::processPartialIndex(const std::string& indexNam
     }
 }
 
-void PlanCacheIndexabilityState::processAllPathsIndex(const IndexEntry& ie) {
-    invariant(ie.type == IndexType::INDEX_ALLPATHS);
+void PlanCacheIndexabilityState::processWildcardIndex(const IndexEntry& ie) {
+    invariant(ie.type == IndexType::INDEX_WILDCARD);
 
-    _allPathsIndexDiscriminators.emplace_back(
-        AllPathsKeyGenerator::createProjectionExec(ie.keyPattern,
+    _wildcardIndexDiscriminators.emplace_back(
+        WildcardKeyGenerator::createProjectionExec(ie.keyPattern,
                                                    ie.infoObj.getObjectField("wildcardProjection")),
         ie.identifier.catalogName,
         ie.filterExpr,
@@ -145,23 +145,23 @@ const IndexToDiscriminatorMap& PlanCacheIndexabilityState::getDiscriminators(
     return it->second;
 }
 
-IndexToDiscriminatorMap PlanCacheIndexabilityState::buildAllPathsDiscriminators(
+IndexToDiscriminatorMap PlanCacheIndexabilityState::buildWildcardDiscriminators(
     StringData path) const {
 
     IndexToDiscriminatorMap ret;
-    for (auto&& allPathsDiscriminator : _allPathsIndexDiscriminators) {
-        if (allPathsDiscriminator.projectionExec->applyProjectionToOneField(path)) {
-            CompositeIndexabilityDiscriminator& cid = ret[allPathsDiscriminator.catalogName];
+    for (auto&& wildcardDiscriminator : _wildcardIndexDiscriminators) {
+        if (wildcardDiscriminator.projectionExec->applyProjectionToOneField(path)) {
+            CompositeIndexabilityDiscriminator& cid = ret[wildcardDiscriminator.catalogName];
 
             // We can use these 'shallow' functions because the code building the plan cache key
             // will descend the match expression for us, and check the discriminator's return value
             // at each node.
-            cid.addDiscriminator(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex);
+            cid.addDiscriminator(QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex);
             cid.addDiscriminator(nodeIsConservativelySupportedBySparseIndex);
-            cid.addDiscriminator(getCollatedIndexDiscriminator(allPathsDiscriminator.collator));
-            if (allPathsDiscriminator.filterExpr) {
+            cid.addDiscriminator(getCollatedIndexDiscriminator(wildcardDiscriminator.collator));
+            if (wildcardDiscriminator.filterExpr) {
                 cid.addDiscriminator(
-                    getPartialIndexDiscriminator(allPathsDiscriminator.filterExpr));
+                    getPartialIndexDiscriminator(wildcardDiscriminator.filterExpr));
             }
         }
     }
@@ -172,8 +172,8 @@ void PlanCacheIndexabilityState::updateDiscriminators(const std::vector<IndexEnt
     _pathDiscriminatorsMap = PathDiscriminatorsMap();
 
     for (const IndexEntry& idx : indexEntries) {
-        if (idx.type == IndexType::INDEX_ALLPATHS) {
-            processAllPathsIndex(idx);
+        if (idx.type == IndexType::INDEX_WILDCARD) {
+            processWildcardIndex(idx);
             continue;
         }
 

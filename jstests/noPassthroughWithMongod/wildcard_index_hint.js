@@ -8,7 +8,7 @@
     load("jstests/aggregation/extras/utils.js");  // For arrayEq.
     load("jstests/libs/analyze_plan.js");         // For getPlanStages.
 
-    const coll = db.all_paths_hint;
+    const coll = db.wildcard_hint;
     coll.drop();
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
@@ -26,8 +26,8 @@
         assert.gt(ixScans.length, 0, tojson(coll.find(query).hint(hint).explain()));
         ixScans.forEach((ixScan) => assert.eq(ixScan.indexName, expectedIndexName));
 
-        const allPathsResults = coll.find(query, {_id: 0}).hint(hint).toArray();
-        assertArrayEq(allPathsResults, expectedResults);
+        const wildcardResults = coll.find(query, {_id: 0}).hint(hint).toArray();
+        assertArrayEq(wildcardResults, expectedResults);
     }
 
     assert.commandWorked(
@@ -83,7 +83,7 @@
             "$**_1",
             [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 2, b: 2, c: {d: 1, e: 2}}]);
 
-        // Adding another all paths index with a path specified.
+        // Adding another wildcard index with a path specified.
         assert.commandWorked(coll.createIndex({"c.$**": 1}));
 
         // Hint on path that is not in query argument.
@@ -117,8 +117,5 @@
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});
-
-        // TODO: SERVER-36444 remove calls to drop() once wildcard index validation works.
-        coll.drop();
     }
 })();

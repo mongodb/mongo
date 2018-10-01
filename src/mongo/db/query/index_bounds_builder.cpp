@@ -45,8 +45,8 @@
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_allpaths_helpers.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -57,7 +57,7 @@ namespace mongo {
 
 namespace {
 
-namespace app = ::mongo::all_paths_planning;
+namespace app = ::mongo::wildcard_planning;
 
 // Helper for checking that an OIL "appears" to be ascending given one interval.
 void assertOILIsAscendingLocally(const vector<Interval>& intervals, size_t idx) {
@@ -344,8 +344,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     // Under certain circumstances, queries on a $** index require that the bounds' tightness be
     // adjusted regardless of the predicate. Having filled out the initial bounds, we apply any
     // necessary changes to the tightness here.
-    if (index.type == IndexType::INDEX_ALLPATHS) {
-        *tightnessOut = app::applyAllPathsIndexScanBoundsTightness(index, *tightnessOut);
+    if (index.type == IndexType::INDEX_WILDCARD) {
+        *tightnessOut = app::applyWildcardIndexScanBoundsTightness(index, *tightnessOut);
     }
 }
 

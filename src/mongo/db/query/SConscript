@@ -24,7 +24,7 @@ env.Library(
         "plan_cache_indexability.cpp",
         "plan_enumerator.cpp",
         "planner_access.cpp",
-        "planner_allpaths_helpers.cpp",
+        "planner_wildcard_helpers.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
         "query_planner.cpp",
@@ -341,12 +341,12 @@ env.CppUnitTest(
 env.CppUnitTest(
     target="query_planner_test",
     source=[
-        "query_planner_all_paths_index_test.cpp",
         "query_planner_array_test.cpp",
         "query_planner_collation_test.cpp",
         "query_planner_geo_test.cpp",
         "query_planner_partialidx_test.cpp",
         "query_planner_test.cpp",
+        "query_planner_wildcard_index_test.cpp",
     ],
     LIBDEPS=[
         "collation/collator_interface_mock",

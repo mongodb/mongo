@@ -8,9 +8,9 @@
 
     load("jstests/libs/analyze_plan.js");  // For isIxScan, isCollscan.
 
-    const coll = db.all_paths_partial_index;
+    const coll = db.wildcard_partial_index;
 
-    function testPartialAllPathsIndex(indexKeyPattern, indexOptions) {
+    function testPartialWildcardIndex(indexKeyPattern, indexOptions) {
         coll.drop();
 
         assert.commandWorked(coll.createIndex(indexKeyPattern, indexOptions));
@@ -47,10 +47,10 @@
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
 
-        testPartialAllPathsIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
+        testPartialWildcardIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 
         // Case where the partial filter expression is on a field not included in the index.
-        testPartialAllPathsIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
+        testPartialWildcardIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});

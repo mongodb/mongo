@@ -561,7 +561,7 @@ bool IndexScanNode::hasField(const string& field) const {
     for (auto&& elt : index.keyPattern) {
         // For $** indexes, the keyPattern is prefixed by a virtual field, '$_path'. We therefore
         // skip the first keyPattern field when deciding whether we can provide the requested field.
-        if (index.type == IndexType::INDEX_ALLPATHS && !keyPatternFieldIndex) {
+        if (index.type == IndexType::INDEX_WILDCARD && !keyPatternFieldIndex) {
             invariant(elt.fieldNameStringData() == "$_path"_sd);
             ++keyPatternFieldIndex;
             continue;
