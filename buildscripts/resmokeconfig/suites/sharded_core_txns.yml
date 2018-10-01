@@ -25,7 +25,6 @@ selector:
   - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
   - jstests/core/txns/prepare_committed_transaction.js
   - jstests/core/txns/prepare_conflict.js
-  - jstests/core/txns/prepare_conflict_read_concern_behavior.js
   - jstests/core/txns/prepare_nonexistent_transaction.js
   - jstests/core/txns/prepare_prepared_transaction.js
   - jstests/core/txns/prepare_requires_fcv42.js

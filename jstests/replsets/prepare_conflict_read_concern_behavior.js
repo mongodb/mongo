@@ -9,12 +9,18 @@
     "use strict";
     load("jstests/core/txns/libs/prepare_helpers.js");
 
+    const replTest = new ReplSetTest({nodes: 1});
+    replTest.startSet();
+    replTest.initiate();
+
+    const conn = replTest.getPrimary();
+
     const failureTimeout = 1 * 1000;       // 1 second.
     const successTimeout = 5 * 60 * 1000;  // 5 minutes.
     const dbName = "test";
     const collName = "prepare_conflict_read_concern_behavior";
     const collName2 = "prepare_conflict_read_concern_behavior2";
-    const testDB = db.getSiblingDB(dbName);
+    const testDB = conn.getDB(dbName);
     const testColl = testDB.getCollection(collName);
     const testColl2 = testDB.getCollection(collName2);
 
@@ -31,7 +37,7 @@
         testDB.runCommand({drop: collName2, writeConcern: {w: "majority"}});
         assert.commandWorked(testDB.runCommand({create: collName2, writeConcern: {w: "majority"}}));
 
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = conn.startSession({causalConsistency: false});
         const sessionDB = session.getDatabase(dbName);
         const sessionColl = sessionDB.getCollection(collName);
 
@@ -117,7 +123,7 @@
                                   1));
 
         // Create a second session and start a new transaction to test snapshot reads.
-        const session2 = db.getMongo().startSession({causalConsistency: false});
+        const session2 = conn.startSession({causalConsistency: false});
         const sessionDB2 = session2.getDatabase(dbName);
         const sessionColl2 = sessionDB2.getCollection(collName);
         // This makes future reads in the transaction use a read timestamp after the
@@ -141,8 +147,6 @@
 
         jsTestLog("Test read with read concern 'snapshot' and atClusterTime before " +
                   "prepareTimestamp doesn't block on a prepared transaction.");
-        assert.commandWorked(
-            testColl.runCommand("insert", {documents: [{_id: 4, in_prepared_txn: 3}]}));
         assert.commandWorked(read({}, successTimeout, sessionDB2, collName, 1));
 
         session.abortTransaction();
@@ -161,5 +165,7 @@
             mode: "off",
         }));
     }
+
+    replTest.stopSet();
 
 }());

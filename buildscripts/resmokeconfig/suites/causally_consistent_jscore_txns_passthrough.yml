@@ -11,7 +11,6 @@ selector:
   # The following tests are excluded because they do not use the transactions shell helpers.
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
   # These tests rely on having read concerns that don't use afterClusterTime.
-  - jstests/core/txns/prepare_conflict_read_concern_behavior.js
   - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
 
 executor:

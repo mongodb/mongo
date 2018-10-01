@@ -81,7 +81,6 @@ selector:
   - jstests/core/txns/empty_prepare.js
   - jstests/core/txns/no_new_transactions_when_prepared_transaction_in_progress.js
   - jstests/core/txns/prepare_conflict.js
-  - jstests/core/txns/prepare_conflict_read_concern_behavior.js
   - jstests/core/txns/prepare_prepared_transaction.js
   - jstests/core/txns/statement_ids_accepted.js
   # TODO (SERVER-35865): Unblacklist when we also correctly write and apply 'commitTransaction'
