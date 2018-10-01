@@ -476,6 +476,7 @@ variables:
     - windows-64-vs2015-large
   - name: burn_in_tests
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: audit
   - name: auth_audit
   - name: benchmarks_orphaned
@@ -4550,6 +4551,20 @@ tasks:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=generational_fuzzer
 
+## Standalone fuzzer for checking wildcard index correctness ##
+- <<: *jstestfuzz_template
+  name: aggregation_wildcard_fuzzer
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 50 --diffTestingMode wildcard
+      npm_command: agg-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=generational_fuzzer
+
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer
@@ -8069,6 +8084,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -8375,6 +8391,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_sharded
@@ -8462,6 +8479,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -8559,6 +8577,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_txns
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -8639,6 +8658,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -8816,6 +8836,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -8905,6 +8926,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9026,6 +9048,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9218,6 +9241,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9302,6 +9326,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9396,6 +9421,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9483,6 +9509,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9569,6 +9596,7 @@ buildvariants:
   - name: aggregation_sharded_collections_passthrough
   - name: aggregation_multiversion_fuzzer
   - name: aggregation_expression_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: auth
   - name: causally_consistent_jscore_passthrough
   - name: causally_consistent_jscore_passthrough_auth
@@ -9759,6 +9787,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
   - name: aggregation_expression_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -10101,6 +10130,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -10187,6 +10217,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -11042,6 +11073,7 @@ buildvariants:
   - name: jsonSchema
   - name: aggregation_multiversion_fuzzer
   - name: aggregation_expression_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -12096,6 +12128,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_mongos_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
@@ -12242,6 +12275,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
   - name: aggregation_expression_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -12354,6 +12388,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -12574,6 +12609,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -12909,6 +12945,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -12982,6 +13019,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13086,6 +13124,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13267,6 +13306,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13350,6 +13390,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13418,6 +13459,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13502,6 +13544,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13573,6 +13616,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -13702,6 +13746,7 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz
@@ -14049,6 +14094,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_compatibility
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -14442,6 +14488,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: free_monitoring
   - name: aggregation_multiversion_fuzzer
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
