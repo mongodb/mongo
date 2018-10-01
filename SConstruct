@@ -3889,10 +3889,6 @@ if should_dagger:
     # Require everything to be built before trying to extract build dependency information
     env.Requires(dependencyDb, allTargets)
 
-# We don't want installing files to cause them to flow into the cache,
-# since presumably we can re-install them from the origin if needed.
-env.NoCache(env.FindInstalledFiles())
-
 # Declare the cache prune target
 cachePrune = env.Command(
     target="#cache-prune",

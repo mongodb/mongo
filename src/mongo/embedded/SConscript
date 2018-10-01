@@ -154,7 +154,7 @@ if get_option('link-model') != 'dynamic-sdk':
             '$BUILD_DIR/mongo/util/signal_handlers',
         ],
         INSTALL_ALIAS=[
-            'embedded-test',
+            ('embedded', 'test'),
         ],
     )
 

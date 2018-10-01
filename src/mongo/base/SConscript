@@ -53,7 +53,7 @@ env.CppUnitTest(
         'string_data_test.cpp',
         'uuid_test.cpp',
     ],
-    INSTALL_TAGS=[
+    INSTALL_ALIAS=[
         ('base', 'test')
     ],
 )
