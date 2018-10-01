@@ -1,9 +1,12 @@
 /**
  * This tests mongo shell functions bsonWoCompare & bsonBinaryEqual.
  */
+
 (function() {
     'use strict';
 
+    var t = db.getCollection("bson");
+    t.drop();
     function testObjectsAreEqual(obj1, obj2, equalityFunc, func_name) {
         var assert_msg = func_name + " " + tojson(obj1) + " " + tojson(obj2);
         assert(equalityFunc(obj1, obj2), assert_msg);
@@ -16,27 +19,28 @@
 
     function runTests(func, testFunc) {
         // Tests on numbers.
-        testObjectsAreEqual({a: 0}, {a: 0}, func, testFunc);
-        testObjectsAreEqual({a: -5}, {a: -5}, func, testFunc);
-        testObjectsAreEqual({a: 1}, {a: 1.0}, func, testFunc);
-        testObjectsAreEqual({a: 1.1}, {a: 1.1}, func, testFunc);
-        testObjectsAreEqual({a: 1.1}, {a: 1.10}, func, testFunc);
+        testObjectsAreEqual(0, 0, func, testFunc);
+        testObjectsAreEqual(-5, -5, func, testFunc);
+        testObjectsAreEqual(1.1, 1.1, func, testFunc);
+        testObjectsAreEqual(1, 1, func, testFunc);
+        testObjectsAreEqual(1.1, 1.10, func, testFunc);
         var nl0 = new NumberLong("18014398509481984");
         var nl1 = new NumberLong("18014398509481985");
         testObjectsAreEqual(nl0, nl0, func, testFunc);
         testObjectsAreNotEqual(nl0, nl1, func, testFunc);
 
         // Test on key name.
-        testObjectsAreNotEqual({a: 0}, {A: 0}, func, testFunc);
+        t.insertMany([{a: 0}, {A: 0}]);
+        testObjectsAreNotEqual(t.findOne({a: 0}), t.findOne({A: 0}), func, testFunc);
 
         // Tests on strings.
-        testObjectsAreEqual({a: "abc"}, {a: "abc"}, func, testFunc);
-        testObjectsAreNotEqual({a: "abc"}, {a: "aBc"}, func, testFunc);
+        testObjectsAreEqual("abc", "abc", func, testFunc);
+        testObjectsAreNotEqual("abc", "aBc", func, testFunc);
 
         // Tests on boolean.
-        testObjectsAreEqual({a: true}, {a: true}, func, testFunc);
-        testObjectsAreNotEqual({a: true}, {a: false}, func, testFunc);
-        testObjectsAreEqual({a: false}, {a: false}, func, testFunc);
+        testObjectsAreEqual(true, true, func, testFunc);
+        testObjectsAreNotEqual(true, false, func, testFunc);
+        testObjectsAreEqual(false, false, func, testFunc);
 
         // Tests on date & timestamp.
         var d0 = new Date(0);
@@ -50,8 +54,8 @@
         testObjectsAreNotEqual(ts0, ts1, func, testFunc);
 
         // Tests on regex.
-        testObjectsAreEqual({a: /3/}, {a: /3/}, func, testFunc);
-        testObjectsAreNotEqual({a: /3/}, {a: /3/i}, func, testFunc);
+        testObjectsAreEqual(/3/, /3/, func, testFunc);
+        testObjectsAreNotEqual(/3/, /3/i, func, testFunc);
 
         // Tests on DBPointer.
         var dbp0 = new DBPointer("test", new ObjectId());
@@ -66,9 +70,9 @@
         testObjectsAreNotEqual(js0, js1, func, testFunc);
 
         // Tests on arrays.
-        testObjectsAreEqual({a: [0, 1]}, {a: [0, 1]}, func, testFunc);
-        testObjectsAreNotEqual({a: [0, 1]}, {a: [0]}, func, testFunc);
-        testObjectsAreNotEqual({a: [1, 0]}, {a: [0, 1]}, func, testFunc);
+        testObjectsAreEqual([0, 1], [0, 1], func, testFunc);
+        testObjectsAreNotEqual([0, 1], [0], func, testFunc);
+        testObjectsAreNotEqual([1, 0], [0, 1], func, testFunc);
 
         // Tests on BinData & HexData.
         testObjectsAreEqual(new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
@@ -93,14 +97,12 @@
                                testFunc);
 
         // Tests on miscellaneous types.
-        testObjectsAreEqual({a: NaN}, {a: NaN}, func, testFunc);
-        testObjectsAreEqual({a: null}, {a: null}, func, testFunc);
-        testObjectsAreNotEqual({a: null}, {a: -null}, func, testFunc);
-        testObjectsAreEqual({a: undefined}, {a: undefined}, func, testFunc);
-        testObjectsAreNotEqual({a: undefined}, {a: null}, func, testFunc);
-        testObjectsAreEqual({a: MinKey}, {a: MinKey}, func, testFunc);
-        testObjectsAreEqual({a: MaxKey}, {a: MaxKey}, func, testFunc);
-        testObjectsAreNotEqual({a: MinKey}, {a: MaxKey}, func, testFunc);
+        testObjectsAreEqual(NaN, NaN, func, testFunc);
+        testObjectsAreEqual(null, null, func, testFunc);
+        testObjectsAreNotEqual(null, -null, func, testFunc);
+        testObjectsAreEqual(MinKey, MinKey, func, testFunc);
+        testObjectsAreEqual(MaxKey, MaxKey, func, testFunc);
+        testObjectsAreNotEqual(MinKey, MaxKey, func, testFunc);
 
         // Test on object ordering.
         testObjectsAreNotEqual({a: 1, b: 2}, {b: 2, a: 1}, func, testFunc);
@@ -116,22 +118,21 @@
     runTests(bsonBinaryEqual, "bsonBinaryEqual");
 
     // Run the tests which differ between comparators.
-    testObjectsAreEqual({a: NaN}, {a: -NaN}, bsonWoCompareWrapper, "bsonWoCompare");
-    testObjectsAreNotEqual({a: NaN}, {a: -NaN}, bsonBinaryEqual, "bsonBinaryEqual");
-    testObjectsAreEqual({a: 1}, {a: NumberLong("1")}, bsonWoCompareWrapper, "bsonWoCompare");
-    testObjectsAreNotEqual({a: 1}, {a: NumberLong("1")}, bsonBinaryEqual, "bsonBinaryEqual");
-    testObjectsAreEqual({a: 1.0}, {a: NumberLong("1")}, bsonWoCompareWrapper, "bsonWoCompare");
-    testObjectsAreNotEqual({a: 1.0}, {a: NumberLong("1")}, bsonBinaryEqual, "bsonBinaryEqual");
+    testObjectsAreEqual(NaN, -NaN, bsonWoCompareWrapper, "bsonWoCompare");
+    testObjectsAreNotEqual(NaN, -NaN, bsonBinaryEqual, "bsonBinaryEqual");
+    testObjectsAreEqual(1, NumberLong("1"), bsonWoCompareWrapper, "bsonWoCompare");
+    testObjectsAreNotEqual(1, NumberLong("1"), bsonBinaryEqual, "bsonBinaryEqual");
+    testObjectsAreEqual(1.0, NumberLong("1"), bsonWoCompareWrapper, "bsonWoCompare");
+    testObjectsAreNotEqual(1.0, NumberLong("1"), bsonBinaryEqual, "bsonBinaryEqual");
+    testObjectsAreEqual(NumberInt("1"), NumberLong("1"), bsonWoCompareWrapper, "bsonWoCompare");
+    testObjectsAreNotEqual(NumberInt("1"), NumberLong("1"), bsonBinaryEqual, "bsonBinaryEqual");
     testObjectsAreEqual(
-        {a: NumberInt("1")}, {a: NumberLong("1")}, bsonWoCompareWrapper, "bsonWoCompare");
+        NumberInt("1"), NumberDecimal("1.0"), bsonWoCompareWrapper, "bsonWoCompare");
     testObjectsAreNotEqual(
-        {a: NumberInt("1")}, {a: NumberLong("1")}, bsonBinaryEqual, "bsonBinaryEqual");
+        NumberInt("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
     testObjectsAreEqual(
-        {a: NumberInt("1")}, {a: NumberDecimal("1.0")}, bsonWoCompareWrapper, "bsonWoCompare");
+        NumberLong("1"), NumberDecimal("1.0"), bsonWoCompareWrapper, "bsonWoCompare");
     testObjectsAreNotEqual(
-        {a: NumberInt("1")}, {a: NumberDecimal("1.0")}, bsonBinaryEqual, "bsonBinaryEqual");
-    testObjectsAreEqual(
-        {a: NumberLong("1")}, {a: NumberDecimal("1.0")}, bsonWoCompareWrapper, "bsonWoCompare");
-    testObjectsAreNotEqual(
-        {a: NumberLong("1")}, {a: NumberDecimal("1.0")}, bsonBinaryEqual, "bsonBinaryEqual");
+        NumberLong("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
+
 })();
