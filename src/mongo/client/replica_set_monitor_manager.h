@@ -98,10 +98,12 @@ private:
 
     // Protects access to the replica set monitors
     stdx::mutex _mutex;
-    ReplicaSetMonitorsMap _monitors;
 
     // Executor for monitoring replica sets.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
+
+    // Needs to be after `_taskExecutor`, so that it will be destroyed before the `_taskExecutor`.
+    ReplicaSetMonitorsMap _monitors;
 
     void _setupTaskExecutorInLock(const std::string& name);
 
