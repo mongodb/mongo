@@ -393,6 +393,40 @@ tasks:
     - func: "analyze"
       vars:
         reports_analysis: true
+- name: wildcard-index-read
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "wildcard_read"
+        includeFilter2 : "core regression"
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+        readCmd: false
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        reports_analysis: true
+- name: wildcard-index-write
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "wildcard_write"
+        includeFilter2 : "core regression"
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+        readCmd: false
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        reports_analysis: true
 - name: geo
   depends_on:
   - variant: linux-wt-standalone
@@ -523,6 +557,8 @@ buildvariants:
   - name: where
   - name: update
   - name: insert
+  - name: wildcard-index-read
+  - name: wildcard-index-write
   - name: geo
   - name: misc
   - name: singleThreaded
@@ -558,3 +594,4 @@ buildvariants:
   - name: insert
   - name: misc
   - name: singleThreaded
+  - name: wildcard-index-write
