@@ -591,10 +591,14 @@ void updateUniqueIndexesOnUpgrade(OperationContext* opCtx) {
     log() << "Finished updating version of unique indexes for upgrade, waiting for all"
           << " index updates to be committed at optime " << awaitOpTime;
 
-    const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
-                                           WriteConcernOptions::SyncMode::UNSET,
-                                           /*timeout*/ INT_MAX);
-    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(opCtx, awaitOpTime, writeConcern);
+    auto timeout = opCtx->getWriteConcern().usedDefault ? WriteConcernOptions::kNoTimeout
+                                                        : opCtx->getWriteConcern().wTimeout;
+    const WriteConcernOptions writeConcern(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout);
+
+    uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)
+                        ->awaitReplication(opCtx, awaitOpTime, writeConcern)
+                        .status);
 }
 
 Status updateNonReplicatedUniqueIndexes(OperationContext* opCtx) {

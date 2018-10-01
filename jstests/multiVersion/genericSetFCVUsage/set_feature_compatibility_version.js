@@ -206,7 +206,22 @@ TestData.skipCheckDBHashes = true;
     primaryAdminDB = primary.getDB("admin");
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
-    let secondary = rst.add({binVersion: lastStable});
+    let secondary = rst.getSecondary();
+
+    // The command should fail because wtimeout expires before a majority responds.
+    stopServerReplication(secondary);
+    res = primary.adminCommand(
+        {setFeatureCompatibilityVersion: latestFCV, writeConcern: {wtimeout: 1000}});
+    assert.eq(0, res.ok);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    restartServerReplication(secondary);
+
+    // Because the failed setFCV command left the primary in an intermediary state, complete the
+    // upgrade then reset back to the lastStable version.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+
+    secondary = rst.add({binVersion: lastStable});
     secondaryAdminDB = secondary.getDB("admin");
 
     // Rig the election so that the first node running latest version remains the primary after the

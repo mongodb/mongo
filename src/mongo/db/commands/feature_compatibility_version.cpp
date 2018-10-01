@@ -238,7 +238,11 @@ void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
             updateSpec.appendBool("upsert", true);
         }
     }
-    updateCmd.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
+    auto timeout = opCtx->getWriteConcern().usedDefault ? WriteConcernOptions::kNoTimeout
+                                                        : opCtx->getWriteConcern().wTimeout;
+    auto newWC = WriteConcernOptions(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout);
+    updateCmd.append(WriteConcernOptions::kWriteConcernField, newWC.toBSON());
 
     // Update the featureCompatibilityVersion document stored in the server configuration
     // collection.
