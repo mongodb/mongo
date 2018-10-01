@@ -10,7 +10,12 @@ load('jstests/libs/write_concern_util.js');
 
 (function() {
     "use strict";
-    var replTest = new ReplSetTest({name: 'WCSet', nodes: 3, settings: {chainingAllowed: false}});
+    var replTest = new ReplSetTest({
+        name: 'WCSet',
+        // Set priority of secondaries to zero to prevent spurious elections.
+        nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+        settings: {chainingAllowed: false}
+    });
     replTest.startSet();
     replTest.initiate();
 
