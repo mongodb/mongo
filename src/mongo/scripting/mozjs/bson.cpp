@@ -25,7 +25,6 @@
  * delete this exception statement from all source files in the program,
  * then also delete it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/mozjs/bson.h"
@@ -50,7 +49,18 @@ const JSFunctionSpec BSONInfo::freeFunctions[3] = {
     MONGO_ATTACH_JS_FUNCTION(bsonWoCompare), MONGO_ATTACH_JS_FUNCTION(bsonBinaryEqual), JS_FS_END,
 };
 
+
 namespace {
+
+BSONObj getBSONFromArg(JSContext* cx, JS::HandleValue arg, bool isBSON) {
+    if (isBSON) {
+        return ValueWriter(cx, arg).toBSON();
+    }
+    JS::RootedObject rout(cx, JS_NewPlainObject(cx));
+    ObjectWrapper object(cx, rout);
+    object.setValue("a", arg);
+    return object.toBSON();
+}
 
 /**
  * Holder for bson objects which tracks state for the js wrapper
@@ -251,36 +261,35 @@ std::tuple<BSONObj*, bool> BSONInfo::originalBSON(JSContext* cx, JS::HandleObjec
     return out;
 }
 
+
 void BSONInfo::Functions::bsonWoCompare::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 2)
         uasserted(ErrorCodes::BadValue, "bsonWoCompare needs 2 arguments");
 
-    if (!args.get(0).isObject())
-        uasserted(ErrorCodes::BadValue, "first argument to bsonWoCompare must be an object");
+    // If either argument is not proper BSON, then we wrap both objects.
+    auto scope = getScope(cx);
+    bool isBSON = scope->getProto<BSONInfo>().instanceOf(args.get(0)) &&
+        scope->getProto<BSONInfo>().instanceOf(args.get(1));
 
-    if (!args.get(1).isObject())
-        uasserted(ErrorCodes::BadValue, "second argument to bsonWoCompare must be an object");
+    BSONObj bsonObject1 = getBSONFromArg(cx, args.get(0), isBSON);
+    BSONObj bsonObject2 = getBSONFromArg(cx, args.get(1), isBSON);
 
-    BSONObj firstObject = ValueWriter(cx, args.get(0)).toBSON();
-    BSONObj secondObject = ValueWriter(cx, args.get(1)).toBSON();
-
-    args.rval().setInt32(firstObject.woCompare(secondObject));
+    args.rval().setInt32(bsonObject1.woCompare(bsonObject2));
 }
 
 void BSONInfo::Functions::bsonBinaryEqual::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 2)
         uasserted(ErrorCodes::BadValue, "bsonBinaryEqual needs 2 arguments");
 
-    if (!args.get(0).isObject())
-        uasserted(ErrorCodes::BadValue, "first argument to bsonBinaryEqual must be an object");
+    // If either argument is not a proper BSON, then we wrap both objects.
+    auto scope = getScope(cx);
+    bool isBSON = scope->getProto<BSONInfo>().instanceOf(args.get(0)) &&
+        scope->getProto<BSONInfo>().instanceOf(args.get(1));
 
-    if (!args.get(1).isObject())
-        uasserted(ErrorCodes::BadValue, "second argument to bsonBinaryEqual must be an object");
+    BSONObj bsonObject1 = getBSONFromArg(cx, args.get(0), isBSON);
+    BSONObj bsonObject2 = getBSONFromArg(cx, args.get(1), isBSON);
 
-    BSONObj firstObject = ValueWriter(cx, args.get(0)).toBSON();
-    BSONObj secondObject = ValueWriter(cx, args.get(1)).toBSON();
-
-    args.rval().setBoolean(firstObject.binaryEqual(secondObject));
+    args.rval().setBoolean(bsonObject1.binaryEqual(bsonObject2));
 }
 
 void BSONInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
