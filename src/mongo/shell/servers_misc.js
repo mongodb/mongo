@@ -65,14 +65,26 @@ ToolTest.prototype.runTool = function() {
 /**
  * Returns a port number that has not been given out to any other caller from the same mongo shell.
  */
-allocatePort = (function() {
+var allocatePort;
+
+/**
+ * Resets the range of ports which have already been given out to callers of allocatePort().
+ *
+ * This function can be used to allow a test to allocate a large number of ports as part of starting
+ * many MongoDB deployments without worrying about hitting the configured maximum. Callers of this
+ * function should take care to ensure MongoDB deployments started earlier have been terminated and
+ * won't be reused.
+ */
+var resetAllocatedPorts;
+
+(function() {
     // Defer initializing these variables until the first call, as TestData attributes may be
     // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
     // until after this has loaded.
     var maxPort;
     var nextPort;
 
-    return function() {
+    allocatePort = function() {
         // The default port was chosen in an attempt to have a large number of unassigned ports that
         // are also outside the ephemeral port range.
         nextPort = nextPort || jsTestOptions().minPort || 20000;
@@ -82,6 +94,11 @@ allocatePort = (function() {
             throw new Error("Exceeded maximum port range in allocatePort()");
         }
         return nextPort++;
+    };
+
+    resetAllocatedPorts = function() {
+        jsTest.log("Resetting the range of allocated ports");
+        maxPort = nextPort = undefined;
     };
 })();
 

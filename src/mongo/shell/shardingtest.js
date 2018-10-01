@@ -1140,10 +1140,52 @@ var ShardingTest = function(params) {
     this._rs = [];
     this._rsObjects = [];
 
+    let unbridgedConnections;
+    let unbridgedConfigServers;
+    let unbridgedMongos;
+    let _makeAllocatePortFn;
+    let _allocatePortForMongos;
+    let _allocatePortForBridgeForMongos;
+    let _allocatePortForShard;
+    let _allocatePortForBridgeForShard;
+
     if (otherParams.useBridge) {
-        var unbridgedConnections = [];
-        var unbridgedConfigServers = [];
-        var unbridgedMongos = [];
+        unbridgedConnections = [];
+        unbridgedConfigServers = [];
+        unbridgedMongos = [];
+
+        _makeAllocatePortFn = (preallocatedPorts, errorMessage) => {
+            let idxNextNodePort = 0;
+
+            return function() {
+                if (idxNextNodePort >= preallocatedPorts.length) {
+                    throw new Error(errorMessage(preallocatedPorts.length));
+                }
+
+                const nextPort = preallocatedPorts[idxNextNodePort];
+                ++idxNextNodePort;
+                return nextPort;
+            };
+        };
+
+        let errorMessage = (length) =>
+            "Cannot use more than " + length + " mongos processes when useBridge=true";
+        _allocatePortForBridgeForMongos =
+            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+        _allocatePortForMongos =
+            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+
+        errorMessage = (length) =>
+            "Cannot use more than " + length + " stand-alone shards when useBridge=true";
+        _allocatePortForBridgeForShard =
+            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+        _allocatePortForShard =
+            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+    } else {
+        _allocatePortForBridgeForShard = _allocatePortForBridgeForMongos = function() {
+            throw new Error("Using mongobridge isn't enabled for this sharded cluster");
+        };
+        _allocatePortForShard = _allocatePortForMongos = allocatePort;
     }
 
     // Start the MongoD servers (shards)
@@ -1269,13 +1311,14 @@ var ShardingTest = function(params) {
             options = Object.merge(options, otherParams.shardOptions);
             options = Object.merge(options, otherParams["d" + i]);
 
-            options.port = options.port || allocatePort();
+            options.port = options.port || _allocatePortForShard();
 
             if (otherParams.useBridge) {
                 var bridgeOptions =
                     Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
                 bridgeOptions = Object.merge(bridgeOptions, {
                     hostName: otherParams.useHostname ? hostName : "localhost",
+                    port: _allocatePortForBridgeForShard(),
                     // The mongod processes identify themselves to mongobridge as host:port, where
                     // the host is the actual hostname of the machine and not localhost.
                     dest: hostName + ":" + options.port,
@@ -1401,7 +1444,7 @@ var ShardingTest = function(params) {
         options = Object.merge(options, otherParams.mongosOptions);
         options = Object.merge(options, otherParams["s" + i]);
 
-        options.port = options.port || allocatePort();
+        options.port = options.port || _allocatePortForMongos();
 
         mongosOptions.push(options);
     }
@@ -1468,6 +1511,7 @@ var ShardingTest = function(params) {
                 Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: otherParams.useHostname ? hostName : "localhost",
+                port: _allocatePortForBridgeForMongos(),
                 // The mongos processes identify themselves to mongobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: hostName + ":" + options.port,

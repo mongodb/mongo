@@ -89,6 +89,8 @@ var ReplSetTest = function(opts) {
     var _bridgeOptions;
     var _unbridgedPorts;
     var _unbridgedNodes;
+    var _allocatePortForNode;
+    var _allocatePortForBridge;
 
     var _causalConsistency;
 
@@ -850,14 +852,14 @@ var ReplSetTest = function(opts) {
      * Adds a node to the replica set managed by this instance.
      */
     this.add = function(config) {
-        var nextPort = allocatePort();
+        var nextPort = _allocatePortForNode();
         print("ReplSetTest Next port: " + nextPort);
 
         this.ports.push(nextPort);
         printjson(this.ports);
 
         if (_useBridge) {
-            _unbridgedPorts.push(allocatePort());
+            _unbridgedPorts.push(_allocatePortForBridge());
         }
 
         var nextId = this.nodes.length;
@@ -2555,12 +2557,39 @@ var ReplSetTest = function(opts) {
             numNodes = opts.nodes;
         }
 
-        self.ports = allocatePorts(numNodes);
+        if (_useBridge) {
+            let makeAllocatePortFn = (preallocatedPorts) => {
+                let idxNextNodePort = 0;
+
+                return function() {
+                    if (idxNextNodePort >= preallocatedPorts.length) {
+                        throw new Error("Cannot use a replica set larger than " +
+                                        preallocatedPorts.length + " members with useBridge=true");
+                    }
+
+                    const nextPort = preallocatedPorts[idxNextNodePort];
+                    ++idxNextNodePort;
+                    return nextPort;
+                };
+            };
+
+            _allocatePortForBridge = makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset));
+            _allocatePortForNode = makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset));
+        } else {
+            _allocatePortForBridge = function() {
+                throw new Error("Using mongobridge isn't enabled for this replica set");
+            };
+            _allocatePortForNode = allocatePort;
+        }
+
         self.nodes = [];
 
         if (_useBridge) {
-            _unbridgedPorts = allocatePorts(numNodes);
+            self.ports = Array.from({length: numNodes}, _allocatePortForBridge);
+            _unbridgedPorts = Array.from({length: numNodes}, _allocatePortForNode);
             _unbridgedNodes = [];
+        } else {
+            self.ports = Array.from({length: numNodes}, _allocatePortForNode);
         }
     }
 
