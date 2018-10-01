@@ -22,9 +22,16 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     TestData.disableImplicitSessions = true;
 
     var st = new ShardingTest({
+        // Set priority of secondaries to zero to prevent spurious elections.
         shards: {
-            rs0: {nodes: 3, settings: {chainingAllowed: false}},
-            rs1: {nodes: 3, settings: {chainingAllowed: false}}
+            rs0: {
+                nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+                settings: {chainingAllowed: false}
+            },
+            rs1: {
+                nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+                settings: {chainingAllowed: false}
+            }
         },
         configReplSetTestOptions: {settings: {chainingAllowed: false}},
         mongos: 1
