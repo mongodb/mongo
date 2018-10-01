@@ -80,6 +80,8 @@ using SplitPipeline = cluster_aggregation_planner::SplitPipeline;
 
 MONGO_FAIL_POINT_DEFINE(clusterAggregateHangBeforeEstablishingShardCursors);
 
+constexpr unsigned ClusterAggregate::kMaxViewRetries;
+
 namespace {
 
 // Given a document representing an aggregation command such as
@@ -1240,7 +1242,13 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                           const AggregationRequest& request,
                                           const ResolvedView& resolvedView,
                                           const NamespaceString& requestedNss,
-                                          BSONObjBuilder* result) {
+                                          BSONObjBuilder* result,
+                                          unsigned numberRetries) {
+    if (numberRetries >= kMaxViewRetries) {
+        return Status(ErrorCodes::InternalError,
+                      "Failed to resolve view after max number of retries.");
+    }
+
     auto resolvedAggRequest = resolvedView.asExpandedViewAggregation(request);
     auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
     result->resetToEmpty();
@@ -1253,8 +1261,21 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     nsStruct.requestedNss = requestedNss;
     nsStruct.executionNss = resolvedView.getNamespace();
 
-    return ClusterAggregate::runAggregate(
-        opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, result);
+    auto status =
+        ClusterAggregate::runAggregate(opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, result);
+
+    // If the underlying namespace was changed to a view during retry, then re-run the aggregation
+    // on the new resolved namespace.
+    if (status.extraInfo<ResolvedView>()) {
+        return ClusterAggregate::retryOnViewError(opCtx,
+                                                  resolvedAggRequest,
+                                                  *status.extraInfo<ResolvedView>(),
+                                                  requestedNss,
+                                                  result,
+                                                  numberRetries + 1);
+    }
+
+    return status;
 }
 
 }  // namespace mongo

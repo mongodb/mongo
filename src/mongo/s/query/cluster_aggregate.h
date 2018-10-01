@@ -53,6 +53,11 @@ class ShardId;
 class ClusterAggregate {
 public:
     /**
+     * Max number of retries to resolve the underlying namespace of a view.
+     */
+    static constexpr unsigned kMaxViewRetries = 10;
+
+    /**
      * 'requestedNss' is the namespace aggregation will register cursors under. This is the
      * namespace which we will return in responses to aggregate / getMore commands, and it is the
      * namespace we expect users to hand us inside any subsequent getMores. 'executionNss' is the
@@ -90,7 +95,8 @@ public:
                                    const AggregationRequest& request,
                                    const ResolvedView& resolvedView,
                                    const NamespaceString& requestedNss,
-                                   BSONObjBuilder* result);
+                                   BSONObjBuilder* result,
+                                   unsigned numberRetries = 0);
 
 private:
     static void uassertAllShardsSupportExplain(
