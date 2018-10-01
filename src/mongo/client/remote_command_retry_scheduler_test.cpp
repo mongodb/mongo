@@ -318,7 +318,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
        ShuttingDownExecutorAfterSchedulerStartupInvokesCallbackWithCallbackCanceledError) {
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
-        10U, Milliseconds(1), {ErrorCodes::HostNotFound});
+        10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, stdx::ref(callback), std::move(policy));
     start(&scheduler);
@@ -340,7 +340,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
        ShuttingDownSchedulerAfterSchedulerStartupInvokesCallbackWithCallbackCanceledError) {
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
-        10U, Milliseconds(1), {ErrorCodes::HostNotFound});
+        10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, stdx::ref(callback), std::move(policy));
     start(&scheduler);
@@ -372,7 +372,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnNonRetryableEr
 TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfulResponse) {
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
-        10U, Milliseconds(1), {ErrorCodes::HostNotFound});
+        10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, stdx::ref(callback), std::move(policy));
     start(&scheduler);
@@ -391,7 +391,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfu
 TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfulResponse) {
     CallbackResponseSaver callback;
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy(
-        10U, Milliseconds(1), {ErrorCodes::HostNotFound});
+        10U, Milliseconds(1), {ErrorCodes::HostUnreachable});
     RemoteCommandRetryScheduler scheduler(
         &getExecutor(), request, stdx::ref(callback), std::move(policy));
     start(&scheduler);

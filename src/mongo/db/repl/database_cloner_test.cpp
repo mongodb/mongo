@@ -637,8 +637,8 @@ TEST_F(DatabaseClonerTest, DatabaseClonerResendsListCollectionsRequestOnRetriabl
     executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
     // Respond to first listCollections request with a retriable error.
-    assertRemoteCommandNameEquals("listCollections",
-                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    assertRemoteCommandNameEquals(
+        "listCollections", net->scheduleErrorResponse(Status(ErrorCodes::HostUnreachable, "")));
     net->runReadyNetworkOperations();
 
     // DatabaseCloner stays active because it resends the listCollections request.

@@ -459,7 +459,7 @@ void DBClientReplicaSet::_auth(const BSONObj& params) {
     if (lastNodeStatus.isOK()) {
         StringBuilder assertMsgB;
         assertMsgB << "Failed to authenticate, no good nodes in " << _getMonitor()->getName();
-        uasserted(ErrorCodes::NodeNotFound, assertMsgB.str());
+        uasserted(ErrorCodes::HostNotFound, assertMsgB.str());
     } else {
         uassertStatusOK(lastNodeStatus);
     }
@@ -937,7 +937,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientReplicaSet::runCommandWithTar
         }
     }
 
-    uasserted(ErrorCodes::NodeNotFound,
+    uasserted(ErrorCodes::HostNotFound,
               str::stream() << "Could not satisfy $readPreference of '" << readPref.toString()
                             << "' while attempting to run command "
                             << request.getCommandName());
