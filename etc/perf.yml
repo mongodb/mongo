@@ -58,6 +58,11 @@ functions:
           rm -rf ./dsi
           mkdir -p ./src
           git clone git@github.com:10gen/dsi.git
+    # get the mongo source, note the s3.get calls put the
+    # exe files in their respective make locations.
+    - command: git.get_project
+      params:
+        directory: src
   "start server":
     - command: shell.exec
       params:
@@ -135,9 +140,43 @@ functions:
         script: |
           set -e
           set -v
-          virtualenv ./venv
-          source ./venv/bin/activate
-          pip install -r ../dsi/requirements/analysis.txt
+          ../dsi/run-dsi setup
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          cat > bootstrap.yml <<EOF
+          infrastructure_provisioning: ${cluster}
+          platform: ${platform}
+          mongodb_setup: ${setup}
+          storageEngine: ${storageEngine}
+          test_control: ${test}
+          production: true
+          EOF
+
+          cat > runtime.yml <<EOF
+          # evergreen default expansions
+          is_patch: ${is_patch}
+          task_id: ${task_id}
+          EOF
+
+          cp ../dsi/configurations/analysis/analysis.common.yml  analysis.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        silent: true
+        script: |
+          cat > runtime_secret.yml <<EOF
+          dsi_analysis_atlas_user: "${dsi_analysis_atlas_user}"
+          dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
+          EOF
+          chmod 400 runtime_secret.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -v
+          ../dsi/run-dsi detect-changes
     - command: json.get_history
       params:
         task: ${task_name}
