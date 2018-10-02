@@ -68,6 +68,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
@@ -1585,6 +1586,78 @@ TEST_F(SyncTailTest, DropDatabaseSucceedsInRecovering) {
 
     auto op = makeCommandOplogEntry(nextOpTime(), ns, BSON("dropDatabase" << 1));
     ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
+    // This duration is greater than "slowMS", so the op would be considered slow.
+    auto applyDuration = serverGlobalParams.slowMS * 10;
+    getServiceContext()->setFastClockSource(
+        stdx::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(applyDuration)));
+
+    // We are inserting into an existing collection.
+    const NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
+    auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
+
+    startCapturingLogMessages();
+    ASSERT_OK(
+        SyncTail::syncApply(_opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary));
+
+    // Use a builder for easier escaping. We expect the operation to be logged.
+    StringBuilder expected;
+    expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
+                "t: 1, h: 1, v: 2 }, took "
+             << applyDuration << "ms";
+    ASSERT_EQUALS(1, countLogLinesContaining(expected.str()));
+}
+
+TEST_F(SyncTailTest, DoNotLogSlowOpApplicationWhenFailed) {
+    // This duration is greater than "slowMS", so the op would be considered slow.
+    auto applyDuration = serverGlobalParams.slowMS * 10;
+    getServiceContext()->setFastClockSource(
+        stdx::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(applyDuration)));
+
+    // We are trying to insert into a non-existing database.
+    NamespaceString nss("test.t");
+    auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
+
+    startCapturingLogMessages();
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary)
+            .transitional_ignore(),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+
+    // Use a builder for easier escaping. We expect the operation to *not* be logged
+    // even thought it was slow, since we couldn't apply it successfully.
+    StringBuilder expected;
+    expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
+                "t: 1, h: 1, v: 2 }, took "
+             << applyDuration << "ms";
+    ASSERT_EQUALS(0, countLogLinesContaining(expected.str()));
+}
+
+TEST_F(SyncTailTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
+    // This duration is below "slowMS", so the op would *not* be considered slow.
+    auto applyDuration = serverGlobalParams.slowMS / 10;
+    getServiceContext()->setFastClockSource(
+        stdx::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(applyDuration)));
+
+    // We are inserting into an existing collection.
+    const NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
+    auto entry = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
+
+    startCapturingLogMessages();
+    ASSERT_OK(
+        SyncTail::syncApply(_opCtx.get(), entry.toBSON(), OplogApplication::Mode::kSecondary));
+
+    // Use a builder for easier escaping. We expect the operation to *not* be logged,
+    // since it wasn't slow to apply.
+    StringBuilder expected;
+    expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
+                "t: 1, h: 1, v: 2 }, took "
+             << applyDuration << "ms";
+    ASSERT_EQUALS(0, countLogLinesContaining(expected.str()));
 }
 
 class SyncTailTxnTableTest : public SyncTailTest {
