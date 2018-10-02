@@ -436,7 +436,8 @@ public:
     /**
      * Returns a list of GenericCursors for all idle (non-pinned) cursors in the cursor manager.
      */
-    std::vector<GenericCursor> getIdleCursors() const;
+    std::vector<GenericCursor> getIdleCursors(
+        const OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const;
 
     std::pair<Status, int> killCursorsWithMatchingSessions(OperationContext* opCtx,
                                                            const SessionKiller::Matcher& matcher);

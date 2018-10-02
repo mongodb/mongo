@@ -628,15 +628,25 @@ GenericCursor ClusterCursorManager::CursorEntry::cursorToGenericCursor(
     return gc;
 }
 
-std::vector<GenericCursor> ClusterCursorManager::getIdleCursors() const {
+std::vector<GenericCursor> ClusterCursorManager::getIdleCursors(
+    const OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const {
     std::vector<GenericCursor> cursors;
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
+    AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
+
     for (const auto& nsContainerPair : _namespaceToContainerMap) {
         for (const auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
-            const CursorEntry& entry = cursorIdEntryPair.second;
 
+            const CursorEntry& entry = cursorIdEntryPair.second;
+            // If auth is enabled, and userMode is allUsers, check if the current user has
+            // permission to see this cursor.
+            if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
+                userMode == MongoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
+                !ctxAuth->isCoauthorizedWith(entry.getAuthenticatedUsers())) {
+                continue;
+            }
             if (entry.isKillPending() || entry.getOperationUsingCursor()) {
                 // Don't include sessions for killed or pinned cursors.
                 continue;

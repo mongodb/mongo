@@ -252,7 +252,7 @@ std::vector<GenericCursor> MongoSInterface::getIdleCursors(
     invariant(hasGlobalServiceContext());
     auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();
     invariant(cursorManager);
-    return cursorManager->getIdleCursors();
+    return cursorManager->getIdleCursors(expCtx->opCtx, userMode);
 }
 
 bool MongoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
