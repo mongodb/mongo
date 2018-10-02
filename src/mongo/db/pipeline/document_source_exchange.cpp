@@ -66,6 +66,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
     : _spec(std::move(spec)),
       _keyPattern(_spec.getKey().getOwned()),
       _ordering(extractOrdering(_keyPattern)),
+      _keyPaths(extractKeyPaths(_keyPattern)),
       _boundaries(extractBoundaries(_spec.getBoundaries(), _ordering)),
       _consumerIds(extractConsumerIds(_spec.getConsumerIds(), _spec.getConsumers())),
       _policy(_spec.getPolicy()),
@@ -89,6 +90,9 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
         uassert(50900,
                 "Exchange boundaries do not match number of consumers.",
                 _boundaries.size() == _consumerIds.size() + 1);
+        uassert(50967,
+                str::stream() << "The key pattern " << _keyPattern << " must have at least one key",
+                !_keyPaths.empty());
     } else {
         uassert(50899, "Exchange boundaries must not be specified.", _boundaries.empty());
     }
@@ -183,11 +187,11 @@ std::vector<size_t> Exchange::extractConsumerIds(
     return ret;
 }
 
-Ordering Exchange::extractOrdering(const BSONObj& obj) {
+Ordering Exchange::extractOrdering(const BSONObj& keyPattern) {
     bool hasHashKey = false;
     bool hasOrderKey = false;
 
-    for (const auto& element : obj) {
+    for (const auto& element : keyPattern) {
         if (element.type() == BSONType::String) {
             uassert(50895,
                     str::stream() << "Exchange key description is invalid: " << element,
@@ -206,10 +210,19 @@ Ordering Exchange::extractOrdering(const BSONObj& obj) {
     }
 
     uassert(50898,
-            str::stream() << "Exchange hash and order keys cannot be mixed together: " << obj,
+            str::stream() << "Exchange hash and order keys cannot be mixed together: "
+                          << keyPattern,
             !(hasHashKey && hasOrderKey));
 
-    return hasHashKey ? Ordering::make(BSONObj()) : Ordering::make(obj);
+    return hasHashKey ? Ordering::make(BSONObj()) : Ordering::make(keyPattern);
+}
+
+std::vector<FieldPath> Exchange::extractKeyPaths(const BSONObj& keyPattern) {
+    std::vector<FieldPath> paths;
+    for (auto& elem : keyPattern) {
+        paths.emplace_back(FieldPath{elem.fieldNameStringData()});
+    }
+    return paths;
 }
 
 DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx, size_t consumerId) {
@@ -237,18 +250,22 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx, size_t 
             // This consumer won the race and will fill the buffers.
             _loadingThreadId = consumerId;
 
-            _pipeline->reattachToOperationContext(opCtx);
+            {
+                // Make sure we detach the context even when exceptions are thrown; we wrap the
+                // detach in the guard.
+                ON_BLOCK_EXIT([this] { _pipeline->detachFromOperationContext(); });
 
-            // This will return when some exchange buffer is full and we cannot make any forward
-            // progress anymore.
-            // The return value is an index of a full consumer buffer.
-            size_t fullConsumerId = loadNextBatch();
+                _pipeline->reattachToOperationContext(opCtx);
 
-            _pipeline->detachFromOperationContext();
+                // This will return when some exchange buffer is full and we cannot make any forward
+                // progress anymore.
+                // The return value is an index of a full consumer buffer.
+                size_t fullConsumerId = loadNextBatch();
 
-            // The loading cannot continue until the consumer with the full buffer consumes some
-            // documents.
-            _loadingThreadId = fullConsumerId;
+                // The loading cannot continue until the consumer with the full buffer consumes some
+                // documents.
+                _loadingThreadId = fullConsumerId;
+            }
 
             // Wake up everybody and try to make some progress.
             _haveBufferSpace.notify_all();
@@ -310,14 +327,22 @@ size_t Exchange::loadNextBatch() {
 size_t Exchange::getTargetConsumer(const Document& input) {
     // Build the key.
     BSONObjBuilder kb;
+    size_t counter = 0;
     for (auto elem : _keyPattern) {
-        auto value = input[elem.fieldName()];
+        auto value = input.getNestedField(_keyPaths[counter]);
+
+        // By definition we send documents with missing fields to the consumer 0.
+        if (value.missing()) {
+            return 0;
+        }
+
         if (elem.type() == BSONType::String && elem.str() == "hashed") {
             kb << "" << BSONElementHasher::hash64(BSON("" << value).firstElement(),
                                                   BSONElementHasher::DEFAULT_HASH_SEED);
         } else {
             kb << "" << value;
         }
+        ++counter;
     }
 
     KeyString key{KeyString::Version::V1, kb.obj(), _ordering};

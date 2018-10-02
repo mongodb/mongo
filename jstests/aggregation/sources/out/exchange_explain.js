@@ -3,6 +3,8 @@
  *
  * @tags: [requires_sharding]
  */
+load('jstests/aggregation/extras/utils.js');
+
 (function() {
     "use strict";
 
@@ -12,6 +14,7 @@
 
     const inColl = mongosDB["inColl"];
     const outCollRange = mongosDB["outCollRange"];
+    const outCollRangeOtherField = mongosDB["outCollRangeOtherField"];
     const outCollHash = mongosDB["outCollHash"];
 
     const numDocs = 1000;
@@ -55,12 +58,13 @@
     // Insert some data to the input collection.
     let bulk = inColl.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i++) {
-        bulk.insert({a: i});
+        bulk.insert({a: i}, {b: [0, 1, 2, 3, i]});
     }
     assert.commandWorked(bulk.execute());
 
     // Shard the output collections.
     st.shardColl(outCollRange, {_id: 1}, {_id: 500}, {_id: 500}, mongosDB.getName());
+    st.shardColl(outCollRangeOtherField, {b: 1}, {b: 500}, {b: 500}, mongosDB.getName());
     st.shardColl(outCollHash, {_id: "hashed"}, false, false, mongosDB.getName());
 
     // Run the explain. We expect to see the range based exchange here.
@@ -91,6 +95,18 @@
     results = outCollHash.aggregate([{'$count': "count"}]).next().count;
     assert.eq(results, numDocs);
 
+    // This should fail with the error '$out write error: uniqueKey field 'b' cannot be missing,
+    // null, undefined or an array.' as we are trying to insert an array value.
+    assertErrorCode(inColl,
+                    [{
+                       $out: {
+                           to: outCollRangeOtherField.getName(),
+                           db: outCollRangeOtherField.getDB().getName(),
+                           mode: "replaceDocuments"
+                       }
+                    }],
+                    50905);
+
     // Turn off the exchange and rerun the query.
     assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
     explain = runExplainQuery(outCollRange);
@@ -99,6 +115,18 @@
     assert.eq(explain.mergeType, "primaryShard", tojson(explain));
     assert(explain.hasOwnProperty("splitPipeline"), tojson(explain));
     assert(!explain.splitPipeline.hasOwnProperty("exchange"), tojson(explain));
+
+    // This should fail with the same error '$out write error: uniqueKey field 'b' cannot be
+    // missing, null, undefined or an array.' as before even if we are not running the exchange.
+    assertErrorCode(inColl,
+                    [{
+                       $out: {
+                           to: outCollRangeOtherField.getName(),
+                           db: outCollRangeOtherField.getDB().getName(),
+                           mode: "replaceDocuments"
+                       }
+                    }],
+                    50905);
 
     st.stop();
 }());

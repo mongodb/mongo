@@ -63,7 +63,10 @@ structs:
         type: object
         default: "BSONObj()"
         description: A key used for document distribution to consumers. The same description as
-                     sorting/sharding.
+                     sorting/sharding. If the document entering the exchange does not have every
+                     field listed here, or if any prefix of any path is multikey (i.e. an array is
+                     encountered while traversing a path listed here), then it is by definition sent
+                     to consumer 0.
       boundaries:
         type: array<object>
         optional: true

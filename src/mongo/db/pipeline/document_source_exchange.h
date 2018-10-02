@@ -34,6 +34,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
@@ -61,7 +62,12 @@ class Exchange : public RefCountable {
     /**
      * Extract the order description from the key.
      */
-    static Ordering extractOrdering(const BSONObj& obj);
+    static Ordering extractOrdering(const BSONObj& keyPattern);
+
+    /**
+     * Extract dotted paths from the key.
+     */
+    static std::vector<FieldPath> extractKeyPaths(const BSONObj& keyPattern);
 
 public:
     Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
@@ -102,6 +108,8 @@ private:
     const BSONObj _keyPattern;
 
     const Ordering _ordering;
+
+    const std::vector<FieldPath> _keyPaths;
 
     // Range boundaries. The boundaries are ordered and must cover the whole domain, e.g.
     // [Min, -200, 0, 200, Max] partitions the domain into 4 ranges (i.e. 1 less than number of

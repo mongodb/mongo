@@ -18,7 +18,7 @@ TestData.disableImplicitSessions = true;
 
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; ++i) {
-        bulk.insert({a: i, b: 'abcdefghijklmnopqrstuvxyz'});
+        bulk.insert({a: i, b: 'abcdefghijklmnopqrstuvxyz', c: {d: i}, e: [0, {f: i}]});
     }
 
     assert.commandWorked(bulk.execute());
@@ -174,6 +174,68 @@ TestData.disableImplicitSessions = true;
         parallelShells.push(countingConsumer(res.cursors[2], 2500));
         parallelShells.push(countingConsumer(res.cursors[3], 2500));
 
+        for (let i = 0; i < numConsumers; ++i) {
+            parallelShells[i]();
+        }
+    })();
+
+    /**
+     * Range with a dotted path.
+     */
+    (function testRangeDottedPath() {
+        let res = assert.commandWorked(db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "keyRange",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+                key: {"c.d": 1},
+                boundaries:
+                    [{"c.d": MinKey}, {"c.d": 2500}, {"c.d": 5000}, {"c.d": 7500}, {"c.d": MaxKey}],
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
+            },
+            cursor: {batchSize: 0}
+        }));
+        assert.eq(numConsumers, res.cursors.length);
+
+        let parallelShells = [];
+
+        for (let i = 0; i < numConsumers; ++i) {
+            parallelShells.push(countingConsumer(res.cursors[i], numDocs / numConsumers));
+        }
+        for (let i = 0; i < numConsumers; ++i) {
+            parallelShells[i]();
+        }
+    })();
+
+    /**
+     * Range with a dotted path and array.
+     */
+    (function testRangeDottedPath() {
+        let res = assert.commandWorked(db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "keyRange",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+                key: {"e.f": 1},
+                boundaries:
+                    [{"e.f": MinKey}, {"e.f": 2500}, {"e.f": 5000}, {"e.f": 7500}, {"e.f": MaxKey}],
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
+            },
+            cursor: {batchSize: 0}
+        }));
+        assert.eq(numConsumers, res.cursors.length);
+
+        let parallelShells = [];
+
+        // The e.f field contains an array and hence the exchange cannot compute the range. Instead
+        // it sends all such documents to the consumer 0 by fiat.
+        for (let i = 0; i < numConsumers; ++i) {
+            parallelShells.push(countingConsumer(res.cursors[i], i == 0 ? numDocs : 0));
+        }
         for (let i = 0; i < numConsumers; ++i) {
             parallelShells[i]();
         }
