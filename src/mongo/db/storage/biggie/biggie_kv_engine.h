@@ -152,7 +152,7 @@ public:
 
 private:
     std::shared_ptr<void> _catalogInfo;
-    int _cachePressureForTest;
+    int _cachePressureForTest = 0;
 };
 }  // namespace biggie
 }  // namespace mongo
