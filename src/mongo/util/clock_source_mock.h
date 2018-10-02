@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * Mock clock source that returns a fixed time until explicitly advanced.
  */
-class ClockSourceMock final : public ClockSource {
+class ClockSourceMock : public ClockSource {
 public:
     /**
      * Constructs a ClockSourceMock with the current time set to the Unix epoch.
@@ -73,6 +73,22 @@ private:
     stdx::mutex _mutex;
     Date_t _now{Date_t::fromMillisSinceEpoch(1)};
     std::vector<Alarm> _alarms;
+};
+
+/**
+ * Mock clock source where reading the clock also advances the current time by a fixed interval.
+ */
+class AutoAdvancingClockSourceMock : public ClockSourceMock {
+public:
+    AutoAdvancingClockSourceMock(Milliseconds increment) : _increment(increment) {}
+
+    Date_t now() override {
+        ClockSourceMock::advance(_increment);
+        return ClockSourceMock::now();
+    }
+
+private:
+    const Milliseconds _increment;
 };
 
 class SharedClockSourceAdapter final : public ClockSource {

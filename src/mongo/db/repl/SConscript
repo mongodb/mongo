@@ -725,6 +725,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         'idempotency_test_fixture',
         'oplog_buffer_blocking_queue',
         'oplog_interface_local',

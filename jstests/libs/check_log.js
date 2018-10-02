@@ -29,23 +29,19 @@ var checkLog;
          * the provided 'msg' is found in the logs, or 5 minutes have elapsed. Throws an exception
          * on timeout.
          */
-        var contains = function(conn, msg) {
-            assert.soon(
-                function() {
-                    var logMessages = getGlobalLog(conn);
-                    if (logMessages === null) {
-                        return false;
-                    }
-                    for (var i = 0; i < logMessages.length; i++) {
-                        if (logMessages[i].indexOf(msg) != -1) {
-                            return true;
-                        }
-                    }
+        var contains = function(conn, msg, timeout = 5 * 60 * 1000) {
+            assert.soon(function() {
+                var logMessages = getGlobalLog(conn);
+                if (logMessages === null) {
                     return false;
-                },
-                'Could not find log entries containing the following message: ' + msg,
-                5 * 60 * 1000,
-                300);
+                }
+                for (var i = 0; i < logMessages.length; i++) {
+                    if (logMessages[i].indexOf(msg) != -1) {
+                        return true;
+                    }
+                }
+                return false;
+            }, 'Could not find log entries containing the following message: ' + msg, timeout, 300);
         };
 
         /*
