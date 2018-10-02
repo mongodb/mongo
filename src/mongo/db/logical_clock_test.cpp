@@ -326,8 +326,7 @@ TEST_F(LogicalClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
     auto almostMaxSecs =
         Seconds(maxVal) - LogicalClock::kMaxAcceptableLogicalClockDriftSecs + Seconds(10);
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(almostMaxSecs));
-    ASSERT_THROWS(getClock()->advanceClusterTime(beyondMaxTime).transitional_ignore(),
-                  std::exception);
+    ASSERT_THROWS(getClock()->advanceClusterTime(beyondMaxTime), std::exception);
     ASSERT_TRUE(getClock()->getClusterTime() == LogicalTime());
 }
 

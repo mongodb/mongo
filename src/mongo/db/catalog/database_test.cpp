@@ -315,8 +315,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_THROWS_CODE(
-            db->dropCollection(opCtx, nss.ns()).transitional_ignore(), AssertionException, 40461);
+        ASSERT_THROWS_CODE(db->dropCollection(opCtx, nss.ns()), AssertionException, 40461);
     });
 }
 

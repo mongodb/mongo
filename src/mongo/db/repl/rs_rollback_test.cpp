@@ -246,8 +246,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     {},
                                     _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
+                                    _replicationProcess.get()),
                        AssertionException,
                        ErrorCodes::UnknownError);
 }
@@ -270,8 +269,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     1,
                                     _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
+                                    _replicationProcess.get()),
                        AssertionException,
                        ErrorCodes::duplicateCodeForTest(40506));
 }
@@ -1521,8 +1519,7 @@ TEST_F(RSRollbackTest, RollbackCollModCommandFailsIfRBIDChangesWhileSyncingColle
                                     rollbackSource,
                                     0,
                                     _coordinator,
-                                    _replicationProcess.get())
-                           .transitional_ignore(),
+                                    _replicationProcess.get()),
                        DBException,
                        40508);
     ASSERT(rollbackSource.getCollectionInfoCalled);
@@ -2029,9 +2026,8 @@ TEST(RSRollbackTest, LocalEntryWithoutNsIsFatal) {
                                         << ""
                                         << "o"
                                         << BSON("_id" << 1 << "a" << 1));
-    ASSERT_THROWS(
-        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
-        RSFatalException);
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false),
+                  RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
@@ -2065,9 +2061,8 @@ TEST(RSRollbackTest, LocalEntryWithoutOIsFatal) {
                                         << "test.t"
                                         << "o"
                                         << BSONObj());
-    ASSERT_THROWS(
-        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
-        RSFatalException);
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false),
+                  RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal) {
@@ -2103,9 +2098,8 @@ TEST(RSRollbackTest, LocalUpdateEntryWithoutO2IsFatal) {
                                         << "test.t"
                                         << "o"
                                         << BSON("_id" << 1 << "a" << 1));
-    ASSERT_THROWS(
-        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
-        RSFatalException);
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false),
+                  RSFatalException);
 }
 
 TEST(RSRollbackTest, LocalUpdateEntryWithEmptyO2IsFatal) {
@@ -2143,9 +2137,8 @@ TEST(RSRollbackTest, LocalUpdateEntryWithEmptyO2IsFatal) {
                                         << BSON("_id" << 1 << "a" << 1)
                                         << "o2"
                                         << BSONObj());
-    ASSERT_THROWS(
-        updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false).transitional_ignore(),
-        RSFatalException);
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, invalidOplogEntry, false),
+                  RSFatalException);
 }
 
 DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutSessionIdIsFatal, "invariant") {
@@ -2165,8 +2158,7 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutSessionIdIsFatal, "in
 
     const auto stmtId = BSON("stmtId" << 1);
     const auto noSessionId = noSessionIdOrStmtId.addField(stmtId.firstElement());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noSessionId, false).transitional_ignore(),
-                  RSFatalException);
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noSessionId, false), RSFatalException);
 }
 
 DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invariant") {
@@ -2187,8 +2179,7 @@ DEATH_TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutStmtIdIsFatal, "invar
     const auto lsid = makeLogicalSessionIdForTest();
     const auto sessionId = BSON("lsid" << lsid.toBSON());
     const auto noStmtId = noSessionIdOrStmtId.addField(sessionId.firstElement());
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noStmtId, false).transitional_ignore(),
-                  RSFatalException);
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, noStmtId, false), RSFatalException);
 }
 
 TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutTxnTableUUIDIsFatal) {
@@ -2212,7 +2203,7 @@ TEST_F(RSRollbackTest, LocalEntryWithTxnNumberWithoutTxnTableUUIDIsFatal) {
                   << lsid.toBSON());
 
     FixUpInfo fui;
-    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false).ignore(),
+    ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, entryWithTxnNumber, false),
                   RSFatalException);
 }
 

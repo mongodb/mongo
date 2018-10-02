@@ -301,7 +301,7 @@ TEST_F(DropDatabaseTest, DropDatabaseResetsDropPendingStateOnException) {
     auto db = autoDb.getDb();
     ASSERT_TRUE(db);
 
-    ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), _nss.db().toString()).ignore(),
+    ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), _nss.db().toString()),
                                 AssertionException,
                                 ErrorCodes::OperationFailed,
                                 "onDropCollection() failed");
@@ -455,7 +455,7 @@ TEST_F(DropDatabaseTest,
 TEST_F(DropDatabaseTest, DropDatabaseFailsToDropAdmin) {
     NamespaceString adminNSS(NamespaceString::kAdminDb, "foo");
     _createCollection(_opCtx.get(), adminNSS);
-    ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), adminNSS.db().toString()).ignore(),
+    ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), adminNSS.db().toString()),
                                 AssertionException,
                                 ErrorCodes::IllegalOperation,
                                 "Dropping the 'admin' database is prohibited.");

@@ -90,10 +90,9 @@ TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunnin
     operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000),
                                               ErrorCodes::ExceededTimeLimit);
 
-    ASSERT_THROWS(keyManager()
-                      ->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)))
-                      .status_with_transitional_ignore(),
-                  DBException);
+    ASSERT_THROWS(
+        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0))),
+        DBException);
 }
 
 TEST_F(KeysManagerShardedTest, GetKeyForValidationErrorsIfKeyDoesntExist) {

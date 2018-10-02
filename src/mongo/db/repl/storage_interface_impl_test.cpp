@@ -525,7 +525,7 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentThrowsNamespaceNotFoundIfOplogUUI
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     ASSERT_THROWS_CODE(
-        storage.insertDocuments(opCtx, {"local", UUID::gen()}, transformInserts({op})).ignore(),
+        storage.insertDocuments(opCtx, {"local", UUID::gen()}, transformInserts({op})),
         DBException,
         ErrorCodes::NamespaceNotFound);
 }
@@ -1910,10 +1910,9 @@ TEST_F(StorageInterfaceImplTest, FindByIdThrowsIfUUIDNotInCatalog) {
     auto obj = BSON("_id"
                     << "kyle");
     StorageInterfaceImpl storage;
-    ASSERT_THROWS_CODE(
-        storage.findById(opCtx, {"local", UUID::gen()}, obj["_id"]).getStatus().ignore(),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(storage.findById(opCtx, {"local", UUID::gen()}, obj["_id"]).getStatus(),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(StorageInterfaceImplTest, FindByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
@@ -2003,10 +2002,9 @@ TEST_F(StorageInterfaceImplTest, DeleteByIdThrowsIfUUIDNotInCatalog) {
     auto obj = BSON("_id"
                     << "kyle");
     StorageInterfaceImpl storage;
-    ASSERT_THROWS_CODE(
-        storage.deleteById(opCtx, {"local", UUID::gen()}, obj["_id"]).getStatus().ignore(),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(storage.deleteById(opCtx, {"local", UUID::gen()}, obj["_id"]).getStatus(),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
@@ -2078,7 +2076,7 @@ TEST_F(StorageInterfaceImplTest, UpsertByIdThrowsIfUUIDNotInCatalog) {
     auto obj = BSON("_id"
                     << "kyle");
     StorageInterfaceImpl storage;
-    ASSERT_THROWS_CODE(storage.upsertById(opCtx, {"local", UUID::gen()}, obj["_id"], obj).ignore(),
+    ASSERT_THROWS_CODE(storage.upsertById(opCtx, {"local", UUID::gen()}, obj["_id"], obj),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
 }
@@ -2265,17 +2263,15 @@ TEST_F(StorageInterfaceImplTest,
 
     auto unknownUpdateOp = BSON("$unknownUpdateOp" << BSON("x" << 1000));
     ASSERT_THROWS_CODE_AND_WHAT(
-        storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), unknownUpdateOp).ignore(),
+        storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), unknownUpdateOp),
         AssertionException,
         ErrorCodes::FailedToParse,
         "Unknown modifier: $unknownUpdateOp");
 
-    ASSERT_THROWS_CODE(storage
-                           .upsertById(opCtx,
-                                       {nss.db().toString(), *options.uuid},
-                                       BSON("" << 1).firstElement(),
-                                       unknownUpdateOp)
-                           .ignore(),
+    ASSERT_THROWS_CODE(storage.upsertById(opCtx,
+                                          {nss.db().toString(), *options.uuid},
+                                          BSON("" << 1).firstElement(),
+                                          unknownUpdateOp),
                        DBException,
                        ErrorCodes::FailedToParse);
 }

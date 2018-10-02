@@ -845,7 +845,7 @@ TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotVa
                                          << ""));
     BSONObj cmdObj =
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
-    ASSERT_THROWS_CODE(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false).ignore(),
+    ASSERT_THROWS_CODE(authzSession->checkAuthForAggregate(testFooNss, cmdObj, false),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
 }

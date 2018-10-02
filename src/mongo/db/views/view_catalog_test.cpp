@@ -220,8 +220,7 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
 
     auto invalidPipeline = BSON_ARRAY(BSON("INVALID_STAGE_NAME" << 1));
     ASSERT_THROWS(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation)
-            .transitional_ignore(),
+        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException);
 }
 
@@ -233,8 +232,7 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
     auto invalidPipeline = BSON_ARRAY(BSON("$changeStream" << BSONObj()));
 
     ASSERT_THROWS_CODE(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation)
-            .ignore(),
+        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException,
         ErrorCodes::OptionNotSupportedOnView);
 }
@@ -248,8 +246,7 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersi
                                            << "someOtherCollection"));
 
     ASSERT_THROWS_CODE(
-        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation)
-            .ignore(),
+        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
         AssertionException,
         ErrorCodes::OptionNotSupportedOnView);
 }
@@ -424,10 +421,9 @@ TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
     ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, validPipeline, emptyCollation));
 
     // Now attempt to replace it with a pipeline containing $changeStream.
-    ASSERT_THROWS_CODE(
-        viewCatalog.modifyView(opCtx.get(), viewName, viewOn, invalidPipeline).ignore(),
-        AssertionException,
-        ErrorCodes::OptionNotSupportedOnView);
+    ASSERT_THROWS_CODE(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, invalidPipeline),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
 }
 
 TEST_F(ViewCatalogFixture, LookupMissingView) {

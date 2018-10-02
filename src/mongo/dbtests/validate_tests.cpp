@@ -698,8 +698,7 @@ public:
                                                         << "background"
                                                         << false
                                                         << "partialFilterExpression"
-                                                        << BSON("a" << BSON("$eq" << 2))))
-                          .transitional_ignore(),
+                                                        << BSON("a" << BSON("$eq" << 2)))),
                       AssertionException);
 
         // Create a partial geo index that does not index the document.
