@@ -40,6 +40,16 @@
         assert.eq(3, cursor.itcount());
     }
 
+    assert.commandWorked(db.createCollection("bar"));
+    assert.commandWorked(db.createCollection("baz"));
+
+    for (let i = 0; i < 10; i++) {
+        const res =
+            assert.commandWorked(db.runCommand({listCollections: 1, cursor: {batchSize: 0}}));
+        const cursor = new DBCommandCursor(db, res);
+        assert.eq(3, cursor.itcount());
+    }
+
     // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
     if (st.configRS) {
         st.configRS.nodes.forEach((node) => {
