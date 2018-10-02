@@ -3672,13 +3672,15 @@ tasks:
 
           rm -rf mongo-c-driver
 
+          # NOTE: If you change the C Driver version here, also change the substitution in the CocoaPod podspec below in the apple builder.
           git clone --branch r1.13 --depth 1 https://github.com/mongodb/mongo-c-driver.git
           cd mongo-c-driver
 
           trap "cat CMakeFiles/CMakeOutput.log" EXIT
           export ${compile_env|}
-          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
+          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
           make install VERBOSE=1
+          cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp
           mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
 
 - name: embedded_sdk_install_dev
@@ -4055,6 +4057,8 @@ tasks:
 - name: embedded_sdk_multiarch_apple_package
   depends_on:
     - name: embedded_sdk_s3_put
+      variant: embedded-sdk-macosx-10.10
+    - name: embedded_sdk_s3_put
       variant: embedded-sdk-iphoneos-10.2
     - name: embedded_sdk_s3_put
       variant: embedded-sdk-iphonesimulator-10.2
@@ -4074,6 +4078,14 @@ tasks:
     - func: "set up credentials"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
+
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.10/${revision}/mongo-embedded-sdk-${version}.tgz
+        bucket: mciuploads
+        local_file: "MacOS/embedded-sdk.tgz"
 
     - command: s3.get
       params:
@@ -4132,7 +4144,8 @@ tasks:
           pushd mongo-embedded-sdk-${version}
           for directory in *OS *Simulator; do
               pushd $directory
-              tar --include "*/Frameworks*" --include "*/LICENSE*" --strip-components=1 -xf ./embedded-sdk.tgz
+              tar --include "*/Frameworks*" --include "*/LICENSE*" --include "*/COPYING" --strip-components=1 -xf ./embedded-sdk.tgz
+              cp ./COPYING ../COPYING
               popd
           done
 
@@ -4147,6 +4160,10 @@ tasks:
 
           tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./mongo-embedded-sdk-${version}/*OS
 
+          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz ./*OS/Frameworks/bson.framework ./*OS/Frameworks/mongoc.framework ./COPYING
+          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz ./*OS/Frameworks/mongo_embedded.framework
+          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz ./*OS/Frameworks/mongoc_embedded.framework
+
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -4158,6 +4175,39 @@ tasks:
         content_type: application/tar
         display_name: "Embedded SDK Tar Archive"
 
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-c-driver.tgz"
+        remote_file: "${project}/embedded-sdk/mongo-c-driver-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "MongoDB C Driver Tar Archive"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-embedded.tgz"
+        remote_file: "${project}/embedded-sdk/mongo-embedded-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "MongoDB Embedded Tar Archive"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongoc-embedded.tgz"
+        remote_file: "${project}/embedded-sdk/mongoc-embedded-apple-multiarch/${revision}/${version}.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "MongoDB Embedded C Driver Transport Tar Archive"
+
     # If this is a patch build, blow away the file so our subsequent and optional s3.put
     # doesn't run. That way, we won't overwrite the latest part in our patches.
     - command: shell.exec
@@ -4168,6 +4218,9 @@ tasks:
 
           if [ "${is_patch}" = "true" ]; then
             rm -f mongo-embedded-sdk-${version}.tgz
+            rm -f mongo-embedded-sdk-${version}-mongo-c-driver.tgz
+            rm -f mongo-embedded-sdk-${version}-mongo-embedded.tgz
+            rm -f mongo-embedded-sdk-${version}-mongoc-embedded.tgz
           fi
 
     # A second put, this time to -latest, to give devs a reasonable
@@ -4183,6 +4236,55 @@ tasks:
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
+
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-c-driver.tgz"
+        remote_file: ${project}/embedded-sdk/mongo-c-driver-cocoapod-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-embedded.tgz"
+        remote_file: ${project}/embedded-sdk/mongo-embedded-cocoapod-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongoc-embedded.tgz"
+        remote_file: ${project}/embedded-sdk/mongoc-embedded-cocoapod-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-c-driver.podspec.in | tee mongo-c-driver.podspec
+          sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongo_embedded/mongo_embedded.podspec.in | tee mongo_embedded.podspec
+          sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongoc_embedded/mongoc_embedded.podspec.in | tee mongoc_embedded.podspec
+
+          # conditional cocoapods deployment here, pending integration with release process
+          #sudo gem install cocoapods
 
 - name: compile_benchmarks
   depends_on: []
@@ -10760,13 +10862,15 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=x86_64
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_SYSTEM_PROCESSOR=x86_64
-        -DCMAKE_C_FLAGS="-arch x86_64 -mmacosx-version-min=10.10 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch x86_64 -mmacosx-version-min=10.10 -flto"
+        -DENABLE_SSL=DARWIN
+        -DENABLE_ZLIB=BUNDLED
+        -DCMAKE_C_FLAGS="-flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
     disable_unit_tests: true
     enable_embedded_tests: native
     dump_scons_config_on_failure: true
@@ -10789,12 +10893,17 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=arm64
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_C_FLAGS="-arch arm64 -fembed-bitcode -miphoneos-version-min=10.2 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch arm64 -fembed-bitcode -miphoneos-version-min=10.2 -flto"
+        -DENABLE_SSL=OFF
+        -DENABLE_SASL=OFF
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SNAPPY=OFF
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -10816,12 +10925,17 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=x86_64
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_C_FLAGS="-arch x86_64 -fembed-bitcode -miphoneos-version-min=10.2 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch x86_64 -fembed-bitcode -miphoneos-version-min=10.2 -flto"
+        -DENABLE_SSL=OFF
+        -DENABLE_SASL=OFF
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SNAPPY=OFF
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: iPhone-7
@@ -10846,12 +10960,17 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvos --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=arm64
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_C_FLAGS="-arch arm64 -fembed-bitcode -mtvos-version-min=10.2 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch arm64 -fembed-bitcode -mtvos-version-min=10.2 -flto"
+        -DENABLE_SSL=OFF
+        -DENABLE_SASL=OFF
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SNAPPY=OFF
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -10873,12 +10992,17 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvsimulator --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=x86_64
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_C_FLAGS="-arch x86_64 -fembed-bitcode -mtvos-version-min=10.2 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch x86_64 -fembed-bitcode -mtvos-version-min=10.2 -flto"
+        -DENABLE_SSL=OFF
+        -DENABLE_SASL=OFF
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SNAPPY=OFF
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-TV-1080p
@@ -10903,12 +11027,17 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk watchos --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=armv7k
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=4.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_C_FLAGS="-arch armv7k -fembed-bitcode -mwatchos-version-min=4.2 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch armv7k -fembed-bitcode -mwatchos-version-min=4.2 -flto"
+        -DENABLE_SSL=OFF
+        -DENABLE_SASL=OFF
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SNAPPY=OFF
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -10930,12 +11059,17 @@ buildvariants:
       --lto
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk watchsimulator --show-sdk-path)"
+        -DCMAKE_OSX_ARCHITECTURES=i386
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=4.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
-        -DCMAKE_C_FLAGS="-arch i386 -fembed-bitcode -mwatchos-version-min=4.2 -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-arch i386 -fembed-bitcode -mwatchos-version-min=4.2 -flto"
+        -DENABLE_SSL=OFF
+        -DENABLE_SASL=OFF
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SNAPPY=OFF
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-Watch-Series-3-42mm
@@ -10999,13 +11133,14 @@ buildvariants:
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=armeabi-v7a
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
         -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-arm-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SRV=OFF
         -DCMAKE_C_FLAGS="-flto"
         -DCMAKE_SHARED_LINKER_FLAGS="-flto"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
@@ -11040,13 +11175,14 @@ buildvariants:
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=arm64-v8a
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
         -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-arm64-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SRV=OFF
         -DCMAKE_C_FLAGS="-flto"
         -DCMAKE_SHARED_LINKER_FLAGS="-flto"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
@@ -11081,13 +11217,14 @@ buildvariants:
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=x86_64
-        -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
         -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-x86_64-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+        -DENABLE_ZLIB=OFF
+        -DENABLE_SRV=OFF
         -DCMAKE_C_FLAGS="-flto"
         -DCMAKE_SHARED_LINKER_FLAGS="-flto"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
