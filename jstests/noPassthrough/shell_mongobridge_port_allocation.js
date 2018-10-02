@@ -2,6 +2,8 @@
  * Tests that the ports assigned to the mongobridge and mongod/mongos processes make it easy to
  * reason about which mongobridge process corresponds to a particular mongod/mongos process in the
  * logs.
+ *
+ * @tags: [requires_replication, requires_sharding]
  */
 (function() {
     "use strict";
