@@ -94,6 +94,8 @@ AtomicInt32 SyncTail::replBatchLimitOperations{5 * 1000};
 
 namespace {
 
+MONGO_FP_DECLARE(hangAfterRecordingOpApplicationStartTime);
+
 /**
  * This variable determines the number of writer threads SyncTail will have. It has a default value,
  * which varies based on architecture and can be overridden using the "replWriterThreadCount" server
@@ -316,6 +318,41 @@ bool SyncTail::peek(OperationContext* opCtx, BSONObj* op) {
     return _networkQueue->peek(opCtx, op);
 }
 
+/**
+ * Used for logging a report of ops that take longer than "slowMS" to apply. This is called
+ * right before returning from syncApply, and it returns the same status.
+ */
+Status finishAndLogApply(ClockSource* clockSource,
+                         Status finalStatus,
+                         Date_t applyStartTime,
+                         const char* opType,
+                         const BSONObj& op) {
+
+    if (finalStatus.isOK()) {
+        auto applyEndTime = clockSource->now();
+        auto diffMS = durationCount<Milliseconds>(applyEndTime - applyStartTime);
+
+        // This op was slow to apply, so we should log a report of it.
+        if (diffMS > serverGlobalParams.slowMS) {
+
+            StringBuilder s;
+            s << "applied op: ";
+
+            if (opType[0] == 'c') {
+                s << "command ";
+            } else {
+                s << "CRUD ";
+            }
+
+            s << redact(op);
+            s << ", took " << diffMS << "ms";
+
+            log() << s.str();
+        }
+    }
+    return finalStatus;
+}
+
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
@@ -353,6 +390,19 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         return status;
     };
 
+    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+    auto applyStartTime = clockSource->now();
+
+    if (MONGO_FAIL_POINT(hangAfterRecordingOpApplicationStartTime)) {
+        log() << "syncApply - fail point hangAfterRecordingOpApplicationStartTime enabled. "
+              << "Blocking until fail point is disabled. ";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterRecordingOpApplicationStartTime);
+    }
+
+    auto finishApply = [&](Status status) {
+        return finishAndLogApply(clockSource, status, applyStartTime, opType, op);
+    };
+
     bool isNoOp = opType[0] == 'n';
     if (isNoOp || (opType[0] == 'i' && nss.isSystemDotIndexes())) {
         if (isNoOp && nss.db() == "") {
@@ -361,11 +411,11 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         }
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
-        return applyOp(ctx.db());
+        return finishApply(applyOp(ctx.db()));
     }
 
     if (isCrudOpType(opType)) {
-        return writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
+        return finishApply(writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
             // DB lock always acquires the global lock
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
             auto ui = op["ui"];
@@ -399,11 +449,11 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
             OldClientContext ctx(opCtx, actualNss.ns(), db, /*justCreated*/ false);
             return applyOp(ctx.db());
-        });
+        }));
     }
 
     if (opType[0] == 'c') {
-        return writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
+        return finishApply(writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
             // a command may need a global write lock. so we will conservatively go
             // ahead and grab one here. suboptimal. :-(
             Lock::GlobalWrite globalWriteLock(opCtx);
@@ -412,7 +462,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             Status status = applyCommandInLock(opCtx, op, oplogApplicationMode);
             incrementOpsAppliedStats();
             return status;
-        });
+        }));
     }
 
     // unknown opType

@@ -70,6 +70,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"
@@ -2121,6 +2122,137 @@ TEST_F(IdempotencyTest, ConvertToCappedNamespaceNotFound) {
     // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
     ASSERT_FALSE(autoColl.getCollection());
     ASSERT_FALSE(autoColl.getDb());
+}
+
+TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
+    // We are inserting into an existing collection.
+    const NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
+
+    // This duration is greater than "slowMS", so the op would be considered slow.
+    auto applyDuration = serverGlobalParams.slowMS * 10;
+    getServiceContext()->setFastClockSource(
+        stdx::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(applyDuration)));
+
+    auto entry = repl::OplogEntry(OpTime(Timestamp(1, 1), 1),       // optime
+                                  1LL,                              // hash
+                                  OpTypeEnum::kInsert,              // opType
+                                  nss,                              // namespace
+                                  boost::none,                      // uuid
+                                  boost::none,                      // fromMigrate
+                                  repl::OplogEntry::kOplogVersion,  // version
+                                  BSON("_id" << 1),                 // o
+                                  boost::none,                      // o2
+                                  {},                               // sessionInfo
+                                  boost::none,                      // upsert
+                                  boost::none,                      // wall clock time
+                                  boost::none,                      // statement id
+                                  boost::none,   // optime of previous write within same transaction
+                                  boost::none,   // pre-image optime
+                                  boost::none);  // post-image optime
+    startCapturingLogMessages();
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
+                                  entry.toBSON(),
+                                  OplogApplication::Mode::kSecondary,
+                                  _applyOp,
+                                  _applyCmd,
+                                  _incOps));
+
+    // Use a builder for easier escaping. We expect the operation to be logged.
+    StringBuilder expected;
+    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, h: 1, v: 2, op: \"i\", ns: "
+                "\"test.t\", o: { _id: 1 } }, took "
+             << applyDuration << "ms";
+
+    ASSERT_EQUALS(1, countLogLinesContaining(expected.str()));
+}
+
+TEST_F(SyncTailTest, DoNotLogSlowOpApplicationWhenFailed) {
+    // We are trying to insert into a nonexistent database.
+    NamespaceString nss("test.t");
+
+    // This duration is greater than "slowMS", so the op would be considered slow.
+    auto applyDuration = serverGlobalParams.slowMS * 10;
+    getServiceContext()->setFastClockSource(
+        stdx::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(applyDuration)));
+
+    auto entry = repl::OplogEntry(OpTime(Timestamp(1, 1), 1),       // optime
+                                  1LL,                              // hash
+                                  OpTypeEnum::kInsert,              // opType
+                                  nss,                              // namespace
+                                  boost::none,                      // uuid
+                                  boost::none,                      // fromMigrate
+                                  repl::OplogEntry::kOplogVersion,  // version
+                                  BSON("_id" << 1),                 // o
+                                  boost::none,                      // o2
+                                  {},                               // sessionInfo
+                                  boost::none,                      // upsert
+                                  boost::none,                      // wall clock time
+                                  boost::none,                      // statement id
+                                  boost::none,   // optime of previous write within same transaction
+                                  boost::none,   // pre-image optime
+                                  boost::none);  // post-image optime
+
+    startCapturingLogMessages();
+    ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(),
+                                      entry.toBSON(),
+                                      OplogApplication::Mode::kSecondary,
+                                      _applyOp,
+                                      _applyCmd,
+                                      _incOps)
+                      .transitional_ignore(),
+                  ExceptionFor<ErrorCodes::NamespaceNotFound>);
+
+    // Use a builder for easier escaping. We expect the operation to *not* be logged
+    // even thought it was slow, since we couldn't apply it successfully.
+    StringBuilder expected;
+    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, h: 1, v: 2, op: \"i\", ns: "
+                "\"test.t\", o: { _id: 1 } }, took "
+             << applyDuration << "ms";
+    ASSERT_EQUALS(0, countLogLinesContaining(expected.str()));
+}
+
+TEST_F(SyncTailTest, DoNotLogNonSlowOpApplicationWhenSuccessful) {
+    // This duration is below "slowMS", so the op would *not* be considered slow.
+    auto applyDuration = serverGlobalParams.slowMS / 10;
+    getServiceContext()->setFastClockSource(
+        stdx::make_unique<AutoAdvancingClockSourceMock>(Milliseconds(applyDuration)));
+
+    // We are inserting into an existing collection.
+    const NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
+    auto entry = repl::OplogEntry(OpTime(Timestamp(1, 1), 1),       // optime
+                                  1LL,                              // hash
+                                  OpTypeEnum::kInsert,              // opType
+                                  nss,                              // namespace
+                                  boost::none,                      // uuid
+                                  boost::none,                      // fromMigrate
+                                  repl::OplogEntry::kOplogVersion,  // version
+                                  BSON("_id" << 1),                 // o
+                                  boost::none,                      // o2
+                                  {},                               // sessionInfo
+                                  boost::none,                      // upsert
+                                  boost::none,                      // wall clock time
+                                  boost::none,                      // statement id
+                                  boost::none,   // optime of previous write within same transaction
+                                  boost::none,   // pre-image optime
+                                  boost::none);  // post-image optime
+
+    startCapturingLogMessages();
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
+                                  entry.toBSON(),
+                                  OplogApplication::Mode::kSecondary,
+                                  _applyOp,
+                                  _applyCmd,
+                                  _incOps));
+
+    // Use a builder for easier escaping. We expect the operation to *not* be logged,
+    // since it wasn't slow to apply.
+    StringBuilder expected;
+    expected << "applied op: CRUD { ts: Timestamp(1, 1), t: 1, h: 1, v: 2, op: \"i\", ns: "
+                "\"test.t\", o: { _id: 1 } }, took "
+             << applyDuration << "ms";
+    ASSERT_EQUALS(0, countLogLinesContaining(expected.str()));
 }
 
 }  // namespace
