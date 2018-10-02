@@ -78,10 +78,22 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     if (cursorMode == CurrentOpCursorMode::kIncludeCursors) {
 
         for (auto&& cursor : getIdleCursors(expCtx, userMode)) {
-            ops.push_back(BSON("type"
-                               << "idleCursor"
-                               << "cursor"
-                               << cursor.toBSON()));
+            BSONObjBuilder cursorObj;
+            cursorObj.append("type", "idleCursor");
+            // On mongos, planSummary is not present.
+            auto planSummaryData = cursor.getPlanSummary();
+            if (planSummaryData) {
+                auto planSummaryText = planSummaryData->toString();
+                // Plan summary has to appear in the top level object, not the cursor object.
+                // We remove it, create the op, then put it back.
+                cursor.setPlanSummary(boost::none);
+                cursorObj.append("planSummary", planSummaryText);
+                cursorObj.append("cursor", cursor.toBSON());
+                cursor.setPlanSummary(StringData(planSummaryText));
+            } else {
+                cursorObj.append("cursor", cursor.toBSON());
+            }
+            ops.emplace_back(cursorObj.obj());
         }
     }
 

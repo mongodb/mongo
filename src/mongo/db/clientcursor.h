@@ -209,6 +209,14 @@ public:
         return _createdDate;
     }
 
+    void setPlanSummary(std::string ps) {
+        _planSummary = std::move(ps);
+    }
+
+    StringData getPlanSummary() const {
+        return StringData(_planSummary);
+    }
+
     /**
      * Returns a generic cursor containing diagnostics about this cursor.
      * The caller must either have this cursor pinned or hold a mutex from the cursor manager.
@@ -374,6 +382,9 @@ private:
 
     Date_t _lastUseDate;
     Date_t _createdDate;
+
+    // A string with the plan summary of the cursor's query.
+    std::string _planSummary;
 };
 
 /**

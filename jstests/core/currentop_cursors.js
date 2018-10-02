@@ -8,6 +8,9 @@
 (function() {
     "use strict";
     const coll = db.jstests_currentop_cursors;
+
+    load("jstests/libs/fixture_helpers.js");  // for FixtureHelpers
+
     // Avoiding using the shell helper to avoid the implicit collection recreation.
     db.runCommand({drop: coll.getName()});
     assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1000}));
@@ -63,6 +66,12 @@
         },
         assertFunc: function(cursorId, result) {
             assert.eq(result.length, 1, result);
+            // Plan summary does not exist on mongos, so skip this test on mongos.
+            if (!FixtureHelpers.isMongos(db)) {
+                assert.eq(result[0].planSummary, "COLLSCAN", result);
+            } else {
+                assert(!result[0].hasOwnProperty("planSummary"), result);
+            }
             const idleCursor = result[0].cursor;
             assert.eq(idleCursor.nDocsReturned, 2, result);
             assert.eq(idleCursor.nBatchesReturned, 1, result);
@@ -71,6 +80,7 @@
             assert.eq(idleCursor.noCursorTimeout, false, result);
             assert.eq(idleCursor.originatingCommand.batchSize, 2, result);
             assert.lte(idleCursor.createdDate, idleCursor.lastAccessDate, result);
+            assert(!idleCursor.hasOwnProperty("planSummary"), result);
         }
     });
     runTest({
@@ -189,4 +199,25 @@
         }
     });
 
+    // planSummary does not exist on Mongos, so skip this test.
+    if (!FixtureHelpers.isMongos(db)) {
+        runTest({
+            findFunc: function() {
+                assert.commandWorked(coll.createIndex({"val": 1}));
+                return assert
+                    .commandWorked(db.runCommand({
+                        find: "jstests_currentop_cursors",
+                        filter: {"val": {$gt: 2}},
+                        batchSize: 2
+                    }))
+                    .cursor.id;
+
+            },
+            assertFunc: function(cursorId, result) {
+                assert.eq(result.length, 1, result);
+                assert.eq(result[0].planSummary, "IXSCAN { val: 1 }", result);
+
+            }
+        });
+    }
 })();

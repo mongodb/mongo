@@ -71,6 +71,10 @@ structs:
       lsid:
         type: LogicalSessionId
         optional: true
+      planSummary: 
+        description: The plan summary of this cursor's query.
+        type: string
+        optional: true
       operationUsingCursorId:
         description: The op ID of the operation pinning the cursor. Will be empty for idle cursors.
         type: long

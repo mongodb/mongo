@@ -47,6 +47,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/background.h"
@@ -92,7 +93,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _exec(std::move(params.exec)),
       _operationUsingCursor(operationUsingCursor),
       _lastUseDate(now),
-      _createdDate(now) {
+      _createdDate(now),
+      _planSummary(Explain::getPlanSummary(_exec.get())) {
     invariant(_cursorManager);
     invariant(_exec);
     invariant(_operationUsingCursor);
@@ -143,6 +145,7 @@ GenericCursor ClientCursor::toGenericCursor() const {
     gc.setLastAccessDate(getLastUseDate());
     gc.setCreatedDate(getCreatedDate());
     gc.setNBatchesReturned(getNBatches());
+    gc.setPlanSummary(getPlanSummary());
     if (auto opCtx = _operationUsingCursor) {
         gc.setOperationUsingCursorId(opCtx->getOpID());
     }
