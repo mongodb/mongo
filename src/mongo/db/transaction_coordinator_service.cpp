@@ -88,7 +88,6 @@ TransactionCoordinatorService::CommitDecision TransactionCoordinatorService::coo
         return TransactionCoordinatorService::CommitDecision::kAbort;
     }
 
-    // TODO (SERVER-37017): Execute this asynchronously.
     txn::recvCoordinateCommit(opCtx, coordinator.get(), participantList);
 
     // TODO (SERVER-36640): Return a notification wrapping the decision that the caller can wait on.
@@ -106,7 +105,6 @@ void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,
         return;
     }
 
-    // TODO (SERVER-37017): Execute this asynchronously
     txn::recvVoteCommit(opCtx, coordinator.get(), shardId, prepareTimestamp);
 }
 
@@ -117,7 +115,6 @@ void TransactionCoordinatorService::voteAbort(OperationContext* opCtx,
     auto coordinator = _coordinatorCatalog.get(lsid, txnNumber);
 
     if (coordinator) {
-        // TODO (SERVER-37017): Execute this asynchronously.
         txn::recvVoteAbort(opCtx, coordinator.get(), shardId);
     }
 }
@@ -128,7 +125,6 @@ void TransactionCoordinatorService::tryAbort(OperationContext* opCtx,
     auto coordinator = _coordinatorCatalog.get(lsid, txnNumber);
 
     if (coordinator) {
-        // TODO (SERVER-37017): Execute this asynchronously.
         // TODO (SERVER-37020): Do recvTryAbort, remove this once implemented.
         MONGO_UNREACHABLE;
     }

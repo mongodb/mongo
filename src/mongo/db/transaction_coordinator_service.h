@@ -41,7 +41,6 @@ class ShardId;
 class OperationContext;
 class ServiceContext;
 
-// TODO (SERVER-37017): Update comments to reflect asynchronicity of relevant methods.
 class TransactionCoordinatorService final {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorService);
 
@@ -68,7 +67,8 @@ public:
     void createCoordinator(LogicalSessionId lsid, TxnNumber txnNumber, Date_t commitDeadline);
 
     /**
-     * Delivers coordinateCommit to the TransactionCoordinator.
+     * Delivers coordinateCommit to the TransactionCoordinator and asynchronously sends commit or
+     * abort to participants if necessary.
      *
      * TODO (SERVER-36640): Return Notification<CommitDecision>.
      */
@@ -78,7 +78,8 @@ public:
                                     const std::set<ShardId>& participantList);
 
     /**
-     * Delivers voteCommit to the TransactionCoordinator.
+     * Delivers voteCommit to the TransactionCoordinator and asynchronously sends commit or abort to
+     * participants if necessary.
      */
     void voteCommit(OperationContext* opCtx,
                     LogicalSessionId lsid,
@@ -87,7 +88,8 @@ public:
                     Timestamp prepareTimestamp);
 
     /**
-     * Delivers voteAbort on the TransactionCoordinator.
+     * Delivers voteAbort on the TransactionCoordinator and asynchronously sends commit or abort to
+     * participants if necessary.
      */
     void voteAbort(OperationContext* opCtx,
                    LogicalSessionId lsid,
@@ -95,8 +97,9 @@ public:
                    const ShardId& shardId);
 
     /**
-     * Attempts to abort the coordinator for the given session id and transaction
-     * number. Will not abort a coordinator which has already decided to commit.
+     * Attempts to abort the coordinator for the given session id and transaction number. Will not
+     * abort a coordinator which has already decided to commit. Asynchronously sends abort to
+     * participants if necessary.
      */
     void tryAbort(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
 
