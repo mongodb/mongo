@@ -368,6 +368,7 @@ selector:
   - jstests/sharding/transactions_stale_shard_version_errors.js
   - jstests/sharding/transactions_target_at_point_in_time.js
   - jstests/sharding/transactions_view_resolution.js
+  - jstests/sharding/transactions_writes_not_retryable.js
   - jstests/sharding/txn_agg.js
   - jstests/sharding/txn_basic_two_phase_commit.js
   - jstests/sharding/txn_coordinator_commands_basic_requirements.js

@@ -209,14 +209,15 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 pendingBatches.emplace(targetShardId, nextBatch);
             }
 
+            bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
+
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                 clientRequest.getNS().db().toString(),
                 requests,
                 kPrimaryOnlyReadPreference,
-                opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
-                                      : Shard::RetryPolicy::kNoRetry);
+                isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
             numSent += pendingBatches.size();
 
             //
@@ -274,7 +275,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     LOG(4) << "Write results received from " << shardHost.toString() << ": "
                            << redact(batchedCommandResponse.toString());
 
-                    // If we are in a transaction, we must fail the whole batch.
+                    // If we are in a transaction, we must fail the whole batch on any error.
                     if (TransactionRouter::get(opCtx)) {
                         // Note: this returns a bad status if any part of the batch failed.
                         auto batchStatus = batchedCommandResponse.toStatus();
@@ -324,6 +325,14 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                     LOG(4) << "Unable to receive write results from " << shardHost
                            << causedBy(redact(status));
+
+                    // If we are in a transaction, we must fail the whole batch on any error.
+                    if (TransactionRouter::get(opCtx)) {
+                        batchOp.forgetTargetedBatchesOnTransactionAbortingError();
+                        uassertStatusOK(status.withContext(
+                            str::stream() << "Encountered error from " << shardHost.toString()
+                                          << " during a transaction"));
+                    }
                 }
             }
         }

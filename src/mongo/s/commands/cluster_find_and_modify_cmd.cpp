@@ -211,14 +211,15 @@ private:
                 appendShardVersion(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
                                    shardVersion));
 
+            bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
+
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                 nss.db().toString(),
                 requests,
                 kPrimaryOnlyReadPreference,
-                opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
-                                      : Shard::RetryPolicy::kNoRetry);
+                isRetryableWrite ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
 
             auto response = ars.next();
             invariant(ars.done());
