@@ -322,6 +322,18 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='sharding_task_executor_test',
+    source=[
+        'sharding_task_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        'sharding_task_executor',
+        'shard_server_test_fixture',
+    ],
+)
+
 # This library contains sharding functionality used by both mongod and mongos
 env.Library(
     target='grid',

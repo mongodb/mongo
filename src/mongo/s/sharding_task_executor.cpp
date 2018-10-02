@@ -121,20 +121,41 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         return _executor->scheduleRemoteCommand(request, cb, baton);
     }
 
-    boost::optional<RemoteCommandRequest> newRequest;
+    boost::optional<RemoteCommandRequest> requestWithFixedLsid = [&] {
+        boost::optional<RemoteCommandRequest> newRequest;
 
-    if (request.opCtx->getLogicalSessionId() && !request.cmdObj.hasField("lsid")) {
-        newRequest.emplace(request);
+        if (!request.opCtx->getLogicalSessionId()) {
+            return newRequest;
+        }
+
+        if (request.cmdObj.hasField("lsid")) {
+            auto cmdObjLsid =
+                LogicalSessionFromClient::parse("lsid"_sd, request.cmdObj["lsid"].Obj());
+
+            if (cmdObjLsid.getUid()) {
+                invariant(*cmdObjLsid.getUid() == request.opCtx->getLogicalSessionId()->getUid());
+                return newRequest;
+            }
+
+            newRequest.emplace(request);
+            newRequest->cmdObj = newRequest->cmdObj.removeField("lsid");
+        }
+
+        if (!newRequest) {
+            newRequest.emplace(request);
+        }
 
         BSONObjBuilder bob(std::move(newRequest->cmdObj));
         {
-            // TODO SERVER-33702.
             BSONObjBuilder subbob(bob.subobjStart("lsid"));
             request.opCtx->getLogicalSessionId()->serialize(&subbob);
+            subbob.done();
         }
 
         newRequest->cmdObj = bob.obj();
-    }
+
+        return newRequest;
+    }();
 
     std::shared_ptr<OperationTimeTracker> timeTracker = OperationTimeTracker::get(request.opCtx);
 
@@ -204,7 +225,8 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         }
     };
 
-    return _executor->scheduleRemoteCommand(newRequest ? *newRequest : request, shardingCb, baton);
+    return _executor->scheduleRemoteCommand(
+        requestWithFixedLsid ? *requestWithFixedLsid : request, shardingCb, baton);
 }
 
 void ShardingTaskExecutor::cancel(const CallbackHandle& cbHandle) {
