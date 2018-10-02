@@ -157,6 +157,9 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                         return {code, "Values in the index key pattern cannot be NaN."};
                     } else if (value == 0.0) {
                         return {code, "Values in the index key pattern cannot be 0."};
+                    } else if (value < 0.0 && pluginName == IndexNames::WILDCARD) {
+                        return {code,
+                                "A numeric value in a $** index key pattern must be positive."};
                     }
                 } else if (keyElement.type() != BSONType::String) {
                     return {code,

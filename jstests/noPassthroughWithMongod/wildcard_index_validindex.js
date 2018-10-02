@@ -63,8 +63,13 @@
         createIndexAndVerifyWithDrop(
             {"$**": 1}, {wildcardProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
 
-        // Cannot create a wildcard index with sparse option.
+        // Cannot create a wildcard index with a non-positive numeric key value.
         coll.dropIndexes();
+        assert.commandFailedWithCode(coll.createIndex({"$**": 0}), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.createIndex({"$**": -1}), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.createIndex({"$**": -2}), ErrorCodes.CannotCreateIndex);
+
+        // Cannot create a wildcard index with sparse option.
         assert.commandFailedWithCode(coll.createIndex({"$**": 1}, {sparse: true}),
                                      ErrorCodes.CannotCreateIndex);
 

@@ -258,6 +258,20 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceeds) {
     ASSERT_OK(validateKeyPattern(BSON("$**" << 1), IndexVersion::kV2));
 }
 
+TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueFailsIfNotPositive) {
+    TestCommandQueryKnobGuard guard;
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("$**" << 0.0), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("$**" << -0.0), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("$**" << -0.1), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("$**" << -1), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("$**" << INT_MIN), IndexVersion::kV2));
+}
+
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnRepeat) {
     TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**.$**" << 1), IndexVersion::kV2);
