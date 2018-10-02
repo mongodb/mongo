@@ -598,11 +598,11 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
         nodeIndex = &scan->index;
         bounds = &scan->bounds;
-    }
 
-    // If this is a $** index, update and populate the keyPattern, bounds, and multikeyPaths.
-    if (index.type == IndexType::INDEX_WILDCARD) {
-        wcp::finalizeWildcardIndexScanConfiguration(nodeIndex, bounds);
+        // If this is a $** index, update and populate the keyPattern, bounds, and multikeyPaths.
+        if (index.type == IndexType::INDEX_WILDCARD) {
+            wcp::finalizeWildcardIndexScanConfiguration(scan);
+        }
     }
 
     // Find the first field in the scan's bounds that was not filled out.

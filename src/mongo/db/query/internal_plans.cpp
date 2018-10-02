@@ -209,6 +209,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* opCtx,
     params.bounds.startKey = startKey;
     params.bounds.endKey = endKey;
     params.bounds.boundInclusion = boundInclusion;
+    params.shouldDedup = descriptor->isMultikey(opCtx);
 
     std::unique_ptr<PlanStage> root =
         stdx::make_unique<IndexScan>(opCtx, std::move(params), ws, nullptr);

@@ -89,7 +89,7 @@ struct IndexScanParams {
 
     int direction{1};
 
-    bool doNotDedup{false};
+    bool shouldDedup{false};
 
     // Do we want to add the key as metadata?
     bool addKeyMetadata{false};
@@ -166,7 +166,6 @@ private:
     const MatchExpression* const _filter;
 
     // Could our index have duplicates?  If so, we use _returned to dedup.
-    bool _shouldDedup;
     stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
 
     const bool _forward;

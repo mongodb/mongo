@@ -318,7 +318,6 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
     // This is handled in query planning.
     IndexScanParams scanParams(opCtx, *_twoDIndex);
     scanParams.bounds = _nearParams->baseBounds;
-    scanParams.doNotDedup = true;
 
     // The "2d" field is always the first in the index
     const string twoDFieldName = _nearParams->nearQuery->field;
@@ -691,7 +690,6 @@ StatusWith<NearStage::CoveredInterval*>  //
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;
-    scanParams.doNotDedup = true;
 
     // The "2d" field is always the first in the index
     const string twoDFieldName = _nearParams.nearQuery->field;
@@ -882,7 +880,6 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* op
                                                             Collection* collection) {
     IndexScanParams scanParams(opCtx, *_s2Index);
     scanParams.bounds = _nearParams->baseBounds;
-    scanParams.doNotDedup = true;
 
     // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
     const string s2Field = _nearParams->nearQuery->field;
@@ -1057,7 +1054,6 @@ StatusWith<NearStage::CoveredInterval*>  //
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;
-    scanParams.doNotDedup = true;
 
     // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
     const string s2Field = _nearParams.nearQuery->field;

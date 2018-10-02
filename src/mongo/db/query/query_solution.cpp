@@ -519,6 +519,7 @@ IndexScanNode::IndexScanNode(IndexEntry index)
       index(std::move(index)),
       direction(1),
       addKeyMetadata(false),
+      shouldDedup(index.multikey),
       queryCollator(nullptr) {}
 
 void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {

@@ -69,7 +69,6 @@ IndexScan::IndexScan(OperationContext* opCtx,
       _keyPattern(params.keyPattern.getOwned()),
       _scanState(INITIALIZING),
       _filter(filter),
-      _shouldDedup(true),
       _forward(params.direction == 1),
       _params(std::move(params)),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_params.bounds.boundInclusion)),
@@ -86,12 +85,6 @@ IndexScan::IndexScan(OperationContext* opCtx,
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
-    if (_params.doNotDedup) {
-        _shouldDedup = false;
-    } else {
-        _shouldDedup = _params.isMultiKey;
-    }
-
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
     _indexCursor = _iam->newCursor(getOpCtx(), _forward);
 
@@ -193,7 +186,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     _scanState = GETTING_NEXT;
 
-    if (_shouldDedup) {
+    if (_params.shouldDedup) {
         ++_specificStats.dupsTested;
         if (!_returned.insert(kv->loc).second) {
             // We've seen this RecordId before. Skip it this time.

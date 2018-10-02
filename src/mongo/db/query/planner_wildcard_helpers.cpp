@@ -389,7 +389,10 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
     return (arrayIndicesTraversedByQuery.empty() ? tightnessIn : BoundsTightness::INEXACT_FETCH);
 }
 
-void finalizeWildcardIndexScanConfiguration(IndexEntry* index, IndexBounds* bounds) {
+void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
+    IndexEntry* index = &scan->index;
+    IndexBounds* bounds = &scan->bounds;
+
     // We should only ever reach this point when processing a $** index. Sanity check the arguments.
     invariant(index && index->type == IndexType::INDEX_WILDCARD);
     invariant(index->keyPattern.nFields() == 1);
@@ -448,6 +451,11 @@ void finalizeWildcardIndexScanConfiguration(IndexEntry* index, IndexBounds* boun
         if (requiresSubpathBounds) {
             pathIntervals.push_back(IndexBoundsBuilder::makeRangeInterval(
                 path + subPathStart, path + subPathEnd, BoundInclusion::kIncludeStartKeyOnly));
+
+            // Queries which scan subpaths for a single wildcard index should be deduped. The index
+            // bounds may include multiple keys associated with the same document. Therefore, we
+            // instruct the IXSCAN to dedup keys which point to the same object.
+            scan->shouldDedup = true;
         }
     }
     // Ensure that the bounds' intervals are correctly aligned.

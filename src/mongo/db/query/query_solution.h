@@ -505,6 +505,8 @@ struct IndexScanNode : public QuerySolutionNode {
     // If there's a 'returnKey' projection we add key metadata.
     bool addKeyMetadata;
 
+    bool shouldDedup = false;
+
     IndexBounds bounds;
 
     const CollatorInterface* queryCollator;

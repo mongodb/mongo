@@ -105,6 +105,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.addKeyMetadata = ixn->addKeyMetadata;
+            params.shouldDedup = ixn->shouldDedup;
             return new IndexScan(opCtx, std::move(params), ws, ixn->filter.get());
         }
         case STAGE_FETCH: {
@@ -352,7 +353,6 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.startKeyInclusive = csn->startKeyInclusive;
             params.endKey = csn->endKey;
             params.endKeyInclusive = csn->endKeyInclusive;
-
             return new CountScan(opCtx, std::move(params), ws);
         }
         case STAGE_ENSURE_SORTED: {

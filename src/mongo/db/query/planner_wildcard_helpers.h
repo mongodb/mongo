@@ -73,8 +73,9 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
  * - Converts the keyPattern to the {$_path: 1, "path": 1} format expected by the $** index.
  * - Adds a new entry '$_path' to the bounds vector, and computes the necessary intervals on it.
  * - Adds a new, empty entry to 'multikeyPaths' for '$_path'.
+ * - Updates shouldDedup for index scan node.
  */
-void finalizeWildcardIndexScanConfiguration(IndexEntry* index, IndexBounds* bounds);
+void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan);
 
 /**
  * Returns true if the given IndexScanNode is a $** scan whose bounds overlap the object type
