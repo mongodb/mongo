@@ -139,6 +139,10 @@ void sendAsyncCommandToShards(StringData commandName,
     LOG(0) << "Coordinator shard sending " << commandObj << " to " << ss.str();
 }
 
+}  // namespace
+
+namespace txn {
+
 void sendCommit(OperationContext* opCtx,
                 std::shared_ptr<TransactionCoordinator> coordinator,
                 const std::set<ShardId>& nonAckedParticipants,
@@ -177,87 +181,6 @@ void sendAbort(OperationContext* opCtx, const std::set<ShardId>& nonVotedAbortPa
     sendAsyncCommandToShards(
         "abortTransaction", opCtx, nonVotedAbortParticipants, abortObj, [](Status, const ShardId&) {
         });
-}
-
-void doAction(OperationContext* opCtx,
-              std::shared_ptr<TransactionCoordinator> coordinator,
-              TransactionCoordinator::StateMachine::Action action) {
-    switch (action) {
-        case TransactionCoordinator::StateMachine::Action::kSendCommit: {
-            sendCommit(opCtx,
-                       coordinator,
-                       coordinator->getNonAckedCommitParticipants(),
-                       coordinator->getCommitTimestamp());
-            return;
-        }
-        case TransactionCoordinator::StateMachine::Action::kSendAbort: {
-            sendAbort(opCtx, coordinator->getNonVotedAbortParticipants());
-            return;
-        }
-        case TransactionCoordinator::StateMachine::Action::kNone:
-            return;
-    }
-    MONGO_UNREACHABLE;
-}
-
-}  // namespace
-
-namespace txn {
-
-void recvCoordinateCommit(OperationContext* opCtx,
-                          std::shared_ptr<TransactionCoordinator> coordinator,
-                          const std::set<ShardId>& participantList) {
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
-    StringBuilder ss;
-    ss << "[";
-    for (const auto& shardId : participantList) {
-        ss << shardId << " ";
-    }
-    ss << "]";
-    LOG(0) << "Coordinator shard received participant list with shards " << ss.str();
-
-    TransactionCoordinator::StateMachine::Action action;
-    action = coordinator->recvCoordinateCommit(participantList);
-    doAction(opCtx, coordinator, action);
-
-    // TODO (SERVER-36640): Wait for decision to be made.
-}
-
-void recvVoteCommit(OperationContext* opCtx,
-                    std::shared_ptr<TransactionCoordinator> coordinator,
-                    const ShardId& shardId,
-                    Timestamp prepareTimestamp) {
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
-    LOG(0) << "Coordinator shard received voteCommit from " << shardId << " with prepare timestamp "
-           << prepareTimestamp;
-
-    TransactionCoordinator::StateMachine::Action action;
-    action = coordinator->recvVoteCommit(shardId, prepareTimestamp);
-    doAction(opCtx, coordinator, action);
-}
-
-void recvVoteAbort(OperationContext* opCtx,
-                   std::shared_ptr<TransactionCoordinator> coordinator,
-                   const ShardId& shardId) {
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
-    LOG(0) << "Coordinator shard received voteAbort from " << shardId;
-
-    TransactionCoordinator::StateMachine::Action action;
-    action = coordinator->recvVoteAbort(shardId);
-    doAction(opCtx, coordinator, action);
-}
-
-void recvTryAbort(OperationContext* opCtx, std::shared_ptr<TransactionCoordinator> coordinator) {
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
-    LOG(0) << "Coordinator shard received tryAbort";
-
-    TransactionCoordinator::StateMachine::Action action;
-    action = coordinator->recvTryAbort();
-    doAction(opCtx, coordinator, action);
 }
 
 }  // namespace txn

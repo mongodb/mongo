@@ -33,24 +33,21 @@
 
 namespace mongo {
 
-/**
- * Encompasses the business logic for the coordinator's role in the distributed transaction
- * two-phase commit.
- */
 namespace txn {
 
-void recvCoordinateCommit(OperationContext* opCtx,
-                          std::shared_ptr<TransactionCoordinator> coordinator,
-                          const std::set<ShardId>& participantList);
-void recvVoteCommit(OperationContext* opCtx,
-                    std::shared_ptr<TransactionCoordinator> coordinator,
-                    const ShardId& shardId,
-                    Timestamp prepareTimestamp);
-void recvVoteAbort(OperationContext* opCtx,
-                   std::shared_ptr<TransactionCoordinator> coordinator,
-                   const ShardId& shardId);
-void recvTryAbort(OperationContext* opCtx, std::shared_ptr<TransactionCoordinator> coordinator);
+/**
+ * Asynchronously sends commit to all participants provided and calls recvCommitAck on the
+ * coordinator if the commit command succeeds.
+ */
+void sendCommit(OperationContext* opCtx,
+                std::shared_ptr<TransactionCoordinator> coordinator,
+                const std::set<ShardId>& nonAckedParticipants,
+                Timestamp commitTimestamp);
 
+/**
+ * Asynchronously sends abort to all participants provided.
+ */
+void sendAbort(OperationContext* opCtx, const std::set<ShardId>& nonVotedAbortParticipants);
 
 }  // namespace txn
 }  // namespace mongo

@@ -102,13 +102,6 @@ public:
                    TxnNumber txnNumber,
                    const ShardId& shardId);
 
-    /**
-     * Attempts to abort the coordinator for the given session id and transaction number. Will not
-     * abort a coordinator which has already decided to commit. Asynchronously sends abort to
-     * participants if necessary.
-     */
-    void tryAbort(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
-
 private:
     std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
 };
