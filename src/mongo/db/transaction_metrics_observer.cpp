@@ -37,12 +37,13 @@ namespace mongo {
 
 void TransactionMetricsObserver::onStart(ServerTransactionsMetrics* serverTransactionsMetrics,
                                          bool isAutoCommit,
-                                         unsigned long long curTime,
+                                         TickSource* tickSource,
+                                         Date_t curWallClockTime,
                                          Date_t expireDate) {
     //
     // Per transaction metrics.
     //
-    _singleTransactionStats.setStartTime(curTime);
+    _singleTransactionStats.setStartTime(tickSource->getTicks(), curWallClockTime);
     _singleTransactionStats.setAutoCommit(isAutoCommit);
     _singleTransactionStats.setExpireDate(expireDate);
 
@@ -59,7 +60,7 @@ void TransactionMetricsObserver::onChooseReadTimestamp(Timestamp readTimestamp) 
 }
 
 void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransactionsMetrics,
-                                         unsigned long long curTime) {
+                                         TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
@@ -67,7 +68,7 @@ void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransa
     // aborted by another thread, so we check that the transaction is active before setting it as
     // inactive.
     if (_singleTransactionStats.isActive()) {
-        _singleTransactionStats.setInactive(curTime);
+        _singleTransactionStats.setInactive(tickSource, tickSource->getTicks());
     }
 
     //
@@ -79,11 +80,11 @@ void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransa
 }
 
 void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics,
-                                           unsigned long long curTime) {
+                                           TickSource* tickSource) {
     //
     // Per transaction metrics.
     //
-    _singleTransactionStats.setActive(curTime);
+    _singleTransactionStats.setActive(tickSource->getTicks());
 
     //
     // Server wide transactions metrics.
@@ -94,7 +95,7 @@ void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTran
 }
 
 void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
-                                          unsigned long long curTime,
+                                          TickSource* tickSource,
                                           boost::optional<Timestamp> oldestOplogEntryTS,
                                           Top* top) {
     //
@@ -102,11 +103,12 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
     //
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive. We use the same "now" time to prevent skew in the time-related metrics.
-    _singleTransactionStats.setEndTime(curTime);
+    auto curTick = tickSource->getTicks();
+    _singleTransactionStats.setEndTime(curTick);
     // The transaction operation may have already been aborted by another thread, so we check that
     // the transaction is active before setting it as inactive.
     if (_singleTransactionStats.isActive()) {
-        _singleTransactionStats.setInactive(curTime);
+        _singleTransactionStats.setInactive(tickSource, curTick);
     }
 
     //
@@ -116,7 +118,9 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
     serverTransactionsMetrics->decrementCurrentOpen();
     serverTransactionsMetrics->decrementCurrentActive();
 
-    top->incrementGlobalTransactionLatencyStats(_singleTransactionStats.getDuration(curTime));
+    auto duration =
+        durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
+    top->incrementGlobalTransactionLatencyStats(static_cast<uint64_t>(duration));
 
     // Remove this transaction's oldest oplog entry Timestamp if one was written.
     if (oldestOplogEntryTS) {
@@ -125,17 +129,18 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
 }
 
 void TransactionMetricsObserver::onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
-                                               unsigned long long curTime,
+                                               TickSource* tickSource,
                                                boost::optional<Timestamp> oldestOplogEntryTS,
                                                Top* top) {
-    _onAbort(serverTransactionsMetrics, curTime, top);
+    auto curTick = tickSource->getTicks();
+    _onAbort(serverTransactionsMetrics, curTick, tickSource, top);
     //
     // Per transaction metrics.
     //
     // The transaction operation may have already been aborted by another thread, so we check that
     // the transaction is active before setting it as inactive.
     if (_singleTransactionStats.isActive()) {
-        _singleTransactionStats.setInactive(curTime);
+        _singleTransactionStats.setInactive(tickSource, curTick);
     }
 
     //
@@ -151,10 +156,11 @@ void TransactionMetricsObserver::onAbortActive(ServerTransactionsMetrics* server
 
 void TransactionMetricsObserver::onAbortInactive(
     ServerTransactionsMetrics* serverTransactionsMetrics,
-    unsigned long long curTime,
+    TickSource* tickSource,
     boost::optional<Timestamp> oldestOplogEntryTS,
     Top* top) {
-    _onAbort(serverTransactionsMetrics, curTime, top);
+    auto curTick = tickSource->getTicks();
+    _onAbort(serverTransactionsMetrics, curTick, tickSource, top);
 
     //
     // Server wide transactions metrics.
@@ -180,12 +186,13 @@ void TransactionMetricsObserver::onTransactionOperation(Client* client,
 }
 
 void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
-                                          unsigned long long curTime,
+                                          TickSource::Tick curTick,
+                                          TickSource* tickSource,
                                           Top* top) {
     //
     // Per transaction metrics.
     //
-    _singleTransactionStats.setEndTime(curTime);
+    _singleTransactionStats.setEndTime(curTick);
 
     //
     // Server wide transactions metrics.
@@ -193,7 +200,9 @@ void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTrans
     serverTransactionsMetrics->incrementTotalAborted();
     serverTransactionsMetrics->decrementCurrentOpen();
 
-    top->incrementGlobalTransactionLatencyStats(_singleTransactionStats.getDuration(curTime));
+    auto latency =
+        durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
+    top->incrementGlobalTransactionLatencyStats(static_cast<uint64_t>(latency));
 }
 
 void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,

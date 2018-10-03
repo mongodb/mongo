@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,30 +26,30 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
-#include <utility>
-
 namespace mongo {
-
 namespace {
-const TickSource::Tick kTicksPerSecond = 1000;
-}  // unnamed namespace
 
-TickSource::Tick TickSourceMock::getTicks() {
-    return _currentTicks;
+TEST(TickSourceTest, TicksToDurationConversion) {
+    TickSourceMock<Seconds> tsSecs;
+    tsSecs.reset(1);
+    ASSERT_EQ(tsSecs.ticksTo<Seconds>(tsSecs.getTicks()).count(), 1);
+    ASSERT_EQ(tsSecs.ticksTo<Milliseconds>(tsSecs.getTicks()).count(), 1000);
+    ASSERT_EQ(tsSecs.ticksTo<Microseconds>(tsSecs.getTicks()).count(), 1000 * 1000);
+
+    TickSourceMock<Milliseconds> tsMillis;
+    tsMillis.reset(1);
+    ASSERT_EQ(tsMillis.ticksTo<Milliseconds>(tsMillis.getTicks()).count(), 1);
+    ASSERT_EQ(tsMillis.ticksTo<Microseconds>(tsMillis.getTicks()).count(), 1000);
+
+    TickSourceMock<Microseconds> tsMicros;
+    tsMicros.reset(1);
+    ASSERT_EQ(tsMicros.ticksTo<Microseconds>(tsMicros.getTicks()).count(), 1);
 }
-
-TickSource::Tick TickSourceMock::getTicksPerSecond() {
-    return kTicksPerSecond;
 }
-
-void TickSourceMock::advance(const Milliseconds& ms) {
-    _currentTicks += ms.count();
-}
-
-void TickSourceMock::reset(TickSource::Tick tick) {
-    _currentTicks = std::move(tick);
-}
-
 }  // namespace mongo

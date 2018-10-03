@@ -47,7 +47,8 @@ public:
      */
     void onStart(ServerTransactionsMetrics* serverTransactionMetrics,
                  bool isAutoCommit,
-                 unsigned long long curTime,
+                 TickSource* tickSource,
+                 Date_t curWallClockTime,
                  Date_t expireDate);
 
     /**
@@ -58,20 +59,19 @@ public:
     /**
      * Updates relevant metrics when a transaction stashes its resources.
      */
-    void onStash(ServerTransactionsMetrics* serverTransactionMetrics, unsigned long long curTime);
+    void onStash(ServerTransactionsMetrics* serverTransactionMetrics, TickSource* tickSource);
 
     /**
      * Updates relevant metrics when a transaction unstashes its resources.
      */
-    void onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics,
-                   unsigned long long curTime);
+    void onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics, TickSource* tickSource);
 
     /**
      * Updates relevant metrics when a transaction commits. Also removes this transaction's oldest
      * oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
      */
     void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
-                  unsigned long long curTime,
+                  TickSource* tickSource,
                   boost::optional<Timestamp> oldestOplogEntryTS,
                   Top* top);
 
@@ -80,7 +80,7 @@ public:
      * oldest oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
      */
     void onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
-                       unsigned long long curTime,
+                       TickSource* tickSource,
                        boost::optional<Timestamp> oldestOplogEntryTS,
                        Top* top);
 
@@ -89,7 +89,7 @@ public:
      * oldest oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
      */
     void onAbortInactive(ServerTransactionsMetrics* serverTransactionsMetrics,
-                         unsigned long long curTime,
+                         TickSource* tickSource,
                          boost::optional<Timestamp> oldestOplogEntryTS,
                          Top* top);
 
@@ -125,7 +125,8 @@ public:
 private:
     // Updates relevant metrics for any generic transaction abort.
     void _onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
-                  unsigned long long curTime,
+                  TickSource::Tick curTick,
+                  TickSource* tickSource,
                   Top* top);
 
     // Tracks metrics for a single multi-document transaction.

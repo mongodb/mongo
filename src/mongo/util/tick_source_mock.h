@@ -34,24 +34,38 @@
 namespace mongo {
 
 /**
- * Mock tick source with millisecond resolution that doesn't gives a fixed tick count
- * until the advance method is called.
+ * Mock tick source that can be parameterized on a duration type.
+ *
+ * Its internal tick count will be tracked in the unit of the duration type parameter. For example,
+ * for TickSourceMock<Milliseconds>, 1 tick = 1 millisecond. It gives a fixed tick count until the
+ * advance method is called.
  */
+template <typename D = Milliseconds>
 class TickSourceMock final : public TickSource {
 public:
-    TickSource::Tick getTicks() override;
+    TickSource::Tick getTicks() override {
+        return _currentTicks;
+    };
 
-    TickSource::Tick getTicksPerSecond() override;
+    TickSource::Tick getTicksPerSecond() override {
+        static_assert(D::period::num == 1,
+                      "Cannot measure ticks per second for duration types larger than 1 second.");
+        return D::period::den;
+    };
 
     /**
      * Advance the ticks by the given amount of milliseconds.
      */
-    void advance(const Milliseconds& ms);
+    void advance(const D& duration) {
+        _currentTicks += duration.count();
+    }
 
     /**
-     * Resets the tick count to the give value.
+     * Resets the tick count to the given value.
      */
-    void reset(TickSource::Tick tick);
+    void reset(TickSource::Tick tick) {
+        _currentTicks = std::move(tick);
+    }
 
 private:
     TickSource::Tick _currentTicks = 0;

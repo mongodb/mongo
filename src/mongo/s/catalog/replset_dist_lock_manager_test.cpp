@@ -118,14 +118,14 @@ private:
 class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
 protected:
     RSDistLockMgrWithMockTickSource() {
-        getServiceContext()->setTickSource(stdx::make_unique<TickSourceMock>());
+        getServiceContext()->setTickSource(stdx::make_unique<TickSourceMock<>>());
     }
 
     /**
      * Returns the mock tick source.
      */
-    TickSourceMock* getMockTickSource() {
-        return dynamic_cast<TickSourceMock*>(getServiceContext()->getTickSource());
+    TickSourceMock<>* getMockTickSource() {
+        return dynamic_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
     }
 };
 

@@ -295,7 +295,7 @@ protected:
         auto sc = scOwned.get();
         setGlobalServiceContext(std::move(scOwned));
 
-        sc->setTickSource(stdx::make_unique<TickSourceMock>());
+        sc->setTickSource(stdx::make_unique<TickSourceMock<>>());
         sc->setFastClockSource(stdx::make_unique<ClockSourceMock>());
 
         auto sep = stdx::make_unique<MockSEP>();

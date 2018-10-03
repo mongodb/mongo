@@ -174,8 +174,7 @@ env.CppUnitTest(
 env.Library(
     target='clock_source_mock',
     source=[
-        'clock_source_mock.cpp',
-        'tick_source_mock.cpp',
+        'clock_source_mock.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -190,6 +189,14 @@ env.CppUnitTest(
     LIBDEPS=[
         'clock_source_mock',
     ],
+)
+
+env.CppUnitTest(
+    target='tick_source_test',
+    source=[
+        'tick_source_test.cpp',
+    ],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(

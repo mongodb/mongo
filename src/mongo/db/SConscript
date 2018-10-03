@@ -1950,6 +1950,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         'query_exec',
     ],
 )

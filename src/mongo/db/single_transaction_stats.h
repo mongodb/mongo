@@ -36,6 +36,8 @@ namespace mongo {
 
 /**
  * Tracks metrics for a single multi-document transaction.
+ *
+ * For all timing related stats, a TickSource with at least microsecond resolution must be used.
  */
 class SingleTransactionStats {
 public:
@@ -65,18 +67,18 @@ public:
     SingleTransactionStats(TxnNumber txnNumber) : _txnNumber(txnNumber){};
 
     /**
-     * Returns the start time of the transaction in microseconds.
-     *
-     * This method cannot be called until setStartTime() has been called.
-     */
-    unsigned long long getStartTime() const;
-
-    /**
      * Sets the transaction's start time, only if it hasn't already been set.
+     *
+     * This method takes two sources of input for the current time. The 'curTick' argument should be
+     * the current time as measured by a TickSource, which is a high precision interface for
+     * measuring the passage of time that should provide at least microsecond resolution. The given
+     * 'curWallClockTime' need only be a millisecond resolution time point that serves as a close
+     * approximation to the true start time. This millisecond resolution time point is not used for
+     * measuring transaction durations. The given tick value, however, is.
      *
      * This method must only be called once.
      */
-    void setStartTime(unsigned long long time);
+    void setStartTime(TickSource::Tick curTick, Date_t curWallClockTime);
 
     /**
      * If the transaction is currently in progress, this method returns the duration
@@ -87,26 +89,26 @@ public:
      *
      * This method cannot be called until setStartTime() has been called.
      */
-    unsigned long long getDuration(unsigned long long curTime) const;
+    Microseconds getDuration(TickSource* tickSource, TickSource::Tick curTick) const;
 
     /**
      * Sets the transaction's end time, only if the start time has already been set.
      *
      * This method cannot be called until setStartTime() has been called.
      */
-    void setEndTime(unsigned long long time);
+    void setEndTime(TickSource::Tick time);
 
     /**
      * Returns the total active time of the transaction, given the current time value. A transaction
      * is active when there is a running operation that is part of the transaction.
      */
-    Microseconds getTimeActiveMicros(unsigned long long curTime) const;
+    Microseconds getTimeActiveMicros(TickSource* tickSource, TickSource::Tick curTick) const;
 
     /**
      * Returns the total inactive time of the transaction, given the current time value. A
      * transaction is inactive when it is idly waiting for a new operation to occur.
      */
-    Microseconds getTimeInactiveMicros(unsigned long long curTime) const;
+    Microseconds getTimeInactiveMicros(TickSource* tickSource, TickSource::Tick curTick) const;
 
     /**
      * Marks the transaction as active and sets the start of the transaction's active time.
@@ -114,7 +116,7 @@ public:
      * This method cannot be called if the transaction is currently active. A call to setActive()
      * must be followed by a call to setInactive() before calling setActive() again.
      */
-    void setActive(unsigned long long time);
+    void setActive(TickSource::Tick curTick);
 
     /**
      * Marks the transaction as inactive and sets the total active time of the transaction. The
@@ -122,7 +124,7 @@ public:
      *
      * This method cannot be called if the transaction is currently not active.
      */
-    void setInactive(unsigned long long time);
+    void setInactive(TickSource* tickSource, TickSource::Tick curTick);
 
     /**
      * Returns whether or not the transaction is currently active.
@@ -192,7 +194,10 @@ public:
     /**
      * Append the stats to the builder.
      */
-    void report(BSONObjBuilder* builder, const repl::ReadConcernArgs& readConcernArgs) const;
+    void report(BSONObjBuilder* builder,
+                const repl::ReadConcernArgs& readConcernArgs,
+                TickSource* tickSource,
+                TickSource::Tick curTick) const;
 
 private:
     // The transaction number of the transaction.
@@ -202,18 +207,23 @@ private:
     // for future use.
     boost::optional<bool> _autoCommit;
 
-    // The start time of the transaction in microseconds.
-    unsigned long long _startTime{0};
+    // The start time of the transaction in millisecond resolution. Used only for diagnostics
+    // reporting. Not used for measuring transaction durations.
+    Date_t _startWallClockTime;
 
-    // The end time of the transaction in microseconds.
-    unsigned long long _endTime{0};
+    // The start time of the transaction. Note that tick values should only ever be used to measure
+    // distance from other tick values, not for reporting absolute wall clock time.
+    TickSource::Tick _startTime{0};
+
+    // The end time of the transaction.
+    TickSource::Tick _endTime{0};
 
     // The total amount of active time spent by the transaction.
     Microseconds _timeActiveMicros = Microseconds{0};
 
-    // The time at which the transaction was last marked as active in microseconds. The transaction
-    // is considered active if this value is not equal to 0.
-    unsigned long long _lastTimeActiveStart{0};
+    // The time at which the transaction was last marked as active. The transaction is considered
+    // active if this value is not equal to 0.
+    TickSource::Tick _lastTimeActiveStart{0};
 
     // The expiration date of the transaction.
     Date_t _expireDate = Date_t::max();

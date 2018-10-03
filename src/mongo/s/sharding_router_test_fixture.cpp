@@ -99,7 +99,7 @@ ShardingTestFixture::ShardingTestFixture() {
     // Configure the service context
     service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    service->setTickSource(stdx::make_unique<TickSourceMock>());
+    service->setTickSource(stdx::make_unique<TickSourceMock<>>());
 
     CollatorFactoryInterface::set(service, stdx::make_unique<CollatorFactoryMock>());
     _transportSession = transport::MockSession::create(nullptr);

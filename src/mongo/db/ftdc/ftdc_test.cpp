@@ -142,7 +142,7 @@ FTDCTest::FTDCTest() {
     auto service = getServiceContext();
     service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    service->setTickSource(stdx::make_unique<TickSourceMock>());
+    service->setTickSource(stdx::make_unique<TickSourceMock<>>());
 }
 
 }  // namespace mongo

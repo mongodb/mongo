@@ -152,16 +152,22 @@ void TransactionParticipant::_beginMultiDocumentTransaction(WithLock wl, TxnNumb
     _txnState.transitionTo(wl, TransactionState::kInProgress);
 
     // Start tracking various transactions metrics.
-    auto curTime = curTimeMicros64();
-    _transactionExpireDate = Date_t::fromMillisSinceEpoch(curTime / 1000) +
-        stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
+    //
+    // We measure the start time in both microsecond and millisecond resolution. The TickSource
+    // provides microsecond resolution to record the duration of the transaction. The start "wall
+    // clock" time can be considered an approximation to the microsecond measurement.
+    auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
+    auto tickSource = getGlobalServiceContext()->getTickSource();
+
+    _transactionExpireDate = now + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
 
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onStart(
             ServerTransactionsMetrics::get(getGlobalServiceContext()),
             *_autoCommit,
-            curTime,
+            tickSource,
+            now,
             *_transactionExpireDate);
     }
     invariant(_transactionOperations.empty());
@@ -398,8 +404,8 @@ void TransactionParticipant::_stashActiveTransaction(WithLock, OperationContext*
     invariant(_activeTxnNumber == opCtx->getTxnNumber());
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
-        _transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx),
-                                            curTimeMicros64());
+        auto tickSource = opCtx->getServiceContext()->getTickSource();
+        _transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), tickSource);
         _transactionMetricsObserver.onTransactionOperation(
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
     }
@@ -463,7 +469,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
             _txnResourceStash = boost::none;
             stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
             _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
-                                                  curTimeMicros64());
+                                                  opCtx->getServiceContext()->getTickSource());
             return;
         }
 
@@ -494,7 +500,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
 
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
-                                              curTimeMicros64());
+                                              opCtx->getServiceContext()->getTickSource());
     }
 
     // Storage engine transactions may be started in a lazy manner. By explicitly
@@ -767,11 +773,11 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
 
     _txnState.transitionTo(lk, TransactionState::kCommitted);
 
-    const auto curTime = curTimeMicros64();
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        auto tickSource = opCtx->getServiceContext()->getTickSource();
         _transactionMetricsObserver.onCommit(ServerTransactionsMetrics::get(opCtx),
-                                             curTime,
+                                             tickSource,
                                              _oldestOplogEntryTS,
                                              &Top::get(getGlobalServiceContext()));
         _transactionMetricsObserver.onTransactionOperation(
@@ -940,7 +946,7 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
 }
 
 void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
-    const auto curTime = curTimeMicros64();
+    const auto tickSource = getGlobalServiceContext()->getTickSource();
     // If the transaction is stashed, then we have aborted an inactive transaction.
     if (_txnResourceStash) {
         // The transaction is stashed, so we abort the inactive transaction on session.
@@ -948,7 +954,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
             stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
             _transactionMetricsObserver.onAbortInactive(
                 ServerTransactionsMetrics::get(getGlobalServiceContext()),
-                curTime,
+                tickSource,
                 _oldestOplogEntryTS,
                 &Top::get(getGlobalServiceContext()));
         }
@@ -961,7 +967,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onAbortActive(
             ServerTransactionsMetrics::get(getGlobalServiceContext()),
-            curTime,
+            tickSource,
             _oldestOplogEntryTS,
             &Top::get(getGlobalServiceContext()));
     }
@@ -1208,7 +1214,9 @@ void TransactionParticipant::TransactionState::transitionTo(WithLock,
 void TransactionParticipant::_reportTransactionStats(WithLock wl,
                                                      BSONObjBuilder* builder,
                                                      repl::ReadConcernArgs readConcernArgs) const {
-    _transactionMetricsObserver.getSingleTransactionStats().report(builder, readConcernArgs);
+    auto tickSource = getGlobalServiceContext()->getTickSource();
+    _transactionMetricsObserver.getSingleTransactionStats().report(
+        builder, readConcernArgs, tickSource, tickSource->getTicks());
 }
 
 void TransactionParticipant::_updateState(WithLock wl, const Session::RefreshState& newState) {
@@ -1259,11 +1267,15 @@ std::string TransactionParticipant::_transactionInfoForLog(
         terminationCause == TransactionState::kCommitted ? "committed" : "aborted";
     s << " terminationCause:" << terminationCauseString;
 
-    auto curTime = curTimeMicros64();
+    auto tickSource = getGlobalServiceContext()->getTickSource();
+    auto curTick = tickSource->getTicks();
+
     s << " timeActiveMicros:"
-      << durationCount<Microseconds>(singleTransactionStats.getTimeActiveMicros(curTime));
+      << durationCount<Microseconds>(
+             singleTransactionStats.getTimeActiveMicros(tickSource, curTick));
     s << " timeInactiveMicros:"
-      << durationCount<Microseconds>(singleTransactionStats.getTimeInactiveMicros(curTime));
+      << durationCount<Microseconds>(
+             singleTransactionStats.getTimeInactiveMicros(tickSource, curTick));
 
     // Number of yields is always 0 in multi-document transactions, but it is included mainly to
     // match the format with other slow operation logging messages.
@@ -1276,7 +1288,7 @@ std::string TransactionParticipant::_transactionInfoForLog(
 
     // Total duration of the transaction.
     s << " "
-      << Milliseconds{static_cast<long long>(singleTransactionStats.getDuration(curTime)) / 1000};
+      << duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick));
 
     return s.str();
 }
@@ -1287,9 +1299,10 @@ void TransactionParticipant::_logSlowTransaction(WithLock wl,
                                                  repl::ReadConcernArgs readConcernArgs) {
     // Only log multi-document transactions.
     if (!_txnState.isNone(wl)) {
+        auto tickSource = getGlobalServiceContext()->getTickSource();
         // Log the transaction if its duration is longer than the slowMS command threshold.
-        if (_transactionMetricsObserver.getSingleTransactionStats().getDuration(curTimeMicros64()) >
-            serverGlobalParams.slowMS * 1000ULL) {
+        if (_transactionMetricsObserver.getSingleTransactionStats().getDuration(
+                tickSource, tickSource->getTicks()) > Milliseconds(serverGlobalParams.slowMS)) {
             log(logger::LogComponent::kTransaction)
                 << "transaction "
                 << _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);

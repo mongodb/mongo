@@ -96,8 +96,7 @@ constexpr auto kThreadReasons = "threadCreationCauses"_sd;
 
 int64_t ticksToMicros(TickSource::Tick ticks, TickSource* tickSource) {
     invariant(tickSource->getTicksPerSecond() >= 1000000);
-    static const auto ticksPerMicro = tickSource->getTicksPerSecond() / 1000000;
-    return ticks / ticksPerMicro;
+    return tickSource->ticksTo<Microseconds>(ticks).count();
 }
 
 struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
