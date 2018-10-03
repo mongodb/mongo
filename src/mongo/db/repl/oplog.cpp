@@ -80,13 +80,13 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
@@ -1018,32 +1018,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
-         if (mode == OplogApplication::Mode::kRecovering) {
-             const auto replCoord = ReplicationCoordinator::get(opCtx);
-             const auto recoveryTimestamp = replCoord->getRecoveryTimestamp();
-             invariant(recoveryTimestamp);
-
-             // If the commitTimestamp is before the recoveryTimestamp, then the data already
-             // reflects the operations from the transaction.
-             const auto commitTimestamp = cmd["commitTimestamp"].timestamp();
-             if (recoveryTimestamp.get() > commitTimestamp) {
-                 return Status::OK();
-             }
-
-             // Get the corresponding prepareTransaction oplog entry.
-             TransactionHistoryIterator iter(opTime);
-             invariant(iter.hasNext());
-             const auto commitOplogEntry = iter.next(opCtx);
-             invariant(iter.hasNext());
-             const auto prepareOplogEntry = iter.next(opCtx);
-
-             // Transform prepare command into a normal applyOps command.
-             const auto prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
-
-             BSONObjBuilder resultWeDontCareAbout;
-             return applyOps(opCtx, nsToDatabase(ns), prepareCmd, mode, &resultWeDontCareAbout);
-         }
-         return Status::OK();
+         return applyCommitTransaction(opCtx, entry, mode);
      }}},
     {"abortTransaction",
      {[](OperationContext* opCtx,
@@ -1053,7 +1028,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
-         return TransactionParticipant::applyAbortTransaction(opCtx, entry, mode);
+         return applyAbortTransaction(opCtx, entry, mode);
      }}},
 };
 
@@ -1632,7 +1607,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
         // Don't assign commit timestamp for transaction commands.
         const StringData commandName(o.firstElementFieldName());
-        if (op.getBoolField("prepare") || commandName == "abortTransaction")
+        if (op.getBoolField("prepare") || commandName == "abortTransaction" ||
+            commandName == "commitTransaction")
             return false;
 
         switch (replMode) {

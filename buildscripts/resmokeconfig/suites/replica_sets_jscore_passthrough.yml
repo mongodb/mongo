@@ -24,13 +24,6 @@ selector:
   # TODO SERVER-35217: Attempting to kill a session while multiple transactions have been started on
   # the server may lead to deadlock.
   - jstests/core/txns/kill_sessions_kills_transaction.js
-  # TODO (SERVER-35865): Unblacklist when we correctly write and apply 'commitTransaction' oplog
-  # entries.
-  - jstests/core/txns/commit_prepared_transaction.js
-  - jstests/core/txns/disallow_operations_on_prepared_transaction.js
-  - jstests/core/txns/ensure_active_txn_for_prepare_transaction.js
-  - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
-  - jstests/core/txns/prepare_requires_fcv42.js
   # This test sets the "failCommand" failpoint which forces find commands to fail. It cannot be run
   # with the CheckReplDBHashInBackground hook because it will fail the find commands run by the hook.
   - jstests/core/failcommand_failpoint.js

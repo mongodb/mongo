@@ -130,9 +130,6 @@ Status _applyOps(OperationContext* opCtx,
         Status status(ErrorCodes::InternalError, "");
 
         if (haveWrappingWUOW) {
-            // Atomic applyOps command already acquired the global write lock.
-            invariant(opCtx->lockState()->isW() ||
-                      oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
             // Only CRUD operations are allowed in atomic mode.
             invariant(*opType != 'c');
 

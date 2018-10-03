@@ -156,13 +156,6 @@ public:
     static TransactionParticipant* getFromNonCheckedOutSession(Session* session);
 
     /**
-     * Apply `abortTransaction` oplog entry.
-     */
-    static Status applyAbortTransaction(OperationContext* opCtx,
-                                        const repl::OplogEntry& entry,
-                                        repl::OplogApplication::Mode mode);
-
-    /**
      * Kills the transaction if it is running, ensuring that it releases all resources, even if the
      * transaction is in prepare().  Avoids writing any oplog entries or making any changes to the
      * transaction table.  State for prepared transactions will be re-constituted at startup.

@@ -1040,6 +1040,10 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 void OpObserverImpl::onTransactionCommit(OperationContext* opCtx,
                                          boost::optional<OplogSlot> commitOplogEntryOpTime,
                                          boost::optional<Timestamp> commitTimestamp) {
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
     invariant(session);

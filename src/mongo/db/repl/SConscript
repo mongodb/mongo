@@ -10,6 +10,7 @@ env.Library(
         'apply_ops.cpp',
         'do_txn.cpp',
         'oplog.cpp',
+        'transaction_oplog_application.cpp',
         env.Idlc('apply_ops.idl')[0],
     ],
     LIBDEPS_PRIVATE=[

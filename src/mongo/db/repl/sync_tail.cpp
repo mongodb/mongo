@@ -363,7 +363,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             const StringData commandName(op["o"].embeddedObject().firstElementFieldName());
             // SERVER-37313: createIndex does not need to take the Global X lock.
             if (!op.getBoolField("prepare") && commandName != "abortTransaction" &&
-                commandName != "createIndexes") {
+                commandName != "createIndexes" && commandName != "commitTransaction") {
                 globalWriteLock.emplace(opCtx);
             }
 
