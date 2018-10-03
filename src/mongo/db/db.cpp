@@ -1268,6 +1268,11 @@ void shutdownTask() {
     // Shut down the global dbclient pool so callers stop waiting for connections.
     globalConnPool.shutdown();
 
+    // Shut down the background periodic task runner
+    if (auto runner = serviceContext->getPeriodicRunner()) {
+        runner->shutdown();
+    }
+
     if (serviceContext->getGlobalStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         OperationContext* opCtx = client->getOperationContext();
@@ -1306,11 +1311,6 @@ void shutdownTask() {
     }
 
     serviceContext->setKillAllOperations();
-
-    // Shut down the background periodic task runner
-    if (auto runner = serviceContext->getPeriodicRunner()) {
-        runner->shutdown();
-    }
 
     ReplicaSetMonitor::shutdown();
 
