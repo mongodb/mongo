@@ -354,7 +354,7 @@ void ShardingTestFixture::expectConfigCollectionCreate(const HostAndPort& config
                           << BSON("w"
                                   << "majority"
                                   << "wtimeout"
-                                  << 15000)
+                                  << 60000)
                           << "maxTimeMS"
                           << 30000);
         ASSERT_BSONOBJ_EQ(expectedCreateCmd, request.cmdObj);

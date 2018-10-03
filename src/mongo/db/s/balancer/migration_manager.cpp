@@ -66,7 +66,7 @@ const char kChunkTooBig[] = "chunkTooBig";  // TODO: delete in 3.8
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
+                                                WriteConcernOptions::kWriteConcernTimeoutMigration);
 
 /**
  * Parses the 'commandResponse' and converts it to a status to use as the outcome of the command.
