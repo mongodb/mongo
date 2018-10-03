@@ -1156,7 +1156,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 if (programName.endsWith('mongod')) {
                     if (jsTest.options().storageEngine === "wiredTiger" ||
                         !jsTest.options().storageEngine) {
-                        if (!argArrayContains("--enableMajorityReadConcern")) {
+                        if (jsTest.options().enableMajorityReadConcern &&
+                            !argArrayContains("--enableMajorityReadConcern")) {
                             argArray.push(
                                 ...['--enableMajorityReadConcern',
                                     jsTest.options().enableMajorityReadConcern.toString()]);
