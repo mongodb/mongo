@@ -121,13 +121,6 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                 code, mongoutils::str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
 
-    if (pluginName == IndexNames::WILDCARD && !internalQueryAllowAllPathsIndexes.load()) {
-        // TODO: SERVER-36198 remove this check once wildcard indexes are complete.
-        return Status(
-            ErrorCodes::NotImplemented,
-            "Cannot use a wildcard index without enabling internalQueryAllowAllPathsIndexes");
-    }
-
     BSONObjIterator it(key);
     while (it.more()) {
         BSONElement keyElement = it.next();

@@ -96,24 +96,5 @@ var $config = (function() {
         query: {reIndex: 0.5, query: 0.5}
     };
 
-    function setup(db, collName, cluster) {
-        // Enable the test flag required in order to build $** indexes on all data bearing nodes.
-        // TODO SERVER-36198: Remove this.
-        const hosts = DiscoverTopology.findDataBearingNodes(db.getMongo());
-        for (let host of hosts) {
-            const conn = new Mongo(host);
-            const adminDB = conn.getDB("admin");
-            assert.commandWorked(
-                adminDB.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
-        }
-    }
-
-    return {
-        threadCount: 15,
-        iterations: 10,
-        states: states,
-        transitions: transitions,
-        data: data,
-        setup: setup
-    };
+    return {threadCount: 15, iterations: 10, states: states, transitions: transitions, data: data};
 })();

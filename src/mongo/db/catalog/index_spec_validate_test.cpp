@@ -68,21 +68,15 @@ public:
         // TODO: Remove test command enabling/disabling in SERVER-36198
         _prevEnabled = getTestCommandsEnabled();
         setTestCommandsEnabled(true);
-
-        // TODO: Remove knob enabling/disabling in SERVER-36198.
-        _prevKnobEnabled = internalQueryAllowAllPathsIndexes.load();
-        internalQueryAllowAllPathsIndexes.store(true);
     }
 
     ~TestCommandFcvGuard() {
         serverGlobalParams.featureCompatibility.setVersion(_prevVersion);
         setTestCommandsEnabled(_prevEnabled);
-        internalQueryAllowAllPathsIndexes.store(_prevKnobEnabled);
     }
 
 private:
     bool _prevEnabled;
-    bool _prevKnobEnabled;
     ServerGlobalParams::FeatureCompatibility::Version _prevVersion;
 };
 

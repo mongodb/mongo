@@ -6,10 +6,6 @@
 
     const coll = db.wildcard_nonblocking_sort;
 
-    // Required in order to build $** indexes.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
-
     assert.commandWorked(coll.createIndex({"$**": 1}, {wildcardProjection: {"excludedField": 0}}));
 
     for (let i = 0; i < 50; i++) {

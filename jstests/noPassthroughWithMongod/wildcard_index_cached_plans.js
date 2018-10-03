@@ -7,9 +7,6 @@
 
     load('jstests/libs/analyze_plan.js');  // For getPlanStage().
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
-
     const coll = db.wildcard_cached_plans;
     coll.drop();
     assert.commandWorked(coll.createIndex({"b.$**": 1}));

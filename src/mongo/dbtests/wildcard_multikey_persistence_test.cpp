@@ -61,13 +61,10 @@ std::vector<InsertStatement> toInserts(std::vector<BSONObj> docs) {
 class WildcardMultikeyPersistenceTestFixture : public unittest::Test {
 public:
     WildcardMultikeyPersistenceTestFixture() {
-        _origWildcardKnob = internalQueryAllowAllPathsIndexes.load();
-        internalQueryAllowAllPathsIndexes.store(true);
         _opCtx = cc().makeOperationContext();
     }
 
     virtual ~WildcardMultikeyPersistenceTestFixture() {
-        internalQueryAllowAllPathsIndexes.store(_origWildcardKnob);
         _opCtx.reset();
     }
 

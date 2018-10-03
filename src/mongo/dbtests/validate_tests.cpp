@@ -66,9 +66,6 @@ public:
           _db(nullptr) {
         _client.createCollection(_ns);
         {
-            _origWildcardKnob = internalQueryAllowAllPathsIndexes.load();
-            internalQueryAllowAllPathsIndexes.store(true);
-
             AutoGetCollection autoGetCollection(&_opCtx, _nss, MODE_X);
             _isInRecordIdOrder =
                 autoGetCollection.getCollection()->getRecordStore()->isInRecordIdOrder();
@@ -78,7 +75,6 @@ public:
     ~ValidateBase() {
         _client.dropCollection(_ns);
         getGlobalServiceContext()->unsetKillAllOperations();
-        internalQueryAllowAllPathsIndexes.store(_origWildcardKnob);
     }
 
 protected:
@@ -140,7 +136,6 @@ protected:
     unique_ptr<AutoGetDb> _autoDb;
     Database* _db;
     bool _isInRecordIdOrder;
-    bool _origWildcardKnob{false};
 };
 
 template <bool full, bool background>

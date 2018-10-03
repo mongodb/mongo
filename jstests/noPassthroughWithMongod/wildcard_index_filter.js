@@ -44,58 +44,45 @@
         assert.eq(planStage.indexName, expectedIndexName, tojson(planStage));
     }
 
-    // Required in order to build $** indexes.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
+    const indexWildcard = {"$**": 1};
+    const indexA = {"a": 1};
+    assert.commandWorked(coll.createIndex(indexWildcard));
+    assert.commandWorked(coll.createIndex(indexA));
 
-    try {
-        const indexWildcard = {"$**": 1};
-        const indexA = {"a": 1};
-        assert.commandWorked(coll.createIndex(indexWildcard));
-        assert.commandWorked(coll.createIndex(indexA));
+    assert.commandWorked(coll.insert({a: "a"}));
 
-        assert.commandWorked(coll.insert({a: "a"}));
+    // Filtering on $** index. $** index is used over another index.
+    assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexWildcard], {a: "a"}, "$**_1");
 
-        // Filtering on $** index. $** index is used over another index.
-        assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexWildcard], {a: "a"}, "$**_1");
+    // Filtering on regular index. $** index is not used over another index.
+    assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexA], {a: "a"}, "a_1");
 
-        // Filtering on regular index. $** index is not used over another index.
-        assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexA], {a: "a"}, "a_1");
+    assert.commandWorked(coll.insert({a: "a", b: "b"}));
 
-        assert.commandWorked(coll.insert({a: "a", b: "b"}));
+    const indexAB = {"a": 1, "b": 1};
+    assert.commandWorked(coll.createIndex(indexAB));
 
-        const indexAB = {"a": 1, "b": 1};
-        assert.commandWorked(coll.createIndex(indexAB));
+    // Filtering on $** index. $** index is used over another index for compound query.
+    assertExpectedIndexAnswersQueryWithFilter(
+        {a: "a", b: "b"}, [indexWildcard], {a: "a", b: "b"}, "$**_1");
 
-        // Filtering on $** index. $** index is used over another index for compound query.
-        assertExpectedIndexAnswersQueryWithFilter(
-            {a: "a", b: "b"}, [indexWildcard], {a: "a", b: "b"}, "$**_1");
+    // Filtering on regular compound index. Check that $** index is not used over another index
+    // for compound query.
+    assertExpectedIndexAnswersQueryWithFilter(
+        {a: "a", b: "b"}, [indexAB], {a: "a", b: "b"}, "a_1_b_1");
 
-        // Filtering on regular compound index. Check that $** index is not used over another index
-        // for compound query.
-        assertExpectedIndexAnswersQueryWithFilter(
-            {a: "a", b: "b"}, [indexAB], {a: "a", b: "b"}, "a_1_b_1");
+    // Filtering on $** index while hinting on another index. Index filter is prioritized.
+    assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexWildcard], {a: "a"}, "$**_1", indexA);
 
-        // Filtering on $** index while hinting on another index. Index filter is prioritized.
-        assertExpectedIndexAnswersQueryWithFilter(
-            {a: "a"}, [indexWildcard], {a: "a"}, "$**_1", indexA);
+    // Filtering on regular index while hinting on $** index. Index filter is prioritized.
+    assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexA], {a: "a"}, "a_1", indexWildcard);
 
-        // Filtering on regular index while hinting on $** index. Index filter is prioritized.
-        assertExpectedIndexAnswersQueryWithFilter(
-            {a: "a"}, [indexA], {a: "a"}, "a_1", indexWildcard);
+    // Index filter for $** index does not apply when query does not match filter query shape.
+    assertExpectedIndexAnswersQueryWithFilter({b: "b"}, [indexWildcard], {a: "a"}, "a_1", indexA);
 
-        // Index filter for $** index does not apply when query does not match filter query shape.
-        assertExpectedIndexAnswersQueryWithFilter(
-            {b: "b"}, [indexWildcard], {a: "a"}, "a_1", indexA);
+    const indexAWildcard = {"a.$**": 1};
+    assert.commandWorked(coll.createIndex(indexAWildcard));
 
-        const indexAWildcard = {"a.$**": 1};
-        assert.commandWorked(coll.createIndex(indexAWildcard));
-
-        // Filtering on a path specified $** index. Check that the $** is used over other indices.
-        assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexAWildcard], {a: "a"}, "a.$**_1");
-    } finally {
-        // Disable $** indexes once the tests have either completed or failed.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false}));
-    }
+    // Filtering on a path specified $** index. Check that the $** is used over other indices.
+    assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexAWildcard], {a: "a"}, "a.$**_1");
 })();

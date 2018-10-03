@@ -49,80 +49,71 @@
                        tojson(collation) + " not found: " + tojson(indexSpecs));
     }
 
-    try {
-        // Required in order to build $** indexes.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
+    // Recreate the collection with a default case-insensitive collation.
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 1}}));
 
-        // Recreate the collection with a default case-insensitive collation.
-        assert.commandWorked(
-            db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 1}}));
+    // Confirm that the $** index inherits the collection's default collation.
+    assert.commandWorked(coll.createIndex({"$**": 1}));
+    assertIndexHasCollation({"$**": 1}, {
+        locale: "en_US",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 1,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: false,
+        version: "57.1",
+    });
 
-        // Confirm that the $** index inherits the collection's default collation.
-        assert.commandWorked(coll.createIndex({"$**": 1}));
-        assertIndexHasCollation({"$**": 1}, {
-            locale: "en_US",
-            caseLevel: false,
-            caseFirst: "off",
-            strength: 1,
-            numericOrdering: false,
-            alternate: "non-ignorable",
-            maxVariable: "punct",
-            normalization: false,
-            backwards: false,
-            version: "57.1",
-        });
+    // Insert a series of documents whose fieldnames and values differ only by case.
+    assert.commandWorked(coll.insert({a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5}));
+    assert.commandWorked(coll.insert({a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}));
+    assert.commandWorked(coll.insert({A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5}));
+    assert.commandWorked(coll.insert({A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}));
 
-        // Insert a series of documents whose fieldnames and values differ only by case.
-        assert.commandWorked(coll.insert({a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5}));
-        assert.commandWorked(coll.insert({a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}));
-        assert.commandWorked(coll.insert({A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5}));
-        assert.commandWorked(coll.insert({A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}));
+    // Confirm that only the document's values adhere to the case-insensitive collation. The field
+    // paths, which are also present in the $** index keys, are evaluated using simple binary
+    // comparison; so for instance, path "a.b" does *not* match path "A.B".
+    assertWildcardIndexAnswersQuery({"a.b": "string"}, [
+        {a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5},
+        {a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}
+    ]);
+    assertWildcardIndexAnswersQuery({"A.B": "string"}, [
+        {A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5},
+        {A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}
+    ]);
 
-        // Confirm that only the document's values adhere to the case-insensitive collation. The
-        // field paths, which are also present in the $** index keys, are evaluated using simple
-        // binary comparison; so for instance, path "a.b" does *not* match path "A.B".
-        assertWildcardIndexAnswersQuery({"a.b": "string"}, [
-            {a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5},
-            {a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}
-        ]);
-        assertWildcardIndexAnswersQuery({"A.B": "string"}, [
-            {A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5},
-            {A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}
-        ]);
+    // All documents in the collection are returned if we query over both upper- and lower-case
+    // fieldnames, or when the fieldname has a consistent case across all documents.
+    const allDocs = coll.find({}, {_id: 0}).toArray();
+    assertWildcardIndexAnswersQuery({$or: [{"a.c": "string"}, {"A.C": "string"}]}, allDocs);
+    assertWildcardIndexAnswersQuery({d: "string"}, allDocs);
 
-        // All documents in the collection are returned if we query over both upper- and lower-case
-        // fieldnames, or when the fieldname has a consistent case across all documents.
-        const allDocs = coll.find({}, {_id: 0}).toArray();
-        assertWildcardIndexAnswersQuery({$or: [{"a.c": "string"}, {"A.C": "string"}]}, allDocs);
-        assertWildcardIndexAnswersQuery({d: "string"}, allDocs);
+    // Confirm that the $** index also differentiates between upper and lower fieldname case when
+    // querying fields which do not contain string values.
+    assertWildcardIndexAnswersQuery({e: 5}, [
+        {a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5},
+        {a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}
+    ]);
+    assertWildcardIndexAnswersQuery({E: 5}, [
+        {A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5},
+        {A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}
+    ]);
 
-        // Confirm that the $** index also differentiates between upper and lower fieldname case
-        // when querying fields which do not contain string values.
-        assertWildcardIndexAnswersQuery({e: 5}, [
-            {a: {b: "string", c: "STRING"}, d: "sTrInG", e: 5},
-            {a: {b: "STRING", c: "string"}, d: "StRiNg", e: 5}
-        ]);
-        assertWildcardIndexAnswersQuery({E: 5}, [
-            {A: {B: "string", C: "STRING"}, d: "sTrInG", E: 5},
-            {A: {B: "STRING", C: "string"}, d: "StRiNg", E: 5}
-        ]);
+    // Confirm that the $** index produces a covered plan for a query on non-string, non-object,
+    // non-array values.
+    assert(isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, e: 1})));
+    assert(isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, E: 1})));
 
-        // Confirm that the $** index produces a covered plan for a query on non-string, non-object,
-        // non-array values.
-        assert(isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, e: 1})));
-        assert(isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, E: 1})));
+    // Confirm that the $** index differentiates fieldname case when attempting to cover.
+    assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, E: 1})));
+    assert(!isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, e: 1})));
 
-        // Confirm that the $** index differentiates fieldname case when attempting to cover.
-        assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, E: 1})));
-        assert(!isIndexOnly(coll.getDB(), winningPlan({E: 5}, {_id: 0, e: 1})));
-
-        // Confirm that attempting to project the virtual $_path field which is present in $** index
-        // keys produces a non-covered solution, which nonetheless returns the correct results.
-        assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, e: 1, $_path: 1})));
-        assertWildcardIndexAnswersQuery({e: 5}, [{e: 5}, {e: 5}], {_id: 0, e: 1, $_path: 1});
-    } finally {
-        // Disable $** indexes once the tests have either completed or failed.
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});
-    }
+    // Confirm that attempting to project the virtual $_path field which is present in $** index
+    // keys produces a non-covered solution, which nonetheless returns the correct results.
+    assert(!isIndexOnly(coll.getDB(), winningPlan({e: 5}, {_id: 0, e: 1, $_path: 1})));
+    assertWildcardIndexAnswersQuery({e: 5}, [{e: 5}, {e: 5}], {_id: 0, e: 1, $_path: 1});
 })();

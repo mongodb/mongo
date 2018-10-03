@@ -42,17 +42,9 @@
         assert(isCollscan(db, explain.queryPlanner.winningPlan));
     }
 
-    try {
-        // Required in order to build $** indexes.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
+    // Case where the partial filter expression is on a field in the index.
+    testPartialWildcardIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 
-        testPartialWildcardIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
-
-        // Case where the partial filter expression is on a field not included in the index.
-        testPartialWildcardIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
-    } finally {
-        // Disable $** indexes once the tests have either completed or failed.
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});
-    }
+    // Case where the partial filter expression is on a field not included in the index.
+    testPartialWildcardIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 })();

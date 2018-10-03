@@ -44,51 +44,41 @@
                       coll.find(query, proj).hint({$natural: 1}).toArray());
     }
 
-    try {
-        // Required in order to build $** indexes.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
-
-        // Create a new collection and build a $** index on it.
-        const bulk = coll.initializeUnorderedBulkOp();
-        for (let i = 0; i < 200; i++) {
-            bulk.insert({a: {b: i, c: `${(i+1)}`}, d: (i + 2)});
-        }
-        assert.commandWorked(bulk.execute());
-        assert.commandWorked(coll.createIndex({"$**": 1}));
-
-        // Verify that the $** index can cover an exact match on an integer value.
-        assertWildcardProvidesCoveredSolution({"a.b": 10}, {_id: 0, "a.b": 1});
-
-        // Verify that the $** index can cover an exact match on a string value.
-        assertWildcardProvidesCoveredSolution({"a.c": "10"}, {_id: 0, "a.c": 1});
-
-        // Verify that the $** index can cover a range query for integer values.
-        assertWildcardProvidesCoveredSolution({"a.b": {$gt: 10, $lt: 99}}, {_id: 0, "a.b": 1});
-
-        // Verify that the $** index can cover a range query for string values.
-        assertWildcardProvidesCoveredSolution({"a.c": {$gt: "10", $lt: "99"}}, {_id: 0, "a.c": 1});
-
-        // Verify that the $** index can cover an $in query for integer values.
-        assertWildcardProvidesCoveredSolution({"a.b": {$in: [0, 50, 100, 150]}},
-                                              {_id: 0, "a.b": 1});
-
-        // Verify that the $** index can cover an $in query for string values.
-        assertWildcardProvidesCoveredSolution({"a.c": {$in: ["0", "50", "100", "150"]}},
-                                              {_id: 0, "a.c": 1});
-
-        // Verify that attempting to project the virtual $_path field from the $** keyPattern will
-        // fail to do so and will instead produce a non-covered query. However, this query will
-        // nonetheless output the correct results.
-        const shouldFailToCover = true;
-        assertWildcardProvidesCoveredSolution(
-            {d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}, shouldFailToCover);
-
-        // Verify that predicates which produce inexact-fetch bounds are not covered by a $** index.
-        assertWildcardProvidesCoveredSolution(
-            {d: {$elemMatch: {$eq: 50}}}, {_id: 0, d: 1}, shouldFailToCover);
-    } finally {
-        // Disable $** indexes once the tests have either completed or failed.
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});
+    // Create a new collection and build a $** index on it.
+    const bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < 200; i++) {
+        bulk.insert({a: {b: i, c: `${(i+1)}`}, d: (i + 2)});
     }
+    assert.commandWorked(bulk.execute());
+    assert.commandWorked(coll.createIndex({"$**": 1}));
+
+    // Verify that the $** index can cover an exact match on an integer value.
+    assertWildcardProvidesCoveredSolution({"a.b": 10}, {_id: 0, "a.b": 1});
+
+    // Verify that the $** index can cover an exact match on a string value.
+    assertWildcardProvidesCoveredSolution({"a.c": "10"}, {_id: 0, "a.c": 1});
+
+    // Verify that the $** index can cover a range query for integer values.
+    assertWildcardProvidesCoveredSolution({"a.b": {$gt: 10, $lt: 99}}, {_id: 0, "a.b": 1});
+
+    // Verify that the $** index can cover a range query for string values.
+    assertWildcardProvidesCoveredSolution({"a.c": {$gt: "10", $lt: "99"}}, {_id: 0, "a.c": 1});
+
+    // Verify that the $** index can cover an $in query for integer values.
+    assertWildcardProvidesCoveredSolution({"a.b": {$in: [0, 50, 100, 150]}}, {_id: 0, "a.b": 1});
+
+    // Verify that the $** index can cover an $in query for string values.
+    assertWildcardProvidesCoveredSolution({"a.c": {$in: ["0", "50", "100", "150"]}},
+                                          {_id: 0, "a.c": 1});
+
+    // Verify that attempting to project the virtual $_path field from the $** keyPattern will fail
+    // to do so and will instead produce a non-covered query. However, this query will nonetheless
+    // output the correct results.
+    const shouldFailToCover = true;
+    assertWildcardProvidesCoveredSolution(
+        {d: {$in: [0, 25, 50, 75, 100]}}, {_id: 0, d: 1, $_path: 1}, shouldFailToCover);
+
+    // Verify that predicates which produce inexact-fetch bounds are not covered by a $** index.
+    assertWildcardProvidesCoveredSolution(
+        {d: {$elemMatch: {$eq: 50}}}, {_id: 0, d: 1}, shouldFailToCover);
 })();

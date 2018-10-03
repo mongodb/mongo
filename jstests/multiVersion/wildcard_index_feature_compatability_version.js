@@ -16,11 +16,8 @@
 
     TestData.skipCheckDBHashes = true;  // Skip db hashes when restarting the replset.
 
-    const nodeOptions40 = {binVersion: "last-stable", setParameter: {}};
-    const nodeOptions42 = {
-        binVersion: "latest",
-        setParameter: {internalQueryAllowAllPathsIndexes: 1}
-    };
+    const nodeOptions40 = {binVersion: "last-stable"};
+    const nodeOptions42 = {binVersion: "latest"};
 
     // Set up a new replSet consisting of 3 nodes, initially running on 4.0 binaries.
     const rst = new ReplSetTest({nodes: 3, nodeOptions: nodeOptions40});

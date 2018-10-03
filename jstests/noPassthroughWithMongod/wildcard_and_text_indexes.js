@@ -39,61 +39,51 @@
     assert.commandWorked(coll.insert({_id: 2, a: 1, _fts: 2, textToSearch: "bananas"}));
     assert.commandWorked(coll.insert({_id: 3, a: 1, _fts: 3}));
 
-    // Required in order to build $** indexes.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
-    try {
-        // Build a wildcard index, and verify that it can be used to query for the field '_fts'.
-        assert.commandWorked(coll.createIndex({"$**": 1}));
+    // Build a wildcard index, and verify that it can be used to query for the field '_fts'.
+    assert.commandWorked(coll.createIndex({"$**": 1}));
+    assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
+
+    // Perform the tests below for simple and compound $text indexes.
+    for (let textIndex of[{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
+        // Build the appropriate text index.
+        assert.commandWorked(coll.createIndex(textIndex, {name: "textIndex"}));
+
+        // Confirm that the $** index can still be used to query for the '_fts' field outside of
+        // $text queries.
         assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
 
-        // Perform the tests below for simple and compound $text indexes.
-        for (let textIndex of[{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
-            // Build the appropriate text index.
-            assert.commandWorked(coll.createIndex(textIndex, {name: "textIndex"}));
+        // Confirm that $** does not generate a candidate plan for $text search, including cases
+        // when the query filter contains a compound field in the $text index.
+        const textQuery = Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: 'banana'}});
+        let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
+        assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
+        assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
+        assert.eq(explainOut.executionStats.nReturned, 2);
 
-            // Confirm that the $** index can still be used to query for the '_fts' field outside of
-            // a $text query.
-            assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, '_fts');
+        // Confirm that $** does not generate a candidate plan for $text search, including cases
+        // where the query filter contains a field which is not present in the text index.
+        explainOut =
+            assert.commandWorked(coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery))
+                                     .explain("executionStats"));
+        assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
+        assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
+        assert.eq(explainOut.executionStats.nReturned, 2);
 
-            // Confirm that $** does not generate a candidate plan for $text search, including cases
-            // when the query filter contains a compound field in the $text index.
-            const textQuery =
-                Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: 'banana'}});
-            let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
-            assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
-            assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
-            assert.eq(explainOut.executionStats.nReturned, 2);
+        // Confirm that the $** index can be used alongside a $text predicate in an $or.
+        explainOut = assert.commandWorked(
+            coll.find({$or: [{_fts: 3}, textQuery]}).explain("executionStats"));
+        assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
+        assert.eq(explainOut.executionStats.nReturned, 3);
 
-            // Confirm that $** does not generate a candidate plan for $text search, including cases
-            // where the query filter contains a field which is not present in the text index.
-            explainOut =
-                assert.commandWorked(coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery))
-                                         .explain("executionStats"));
-            assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
-            assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
-            assert.eq(explainOut.executionStats.nReturned, 2);
+        const textOrWildcard = getPlanStages(explainOut.queryPlanner.winningPlan, "OR").shift();
+        assert.eq(textOrWildcard.inputStages.length, 2);
+        const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT" ? 0 : 1);
+        const wildcardBranch = (textBranch + 1) % 2;
+        assert.eq(textOrWildcard.inputStages[textBranch].stage, "TEXT");
+        assert.eq(textOrWildcard.inputStages[wildcardBranch].stage, "IXSCAN");
+        assert.eq(textOrWildcard.inputStages[wildcardBranch].keyPattern, {$_path: 1, _fts: 1});
 
-            // Confirm that the $** index can be used alongside a $text predicate in an $or.
-            explainOut = assert.commandWorked(
-                coll.find({$or: [{_fts: 3}, textQuery]}).explain("executionStats"));
-            assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
-            assert.eq(explainOut.executionStats.nReturned, 3);
-
-            const textOrWildcard = getPlanStages(explainOut.queryPlanner.winningPlan, "OR").shift();
-            assert.eq(textOrWildcard.inputStages.length, 2);
-            const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT" ? 0 : 1);
-            const wildcardBranch = (textBranch + 1) % 2;
-            assert.eq(textOrWildcard.inputStages[textBranch].stage, "TEXT");
-            assert.eq(textOrWildcard.inputStages[wildcardBranch].stage, "IXSCAN");
-            assert.eq(textOrWildcard.inputStages[wildcardBranch].keyPattern, {$_path: 1, _fts: 1});
-
-            // Drop the index so that a different text index can be created.
-            assert.commandWorked(coll.dropIndex("textIndex"));
-        }
-    } finally {
-        // Disable $** indexes once the tests have either completed or failed.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false}));
+        // Drop the index so that a different text index can be created.
+        assert.commandWorked(coll.dropIndex("textIndex"));
     }
 })();

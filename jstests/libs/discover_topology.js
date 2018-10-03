@@ -126,36 +126,6 @@ var DiscoverTopology = (function() {
             }
 
             return findConnectedNodesViaMongos(conn, options);
-        },
-
-        /**
-         * Return a list of nodes that store data.
-         * TODO SERVER-36198: Remove this.
-         */
-        findDataBearingNodes: function findDataBearingNodes(conn) {
-            const topology = DiscoverTopology.findConnectedNodes(conn);
-            const hostList = [];
-            if (topology.type === Topology.kStandalone) {
-                hostList.push(topology.mongod);
-            } else if (topology.type === Topology.kReplicaSet) {
-                hostList.push(...topology.nodes);
-            } else if (topology.type === Topology.kShardedCluster) {
-                for (let shardName of Object.keys(topology.shards)) {
-                    const shard = topology.shards[shardName];
-
-                    if (shard.type === Topology.kStandalone) {
-                        hostList.push(shard.mongod);
-                    } else if (shard.type === Topology.kReplicaSet) {
-                        hostList.push(...shard.nodes);
-                    } else {
-                        throw new Error('Unrecognized topology format: ' + tojson(topology));
-                    }
-                }
-            } else {
-                throw new Error('Unrecognized topology format: ' + tojson(topology));
-            }
-
-            return hostList;
         }
     };
 })();

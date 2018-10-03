@@ -8,20 +8,9 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // For extendWorkload().
 load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // For $config().
-load('jstests/libs/discover_topology.js');                         // For findDataBearingNodes().
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function init(db, collName) {
-        // Enable the test flag required in order to build $** indexes on all data bearing nodes.
-        // TODO SERVER-36198: Remove this.
-        const hosts = DiscoverTopology.findDataBearingNodes(db.getMongo());
-        for (let host of hosts) {
-            const conn = new Mongo(host);
-            const adminDB = conn.getDB("admin");
-            assert.commandWorked(
-                adminDB.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
-        }
-
         $super.setup.apply(this, arguments);
     };
 

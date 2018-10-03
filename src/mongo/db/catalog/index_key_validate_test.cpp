@@ -56,19 +56,14 @@ public:
     TestCommandQueryKnobGuard() {
         _prevEnabled = getTestCommandsEnabled();
         setTestCommandsEnabled(true);
-
-        _prevKnobEnabled = internalQueryAllowAllPathsIndexes.load();
-        internalQueryAllowAllPathsIndexes.store(true);
     }
 
     ~TestCommandQueryKnobGuard() {
         setTestCommandsEnabled(_prevEnabled);
-        internalQueryAllowAllPathsIndexes.store(_prevKnobEnabled);
     }
 
 private:
     bool _prevEnabled;
-    bool _prevKnobEnabled;
 };
 
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {

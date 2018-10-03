@@ -137,10 +137,4 @@ extern AtomicInt32 internalDocumentSourceCursorBatchSizeBytes;
 extern AtomicInt32 internalDocumentSourceLookupCacheSizeBytes;
 
 extern AtomicBool internalQueryProhibitBlockingMergeOnMongoS;
-
-//
-// In-progress features.
-//
-// TODO: Remove in SERVER-36198.
-extern AtomicBool internalQueryAllowAllPathsIndexes;
 }  // namespace mongo
