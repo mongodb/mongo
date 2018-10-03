@@ -77,6 +77,7 @@ LogComponent LogComponent::parent() const {
             DECLARE_LOG_COMPONENT_PARENT(kBridge, kNetwork);
             DECLARE_LOG_COMPONENT_PARENT(kReplicationElection, kReplication);
             DECLARE_LOG_COMPONENT_PARENT(kReplicationHeartbeats, kReplication);
+            DECLARE_LOG_COMPONENT_PARENT(kReplicationInitialSync, kReplication);
             DECLARE_LOG_COMPONENT_PARENT(kReplicationRollback, kReplication);
             DECLARE_LOG_COMPONENT_PARENT(kShardingCatalogRefresh, kSharding);
             DECLARE_LOG_COMPONENT_PARENT(kStorageRecovery, kStorage);
@@ -114,6 +115,8 @@ StringData LogComponent::toStringData() const {
             return "election"_sd;
         case kReplicationHeartbeats:
             return "heartbeats"_sd;
+        case kReplicationInitialSync:
+            return "initialSync"_sd;
         case kReplicationRollback:
             return "rollback"_sd;
         case kSharding:
@@ -198,6 +201,8 @@ StringData LogComponent::getNameForLog() const {
             return "ELECTION"_sd;
         case kReplicationHeartbeats:
             return "REPL_HB "_sd;
+        case kReplicationInitialSync:
+            return "INITSYNC"_sd;
         case kReplicationRollback:
             return "ROLLBACK"_sd;
         case kSharding:

@@ -55,6 +55,7 @@ public:
         kReplication,
         kReplicationElection,
         kReplicationHeartbeats,
+        kReplicationInitialSync,
         kReplicationRollback,
         kSharding,
         kShardingCatalogRefresh,

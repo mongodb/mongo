@@ -27,8 +27,8 @@ DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}}
 # The default verbosity setting for any tests running in Evergreen i.e. started with an Evergreen
 # task id.
 DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
-    "replication": {"election": 4, "heartbeats": 2, "rollback": 2}, "storage": {"recovery": 2},
-    "transaction": 4
+    "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
+    "storage": {"recovery": 2}, "transaction": 4
 }
 
 
