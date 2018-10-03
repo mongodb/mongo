@@ -108,11 +108,13 @@ var $config = (function() {
         // Start write workloads to activate oplog application on secondaries
         // before any reads.
         this.insertDocuments(db, this.collName, {w: cluster.getReplSetNumNodes()});
+        // Facilitate sorting by "x".
+        db[collName].createIndex({x: 1});
     };
 
     return {
-        threadCount: 50,
-        iterations: 40,
+        threadCount: 30,
+        iterations: 10,
         startState: 'readFromSecondaries',
         states: states,
         data: {
