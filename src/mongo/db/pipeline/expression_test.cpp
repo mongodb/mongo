@@ -713,6 +713,46 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnCommutativeAndAssoc
     assertContents(_associativeAndCommutative, expectedContent);
 }
 
+/* ------------------------- ExpressionArrayToObject -------------------------- */
+
+TEST(ExpressionArrayToObjectTest, KVFormatSimple) {
+    assertExpectedResults("$arrayToObject",
+                          {{{Value(BSON_ARRAY(BSON("k"
+                                                   << "key1"
+                                                   << "v"
+                                                   << 2)
+                                              << BSON("k"
+                                                      << "key2"
+                                                      << "v"
+                                                      << 3)))},
+                            {Value(BSON("key1" << 2 << "key2" << 3))}}});
+}
+
+TEST(ExpressionArrayToObjectTest, KVFormatWithDuplicates) {
+    assertExpectedResults("$arrayToObject",
+                          {{{Value(BSON_ARRAY(BSON("k"
+                                                   << "hi"
+                                                   << "v"
+                                                   << 2)
+                                              << BSON("k"
+                                                      << "hi"
+                                                      << "v"
+                                                      << 3)))},
+                            {Value(BSON("hi" << 3))}}});
+}
+
+TEST(ExpressionArrayToObjectTest, ListFormatSimple) {
+    assertExpectedResults("$arrayToObject",
+                          {{{Value(BSON_ARRAY(BSON_ARRAY("key1" << 2) << BSON_ARRAY("key2" << 3)))},
+                            {Value(BSON("key1" << 2 << "key2" << 3))}}});
+}
+
+TEST(ExpressionArrayToObjectTest, ListFormWithDuplicates) {
+    assertExpectedResults("$arrayToObject",
+                          {{{Value(BSON_ARRAY(BSON_ARRAY("key1" << 2) << BSON_ARRAY("key1" << 3)))},
+                            {Value(BSON("key1" << 3))}}});
+}
+
 /* ------------------------- ExpressionCeil -------------------------- */
 
 class ExpressionCeilTest : public ExpressionNaryTestOneArg {

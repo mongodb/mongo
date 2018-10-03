@@ -634,7 +634,7 @@ Value ExpressionArrayToObject::evaluate(const Document& root) const {
                                   << typeName(valArray[0].getType()),
                     (valArray[0].getType() == BSONType::String));
 
-            output.addField(valArray[0].getString(), valArray[1]);
+            output[valArray[0].getString()] = valArray[1];
 
         } else {
             uassert(
@@ -666,7 +666,7 @@ Value ExpressionArrayToObject::evaluate(const Document& root) const {
                               << typeName(key.getType()),
                 (key.getType() == BSONType::String));
 
-            output.addField(key.getString(), value);
+            output[key.getString()] = value;
         }
     }
 
