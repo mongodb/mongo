@@ -1116,7 +1116,10 @@ functions:
 
         for dir in $dirs; do
           echo "Pruning /efs/$dir/scons-cache"
-          distro=$(cat /efs/$dir/info/distro_name)
+
+          if [ -e /efs/$dir/info/distro_name ]; then
+            distro=$(cat /efs/$dir/info/distro_name)
+          fi
 
           # Set cache sizes by distro
           case $distro in
