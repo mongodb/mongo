@@ -1,0 +1,3 @@
+# This file is for the convenience of users who previously relied on buildscripts/requirements.txt.
+# For future use, please use etc/pip/dev-requirements.txt instead.
+-r ../etc/pip/dev-requirements.txt
