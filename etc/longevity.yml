@@ -312,6 +312,7 @@ buildvariants:
     storageEngine: wiredTiger
     use_scons_cache: true
     project: &project longevity-v3.4
+    platform: linux
   run_on:
     - "rhel70-perf-longevity"
   tasks:
