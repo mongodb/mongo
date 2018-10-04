@@ -149,7 +149,7 @@ void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,
                                                Timestamp prepareTimestamp) {
     auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
     if (!coordinator) {
-        // TODO (SERVER-37018): Send abort to the participant who sent this vote (shardId)
+        txn::sendAbort(opCtx, {shardId});
         return;
     }
 

@@ -433,7 +433,12 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn, FinalVoteCommitSendsCommit) {
 // the transaction coordinator finished committing).
 TEST_F(TransactionCoordinatorServiceTest,
        VoteCommitForCoordinatorThatDoesNotExistSendsVoteAbortToCallingParticipant) {
-    // TODO (SERVER-37018): Validate this behavior once it is implemented.
+
+    TransactionCoordinatorService coordinatorService;
+    coordinatorService.voteCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
+
+    assertAbortSentAndRespondWithSuccess();
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
