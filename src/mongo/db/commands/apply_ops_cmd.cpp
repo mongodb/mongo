@@ -260,7 +260,7 @@ public:
         }
 
         auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
-            result, repl::applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, {}, &result));
+            result, repl::applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;
     }

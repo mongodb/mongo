@@ -289,7 +289,6 @@ public:
                                  dbName,
                                  BSON("applyOps" << applyOpsList),
                                  repl::OplogApplication::Mode::kApplyOpsCmd,
-                                 {},
                                  &result);
         if (!status.isOK()) {
             return status;
@@ -308,7 +307,6 @@ public:
                                  dbName,
                                  BSON("applyOps" << applyOpsList << "allowAtomic" << false),
                                  repl::OplogApplication::Mode::kApplyOpsCmd,
-                                 {},
                                  &result);
         if (!status.isOK()) {
             return status;
@@ -649,7 +647,6 @@ public:
                                       << "o"
                                       << BSON("applyOps" << BSONArrayBuilder().obj())))),
                 repl::OplogApplication::Mode::kApplyOpsCmd,
-                {},
                 &result));
         }
 

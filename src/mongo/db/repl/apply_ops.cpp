@@ -47,6 +47,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -278,14 +279,8 @@ Status _applyOps(OperationContext* opCtx,
 }
 
 Status _applyPrepareTransaction(OperationContext* opCtx,
-                                const std::string& dbName,
-                                const BSONObj& applyOpCmd,
-                                const ApplyOpsCommandInfo& info,
-                                repl::OplogApplication::Mode oplogApplicationMode,
-                                BSONObjBuilder* result,
-                                int* numApplied,
-                                BSONArrayBuilder* opsBuilder,
-                                const OpTime& optime) {
+                                const repl::OplogEntry& entry,
+                                repl::OplogApplication::Mode oplogApplicationMode) {
     // Wait until the end of recovery to apply the operations from the prepared transaction.
     if (oplogApplicationMode == OplogApplication::Mode::kRecovering) {
         if (!serverGlobalParams.enableMajorityReadConcern) {
@@ -304,22 +299,42 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // TODO: SERVER-36492 Only run on secondary until we support initial sync.
     invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
 
+    const auto info = ApplyOpsCommandInfo::parse(entry.getObject());
+    invariant(info.getPrepare() && *info.getPrepare());
     uassert(
         50946,
         "applyOps with prepared must only include CRUD operations and cannot have precondition.",
         !info.getPreCondition() && info.areOpsCrudOnly());
 
-    // Session has been checked out by sync_tail.
-    auto transaction = TransactionParticipant::get(opCtx);
-    invariant(transaction);
+    // Transaction operations are in its own batch, so we can modify their opCtx.
+    invariant(entry.getSessionId());
+    invariant(entry.getTxnNumber());
+    opCtx->setLogicalSessionId(*entry.getSessionId());
+    opCtx->setTxnNumber(*entry.getTxnNumber());
+    // The write on transaction table may be applied concurrently, so refreshing state
+    // from disk may read that write, causing starting a new transaction on an existing
+    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+    OperationContextSessionMongodWithoutRefresh sessionCheckout(opCtx);
 
+    auto transaction = TransactionParticipant::get(opCtx);
     transaction->unstashTransactionResources(opCtx, "prepareTransaction");
-    auto status = _applyOps(
-        opCtx, dbName, applyOpCmd, info, oplogApplicationMode, result, numApplied, opsBuilder);
+
+    // Apply the operations via applysOps functionality.
+    int numApplied = 0;
+    BSONObjBuilder resultWeDontCareAbout;
+    auto status = _applyOps(opCtx,
+                            entry.getNss().db().toString(),
+                            entry.getObject(),
+                            info,
+                            oplogApplicationMode,
+                            &resultWeDontCareAbout,
+                            &numApplied,
+                            nullptr);
     if (!status.isOK()) {
         return status;
     }
-    transaction->prepareTransaction(opCtx, optime);
+    invariant(!entry.getOpTime().isNull());
+    transaction->prepareTransaction(opCtx, entry.getOpTime());
     transaction->stashTransactionResources(opCtx);
     return Status::OK();
 }
@@ -401,39 +416,41 @@ ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     }
 }
 
+Status applyApplyOpsOplogEntry(OperationContext* opCtx,
+                               const OplogEntry& entry,
+                               repl::OplogApplication::Mode oplogApplicationMode) {
+    // Apply prepare transaction operation if "prepare" is true.
+    // The lock requirement of transaction operations should be the same as that on the primary,
+    // so we don't acquire the locks conservatively for them.
+    if (entry.shouldPrepare()) {
+        return _applyPrepareTransaction(opCtx, entry, oplogApplicationMode);
+    }
+    BSONObjBuilder resultWeDontCareAbout;
+    return applyOps(opCtx,
+                    entry.getNss().db().toString(),
+                    entry.getObject(),
+                    oplogApplicationMode,
+                    &resultWeDontCareAbout);
+}
+
 Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
-                boost::optional<OpTime> optime,
                 BSONObjBuilder* result) {
     auto info = ApplyOpsCommandInfo::parse(applyOpCmd);
 
     int numApplied = 0;
 
-    // Apply prepare transaction operation if "prepare" is true.
-    // The lock requirement of transaction operations should be the same as that on the primary,
-    // so we don't acquire the locks conservatively for them.
-    if (info.getPrepare().get_value_or(false)) {
-        invariant(optime);
-        return _applyPrepareTransaction(opCtx,
-                                        dbName,
-                                        applyOpCmd,
-                                        info,
-                                        oplogApplicationMode,
-                                        result,
-                                        &numApplied,
-                                        nullptr,
-                                        *optime);
-    }
-
     boost::optional<Lock::GlobalWrite> globalWriteLock;
     boost::optional<Lock::DBLock> dbWriteLock;
 
+    uassert(
+        ErrorCodes::BadValue, "applyOps command can't have 'prepare' field", !info.getPrepare());
+
     // There's only one case where we are allowed to take the database lock instead of the global
-    // lock - no preconditions; only CRUD ops; non-atomic mode; and not for transaction prepare.
-    if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic() &&
-        !info.getPrepare()) {
+    // lock - no preconditions; only CRUD ops; and non-atomic mode.
+    if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic()) {
         dbWriteLock.emplace(opCtx, dbName, MODE_IX);
     } else {
         globalWriteLock.emplace(opCtx);

@@ -96,8 +96,10 @@ Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
-                boost::optional<OpTime> optime,
                 BSONObjBuilder* result);
 
+Status applyApplyOpsOplogEntry(OperationContext* opCtx,
+                               const OplogEntry& entry,
+                               repl::OplogApplication::Mode oplogApplicationMode);
 }  // namespace repl
 }  // namespace mongo

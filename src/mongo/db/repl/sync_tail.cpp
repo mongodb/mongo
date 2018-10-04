@@ -56,7 +56,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/applier_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -1174,22 +1173,6 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                // The write on transaction table may be applied concurrently, so refreshing state
-                // from disk may read that write, causing starting a new transaction on an existing
-                // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-                boost::optional<OperationContextSessionMongodWithoutRefresh> sessionTxnState;
-                if (entry.shouldPrepare() ||
-                    entry.getCommandType() == OplogEntry::CommandType::kAbortTransaction) {
-                    // The update on transaction table may be scheduled to the same writer.
-                    invariant(ops->size() <= 2);
-                    // Transaction operations are in its own batch, so we can modify their opCtx.
-                    invariant(entry.getSessionId());
-                    invariant(entry.getTxnNumber());
-                    opCtx->setLogicalSessionId(*entry.getSessionId());
-                    opCtx->setTxnNumber(*entry.getTxnNumber());
-                    // Check out the session, with autoCommit = false and startMultiDocTxn = true.
-                    sessionTxnState.emplace(opCtx);
-                }
                 const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
 
                 if (!status.isOK()) {

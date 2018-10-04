@@ -46,6 +46,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -293,6 +294,40 @@ const LogicalSessionId& TransactionParticipant::_sessionId() const {
     const auto* owningSession = getTransactionParticipant.owner(this);
     return owningSession->getSessionId();
 }
+
+Status TransactionParticipant::applyAbortTransaction(OperationContext* opCtx,
+                                                     const repl::OplogEntry& entry,
+                                                     repl::OplogApplication::Mode mode) {
+    // We don't put transactions into the prepare state until the end of recovery, so there is
+    // no transaction to abort.
+    if (mode == repl::OplogApplication::Mode::kRecovering) {
+        return Status::OK();
+    }
+
+    // Return error if run via applyOps command.
+    uassert(50972,
+            "abortTransaction is only used internally by secondaries.",
+            mode != repl::OplogApplication::Mode::kApplyOpsCmd);
+
+    // TODO: SERVER-36492 Only run on secondary until we support initial sync.
+    invariant(mode == repl::OplogApplication::Mode::kSecondary);
+
+    // Transaction operations are in its own batch, so we can modify their opCtx.
+    invariant(entry.getSessionId());
+    invariant(entry.getTxnNumber());
+    opCtx->setLogicalSessionId(*entry.getSessionId());
+    opCtx->setTxnNumber(*entry.getTxnNumber());
+    // The write on transaction table may be applied concurrently, so refreshing state
+    // from disk may read that write, causing starting a new transaction on an existing
+    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+    OperationContextSessionMongodWithoutRefresh sessionCheckout(opCtx);
+
+    auto transaction = TransactionParticipant::get(opCtx);
+    transaction->unstashTransactionResources(opCtx, "abortTransaction");
+    transaction->abortActiveTransaction(opCtx);
+    return Status::OK();
+}
+
 
 void TransactionParticipant::_beginOrContinueRetryableWrite(WithLock wl, TxnNumber txnNumber) {
     if (txnNumber > _activeTxnNumber) {

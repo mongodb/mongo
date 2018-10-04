@@ -977,8 +977,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return applyOps(opCtx, nsToDatabase(ns), cmd, mode, opTime, &resultWeDontCareAbout);
+         return applyApplyOpsOplogEntry(opCtx, entry, mode);
      }}},
     {"convertToCapped",
      {[](OperationContext* opCtx,
@@ -1018,17 +1017,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
-         // We don't put transactions into the prepare state until the end of recovery, so there is
-         // no transaction to abort.
-         if (mode == OplogApplication::Mode::kRecovering) {
-             return Status::OK();
-         }
-         // Session has been checked out by sync_tail.
-         auto transaction = TransactionParticipant::get(opCtx);
-         invariant(transaction);
-         transaction->unstashTransactionResources(opCtx, "abortTransaction");
-         transaction->abortActiveTransaction(opCtx);
-         return Status::OK();
+         return TransactionParticipant::applyAbortTransaction(opCtx, entry, mode);
      }}},
 };
 
