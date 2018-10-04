@@ -239,26 +239,73 @@ TEST_F(TransactionCoordinatorServiceTest,
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
+       RetryingCreateCoordinatorForSameLsidAndTxnNumberSucceeds) {
+
+    TransactionCoordinatorService coordinatorService;
+
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    // Retry create. This should succeed but not replace the old coordinator.
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+
+    commitTransaction(coordinatorService, lsid(), txnNumber(), kTwoShardIdSet);
+}
+
+TEST_F(TransactionCoordinatorServiceTest,
        CreateCoordinatorWithHigherTxnNumberThanOngoingUncommittedTxnAbortsPreviousTxnAndSucceeds) {
-    // TODO (SERVER-37021): Implement once more validation is implemented for coordinator creation.
+
+    TransactionCoordinatorService coordinatorService;
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+
+    // This is currently the only way we have to get the commit decision.
+    auto oldTxnCommitDecisionFuture = coordinatorService.coordinateCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+
+    // Create a coordinator for a higher transaction number in the same session.
+    coordinatorService.createCoordinator(
+        operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
+
+    assertAbortSentAndRespondWithSuccess();
+    assertAbortSentAndRespondWithSuccess();
+
+    // We should have aborted the previous transaction.
+    ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
+              static_cast<int>(TransactionCoordinatorService::CommitDecision::kAbort));
+
+    // Make sure the newly created one works fine.
+    commitTransaction(coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
 }
 
-TEST_F(
-    TransactionCoordinatorServiceTest,
-    CreateCoordinatorWithHigherTxnNumberThanOngoingCommittingTxnWaitsForPreviousTxnToCommitAndSucceeds) {
-    // TODO (SERVER-37021): Implement once more validation is implemented for coordinator creation.
-}
+TEST_F(TransactionCoordinatorServiceTest,
+       CreateCoordinatorWithHigherTxnNumberThanOngoingCommittingTxnCommitsPreviousTxnAndSucceeds) {
 
-TEST_F(
-    TransactionCoordinatorServiceTest,
-    CreateCoordinatorWithSameTxnNumberAsOngoingUncommittedTxnThrowsIfPreviousCoordinatorHasReceivedEvents) {
-    // TODO (SERVER-37021): Implement once more validation is implemented for coordinator creation.
-}
+    TransactionCoordinatorService coordinatorService;
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
 
-TEST_F(
-    TransactionCoordinatorServiceTest,
-    CreateCoordinatorWithSameTxnNumberAsOngoingUncommittedTxnSucceedsIfPreviousCoordinatorHasNotReceivedEvents) {
-    // TODO (SERVER-37021): Implement once more validation is implemented for coordinator creation.
+    // Progress the transaction up until the point where it has sent commit and is waiting for
+    // commit acks.
+    auto oldTxnCommitDecisionFuture = coordinatorService.coordinateCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+    coordinatorService.voteCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
+    coordinatorService.voteCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdList[1], kDummyTimestamp);
+
+    // Create a coordinator for a higher transaction number in the same session. This should
+    // "tryAbort" on the old coordinator which should NOT abort it since it's already waiting for
+    // commit acks.
+    coordinatorService.createCoordinator(
+        operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
+
+    // Finish committing the old transaction by sending it commit acks from both participants.
+    assertCommitSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+
+    // The old transaction should now be committed.
+    ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
+              static_cast<int>(TransactionCoordinatorService::CommitDecision::kCommit));
+
+    // Make sure the newly created one works fine too.
+    commitTransaction(coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,

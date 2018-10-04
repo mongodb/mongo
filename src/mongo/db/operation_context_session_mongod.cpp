@@ -43,9 +43,10 @@ OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* o
     : _operationContextSession(opCtx, shouldCheckOutSession) {
     if (shouldCheckOutSession && !opCtx->getClient()->isInDirectClient()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant->refreshFromStorageIfNeeded(opCtx);
-
         const auto clientTxnNumber = *opCtx->getTxnNumber();
+
+        txnParticipant->refreshFromStorageIfNeeded(opCtx);
+        txnParticipant->beginOrContinue(clientTxnNumber, autocommit, startTransaction);
 
         if (startTransaction && *startTransaction) {
             // If this shard has been selected as the coordinator, set up the coordinator state
@@ -54,8 +55,6 @@ OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* o
                 createTransactionCoordinator(opCtx, clientTxnNumber);
             }
         }
-
-        txnParticipant->beginOrContinue(clientTxnNumber, autocommit, startTransaction);
     }
 }
 

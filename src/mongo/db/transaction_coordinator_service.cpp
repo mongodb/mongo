@@ -84,20 +84,27 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
                                                       LogicalSessionId lsid,
                                                       TxnNumber txnNumber,
                                                       Date_t commitDeadline) {
-    // TODO (SERVER-37021): Validate lsid and txnNumber against latest txnNumber on session in the
-    // catalog.
-
-    auto latestTxnNumAndCoordinator = _coordinatorCatalog->getLatestOnSession(lsid);
-    // TODO (SERVER-37039): The below removal logic for a coordinator will change/be removed once we
-    // allow multiple coordinators for a session.
-    if (latestTxnNumAndCoordinator) {
+    if (auto latestTxnNumAndCoordinator = _coordinatorCatalog->getLatestOnSession(lsid)) {
         auto latestCoordinator = latestTxnNumAndCoordinator.get().second;
+        if (txnNumber == latestTxnNumAndCoordinator.get().first) {
+            // If we're trying to re-create a coordinator for an already-existing lsid and
+            // txnNumber, we should be able to continue to use that coordinator, which MUST be in
+            // an unused state. In the state machine, the initial state is encoded as
+            // kWaitingForParticipantList, but this uassert won't necessarily catch all bugs
+            // because it's possible that the participant list (via coordinateCommit) could be en
+            // route when we reach this point or that votes have been received before reaching
+            // coordinateCommit.
+            uassert(50968,
+                    "Cannot start a new transaction with the same session ID and transaction "
+                    "number as a transaction that has already begun two-phase commit.",
+                    latestCoordinator->state() ==
+                        TransactionCoordinator::StateMachine::State::kWaitingForParticipantList);
+
+            return;
+        }
         // Call tryAbort on previous coordinator.
         auto actionToTake = latestCoordinator.get()->recvTryAbort();
         doCoordinatorAction(opCtx, latestCoordinator, actionToTake);
-
-        // Wait for coordinator to finish committing or aborting.
-        latestCoordinator->waitForCompletion().get(opCtx);
     }
 
     _coordinatorCatalog->create(lsid, txnNumber);
