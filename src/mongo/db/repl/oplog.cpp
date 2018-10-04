@@ -1002,6 +1002,11 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONObj& cmd,
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
+         // We don't put transactions into the prepare state until the end of recovery, so there is
+         // no transaction to abort.
+         if (mode == OplogApplication::Mode::kRecovering) {
+             return Status::OK();
+         }
          // Session has been checked out by sync_tail.
          auto transaction = TransactionParticipant::get(opCtx);
          invariant(transaction);

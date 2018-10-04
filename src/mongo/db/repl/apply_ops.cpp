@@ -276,13 +276,22 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                                 int* numApplied,
                                 BSONArrayBuilder* opsBuilder,
                                 const OpTime& optime) {
+    // Wait until the end of recovery to apply the operations from the prepared transaction.
+    if (oplogApplicationMode == OplogApplication::Mode::kRecovering) {
+        if (!serverGlobalParams.enableMajorityReadConcern) {
+            error() << "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
+                       "set to false. Restart the server with --enableMajorityReadConcern=true "
+                       "to complete recovery.";
+        }
+        fassert(50964, serverGlobalParams.enableMajorityReadConcern);
+        return Status::OK();
+    }
     // Return error if run via applyOps command.
     uassert(50945,
             "applyOps with prepared flag is only used internally by secondaries.",
             oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
 
-    // TODO: SERVER-35879 Only run on secondary until we support replication recovery and initial
-    // sync.
+    // TODO: SERVER-36492 Only run on secondary until we support initial sync.
     invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
 
     uassert(
