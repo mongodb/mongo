@@ -495,6 +495,8 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
         uassert(ErrorCodes::InvalidOptions,
                 "Only the first command in a transaction may specify a readConcern",
                 repl::ReadConcernArgs::get(opCtx).isEmpty());
+
+        repl::ReadConcernArgs::get(opCtx) = _readConcernArgs;
     }
 
     if (_txnNumber == txnNumber) {

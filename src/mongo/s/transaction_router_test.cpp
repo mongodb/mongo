@@ -30,6 +30,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
@@ -1364,6 +1365,47 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
 
     // Shouldn't throw.
     future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTest, ContinuingTransactionPlacesItsReadConcernOnOpCtx) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+
+    ASSERT(repl::ReadConcernArgs::get(operationContext()).getLevel() ==
+           repl::ReadConcernLevel::kSnapshotReadConcern);
+}
+
+TEST_F(TransactionRouterTest, SubsequentStatementCanSelectAtClusterTimeIfNotSelectedYet) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    // First statement does not select an atClusterTime, but does not target any participants.
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+
+    // Subsequent statement does select an atClusterTime and does target a participant.
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    BSONObj expectedReadConcern = BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime"
+                                       << kInMemoryLogicalTime.asTimestamp());
+
+    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                    BSON("insert"
+                                                         << "test"));
+    ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
 }
 
 }  // unnamed namespace
