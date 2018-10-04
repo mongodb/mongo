@@ -1668,6 +1668,59 @@ TEST_F(QueryPlannerWildcardTest, CanAnswerInContainingEmptyObjectWhenPathIsMulti
         "bounds: {$_path: [['a','a',true,true]], a: [[2,2,true,true],[{},{},true,true]]}}}}");
 }
 
+TEST_F(QueryPlannerWildcardTest, CanProduceSortMergePlanWithWildcardIndex) {
+    addWildcardIndex(BSON("$**" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQueryAsCommand(fromjson("{filter: {$or: [{a: 1, b: 1}, {b: 2}]}, sort: {b: -1}}"));
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {mergeSort: {nodes: ["
+        "{fetch: {filter: {a: 1}, node: {ixscan: {pattern: {$_path: 1, b: 1}, bounds: "
+        "{$_path: [['b','b',true,true]], b: [[1,1,true,true]]}}}}},"
+        "{ixscan: {pattern: {$_path: 1, b: 1}, bounds:"
+        "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {mergeSort: {nodes: ["
+        "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+        "{a: [[1,1,true,true]], b: [[1,1,true,true]]}}},"
+        "{ixscan: {pattern: {$_path: 1, b: 1}, bounds:"
+        "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {b: -1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: null, node: {or: {nodes: ["
+        "{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {$_path: 1, a: 1}, bounds:"
+        "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}},"
+        "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds:"
+        "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, ContainedOrPushdownWorksWithWildcardIndex) {
+    addWildcardIndex(BSON("$**" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQuery(fromjson("{a: 1, $or: [{c: 2}, {b: 3}]}"));
+    assertNumSolutions(4U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: 1}, node: {or: {nodes: ["
+        "{ixscan: {pattern: {a: 1, b: 1}, filter: null, bounds:"
+        "{a: [[1,1,true,true]], b: [[3,3,true,true]]}}},"
+        "{ixscan: {pattern: {$_path: 1, c: 1}, filter: null, bounds:"
+        "{$_path: [['c','c',true,true]], c: [[2,2,true,true]]}}}]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: 1}, node: {or: {nodes: ["
+        "{ixscan: {pattern: {$_path: 1, c: 1}, filter: null, bounds:"
+        "{$_path: [['c','c',true,true]], c: [[2,2,true,true]]}}},"
+        "{ixscan: {pattern: {$_path: 1, b: 1}, filter: null, bounds:"
+        "{$_path: [['b','b',true,true]], b: [[3,3,true,true]]}}}]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{c: 2}, {b: 3}]}, node:"
+        "{ixscan: {filter: null, pattern: {a: 1, b: 1}, bounds:"
+        "{a: [[1,1,true,true]], b:[['MinKey','MaxKey',true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{c: 2}, {b: 3}]}, node:"
+        "{ixscan: {filter: null, pattern: {$_path: 1, a: 1}, bounds:"
+        "{$_path: [['a','a',true,true]], a:[[1,1,true,true]]}}}}}");
+}
+
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 
 }  // namespace mongo
