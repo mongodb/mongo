@@ -1199,8 +1199,12 @@ DEATH_TEST_F(RollbackImplTest,
     _insertDocAndGenerateOplogEntry(obj, uuid, nss);
 
     // Drop the collection (immediately; not a two-phase drop), so that the namespace can no longer
-    // be found.
-    ASSERT_OK(_storageInterface->dropCollection(_opCtx.get(), nss));
+    // be found. We enforce that the storage interface drops the collection immediately with an
+    // unreplicated writes block, since unreplicated collection drops are not two-phase.
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        ASSERT_OK(_storageInterface->dropCollection(_opCtx.get(), nss));
+    }
 
     auto status = _rollback->runRollback(_opCtx.get());
     unittest::log() << "mongod did not crash when expected; status: " << status;

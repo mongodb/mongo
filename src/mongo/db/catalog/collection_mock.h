@@ -59,12 +59,17 @@ private:
         std::abort();
     }
 
-    const NamespaceString _ns;
+    NamespaceString _ns;
 
 public:
     const NamespaceString& ns() const {
         return _ns;
     }
+
+    void setNs(NamespaceString nss) final {
+        _ns = std::move(nss);
+    }
+
     bool ok() const {
         std::abort();
     }

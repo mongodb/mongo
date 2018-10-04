@@ -1427,4 +1427,17 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
 
     return b.obj();
 }
+
+void IndexCatalogImpl::setNs(NamespaceString ns) {
+    for (auto&& ice : _entries) {
+        ice->setNs(ns);
+    }
+
+    std::vector<BSONObj> newUnfinishedIndexes;
+    for (auto&& indexSpec : _unfinishedIndexes) {
+        newUnfinishedIndexes.push_back(IndexDescriptor::renameNsInIndexSpec(indexSpec, ns));
+    }
+    _unfinishedIndexes.swap(newUnfinishedIndexes);
+}
+
 }  // namespace mongo

@@ -56,7 +56,8 @@ struct TestObserver : public OpObserverNoop {
     }
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) {
+                                  OptionalCollectionUUID uuid,
+                                  const CollectionDropType dropType) {
         drops++;
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
@@ -169,7 +170,10 @@ TEST_F(OpObserverRegistryTest, OnDropCollectionObserverResultReturnsRightTime) {
     OperationContextNoop opCtx;
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::make_unique<OpObserverNoop>());
-    auto op = [&]() -> repl::OpTime { return registry.onDropCollection(&opCtx, testNss, {}); };
+    auto op = [&]() -> repl::OpTime {
+        return registry.onDropCollection(
+            &opCtx, testNss, {}, OpObserver::CollectionDropType::kOnePhase);
+    };
     checkConsistentOpTime(op);
 }
 
@@ -189,7 +193,10 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
     OperationContextNoop opCtx;
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
-    auto op = [&]() -> repl::OpTime { return registry.onDropCollection(&opCtx, testNss, {}); };
+    auto op = [&]() -> repl::OpTime {
+        return registry.onDropCollection(
+            &opCtx, testNss, {}, OpObserver::CollectionDropType::kOnePhase);
+    };
     checkInconsistentOpTime(op);
 }
 

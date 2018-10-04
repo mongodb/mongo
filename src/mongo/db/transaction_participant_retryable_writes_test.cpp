@@ -121,6 +121,20 @@ public:
         onTransactionCommitFn =
             [this](boost::optional<OplogSlot> commitOplogEntryOpTime,
                    boost::optional<Timestamp> commitTimestamp) { transactionCommitted = true; };
+
+    repl::OpTime onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName,
+                                  OptionalCollectionUUID uuid,
+                                  const CollectionDropType dropType) override {
+        // If the oplog is not disabled for this namespace, then we need to reserve an op time for
+        // the drop.
+        if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
+            OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
+        }
+        return {};
+    }
+
+    const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
 class TransactionParticipantRetryableWritesTest : public MockReplCoordServerFixture {

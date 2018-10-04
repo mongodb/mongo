@@ -215,6 +215,8 @@ public:
         virtual const CollectionInfoCache* infoCache() const = 0;
 
         virtual const NamespaceString& ns() const = 0;
+        virtual void setNs(NamespaceString) = 0;
+
         virtual OptionalCollectionUUID uuid() const = 0;
 
         virtual const IndexCatalog* getIndexCatalog() const = 0;
@@ -395,6 +397,10 @@ public:
 
     inline const NamespaceString& ns() const {
         return this->_impl().ns();
+    }
+
+    inline void setNs(NamespaceString nss) {
+        this->_impl().setNs(std::move(nss));
     }
 
     inline OptionalCollectionUUID uuid() const {

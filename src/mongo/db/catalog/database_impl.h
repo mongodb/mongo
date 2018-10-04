@@ -50,7 +50,6 @@ namespace mongo {
 class Collection;
 class DatabaseCatalogEntry;
 class IndexCatalog;
-class NamespaceDetails;
 class OperationContext;
 class PseudoRandom;
 
@@ -202,6 +201,11 @@ public:
 
     Collection* getOrCreateCollection(OperationContext* opCtx, const NamespaceString& nss) final;
 
+    /**
+     * Renames the fully qualified namespace 'fromNS' to the fully qualified namespace 'toNS'.
+     * Illegal to call unless both 'fromNS' and 'toNS' are within this database. Returns an error if
+     * 'toNS' already exists or 'fromNS' does not exist.
+     */
     Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,
                             StringData toNS,
@@ -272,6 +276,7 @@ private:
 
     class AddCollectionChange;
     class RemoveCollectionChange;
+    class RenameCollectionChange;
 
     const std::string _name;  // "dbname"
 
@@ -300,7 +305,6 @@ private:
     Database* _this;                       // Pointer to wrapper, for external caller compatibility.
 
     friend class Collection;
-    friend class NamespaceDetails;
     friend class IndexCatalog;
 };
 

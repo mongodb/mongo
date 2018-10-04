@@ -55,6 +55,10 @@ public:
         return _ns;
     }
 
+    void setNs(NamespaceString ns) {
+        _ns = std::move(ns);
+    }
+
     // ------- indexes ----------
 
     virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const = 0;

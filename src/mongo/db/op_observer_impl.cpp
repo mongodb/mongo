@@ -736,7 +736,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid) {
+                                              OptionalCollectionUUID uuid,
+                                              const CollectionDropType dropType) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
 

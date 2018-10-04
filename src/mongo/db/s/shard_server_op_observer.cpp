@@ -391,7 +391,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
 repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                      const NamespaceString& collectionName,
-                                                     OptionalCollectionUUID uuid) {
+                                                     OptionalCollectionUUID uuid,
+                                                     const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kServerConfigurationNamespace) {
         // Dropping system collections is not allowed for end users
         invariant(!opCtx->writesAreReplicated());

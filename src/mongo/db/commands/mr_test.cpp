@@ -46,6 +46,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -298,12 +299,19 @@ public:
                             const BSONObj& idIndex,
                             const OplogSlot& createOpTime) override;
 
+    repl::OpTime onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName,
+                                  OptionalCollectionUUID uuid,
+                                  CollectionDropType dropType) override;
+
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
     // while mapReduce inserts its results into the temporary output collection.
     std::function<void()> onInsertsFn = [] {};
 
     // Holds namespaces of temporary collections created by mapReduce.
     std::vector<NamespaceString> tempNamespaces;
+
+    const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
 void MapReduceOpObserver::onInserts(OperationContext* opCtx,
@@ -325,6 +333,18 @@ void MapReduceOpObserver::onCreateCollection(OperationContext*,
         return;
     }
     tempNamespaces.push_back(collectionName);
+}
+
+repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
+                                                   const NamespaceString& collectionName,
+                                                   OptionalCollectionUUID uuid,
+                                                   const CollectionDropType dropType) {
+    // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
+    // drop.
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
+        OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
+    }
+    return {};
 }
 
 /**
@@ -381,6 +401,10 @@ void MapReduceCommandTest::setUp() {
         [](OperationContext* opCtx) { return std::make_unique<DBDirectClient>(opCtx); });
     repl::ReplicationCoordinator::set(service,
                                       std::make_unique<repl::ReplicationCoordinatorMock>(service));
+
+    repl::DropPendingCollectionReaper::set(
+        service,
+        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     // Set up an OpObserver to track the temporary collections mapReduce creates.
     auto opObserver = std::make_unique<MapReduceOpObserver>();

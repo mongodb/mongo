@@ -65,7 +65,8 @@ void ConfigServerOpObserver::onDelete(OperationContext* opCtx,
 
 repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
                                                       const NamespaceString& collectionName,
-                                                      OptionalCollectionUUID uuid) {
+                                                      OptionalCollectionUUID uuid,
+                                                      const CollectionDropType dropType) {
     if (collectionName == VersionType::ConfigNS) {
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40303, "cannot drop config.version document while in --configsvr mode");

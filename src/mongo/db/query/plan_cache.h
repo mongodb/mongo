@@ -468,6 +468,10 @@ public:
         const std::function<BSONObj(const PlanCacheEntry&)>& serializationFunc,
         const std::function<bool(const BSONObj&)>& filterFunc) const;
 
+    void setNs(NamespaceString ns) {
+        _ns = ns.toString();
+    }
+
 private:
     struct NewEntryState {
         bool shouldBeCreated = false;

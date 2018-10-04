@@ -168,7 +168,7 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
           parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
       _validationLevel(uassertStatusOK(
           parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel))),
-      _cursorManager(_ns),
+      _cursorManager(std::make_unique<CursorManager>(_ns)),
       _cappedNotifier(_recordStore->isCapped() ? stdx::make_unique<CappedInsertNotifier>()
                                                : nullptr),
       _this(_this_init) {}
@@ -792,7 +792,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
 
     // 2) drop indexes
     _indexCatalog->dropAllIndexes(opCtx, true);
-    _cursorManager.invalidateAll(opCtx, false, "collection truncated");
+    _cursorManager->invalidateAll(opCtx, false, "collection truncated");
 
     // 3) truncate record store
     auto status = _recordStore->truncate(opCtx);
@@ -815,7 +815,7 @@ void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx, RecordId end, 
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
     invariant(_indexCatalog->numIndexesInProgress(opCtx) == 0);
 
-    _cursorManager.invalidateAll(opCtx, false, "capped collection truncated");
+    _cursorManager->invalidateAll(opCtx, false, "capped collection truncated");
     _recordStore->cappedTruncateAfter(opCtx, end, inclusive);
 }
 
@@ -1291,6 +1291,21 @@ Status CollectionImpl::touch(OperationContext* opCtx,
 
 std::unique_ptr<MultiIndexBlock> CollectionImpl::createMultiIndexBlock(OperationContext* opCtx) {
     return std::make_unique<MultiIndexBlockImpl>(opCtx, _this);
+}
+
+void CollectionImpl::setNs(NamespaceString nss) {
+    _ns = std::move(nss);
+    _indexCatalog->setNs(_ns);
+    _infoCache.setNs(_ns);
+    _recordStore->setNs(_ns);
+
+    // Until the query layer is prepared for cursors to survive renames, all cursors are killed when
+    // the name of a collection changes. Therefore, the CursorManager should be empty. This means it
+    // is safe to re-establish it with a new namespace by tearing down the old one and allocating a
+    // new manager associated with the new name. This is done in order to ensure that the
+    // 'globalCursorIdCache' maintains the correct mapping from cursor id "prefix" (the high order
+    // bits) to namespace.
+    _cursorManager = std::make_unique<CursorManager>(_ns);
 }
 
 }  // namespace mongo

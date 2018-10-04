@@ -117,6 +117,32 @@ public:
     const bool _dropOnCommit;
 };
 
+class KVDatabaseCatalogEntryBase::RenameCollectionChange final : public RecoveryUnit::Change {
+public:
+    RenameCollectionChange(KVDatabaseCatalogEntryBase* dce,
+                           KVCollectionCatalogEntry* coll,
+                           NamespaceString fromNs,
+                           NamespaceString toNs)
+        : _dce(dce), _coll(coll), _fromNs(std::move(fromNs)), _toNs(std::move(toNs)) {}
+
+    void commit(boost::optional<Timestamp>) override {}
+
+    void rollback() override {
+        auto it = _dce->_collections.find(_toNs.ns());
+        invariant(it != _dce->_collections.end());
+        invariant(it->second == _coll);
+        _dce->_collections[_fromNs.ns()] = _coll;
+        _dce->_collections.erase(it);
+        _coll->setNs(_fromNs);
+    }
+
+private:
+    KVDatabaseCatalogEntryBase* const _dce;
+    KVCollectionCatalogEntry* const _coll;
+    const NamespaceString _fromNs;
+    const NamespaceString _toNs;
+};
+
 KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase(StringData db, KVStorageEngine* engine)
     : DatabaseCatalogEntry(db), _engine(engine) {}
 
@@ -309,30 +335,26 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
         return status;
 
     const std::string identTo = _engine->getCatalog()->getCollectionIdent(toNS);
-
     invariant(identFrom == identTo);
-
-    BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, toNS);
-
-    opCtx->recoveryUnit()->registerChange(
-        new AddCollectionChange(opCtx, this, toNS, identTo, false));
-
-    auto rs =
-        _engine->getEngine()->getGroupedRecordStore(opCtx, toNS, identTo, md.options, md.prefix);
 
     // Add the destination collection to _collections before erasing the source collection. This
     // is to ensure that _collections doesn't erroneously appear empty during listDatabases if
     // a database consists of a single collection and that collection gets renamed (see
     // SERVER-34531). There is no locking to prevent listDatabases from looking into
     // _collections as a rename is taking place.
-    _collections[toNS.toString()] = new KVCollectionCatalogEntry(
-        _engine->getEngine(), _engine->getCatalog(), toNS, identTo, std::move(rs));
-
-    const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
+    auto itFrom = _collections.find(fromNS.toString());
     invariant(itFrom != _collections.end());
-    opCtx->recoveryUnit()->registerChange(
-        new RemoveCollectionChange(opCtx, this, fromNS, identFrom, itFrom->second, false));
+    auto* collectionCatalogEntry = itFrom->second;
+    invariant(collectionCatalogEntry);
+    _collections[toNS.toString()] = collectionCatalogEntry;
     _collections.erase(itFrom);
+
+    collectionCatalogEntry->setNs(NamespaceString{toNS});
+
+    // Register a Change which, on rollback, will reinstall the collection catalog entry in the
+    // collections map so that it is associated with 'fromNS', not 'toNS'.
+    opCtx->recoveryUnit()->registerChange(new RenameCollectionChange(
+        this, collectionCatalogEntry, NamespaceString{fromNS}, NamespaceString{toNS}));
 
     return Status::OK();
 }

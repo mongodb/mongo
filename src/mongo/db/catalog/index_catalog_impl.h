@@ -342,6 +342,8 @@ public:
                                     const IndexDescriptor* desc,
                                     InsertDeleteOptions* options) const override;
 
+    void setNs(NamespaceString ns) override;
+
 private:
     static const BSONObj _idObj;  // { _id : 1 }
 

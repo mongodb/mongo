@@ -80,6 +80,15 @@ struct TTLCollModInfo {
  */
 class OpObserver {
 public:
+    enum class CollectionDropType {
+        // The collection is being dropped immediately, in one step.
+        kOnePhase,
+
+        // The collection is being dropped in two phases, by renaming to a drop pending collection
+        // which is registered to be reaped later.
+        kTwoPhase,
+    };
+
     virtual ~OpObserver() = default;
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
@@ -178,10 +187,13 @@ public:
      * This function logs an oplog entry when a 'drop' command on a collection is executed.
      * Returns the optime of the oplog entry successfully written to the oplog.
      * Returns a null optime if an oplog entry was not written for this operation.
+     *
+     * 'dropType' describes whether the collection drop is one-phase or two-phase.
      */
     virtual repl::OpTime onDropCollection(OperationContext* opCtx,
                                           const NamespaceString& collectionName,
-                                          OptionalCollectionUUID uuid) = 0;
+                                          OptionalCollectionUUID uuid,
+                                          CollectionDropType dropType) = 0;
 
     /**
      * This function logs an oplog entry when an index is dropped. The namespace of the index,

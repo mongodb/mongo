@@ -110,6 +110,8 @@ public:
      */
     void notifyOfQuery(OperationContext* opCtx, const std::set<std::string>& indexesUsed);
 
+    void setNs(NamespaceString ns) override;
+
 private:
     void computeIndexKeys(OperationContext* opCtx);
     void updatePlanCacheIndexEntries(OperationContext* opCtx);
@@ -121,7 +123,8 @@ private:
     void rebuildIndexData(OperationContext* opCtx);
 
     Collection* _collection;  // not owned
-    const NamespaceString _ns;
+
+    NamespaceString _ns;
 
     // ---  index keys cache
     bool _keysComputed;

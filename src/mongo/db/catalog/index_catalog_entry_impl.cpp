@@ -101,9 +101,8 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
     }
 
-    if (BSONElement collationElement = _descriptor->getInfoElement("collation")) {
-        invariant(collationElement.isABSONObj());
-        BSONObj collation = collationElement.Obj();
+    const BSONObj& collation = _descriptor->collation();
+    if (!collation.isEmpty()) {
         auto statusWithCollator =
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
 
@@ -113,9 +112,9 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         _collator = std::move(statusWithCollator.getValue());
     }
 
-    if (BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression")) {
-        invariant(filterElement.isABSONObj());
-        BSONObj filter = filterElement.Obj();
+    if (_descriptor->isPartial()) {
+        const BSONObj& filter = _descriptor->partialFilterExpression();
+
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, _collator.get()));
 
@@ -343,6 +342,11 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
 void IndexCatalogEntryImpl::setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) {
     _collection->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+}
+
+void IndexCatalogEntryImpl::setNs(NamespaceString ns) {
+    _ns = ns.toString();
+    _descriptor->setNs(std::move(ns));
 }
 
 // ----

@@ -88,6 +88,12 @@ public:
     static constexpr StringData kWeightsFieldName = "weights"_sd;
 
     /**
+     * Given a BSONObj representing an index spec, returns a new owned BSONObj which is identical to
+     * 'spec' after replacing the 'ns' field with the value of 'newNs'.
+     */
+    static BSONObj renameNsInIndexSpec(BSONObj spec, const NamespaceString& newNs);
+
+    /**
      * OnDiskIndexData is a pointer to the memory mapped per-index data.
      * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
      */
@@ -111,6 +117,16 @@ public:
         BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
         fassert(50942, e.isNumber());
         _version = static_cast<IndexVersion>(e.numberInt());
+
+        if (BSONElement filterElement = _infoObj[kPartialFilterExprFieldName]) {
+            invariant(filterElement.isABSONObj());
+            _partialFilterExpression = filterElement.Obj().getOwned();
+        }
+
+        if (BSONElement collationElement = _infoObj[kCollationFieldName]) {
+            invariant(collationElement.isABSONObj());
+            _collation = collationElement.Obj().getOwned();
+        }
     }
 
 
@@ -233,20 +249,6 @@ public:
         return _isIdIndex;
     }
 
-    //
-    // Properties that are Index-specific.
-    //
-
-    // Allow access to arbitrary fields in the per-index info object.  Some indices stash
-    // index-specific data there.
-    BSONElement getInfoElement(const std::string& name) const {
-        return _infoObj[name];
-    }
-
-    //
-    // "Internals" of accessing the index, used by IndexAccessMethod(s).
-    //
-
     // Return a (rather compact) std::string representation.
     std::string toString() const {
         return _infoObj.toString();
@@ -264,6 +266,16 @@ public:
     const IndexCatalog* getIndexCatalog() const;
 
     bool areIndexOptionsEquivalent(const IndexDescriptor* other) const;
+
+    void setNs(NamespaceString ns);
+
+    const BSONObj& collation() const {
+        return _collation;
+    }
+
+    const BSONObj& partialFilterExpression() const {
+        return _partialFilterExpression;
+    }
 
     static bool isIdIndexPattern(const BSONObj& pattern) {
         BSONObjIterator i(pattern);
@@ -290,7 +302,7 @@ private:
     IndexType _indexType;
 
     // The BSONObj describing the index.  Accessed through the various members above.
-    const BSONObj _infoObj;
+    BSONObj _infoObj;
 
     // --- cached data from _infoObj
 
@@ -305,6 +317,8 @@ private:
     bool _unique;
     bool _partial;
     IndexVersion _version;
+    BSONObj _collation;
+    BSONObj _partialFilterExpression;
 
     // only used by IndexCatalogEntryContainer to do caching for perf
     // users not allowed to touch, and not part of API

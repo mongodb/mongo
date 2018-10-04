@@ -159,6 +159,36 @@ public:
     Collection* const _coll;
 };
 
+class DatabaseImpl::RenameCollectionChange final : public RecoveryUnit::Change {
+public:
+    RenameCollectionChange(DatabaseImpl* db,
+                           Collection* coll,
+                           NamespaceString fromNs,
+                           NamespaceString toNs)
+        : _db(db), _coll(coll), _fromNs(std::move(fromNs)), _toNs(std::move(toNs)) {}
+
+    void commit(boost::optional<Timestamp> commitTime) override {
+        // Ban reading from this collection on committed reads on snapshots before now.
+        if (commitTime) {
+            _coll->setMinimumVisibleSnapshot(commitTime.get());
+        }
+    }
+
+    void rollback() override {
+        auto it = _db->_collections.find(_toNs.ns());
+        invariant(it != _db->_collections.end());
+        invariant(it->second == _coll);
+        _db->_collections[_fromNs.ns()] = _coll;
+        _db->_collections.erase(it);
+        _coll->setNs(_fromNs);
+    }
+
+    DatabaseImpl* const _db;
+    Collection* const _coll;
+    const NamespaceString _fromNs;
+    const NamespaceString _toNs;
+};
+
 DatabaseImpl::~DatabaseImpl() {
     for (CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i)
         delete i->second;
@@ -524,7 +554,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-        opObserver->onDropCollection(opCtx, fullns, uuid);
+        opObserver->onDropCollection(
+            opCtx, fullns, uuid, OpObserver::CollectionDropType::kOnePhase);
         return Status::OK();
     }
 
@@ -569,24 +600,24 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
         // Log oplog entry for collection drop and proceed to complete rest of two phase drop
         // process.
-        dropOpTime = opObserver->onDropCollection(opCtx, fullns, uuid);
+        dropOpTime = opObserver->onDropCollection(
+            opCtx, fullns, uuid, OpObserver::CollectionDropType::kTwoPhase);
 
-        // Drop collection immediately if OpObserver did not write entry to oplog.
+        // The OpObserver should have written an entry to the oplog with a particular op time.
         // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
         // oplog.cpp.
         if (dropOpTime.isNull()) {
             log() << "dropCollection: " << fullns << " (" << uuidString
-                  << ") - no drop optime available for pending-drop. "
-                  << "Dropping collection immediately.";
-            fassert(40462, _finishDropCollection(opCtx, fullns, collection));
-            return Status::OK();
+                  << ") - expected oplog entry to be written";
+            fassertFailed(40462);
         }
     } else {
         // If we are provided with a valid 'dropOpTime', it means we are dropping this collection
         // in the context of applying an oplog entry on a secondary.
         // OpObserver::onDropCollection() should be returning a null OpTime because we should not be
         // writing to the oplog.
-        auto opTime = opObserver->onDropCollection(opCtx, fullns, uuid);
+        auto opTime = opObserver->onDropCollection(
+            opCtx, fullns, uuid, OpObserver::CollectionDropType::kTwoPhase);
         if (!opTime.isNull()) {
             severe() << "dropCollection: " << fullns << " (" << uuidString
                      << ") - unexpected oplog entry written to the oplog with optime " << opTime;
@@ -678,36 +709,49 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     BackgroundOperation::assertNoBgOpInProgForNs(fromNS);
     BackgroundOperation::assertNoBgOpInProgForNs(toNS);
 
-    NamespaceString fromNSS(fromNS);
-    NamespaceString toNSS(toNS);
-    {  // remove anything cached
-        Collection* coll = getCollection(opCtx, fromNS);
+    const NamespaceString fromNSS(fromNS);
+    const NamespaceString toNSS(toNS);
 
-        if (!coll)
-            return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
-
-        string clearCacheReason = str::stream() << "renamed collection '" << fromNS << "' to '"
-                                                << toNS << "'";
-        IndexCatalog::IndexIterator ii = coll->getIndexCatalog()->getIndexIterator(opCtx, true);
-
-        while (ii.more()) {
-            IndexDescriptor* desc = ii.next();
-            _clearCollectionCache(
-                opCtx, desc->indexNamespace(), clearCacheReason, /*collectionGoingAway*/ true);
-        }
-
-        _clearCollectionCache(opCtx, fromNS, clearCacheReason, /*collectionGoingAway*/ true);
-        _clearCollectionCache(opCtx, toNS, clearCacheReason, /*collectionGoingAway*/ false);
-
-        Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
-
-        log() << "renameCollection: renaming collection " << coll->uuid()->toString() << " from "
-              << fromNS << " to " << toNS;
+    invariant(fromNSS.db() == _name);
+    invariant(toNSS.db() == _name);
+    if (getCollection(opCtx, toNSS)) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "Cannot rename '" << fromNS << "' to '" << toNS
+                                    << "' because the destination namespace already exists");
     }
 
+    Collection* collToRename = getCollection(opCtx, fromNSS);
+    if (!collToRename) {
+        return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
+    }
+
+    string clearCacheReason = str::stream() << "renamed collection '" << fromNS << "' to '" << toNS
+                                            << "'";
+
+    // Notify the cursor manager that it should kill all the cursors in the source and target
+    // collections. This is currently necessary since the query layer is not prepared for cursors to
+    // survive collection renames.
+    auto sourceManager = collToRename->getCursorManager();
+    invariant(sourceManager);
+    sourceManager->invalidateAll(opCtx, /*collectionGoingAway*/ true, clearCacheReason);
+
+    log() << "renameCollection: renaming collection " << collToRename->uuid()->toString()
+          << " from " << fromNS << " to " << toNS;
+
+    Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
+
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
-    _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNSS);
+    // Make 'toNS' map to the collection instead of 'fromNS'.
+    _collections.erase(fromNS);
+    _collections[toNS] = collToRename;
+
+    // Update Collection's ns.
+    collToRename->setNs(toNSS);
+
+    // Register a Change which, on rollback, will reinstall the Collection* in the collections map
+    // so that it is associated with 'fromNS', not 'toNS'.
+    opCtx->recoveryUnit()->registerChange(
+        new RenameCollectionChange(this, collToRename, fromNSS, toNSS));
 
     return s;
 }

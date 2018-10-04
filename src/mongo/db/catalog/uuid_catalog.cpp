@@ -76,12 +76,23 @@ void UUIDCatalogObserver::onCollMod(OperationContext* opCtx,
 
 repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
-                                                   OptionalCollectionUUID uuid) {
+                                                   OptionalCollectionUUID uuid,
+                                                   const CollectionDropType dropType) {
 
     if (!uuid)
         return {};
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    catalog.onDropCollection(opCtx, uuid.get());
+
+    // Replicated drops are two-phase, meaning that the collection is first renamed into a "drop
+    // pending" state and reaped later. This op observer is only called for the rename phase, which
+    // means the UUID mapping is still valid.
+    //
+    // On the other hand, if the drop is not replicated, it takes effect immediately. In this case,
+    // the UUID mapping must be removed from the UUID catalog.
+    if (dropType == CollectionDropType::kOnePhase) {
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+        catalog.onDropCollection(opCtx, uuid.get());
+    }
+
     return {};
 }
 

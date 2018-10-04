@@ -70,6 +70,8 @@ public:
 
         virtual void notifyOfQuery(OperationContext* opCtx,
                                    const std::set<std::string>& indexesUsed) = 0;
+
+        virtual void setNs(NamespaceString ns) = 0;
     };
 
 
@@ -157,6 +159,10 @@ public:
     inline void notifyOfQuery(OperationContext* const opCtx,
                               const std::set<std::string>& indexesUsed) {
         return this->_impl().notifyOfQuery(opCtx, indexesUsed);
+    }
+
+    inline void setNs(NamespaceString ns) {
+        this->_impl().setNs(std::move(ns));
     }
 
     std::unique_ptr<Impl> _pimpl;

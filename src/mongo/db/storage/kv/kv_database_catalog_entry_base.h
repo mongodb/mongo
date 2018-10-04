@@ -90,6 +90,7 @@ public:
 protected:
     class AddCollectionChange;
     class RemoveCollectionChange;
+    class RenameCollectionChange;
 
     typedef std::map<std::string, KVCollectionCatalogEntry*> CollectionMap;
 

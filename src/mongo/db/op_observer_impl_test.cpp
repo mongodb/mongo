@@ -217,7 +217,8 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onDropCollection(opCtx.get(), nss, uuid);
+        opObserver.onDropCollection(
+            opCtx.get(), nss, uuid, OpObserver::CollectionDropType::kTwoPhase);
         dropOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }

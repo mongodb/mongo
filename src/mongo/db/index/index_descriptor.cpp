@@ -172,4 +172,25 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
                                                                            rhs.second);
                    });
 }
+
+void IndexDescriptor::setNs(NamespaceString ns) {
+    _parentNS = ns.toString();
+    _indexNamespace = makeIndexNamespace(_parentNS, _indexName);
+
+    // Construct a new infoObj with the namespace field replaced.
+    _infoObj = renameNsInIndexSpec(_infoObj, ns);
 }
+
+BSONObj IndexDescriptor::renameNsInIndexSpec(BSONObj spec, const NamespaceString& newNs) {
+    BSONObjBuilder builder;
+    for (auto&& elt : spec) {
+        if (elt.fieldNameStringData() == kNamespaceFieldName) {
+            builder.append(kNamespaceFieldName, newNs.ns());
+        } else {
+            builder.append(elt);
+        }
+    }
+    return builder.obj();
+}
+
+}  // namespace mongo

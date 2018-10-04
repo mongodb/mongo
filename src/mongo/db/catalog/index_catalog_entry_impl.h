@@ -72,6 +72,8 @@ public:
         return _ns;
     }
 
+    void setNs(NamespaceString ns) final;
+
     void init(std::unique_ptr<IndexAccessMethod> accessMethod) final;
 
     IndexDescriptor* descriptor() final {

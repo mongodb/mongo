@@ -209,7 +209,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // Raise an error about unrecognized fields that may be introduced in newer versions of
     // this storage engine.
     // Ensure that 'configString' field is a string. Raise an error if this is not the case.
-    BSONElement storageEngineElement = desc.getInfoElement("storageEngine");
+    BSONElement storageEngineElement = desc.infoObj()["storageEngine"];
     if (storageEngineElement.isABSONObj()) {
         BSONObj storageEngine = storageEngineElement.Obj();
         StatusWith<std::string> parseStatus =

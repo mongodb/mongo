@@ -38,6 +38,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -48,7 +50,6 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/logger.h"
-
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -66,6 +67,23 @@ ReplSettings createReplSettings() {
     settings.setReplSetString("mySet/node1:12345");
     return settings;
 }
+
+class RollbackTestOpObserver : public OpObserverNoop {
+public:
+    repl::OpTime onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName,
+                                  OptionalCollectionUUID uuid,
+                                  const CollectionDropType dropType) override {
+        // If the oplog is not disabled for this namespace, then we need to reserve an op time for
+        // the drop.
+        if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
+            OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
+        }
+        return {};
+    }
+
+    const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
+};
 
 }  // namespace
 
@@ -94,6 +112,9 @@ void RollbackTest::setUp() {
     // Increase rollback log component verbosity for unit tests.
     mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
         logger::LogComponent::kReplicationRollback, logger::LogSeverity::Debug(2));
+
+    auto observerRegistry = checked_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
+    observerRegistry->addObserver(std::make_unique<RollbackTestOpObserver>());
 }
 
 RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollbackMock(

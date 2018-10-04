@@ -96,7 +96,8 @@ public:
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) override;
+                                  OptionalCollectionUUID uuid,
+                                  CollectionDropType dropType) override;
 
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,

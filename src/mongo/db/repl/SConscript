@@ -338,9 +338,10 @@ env.CppUnitTest(
         'replication_recovery_test.cpp',
     ],
     LIBDEPS=[
+        'drop_pending_collection_reaper',
         'oplog_interface_local',
-        'replmocks',
         'replication_recovery',
+        'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
@@ -1627,6 +1628,7 @@ env.Library(
         'mock_repl_coord_server_fixture.cpp',
     ],
     LIBDEPS=[
+        'drop_pending_collection_reaper',
         'oplog',
         'oplog_entry',
         'replmocks',

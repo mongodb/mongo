@@ -57,7 +57,8 @@ FreeMonOpObserver::~FreeMonOpObserver() = default;
 
 repl::OpTime FreeMonOpObserver::onDropCollection(OperationContext* opCtx,
                                                  const NamespaceString& collectionName,
-                                                 OptionalCollectionUUID uuid) {
+                                                 OptionalCollectionUUID uuid,
+                                                 const CollectionDropType dropType) {
     if (collectionName == NamespaceString::kServerConfigurationNamespace) {
         auto controller = FreeMonController::get(opCtx->getServiceContext());
 

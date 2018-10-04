@@ -144,10 +144,11 @@ public:
 
     repl::OpTime onDropCollection(OperationContext* const opCtx,
                                   const NamespaceString& collectionName,
-                                  const OptionalCollectionUUID uuid) override {
+                                  const OptionalCollectionUUID uuid,
+                                  const CollectionDropType dropType) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
-            auto time = observer->onDropCollection(opCtx, collectionName, uuid);
+            auto time = observer->onDropCollection(opCtx, collectionName, uuid, dropType);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);

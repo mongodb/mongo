@@ -111,6 +111,13 @@ public:
     bool onTransactionAbortThrowsException = false;
     bool transactionAborted = false;
     stdx::function<void()> onTransactionAbortFn = []() {};
+
+    repl::OpTime onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName,
+                                  OptionalCollectionUUID uuid,
+                                  CollectionDropType dropType) override;
+
+    const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
 void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) {
@@ -153,6 +160,18 @@ void OpObserverMock::onTransactionAbort(OperationContext* opCtx,
             !onTransactionAbortThrowsException);
     transactionAborted = true;
     onTransactionAbortFn();
+}
+
+repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
+                                              const NamespaceString& collectionName,
+                                              OptionalCollectionUUID uuid,
+                                              const CollectionDropType dropType) {
+    // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
+    // drop.
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collectionName)) {
+        OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
+    }
+    return {};
 }
 
 // When this class is in scope, makes the system behave as if we're in a DBDirectClient

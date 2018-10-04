@@ -86,7 +86,8 @@ public:
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) override;
+                                  OptionalCollectionUUID uuid,
+                                  CollectionDropType dropType) override;
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      OptionalCollectionUUID uuid,

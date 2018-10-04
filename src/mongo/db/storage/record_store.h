@@ -37,6 +37,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 
@@ -47,7 +48,6 @@ class Collection;
 struct CompactOptions;
 struct CompactStats;
 class MAdvise;
-class NamespaceDetails;
 class OperationContext;
 
 class RecordStoreCompactAdaptor;
@@ -248,6 +248,10 @@ public:
 
     virtual const std::string& ns() const {
         return _ns;
+    }
+
+    void setNs(NamespaceString ns) {
+        _ns = ns.ns();
     }
 
     virtual const std::string& getIdent() const = 0;

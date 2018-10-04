@@ -80,6 +80,8 @@ public:
         return _ns;
     }
 
+    void setNs(NamespaceString nss) final;
+
     OptionalCollectionUUID uuid() const {
         return _uuid;
     }
@@ -101,7 +103,7 @@ public:
     }
 
     CursorManager* getCursorManager() const final {
-        return &_cursorManager;
+        return _cursorManager.get();
     }
 
     bool requiresIdIndex() const final;
@@ -390,7 +392,7 @@ private:
 
     int _magic;
 
-    const NamespaceString _ns;
+    NamespaceString _ns;
     OptionalCollectionUUID _uuid;
     CollectionCatalogEntry* const _details;
     RecordStore* const _recordStore;
@@ -415,10 +417,7 @@ private:
     ValidationAction _validationAction;
     ValidationLevel _validationLevel;
 
-    // this is mutable because read only users of the Collection class
-    // use it keep state.  This seems valid as const correctness of Collection
-    // should be about the data.
-    mutable CursorManager _cursorManager;
+    std::unique_ptr<CursorManager> _cursorManager;
 
     // Notifier object for awaitData. Threads polling a capped collection for new data can wait
     // on this object until notified of the arrival of new data.
@@ -430,7 +429,5 @@ private:
     boost::optional<Timestamp> _minVisibleSnapshot;
 
     Collection* _this;
-
-    friend class NamespaceDetails;
 };
 }  // namespace mongo

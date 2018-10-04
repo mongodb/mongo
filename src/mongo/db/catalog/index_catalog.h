@@ -395,6 +395,8 @@ public:
     virtual void prepareInsertDeleteOptions(OperationContext* opCtx,
                                             const IndexDescriptor* desc,
                                             InsertDeleteOptions* options) const = 0;
+
+    virtual void setNs(NamespaceString ns) = 0;
 };
 
 }  // namespace mongo

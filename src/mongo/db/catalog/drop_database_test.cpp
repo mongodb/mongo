@@ -69,12 +69,14 @@ public:
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) override;
+                                  OptionalCollectionUUID uuid,
+                                  CollectionDropType dropType) override;
 
     std::set<std::string> droppedDatabaseNames;
     std::set<NamespaceString> droppedCollectionNames;
     Database* db = nullptr;
     bool onDropCollectionThrowsException = false;
+    const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
 void OpObserverMock::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
@@ -86,9 +88,11 @@ void OpObserverMock::onDropDatabase(OperationContext* opCtx, const std::string& 
 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
-                                              OptionalCollectionUUID uuid) {
+                                              OptionalCollectionUUID uuid,
+                                              const CollectionDropType dropType) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    auto opTime = OpObserverNoop::onDropCollection(opCtx, collectionName, uuid);
+    auto opTime = OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, dropType);
+    invariant(opTime.isNull());
     // Do not update 'droppedCollectionNames' if OpObserverNoop::onDropCollection() throws.
     droppedCollectionNames.insert(collectionName);
 
@@ -100,7 +104,7 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     uassert(
         ErrorCodes::OperationFailed, "onDropCollection() failed", !onDropCollectionThrowsException);
 
-    OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
+    OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
     return {};
 }
 

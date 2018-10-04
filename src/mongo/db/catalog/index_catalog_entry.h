@@ -143,6 +143,8 @@ public:
     virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
 
     virtual void setMinimumVisibleSnapshot(const Timestamp name) = 0;
+
+    virtual void setNs(NamespaceString ns) = 0;
 };
 
 class IndexCatalogEntryContainer {

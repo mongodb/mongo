@@ -35,6 +35,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -86,6 +87,10 @@ void MockReplCoordServerFixture::setUp() {
 
     repl::setOplogCollectionName(service);
     repl::acquireOplogCollectionForLogging(opCtx());
+
+    repl::DropPendingCollectionReaper::set(
+        service,
+        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 }
 
 void MockReplCoordServerFixture::tearDown() {

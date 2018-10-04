@@ -71,7 +71,7 @@ CollectionInfoCacheImpl::~CollectionInfoCacheImpl() {
     // Necessary because the collection cache will not explicitly get updated upon database drop.
     if (_hasTTLIndex) {
         TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-        ttlCollectionCache.unregisterCollection(_ns);
+        ttlCollectionCache.unregisterCollection(_collection->ns());
     }
 }
 
@@ -254,4 +254,19 @@ void CollectionInfoCacheImpl::rebuildIndexData(OperationContext* opCtx) {
 CollectionIndexUsageMap CollectionInfoCacheImpl::getIndexUsageStats() const {
     return _indexUsageTracker.getUsageStats();
 }
+
+void CollectionInfoCacheImpl::setNs(NamespaceString ns) {
+    auto oldNs = _ns;
+    _ns = std::move(ns);
+
+    _planCache->setNs(_ns);
+
+    // Update the TTL collection cache.
+    if (_hasTTLIndex) {
+        auto& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
+        ttlCollectionCache.unregisterCollection(oldNs);
+        ttlCollectionCache.registerCollection(_ns);
+    }
+}
+
 }  // namespace mongo
