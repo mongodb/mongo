@@ -541,7 +541,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutpu
 	case dump.OutputOptions.ViewsAsCollections:
 		// views have an implied aggregation which does not support snapshot
 		fallthrough
-	case dump.InputOptions.TableScan || intent.IsSpecialCollection():
+	case dump.InputOptions.TableScan || intent.IsSpecialCollection() || intent.IsOplog():
 		// ---forceTablesScan runs the query without snapshot enabled
 		// The system.profile collection has no index on _id so can't be hinted.
 		findQuery = session.DB(intent.DB).C(intent.C).Find(nil)

@@ -28,7 +28,8 @@ func init() {
 }
 
 var (
-	testArchive = "testdata/test.bar.archive"
+	testArchive          = "testdata/test.bar.archive"
+	testArchiveWithOplog = "testdata/dump-w-oplog.archive"
 )
 
 func TestMongorestoreShortArchive(t *testing.T) {
@@ -84,5 +85,35 @@ func TestMongorestoreShortArchive(t *testing.T) {
 				So(err, ShouldNotBeNil)
 			}
 		}
+	})
+}
+
+func TestMongorestoreArchiveWithOplog(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
+	_, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
+
+	Convey("With a test MongoRestore", t, func() {
+		inputOptions := &InputOptions{
+			Archive:     testArchiveWithOplog,
+			OplogReplay: true,
+		}
+		outputOptions := &OutputOptions{
+			Drop: true,
+		}
+		nsOptions := &NSOptions{}
+		provider, toolOpts, err := testutil.GetBareSessionProvider()
+
+		restore := MongoRestore{
+			ToolOptions:     toolOpts,
+			OutputOptions:   outputOptions,
+			InputOptions:    inputOptions,
+			NSOptions:       nsOptions,
+			SessionProvider: provider,
+		}
+		err = restore.Restore()
+		So(err, ShouldBeNil)
 	})
 }
