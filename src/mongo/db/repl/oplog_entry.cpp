@@ -71,9 +71,10 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
     } else if (commandString == "abortTransaction") {
         return OplogEntry::CommandType::kAbortTransaction;
     } else {
-        severe() << "Unknown oplog entry command type: " << commandString
-                 << " Object field: " << redact(objectField);
-        fassertFailedNoTrace(40444);
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "Unknown oplog entry command type: " << commandString
+                                << " Object field: "
+                                << redact(objectField));
     }
     MONGO_UNREACHABLE;
 }

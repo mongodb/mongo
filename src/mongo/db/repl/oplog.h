@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/functional.h"
@@ -222,10 +223,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
 /**
  * Take a command op and apply it locally
- * Used for applying from an oplog
+ * Used for applying from an oplog and for applyOps command.
  * Returns failure status if the op that could not be applied.
  */
-Status applyCommand_inlock(OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode mode);
+Status applyCommand_inlock(OperationContext* opCtx,
+                           const BSONObj& op,
+                           const OplogEntry& entry,
+                           OplogApplication::Mode mode);
 
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.

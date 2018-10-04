@@ -202,10 +202,20 @@ Status _applyOps(OperationContext* opCtx,
                     "applyOps",
                     nss.ns(),
                     [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode] {
+                        BSONObjBuilder builder;
+                        builder.appendElements(opObj);
+                        if (!builder.hasField(OplogEntry::kTimestampFieldName)) {
+                            builder.append(OplogEntry::kTimestampFieldName, Timestamp());
+                        }
+                        if (!builder.hasField(OplogEntry::kHashFieldName)) {
+                            builder.append(OplogEntry::kHashFieldName, 0LL);
+                        }
+                        auto entryObj = builder.done();
+                        auto entry = uassertStatusOK(OplogEntry::parse(entryObj));
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
-                            uassertStatusOK(
-                                repl::applyCommand_inlock(opCtx, opObj, oplogApplicationMode));
+                            uassertStatusOK(repl::applyCommand_inlock(
+                                opCtx, opObj, entry, oplogApplicationMode));
                             return Status::OK();
                         }
 

@@ -365,7 +365,10 @@
     assert.eq(true, res.results[1], "Valid update failed");
 
     // Ops with transaction numbers are valid.
-    var lsid = {id: UUID()};
+    const lsid = {
+        "id": UUID("3eea4a58-6018-40b6-8743-6a55783bf902"),
+        "uid": BinData(0, "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=")
+    };
     res = db.runCommand({
         applyOps: [
             {
@@ -374,7 +377,7 @@
               o: {_id: 7, x: 24},
               lsid: lsid,
               txnNumber: NumberLong(1),
-              stmdId: 0
+              stmtId: NumberInt(0)
             },
             {
               op: "u",
@@ -383,7 +386,7 @@
               o: {$set: {x: 25}},
               lsid: lsid,
               txnNumber: NumberLong(1),
-              stmdId: 1
+              stmtId: NumberInt(1)
             },
             {
               op: "d",
@@ -391,7 +394,7 @@
               o: {_id: 7},
               lsid: lsid,
               txnNumber: NumberLong(2),
-              stmdId: 0
+              stmtId: NumberInt(0)
             },
         ]
     });

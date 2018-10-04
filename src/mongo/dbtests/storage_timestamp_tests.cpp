@@ -639,7 +639,7 @@ public:
                                    << BSON("_id" << idx))
                          << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
                                       << "h"
-                                      << 1
+                                      << 1LL
                                       << "op"
                                       << "c"
                                       << "ns"
@@ -665,7 +665,7 @@ public:
 class SecondaryArrayInsertTimes : public StorageTimestampTest {
 public:
     void run() {
-        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        // In order for oplog application to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         // Create a new collection.
@@ -676,57 +676,37 @@ public:
 
         const std::uint32_t docsToInsert = 10;
         const LogicalTime firstInsertTime = _clock->reserveTicks(docsToInsert);
-        BSONObjBuilder fullCommand;
-        BSONArrayBuilder applyOpsB(fullCommand.subarrayStart("applyOps"));
 
-        BSONObjBuilder applyOpsElem1Builder;
+        BSONObjBuilder oplogEntryBuilder;
 
         // Populate the "ts" field with an array of all the grouped inserts' timestamps.
-        BSONArrayBuilder tsArrayBuilder(applyOpsElem1Builder.subarrayStart("ts"));
+        BSONArrayBuilder tsArrayBuilder(oplogEntryBuilder.subarrayStart("ts"));
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
             tsArrayBuilder.append(firstInsertTime.addTicks(idx).asTimestamp());
         }
         tsArrayBuilder.done();
 
         // Populate the "t" (term) field with an array of all the grouped inserts' terms.
-        BSONArrayBuilder tArrayBuilder(applyOpsElem1Builder.subarrayStart("t"));
+        BSONArrayBuilder tArrayBuilder(oplogEntryBuilder.subarrayStart("t"));
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
             tArrayBuilder.append(1LL);
         }
         tArrayBuilder.done();
 
         // Populate the "o" field with an array of all the grouped inserts.
-        BSONArrayBuilder oArrayBuilder(applyOpsElem1Builder.subarrayStart("o"));
+        BSONArrayBuilder oArrayBuilder(oplogEntryBuilder.subarrayStart("o"));
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
             oArrayBuilder.append(BSON("_id" << idx));
         }
         oArrayBuilder.done();
 
-        applyOpsElem1Builder << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                             << "i"
-                             << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get();
+        oplogEntryBuilder << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                          << "i"
+                          << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get();
 
-        applyOpsB.append(applyOpsElem1Builder.done());
-
-        BSONObjBuilder applyOpsElem2Builder;
-        applyOpsElem2Builder << "ts" << firstInsertTime.addTicks(docsToInsert).asTimestamp() << "t"
-                             << 1LL << "h" << 1 << "op"
-                             << "c"
-                             << "ns"
-                             << "test.$cmd"
-                             << "o" << BSON("applyOps" << BSONArrayBuilder().obj());
-
-        applyOpsB.append(applyOpsElem2Builder.done());
-        applyOpsB.done();
-        // Apply the group of inserts.
-        BSONObjBuilder result;
-        ASSERT_OK(applyOps(_opCtx,
-                           nss.db().toString(),
-                           fullCommand.done(),
-                           repl::OplogApplication::Mode::kApplyOpsCmd,
-                           {},
-                           &result));
-
+        auto oplogEntry = oplogEntryBuilder.done();
+        ASSERT_OK(repl::SyncTail::syncApply(
+            _opCtx, oplogEntry, repl::OplogApplication::Mode::kSecondary));
 
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());

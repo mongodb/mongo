@@ -308,13 +308,15 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             boost::optional<Lock::GlobalWrite> globalWriteLock;
 
             // TODO SERVER-37180 Remove this double-parsing.
+            // The command entry has been parsed before, so it must be valid.
+            auto entry = uassertStatusOK(OplogEntry::parse(op));
             const StringData commandName(op["o"].embeddedObject().firstElementFieldName());
             if (!op.getBoolField("prepare") && commandName != "abortTransaction") {
                 globalWriteLock.emplace(opCtx);
             }
 
             // special case apply for commands to avoid implicit database creation
-            Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
+            Status status = applyCommand_inlock(opCtx, op, entry, oplogApplicationMode);
             incrementOpsAppliedStats();
             return status;
         });

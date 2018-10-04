@@ -217,6 +217,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                            const BSONElement& ui,
                            BSONObj& cmd,
                            const repl::OpTime& optime,
+                           const repl::OplogEntry& entry,
                            OplogApplication::Mode mode);
 }
 }

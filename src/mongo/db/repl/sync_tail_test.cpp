@@ -351,7 +351,11 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
                    << "ns"
                    << nss.getCommandNS().ns()
                    << "o"
-                   << BSON("create" << nss.coll()));
+                   << BSON("create" << nss.coll())
+                   << "ts"
+                   << Timestamp(1, 1)
+                   << "h"
+                   << 0LL);
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
                                             Collection*,
@@ -379,10 +383,14 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
                             << 12345
                             << "o"
                             << BSON("create"
-                                    << "t"));
-    // This test relies on the namespace type check in applyCommand_inlock().
+                                    << "t")
+                            << "ts"
+                            << Timestamp(1, 1)
+                            << "h"
+                            << 0LL);
+    // This test relies on the namespace type check of IDL.
     ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync),
-                  ExceptionFor<ErrorCodes::InvalidNamespace>);
+                  ExceptionFor<ErrorCodes::TypeMismatch>);
 }
 
 DEATH_TEST_F(SyncTailTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {

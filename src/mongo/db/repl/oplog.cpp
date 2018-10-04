@@ -790,6 +790,7 @@ using OpApplyFn = stdx::function<Status(OperationContext* opCtx,
                                         const BSONElement& ui,
                                         BSONObj& cmd,
                                         const OpTime& opTime,
+                                        const OplogEntry& entry,
                                         OplogApplication::Mode mode)>;
 
 struct ApplyOpMetadata {
@@ -813,6 +814,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           const NamespaceString nss(parseNs(ns, cmd));
           if (auto idIndexElem = cmd["idIndex"]) {
@@ -839,6 +841,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
           BSONElement first = cmd.firstElement();
@@ -861,6 +864,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           NamespaceString nss;
           std::tie(std::ignore, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
@@ -876,6 +880,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           return dropDatabase(opCtx, NamespaceString(ns).db().toString());
       },
@@ -886,6 +891,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           auto nss = parseUUIDorNs(opCtx, ns, ui, cmd);
@@ -910,6 +916,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
@@ -921,6 +928,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
@@ -932,6 +940,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
@@ -943,6 +952,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
@@ -954,6 +964,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           return renameCollectionForApplyOps(opCtx, nsToDatabase(ns), ui, cmd, opTime);
       },
@@ -964,6 +975,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
          BSONObjBuilder resultWeDontCareAbout;
          return applyOps(opCtx, nsToDatabase(ns), cmd, mode, opTime, &resultWeDontCareAbout);
@@ -974,6 +986,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           return convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
       },
@@ -984,6 +997,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
           return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
       },
@@ -994,6 +1008,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status { return Status::OK(); }}},
     {"abortTransaction",
      {[](OperationContext* opCtx,
@@ -1001,6 +1016,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
+         const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
          // We don't put transactions into the prepare state until the end of recovery, so there is
          // no transaction to abort.
@@ -1510,6 +1526,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
 Status applyCommand_inlock(OperationContext* opCtx,
                            const BSONObj& op,
+                           const OplogEntry& entry,
                            OplogApplication::Mode mode) {
     LOG(3) << "applying command op: " << redact(op)
            << ", oplog application mode: " << OplogApplication::modeToString(mode);
@@ -1629,7 +1646,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
             // If 'writeTime' is not null, any writes in this scope will be given 'writeTime' as
             // their timestamp at commit.
             TimestampBlock tsBlock(opCtx, writeTime);
-            status = curOpToApply.applyFunc(opCtx, nss.ns().c_str(), fieldUI, o, opTime, mode);
+            status =
+                curOpToApply.applyFunc(opCtx, nss.ns().c_str(), fieldUI, o, opTime, entry, mode);
         } catch (...) {
             status = exceptionToStatus();
         }
