@@ -622,7 +622,7 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 	WT_SESSION_IMPL *session;
 	WT_TXN_ISOLATION saved_isolation;
 	WT_UPDATE *upd;
-	uint64_t insert_cnt;
+	uint64_t insert_cnt, prepared_insert_cnt;
 	uint64_t las_counter, las_pageid;
 	uint32_t btree_id, i, slot;
 	uint8_t *p;
@@ -632,7 +632,7 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 	conn = S2C(session);
 	WT_CLEAR(las_timestamp);
 	WT_CLEAR(las_value);
-	insert_cnt = 0;
+	insert_cnt = prepared_insert_cnt = 0;
 	btree_id = btree->id;
 	local_txn = false;
 
@@ -763,6 +763,8 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 			 */
 			WT_ERR(cursor->update(cursor));
 			++insert_cnt;
+			if (upd->prepare_state == WT_PREPARE_INPROGRESS)
+				++prepared_insert_cnt;
 		} while ((upd = upd->next) != NULL);
 	}
 
@@ -774,9 +776,13 @@ err:	/* Resolve the transaction. */
 			WT_TRET(__wt_txn_rollback(session, NULL));
 
 		/* Adjust the entry count. */
-		if (ret == 0)
+		if (ret == 0) {
 			(void)__wt_atomic_add64(
 			    &conn->cache->las_insert_count, insert_cnt);
+			WT_STAT_CONN_INCRV(session,
+			    txn_prepared_updates_lookaside_inserts,
+			    prepared_insert_cnt);
+		}
 	}
 
 	__las_restore_isolation(session, saved_isolation);

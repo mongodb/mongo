@@ -65,11 +65,11 @@
 #define	LZO_PATH	".libs/lzo_compress.so"
 
 #undef	M
-#define	M(v)		((v) * 1000000)		/* Million */
+#define	M(v)		((v) * WT_MILLION)	/* Million */
 #undef	KILOBYTE
-#define	KILOBYTE(v)	((v) * 1024)
+#define	KILOBYTE(v)	((v) * WT_KILOBYTE)
 #undef	MEGABYTE
-#define	MEGABYTE(v)	((v) * 1048576)
+#define	MEGABYTE(v)	((v) * WT_MEGABYTE)
 
 #define	WT_NAME	"wt"				/* Object name */
 
@@ -201,6 +201,7 @@ typedef struct {
 	uint32_t c_logging_prealloc;
 	uint32_t c_long_running_txn;
 	uint32_t c_lsm_worker_threads;
+	uint32_t c_memory_page_max;
 	uint32_t c_merge_max;
 	uint32_t c_mmap;
 	uint32_t c_modify_pct;

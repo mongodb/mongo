@@ -364,6 +364,7 @@ __wt_txn_resolve_prepared_op(
 #endif
 
 	op->u.op_upd = upd;
+	WT_STAT_CONN_INCR(session, txn_prepared_updates_resolved);
 
 	for (; upd != NULL; upd = upd->next) {
 		 if (upd->txnid != txn->id)

@@ -182,11 +182,11 @@ err:	if (table != NULL && !tracked)
 }
 
 /*
- * __wt_schema_drop --
+ * __schema_drop --
  *	Process a WT_SESSION::drop operation for all supported types.
  */
-int
-__wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+static int
+__schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
@@ -228,5 +228,21 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 
 	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
+	return (ret);
+}
+
+/*
+ * __wt_schema_drop --
+ *	Process a WT_SESSION::drop operation for all supported types.
+ */
+int
+__wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *int_session;
+
+	WT_RET(__wt_schema_internal_session(session, &int_session));
+	ret = __schema_drop(int_session, uri, cfg);
+	WT_TRET(__wt_schema_session_release(session, int_session));
 	return (ret);
 }

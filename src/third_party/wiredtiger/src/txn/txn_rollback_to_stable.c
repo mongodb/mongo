@@ -104,10 +104,6 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
     WT_UPDATE *first_upd, wt_timestamp_t *rollback_timestamp)
 {
 	WT_UPDATE *upd;
-	bool skip_zero_timestamps;
-
-	skip_zero_timestamps = !FLD_ISSET(S2BT(session)->assert_flags,
-	    WT_ASSERT_COMMIT_TS_ALWAYS | WT_ASSERT_COMMIT_TS_KEYS);
 
 	for (upd = first_upd; upd != NULL; upd = upd->next) {
 		/*
@@ -116,23 +112,30 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		 * strict timestamp checking, assert that all more recent
 		 * updates were also rolled back.
 		 */
-		if (upd->txnid == WT_TXN_ABORTED && upd == first_upd)
-			first_upd = upd->next;
-		else if (__wt_timestamp_iszero(&upd->timestamp)) {
-			if (skip_zero_timestamps && upd == first_upd)
+		if (upd->txnid == WT_TXN_ABORTED ||
+		    __wt_timestamp_iszero(&upd->timestamp)) {
+			if (upd == first_upd)
 				first_upd = upd->next;
 		} else if (__wt_timestamp_cmp(
 		    rollback_timestamp, &upd->timestamp) < 0) {
-			upd->txnid = WT_TXN_ABORTED;
-			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
-			__wt_timestamp_set_zero(&upd->timestamp);
-
 			/*
 			 * If any updates are aborted, all newer updates
 			 * better be aborted as well.
+			 *
+			 * Timestamp ordering relies on the validations at
+			 * the time of commit. Thus if the table is not
+			 * configured for key consistency check, the
+			 * the timestamps could be out of order here.
 			 */
-			WT_ASSERT(session, upd == first_upd);
+			WT_ASSERT(session,
+			    !FLD_ISSET(S2BT(session)->assert_flags,
+			    WT_ASSERT_COMMIT_TS_KEYS) ||
+			    upd == first_upd);
 			first_upd = upd->next;
+
+			upd->txnid = WT_TXN_ABORTED;
+			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
+			__wt_timestamp_set_zero(&upd->timestamp);
 		}
 	}
 }

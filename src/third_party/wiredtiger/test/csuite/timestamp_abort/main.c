@@ -58,7 +58,8 @@ static char home[1024];			/* Program working dir */
  */
 #define	INVALID_KEY	UINT64_MAX
 #define	MAX_CKPT_INVL	5	/* Maximum interval between checkpoints */
-#define	MAX_TH		12
+#define	MAX_DEFAULT_TH	12
+#define	MAX_TH		200	/* Maximum configurable threads */
 #define	MAX_TIME	40
 #define	MAX_VAL		1024
 #define	MIN_TH		5
@@ -67,6 +68,7 @@ static char home[1024];			/* Program working dir */
 #define	PREPARE_YIELD	(PREPARE_FREQ * 10)
 #define	RECORDS_FILE	"records-%" PRIu32
 #define	STABLE_PERIOD	100
+#define	SESSION_MAX	MAX_TH + 3	/* Include program worker threads */
 
 static const char * table_pfx = "table";
 static const char * const uri_local = "local";
@@ -81,10 +83,10 @@ static volatile uint64_t th_ts[MAX_TH];
 
 #define	ENV_CONFIG_COMPAT	",compatibility=(release=\"2.9\")"
 #define	ENV_CONFIG_DEF						\
-    "create,log=(archive=false,file_max=10M,enabled)"
+    "create,log=(archive=false,file_max=10M,enabled),session_max=%" PRIu32
 #define	ENV_CONFIG_TXNSYNC					\
-    "create,log=(archive=false,file_max=10M,enabled),"			\
-    "transaction_sync=(enabled,method=none)"
+    "create,log=(archive=false,file_max=10M,enabled),"		\
+    "transaction_sync=(enabled,method=none),session_max=%" PRIu32
 #define	ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
 typedef struct {
@@ -445,9 +447,11 @@ run_workload(uint32_t nth)
 	if (chdir(home) != 0)
 		testutil_die(errno, "Child chdir: %s", home);
 	if (inmem)
-		strcpy(envconf, ENV_CONFIG_DEF);
+		(void)__wt_snprintf(envconf, sizeof(envconf),
+		    ENV_CONFIG_DEF, SESSION_MAX);
 	else
-		strcpy(envconf, ENV_CONFIG_TXNSYNC);
+		(void)__wt_snprintf(envconf, sizeof(envconf),
+		    ENV_CONFIG_TXNSYNC, SESSION_MAX);
 	if (compat)
 		strcat(envconf, ENV_CONFIG_COMPAT);
 
@@ -628,6 +632,12 @@ main(int argc, char *argv[])
 		case 'T':
 			rand_th = false;
 			nth = (uint32_t)atoi(__wt_optarg);
+			if (nth > MAX_TH) {
+				fprintf(stderr,
+				    "Number of threads is larger than the"
+				    " maximum %" PRId32 "\n", MAX_TH);
+				return (EXIT_FAILURE);
+			}
 			break;
 		case 't':
 			rand_time = false;
@@ -666,7 +676,7 @@ main(int argc, char *argv[])
 				timeout = MIN_TIME;
 		}
 		if (rand_th) {
-			nth = __wt_random(&rnd) % MAX_TH;
+			nth = __wt_random(&rnd) % MAX_DEFAULT_TH;
 			if (nth < MIN_TH)
 				nth = MIN_TH;
 		}
