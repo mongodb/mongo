@@ -365,6 +365,20 @@ variables:
   - compile_dbtest
   - dbtest
 
+- &aggregation_multiversion_fuzzer_burn_in
+  name: aggregation_multiversion_fuzzer_burn_in
+  execution_tasks:
+  - aggregation_multiversion_fuzzer_0
+  - aggregation_multiversion_fuzzer_1
+  - aggregation_multiversion_fuzzer_2
+  - aggregation_multiversion_fuzzer_3
+  - aggregation_multiversion_fuzzer_4
+  - aggregation_multiversion_fuzzer_5
+  - aggregation_multiversion_fuzzer_6
+  - aggregation_multiversion_fuzzer_7
+  - aggregation_multiversion_fuzzer_8
+  - aggregation_multiversion_fuzzer_9
+
 - &compile_task_group_template
   name: compile_task_group_template
   max_hosts: 1
@@ -4531,20 +4545,52 @@ tasks:
       jepsen_write_concern: --write-concern w1
 
 ## Standalone generational fuzzer for aggregation pipelines ##
-- <<: *jstestfuzz_template
+- &aggregation_multiversion_fuzzer_template
+  <<: *jstestfuzz_template 
   name: aggregation_multiversion_fuzzer
   commands:
   - func: "do setup"
   - func: "do multiversion setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --numGeneratedFiles 50
+      jstestfuzz_vars: --numGeneratedFiles 5
       npm_command: agg-fuzzer
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=generational_fuzzer
+
+# Define multiple fuzzer tasks so they can be run in parallel.
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_0
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_1
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_2
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_3
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_4
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_5
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_6
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_7
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_8
+
+- <<: *aggregation_multiversion_fuzzer_template
+  name: aggregation_multiversion_fuzzer_9
 
 ## Standalone generational fuzzer for aggregation expressions ##
 - <<: *jstestfuzz_template
@@ -8139,6 +8185,7 @@ buildvariants:
   display_tasks:
   - *dbtest
   - *unittests
+  - *aggregation_multiversion_fuzzer_burn_in
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8182,12 +8229,21 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: aggregation_multiversion_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_replication
+  - name: aggregation_multiversion_fuzzer_0
+  - name: aggregation_multiversion_fuzzer_1
+  - name: aggregation_multiversion_fuzzer_2
+  - name: aggregation_multiversion_fuzzer_3
+  - name: aggregation_multiversion_fuzzer_4
+  - name: aggregation_multiversion_fuzzer_5
+  - name: aggregation_multiversion_fuzzer_6
+  - name: aggregation_multiversion_fuzzer_7
+  - name: aggregation_multiversion_fuzzer_8
+  - name: aggregation_multiversion_fuzzer_9
   - name: jstestfuzz_sharded
   - name: mongosTest
   - name: multiversion_auth
