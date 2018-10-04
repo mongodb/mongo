@@ -1,5 +1,5 @@
 {
-    "commit": "874ad456ffec7463c476e976c72b9bf2379b668d", 
+    "commit": "7e7a3acf2b411c2861782d34c68be940f85a6582", 
     "github": "mongodb/mongo-tools.git", 
     "vendor": "tools", 
     "branch": "v3.6"
