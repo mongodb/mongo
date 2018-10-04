@@ -84,7 +84,7 @@ public:
                 "commitTransaction must be run within a transaction",
                 txnParticipant);
 
-        LOG(3) << "Participant shard received commitTransaction for transaction with txnNumber "
+        LOG(3) << "Received commitTransaction for transaction with txnNumber "
                << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
 
         // commitTransaction is retryable.
@@ -150,7 +150,7 @@ public:
                 "abortTransaction must be run within a transaction",
                 txnParticipant);
 
-        LOG(3) << "Participant shard received abortTransaction for transaction with txnNumber "
+        LOG(3) << "Received abortTransaction for transaction with txnNumber "
                << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
 
         uassert(ErrorCodes::NoSuchTransaction,
