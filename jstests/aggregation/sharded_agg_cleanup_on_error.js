@@ -95,8 +95,8 @@
 
         // Neither mongos or the shards should leave cursors open.
         assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
-        assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
-        assert.eq(shard1DB.serverStatus().metrics.cursor.open.total, 0);
+        assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.total == 0);
+        assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.total == 0);
 
     } finally {
         assert.commandWorked(mongosDB.adminCommand({
@@ -120,8 +120,8 @@
 
         // Neither mongos or the shards should leave cursors open.
         assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
-        assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
-        assert.eq(shard1DB.serverStatus().metrics.cursor.open.total, 0);
+        assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.total == 0);
+        assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.total == 0);
 
     } finally {
         assert.commandWorked(mongosDB.adminCommand({
