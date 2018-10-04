@@ -172,7 +172,7 @@ func Record(ctx *packetHandlerContext,
 		var fail error
 		for op := range ctx.mongoOpStream.Ops {
 			// since we don't currently have a way to shutdown packetHandler.Handle()
-			// continue to read from ctx.mongoOpStream.Ops even after a faltal error
+			// continue to read from ctx.mongoOpStream.Ops even after a fatal error
 			if fail != nil {
 				toolDebugLogger.Logvf(DebugHigh, "not recording op because of record error %v", fail)
 				continue

@@ -34,7 +34,7 @@ func GetFieldsFromFile(path string) ([]string, error) {
 }
 
 // ToUniversalPath returns the result of replacing each slash ('/') character
-// in "path" with an OS-sepcific separator character. Multiple slashes are
+// in "path" with an OS-specific separator character. Multiple slashes are
 // replaced by multiple separators
 func ToUniversalPath(path string) string {
 	return filepath.FromSlash(path)

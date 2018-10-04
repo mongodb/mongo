@@ -51,7 +51,7 @@ type OpStat struct {
 	PlayAt *time.Time `json:"play_at,omitempty"`
 
 	// PlaybackLagMicros is the time difference in microseconds between the time
-	// that the operation was supposed to be played, and the time it was actualy played.
+	// that the operation was supposed to be played, and the time it was actually played.
 	// High values indicate that playback is falling behind the intended rate.
 	PlaybackLagMicros int64 `json:"playbacklag_us,omitempty"`
 

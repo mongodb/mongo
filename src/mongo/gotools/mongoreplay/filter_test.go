@@ -434,7 +434,7 @@ func TestRemoveOpsAfterDuration(t *testing.T) {
 	}
 }
 
-// convienence function for adding a close method to an io.Writer
+// convenience function for adding a close method to an io.Writer
 func NopWriteCloser(w io.Writer) io.WriteCloser {
 	return &nopWriteCloser{w}
 }

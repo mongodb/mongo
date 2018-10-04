@@ -76,7 +76,7 @@ var (
 	oracleStringReplacer = strings.NewReplacer(oracleReplacers...)
 )
 
-// FromOrace reformats a datetime layout string from the Oracle Database
+// FromOracle reformats a datetime layout string from the Oracle Database
 // TO_DATE function into go's parse format.
 func FromOracle(layout string) string {
 	return oracleStringReplacer.Replace(strings.ToUpper(layout))

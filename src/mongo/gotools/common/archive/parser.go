@@ -64,7 +64,7 @@ func newParserWrappedError(msg string, err error) error {
 }
 
 // readBSONOrTerminator reads at least four bytes, determines
-// if the first four bytes are a terminator, a bson lenght, or something else.
+// if the first four bytes are a terminator, a bson length, or something else.
 // If they are a terminator, true,nil are returned. If they are a BSON length,
 // then the remainder of the BSON document are read in to the parser, otherwise
 // an error is returned.

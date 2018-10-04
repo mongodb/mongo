@@ -165,7 +165,7 @@ func getMatchingFiles(dir, pattern string) ([]string, error) {
 }
 
 // read all the database bson documents from dir and put it into another DB
-// ignore the inddexes for now
+// ignore the indexes for now
 func readBSONIntoDatabase(dir, restoreDBName string) error {
 	if ok := fileDirExists(dir); !ok {
 		return fmt.Errorf("error finding '%v' on local FS", dir)

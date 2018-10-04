@@ -49,10 +49,10 @@ func (gmCommand *CommandGetMore) getCursorIDs() ([]int64, error) {
 	return []int64{*gmCommand.cachedCursor}, err
 }
 
-// setCursorIDs is an implementation of the cusorsRewriteable interface method.
-// It takes an array of of cursors that will function as the new cursors for
-// this operation.  If there are more than one cursorIDs in the array, it
-// errors, as it only ever expects one.  It may also error if unmarshalling the
+// setCursorIDs is an implementation of the cursorsRewriteable interface method.
+// It takes an array of cursors that will function as the new cursors for
+// this operation.  If there is more than one cursorID in the array, it
+// errors, as it only ever expects one. It may also error if unmarshalling the
 // underlying bson fails.
 func (gmCommand *CommandGetMore) setCursorIDs(newCursorIDs []int64) error {
 	newDoc, newCursorID, err := setCursorID(gmCommand.CommandArgs, newCursorIDs)

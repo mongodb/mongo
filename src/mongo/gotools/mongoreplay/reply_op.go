@@ -125,7 +125,7 @@ func stringifyReplyDocs(d []bson.Raw) string {
 
 // getCursorID implements the Replyable interface method. It returns the
 // cursorID stored in this reply. It returns an error if there is an issue
-// unmarshaling the underlying bson. It caches the cursorID in the ReplyOp
+// unmarshalling the underlying bson. It caches the cursorID in the ReplyOp
 // struct so that subsequent calls to this function do not incur cost of
 // unmarshalling the bson each time.
 func (op *ReplyOp) getCursorID() (int64, error) {

@@ -80,7 +80,7 @@ func (dbs *DecodedBSONSource) Next(result interface{}) bool {
 // LoadNext reads and returns the next BSON document in the stream. If the
 // BSONSource was created with NewBSONSource then each returned []byte will be
 // a slice of a single reused I/O buffer. If the BSONSource was created with
-// NewBufferlessBSONSource then each returend []byte will be individually
+// NewBufferlessBSONSource then each returned []byte will be individually
 // allocated
 func (bs *BSONSource) LoadNext() []byte {
 	var into []byte

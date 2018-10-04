@@ -301,7 +301,7 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 					}
 					// we don't want '"foo" "bar",' to look like '"foo""bar"'
 					// which evaluates to 'foo"bar'
-					// so we explicitly test for the case that the trimed whitespace isn't
+					// so we explicitly test for the case that the trimmed whitespace isn't
 					// followed by a '"'
 					if err == nil && r1 == '"' {
 						r.column--

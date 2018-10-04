@@ -6,7 +6,7 @@
 
 // +build failpoints
 
-// Package failpoint implements triggers for custom debugging behavoir
+// Package failpoint implements triggers for custom debugging behavior
 package failpoint
 
 import (

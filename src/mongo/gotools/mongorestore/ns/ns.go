@@ -16,7 +16,7 @@ import (
 type Renamer struct {
 	// List of regexps to match namespaces against
 	matchers []*regexp.Regexp
-	// List of regexp-syle replacement strings to use with the matcher
+	// List of regexp-style replacement strings to use with the matcher
 	replacers []string
 }
 

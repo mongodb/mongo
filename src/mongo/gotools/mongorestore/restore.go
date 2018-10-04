@@ -237,7 +237,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 }
 
 // RestoreCollectionToDB pipes the given BSON data into the database.
-// Returns the number of documents restored and any errors that occured.
+// Returns the number of documents restored and any errors that occurred.
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, file PosReader, fileSize int64) (int64, error) {
 

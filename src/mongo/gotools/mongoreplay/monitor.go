@@ -56,7 +56,7 @@ func (gen *RegularStatGenerator) AddUnresolvedOp(op *RecordedOp, parsedOp Op, re
 //
 // recordedReply is the just received reply in the form of a RecordedOp, which
 // contains additional metadata.  parsedReply is the same reply, parsed so that
-// the payload of the op can be accesssed.  replyStat is the OpStat created by
+// the payload of the op can be accessed.  replyStat is the OpStat created by
 // the GenerateOpStat function, containing computed metadata about the reply.
 func (gen *RegularStatGenerator) ResolveOp(recordedReply *RecordedOp, reply Replyable, replyStat *OpStat) *OpStat {
 	result := &OpStat{}

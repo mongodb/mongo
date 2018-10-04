@@ -64,7 +64,7 @@ type IngestOptions struct {
 	// Modify the import process.
 	// Always insert the documents if they are new (do NOT match --upsertFields).
 	// For existing documents (match --upsertFields) in the database:
-	// "insert": Insert only, skip exisiting documents.
+	// "insert": Insert only, skip existing documents.
 	// "upsert": Insert new documents or replace existing ones.
 	// "merge": Insert new documents or modify existing ones; Preserve values in the database that are not overwritten.
 	Mode string `long:"mode" choice:"insert" choice:"upsert" choice:"merge" description:"insert: insert only. upsert: insert or replace existing documents. merge: insert or modify existing documents. defaults to insert"`

@@ -36,7 +36,7 @@ type V struct {
 	F3 Number
 }
 
-// ifaceNumAsFloat64/ifaceNumAsNumber are used to test unmarshaling with and
+// ifaceNumAsFloat64/ifaceNumAsNumber are used to test unmarshalling with and
 // without UseNumber
 var ifaceNumAsFloat64 = map[string]interface{}{
 	"k1": float64(1),
@@ -100,14 +100,14 @@ type ustructText struct {
 }
 
 var (
-	um0, um1 unmarshaler // target2 of unmarshaling
+	um0, um1 unmarshaler // target2 of unmarshalling
 	ump      = &um1
 	umtrue   = unmarshaler{true}
 	umslice  = []unmarshaler{{true}}
 	umslicep = new([]unmarshaler)
 	umstruct = ustruct{unmarshaler{true}}
 
-	um0T, um1T unmarshalerText // target2 of unmarshaling
+	um0T, um1T unmarshalerText // target2 of unmarshalling
 	umpT       = &um1T
 	umtrueT    = unmarshalerText{true}
 	umsliceT   = []unmarshalerText{{true}}

@@ -182,7 +182,7 @@ func TestOpInsertLiveDB(t *testing.T) {
 	result := testDoc{}
 
 	// iterate over the results of the query and ensure they match expected documents
-	t.Log("Querying database to ensure insert occured successfully")
+	t.Log("Querying database to ensure insert occurred successfully")
 	for iter.Next(&result) {
 		t.Logf("Query result: %#v\n", result)
 		if result.DocumentNumber != ind {
@@ -306,7 +306,7 @@ func TestUpdateOpLiveDB(t *testing.T) {
 	}{}
 
 	// iterate over the results of the query and ensure they match expected documents
-	t.Log("Querying database to ensure insert occured successfully")
+	t.Log("Querying database to ensure insert occurred successfully")
 	for iter.Next(&result) {
 		t.Logf("Query result: %#v\n", result)
 		if result.DocumentNumber != ind {
@@ -452,10 +452,10 @@ func TestOpGetMoreLiveDB(t *testing.T) {
 
 // TestOpGetMoreMultiCursorLiveDB tests the functionality of getmores using
 // multiple cursors against a live database. It generates a series of inserts
-// followed by two seperate queries. It then uses each of those queries to
+// followed by two separate queries. It then uses each of those queries to
 // generate multiple getmores. TestOpGetMoreMultiCursorLiveDB uses a
 // BufferedStatCollector to ensure that each getmore played against the database
-// is executed and recieves the response expected
+// is executed and receives the response expected
 func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 	if err := teardownDB(); err != nil {
 		t.Error(err)
@@ -570,11 +570,11 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 
 // TestOpKillCursorsLiveDB tests the functionality of killcursors using multiple
 // cursors against a live database. It generates a series of inserts followed
-// by two seperate queries. It then uses each of those queries to generate
+// by two separate queries. It then uses each of those queries to generate
 // multiple getmores. Finally, it runs a killcursors op and one getmore for
 // each killed cursor TestOpKillCursorsLiveDB uses a BufferedStatCollector to
 // ensure that each killcursors played against the database is executed and
-// recieves the response expected
+// receives the response expected
 func TestOpKillCursorsLiveDB(t *testing.T) {
 	if err := teardownDB(); err != nil {
 		t.Error(err)
@@ -745,7 +745,7 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 	result := testDoc{}
 
 	// iterate over the results of the query and ensure they match expected documents
-	t.Log("Querying database to ensure insert occured successfully")
+	t.Log("Querying database to ensure insert occurred successfully")
 	for iter.Next(&result) {
 		t.Logf("Query result: %#v\n", result)
 		if result.DocumentNumber != ind {
@@ -948,7 +948,7 @@ func TestMsgOpInsertLiveDB(t *testing.T) {
 	result := testDoc{}
 
 	// iterate over the results of the query and ensure they match expected documents
-	t.Log("Querying database to ensure insert occured successfully")
+	t.Log("Querying database to ensure insert occurred successfully")
 	for iter.Next(&result) {
 		t.Logf("Query result: %#v\n", result)
 		if result.DocumentNumber != ind {

@@ -18,7 +18,7 @@ import (
 // playback. It then calls SetCursor to simulate setting this CursorID from live
 // traffic. Finally, it gets the cursor from the preprocessCursorManager to
 // ensure the cursorID has been remapped correctly. It uses a select statement
-// to establish a timeout incase the goroutine running GetCursor has not
+// to establish a timeout in case the goroutine running GetCursor has not
 // returned because the cursorID was not set properly.
 func TestFetchingCursorFromPreprocessManager(t *testing.T) {
 	fileCursor := int64(1234)
@@ -189,7 +189,7 @@ func TestBlockOnUnresolvedCursor(t *testing.T) {
 
 		t.Log("Verifying that successChan not closed before cursor was set")
 		// Verify that its successChan is not closed, which indicates that
-		// GetCuror would block
+		// GetCursor would block
 		select {
 		case <-cursorInfo.successChan:
 			t.Error("successChan closed before mapping was complete")

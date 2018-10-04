@@ -463,7 +463,7 @@ type flushInserter interface {
 }
 
 // runInsertionWorker is a helper to InsertDocuments - it reads document off
-// the read channel and prepares then in batches for insertion into the databas
+// the read channel and prepares then in batches for insertion into the database
 func (imp *MongoImport) runInsertionWorker(readDocs chan bson.D) (err error) {
 	session, err := imp.SessionProvider.GetSession()
 	if err != nil {

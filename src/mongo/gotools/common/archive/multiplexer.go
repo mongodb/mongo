@@ -43,7 +43,7 @@ type notifier interface {
 }
 
 // NewMultiplexer creates a Multiplexer and populates its Control/Completed chans
-// it takes a WriteCloser, which is where in imputs will get multiplexed on to,
+// it takes a WriteCloser, which is where in inputs will get multiplexed on to,
 // and it takes a notifier, which should allow the multiplexer to ask for the shutdown
 // of the inputs.
 func NewMultiplexer(out io.WriteCloser, shutdownInputs notifier) *Multiplexer {

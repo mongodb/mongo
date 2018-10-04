@@ -541,7 +541,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutpu
 	case dump.OutputOptions.ViewsAsCollections:
 		// views have an implied aggregation which does not support snapshot
 		fallthrough
-	case dump.InputOptions.TableScan || intent.IsSpecialCollection():
+	case dump.InputOptions.TableScan || intent.IsSpecialCollection() || intent.IsOplog():
 		// ---forceTablesScan runs the query without snapshot enabled
 		// The system.profile collection has no index on _id so can't be hinted.
 		findQuery = session.DB(intent.DB).C(intent.C).Find(nil)
@@ -602,7 +602,7 @@ func copyDocumentFilter(in []byte) ([]byte, error) {
 
 // dumpQueryToIntent takes an mgo Query, its intent, and a writer, performs the query,
 // and writes the raw bson results to the writer. Returns a final count of documents
-// dumped, and any errors that occured.
+// dumped, and any errors that occurred.
 func (dump *MongoDump) dumpQueryToIntent(
 	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer) (dumpCount int64, err error) {
 	return dump.dumpFilteredQueryToIntent(query, intent, buffer, copyDocumentFilter)
@@ -611,7 +611,7 @@ func (dump *MongoDump) dumpQueryToIntent(
 // dumpFilterQueryToIntent takes an mgo Query, its intent, a writer, and a document filter, performs the query,
 // passes the results through the filter
 // and writes the raw bson results to the writer. Returns a final count of documents
-// dumped, and any errors that occured.
+// dumped, and any errors that occurred.
 func (dump *MongoDump) dumpFilteredQueryToIntent(
 	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer, filter documentFilter) (dumpCount int64, err error) {
 
@@ -677,7 +677,7 @@ func (dump *MongoDump) dumpIterToWriter(
 }
 
 // dumpFilteredIterToWriter takes an mgo iterator, a writer, and a pointer to
-// a counter, and fiters and dumps the iterator's contents to the writer.
+// a counter, and filters and dumps the iterator's contents to the writer.
 func (dump *MongoDump) dumpFilteredIterToWriter(
 	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable, filter documentFilter) error {
 	var termErr error

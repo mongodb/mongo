@@ -200,7 +200,7 @@ func newPreprocessCursorManager(opChan <-chan *RecordedOp) (*preprocessCursorMan
 		switch castOp := parsedOp.(type) {
 		case cursorsRewriteable:
 			// If the op makes use of a cursor, such as a getmore or a killcursors,
-			// track this op and attemp to match it with the reply that contains its
+			// track this op and attempt to match it with the reply that contains its
 			// cursor
 			cursorIDs, err := castOp.getCursorIDs()
 			if err != nil {
@@ -257,9 +257,9 @@ func newPreprocessCursorManager(opChan <-chan *RecordedOp) (*preprocessCursorMan
 // playback, but was in the original recording file, GetCursor will block until
 // it receives the cursorID. GetCursor also takes the connection number that the
 // waiting operation will be played on so that it will not block if the op is
-// somehow waiting for a reply that has not yet occured and is on the same
+// somehow waiting for a reply that has not yet occurred and is on the same
 // connection.  It takes a lock to prevent prevent concurrent accesses to its
-// data structues and so that it can unlock while waiting for its cursorID
+// data structures and so that it can unlock while waiting for its cursorID
 // without deadlocking other attempts to access its data.
 func (p *preprocessCursorManager) GetCursor(fileCursorID int64, connectionNum int64) (int64, bool) {
 	p.RLock()

@@ -12,6 +12,7 @@ package mgo
 import (
 	"crypto/md5"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/10gen/llmgo/bson"
 	"github.com/10gen/llmgo/internal/scram"
+	"github.com/xdg/stringprep"
 )
 
 type authCmd struct {
@@ -68,6 +70,17 @@ type saslResult struct {
 	ConversationId int `bson:"conversationId"`
 	Payload        []byte
 	ErrMsg         string
+}
+
+type saslMechNegotation struct {
+	IsMaster           int    `bson:"ismaster"`
+	SaslSupportedMechs string `bson:"saslSupportedMechs"`
+}
+
+type saslMechResult struct {
+	Ok                 bool     `bson:"ok"`
+	SaslSupportedMechs []string `bson:"saslSupportedMechs,omitempty"`
+	ErrMsg             string
 }
 
 type saslStepper interface {
@@ -143,12 +156,31 @@ func (socket *MongoSocket) resetNonce() {
 
 func (socket *MongoSocket) Login(cred Credential) error {
 	socket.Lock()
-	if cred.Mechanism == "" && socket.serverInfo.MaxWireVersion >= 3 {
-		cred.Mechanism = "SCRAM-SHA-1"
+	maxWire := socket.serverInfo.MaxWireVersion
+	socket.Unlock()
+
+	// Must update credential mechanism before later caching
+	if cred.Mechanism == "" {
+		switch {
+		case maxWire >= 7:
+			debugf("Needs mechanism negotiation")
+			mech, err := socket.negotiateDefaultMech(cred)
+			if err != nil {
+				return err
+			}
+			cred.Mechanism = mech
+			debugf("Got mechanism '%s'", mech)
+		case maxWire >= 3:
+			cred.Mechanism = "SCRAM-SHA-1"
+		default:
+			cred.Mechanism = "MONGODB-CR"
+		}
 	}
+
+	socket.Lock()
 	for _, sockCred := range socket.creds {
 		if sockCred == cred {
-			debugf("Socket %p to %s: login: db=%q user=%q (already logged in)", socket, socket.addr, cred.Source, cred.Username)
+			debugf("Socket %p to %s: login: db=%q user=%q mech=%s", socket, socket.addr, cred.Source, cred.Username, cred.Mechanism)
 			socket.Unlock()
 			return nil
 		}
@@ -165,7 +197,7 @@ func (socket *MongoSocket) Login(cred Credential) error {
 
 	var err error
 	switch cred.Mechanism {
-	case "", "MONGODB-CR", "MONGO-CR": // Name changed to MONGODB-CR in SERVER-8501.
+	case "MONGODB-CR", "MONGO-CR": // Name changed to MONGODB-CR in SERVER-8501.
 		err = socket.loginClassic(cred)
 	case "PLAIN":
 		err = socket.loginPlain(cred)
@@ -184,12 +216,33 @@ func (socket *MongoSocket) Login(cred Credential) error {
 	return err
 }
 
+func (socket *MongoSocket) negotiateDefaultMech(cred Credential) (string, error) {
+	user := cred.Source + "." + cred.Username
+	req := &saslMechNegotation{IsMaster: 1, SaslSupportedMechs: user}
+	res := saslMechResult{}
+	err := socket.loginRun(cred.Source, &req, &res, func() error {
+		if !res.Ok {
+			return errors.New(res.ErrMsg)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, mech := range res.SaslSupportedMechs {
+		if mech == "SCRAM-SHA-256" {
+			return "SCRAM-SHA-256", nil
+		}
+	}
+	return "SCRAM-SHA-1", nil
+}
+
 func (socket *MongoSocket) loginClassic(cred Credential) error {
 	// Note that this only works properly because this function is
 	// synchronous, which means the nonce won't get reset while we're
 	// using it and any other login requests will block waiting for a
 	// new nonce.
-	socket.resetNonce();
+	socket.resetNonce()
 	nonce, err := socket.getNonce()
 	if err != nil {
 		return err
@@ -257,9 +310,11 @@ func (socket *MongoSocket) loginPlain(cred Credential) error {
 func (socket *MongoSocket) loginSASL(cred Credential) error {
 	var sasl saslStepper
 	var err error
+	// SCRAM is handled without external libraries.
 	if cred.Mechanism == "SCRAM-SHA-1" {
-		// SCRAM is handled without external libraries.
-		sasl = saslNewScram(cred)
+		sasl = saslNewScram1(cred)
+	} else if cred.Mechanism == "SCRAM-SHA-256" {
+		sasl, err = saslNewScram256(cred)
 	} else if len(cred.ServiceHost) > 0 {
 		sasl, err = saslNew(cred, cred.ServiceHost)
 	} else {
@@ -336,11 +391,21 @@ func (socket *MongoSocket) loginSASL(cred Credential) error {
 	return nil
 }
 
-func saslNewScram(cred Credential) *saslScram {
+func saslNewScram1(cred Credential) *saslScram {
 	credsum := md5.New()
 	credsum.Write([]byte(cred.Username + ":mongo:" + cred.Password))
 	client := scram.NewClient(sha1.New, cred.Username, hex.EncodeToString(credsum.Sum(nil)))
 	return &saslScram{cred: cred, client: client}
+}
+
+func saslNewScram256(cred Credential) (*saslScram, error) {
+	preppedPass, err := stringprep.SASLprep.Prepare(cred.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	client := scram.NewClient(sha256.New, cred.Username, preppedPass)
+	return &saslScram{cred: cred, client: client}, nil
 }
 
 type saslScram struct {

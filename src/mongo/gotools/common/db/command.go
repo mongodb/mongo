@@ -210,7 +210,7 @@ func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 	return (masterDoc.Ok == 1 && masterDoc.MaxWire >= 2), nil
 }
 
-// FindOne retuns the first document in the collection and database that matches
+// FindOne returns the first document in the collection and database that matches
 // the query after skip, sort and query flags are applied.
 func (sp *SessionProvider) FindOne(db, collection string, skip int, query interface{}, sort []string, into interface{}, flags int) error {
 	session, err := sp.GetSession()

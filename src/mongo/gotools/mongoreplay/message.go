@@ -21,7 +21,7 @@ const MaxMessageSize = 48 * 1000 * 1000
 type MsgHeader struct {
 	// MessageLength is the total message size, including this header
 	MessageLength int32
-	// RequestID is the identifier for this miessage
+	// RequestID is the identifier for this message
 	RequestID int32
 	// ResponseTo is the RequestID of the message being responded to;
 	// used in DB responses
@@ -76,7 +76,7 @@ func (m *MsgHeader) WriteTo(w io.Writer) (int64, error) {
 	return n, nil
 }
 
-// LooksReal does a best efffort to detect if a MsgHeadr is not invalid
+// LooksReal does a best effort to detect if a MsgHeader is valid
 func (m *MsgHeader) LooksReal() bool {
 	// AFAIK, the smallest wire protocol message possible is a 24 byte
 	// KILL_CURSORS_OP

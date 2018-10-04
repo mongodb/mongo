@@ -36,7 +36,7 @@ func TestOpCommandFromPcapFileLiveDB(t *testing.T) {
 			TestNum int `bson:"op_command_test"`
 		}{}
 
-		t.Log("Querying database to ensure insert occured successfully")
+		t.Log("Querying database to ensure insert occurred successfully")
 		ind := 1
 		for iter.Next(&result) {
 			if result.TestNum != ind {

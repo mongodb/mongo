@@ -18,7 +18,7 @@ import (
 
 // CommandReplyOp is a struct for parsing OP_COMMANDREPLY as defined here:
 // https://github.com/mongodb/mongo/blob/master/src/mongo/rpc/command_reply.h.
-// Although this file parses the wire protocol message into a more useable
+// Although this file parses the wire protocol message into a more usable
 // struct, it does not currently provide functionality to execute the operation,
 // as it is not implemented fully in llmgo.
 type CommandReplyOp struct {

@@ -270,11 +270,11 @@ func (receiver *RegularCollectionReceiver) Read(r []byte) (int, error) {
 		return 0, receiver.err
 	}
 	if wLen > db.MaxBSONSize {
-		return 0, fmt.Errorf("incomming buffer size is too big %v", wLen)
+		return 0, fmt.Errorf("incoming buffer size is too big %v", wLen)
 	}
 	rLen := len(r)
 	if wLen > rLen {
-		// if the incomming write size is larger then the incomming read buffer then we need to accept
+		// if the incoming write size is larger then the incoming read buffer then we need to accept
 		// the write in a larger buffer, fill the read buffer, then cache the remainder
 		receiver.partialReadBuf = receiver.partialReadArray[:wLen]
 		receiver.readBufChan <- receiver.partialReadBuf
@@ -303,7 +303,7 @@ func (receiver *RegularCollectionReceiver) Pos() int64 {
 
 // Open is part of the intents.file interface.  It creates the chan's in the
 // RegularCollectionReceiver and adds the RegularCollectionReceiver to the set of
-// RegularCollectonReceivers in the demultiplexer
+// RegularCollectionReceivers in the demultiplexer
 func (receiver *RegularCollectionReceiver) Open() error {
 	// TODO move this implementation to some non intents.file method, to be called from prioritizer.Get
 	// So that we don't have to enable this double open stuff.
@@ -330,7 +330,7 @@ func (receiver *RegularCollectionReceiver) ReleaseIOBuffer() {
 func (receiver *RegularCollectionReceiver) Write(buf []byte) (int, error) {
 	//  As a writer, we need to write first, so that the reader can properly detect EOF
 	//  Additionally, the reader needs to know the write size, so that it can give us a
-	//  properly sized buffer. Sending the incomming buffersize fills both of these needs.
+	//  properly sized buffer. Sending the incoming buffersize fills both of these needs.
 	receiver.readLenChan <- len(buf)
 	// Receive from the reader a buffer to put the bytes into
 	readBuf := <-receiver.readBufChan
@@ -356,7 +356,7 @@ func (receiver *RegularCollectionReceiver) Close() error {
 	return nil
 }
 
-// SpecialCollectionCache implemnts both DemuxOut as well as intents.file
+// SpecialCollectionCache implements both DemuxOut as well as intents.file
 type SpecialCollectionCache struct {
 	pos    int64 // updated atomically, aligned at the beginning of the struct
 	Intent *intents.Intent
@@ -438,7 +438,7 @@ func (*MutedCollection) Sum64() (uint64, bool) {
 
 //===== Archive Manager Prioritizer =====
 
-// NewPrioritizer careates a new Prioritizer and hooks up its Namespace channels to the ones in demux
+// NewPrioritizer creates a new Prioritizer and hooks up its Namespace channels to the ones in demux
 func (demux *Demultiplexer) NewPrioritizer(mgr *intents.Manager) *Prioritizer {
 	return &Prioritizer{
 		NamespaceChan:      demux.NamespaceChan,

@@ -71,7 +71,7 @@ func (ilf *InteractiveLineFormatter) Finish() {
 
 // FormatLines formats the StatLines as a table in the terminal ui
 func (ilf *InteractiveLineFormatter) FormatLines(lines []*line.StatLine, headerKeys []string, keyNames map[string]string) string {
-	defer ilf.update() // so that it runs after the unlock, bnecause update locks again
+	defer ilf.update() // so that it runs after the unlock, because update locks again
 	ilf.Lock()
 	defer ilf.Unlock()
 	// keep ordering consistent
@@ -181,7 +181,7 @@ func (ilf *InteractiveLineFormatter) handleEvent(ev termbox.Event) {
 	case ev.Ch == '?':
 		ilf.showHelp = !ilf.showHelp
 	default:
-		// ouput a bell on unknown inputs
+		// output a bell on unknown inputs
 		fmt.Printf("\a")
 	}
 }

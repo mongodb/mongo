@@ -43,9 +43,9 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 	jsonWriteConcern := map[string]interface{}{}
 
 	if err = json.Unmarshal([]byte(writeConcern), &jsonWriteConcern); err != nil {
-		// if the writeConcern string can not be unmarshaled into JSON, this
+		// if the writeConcern string cannot be unmarshalled into JSON, this
 		// allows a default to the old behavior wherein the entire argument
-		// passed in is assigned to the 'w' field - thus allowing users pass
+		// passed in is assigned to the 'w' field - thus allowing users to pass
 		// a write concern that looks like: "majority", 0, "4", etc.
 		wValue, err := strconv.Atoi(writeConcern)
 		if err != nil {

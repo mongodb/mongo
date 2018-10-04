@@ -48,7 +48,11 @@ if opts.version == "latest" or isVersionGreaterOrEqual(opts.version,"4.1.0"):
     opts.target = 'windows_x86_64-2012plus'
 
 def isCorrectVersion(version):
-  actual = version["version"].split(".")
+  parts = version["version"].split("-")
+  # always skip '-rcX' versions
+  if len(parts) > 1:
+    return False
+  actual = parts[0].split(".")
   desired = opts.version.split(".")
   for i in range(len(desired)):
     if desired[i] and not actual[i] == desired[i]:

@@ -258,7 +258,7 @@ func extractErrorsFromDoc(doc *bson.D) []error {
 	return errors
 }
 
-// readCStringFromReader reads a null turminated string from an io.Reader.
+// readCStringFromReader reads a null terminated string from an io.Reader.
 func readCStringFromReader(r io.Reader) ([]byte, error) {
 	var b []byte
 	var n [1]byte
@@ -578,7 +578,7 @@ func bsonToWriter(writer io.Writer, in interface{}) error {
 	return nil
 }
 
-// bufferWaiter is a channel-like structure which only recieves a buffer
+// bufferWaiter is a channel-like structure which only receives a buffer
 // from its channel once on the first Get() call, then yields the same
 // buffer upon subsequent Get() calls.
 type bufferWaiter struct {

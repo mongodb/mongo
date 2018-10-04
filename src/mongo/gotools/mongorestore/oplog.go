@@ -104,6 +104,9 @@ func (restore *MongoRestore) RestoreOplog() error {
 	}
 
 	log.Logvf(log.Info, "applied %v ops", totalOps)
+	if err := bsonSource.Err(); err != nil {
+		return fmt.Errorf("error reading oplog bson input: %v", err)
+	}
 	return nil
 
 }
@@ -261,7 +264,7 @@ type nestedApplyOps struct {
 
 // unwrapNestedApplyOps converts a bson.D to a typed data structure.
 // Unfortunately, we're forced to convert by marshaling to bytes and
-// unmarshaling.
+// unmarshalling.
 func unwrapNestedApplyOps(doc bson.D) ([]db.Oplog, error) {
 	// Doc to bytes
 	bs, err := bson.Marshal(doc)
@@ -281,7 +284,7 @@ func unwrapNestedApplyOps(doc bson.D) ([]db.Oplog, error) {
 
 // wrapNestedApplyOps converts a typed data structure to a bson.D.
 // Unfortunately, we're forced to convert by marshaling to bytes and
-// unmarshaling.
+// unmarshalling.
 func wrapNestedApplyOps(ops []db.Oplog) (bson.D, error) {
 	cmd := &nestedApplyOps{ApplyOps: ops}
 

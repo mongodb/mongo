@@ -33,7 +33,7 @@ set_dependencies() {
 
     git clone $giturl "$install_path"
 
-    ( cd $install_path && git checkout  "$version" )
+    ( cd $install_path && git checkout  "$version" && rm -rf '.git' )
   done < $1
 
   echo ">> All Done"
