@@ -50,6 +50,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         self._suite = suite
 
+        self.test_queue_logger = self.logger.new_testqueue_logger(suite.test_kind)
+
         # Only start as many jobs as we need. Note this means that the number of jobs we run may
         # not actually be _config.JOBS or self._suite.options.num_jobs.
         jobs_to_start = self._suite.options.num_jobs
@@ -74,12 +76,13 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         self.logger.info("Starting execution of %ss...", self._suite.test_kind)
 
         return_code = 0
+        # The first run of the job will set up the fixture.
+        setup_flag = threading.Event()
+        # We reset the internal state of the PortAllocator so that ports used by the fixture during
+        # a test suite run earlier can be reused during this current test suite.
+        network.PortAllocator.reset()
         teardown_flag = None
         try:
-            if not self._setup_fixtures():
-                return_code = 2
-                return
-
             num_repeat_suites = self._suite.options.num_repeat_suites
             while num_repeat_suites > 0:
                 test_queue = self._make_test_queue()
@@ -92,9 +95,16 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 # still running if an Evergreen task were to time out from a hang/deadlock being
                 # triggered.
                 teardown_flag = threading.Event() if num_repeat_suites == 1 else None
-                (report, interrupted) = self._run_tests(test_queue, teardown_flag)
+                (report, interrupted) = self._run_tests(test_queue, setup_flag, teardown_flag)
 
                 self._suite.record_test_end(report)
+
+                if setup_flag and setup_flag.is_set():
+                    self.logger.error("Setup of one of the job fixtures failed")
+                    return_code = 2
+                    return
+                # Remove the setup flag once the first suite ran.
+                setup_flag = None
 
                 # If the user triggered a KeyboardInterrupt, then we should stop.
                 if interrupted:
@@ -129,32 +139,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                     return_code = 2
             self._suite.return_code = return_code
 
-    def _setup_fixtures(self):
-        """Set up a fixture for each job."""
-
-        # We reset the internal state of the PortAllocator before calling job.fixture.setup() so
-        # that ports used by the fixture during a test suite run earlier can be reused during this
-        # current test suite.
-        network.PortAllocator.reset()
-
-        for job in self._jobs:
-            try:
-                job.fixture.setup()
-            except:  # pylint: disable=bare-except
-                self.logger.exception("Encountered an error while setting up %s.", job.fixture)
-                return False
-
-        # Once they have all been started, wait for them to become available.
-        for job in self._jobs:
-            try:
-                job.fixture.await_ready()
-            except:  # pylint: disable=bare-except
-                self.logger.exception("Encountered an error while waiting for %s to be ready",
-                                      job.fixture)
-                return False
-        return True
-
-    def _run_tests(self, test_queue, teardown_flag):
+    def _run_tests(self, test_queue, setup_flag, teardown_flag):
         """Start a thread for each Job instance and block until all of the tests are run.
 
         Returns a (combined report, user interrupted) pair, where the
@@ -168,8 +153,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         try:
             # Run each Job instance in its own thread.
             for job in self._jobs:
-                thr = threading.Thread(target=job, args=(test_queue, interrupt_flag),
-                                       kwargs=dict(teardown_flag=teardown_flag))
+                thr = threading.Thread(target=job, args=(test_queue, interrupt_flag), kwargs=dict(
+                    setup_flag=setup_flag, teardown_flag=teardown_flag))
                 # Do not wait for tests to finish executing if interrupted by the user.
                 thr.daemon = True
                 thr.start()
@@ -209,13 +194,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         """
         success = True
         for job in self._jobs:
-            try:
-                job.fixture.teardown(finished=True)
-            except errors.ServerFailure as err:
-                self.logger.warn("Teardown of %s was not successful: %s", job.fixture, err)
-                success = False
-            except:  # pylint: disable=bare-except
-                self.logger.exception("Encountered an error while tearing down %s.", job.fixture)
+            if not job.teardown_fixture():
+                self.logger.warning("Teardown of %s of job %s was not successful", job.fixture,
+                                    job.job_num)
                 success = False
         return success
 
@@ -257,7 +238,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         report = _report.TestReport(job_logger, self._suite.options)
 
-        return _job.Job(job_logger, fixture, hooks, report, self.archival, self._suite.options)
+        return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
+                        self._suite.options, self.test_queue_logger)
 
     def _make_test_queue(self):
         """Return a queue of TestCase instances.
@@ -266,12 +248,11 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         that the test cases can be dispatched to multiple threads.
         """
 
-        test_queue_logger = self.logger.new_testqueue_logger(self._suite.test_kind)
         # Put all the test cases in a queue.
         queue = _queue.Queue()
         for _ in range(self._suite.options.num_repeat_tests):
             for test_name in self._suite.tests:
-                test_case = testcases.make_test_case(self._suite.test_kind, test_queue_logger,
+                test_case = testcases.make_test_case(self._suite.test_kind, self.test_queue_logger,
                                                      test_name, **self.test_config)
                 queue.put(test_case)
 

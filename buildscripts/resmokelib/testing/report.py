@@ -89,21 +89,24 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
         return combined_report
 
-    def startTest(self, test, dynamic=False):  # pylint: disable=invalid-name,arguments-differ
+    def startTest(self, test):  # pylint: disable=invalid-name
         """Call before 'test' is run."""
 
         unittest.TestResult.startTest(self, test)
 
-        test_info = _TestInfo(test.id(), test.test_name, dynamic)
+        test_info = _TestInfo(test.id(), test.test_name, test.dynamic)
         test_info.start_time = time.time()
 
         basename = test.basename()
         command = test.as_command()
-        self.job_logger.info("Running %s...\n%s", basename, command)
+        if command:
+            self.job_logger.info("Running %s...\n%s", basename, command)
+        else:
+            self.job_logger.info("Running %s...", basename)
 
         with self._lock:
             self.test_infos.append(test_info)
-            if dynamic:
+            if test.dynamic:
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
@@ -151,6 +154,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
     def setError(self, test):  # pylint: disable=invalid-name
         """Change the outcome of an existing test to an error."""
+        self.job_logger.info("setError(%s)", test)
 
         with self._lock:
             test_info = self.find_test_info(test)

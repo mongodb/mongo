@@ -64,14 +64,14 @@ class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, test_name, description, base_test_name, hook):
         """Initialize DynamicTestCase."""
-        testcase.TestCase.__init__(self, logger, "Hook", test_name)
+        testcase.TestCase.__init__(self, logger, "Hook", test_name, dynamic=True)
         self.description = description
         self._hook = hook
         self._base_test_name = base_test_name
 
     def run_dynamic_test(self, test_report):
         """Provide helper method to run a dynamic test and update the test report."""
-        test_report.startTest(self, dynamic=True)
+        test_report.startTest(self)
         try:
             self.run_test()
         except (errors.TestFailure, self.failureException) as err:
@@ -88,10 +88,6 @@ class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
             test_report.addSuccess(self)
         finally:
             test_report.stopTest(self)
-
-    def as_command(self):
-        """Provide base method."""
-        return "(dynamic test case)"
 
     @classmethod
     def create_before_test(cls, logger, base_test, hook, *args, **kwargs):

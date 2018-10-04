@@ -30,7 +30,7 @@ class TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attribut
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger, test_kind, test_name):
+    def __init__(self, logger, test_kind, test_name, dynamic=False):
         """Initialize the TestCase with the name of the test."""
         unittest.TestCase.__init__(self, methodName="run_test")
 
@@ -54,6 +54,7 @@ class TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attribut
 
         self.test_kind = test_kind
         self.test_name = test_name
+        self.dynamic = dynamic
 
         self.fixture = None
         self.return_code = None
@@ -107,9 +108,9 @@ class TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attribut
         """Run the specified test."""
         raise NotImplementedError("run_test must be implemented by TestCase subclasses")
 
-    def as_command(self):
-        """Return the command invocation used to run the test."""
-        raise NotImplementedError("as_command must be implemented by TestCase subclasses")
+    def as_command(self):  # pylint: disable=no-self-use
+        """Return the command invocation used to run the test or None."""
+        return None
 
 
 class ProcessTestCase(TestCase):  # pylint: disable=abstract-method
