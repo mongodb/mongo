@@ -38,14 +38,14 @@
     assert.commandWorked(outColl.insert({_id: 2, a: 1}));
     assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
 
-    // Test that both batched updates and inserts will successfully write the first document but
-    // fail on the second. We don't guarantee any particular behavior in this case, but this test is
-    // meant to characterize the current behavior.
+    // Test that the writes for $out are unordered, meaning the operation continues even if it
+    // encounters a duplicate key error. We don't guarantee any particular behavior in this case,
+    // but this test is meant to characterize the current behavior.
     ["insertDocuments", "replaceDocuments"].forEach(mode => {
         assertErrorCode(
             coll, [{$out: {to: outColl.getName(), mode: mode}}], ErrorCodes.DuplicateKey);
         assert.soon(() => {
-            return outColl.find().itcount() == 2;
+            return outColl.find().itcount() == 9;
         });
     });
 

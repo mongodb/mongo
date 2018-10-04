@@ -40,8 +40,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -51,9 +49,6 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/transaction_participant.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -67,58 +62,6 @@ using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
 namespace {
-
-/**
- * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
- */
-Insert buildInsertOp(const NamespaceString& nss,
-                     std::vector<BSONObj>&& objs,
-                     bool bypassDocValidation) {
-    Insert insertOp(nss);
-    insertOp.setDocuments(std::move(objs));
-    insertOp.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
-        wcb.setOrdered(true);
-        wcb.setBypassDocumentValidation(bypassDocValidation);
-        return wcb;
-    }());
-    return insertOp;
-}
-
-/**
- * Builds an ordered update op on namespace 'nss' with update entries {q: <queries>, u: <updates>}.
- *
- * Note that 'queries' and 'updates' must be the same length.
- */
-Update buildUpdateOp(const NamespaceString& nss,
-                     std::vector<BSONObj>&& queries,
-                     std::vector<BSONObj>&& updates,
-                     bool upsert,
-                     bool multi,
-                     bool bypassDocValidation) {
-    Update updateOp(nss);
-    updateOp.setUpdates([&] {
-        std::vector<UpdateOpEntry> updateEntries;
-        for (size_t index = 0; index < queries.size(); ++index) {
-            updateEntries.push_back([&] {
-                UpdateOpEntry entry;
-                entry.setQ(std::move(queries[index]));
-                entry.setU(std::move(updates[index]));
-                entry.setUpsert(upsert);
-                entry.setMulti(multi);
-                return entry;
-            }());
-        }
-        return updateEntries;
-    }());
-    updateOp.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
-        wcb.setOrdered(true);
-        wcb.setBypassDocumentValidation(bypassDocValidation);
-        return wcb;
-    }());
-    return updateOp;
-}
 
 // Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and each
 // of the elements of 'keyPattern' is numeric, i.e. not "text", "$**", or any other special type of
@@ -164,15 +107,69 @@ bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const Namespac
     return css->getMetadata(opCtx)->isSharded();
 }
 
+Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
+                                               std::vector<BSONObj>&& objs,
+                                               bool bypassDocValidation) {
+    Insert insertOp(nss);
+    insertOp.setDocuments(std::move(objs));
+    insertOp.setWriteCommandBase([&] {
+        write_ops::WriteCommandBase wcb;
+        wcb.setOrdered(false);
+        // wcb.setOrdered(true);
+        wcb.setBypassDocumentValidation(bypassDocValidation);
+        return wcb;
+    }());
+    return insertOp;
+}
+
+Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
+                                               std::vector<BSONObj>&& queries,
+                                               std::vector<BSONObj>&& updates,
+                                               bool upsert,
+                                               bool multi,
+                                               bool bypassDocValidation) {
+    Update updateOp(nss);
+    updateOp.setUpdates([&] {
+        std::vector<UpdateOpEntry> updateEntries;
+        for (size_t index = 0; index < queries.size(); ++index) {
+            updateEntries.push_back([&] {
+                UpdateOpEntry entry;
+                entry.setQ(std::move(queries[index]));
+                entry.setU(std::move(updates[index]));
+                entry.setUpsert(upsert);
+                entry.setMulti(multi);
+                return entry;
+            }());
+        }
+        return updateEntries;
+    }());
+    updateOp.setWriteCommandBase([&] {
+        write_ops::WriteCommandBase wcb;
+        wcb.setOrdered(false);
+        // wcb.setOrdered(true);
+        wcb.setBypassDocumentValidation(bypassDocValidation);
+        return wcb;
+    }());
+    return updateOp;
+}
+
 void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& ns,
                                       std::vector<BSONObj>&& objs) {
     auto writeResults = performInserts(
         expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
-    // Only need to check that the final result passed because the inserts are ordered and the batch
-    // will stop on the first failure.
-    uassertStatusOKWithContext(writeResults.results.back().getStatus(), "Insert failed: ");
+    // Need to check each result in the batch since the writes are unordered.
+    uassertStatusOKWithContext(
+        [&writeResults]() {
+            for (const auto& result : writeResults.results) {
+                if (result.getStatus() != Status::OK()) {
+                    return result.getStatus();
+                }
+            }
+            return Status::OK();
+        }(),
+        "Insert failed: ");
 }
 
 void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -189,9 +186,17 @@ void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionConte
                                                      multi,
                                                      expCtx->bypassDocumentValidation));
 
-    // Only need to check that the final result passed because the updates are ordered and the batch
-    // will stop on the first failure.
-    uassertStatusOKWithContext(writeResults.results.back().getStatus(), "Update failed: ");
+    // Need to check each result in the batch since the writes are unordered.
+    uassertStatusOKWithContext(
+        [&writeResults]() {
+            for (const auto& result : writeResults.results) {
+                if (result.getStatus() != Status::OK()) {
+                    return result.getStatus();
+                }
+            }
+            return Status::OK();
+        }(),
+        "Update failed: ");
 }
 
 CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,

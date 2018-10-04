@@ -29,10 +29,15 @@
 #pragma once
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
+
+using write_ops::Insert;
+using write_ops::Update;
 
 /**
  * Class to provide access to mongod-specific implementations of methods required by some
@@ -112,6 +117,26 @@ protected:
     void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                           CurrentOpUserMode userMode,
                                           std::vector<BSONObj>* ops) const final;
+
+    /**
+     * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
+     */
+    Insert buildInsertOp(const NamespaceString& nss,
+                         std::vector<BSONObj>&& objs,
+                         bool bypassDocValidation);
+
+    /**
+     * Builds an ordered update op on namespace 'nss' with update entries {q: <queries>, u:
+     * <updates>}.
+     *
+     * Note that 'queries' and 'updates' must be the same length.
+     */
+    Update buildUpdateOp(const NamespaceString& nss,
+                         std::vector<BSONObj>&& queries,
+                         std::vector<BSONObj>&& updates,
+                         bool upsert,
+                         bool multi,
+                         bool bypassDocValidation);
 
 private:
     /**
