@@ -1198,6 +1198,9 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSL
             tls11 = false;
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
             tls12 = false;
+        } else if (protocol == SSLParams::Protocols::TLS1_3) {
+            // By ignoring this value, we are disabling support until we have access to the
+            // modern library.
         } else {
             return {ErrorCodes::InvalidSSLConfiguration, "Unknown disabled TLS protocol version"};
         }

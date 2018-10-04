@@ -217,3 +217,30 @@ function requireSSLProvider(required, fn) {
     }
     fn();
 }
+
+function detectDefaultTLSProtocol() {
+    const conn = MongoRunner.runMongod({
+        sslMode: 'allowSSL',
+        sslPEMKeyFile: SERVER_CERT,
+        sslDisabledProtocols: 'none',
+        useLogFiles: true,
+        tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
+    });
+
+    const res = conn.getDB("admin").serverStatus().transportSecurity;
+
+    MongoRunner.stopMongod(conn);
+
+    // Verify that the default protocol is either TLS1.2 or TLS1.3.
+    // No supported platform should default to an older protocol version.
+    assert.eq(0, res["1.0"]);
+    assert.eq(0, res["1.1"]);
+    assert.eq(0, res["unknown"]);
+    assert.neq(res["1.2"], res["1.3"]);
+
+    if (res["1.2"].tojson() != NumberLong(0).tojson()) {
+        return "TLS1_2";
+    } else {
+        return "TLS1_3";
+    }
+}

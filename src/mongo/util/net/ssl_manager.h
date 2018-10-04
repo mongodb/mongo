@@ -120,9 +120,11 @@ const ASN1OID mongodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
  * Counts of negogtiated version used by TLS connections.
  */
 struct TLSVersionCounts {
+    AtomicInt64 tlsUnknown;
     AtomicInt64 tls10;
     AtomicInt64 tls11;
     AtomicInt64 tls12;
+    AtomicInt64 tls13;
 
     static TLSVersionCounts& get(ServiceContext* serviceContext);
 };
@@ -243,6 +245,7 @@ enum class TLSVersion {
     kTLS10,
     kTLS11,
     kTLS12,
+    kTLS13,
 };
 
 /**

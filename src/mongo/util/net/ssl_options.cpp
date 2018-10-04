@@ -88,6 +88,7 @@ Status storeSSLDisabledProtocols(const std::string& disabledProtocols,
         {"TLS1_0", SSLParams::Protocols::TLS1_0},
         {"TLS1_1", SSLParams::Protocols::TLS1_1},
         {"TLS1_2", SSLParams::Protocols::TLS1_2},
+        {"TLS1_3", SSLParams::Protocols::TLS1_3},
     };
 
     // These noTLS* tokens exist for backwards compatibility.
@@ -95,6 +96,7 @@ Status storeSSLDisabledProtocols(const std::string& disabledProtocols,
         {"noTLS1_0", SSLParams::Protocols::TLS1_0},
         {"noTLS1_1", SSLParams::Protocols::TLS1_1},
         {"noTLS1_2", SSLParams::Protocols::TLS1_2},
+        {"noTLS1_3", SSLParams::Protocols::TLS1_3},
     };
 
     // Map the tokens to their enum values, and push them onto the list of disabled protocols.

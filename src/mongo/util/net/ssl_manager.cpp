@@ -761,6 +761,8 @@ public:
         builder.append("1.0", counts.tls10.load());
         builder.append("1.1", counts.tls11.load());
         builder.append("1.2", counts.tls12.load());
+        builder.append("1.3", counts.tls13.load());
+        builder.append("unknown", counts.tlsUnknown.load());
         return builder.obj();
     }
 } tlsVersionStatus;
@@ -793,9 +795,18 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
                 versionString = "1.2"_sd;
             }
             break;
+        case TLSVersion::kTLS13:
+            counts.tls13.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_3) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.3"_sd;
+            }
+            break;
         default:
+            counts.tlsUnknown.addAndFetch(1);
             if (!sslGlobalParams.tlsLogVersions.empty()) {
-                versionString = "unkown"_sd;
+                versionString = "unknown"_sd;
             }
             break;
     }
