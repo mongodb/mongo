@@ -40,16 +40,11 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
-void uassertLockTimeout(std::string resourceName,
-                        LockMode lockMode,
-                        Date_t deadline,
-                        bool isLocked) {
+void uassertLockTimeout(std::string resourceName, LockMode lockMode, bool isLocked) {
     uassert(ErrorCodes::LockTimeout,
             str::stream() << "Failed to acquire " << modeName(lockMode) << " lock for "
                           << resourceName
-                          << " since deadline "
-                          << dateToISOStringLocal(deadline)
-                          << " has passed.",
+                          << " due to lock timeout.",
             isLocked);
 }
 
@@ -57,8 +52,7 @@ void uassertLockTimeout(std::string resourceName,
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
     : _dbLock(opCtx, dbName, mode, deadline), _db([&] {
-          uassertLockTimeout(
-              str::stream() << "database " << dbName, mode, deadline, _dbLock.isLocked());
+          uassertLockTimeout(str::stream() << "database " << dbName, mode, _dbLock.isLocked());
           return DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
       }()) {
     if (_db) {
@@ -86,10 +80,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         _resolvedNss = resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
 
     _collLock.emplace(opCtx->lockState(), _resolvedNss.ns(), modeColl, deadline);
-    uassertLockTimeout(str::stream() << "collection " << nsOrUUID.toString(),
-                       modeColl,
-                       deadline,
-                       _collLock->isLocked());
+    uassertLockTimeout(
+        str::stream() << "collection " << nsOrUUID.toString(), modeColl, _collLock->isLocked());
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
