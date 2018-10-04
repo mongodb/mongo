@@ -149,6 +149,9 @@ UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
 #ifndef SSL_OP_NO_TLSv1_2
 #define SSL_OP_NO_TLSv1_2 0
 #endif
+#ifndef SSL_OP_NO_TLSv1_3
+#define SSL_OP_NO_TLSv1_3 0
+#endif
 
 // clang-format off
 #ifndef MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS
@@ -720,6 +723,8 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
             supportedProtocols |= SSL_OP_NO_TLSv1_1;
         } else if (protocol == SSLParams::Protocols::TLS1_2) {
             supportedProtocols |= SSL_OP_NO_TLSv1_2;
+        } else if (protocol == SSLParams::Protocols::TLS1_3) {
+            supportedProtocols |= SSL_OP_NO_TLSv1_3;
         }
     }
     ::SSL_CTX_set_options(context, supportedProtocols);

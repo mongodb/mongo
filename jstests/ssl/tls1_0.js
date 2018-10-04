@@ -3,6 +3,8 @@
 (function() {
     'use strict';
 
+    load("jstests/ssl/libs/ssl_helpers.js");
+
     // There will be cases where a connect is impossible,
     // let the test runner clean those up.
     TestData.failIfUnterminatedProcesses = false;
@@ -30,6 +32,8 @@
         // If the build doesn't support TLS 1.1, then TLS 1.0 is left enabled.
         return !supportsTLS1_1;
     })();
+
+    const supportsTLS1_3 = detectDefaultTLSProtocol() !== "TLS1_2";
 
     function test(serverDP, clientDP, shouldSucceed) {
         const expectLogMessage = !defaultEnableTLS1_0 && (serverDP === null);
@@ -84,9 +88,11 @@
     test(null, null, true);
     test('none', null, true);
     test('TLS1_0', null, supportsTLS1_1);
-    test('TLS1_1,TLS1_2', null, !supportsTLS1_1);
+    test('TLS1_1,TLS1_2', null, !supportsTLS1_1 || supportsTLS1_3);
+    test('TLS1_1,TLS1_2,TLS1_3', null, !supportsTLS1_1);
     test('TLS1_0,TLS1_1', null, supportsTLS1_1);
-    test('TLS1_0,TLS1_1,TLS1_2', null, false);
+    test('TLS1_0,TLS1_1,TLS1_2', null, supportsTLS1_3);
+    test('TLS1_0,TLS1_1,TLS1_2,TLS1_3', null, false);
 
     // Tests with TLS 1.0 always enabled on client.
     test(null, 'none', true);
@@ -99,6 +105,7 @@
     test(null, 'TLS1_0', supportsTLS1_1);
     test('none', 'TLS1_0', supportsTLS1_1);
     test('TLS1_0', 'TLS1_0', supportsTLS1_1);
-    test('TLS1_1,TLS1_2', 'TLS1_0', false);
+    test('TLS1_1,TLS1_2', 'TLS1_0', supportsTLS1_3);
+    test('TLS1_1,TLS1_2,TLS1_3', 'TLS1_0', false);
     test('TLS1_0,TLS1_1', 'TLS1_0', supportsTLS1_1);
 })();

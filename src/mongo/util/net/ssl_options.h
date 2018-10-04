@@ -49,8 +49,8 @@ class Environment;
 }  // namespace optionenvironment
 
 struct SSLParams {
-    enum class Protocols { TLS1_0, TLS1_1, TLS1_2 };
-    AtomicInt32 sslMode;            // --sslMode - the SSL operation mode, see enum SSLModes
+    enum class Protocols { TLS1_0, TLS1_1, TLS1_2, TLS1_3 };
+    AtomicInt32 sslMode;            // --sslMode - the TLS operation mode, see enum SSLModes
     std::string sslPEMTempDHParam;  // --setParameter OpenSSLDiffieHellmanParameters=file : PEM file
                                     // with DH parameters.
     std::string sslPEMKeyFile;      // --sslPEMKeyFile
