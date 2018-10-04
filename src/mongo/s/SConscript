@@ -392,7 +392,6 @@ env.CppUnitTest(
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/serveronly',
         'catalog_cache_test_fixture',
     ]
 )

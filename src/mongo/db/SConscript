@@ -1878,13 +1878,16 @@ env.Library(
     source= [
         'service_context_d_test_fixture.cpp',
     ],
-    LIBDEPS= [
-        '$BUILD_DIR/mongo/db/commands/mongod',
-        '$BUILD_DIR/mongo/db/serveronly',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+    LIBDEPS=[
         '$BUILD_DIR/mongo/unittest/unittest',
-        'service_context_d',
         'service_context_test_fixture',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/mongod',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        'service_context_d',
+        'storage/devnull/storage_devnull',
+        'storage/ephemeral_for_test/storage_ephemeral_for_test',
     ],
 )
 
@@ -2019,6 +2022,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/op_observer',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'query_exec',
