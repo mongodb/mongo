@@ -176,11 +176,11 @@ Status ShardingCatalogClientImpl::logAction(OperationContext* opCtx,
                 ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-Status ShardingCatalogClientImpl::logChange(OperationContext* opCtx,
-                                            const std::string& what,
-                                            const std::string& ns,
-                                            const BSONObj& detail,
-                                            const WriteConcernOptions& writeConcern) {
+Status ShardingCatalogClientImpl::logChangeChecked(OperationContext* opCtx,
+                                                   const std::string& what,
+                                                   const std::string& ns,
+                                                   const BSONObj& detail,
+                                                   const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               writeConcern.wMode == WriteConcernOptions::kMajority);
     if (_changeLogCollectionCreated.load() == 0) {

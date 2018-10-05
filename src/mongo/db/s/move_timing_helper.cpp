@@ -82,14 +82,11 @@ MoveTimingHelper::~MoveTimingHelper() {
             _b.append("errmsg", *_cmdErrmsg);
         }
 
-        Grid::get(_opCtx)
-            ->catalogClient()
-            ->logChange(_opCtx,
-                        str::stream() << "moveChunk." << _where,
-                        _ns,
-                        _b.obj(),
-                        ShardingCatalogClient::kMajorityWriteConcern)
-            .transitional_ignore();
+        Grid::get(_opCtx)->catalogClient()->logChange(_opCtx,
+                                                      str::stream() << "moveChunk." << _where,
+                                                      _ns,
+                                                      _b.obj(),
+                                                      ShardingCatalogClient::kMajorityWriteConcern);
     } catch (const std::exception& e) {
         warning() << "couldn't record timing for moveChunk '" << _where
                   << "': " << redact(e.what());

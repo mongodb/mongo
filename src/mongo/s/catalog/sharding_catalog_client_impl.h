@@ -76,11 +76,11 @@ public:
                      const std::string& ns,
                      const BSONObj& detail) override;
 
-    Status logChange(OperationContext* opCtx,
-                     const std::string& what,
-                     const std::string& ns,
-                     const BSONObj& detail,
-                     const WriteConcernOptions& writeConcern) override;
+    Status logChangeChecked(OperationContext* opCtx,
+                            const std::string& what,
+                            const std::string& ns,
+                            const BSONObj& detail,
+                            const WriteConcernOptions& writeConcern) override;
 
     StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
         OperationContext* opCtx,

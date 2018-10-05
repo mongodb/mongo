@@ -757,11 +757,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    Grid::get(opCtx)
-        ->catalogClient()
-        ->logChange(
-            opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern)
-        .ignore();
+    Grid::get(opCtx)->catalogClient()->logChange(
+        opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // Ensure the added shard is visible to this process.
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -812,6 +809,17 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     if (countStatus.getValue() == 0) {
         log() << "going to start draining shard: " << name;
 
+        // Record start in changelog
+        const Status logStatus = Grid::get(opCtx)->catalogClient()->logChangeChecked(
+            opCtx,
+            "removeShard.start",
+            "",
+            BSON("shard" << name),
+            ShardingCatalogClient::kLocalWriteConcern);
+        if (!logStatus.isOK()) {
+            return logStatus;
+        }
+
         auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
             opCtx,
             ShardType::ConfigNS,
@@ -826,16 +834,6 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
         }
 
         shardRegistry->reload(opCtx);
-
-        // Record start in changelog
-        Grid::get(opCtx)
-            ->catalogClient()
-            ->logChange(opCtx,
-                        "removeShard.start",
-                        "",
-                        BSON("shard" << name),
-                        ShardingCatalogClient::kLocalWriteConcern)
-            .ignore();
 
         return ShardDrainingStatus::STARTED;
     }
@@ -884,14 +882,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     shardRegistry->reload(opCtx);
 
     // Record finish in changelog
-    Grid::get(opCtx)
-        ->catalogClient()
-        ->logChange(opCtx,
-                    "removeShard",
-                    "",
-                    BSON("shard" << name),
-                    ShardingCatalogClient::kLocalWriteConcern)
-        .ignore();
+    Grid::get(opCtx)->catalogClient()->logChange(
+        opCtx, "removeShard", "", BSON("shard" << name), ShardingCatalogClient::kLocalWriteConcern);
 
     return ShardDrainingStatus::COMPLETED;
 }

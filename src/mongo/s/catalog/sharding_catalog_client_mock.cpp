@@ -148,11 +148,11 @@ Status ShardingCatalogClientMock::logAction(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::logChange(OperationContext* opCtx,
-                                            const std::string& what,
-                                            const std::string& ns,
-                                            const BSONObj& detail,
-                                            const WriteConcernOptions& writeConcern) {
+Status ShardingCatalogClientMock::logChangeChecked(OperationContext* opCtx,
+                                                   const std::string& what,
+                                                   const std::string& ns,
+                                                   const BSONObj& detail,
+                                                   const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

@@ -178,7 +178,7 @@ protected:
 
     Status log(const std::string& what, const std::string& ns, const BSONObj& detail) {
         if (_configCollType == ChangeLog) {
-            return catalogClient()->logChange(
+            return catalogClient()->logChangeChecked(
                 operationContext(), what, ns, detail, ShardingCatalogClient::kMajorityWriteConcern);
         } else {
             return catalogClient()->logAction(operationContext(), what, ns, detail);

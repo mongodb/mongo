@@ -429,7 +429,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     }
 
     // apply the batch of updates to local metadata.
-    Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
+    const Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates.arr(),
         preCond.arr(),
@@ -454,10 +454,8 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
         appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
 
-        Grid::get(opCtx)
-            ->catalogClient()
-            ->logChange(opCtx, "split", nss.ns(), logDetail.obj(), WriteConcernOptions())
-            .transitional_ignore();
+        Grid::get(opCtx)->catalogClient()->logChange(
+            opCtx, "split", nss.ns(), logDetail.obj(), WriteConcernOptions());
     } else {
         BSONObj beforeDetailObj = logDetail.obj();
         BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -470,15 +468,12 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
             chunkDetail.append("of", newChunksSize);
             appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
 
-            Grid::get(opCtx)
-                ->catalogClient()
-                ->logChange(
-                    opCtx, "multi-split", nss.ns(), chunkDetail.obj(), WriteConcernOptions())
-                .transitional_ignore();
+            Grid::get(opCtx)->catalogClient()->logChange(
+                opCtx, "multi-split", nss.ns(), chunkDetail.obj(), WriteConcernOptions());
         }
     }
 
-    return applyOpsStatus;
+    return Status::OK();
 }
 
 Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
@@ -563,7 +558,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     auto preCond = buildMergeChunksTransactionPrecond(chunksToMerge, collVersion);
 
     // apply the batch of updates to local metadata
-    Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
+    const Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates,
         preCond,
@@ -586,12 +581,10 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     collVersion.appendLegacyWithField(&logDetail, "prevShardVersion");
     mergeVersion.appendLegacyWithField(&logDetail, "mergedVersion");
 
-    Grid::get(opCtx)
-        ->catalogClient()
-        ->logChange(opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions())
-        .transitional_ignore();
+    Grid::get(opCtx)->catalogClient()->logChange(
+        opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
-    return applyOpsStatus;
+    return Status::OK();
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(

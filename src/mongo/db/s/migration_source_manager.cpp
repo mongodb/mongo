@@ -223,17 +223,18 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
-    Grid::get(opCtx)
-        ->catalogClient()
-        ->logChange(opCtx,
-                    "moveChunk.start",
-                    getNss().ns(),
-                    BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                               << _args.getFromShardId()
-                               << "to"
-                               << _args.getToShardId()),
-                    ShardingCatalogClient::kMajorityWriteConcern)
-        .ignore();
+    const Status logStatus = Grid::get(opCtx)->catalogClient()->logChangeChecked(
+        opCtx,
+        "moveChunk.start",
+        getNss().ns(),
+        BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
+                   << _args.getFromShardId()
+                   << "to"
+                   << _args.getToShardId()),
+        ShardingCatalogClient::kMajorityWriteConcern);
+    if (logStatus != Status::OK()) {
+        return logStatus;
+    }
 
     _cloneAndCommitTimer.reset();
 
@@ -443,7 +444,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                  "against the config server to obtain its latest optime"
               << causedBy(redact(migrationCommitStatus));
 
-        Status status = Grid::get(opCtx)->catalogClient()->logChange(
+        Status status = Grid::get(opCtx)->catalogClient()->logChangeChecked(
             opCtx,
             "moveChunk.validating",
             getNss().ns(),
@@ -571,19 +572,17 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // scheduling orphan cleanup.
     _cleanup(opCtx);
 
-    Grid::get(opCtx)
-        ->catalogClient()
-        ->logChange(opCtx,
-                    "moveChunk.commit",
-                    getNss().ns(),
-                    BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                               << _args.getFromShardId()
-                               << "to"
-                               << _args.getToShardId()
-                               << "counts"
-                               << _recipientCloneCounts),
-                    ShardingCatalogClient::kMajorityWriteConcern)
-        .ignore();
+    Grid::get(opCtx)->catalogClient()->logChange(
+        opCtx,
+        "moveChunk.commit",
+        getNss().ns(),
+        BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
+                   << _args.getFromShardId()
+                   << "to"
+                   << _args.getToShardId()
+                   << "counts"
+                   << _recipientCloneCounts),
+        ShardingCatalogClient::kMajorityWriteConcern);
 
     const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
@@ -636,17 +635,15 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
         return;
     }
 
-    Grid::get(opCtx)
-        ->catalogClient()
-        ->logChange(opCtx,
-                    "moveChunk.error",
-                    getNss().ns(),
-                    BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
-                               << _args.getFromShardId()
-                               << "to"
-                               << _args.getToShardId()),
-                    ShardingCatalogClient::kMajorityWriteConcern)
-        .ignore();
+    Grid::get(opCtx)->catalogClient()->logChange(
+        opCtx,
+        "moveChunk.error",
+        getNss().ns(),
+        BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
+                   << _args.getFromShardId()
+                   << "to"
+                   << _args.getToShardId()),
+        ShardingCatalogClient::kMajorityWriteConcern);
 
     try {
         _cleanup(opCtx);
