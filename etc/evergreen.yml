@@ -3720,7 +3720,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/${build_variant}/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3754,7 +3754,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk-tests.tgz"
-        remote_file: ${project}/embedded-sdk-test/${build_variant}/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk-test/${build_variant}/${revision}/mongo-embedded-sdk-test-${version}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3821,7 +3821,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        remote_file: ${project}/embedded-sdk/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -3837,7 +3837,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk-tests.tgz"
-        remote_file: ${project}/embedded-sdk-test/${build_variant}-latest.tgz
+        remote_file: ${project}/embedded-sdk-test/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -3862,21 +3862,21 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-android-arm32/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-android-arm32/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-android-armeabi-v7a.tgz"
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-android-arm64/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-android-arm64/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-android-arm64-v8a.tgz"
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-android-x86_64/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-android-x86_64/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-android-x86_64.tgz"
     - command: shell.exec
@@ -3919,7 +3919,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
-        remote_file: "${project}/embedded-sdk/embedded-sdk-android-multiarch/${revision}/${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-android-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3945,7 +3945,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        remote_file: ${project}/embedded-sdk/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3968,14 +3968,14 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-ubuntu-1604-x86_64/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-ubuntu-1604-x86_64/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-java-linux-x86-64.tgz"
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.10/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.10/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-java-darwin.tgz"
     - command: shell.exec
@@ -4021,7 +4021,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
-        remote_file: "${project}/embedded-sdk/embedded-sdk-java-multiarch/${revision}/${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-java-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -4046,7 +4046,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        remote_file: ${project}/embedded-sdk/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -4079,49 +4079,49 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-iphoneos-10.2/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-iphoneos-10.2/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "iPhoneOS/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/iPhoneOS/embedded-sdk.tgz"
 
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-iphonesimulator-10.2/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-iphonesimulator-10.2/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "iPhoneSimulator/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/iPhoneSimulator/embedded-sdk.tgz"
 
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvos-10.2/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvos-10.2/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "AppleTVOS/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/AppleTVOS/embedded-sdk.tgz"
 
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvsimulator-10.2/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvsimulator-10.2/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "AppleTVSimulator/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/AppleTVSimulator/embedded-sdk.tgz"
 
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-watchos-4.2/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-watchos-4.2/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "WatchOS/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/WatchOS/embedded-sdk.tgz"
 
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-watchsimulator-4.2/${revision}/${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-watchsimulator-4.2/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "WatchSimulator/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/WatchSimulator/embedded-sdk.tgz"
 
     - command: shell.exec
       params:
@@ -4129,6 +4129,7 @@ tasks:
           set -o errexit
           set -o verbose
 
+          pushd mongo-embedded-sdk-${version}
           for directory in *OS *Simulator; do
               pushd $directory
               tar --include "*/Frameworks*" --include "*/LICENSE*" --strip-components=1 -xf ./embedded-sdk.tgz
@@ -4142,15 +4143,16 @@ tasks:
                   ${compile_env|} xcrun lipo $_OSFile $_SimulatorFile -create -output $_OSFile
               done
           done
+          popd
 
-          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./*OS
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./mongo-embedded-sdk-${version}/*OS
 
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "mongo-embedded-sdk-${version}.tgz"
-        remote_file: "${project}/embedded-sdk/embedded-sdk-apple-multiarch/${revision}/${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -4177,7 +4179,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "mongo-embedded-sdk-${version}.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        remote_file: ${project}/embedded-sdk/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
