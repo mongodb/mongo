@@ -53,8 +53,7 @@ namespace mongo {
 namespace {
 
 const Milliseconds kSessionTimeout = duration_cast<Milliseconds>(kLogicalSessionDefaultTimeout);
-const Milliseconds kForceRefresh =
-    duration_cast<Milliseconds>(LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh);
+const Milliseconds kForceRefresh = LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 
 using SessionList = std::list<LogicalSessionId>;
 using unittest::EnsureFCV;

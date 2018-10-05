@@ -46,7 +46,7 @@
 namespace mongo {
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(
-    logicalSessionRefreshMinutes,
+    logicalSessionRefreshMillis,
     int,
     LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh.count());
 
@@ -54,7 +54,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(disableLogicalSessionCacheRefresh, bool, f
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSessions, int, 1'000'000);
 
-constexpr Minutes LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
+constexpr Milliseconds LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 
 LogicalSessionCacheImpl::LogicalSessionCacheImpl(
     std::unique_ptr<ServiceLiaison> service,
