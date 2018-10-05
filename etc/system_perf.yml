@@ -69,6 +69,7 @@ functions:
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe)
+
           # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
           # that githash to version string.
           if [ "${compile-variant|}" = "-wtdevelop" ]; then
@@ -663,7 +664,6 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules:
     - wtdevelop
-    - enterprise
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=linux-64-amzn-build -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -675,8 +675,23 @@ buildvariants:
       - "linux-64-amzn-build"
   tasks:
     - name: compile
-    - name: compile_enterprise
     - name: compile_wtdevelop
+
+- name: compile-amazon2
+  display_name: Compile on Amazon Linux 2
+  modules:
+    - enterprise
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    platform: linux
+    project_dir: &project_dir dsi
+    tooltags: ""
+    use_scons_cache: true
+  run_on:
+      - "amazon2-build"
+  tasks:
+    - name: compile_enterprise
 
 #######################################
 #         Linux Buildvariants         #
@@ -760,7 +775,7 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on:
       - name: compile_enterprise
-        variant: compile-linux-64-amzn
+        variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
