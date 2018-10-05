@@ -45,7 +45,7 @@ class Client;
 class OperationContext;
 class ServiceContext;
 
-extern int logicalSessionRefreshMinutes;
+extern int logicalSessionRefreshMillis;
 
 /**
  * A thread-safe cache structure for logical session records.
@@ -55,7 +55,7 @@ extern int logicalSessionRefreshMinutes;
  */
 class LogicalSessionCacheImpl final : public LogicalSessionCache {
 public:
-    static constexpr Minutes kLogicalSessionDefaultRefresh = Minutes(5);
+    static constexpr Milliseconds kLogicalSessionDefaultRefresh = Milliseconds(5 * 60 * 1000);
 
     /**
      * An Options type to support the LogicalSessionCacheImpl.
@@ -75,13 +75,13 @@ public:
         /**
          * The interval over which the cache will refresh session records.
          *
-         * By default, this is set to every 5 minutes. If the caller is
-         * setting the sessionTimeout by hand, it is suggested that they
+         * By default, this is set to every 5 minutes (300,000). If the caller
+         * is setting the sessionTimeout by hand, it is suggested that they
          * consider also setting the refresh interval accordingly.
          *
-         * May be set with --setParameter logicalSessionRefreshMinutes=X.
+         * May be set with --setParameter logicalSessionRefreshMillis=X.
          */
-        Minutes refreshInterval = Minutes(logicalSessionRefreshMinutes);
+        Milliseconds refreshInterval = Milliseconds(logicalSessionRefreshMillis);
     };
 
     /**
@@ -148,7 +148,7 @@ private:
      */
     Status _addToCache(LogicalSessionRecord record);
 
-    const Minutes _refreshInterval;
+    const Milliseconds _refreshInterval;
     const Minutes _sessionTimeout;
 
     // This value is only modified under the lock, and is modified
