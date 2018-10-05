@@ -11,7 +11,7 @@
     // Avoiding using the shell helper to avoid the implicit collection recreation.
     db.runCommand({drop: coll.getName()});
     assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1000}));
-    for (let i = 0; i < 5; ++i) {
+    for (let i = 0; i < 30; ++i) {
         assert.commandWorked(coll.insert({"val": i}));
     }
     /**
@@ -99,27 +99,28 @@
                 .cursor.id;
         },
         assertFunc: function(cursorId, result) {
-            const secondCursor =
-                assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2}));
             const adminDB = db.getSiblingDB("admin");
-            const secondResult =
-                adminDB
-                    .aggregate([
-                        {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
-                        {
-                          $match: {
-                              $and: [
-                                  {type: "idleCursor"},
-                                  {"cursor.cursorId": secondCursor.cursor.id}
-                              ]
-                          }
-                        }
-                    ])
-                    .toArray();
-            assert.lt(result[0].cursor.createdDate, secondResult[0].cursor.createdDate, function() {
-                return tojson(result) + tojson(secondResult);
-            });
+            // Make sure the two cursors have different creation times.
+            assert.soon(() => {
+                const secondCursor =
+                    assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2}));
 
+                const secondResult =
+                    adminDB
+                        .aggregate([
+                            {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
+                            {
+                              $match: {
+                                  $and: [
+                                      {type: "idleCursor"},
+                                      {"cursor.cursorId": secondCursor.cursor.id}
+                                  ]
+                              }
+                            }
+                        ])
+                        .toArray();
+                return result[0].cursor.createdDate < secondResult[0].cursor.createdDate;
+            });
         }
     });
 
@@ -157,12 +158,30 @@
                         {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}}
                     ])
                     .toArray();
-            const idleCursor = result[0].cursor;
+            let idleCursor = result[0].cursor;
             assert.eq(idleCursor.nDocsReturned, 4, result);
             assert.eq(idleCursor.nBatchesReturned, 2, result);
             assert.eq(idleCursor.originatingCommand.batchSize, 2, result);
-            assert.lt(idleCursor.createdDate, idleCursor.lastAccessDate, result);
-            assert.lt(originalAccess, idleCursor.lastAccessDate, result);
+            // Make sure that the getMore will not finish running in the same milli as the cursor
+            // creation.
+            assert.soon(() => {
+                assert.commandWorked(db.runCommand(
+                    {getMore: cursorId, collection: "jstests_currentop", batchSize: 2}));
+                result =
+                    adminDB
+                        .aggregate([
+                            {$currentOp: {localOps: true, allUsers: false, idleCursors: true}},
+                            {
+                              $match:
+                                  {$and: [{type: "idleCursor"}, {"cursor.cursorId": cursorId}]}
+                            }
+                        ])
+                        .toArray();
+                idleCursor = result[0].cursor;
+                return idleCursor.createdDate < idleCursor.lastAccessDate &&
+                    originalAccess < idleCursor.lastAccessDate;
+
+            });
         }
     });
 
