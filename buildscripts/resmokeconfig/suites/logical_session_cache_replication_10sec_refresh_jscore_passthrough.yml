@@ -1,0 +1,76 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # These tests are not expected to pass with replica-sets:
+  - jstests/core/dbadmin.js
+  - jstests/core/opcounters_write_cmd.js
+  - jstests/core/read_after_optime.js
+  - jstests/core/capped_update.js
+  # These tests change the featureCompatibilityVersion which makes it so transactions aren't
+  # supported.
+  - jstests/core/txns/only_allow_transactions_on_FCV_40.js
+  - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
+  # These tests change the transactionLifetimeLimitSeconds server parameter which conflicts with how
+  # the CheckReplDBHashInBackground hook doesn't want transactions to be reaped while it is running.
+  - jstests/core/txns/abort_expired_transaction.js
+  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+  - jstests/core/txns/kill_op_on_txn_expiry.js
+  # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+  # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+  # server parameter.
+  - jstests/core/set_param1.js
+  # These tests expect the logical session cache refresh thread to be turned off, so that refreshes
+  # can be triggered deterministically.
+  - jstests/core/list_all_local_sessions.js
+  - jstests/core/list_all_sessions.js
+  - jstests/core/list_local_sessions.js
+  - jstests/core/list_sessions.js
+  # The awaitdata_getmore_cmd.js test tails the oplog and waits for the getMore batch size to equal
+  # zero. The CheckReplDBHashInBackground hook consistently runs and creates sessions. At the same
+  # time, the logical session cache refresh thread will flush these sessions to disk, creating more
+  # opLog entries. To avoid this infinite loop, we will blacklist the test from this suite.
+  - jstests/core/awaitdata_getmore_cmd.js
+  # TODO SERVER-35217: Attempting to kill a session while multiple transactions have been started on
+  # the server may lead to deadlock.
+  - jstests/core/txns/kill_sessions_kills_transaction.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplDBHashInBackground
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+      readMode: commands
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplDBHashInBackground
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+        disableLogicalSessionCacheRefresh: false
+        logicalSessionRefreshMillis: 10000
+        # When running tests that intentionally trigger a DuplicateKeyError, we somehow end up
+        # performing an atClusterTime read in the CheckReplDBHashInBackground hook based on an
+        # operationTime that is greater than anything in the oplog. The periodic no-op writer must
+        # be enabled to ensure that we eventually reach the clusterTime we are waiting for.
+        #
+        # TODO SERVER-35156: Remove the following line to disable the periodic no-op writer.
+        writePeriodicNoops: 1
+    num_nodes: 3
