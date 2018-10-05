@@ -231,10 +231,11 @@ public:
         }
     }
 
-    void onTransactionAbort(OperationContext* opCtx) override {
+    void onTransactionAbort(OperationContext* opCtx,
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onTransactionAbort(opCtx);
+            o->onTransactionAbort(opCtx, abortOplogEntryOpTime);
     }
 
     void onReplicationRollback(OperationContext* opCtx,

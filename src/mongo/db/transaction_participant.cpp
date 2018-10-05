@@ -541,7 +541,17 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
         if (lk.owns_lock()) {
             lk.unlock();
         }
-        abortActiveTransaction(opCtx);
+
+        try {
+            abortActiveTransaction(opCtx);
+        } catch (...) {
+            // It is illegal for aborting a prepared transaction to fail for any reason, so we crash
+            // instead.
+            severe() << "Caught exception during abort of prepared transaction "
+                     << opCtx->getTxnNumber() << " on " << _getSession()->getSessionId().toBSON()
+                     << ": " << exceptionToStatus();
+            std::terminate();
+        }
     });
 
     _txnState.transitionTo(lk, TransactionState::kPrepared);
@@ -902,16 +912,29 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
     }
 
-    // We write the abort oplog entry before aborting the transaction so that no writes that are
-    // causally related to the transaction aborting enter the oplog with a timestamp earlier
-    // than the abort oplog entry's timestamp. This is required so that secondaries apply subsequent
-    // operations on a document with a prepared update after the prepared update is aborted.
-    // We need to unlock the mutex to run the opObserver onTransactionAbort, which calls back
-    // into the TransactionParticipant.
+    // We reserve an oplog slot before aborting the transaction so that no writes that are causally
+    // related to the transaction abort enter the oplog at a timestamp earlier than the abort oplog
+    // entry. On secondaries, we generate a fake empty oplog slot, since it's not used by the
+    // OpObserver.
+    boost::optional<OplogSlotReserver> oplogSlotReserver;
+    boost::optional<OplogSlot> abortOplogSlot;
+    if (_txnState.isPrepared(lock) && opCtx->writesAreReplicated()) {
+        oplogSlotReserver.emplace(opCtx);
+        abortOplogSlot = oplogSlotReserver->getReservedOplogSlot();
+    }
+
+    // Clean up the transaction resources on the opCtx even if the transaction resources on the
+    // session were not aborted. This actually aborts the storage-transaction.
+    _cleanUpTxnResourceOnOpCtx(lock, opCtx, TransactionState::kAborted);
+
+    // Write the abort oplog entry. This must be done after aborting the storage transaction, so
+    // that the lock state is reset, and there is no max lock timeout on the locker. We need to
+    // unlock the session to run the opObserver onTransactionAbort, which calls back into the
+    // session.
     lock.unlock();
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    opObserver->onTransactionAbort(opCtx);
+    opObserver->onTransactionAbort(opCtx, abortOplogSlot);
     lock.lock();
     // We do not check if the active transaction number is correct here because we handle it below.
 
@@ -939,10 +962,6 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
         // If _activeTxnNumber is higher than ours, it means the transaction is already aborted.
         invariant(_txnState.isInSet(lock, TransactionState::kNone | TransactionState::kAborted));
     }
-
-    // Clean up the transaction resources on the opCtx even if the transaction resources on the
-    // session were not aborted. This actually aborts the storage-transaction.
-    _cleanUpTxnResourceOnOpCtx(lock, opCtx, TransactionState::kAborted);
 }
 
 void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {

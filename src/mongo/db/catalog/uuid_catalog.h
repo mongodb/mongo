@@ -118,7 +118,8 @@ public:
                              boost::optional<OplogSlot> commitOplogEntryOpTime,
                              boost::optional<Timestamp> commitTimestamp) override {}
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override {}
-    void onTransactionAbort(OperationContext* opCtx) override {}
+    void onTransactionAbort(OperationContext* opCtx,
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) override {}
     void onReplicationRollback(OperationContext* opCtx,
                                const RollbackObserverInfo& rbInfo) override {}
 };

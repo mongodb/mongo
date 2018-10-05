@@ -723,6 +723,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
 
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
+    opCtx()->lockState()->unsetMaxLockTimeout();
     opObserver().onTransactionCommit(opCtx(), commitSlot, prepareTimestamp);
 
     repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
@@ -775,6 +776,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     std::vector<InsertStatement> insert;
     insert.emplace_back(0, doc);
 
+    OplogSlot abortSlot;
     {
         WriteUnitOfWork wuow(opCtx());
         AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
@@ -786,9 +788,14 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
         session()->lockTxnNumber(txnNum,
                                  Status(ErrorCodes::OperationFailed, "unittest lock failed"));
 
-        opObserver().onTransactionAbort(opCtx());
-        txnParticipant->transitionToAbortedforTest();
+        abortSlot = repl::getNextOpTime(opCtx());
     }
+
+    // Mimic aborting the transaction.
+    opCtx()->setWriteUnitOfWork(nullptr);
+    opCtx()->lockState()->unsetMaxLockTimeout();
+    opObserver().onTransactionAbort(opCtx(), abortSlot);
+    txnParticipant->transitionToAbortedforTest();
 
     repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
     auto oplogIter = oplogInterface.makeIterator();
@@ -845,7 +852,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
         opObserver().onInserts(opCtx(), nss, uuid, insert.begin(), insert.end(), false);
 
         txnParticipant->transitionToAbortedforTest();
-        opObserver().onTransactionAbort(opCtx());
+        opObserver().onTransactionAbort(opCtx(), boost::none);
     }
 
     // Assert no oplog entries were written.
@@ -913,7 +920,7 @@ TEST_F(OpObserverTransactionTest, AbortingUnpreparedTransactionDoesNotWriteToTra
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
-    opObserver().onTransactionAbort(opCtx());
+    opObserver().onTransactionAbort(opCtx(), boost::none);
     txnParticipant->stashTransactionResources(opCtx());
 
     // Abort the storage-transaction without calling the OpObserver.
@@ -930,6 +937,7 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
+    OplogSlot abortSlot;
     {
         WriteUnitOfWork wuow(opCtx());
         OplogSlot slot = repl::getNextOpTime(opCtx());
@@ -939,9 +947,16 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
         session()->lockTxnNumber(txnNum,
                                  {ErrorCodes::PreparedTransactionInProgress,
                                   "unittest mock prepare transaction number lock"});
+
+        abortSlot = repl::getNextOpTime(opCtx());
     }
 
-    opObserver().onTransactionAbort(opCtx());
+    // Mimic aborting the transaction.
+    opCtx()->setWriteUnitOfWork(nullptr);
+    opCtx()->lockState()->unsetMaxLockTimeout();
+    opObserver().onTransactionAbort(opCtx(), abortSlot);
+    txnParticipant->transitionToAbortedforTest();
+
     session()->unlockTxnNumber();
     txnParticipant->stashTransactionResources(opCtx());
 
@@ -1021,10 +1036,9 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     repl::OpTime commitOpTime = commitSlot.opTime;
     ASSERT_LTE(prepareOpTime, commitOpTime);
 
-    txnParticipant->stashTransactionResources(opCtx());
-
-    // Abort the storage-transaction without calling the OpObserver.
-    txnParticipant->shutdown();
+    // Mimic committing the transaction.
+    opCtx()->setWriteUnitOfWork(nullptr);
+    opCtx()->lockState()->unsetMaxLockTimeout();
     opObserver().onTransactionCommit(opCtx(), commitSlot, prepareOpTime.getTimestamp());
 
     session()->unlockTxnNumber();

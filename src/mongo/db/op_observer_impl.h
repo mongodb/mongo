@@ -114,7 +114,8 @@ public:
                              boost::optional<OplogSlot> commitOplogEntryOpTime,
                              boost::optional<Timestamp> commitTimestamp) final;
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) final;
-    void onTransactionAbort(OperationContext* opCtx) final;
+    void onTransactionAbort(OperationContext* opCtx,
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) final;
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
     // Contains the fields of the document that are in the collection's shard key, and "_id".

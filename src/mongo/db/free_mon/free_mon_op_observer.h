@@ -137,7 +137,8 @@ public:
 
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) final {}
 
-    void onTransactionAbort(OperationContext* opCtx) final {}
+    void onTransactionAbort(OperationContext* opCtx,
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
 
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
 };

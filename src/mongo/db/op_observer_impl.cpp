@@ -985,6 +985,11 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     // write conflict retry loop.
     invariant(!opCtx->getWriteUnitOfWork());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    // We must not have a maximum lock timeout, since writing the commit or abort oplog entry for a
+    // prepared transaction must always succeed.
+    invariant(!opCtx->lockState()->hasMaxLockTimeout());
+
     writeConflictRetry(
         opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
 
@@ -1086,7 +1091,8 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSl
     }
 }
 
-void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
+void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
+                                        boost::optional<OplogSlot> abortOplogEntryOpTime) {
     if (!opCtx->writesAreReplicated()) {
         return;
     }
@@ -1098,18 +1104,14 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(txnParticipant);
 
-    if (!txnParticipant->transactionIsPrepared()) {
+    if (!abortOplogEntryOpTime) {
         invariant(!txnParticipant->transactionIsCommitted());
         return;
     }
 
-    // We write the oplog entry in a side transaction so that we do not commit the prepared
-    // transaction, since we must write the oplog entry before aborting the prepared transaction.
-    TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
-
     AbortTransactionOplogObject cmdObj;
     logCommitOrAbortForPreparedTransaction(
-        opCtx, session, OplogSlot(), cmdObj.toBSON(), DurableTxnStateEnum::kAborted);
+        opCtx, session, *abortOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kAborted);
 }
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,

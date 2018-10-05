@@ -262,10 +262,14 @@ public:
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the
-     * RecoveryUnit onRollback() is called.  It must be called when the transaction to abort is
+     * RecoveryUnit onRollback() is called. It must not be called when the transaction to abort is
      * active.
+     *
+     * If the transaction was prepared, then 'abortOplogEntryOpTime' is passed in to be used as the
+     * OpTime of the oplog entry.
      */
-    virtual void onTransactionAbort(OperationContext* opCtx) = 0;
+    virtual void onTransactionAbort(OperationContext* opCtx,
+                                    boost::optional<OplogSlot> abortOplogEntryOpTime) = 0;
 
     /**
      * A structure to hold information about a replication rollback suitable to be passed along to

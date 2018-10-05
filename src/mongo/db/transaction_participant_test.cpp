@@ -104,7 +104,8 @@ public:
         onTransactionCommitFn = [](boost::optional<OplogSlot> commitOplogEntryOpTime,
                                    boost::optional<Timestamp> commitTimestamp) {};
 
-    void onTransactionAbort(OperationContext* opCtx) override;
+    void onTransactionAbort(OperationContext* opCtx,
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) override;
     bool onTransactionAbortThrowsException = false;
     bool transactionAborted = false;
     stdx::function<void()> onTransactionAbortFn = []() {};
@@ -142,8 +143,9 @@ void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
     onTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp);
 }
 
-void OpObserverMock::onTransactionAbort(OperationContext* opCtx) {
-    OpObserverNoop::onTransactionAbort(opCtx);
+void OpObserverMock::onTransactionAbort(OperationContext* opCtx,
+                                        boost::optional<OplogSlot> abortOplogEntryOpTime) {
+    OpObserverNoop::onTransactionAbort(opCtx, abortOplogEntryOpTime);
     uassert(ErrorCodes::OperationFailed,
             "onTransactionAbort() failed",
             !onTransactionAbortThrowsException);
