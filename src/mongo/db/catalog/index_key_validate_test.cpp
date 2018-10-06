@@ -46,26 +46,6 @@ namespace {
 using IndexVersion = IndexDescriptor::IndexVersion;
 using index_key_validate::validateKeyPattern;
 
-/**
- * Helper class to ensure proper FCV & test commands enabled.
- * TODO: Remove test command enabling/disabling in SERVER-36198
- */
-class TestCommandQueryKnobGuard {
-
-public:
-    TestCommandQueryKnobGuard() {
-        _prevEnabled = getTestCommandsEnabled();
-        setTestCommandsEnabled(true);
-    }
-
-    ~TestCommandQueryKnobGuard() {
-        setTestCommandsEnabled(_prevEnabled);
-    }
-
-private:
-    bool _prevEnabled;
-};
-
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {
     for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("x" << 1), indexVersion));
@@ -244,17 +224,14 @@ TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceedsOnSubPath) {
-    TestCommandQueryKnobGuard guard;
     ASSERT_OK(validateKeyPattern(BSON("a.$**" << 1), IndexVersion::kV2));
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceeds) {
-    TestCommandQueryKnobGuard guard;
     ASSERT_OK(validateKeyPattern(BSON("$**" << 1), IndexVersion::kV2));
 }
 
 TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueFailsIfNotPositive) {
-    TestCommandQueryKnobGuard guard;
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("$**" << 0.0), IndexVersion::kV2));
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
@@ -268,36 +245,30 @@ TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueFailsIfNotPositive
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnRepeat) {
-    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**.$**" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnSubPathRepeat) {
-    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("a.$**.$**" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnCompound) {
-    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**" << 1 << "a" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnIncorrectValue) {
-    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**" << false), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithInvalidKeyName) {
-    // TODO: Remove test command enabling/disabling in SERVER-36198
-    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("a"
                                           << "wildcard"),
                                      IndexVersion::kV2);
@@ -306,8 +277,6 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithI
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithValidKeyName) {
-    // TODO: Remove test command enabling/disabling in SERVER-36198
-    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**"
                                           << "wildcard"),
                                      IndexVersion::kV2);

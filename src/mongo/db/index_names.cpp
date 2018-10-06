@@ -28,7 +28,6 @@
 
 #include "mongo/db/index_names.h"
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -71,10 +70,7 @@ string IndexNames::findPluginName(const BSONObj& keyPattern) {
 
 // static
 bool IndexNames::isKnownName(const string& name) {
-    return name == IndexNames::GEO_2D || name == IndexNames::GEO_2DSPHERE ||
-        name == IndexNames::GEO_HAYSTACK || name == IndexNames::TEXT ||
-        name == IndexNames::HASHED || name == IndexNames::BTREE ||
-        (getTestCommandsEnabled() && name == IndexNames::WILDCARD);
+    return (name == IndexNames::BTREE || kIndexNameToType.count(name));
 }
 
 // static
