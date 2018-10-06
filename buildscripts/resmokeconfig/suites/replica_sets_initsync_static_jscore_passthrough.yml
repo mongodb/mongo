@@ -17,13 +17,12 @@ selector:
   - jstests/core/txns/commit_prepared_transaction_errors.js
   - jstests/core/txns/empty_prepare.js
   - jstests/core/txns/no_new_transactions_when_prepared_transaction_in_progress.js
+  - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
   - jstests/core/txns/prepare_conflict.js
   - jstests/core/txns/prepare_prepared_transaction.js
   - jstests/core/txns/statement_ids_accepted.js
   # TODO (SERVER-35865): Unblacklist when we also correctly write and apply 'commitTransaction'
   # oplog entries, besides SERVER-36492.
-  - jstests/core/txns/commit_prepared_transaction.js
-  - jstests/core/txns/disallow_operations_on_prepared_transaction.js
   - jstests/core/txns/commit_prepared_transaction.js
   - jstests/core/txns/disallow_operations_on_prepared_transaction.js
   - jstests/core/txns/ensure_active_txn_for_prepare_transaction.js
