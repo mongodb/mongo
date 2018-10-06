@@ -23,6 +23,8 @@ var $config = extendWorkload($config, function($config, $super) {
         this.session = db.getMongo().startSession({causalConsistency: true});
         // Force the session to use `lsid` for its session id. This way all threads will use
         // the same session.
+        const oldId = this.session._serverSession.handle.getId();
+        print("Overriding sessionID " + tojson(oldId) + " with " + tojson(lsid) + " for test.");
         this.session._serverSession.handle.getId = () => lsid;
 
         this.txnNumber = -1;
