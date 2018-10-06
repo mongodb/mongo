@@ -276,10 +276,15 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                                 int* numApplied,
                                 BSONArrayBuilder* opsBuilder,
                                 const OpTime& optime) {
-    // Only run on secondary.
+    // Return error if run via applyOps command.
     uassert(50945,
             "applyOps with prepared flag is only used internally by secondaries.",
-            oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
+            oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
+
+    // TODO: SERVER-35879 Only run on secondary until we support replication recovery and initial
+    // sync.
+    invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
+
     uassert(
         50946,
         "applyOps with prepared must only include CRUD operations and cannot have precondition.",
