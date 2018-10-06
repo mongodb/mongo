@@ -1,14 +1,22 @@
 /**
  * Test that cached plans which use wildcard indexes work.
- * TODO: SERVER-36198: Move this test back to jstests/core/
+ *
+ * This test attempts to perform queries and introspect the server's plan cache entries using the
+ * $planCacheStats aggregation source. Both operations must be routed to the primary, and the latter
+ * only supports 'local' readConcern.
+ * @tags: [assumes_read_preference_unchanged, assumes_read_concern_unchanged,
+ * does_not_support_stepdowns]
  */
 (function() {
     "use strict";
 
-    load('jstests/libs/analyze_plan.js');  // For getPlanStage().
+    load('jstests/libs/analyze_plan.js');              // For getPlanStage().
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
 
     const coll = db.wildcard_cached_plans;
     coll.drop();
+
     assert.commandWorked(coll.createIndex({"b.$**": 1}));
     assert.commandWorked(coll.createIndex({"a": 1}));
 
@@ -22,7 +30,9 @@
 
     function getCacheEntryForQuery(query) {
         const aggRes =
-            coll.aggregate([
+            FixtureHelpers.getPrimaryForNodeHostingDatabase(db)
+                .getCollection(coll.getFullName())
+                .aggregate([
                     {$planCacheStats: {}},
                     {$match: {createdFromQuery: {query: query, sort: {}, projection: {}}}}
                 ])
@@ -34,11 +44,16 @@
         return null;
     }
 
-    function getQueryHash(query) {
-        const explainRes = assert.commandWorked(coll.explain().find(query).finish());
-        const hash = explainRes.queryPlanner.queryHash;
+    function getQueryHashFromExplain(explainRes) {
+        const hash = FixtureHelpers.isMongos(db)
+            ? explainRes.queryPlanner.winningPlan.shards[0].queryHash
+            : explainRes.queryPlanner.queryHash;
         assert.eq(typeof(hash), "string");
         return hash;
+    }
+
+    function getQueryHash(query) {
+        return getQueryHashFromExplain(assert.commandWorked(coll.explain().find(query).finish()));
     }
 
     const query = {a: 1, b: 1};
@@ -81,9 +96,8 @@
     // Check that indexability discriminators work with collations.
     (function() {
         // Create wildcard index with a collation.
-        assert.eq(coll.drop(), true);
-        assert.commandWorked(
-            db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 1}}));
+        assertDropAndRecreateCollection(
+            db, coll.getName(), {collation: {locale: "en_US", strength: 1}});
         assert.commandWorked(coll.createIndex({"b.$**": 1}));
 
         // Run a query which uses a different collation from that of the index, but does not use
@@ -91,7 +105,7 @@
         const queryWithoutStringExplain =
             coll.explain().find({a: 5, b: 5}).collation({locale: "fr"}).finish();
         let ixScans = getPlanStages(queryWithoutStringExplain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(ixScans.length, 1);
+        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.eq(ixScans[0].keyPattern, {$_path: 1, b: 1});
 
         // Run a query which uses a different collation from that of the index and does have string
@@ -103,21 +117,20 @@
 
         // Check that the shapes are different since the query which matches on a string will not
         // be eligible to use the b.$** index (since the index has a different collation).
-        assert.neq(queryWithoutStringExplain.queryPlanner.queryHash,
-                   queryWithStringExplain.queryPlanner.queryHash);
+        assert.neq(getQueryHashFromExplain(queryWithoutStringExplain),
+                   getQueryHashFromExplain(queryWithStringExplain));
     })();
 
     // Check that indexability discriminators work with partial wildcard indexes.
     (function() {
-        assert.eq(coll.drop(), true);
-        assert.commandWorked(db.createCollection(coll.getName()));
+        assertDropAndRecreateCollection(db, coll.getName());
         assert.commandWorked(
             coll.createIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 5}}}));
 
         // Run a query for a value included by the partial filter expression.
         const queryIndexedExplain = coll.find({a: 4}).explain();
         let ixScans = getPlanStages(queryIndexedExplain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(ixScans.length, 1);
+        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.eq(ixScans[0].keyPattern, {$_path: 1, a: 1});
 
         // Run a query which tries to get a value not included by the partial filter expression.
@@ -127,7 +140,7 @@
 
         // Check that the shapes are different since the query which searches for a value not
         // included by the partial filter expression won't be eligible to use the $** index.
-        assert.neq(queryIndexedExplain.queryPlanner.queryHash,
-                   queryUnindexedExplain.queryPlanner.queryHash);
+        assert.neq(getQueryHashFromExplain(queryIndexedExplain),
+                   getQueryHashFromExplain(queryUnindexedExplain));
     })();
 })();

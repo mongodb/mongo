@@ -1,7 +1,5 @@
 /**
  * Tests that queries using a multikey $** index, return correct results.
- *
- * TODO: SERVER-36198: Move this test back to jstests/core/.
  */
 (function() {
     "use strict";
@@ -81,15 +79,15 @@
     function assertWildcardQuery(query, expectedPath, explainStats = {}) {
         // Explain the query, and determine whether an indexed solution is available.
         const explainOutput = coll.find(query).explain("executionStats");
-        const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
         // If we expect the current path to have been excluded based on the $** keyPattern
         // or projection, confirm that no indexed solution was found.
         if (!expectedPath) {
-            assert.eq(ixScans.length, 0);
+            assert.gt(getPlanStages(explainOutput.queryPlanner.winningPlan, "COLLSCAN").length, 0);
             return;
         }
         // Verify that the winning plan uses the $** index with the expected path.
-        assert.eq(ixScans.length, 1);
+        const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
+        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
         // Verify that the results obtained from the $** index are identical to a COLLSCAN.
         assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());

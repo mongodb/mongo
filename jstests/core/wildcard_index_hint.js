@@ -1,6 +1,5 @@
 /**
  * Tests that $** indexes obey hinting.
- * TODO: SERVER-36198: Move this test back to jstests/core/
  */
 (function() {
     "use strict";

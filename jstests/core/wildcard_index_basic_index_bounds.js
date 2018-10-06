@@ -1,19 +1,17 @@
 /**
  * Tests basic index bounds generation and planning for $** indexes.
  *
- * Tagged as 'assumes_unsharded_collection' so that the expected relationship between the number of
- * IXSCANs in the explain output and the number of fields in the indexed documents is not distorted
- * by being spread across multiple shards.
+ * Does not support stepdowns because the test issues getMores, which the stepdown/kill_primary
+ * passthroughs will reject.
  *
- * @tags: [assumes_unsharded_collection]
- *
- * TODO: SERVER-36198: Move this test back to jstests/core/
+ * @tags: [does_not_support_stepdowns]
  */
 (function() {
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For arrayEq.
     load("jstests/libs/analyze_plan.js");         // For getPlanStages.
+    load("jstests/libs/fixture_helpers.js");      // For isMongos and numberOfShardsForCollection.
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
@@ -126,7 +124,7 @@
                 }
 
                 // Verify that the winning plan uses the $** index with the expected bounds.
-                assert.eq(ixScans.length, 1);
+                assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
                 assert.docEq(ixScans[0].keyPattern, {$_path: 1, [path]: 1});
                 assert.docEq(ixScans[0].indexBounds, expectedBounds);
 
@@ -152,7 +150,13 @@
             // We should find that each branch of the $or has used a separate $** sub-index.
             const ixScanBounds = [];
             ixScans.forEach((ixScan) => ixScanBounds.push(ixScan.indexBounds));
-            assertArrayEq(ixScanBounds, orQueryBounds);
+            // In the sharded passthroughs, we expect to have 'orQueryBounds' on each shard.
+            const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
+            let orQueryBoundsShards = [];
+            for (let i = 0; i < numShards; ++i) {
+                orQueryBoundsShards = orQueryBoundsShards.concat(orQueryBounds);
+            }
+            assertArrayEq(ixScanBounds, orQueryBoundsShards);
 
             // Verify that the results obtained from the $** index are identical to a COLLSCAN.
             assertArrayEq(coll.find({$or: multiFieldPreds}).toArray(),
@@ -167,8 +171,9 @@
             // candidate that wasn't the winner. Before SERVER-36521 banned them for $** indexes, a
             // number of AND_SORTED plans would also be generated here; we search for these in order
             // to verify that no such plans now exist.
+            const rejectedPlans = getRejectedPlans(explainOutput);
             let rejectedIxScans = [], rejectedAndSorted = [];
-            for (let rejectedPlan of explainOutput.queryPlanner.rejectedPlans) {
+            for (let rejectedPlan of rejectedPlans) {
                 rejectedAndSorted =
                     rejectedAndSorted.concat(getPlanStages(rejectedPlan, "AND_SORTED"));
                 rejectedIxScans = rejectedIxScans.concat(getPlanStages(rejectedPlan, "IXSCAN"));
@@ -179,8 +184,8 @@
 
             // We should find that one of the available $** subindexes has been chosen as the
             // winner, and all other candidate $** indexes are present in 'rejectedPlans'.
-            assert.eq(winningIxScan.length, 1);
-            assert.eq(rejectedIxScans.length, expectedPaths.length - 1);
+            assert.eq(winningIxScan.length, numShards);
+            assert.eq(rejectedIxScans.length, numShards * (expectedPaths.length - 1));
 
             // Verify that each of the IXSCANs have the expected bounds and $_path key.
             for (let ixScan of winningIxScan.concat(rejectedIxScans)) {

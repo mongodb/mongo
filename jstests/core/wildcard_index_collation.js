@@ -2,22 +2,31 @@
  * Test that $** indexes obey collation rules for document values, while the virtual $_path
  * components stored alongside these values in the index always use simple binary comparison.
  *
- * TODO: SERVER-36198: Move this test back into jstests/core/collation.js
+ * The tags below are necessary because collation requires that we use read/write commands rather
+ * than legacy operations. We also require that collections are unsharded, since we perform queries
+ * which we expect to be covered.
+ * @tags: [assumes_unsharded_collection, requires_find_command, requires_non_retryable_commands,
+ * requires_non_retryable_writes]
  */
 (function() {
     "user strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-    load("jstests/libs/analyze_plan.js");         // For getPlanStages.
-    load("jstests/libs/get_index_helpers.js");    // For GetIndexHelpers.
+    load("jstests/aggregation/extras/utils.js");       // For arrayEq.
+    load("jstests/libs/analyze_plan.js");              // For getPlanStages.
+    load("jstests/libs/get_index_helpers.js");         // For GetIndexHelpers.
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For isMongos.
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
-    const coll = db.wildcard_collation;
-    coll.drop();
+    // Create the collection and assign it a default case-insensitive collation.
+    const coll = assertDropAndRecreateCollection(
+        db, "wildcard_collation", {collation: {locale: "en_US", strength: 1}});
 
     // Extracts the winning plan for the given query and projection from the explain output.
-    const winningPlan = (query, proj) => coll.find(query, proj).explain().queryPlanner.winningPlan;
+    const winningPlan = (query, proj) => FixtureHelpers.isMongos(db)
+        ? coll.find(query, proj).explain().queryPlanner.winningPlan.shards[0].winningPlan
+        : coll.find(query, proj).explain().queryPlanner.winningPlan;
 
     // Runs the given query and confirms that: (1) the $** was used to answer the query, (2) the
     // results produced by the $** index match the given 'expectedResults', and (3) the same output
@@ -48,10 +57,6 @@
                    "Index with key pattern " + tojson(keyPattern) + " and collation " +
                        tojson(collation) + " not found: " + tojson(indexSpecs));
     }
-
-    // Recreate the collection with a default case-insensitive collation.
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 1}}));
 
     // Confirm that the $** index inherits the collection's default collation.
     assert.commandWorked(coll.createIndex({"$**": 1}));

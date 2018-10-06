@@ -1,5 +1,9 @@
 /**
  * Test that $** indexes obey index filter rules.
+ *
+ * Does not support stepdowns, because the stepdown/kill_primary passthroughs will reject commands
+ * that may return different values after a failover; in this case, 'planCacheClearFilters'.
+ * @tags: [does_not_support_stepdowns]
  */
 (function() {
     "use strict";
@@ -39,7 +43,8 @@
                 coll.explain("executionStats").find(query).hint(hint).finish());
         }
 
-        let planStage = getPlanStage(explain.executionStats.executionStages, 'IXSCAN');
+        const executionStages = getExecutionStages(explain).shift();
+        let planStage = getPlanStage(executionStages, 'IXSCAN');
         assert.neq(null, planStage);
         assert.eq(planStage.indexName, expectedIndexName, tojson(planStage));
     }

@@ -58,6 +58,22 @@ function getPlanStage(root, stage) {
 }
 
 /**
+ * Returns the set of rejected plans from the given replset or sharded explain output.
+ */
+function getRejectedPlans(root) {
+    if (root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+        const rejectedPlans = [];
+        for (let shard of root.queryPlanner.winningPlan.shards) {
+            for (let rejectedPlan of shard.rejectedPlans) {
+                rejectedPlans.push(Object.assign({shardName: shard.shardName}, rejectedPlan));
+            }
+        }
+        return rejectedPlans;
+    }
+    return root.queryPlanner.rejectedPlans;
+}
+
+/**
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns true if
  * the query planner reports at least one rejected alternative plan, and false otherwise.
  */
@@ -97,6 +113,22 @@ function hasRejectedPlans(root) {
         return root.queryPlanner.winningPlan.shards.find(
                    (shard) => sectionHasRejectedPlans(shard)) !== undefined;
     }
+}
+
+/**
+ * Returns an array of execution stages from the given replset or sharded explain output.
+ */
+function getExecutionStages(root) {
+    if (root.executionStats.executionStages.hasOwnProperty("shards")) {
+        const executionStages = [];
+        for (let shard of root.executionStats.executionStages.shards) {
+            executionStages.push(Object.assign(
+                {shardName: shard.shardName, executionSuccess: shard.executionSuccess},
+                shard.executionStages));
+        }
+        return executionStages;
+    }
+    return [root.executionStats.executionStages];
 }
 
 /**

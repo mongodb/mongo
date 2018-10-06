@@ -4,7 +4,6 @@
  *  # Uses index building in background
  *  requires_background_index,
  * ]
- * TODO: SERVER-36198: Move this test back to jstests/core/
  */
 (function() {
     "use strict";

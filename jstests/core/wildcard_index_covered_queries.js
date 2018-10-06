@@ -2,11 +2,10 @@
  * Test that $** indexes can provide a covered solution, given an appropriate query and projection.
  *
  * Cannot implicitly shard accessed collections, because queries on a sharded collection cannot be
- * covered unless they include the shard key.
+ * covered unless they include the shard key. Does not support stepdowns because the test issues
+ * getMores, which the stepdown/kill_primary passthroughs will reject.
  *
- * @tags: [assumes_unsharded_collection]
- *
- * TODO: SERVER-36198: Move this test back to jstests/core/
+ * @tags: [assumes_unsharded_collection, does_not_support_stepdowns]
  */
 (function() {
     "use strict";

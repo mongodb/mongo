@@ -215,7 +215,8 @@ if (typeof _threadInject != "undefined") {
                 "views/views_aggregation.js",
                 "views/views_change.js",
                 "views/views_drop.js",
-                "views/views_find.js"
+                "views/views_find.js",
+                "wildcard_index_collation.js"
             ];
             Object.assign(skipTests, makeKeys(requires_find_command));
         }

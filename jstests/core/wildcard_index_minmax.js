@@ -11,12 +11,13 @@
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
-    assert.commandWorked(coll.createIndex({"$**": 1}));
-
     assert.commandWorked(coll.insert({a: 1, b: 1}));
     assert.commandWorked(coll.insert({a: 1, b: 2}));
     assert.commandWorked(coll.insert({a: 2, b: 1}));
     assert.commandWorked(coll.insert({a: 2, b: 2}));
+
+    assert.commandWorked(coll.createIndex({"$**": 1}));
+    assert.commandWorked(coll.createIndex({"a": 1}));
 
     // Throws error for $** index min.
     assert.commandFailedWithCode(
@@ -72,8 +73,6 @@
         hint: {"$**": 1}
     }),
                                  ErrorCodes.BadValue);
-
-    assert.commandWorked(coll.createIndex({"a": 1}));
 
     // $** index does not interfere with valid min/max.
     assertArrayEq(coll.find({}, {_id: 0}).min({"a": 0.5}).max({"a": 1.5}).toArray(),

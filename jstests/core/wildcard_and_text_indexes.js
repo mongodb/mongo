@@ -1,19 +1,12 @@
 /**
  * Tests that a {$**: 1} index can coexist with a {$**: 'text'} index in the same collection.
- *
- * Tagged as 'assumes_unsharded_collection' so that the expected relationship between the number of
- * IXSCANs in the explain output and the number of fields in the indexed documents is not distorted
- * by being spread across multiple shards.
- *
- * @tags: [assumes_unsharded_collection]
- *
- * TODO: SERVER-36198: Move this test back to jstests/core/
  */
 (function() {
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For arrayEq.
     load("jstests/libs/analyze_plan.js");         // For getPlanStages and planHasStage.
+    load("jstests/libs/fixture_helpers.js");      // For isMongos.
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -28,7 +21,7 @@
         const explainOutput = coll.find(query).explain("executionStats");
         const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
         // Verify that the winning plan uses the $** index with the expected path.
-        assert.eq(ixScans.length, 1);
+        assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
         // Verify that the results obtained from the $** index are identical to a COLLSCAN.
         assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());
@@ -57,7 +50,7 @@
         const textQuery = Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: 'banana'}});
         let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
         assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
-        assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
+        assert.eq(getRejectedPlans(explainOut).length, 0);
         assert.eq(explainOut.executionStats.nReturned, 2);
 
         // Confirm that $** does not generate a candidate plan for $text search, including cases
@@ -66,13 +59,13 @@
             assert.commandWorked(coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery))
                                      .explain("executionStats"));
         assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
-        assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
+        assert.eq(getRejectedPlans(explainOut).length, 0);
         assert.eq(explainOut.executionStats.nReturned, 2);
 
         // Confirm that the $** index can be used alongside a $text predicate in an $or.
         explainOut = assert.commandWorked(
             coll.find({$or: [{_fts: 3}, textQuery]}).explain("executionStats"));
-        assert.eq(explainOut.queryPlanner.rejectedPlans.length, 0);
+        assert.eq(getRejectedPlans(explainOut).length, 0);
         assert.eq(explainOut.executionStats.nReturned, 3);
 
         const textOrWildcard = getPlanStages(explainOut.queryPlanner.winningPlan, "OR").shift();

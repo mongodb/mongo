@@ -3,6 +3,7 @@
 
     load("jstests/aggregation/extras/utils.js");  // For arrayEq().
     load("jstests/libs/analyze_plan.js");         // For getPlanStages().
+    load("jstests/libs/fixture_helpers.js");      // For numberOfShardsForCollection().
 
     const coll = db.wildcard_nonblocking_sort;
 
@@ -26,14 +27,14 @@
         const sorts = getPlanStages(plan, "SORT");
 
         if (isBlocking) {
-            assert.eq(sorts.length, 1);
+            assert.eq(sorts.length, FixtureHelpers.numberOfShardsForCollection(coll));
             assert.eq(sorts[0].sortPattern, sort);
 
             // A blocking sort may or may not use the index, so we don't check the length of
             // 'ixScans'.
         } else {
             assert.eq(sorts.length, 0);
-            assert.eq(ixScans.length, 1);
+            assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
 
             const sortKey = Object.keys(sort)[0];
             assert.docEq(ixScans[0].keyPattern, {$_path: 1, [sortKey]: 1});

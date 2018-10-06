@@ -1,7 +1,5 @@
 /**
  * Tests that a $** index can support queries which test for equality to empty nested objects.
- *
- * TODO: SERVER-36198: Move this test back to jstests/core/
  */
 (function() {
     "use strict";
