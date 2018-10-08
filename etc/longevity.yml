@@ -275,7 +275,9 @@ modules:
 buildvariants:
 - name: linux-wt-shard
   display_name: Linux WT Shard
-  batchtime: 40320 # 4 weeks
+  # We set an exceptionally large batchtime because the intention is for builds on this Evergreen
+  # project to only be triggered manually.
+  batchtime: 524160 # 52 weeks
   modules: &modules
     - dsi
   expansions:
