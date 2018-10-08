@@ -984,7 +984,17 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
         return nullptr;
     }
 
-    auto groupId = fieldPathExpr->getFieldPath().tail().fullPath();
+    const auto fieldPath = fieldPathExpr->getFieldPath();
+    if (fieldPath.getPathLength() == 1) {
+        // The path is $$CURRENT or $$ROOT. This isn't really a sensible value to group by (since
+        // each document has a unique _id, it will just return the entire collection). We only
+        // apply the rewrite when grouping by a single field, so we cannot apply it in this case,
+        // where we are grouping by the entire document.
+        invariant(fieldPath.getFieldName(0) == "CURRENT" || fieldPath.getFieldName(0) == "ROOT");
+        return nullptr;
+    }
+
+    const auto groupId = fieldPath.tail().fullPath();
 
     // We can't do this transformation if there are any non-$first accumulators.
     for (auto&& accumulator : _accumulatedFields) {
