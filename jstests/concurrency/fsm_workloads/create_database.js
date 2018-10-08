@@ -8,6 +8,8 @@
  *
  * Each thread uses its own database, though sometimes threads may try to create databases with
  * names that only differ in case, expecting the appriopriate error code.
+ *
+ * @tags: [creates_background_indexes]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeralForTest

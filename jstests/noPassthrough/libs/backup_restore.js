@@ -109,7 +109,7 @@ var BackupRestoreTest = function(options) {
 
         // Returns the pid of the started mongo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect('mongo',
+        return startMongoProgramNoConnect(MongoRunner.mongoShellPath,
                                           '--eval',
                                           '(' + crudClientCmds + ')("' + dbName + '", "' +
                                               collectionName + '", ' + numNodes + ')',
@@ -119,102 +119,16 @@ var BackupRestoreTest = function(options) {
     /**
      * Starts a client that will run a FSM workload.
      */
-    function _fsmClient(host, blackListDb, numNodes) {
+    function _fsmClient(host) {
         // Launch FSM client
-        // SERVER-19488 The FSM framework assumes that there is an implicit 'db' connection when
-        // started without any cluster options. Since the shell running this test was started with
-        // --nodb, another mongo shell is used to allow implicit connections to be made to the
-        // primary of the replica set.
-        var fsmClientCmds = function(blackListDb, numNodes) {
-            'use strict';
-            load('jstests/concurrency/fsm_libs/runner.js');
-            var dir = 'jstests/concurrency/fsm_workloads';
-            var blacklist = [
-                // Disabled due to MongoDB restrictions and/or workload restrictions
-                'agg_group_external.js',  // uses >100MB of data, which can overwhelm test hosts
-                'agg_out_mode_insert_documents.js',
-                'agg_out_mode_replace_documents.js',
-                'agg_sort_external.js',  // uses >100MB of data, which can overwhelm test hosts
-                'agg_with_chunk_migrations.js',
-                'auth_create_role.js',
-                'auth_create_user.js',
-                'auth_drop_role.js',
-                'auth_drop_user.js',
-                'create_index_background.js',
-                'create_index_background_unique_capped.js',
-                'create_index_background_unique.js',
-                'database_versioning.js',
-                'findAndModify_update_grow.js',  // can cause OOM kills on test hosts
-                'multi_statement_transaction_atomicity_isolation.js',
-                'multi_statement_transaction_atomicity_isolation_multi_db.js',
-                'multi_statement_transaction_atomicity_isolation_repeated_reads.js',
-                'multi_statement_transaction_kill_sessions_atomicity_isolation.js',
-                'multi_statement_transaction_atomicity_isolation_metrics_test.js',
-                'multi_statement_transaction_simple.js',
-                'multi_statement_transaction_simple_repeated_reads.js',
-                'reindex_background.js',
-                'remove_multiple_documents.js',
-                'remove_where.js',
-                'rename_capped_collection_chain.js',
-                'rename_capped_collection_dbname_chain.js',
-                'rename_capped_collection_dbname_droptarget.js',
-                'rename_capped_collection_droptarget.js',
-                'rename_collection_chain.js',
-                'rename_collection_dbname_chain.js',
-                'rename_collection_dbname_droptarget.js',
-                'rename_collection_droptarget.js',
-                'secondary_reads.js',
-                'secondary_reads_with_catalog_changes.js',
-                'sharded_base_partitioned.js',
-                'sharded_mergeChunks_partitioned.js',
-                'sharded_moveChunk_drop_shard_key_index.js',
-                'sharded_moveChunk_partitioned.js',
-                'sharded_splitChunk_partitioned.js',
-                'snapshot_read_catalog_operations.js',
-                'snapshot_read_kill_operations.js',
-                'snapshot_read_kill_op_only.js',
-                'update_rename.js',
-                'update_rename_noindex.js',
-                'yield_sort.js',
-            ].map(function(file) {
-                return dir + '/' + file;
-            });
-            Random.setRandomSeed();
-            // Run indefinitely.
-            while (true) {
-                try {
-                    var workloads = Array.shuffle(ls(dir).filter(function(file) {
-                        return !Array.contains(blacklist, file);
-                    }));
-                    // Run workloads one at a time, so we ensure replication completes.
-                    workloads.forEach(function(workload) {
-                        runWorkloadsSerially(
-                            [workload], {}, {}, {dropDatabaseBlacklist: [blackListDb]});
-                        // Wait for replication to complete between workloads.
-                        var wc = {
-                            writeConcern: {w: numNodes, wtimeout: ReplSetTest.kDefaultTimeoutMS}
-                        };
-                        var result = db.getSiblingDB('test').fsm_teardown.insert({a: 1}, wc);
-                        assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
-                        result = db.getSiblingDB('test').fsm_teardown.drop(
-                            {writeConcern: {w: "majority"}});
-                        assert(result, 'teardown drop failed');
-                    });
-                } catch (e) {
-                    if (e instanceof ReferenceError || e instanceof TypeError) {
-                        throw e;
-                    }
-                }
-            }
-        };
+        const suite = 'concurrency_replication_for_backup_restore';
+        const resmokeCmd = 'python buildscripts/resmoke.py --shuffle --continueOnFailure' +
+            ' --repeat=99999 --mongo=' + MongoRunner.mongoShellPath + ' --shellConnString=' + host +
+            ' --suites=' + suite;
 
-        // Returns the pid of the started mongo shell so the FSM test client can be terminated
-        // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(
-            'mongo',
-            '--eval',
-            '(' + fsmClientCmds + ')("' + blackListDb + '", ' + numNodes + ');',
-            host);
+        // Returns the pid of the FSM test client so it can be terminated without waiting for its
+        // execution to finish.
+        return _startMongoProgram({args: resmokeCmd.split(' ')});
     }
 
     /**
@@ -278,7 +192,7 @@ var BackupRestoreTest = function(options) {
         var crudPid = _crudClient(primary.host, crudDb, crudColl, numNodes);
 
         // Launch FSM client
-        var fsmPid = _fsmClient(primary.host, crudDb, numNodes);
+        var fsmPid = _fsmClient(primary.host);
 
         // Let clients run for specified time before backing up secondary
         sleep(clientTime);
@@ -429,13 +343,20 @@ var BackupRestoreTest = function(options) {
                    fsmStatus.exitCode);
         stopMongoProgramByPid(fsmPid);
 
-        // Make sure the test database is not in a drop-pending state. This can happen if we
-        // killed the FSM client while it was in the middle of dropping it.
-        assert.soonNoExcept(function() {
-            let result = primary.getDB("test").afterClientKills.insert(
-                {"a": 1}, {writeConcern: {w: "majority"}});
+        // Make sure the databases are not in a drop-pending state. This can happen if we
+        // killed the FSM client while it was in the middle of dropping them.
+        let result = primary.adminCommand({
+            listDatabases: 1,
+            nameOnly: true,
+            filter: {'name': {$nin: ['admin', 'config', 'local', '$external']}}
+        });
+        assert.commandWorked(result);
+        const databases = result.databases.map(dbs => dbs.name);
+        databases.forEach(dbName => assert.soonNoExcept(function() {
+            let result = primary.getDB(dbName).afterClientKills.insert(
+                {'a': 1}, {writeConcern: {w: 'majority'}});
             return (result.nInserted === 1);
-        }, "failed to insert to test collection", 10 * 60 * 1000);
+        }, 'failed to insert to test collection', 10 * 60 * 1000));
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
         jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +

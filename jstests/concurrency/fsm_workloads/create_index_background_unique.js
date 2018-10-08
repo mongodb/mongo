@@ -4,6 +4,8 @@
  * create_index_background_unique.js
  *
  * Creates multiple unique background indexes in parallel.
+ *
+ * @tags: [creates_background_indexes]
  */
 
 var $config = (function() {

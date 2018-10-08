@@ -16,7 +16,7 @@
  * For each read, we check if there is any 'hole' in the returned batch. There
  * should not be any 'hole' because oplogs are applied sequentially in batches.
  *
- * @tags: [requires_replication]
+ * @tags: [requires_replication, uses_write_concern]
  */
 
 var $config = (function() {

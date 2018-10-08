@@ -35,8 +35,11 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
         if _config.SHELL_CONN_STRING is not None:
             # Specifying the shellConnString command line option should override the fixture
-            # specified in the YAML configuration to be the no-op fixture.
-            self.fixture_config = {"class": fixtures.NOOP_FIXTURE_CLASS}
+            # specified in the YAML configuration to be the external fixture.
+            self.fixture_config = {
+                "class": fixtures.EXTERNAL_FIXTURE_CLASS,
+                "shell_conn_string": _config.SHELL_CONN_STRING
+            }
         else:
             self.fixture_config = fixture
 

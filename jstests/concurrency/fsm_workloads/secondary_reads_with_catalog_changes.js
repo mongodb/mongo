@@ -22,7 +22,7 @@ load('jstests/concurrency/fsm_workloads/secondary_reads.js');  // for $config
  * Note that index/collection drop could interrupt the reads, so we need to retry if the read is
  * interrupted.
  *
- * @tags: [requires_replication]
+ * @tags: [creates_background_indexes, requires_replication, uses_write_concern]
  */
 var $config = extendWorkload($config, function($config, $super) {
 

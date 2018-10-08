@@ -54,15 +54,17 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         global_vars["MongoRunner.dataDir"] = data_dir
         global_vars["MongoRunner.dataPath"] = data_path
 
-        # Don't set the path to the executables when the user didn't specify them via the command
-        # line. The functions in the mongo shell for spawning processes have their own logic for
-        # determining the default path to use.
+        # Don't set the path to the mongod and mongos executables when the user didn't specify them
+        # via the command line. The functions in the mongo shell for spawning processes have their
+        # own logic for determining the default path to use.
         if config.MONGOD_EXECUTABLE is not None:
             global_vars["MongoRunner.mongodPath"] = config.MONGOD_EXECUTABLE
         if config.MONGOS_EXECUTABLE is not None:
             global_vars["MongoRunner.mongosPath"] = config.MONGOS_EXECUTABLE
-        if self.shell_executable is not None:
-            global_vars["MongoRunner.mongoShellPath"] = self.shell_executable
+        # We provide an absolute path for mongo shell to ensure that programs starting their own
+        # mongo shell will use the same as specified from resmoke.py.
+        global_vars["MongoRunner.mongoShellPath"] = os.path.abspath(
+            utils.default_if_none(self.shell_executable, config.DEFAULT_MONGO_EXECUTABLE))
 
         test_data = global_vars.get("TestData", {}).copy()
         test_data["minPort"] = core.network.PortAllocator.min_test_port(self.fixture.job_num)

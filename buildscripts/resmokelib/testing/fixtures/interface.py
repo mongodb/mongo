@@ -195,6 +195,10 @@ class NoOpFixture(Fixture):
 
     REGISTERED_NAME = "NoOpFixture"
 
+    def mongo_client(self, read_preference=None, timeout_millis=None):
+        """Return the mongo_client connection."""
+        raise NotImplementedError("NoOpFixture does not support a mongo_client")
+
     def get_internal_connection_string(self):
         """Return the internal connection string."""
         return None

@@ -8,7 +8,7 @@
  * finished. Additionally, index operations running concurrently with the snapshot read may cause
  * the read to fail with a SnapshotUnavailable error.
  *
- * @tags: [uses_transactions]
+ * @tags: [creates_background_indexes, uses_transactions]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');

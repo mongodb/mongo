@@ -7,6 +7,8 @@
  * The command to create a background index completes in the shell once the
  * index has completed and the test no longer needs to execute more transitions.
  * The first thread (tid = 0) will be the one that creates the background index.
+ *
+ * @tags: [creates_background_indexes]
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 

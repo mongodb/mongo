@@ -2618,7 +2618,7 @@ var ReplSetTest = function(opts) {
             // and too slowly processing heartbeats. When it steps down, it closes all of
             // its connections.
             _constructFromExistingSeedNode(opts);
-        }, 10);
+        }, 60);
     } else {
         _constructStartNewInstances(opts);
     }
