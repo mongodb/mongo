@@ -15,13 +15,7 @@ function abortTransaction(db, txnNumber, errorCodes) {
  * This function operates on the last iteration of each thread to abort any active transactions.
  */
 var {cleanupOnLastIteration} = (function() {
-    function cleanupOnLastIteration(data, func) {
-        const abortErrorCodes = [
-            ErrorCodes.NoSuchTransaction,
-            ErrorCodes.TransactionCommitted,
-            ErrorCodes.TransactionTooOld
-        ];
-
+    function cleanupOnLastIteration(data, func, abortErrorCodes) {
         let lastIteration = ++data.iteration >= data.iterations;
         try {
             func();
