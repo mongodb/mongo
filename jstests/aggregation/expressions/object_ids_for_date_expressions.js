@@ -44,7 +44,9 @@
 
     testOp('$dateToString', {date: new Date("1980-12-31T23:59:59Z"), format: "%V-%G"});
     testOp('$dateToString', {date: new Date("1980-12-31T23:59:59Z"), format: "%G-%V"});
-
+    // SERVER-34975 include test for date > 2038
+    testOp('$dateToString', {date: new Date("2038-04-15T09:53:06Z"), format: "%G-%V"});
+    
     const years = [
         2002,  // Starting and ending on Tuesday.
         2014,  // Starting and ending on Wednesday.
@@ -58,7 +60,8 @@
         2004,  // Starting on Thursday, ending on Friday.
         2016,  // Starting on Friday, ending on Saturday.
         2000,  // Starting on Saturday, ending on Sunday (special).
-        2012   // Starting on Sunday, ending on Monday.
+        2012,  // Starting on Sunday, ending on Monday.
+        2038
     ];
 
     const day = 1;
@@ -94,5 +97,5 @@
         testOp('$millisecond', newYear);
 
     });
-    assert.eq(testOpCount, 236, 'Expected 236 tests to run');
+    assert.eq(testOpCount, 255, 'Expected 255 tests to run');
 })();
