@@ -169,6 +169,13 @@ class Graph(object):
             for to_node in self.nodes[node_key]['next_nodes']:
                 print(" ->", self.nodes[to_node]['node'])
 
+    def _get_node_escaped(self, node_key):
+        """Return the name of the node with any double quotes escaped.
+
+        The DOT language requires that literal double quotes be escaped using a backslash character.
+        """
+        return str(self.nodes[node_key]['node']).replace('"', '\\"')
+
     def to_graph(self, nodes=None, message=None):
         """Return the 'to_graph'."""
         sb = []
@@ -180,19 +187,14 @@ class Graph(object):
         sb.append('digraph "mongod+lock-status" {')
         for node_key in self.nodes:
             for next_node_key in self.nodes[node_key]['next_nodes']:
-                sb.append('    "{}" -> "{}";'.format(self.nodes[node_key]['node'],
-                                                     self.nodes[next_node_key]['node']))
+                sb.append('    "{}" -> "{}";'.format(
+                    self._get_node_escaped(node_key), self._get_node_escaped(next_node_key)))
         for node_key in self.nodes:
             color = ""
             if nodes and node_key in nodes:
                 color = "color = red"
 
-            # The DOT language requires that literal double quotes be escaped using a backslash
-            # character.
-            escaped_label = str(self.nodes[node_key]['node']).replace('"', '\\"')
-
-            sb.append('    "{}" [label="{}" {}]'.format(self.nodes[node_key]['node'], escaped_label,
-                                                        color))
+            sb.append('    "{0}" [label="{0}" {1}]'.format(self._get_node_escaped(node_key), color))
         sb.append("}")
         return "\n".join(sb)
 
