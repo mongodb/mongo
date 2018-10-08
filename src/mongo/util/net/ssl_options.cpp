@@ -66,7 +66,7 @@ StatusWith<std::vector<uint8_t>> hexToVector(StringData hex) {
     int idx = -2;
     std::generate(ret.begin(), ret.end(), [&hex, &idx] {
         idx += 2;
-        return (fromHex(hex[idx]) << 4) | fromHex(hex[idx + 1]);
+        return (uassertStatusOK(fromHex(hex[idx])) << 4) | uassertStatusOK(fromHex(hex[idx + 1]));
     });
     return ret;
 }

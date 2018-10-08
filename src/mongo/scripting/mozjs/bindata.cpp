@@ -86,7 +86,7 @@ void hexToBinData(JSContext* cx,
         int src_index = i * 2;
         if (!std::isxdigit(src[src_index]) || !std::isxdigit(src[src_index + 1]))
             uasserted(ErrorCodes::BadValue, "Invalid hex character in string");
-        data[i] = fromHex(src + src_index);
+        data[i] = uassertStatusOK(fromHex(src + src_index));
     }
 
     std::string encoded = base64::encode(data.get(), len);

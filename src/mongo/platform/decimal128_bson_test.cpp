@@ -56,7 +56,7 @@ BSONObj convertHexStringToBsonObj(StringData hexString) {
     auto buffer = SharedBuffer::allocate(bufferSize);
 
     for (unsigned int i = 0; i < bufferSize; i++) {
-        buffer.get()[i] = fromHex(p);
+        buffer.get()[i] = uassertStatusOK(fromHex(p));
         p += 2;
     }
 

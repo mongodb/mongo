@@ -151,7 +151,7 @@ void OID::init(const std::string& s) {
     verify(s.size() == 24);
     const char* p = s.c_str();
     for (std::size_t i = 0; i < kOIDSize; i++) {
-        _data[i] = fromHex(p);
+        _data[i] = uassertStatusOK(fromHex(p));
         p += 2;
     }
 }

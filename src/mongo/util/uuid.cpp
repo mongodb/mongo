@@ -75,7 +75,7 @@ StatusWith<UUID> UUID::parse(const std::string& s) {
         char high = s[j++];
         char low = s[j++];
 
-        uuid[i] = ((fromHex(high) << 4) | fromHex(low));
+        uuid[i] = ((uassertStatusOK(fromHex(high)) << 4) | uassertStatusOK(fromHex(low)));
     }
 
     return UUID{std::move(uuid)};

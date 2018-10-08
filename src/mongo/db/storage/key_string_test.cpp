@@ -280,7 +280,7 @@ TEST_F(KeyStringTest, ActualBytesDouble) {
     // last byte (kEnd) doesn't get flipped
     string hexFlipped;
     for (size_t i = 0; i < hex.size() - 2; i += 2) {
-        char c = fromHex(hex.c_str() + i);
+        char c = uassertStatusOK(fromHex(hex.c_str() + i));
         c = ~c;
         hexFlipped += toHex(&c, 1);
     }

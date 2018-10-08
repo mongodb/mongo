@@ -84,13 +84,20 @@ void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthro
 mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
     StringBuilder out;
     for (size_t i = 0; i < toDecode.size(); ++i) {
-        const auto c = toDecode[i];
+        const char c = toDecode[i];
         if (c == '%') {
             if (i + 2 > toDecode.size()) {
                 return Status(ErrorCodes::FailedToParse,
                               "Encountered partial escape sequence at end of string");
             }
-            out << fromHex(toDecode.substr(i + 1, 2));
+            auto swHex = fromHex(toDecode.substr(i + 1, 2));
+            if (swHex.isOK()) {
+                out << swHex.getValue();
+            } else {
+                return Status(ErrorCodes::FailedToParse,
+                              "The characters after the % do not form a hex value. Please escape "
+                              "the % or pass a valid hex value. ");
+            }
             i += 2;
         } else {
             out << c;

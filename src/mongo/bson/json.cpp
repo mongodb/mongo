@@ -400,7 +400,8 @@ Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
     // unsigned char. If we don't coerce it to an unsigned char before
     // wrapping it in a BinDataType (currently implicitly a signed
     // integer), we get undefined behavior.
-    const auto binDataTypeNumeric = static_cast<unsigned char>(fromHex(binDataType));
+    const auto binDataTypeNumeric =
+        static_cast<unsigned char>(uassertStatusOK(fromHex(binDataType)));
 
     builder.appendBinData(
         fieldName, binData.length(), BinDataType(binDataTypeNumeric), binData.data());
@@ -1150,8 +1151,8 @@ Status JParse::chars(std::string* result, const char* terminalSet, const char* a
                     if (!isHexString(StringData(q, 4))) {
                         return parseError("Expecting 4 hex digits");
                     }
-                    unsigned char first = fromHex(q);
-                    unsigned char second = fromHex(q += 2);
+                    unsigned char first = uassertStatusOK(fromHex(q));
+                    unsigned char second = uassertStatusOK(fromHex(q += 2));
                     const std::string& utf8str = encodeUTF8(first, second);
                     for (unsigned int i = 0; i < utf8str.size(); i++) {
                         result->push_back(utf8str[i]);
