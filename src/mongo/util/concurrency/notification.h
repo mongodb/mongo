@@ -102,12 +102,10 @@ public:
      * set (in which case a subsequent call to get is guaranteed to not block) or false otherwise.
      * If the wait is interrupted, throws an exception.
      */
-    bool waitFor(OperationContext* txn, Microseconds waitTimeout) {
-        const auto waitDeadline = Date_t::now() + waitTimeout;
-
+    bool waitFor(OperationContext* txn, Milliseconds waitTimeout) {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
-        return _condVar.wait_until(
-            lock, waitDeadline.toSystemTimePoint(), [&]() { return !!_value; });
+        return txn->waitForConditionOrInterruptFor(
+            _condVar, lock, waitTimeout, [&]() { return !!_value; });
     }
 
 private:
@@ -137,7 +135,7 @@ public:
         _notification.set(true);
     }
 
-    bool waitFor(OperationContext* txn, Microseconds waitTimeout) {
+    bool waitFor(OperationContext* txn, Milliseconds waitTimeout) {
         return _notification.waitFor(txn, waitTimeout);
     }
 
