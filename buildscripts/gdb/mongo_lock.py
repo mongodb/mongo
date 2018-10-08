@@ -185,6 +185,10 @@ class Graph(object):
         if message is not None:
             sb.append(message)
         sb.append('digraph "mongod+lock-status" {')
+        # Draw the graph from left to right. There can be hundreds of threads blocked by the same
+        # resource, but only a few resources involved in a deadlock, so we prefer a long graph
+        # than a super wide one. Long resource / thread names would make a wide graph even wider.
+        sb.append('    rankdir=LR;')
         for node_key in self.nodes:
             for next_node_key in self.nodes[node_key]['next_nodes']:
                 sb.append('    "{}" -> "{}";'.format(
