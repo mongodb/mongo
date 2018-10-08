@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <limits>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/unittest_gen.h"
@@ -2428,11 +2430,11 @@ TEST(IDLValidatedField, Int_basic_ranges) {
     ASSERT_THROWS(obj0.setByte_range_int(256), AssertionException);
 
     // IDL ints *are* int32_t, so no number we can pass to the func will actually fail.
-    obj0.setRange_int(-2147483648);
+    obj0.setRange_int(std::numeric_limits<std::int32_t>::min());
     obj0.setRange_int(-65536);
     obj0.setRange_int(0);
     obj0.setRange_int(65536);
-    obj0.setRange_int(2147483647);
+    obj0.setRange_int(std::numeric_limits<std::int32_t>::max());
 
     // Positive case parsing.
     const auto tryPass = [](std::int32_t pos,
