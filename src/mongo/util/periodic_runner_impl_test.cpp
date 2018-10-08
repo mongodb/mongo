@@ -198,7 +198,9 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
     for (int i = 0; i < 10; i++) {
         clockSource().advance(interval);
     }
-    ASSERT_TRUE(count == numExecutionsBeforePause || count == numExecutionsBeforePause + 1);
+    ASSERT_TRUE(count == numExecutionsBeforePause || count == numExecutionsBeforePause + 1)
+        << "Actual values: count: " << count
+        << ", numExecutionsBeforePause: " << numExecutionsBeforePause;
 
     tearDown();
 }
@@ -234,7 +236,10 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     }
     auto countBeforePause = count;
     ASSERT_TRUE(countBeforePause == numFastForwardsForIterationWhileActive ||
-                countBeforePause == numFastForwardsForIterationWhileActive + 1);
+                countBeforePause == numFastForwardsForIterationWhileActive + 1)
+        << "Actual values: countBeforePause: " << countBeforePause
+        << ", numFastForwardsForIterationWhileActive: " << numFastForwardsForIterationWhileActive;
+
     handle->pause();
     // Fast forward ten times, we shouldn't run anymore
     for (int i = 0; i < 10; i++) {
@@ -252,7 +257,9 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
 
     // This is slightly racy so once in a while count will be one extra
     ASSERT_TRUE(count == numFastForwardsForIterationWhileActive * 2 ||
-                count == numFastForwardsForIterationWhileActive * 2 + 1);
+                count == numFastForwardsForIterationWhileActive * 2 + 1)
+        << "Actual values: count: " << count
+        << ", numFastForwardsForIterationWhileActive: " << numFastForwardsForIterationWhileActive;
 
     tearDown();
 }
