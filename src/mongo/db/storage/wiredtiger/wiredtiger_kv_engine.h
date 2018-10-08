@@ -393,6 +393,8 @@ private:
      */
     bool _canRecoverToStableTimestamp() const;
 
+    std::uint64_t _getCheckpointTimestamp() const;
+
     WT_CONNECTION* _conn;
     WiredTigerFileVersion _fileVersion;
     WiredTigerEventHandler _eventHandler;

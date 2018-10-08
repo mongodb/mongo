@@ -303,9 +303,8 @@ public:
                     WT_SESSION* s = session->getSession();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
 
-                    // Now that the checkpoint is durable, publish the previously recorded stable
-                    // timestamp and oplog needed to recover from it.
-                    _lastStableCheckpointTimestamp.store(stableTimestamp.asULL());
+                    // Now that the checkpoint is durable, publish the oplog needed to recover
+                    // from it.
                     _oplogNeededForCrashRecovery.store(oplogNeededForRollback.asULL());
                 }
             } catch (const WriteConflictException&) {
@@ -348,10 +347,6 @@ public:
         }
     }
 
-    std::uint64_t getLastStableCheckpointTimestamp() const {
-        return _lastStableCheckpointTimestamp.load();
-    }
-
     std::uint64_t getOplogNeededForCrashRecovery() const {
         return _oplogNeededForCrashRecovery.load();
     }
@@ -380,10 +375,6 @@ private:
 
     bool _hasTriggeredFirstStableCheckpoint = false;
 
-    // The earliest stable timestamp at which the last checkpoint could have been taken. The
-    // checkpoint might have used a newer stable timestamp if stable was updated concurrently with
-    // checkpointing.
-    AtomicWord<std::uint64_t> _lastStableCheckpointTimestamp;
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
 };
 
@@ -1659,7 +1650,7 @@ boost::optional<Timestamp> WiredTigerKVEngine::getLastStableRecoveryTimestamp() 
         return stable;
     }
 
-    const auto ret = _checkpointThread->getLastStableCheckpointTimestamp();
+    const auto ret = _getCheckpointTimestamp();
     if (ret) {
         return Timestamp(ret);
     }
@@ -1741,6 +1732,15 @@ Timestamp WiredTigerKVEngine::getOldestTimestamp() const {
 
 Timestamp WiredTigerKVEngine::getInitialDataTimestamp() const {
     return Timestamp(_initialDataTimestamp.load());
+}
+
+std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
+    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
+    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=last_checkpoint"));
+
+    std::uint64_t tmp;
+    fassert(50963, parseNumberFromStringWithBase(buf, 16, &tmp));
+    return tmp;
 }
 
 }  // namespace mongo

@@ -361,51 +361,14 @@ var BackupRestoreTest = function(options) {
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
             rst.start(secondary.nodeId, {}, true);
         } else if (options.backup == 'backupCursor') {
-            resetDbpath(hiddenDbpath);
-            mkdir(hiddenDbpath + '/journal');
-            jsTestLog("Copying start: " + tojson({
-                          source: dbpathSecondary,
-                          destination: hiddenDbpath,
-                          sourceFiles: ls(dbpathSecondary),
-                          journalFiles: ls(dbpathSecondary + '/journal')
-                      }));
+            load("jstests/libs/backup_utils.js");
 
-            let backupCursor = secondary.getDB('admin').aggregate([{$backupCursor: {}}]);
-            assert(backupCursor.hasNext());
-            let doc = backupCursor.next();
-            assert(doc.hasOwnProperty('metadata'));
-            jsTestLog("Metadata doc: " + tojson({doc: doc}));
-
-            // Grab the dbpath, ensure it ends with a slash. Note that while the `dbpath` inputs
-            // may be in windows or unix format, the FS helpers for listing a directory and
-            // copying files (etc..)  treat them equally.
-            let dbpath = doc['metadata']['dbpath'];
-            if (dbpath.lastIndexOf('/') + 1 != dbpath.length &&
-                dbpath.lastIndexOf('\\') + 1 != dbpath.length) {
-                dbpath += '/';
-            }
-
-            while (backupCursor.hasNext()) {
-                doc = backupCursor.next();
-
-                let fileToCopy = doc['filename'];
-                // Ensure that the full path starts with the returned dbpath.
-                assert.eq(0, fileToCopy.search(dbpath));
-
-                // Grab the file path relative to the dbpath. Maintain that relation when copying
-                // to the `hiddenDbpath`.
-                let relativePath = fileToCopy.substr(dbpath.length);
-                jsTestLog("File copy: " +
-                          tojson({fileToCopy: fileToCopy, relativePath: relativePath}));
-                copyFile(fileToCopy, hiddenDbpath + '/' + relativePath);
-            }
-
+            backupData(secondary, hiddenDbpath);
             copiedFiles = ls(hiddenDbpath);
             jsTestLog("Copying End: " + tojson({
                           destinationFiles: copiedFiles,
                           destinationJournal: ls(hiddenDbpath + '/journal')
                       }));
-            backupCursor.close();
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
         }
 
