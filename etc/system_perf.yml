@@ -629,7 +629,7 @@ buildvariants:
 # proper artifacts directly from that project, we should do that and remove these tasks.
 - name: compile-rhel70
   display_name: Compile on rhel70
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules:
     - wtdevelop
   expansions:
@@ -650,7 +650,7 @@ buildvariants:
 #######################################
 - name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: &modules
     - dsi
     - workloads
@@ -685,7 +685,7 @@ buildvariants:
 
 - name: linux-standalone
   display_name: Linux Standalone
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: standalone
@@ -741,7 +741,7 @@ buildvariants:
 
 - name: linux-shard-lite
   display_name: Linux Shard Lite Cluster
-  batchtime: 1440  # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: shard-lite
@@ -771,7 +771,7 @@ buildvariants:
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 1440  # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: replica
@@ -807,7 +807,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 1440  # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: replica-2node
