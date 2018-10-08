@@ -7,7 +7,7 @@
 
 (function() {
     "use strict";
-    const coll = db.jstests_currentop;
+    const coll = db.jstests_currentop_cursors;
     // Avoiding using the shell helper to avoid the implicit collection recreation.
     db.runCommand({drop: coll.getName()});
     assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1000}));
@@ -15,7 +15,8 @@
         assert.commandWorked(coll.insert({"val": i}));
     }
     /**
-     * runTest creates a new collection called jstests_currentop and then runs the provided find
+     * runTest creates a new collection called jstests_currentop_cursors and then runs the provided
+     * find
      * query. It calls $currentOp and does some basic assertions to make sure idleCursors is
      * behaving as intended in each case.
      * findFunc: A function that runs a find query. Is expected to return a cursorID.
@@ -56,7 +57,8 @@
 
     runTest({
         findFunc: function() {
-            return assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2}))
+            return assert
+                .commandWorked(db.runCommand({find: "jstests_currentop_cursors", batchSize: 2}))
                 .cursor.id;
         },
         assertFunc: function(cursorId, result) {
@@ -75,7 +77,7 @@
         findFunc: function() {
             return assert
                 .commandWorked(db.runCommand({
-                    find: "jstests_currentop",
+                    find: "jstests_currentop_cursors",
                     batchSize: 2,
                     tailable: true,
                     awaitData: true,
@@ -95,15 +97,16 @@
     });
     runTest({
         findFunc: function() {
-            return assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2}))
+            return assert
+                .commandWorked(db.runCommand({find: "jstests_currentop_cursors", batchSize: 2}))
                 .cursor.id;
         },
         assertFunc: function(cursorId, result) {
             const adminDB = db.getSiblingDB("admin");
             // Make sure the two cursors have different creation times.
             assert.soon(() => {
-                const secondCursor =
-                    assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2}));
+                const secondCursor = assert.commandWorked(
+                    db.runCommand({find: "jstests_currentop_cursors", batchSize: 2}));
 
                 const secondResult =
                     adminDB
@@ -127,8 +130,8 @@
     runTest({
         findFunc: function() {
             return assert
-                .commandWorked(
-                    db.runCommand({find: "jstests_currentop", batchSize: 4, noCursorTimeout: true}))
+                .commandWorked(db.runCommand(
+                    {find: "jstests_currentop_cursors", batchSize: 4, noCursorTimeout: true}))
                 .cursor.id;
         },
         assertFunc: function(cursorId, result) {
@@ -143,14 +146,15 @@
 
     runTest({
         findFunc: function() {
-            return assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2}))
+            return assert
+                .commandWorked(db.runCommand({find: "jstests_currentop_cursors", batchSize: 2}))
                 .cursor.id;
         },
         assertFunc: function(cursorId, result) {
             const adminDB = db.getSiblingDB("admin");
             const originalAccess = result[0].cursor.lastAccessDate;
-            assert.commandWorked(
-                db.runCommand({getMore: cursorId, collection: "jstests_currentop", batchSize: 2}));
+            assert.commandWorked(db.runCommand(
+                {getMore: cursorId, collection: "jstests_currentop_cursors", batchSize: 2}));
             result =
                 adminDB
                     .aggregate([
@@ -166,7 +170,7 @@
             // creation.
             assert.soon(() => {
                 assert.commandWorked(db.runCommand(
-                    {getMore: cursorId, collection: "jstests_currentop", batchSize: 2}));
+                    {getMore: cursorId, collection: "jstests_currentop_cursors", batchSize: 2}));
                 result =
                     adminDB
                         .aggregate([

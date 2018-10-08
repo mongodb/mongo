@@ -14,13 +14,14 @@
     assert(adminDB.auth("ted", pass), "Authentication 1 Failed");
     adminDB.createUser({user: "yuta", pwd: pass, roles: ["readWriteAnyDatabase"]});
 
-    const coll = db.jstests_currentop;
+    const coll = db.jstests_currentop_cursors_auth;
     coll.drop();
     for (let i = 0; i < 5; ++i) {
         assert.commandWorked(coll.insert({val: i}));
     }
     const cursorId =
-        assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2})).cursor.id;
+        assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}))
+            .cursor.id;
 
     let result = adminDB
                      .aggregate([
@@ -54,7 +55,8 @@
     // Create a cursor with the second user.
 
     const secondCursorId =
-        assert.commandWorked(db.runCommand({find: "jstests_currentop", batchSize: 2})).cursor.id;
+        assert.commandWorked(db.runCommand({find: "jstests_currentop_cursors_auth", batchSize: 2}))
+            .cursor.id;
 
     assert.commandWorked(adminDB.logout());
     // Make sure cursor is still there to double check it was not seen because of auth.
