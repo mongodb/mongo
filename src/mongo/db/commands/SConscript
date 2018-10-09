@@ -204,6 +204,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='list_databases_command',
+    source=[
+        env.Idlc('list_databases.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",
@@ -254,6 +265,7 @@ env.Library(
         'fsync_locked',
         'kill_common',
         'list_collections_filter',
+        'list_databases_command',
         'write_commands_common',
     ],
 )

@@ -35,6 +35,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
@@ -87,27 +88,24 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             const BSONObj& jsobj,
+             const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
+        IDLParserErrorContext ctx("listDatabases");
+        auto cmd = ListDatabasesCommand::parse(ctx, cmdObj);
+
+        const bool nameOnly = cmd.getNameOnly();
+
         // Parse the filter.
         std::unique_ptr<MatchExpression> filter;
-        if (auto filterElt = jsobj[kFilterField]) {
-            if (filterElt.type() != BSONType::Object) {
-                uasserted(ErrorCodes::TypeMismatch,
-                          str::stream() << "Field '" << kFilterField
-                                        << "' must be of type Object in: "
-                                        << jsobj);
-            }
+        if (auto filterObj = cmd.getFilter()) {
             // The collator is null because database metadata objects are compared using simple
             // binary comparison.
             const CollatorInterface* collator = nullptr;
             boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
-            auto statusWithMatcher =
-                MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
-            uassertStatusOK(statusWithMatcher.getStatus());
-            filter = std::move(statusWithMatcher.getValue());
+            auto matcher =
+                uassertStatusOK(MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
+            filter = std::move(matcher);
         }
-        bool nameOnly = jsobj[kNameOnlyField].trueValue();
 
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();

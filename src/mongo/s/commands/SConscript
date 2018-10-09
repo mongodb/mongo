@@ -99,6 +99,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/current_op_common',
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/commands/kill_common',
+        '$BUILD_DIR/mongo/db/commands/list_databases_command',
         '$BUILD_DIR/mongo/db/commands/profile_common',
         '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',

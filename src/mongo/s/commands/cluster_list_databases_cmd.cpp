@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/strategy.h"
@@ -81,7 +82,10 @@ public:
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const bool nameOnly = cmdObj["nameOnly"].trueValue();
+        IDLParserErrorContext ctx("listDatabases");
+        auto cmd = ListDatabasesCommand::parse(ctx, cmdObj);
+
+        const bool nameOnly = cmd.getNameOnly();
 
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
