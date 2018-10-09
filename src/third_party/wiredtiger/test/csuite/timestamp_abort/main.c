@@ -67,7 +67,6 @@ static char home[1024];			/* Program working dir */
 #define	PREPARE_FREQ	5
 #define	PREPARE_YIELD	(PREPARE_FREQ * 10)
 #define	RECORDS_FILE	"records-%" PRIu32
-#define	STABLE_PERIOD	100
 #define	SESSION_MAX	MAX_TH + 3	/* Include program worker threads */
 
 static const char * table_pfx = "table";
@@ -79,7 +78,6 @@ static const char * const ckpt_file = "checkpoint_done";
 
 static bool compat, inmem, use_ts;
 static volatile uint64_t global_ts = 1;
-static volatile uint64_t th_ts[MAX_TH];
 
 #define	ENV_CONFIG_COMPAT	",compatibility=(release=\"2.9\")"
 #define	ENV_CONFIG_DEF						\
@@ -103,6 +101,9 @@ typedef struct {
 	uint32_t info;
 } THREAD_DATA;
 
+/* Lock for transactional ops that set or query a timestamp. */
+static pthread_rwlock_t ts_lock;
+
 static void handler(int)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void)
@@ -122,41 +123,27 @@ usage(void)
 static WT_THREAD_RET
 thread_ts_run(void *arg)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
 	THREAD_DATA *td;
-	uint64_t i, last_ts, oldest_ts, this_ts;
-	char tscfg[64];
+	char tscfg[64], ts_buf[WT_TIMESTAMP_SIZE];
 
 	td = (THREAD_DATA *)arg;
-	last_ts = 0;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-	/*
-	 * Every N records we will record our stable timestamp into the stable
-	 * table. That will define our threshold where we expect to find records
-	 * after recovery.
-	 */
+	/* Update the oldest timestamp every 1 millisecond. */
 	for (;;) {
-		oldest_ts = UINT64_MAX;
 		/*
-		 * For the timestamp thread, the info field contains the number
-		 * of worker threads.
+		 * We get the last committed timestamp periodically in order to
+		 * update the oldest timestamp, that requires locking out
+		 * transactional ops that set or query a timestamp.
 		 */
-		for (i = 0; i < td->info; ++i) {
-			/*
-			 * We need to let all threads get started, so if we find
-			 * any thread still with a zero timestamp we go to
-			 * sleep.
-			 */
-			this_ts = th_ts[i];
-			if (this_ts == 0)
-				goto ts_wait;
-			else if (this_ts < oldest_ts)
-				oldest_ts = this_ts;
-		}
-
-		if (oldest_ts != UINT64_MAX &&
-		    oldest_ts - last_ts > STABLE_PERIOD) {
+		testutil_check(pthread_rwlock_wrlock(&ts_lock));
+		ret = td->conn->query_timestamp(
+		    td->conn, ts_buf, "get=all_committed");
+		testutil_check(pthread_rwlock_unlock(&ts_lock));
+		testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+		if (ret == 0) {
 			/*
 			 * Set both the oldest and stable timestamp so that we
 			 * don't need to maintain read availability at older
@@ -164,14 +151,12 @@ thread_ts_run(void *arg)
 			 */
 			testutil_check(__wt_snprintf(
 			    tscfg, sizeof(tscfg),
-			    "oldest_timestamp=%" PRIx64
-			    ",stable_timestamp=%" PRIx64,
-			    oldest_ts, oldest_ts));
+			    "oldest_timestamp=%s,stable_timestamp=%s",
+			    ts_buf, ts_buf));
 			testutil_check(
 			    td->conn->set_timestamp(td->conn, tscfg));
-			last_ts = oldest_ts;
-		} else
-ts_wait:		__wt_sleep(0, 1000);
+		}
+		__wt_sleep(0, 1000);
 	}
 	/* NOTREACHED */
 }
@@ -242,9 +227,9 @@ thread_run(void *arg)
 	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
 	WT_ITEM data;
 	WT_RAND_STATE rnd;
-	WT_SESSION *oplog_session, *session;
+	WT_SESSION *prepared_session, *session;
 	THREAD_DATA *td;
-	uint64_t i, stable_ts;
+	uint64_t i, active_ts;
 	char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
 	char kname[64], tscfg[64], uri[128];
 	bool use_prep;
@@ -255,6 +240,7 @@ thread_run(void *arg)
 	memset(obuf, 0, sizeof(obuf));
 	memset(kname, 0, sizeof(kname));
 
+	prepared_session = NULL;
 	td = (THREAD_DATA *)arg;
 	/*
 	 * Set up the separate file for checking.
@@ -277,64 +263,73 @@ thread_run(void *arg)
 	use_prep = (use_ts && td->info % 10 == 0) ? true : false;
 
 	/*
-	 * We may have two sessions so that the oplog session can have its own
-	 * transaction in parallel with the collection session for threads
-	 * that are going to be using prepared transactions. We need this
-	 * because prepared transactions cannot have any operations that modify
-	 * a table that is logged. But we also want to test mixed logged and
-	 * not-logged transactions.
+	 * For the prepared case we have two sessions so that the oplog session
+	 * can have its own transaction in parallel with the collection session
+	 * We need this because prepared transactions cannot have any operations
+	 * that modify a table that is logged. But we also want to test mixed
+	 * logged and not-logged transactions.
 	 */
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+	if (use_prep)
+		testutil_check(td->conn->open_session(
+		    td->conn, NULL, NULL, &prepared_session));
 	/*
 	 * Open a cursor to each table.
 	 */
 	testutil_check(__wt_snprintf(
 	    uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
-	testutil_check(session->open_cursor(session,
-	    uri, NULL, NULL, &cur_coll));
+	if (use_prep)
+		testutil_check(prepared_session->open_cursor(prepared_session,
+		    uri, NULL, NULL, &cur_coll));
+	else
+		testutil_check(session->open_cursor(session,
+		    uri, NULL, NULL, &cur_coll));
 	testutil_check(__wt_snprintf(
 	    uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
-	testutil_check(session->open_cursor(session,
-	    uri, NULL, NULL, &cur_local));
+	if (use_prep)
+		testutil_check(prepared_session->open_cursor(prepared_session,
+		    uri, NULL, NULL, &cur_local));
+	else
+		testutil_check(session->open_cursor(session,
+		    uri, NULL, NULL, &cur_local));
 	testutil_check(__wt_snprintf(
 	    uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
-	oplog_session = NULL;
-	if (use_prep) {
-		testutil_check(td->conn->open_session(
-		    td->conn, NULL, NULL, &oplog_session));
-		testutil_check(session->open_cursor(oplog_session,
-		    uri, NULL, NULL, &cur_oplog));
-	} else
-		testutil_check(session->open_cursor(session,
-		    uri, NULL, NULL, &cur_oplog));
+	testutil_check(session->open_cursor(session,
+	    uri, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Write our portion of the key space until we're killed.
 	 */
 	printf("Thread %" PRIu32 " starts at %" PRIu64 "\n",
 	    td->info, td->start);
-	stable_ts = 0;
+	active_ts = 0;
 	for (i = td->start;; ++i) {
-		if (use_ts)
-			stable_ts = __wt_atomic_addv64(&global_ts, 1);
 		testutil_check(__wt_snprintf(
 		    kname, sizeof(kname), "%" PRIu64, i));
 
 		testutil_check(session->begin_transaction(session, NULL));
 		if (use_prep)
-			testutil_check(oplog_session->begin_transaction(
-			    oplog_session, NULL));
-		/*
-		 * If not using prepared transactions set the timestamp now
-		 * before performing the operation. If we are using prepared
-		 * transactions, it must be set after the prepare.
-		 */
-		if (use_ts && !use_prep) {
-			testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-			    "commit_timestamp=%" PRIx64, stable_ts));
-			testutil_check(
-			    session->timestamp_transaction(session, tscfg));
+			testutil_check(prepared_session->begin_transaction(
+			    prepared_session, NULL));
+
+		if (use_ts) {
+			testutil_check(pthread_rwlock_rdlock(&ts_lock));
+			active_ts = __wt_atomic_addv64(&global_ts, 1);
+			testutil_check(__wt_snprintf(tscfg,
+			    sizeof(tscfg), "commit_timestamp=%" PRIx64,
+			    active_ts));
+			/*
+			 * Set the transaction's timestamp now before performing
+			 * the operation. If we are using prepared transactions,
+			 * set the timestamp for the session used for oplog. The
+			 * collection session in that case would continue to use
+			 * this timestamp.
+			 */
+			testutil_check(session->timestamp_transaction(
+			    session, tscfg));
+			testutil_check(pthread_rwlock_unlock(&ts_lock));
 		}
+
 		cur_coll->set_key(cur_coll, kname);
 		cur_local->set_key(cur_local, kname);
 		cur_oplog->set_key(cur_oplog, kname);
@@ -344,13 +339,13 @@ thread_run(void *arg)
 		 */
 		testutil_check(__wt_snprintf(cbuf, sizeof(cbuf),
 		    "COLL: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
-		    td->info, stable_ts, i));
+		    td->info, active_ts, i));
 		testutil_check(__wt_snprintf(lbuf, sizeof(lbuf),
 		    "LOCAL: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
-		    td->info, stable_ts, i));
+		    td->info, active_ts, i));
 		testutil_check(__wt_snprintf(obuf, sizeof(obuf),
 		    "OPLOG: thread:%" PRIu64 " ts:%" PRIu64 " key: %" PRIu64,
-		    td->info, stable_ts, i));
+		    td->info, active_ts, i));
 		data.size = __wt_random(&rnd) % MAX_VAL;
 		data.data = cbuf;
 		cur_coll->set_value(cur_coll, &data);
@@ -359,55 +354,31 @@ thread_run(void *arg)
 		data.data = obuf;
 		cur_oplog->set_value(cur_oplog, &data);
 		testutil_check(cur_oplog->insert(cur_oplog));
-		if (use_ts) {
+		if (use_prep) {
 			/*
 			 * Run with prepare every once in a while. And also
 			 * yield after prepare sometimes too. This is only done
-			 * on the regular session.
+			 * on the collection session.
 			 */
-			if (use_prep && i % PREPARE_FREQ == 0) {
-				testutil_check(__wt_snprintf(
-				    tscfg, sizeof(tscfg),
-				    "prepare_timestamp=%" PRIx64, stable_ts));
-				testutil_check(session->prepare_transaction(
-				    session, tscfg));
+			if (i % PREPARE_FREQ == 0) {
+				testutil_check(__wt_snprintf(tscfg,
+				    sizeof(tscfg), "prepare_timestamp=%"
+				    PRIx64, active_ts));
+				testutil_check(
+				    prepared_session->prepare_transaction(
+				    prepared_session, tscfg));
 				if (i % PREPARE_YIELD == 0)
 					__wt_yield();
 			}
-			/*
-			 * If we did not set the timestamp above via
-			 * timestamp_transaction send it now on commit.
-			 */
-			if (use_ts && !use_prep)
-				testutil_check(
-				    session->commit_transaction(session, NULL));
-			else {
-				testutil_check(
-				    __wt_snprintf(tscfg, sizeof(tscfg),
-				    "commit_timestamp=%" PRIx64, stable_ts));
-				testutil_check(
-				    session->commit_transaction(session,
-				    tscfg));
-			}
-			if (use_prep)
-				testutil_check(
-				    oplog_session->commit_transaction(
-				    oplog_session, tscfg));
-			/*
-			 * Update the thread's last-committed timestamp.
-			 * Don't let the compiler re-order this statement,
-			 * if we were to race with the timestamp thread, it
-			 * might see our thread update before the commit.
-			 */
-			WT_PUBLISH(th_ts[td->info], stable_ts);
-		} else {
 			testutil_check(
-			    session->commit_transaction(session, NULL));
-			if (use_prep)
-				testutil_check(
-				    oplog_session->commit_transaction(
-				    oplog_session, NULL));
+			    __wt_snprintf(tscfg, sizeof(tscfg),
+			    "commit_timestamp=%" PRIx64, active_ts));
+			testutil_check(
+			    prepared_session->commit_transaction(
+			    prepared_session, tscfg));
 		}
+		testutil_check(
+		    session->commit_transaction(session, NULL));
 		/*
 		 * Insert into the local table outside the timestamp txn.
 		 */
@@ -420,7 +391,7 @@ thread_run(void *arg)
 		 * Save the timestamp and key separately for checking later.
 		 */
 		if (fprintf(fp,
-		    "%" PRIu64 " %" PRIu64 "\n", stable_ts, i) < 0)
+		    "%" PRIu64 " %" PRIu64 "\n", active_ts, i) < 0)
 			testutil_die(EIO, "fprintf");
 	}
 	/* NOTREACHED */
@@ -657,6 +628,8 @@ main(int argc, char *argv[])
 		usage();
 
 	testutil_work_dir_from_path(home, sizeof(home), working_dir);
+	testutil_check(pthread_rwlock_init(&ts_lock, NULL));
+
 	/*
 	 * If the user wants to verify they need to tell us how many threads
 	 * there were so we can find the old record files.
@@ -955,6 +928,7 @@ main(int argc, char *argv[])
 		    absent_oplog, count);
 		fatal = true;
 	}
+	testutil_check(pthread_rwlock_destroy(&ts_lock));
 	if (fatal)
 		return (EXIT_FAILURE);
 	printf("%" PRIu64 " records verified\n", count);

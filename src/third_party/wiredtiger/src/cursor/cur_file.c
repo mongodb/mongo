@@ -389,16 +389,31 @@ __curfile_remove(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t time_start, time_stop;
+	bool positioned;
+
+	/*
+	 * WT_CURSOR.remove has a unique semantic, the cursor stays positioned
+	 * if it starts positioned, otherwise clear the cursor on completion.
+	 * Track if starting with a positioned cursor and pass that information
+	 * into the underlying Btree remove function so it tries to maintain a
+	 * position in the tree. This is complicated by the loop in this code
+	 * that restarts operations if they return prepare-conflict or restart.
+	 */
+	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
 	time_start = __wt_clock(session);
-	WT_ERR(__wt_btcur_remove(cbt));
+	WT_ERR(__wt_btcur_remove(cbt, positioned));
 	time_stop = __wt_clock(session);
 	__wt_stat_usecs_hist_incr_opwrite(session,
 	    WT_CLOCKDIFF_US(time_stop, time_start));
+
+	/* If we've lost an initial position, we must fail. */
+	if (positioned && !F_ISSET(cursor, WT_CURSTD_KEY_INT))
+		WT_ERR(WT_ROLLBACK);
 
 	/*
 	 * Remove with a search-key is fire-and-forget, no position and no key.

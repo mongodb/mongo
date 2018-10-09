@@ -127,9 +127,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         # Check if lookaside is working properly with prepare transactions.
         # We put prepared updates in multiple sessions so that we do not hang
         # because of cache being full with uncommitted updates.
-        # TODO: Increase the nsessions below to start testing lookaside eviction
-        # of prepared updates.
-        nsessions = 1
+        nsessions = 3
         nkeys = 4000
         self.prepare_updates(uri, ds, nrows, nsessions, nkeys)
 

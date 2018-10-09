@@ -113,7 +113,7 @@ __las_page_instantiate_verbose(WT_SESSION_IMPL *session, uint64_t las_pageid)
  *	Instantiate lookaside update records in a recently read page.
  */
 static int
-__las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
+__las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, bool *preparedp)
 {
 	WT_CACHE *cache;
 	WT_CURSOR *cursor;
@@ -166,6 +166,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_readlock(session, &cache->las_sweepwalk_lock);
 	WT_PUBLISH(cache->las_reader, false);
 	locked = true;
+	*preparedp = false;
 	for (ret = __wt_las_cursor_position(cursor, las_pageid);
 	    ret == 0;
 	    ret = cursor->next(cursor)) {
@@ -188,6 +189,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		total_incr += incr;
 		upd->txnid = las_txnid;
 		upd->prepare_state = prepare_state;
+		if (prepare_state == WT_PREPARE_INPROGRESS)
+			*preparedp = true;
 #ifdef HAVE_TIMESTAMPS
 		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
 		memcpy(&upd->timestamp, las_timestamp.data, las_timestamp.size);
@@ -374,8 +377,8 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
  *	page access.
  */
 static inline int
-__page_read_lookaside(WT_SESSION_IMPL *session,
-    WT_REF *ref, uint32_t previous_state, uint32_t *final_statep)
+__page_read_lookaside(WT_SESSION_IMPL *session, WT_REF *ref,
+    uint32_t previous_state, uint32_t *final_statep, bool *preparedp)
 {
 	/*
 	 * Reading a lookaside ref for the first time, and not requiring the
@@ -400,7 +403,7 @@ __page_read_lookaside(WT_SESSION_IMPL *session,
 			    cache_read_lookaside_delay_checkpoint);
 	}
 
-	WT_RET(__las_page_instantiate(session, ref));
+	WT_RET(__las_page_instantiate(session, ref, preparedp));
 	ref->page_las->eviction_to_lookaside = false;
 	return (0);
 }
@@ -419,7 +422,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	uint64_t time_start, time_stop;
 	uint32_t page_flags, final_state, new_state, previous_state;
 	const uint8_t *addr;
-	bool timer;
+	bool prepared, timer;
 
 	time_start = time_stop = 0;
 
@@ -517,6 +520,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    F_ISSET(ref->page->dsk, WT_PAGE_LAS_UPDATE));
 
 skip_read:
+	prepared = false;
 	switch (previous_state) {
 	case WT_REF_DELETED:
 		/*
@@ -526,7 +530,7 @@ skip_read:
 		 * then apply the delete.
 		 */
 		if (ref->page_las != NULL) {
-			WT_ERR(__las_page_instantiate(session, ref));
+			WT_ERR(__las_page_instantiate(session, ref, &prepared));
 			ref->page_las->eviction_to_lookaside = false;
 		}
 
@@ -536,26 +540,26 @@ skip_read:
 	case WT_REF_LIMBO:
 	case WT_REF_LOOKASIDE:
 		WT_ERR(__page_read_lookaside(
-		    session, ref, previous_state, &final_state));
+		    session, ref, previous_state, &final_state, &prepared));
 		break;
 	}
 
 	/*
 	 * Once the page is instantiated, we no longer need the history in
 	 * lookaside.  We leave the lookaside sweep thread to do most cleanup,
-	 * but it can only remove keys that skew newest (if there are entries
-	 * in the lookaside newer than the page, they need to be read back into
-	 * cache or they will be lost).
+	 * but it can only remove committed updates and keys that skew newest
+	 * (if there are entries in the lookaside newer than the page, they need
+	 * to be read back into cache or they will be lost).
 	 *
-	 * There is no reason for the lookaside remove should fail, but ignore
-	 * it if for some reason it fails, we've got a valid page.
+	 * Prepared updates can not be removed by the lookaside sweep, remove
+	 * them as we read the page back in memory.
 	 *
 	 * Don't free WT_REF.page_las, there may be concurrent readers.
 	 */
 	if (final_state == WT_REF_MEM &&
-	    ref->page_las != NULL && !ref->page_las->skew_newest)
-		WT_IGNORE_RET(__wt_las_remove_block(
-		    session, ref->page_las->las_pageid, false));
+	    ref->page_las != NULL && (prepared || !ref->page_las->skew_newest))
+		WT_ERR(__wt_las_remove_block(
+		    session, ref->page_las->las_pageid));
 
 	WT_PUBLISH(ref->state, final_state);
 	return (ret);

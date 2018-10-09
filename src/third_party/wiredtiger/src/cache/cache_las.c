@@ -859,8 +859,7 @@ __wt_las_cursor_position(WT_CURSOR *cursor, uint64_t pageid)
  *	Remove all records for a given page from the lookaside table.
  */
 int
-__wt_las_remove_block(
-    WT_SESSION_IMPL *session, uint64_t pageid, bool lock_wait)
+__wt_las_remove_block(WT_SESSION_IMPL *session, uint64_t pageid)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -878,8 +877,7 @@ __wt_las_remove_block(
 	 */
 	__wt_las_cursor(session, &cursor, &session_flags);
 
-	if ((ret = __las_remove_block(
-	    cursor, pageid, lock_wait, &remove_cnt)) == 0)
+	if ((ret = __las_remove_block(cursor, pageid, true, &remove_cnt)) == 0)
 		(void)__wt_atomic_add64(
 		    &conn->cache->las_remove_count, remove_cnt);
 
