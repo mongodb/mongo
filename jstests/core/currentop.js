@@ -38,7 +38,8 @@
                           {ns: coll.getFullName()},
                           {ns: db.$cmd.getFullName(), "command.insert": coll.getName()}
                       ]
-                    }
+                    },
+                    {type: "op"}
                 ]
             });
             return ops.inprog.length === 1;

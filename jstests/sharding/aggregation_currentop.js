@@ -622,6 +622,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // Returns a set of predicates that filter $currentOp for all stashed transactions.
     function sessionFilter() {
         return {
+            type: "idleSession",
             active: false,
             opid: {$exists: false},
             desc: "inactive transaction",

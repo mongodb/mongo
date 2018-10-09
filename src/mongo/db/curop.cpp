@@ -230,6 +230,8 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     invariant(client);
     OperationContext* clientOpCtx = client->getOperationContext();
 
+    infoBuilder->append("type", "op");
+
     const std::string hostName = getHostNameCachedAndPort();
     infoBuilder->append("host", hostName);
 

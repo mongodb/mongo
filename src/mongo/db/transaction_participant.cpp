@@ -1264,6 +1264,7 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
     if (_txnResourceStash && _txnResourceStash->locker()) {
         if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo(boost::none)) {
             invariant(_activeTxnNumber != kUninitializedTxnNumber);
+            builder->append("type", "idleSession");
             builder->append("host", getHostNameCachedAndPort());
             builder->append("desc", "inactive transaction");
 
