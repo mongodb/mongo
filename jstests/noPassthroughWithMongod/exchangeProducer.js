@@ -40,6 +40,22 @@ TestData.disableImplicitSessions = true;
         return shell;
     }
 
+    /**
+     * A consumer runs in a parallel shell reading the cursor expecting an error.
+     *
+     * @param {Object} cursor - the cursor that a consumer will read
+     * @param {int} code - the expected error code
+     */
+    function failingConsumer(cursor, code) {
+        let shell = startParallelShell(`{
+            const dbCursor = new DBCommandCursor(db, ${tojsononeline(cursor)});
+            const cmdRes = db.runCommand({getMore: dbCursor._cursorid, collection: dbCursor._collName});
+            assert.commandFailedWithCode(cmdRes, ${code});
+        }`);
+
+        return shell;
+    }
+
     const numConsumers = 4;
     // For simplicity we assume that we can evenly distribute documents among consumers.
     assert.eq(0, numDocs % numConsumers);
@@ -240,4 +256,44 @@ TestData.disableImplicitSessions = true;
             parallelShells[i]();
         }
     })();
+
+    /**
+     * Range - simulate an exception in loading the batch.
+     */
+    (function testRangeFailLoad() {
+        const kFailPointName = "exchangeFailLoadNextBatch";
+        try {
+            assert.commandWorked(
+                db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
+
+            let res = assert.commandWorked(db.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [],
+                exchange: {
+                    policy: "keyRange",
+                    consumers: NumberInt(numConsumers),
+                    bufferSize: NumberInt(1024),
+                    key: {a: 1},
+                    boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
+                    consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
+                },
+                cursor: {batchSize: 0}
+            }));
+            assert.eq(numConsumers, res.cursors.length);
+
+            let parallelShells = [];
+
+            // All consumers will see the exchange fail error.
+            for (let i = 0; i < numConsumers; ++i) {
+                parallelShells.push(failingConsumer(res.cursors[i], ErrorCodes.FailPointEnabled));
+            }
+            for (let i = 0; i < numConsumers; ++i) {
+                parallelShells[i]();
+            }
+        } finally {
+            assert.commandWorked(
+                db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
+        }
+    })();
+
 })();

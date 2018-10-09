@@ -81,7 +81,7 @@ public:
         return _spec;
     }
 
-    void dispose(OperationContext* opCtx);
+    void dispose(OperationContext* opCtx, size_t consumerId);
 
 private:
     size_t loadNextBatch();
@@ -143,6 +143,10 @@ private:
     // A thread that is currently loading the exchange buffers.
     size_t _loadingThreadId{kInvalidThreadId};
 
+    // A status indicating that the exception was thrown during loadNextBatch(). Once in the failed
+    // state all other producing threads will fail too.
+    Status _errorInLoadNextBatch{Status::OK()};
+
     size_t _roundRobinCounter{0};
 
     // A rundown counter of consumers disposing of the pipelines. Only the last consumer will
@@ -192,7 +196,7 @@ public:
     }
 
     void doDispose() final {
-        _exchange->dispose(pExpCtx->opCtx);
+        _exchange->dispose(pExpCtx->opCtx, _consumerId);
     }
 
     auto getConsumerId() const {
