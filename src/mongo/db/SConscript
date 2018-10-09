@@ -637,6 +637,21 @@ env.Library(
 )
 
 env.Library(
+    target='session_catalog',
+    source=[
+        'session_catalog.cpp',
+        'session.cpp',
+    ],
+    LIBDEPS=[
+        'kill_sessions',
+        'logical_session_id',
+    ],
+    LIBDEPS_PRIVATE=[
+        'service_context',
+    ]
+)
+
+env.Library(
     target='catalog_raii',
     source=[
         'catalog_raii.cpp',
@@ -644,8 +659,6 @@ env.Library(
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
-        'session_catalog.cpp',
-        'session.cpp',
         'single_transaction_stats.cpp',
         'transaction_coordinator_factory.cpp',
         'transaction_history_iterator.cpp',
@@ -668,15 +681,14 @@ env.Library(
         'curop_metrics',
         'dbdirectclient',
         'index/index_access_method',
-        'kill_sessions',
-        'logical_session_id',
         'namespace_string',
         'repl/oplog_entry',
         'repl/oplog_shim',
         's/sharding_api_d',
+        'session_catalog',
         'stats/fill_locker_info',
+        'stats/top',
         'views/views',
-        "stats/top",
     ],
     LIBDEPS_PRIVATE=[
         'commands/server_status',
@@ -1855,8 +1867,6 @@ env.Library(
         'service_context_devnull_test_fixture.cpp',
     ],
     LIBDEPS=[
-        # this library is required only because of SERVER-29908
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         'service_context_d_test_fixture',
     ],
     LIBDEPS_PRIVATE=[
@@ -1967,8 +1977,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'auth/authmocks',
-        'catalog_raii',
-        'repl/mock_repl_coord_server_fixture',
+        'service_context_d_test_fixture',
+        'session_catalog',
     ],
 )
 

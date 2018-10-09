@@ -46,29 +46,54 @@
 namespace mongo {
 namespace {
 
+/**
+ * Shortcut method shared by the various forms of session kill below. Every session kill operation
+ * consists of the following stages:
+ *  1) Select the sessions to kill, based on their lsid or owning user account (achieved through the
+ *     'matcher') and further refining that list through the 'filterFn'.
+ *  2) If any of the selected sessions are currently checked out, interrupt the owning operation
+ *     context with 'reason' as the code.
+ *  3) Finish killing the selected and interrupted sessions through the 'killSessionFn'.
+ */
 void killSessionsAction(OperationContext* opCtx,
                         const SessionKiller::Matcher& matcher,
-                        const SessionCatalog::ScanSessionsCallbackFn& killSessionFn) {
+                        const stdx::function<bool(Session*)>& filterFn,
+                        const stdx::function<void(Session*)>& killSessionFn,
+                        ErrorCodes::Error reason = ErrorCodes::Interrupted) {
     const auto catalog = SessionCatalog::get(opCtx);
 
-    catalog->scanSessions(matcher, [&](Session* session) {
+    std::vector<Session::KillToken> sessionKillTokens;
+    catalog->scanSessions(matcher, [&](WithLock sessionCatalogLock, Session* session) {
+        if (filterFn(session))
+            sessionKillTokens.emplace_back(session->kill(sessionCatalogLock, reason));
+    });
+
+    for (auto& sessionKillToken : sessionKillTokens) {
+        auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
+
         // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
         // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
         const KillAllSessionsByPattern* pattern = matcher.match(session->getSessionId());
         invariant(pattern);
 
         ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
-        killSessionFn(session);
-    });
+        killSessionFn(session.get());
+    }
 }
 
 }  // namespace
 
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher) {
-    killSessionsAction(opCtx, matcher, [](Session* session) {
-        TransactionParticipant::getFromNonCheckedOutSession(session)->abortArbitraryTransaction();
-    });
+                                       const SessionKiller::Matcher& matcher,
+                                       ErrorCodes::Error reason) {
+    killSessionsAction(opCtx,
+                       matcher,
+                       [](Session*) { return true; },
+                       [](Session* session) {
+                           TransactionParticipant::getFromNonCheckedOutSession(session)
+                               ->abortArbitraryTransaction();
+                       },
+                       reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -86,23 +111,52 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
 void killAllExpiredTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(opCtx, matcherAllSessions, [](Session* session) {
-        try {
-            TransactionParticipant::getFromNonCheckedOutSession(session)
-                ->abortArbitraryTransactionIfExpired();
-        } catch (const DBException& ex) {
-            warning() << "May have failed to abort expired transaction on session "
-                      << session->getSessionId().getId() << " due to " << redact(ex.toStatus());
-        }
-    });
+    killSessionsAction(
+        opCtx,
+        matcherAllSessions,
+        [](Session* session) {
+            const auto txnParticipant =
+                TransactionParticipant::getFromNonCheckedOutSession(session);
+
+            return txnParticipant->expired();
+        },
+        [](Session* session) {
+            const auto txnParticipant =
+                TransactionParticipant::getFromNonCheckedOutSession(session);
+
+            LOG(0)
+                << "Aborting transaction with txnNumber " << txnParticipant->getActiveTxnNumber()
+                << " on session " << session->getSessionId().getId()
+                << " because it has been running for longer than 'transactionLifetimeLimitSeconds'";
+
+            // The try/catch block below is necessary because expired() in the filterFn above could
+            // return true for expired, but unprepared transaction, but by the time we get to
+            // actually kill it, the participant could theoretically become prepared (being under
+            // the SessionCatalog mutex doesn't prevent the concurrently running thread from doing
+            // preparing the participant).
+            //
+            // Then when the execution reaches the killSessionFn, it would find the transaction is
+            // prepared and not allowed to be killed, which would cause the exception below
+            try {
+                txnParticipant->abortArbitraryTransaction();
+            } catch (const DBException& ex) {
+                warning() << "May have failed to abort expired transaction on session "
+                          << session->getSessionId().getId() << " due to " << redact(ex.toStatus());
+            }
+        },
+        ErrorCodes::ExceededTimeLimit);
 }
 
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(opCtx, matcherAllSessions, [](Session* session) {
-        TransactionParticipant::getFromNonCheckedOutSession(session)->shutdown();
-    });
+    killSessionsAction(opCtx,
+                       matcherAllSessions,
+                       [](Session*) { return true; },
+                       [](Session* session) {
+                           TransactionParticipant::getFromNonCheckedOutSession(session)->shutdown();
+                       },
+                       ErrorCodes::InterruptedAtShutdown);
 }
 
 }  // namespace mongo

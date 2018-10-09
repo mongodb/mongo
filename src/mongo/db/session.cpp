@@ -32,6 +32,8 @@
 
 #include "mongo/db/session.h"
 
+#include "mongo/db/operation_context.h"
+
 namespace mongo {
 
 Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
@@ -39,6 +41,28 @@ Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) 
 OperationContext* Session::currentOperation() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _checkoutOpCtx;
+}
+
+Session::KillToken Session::kill(WithLock sessionCatalogLock, ErrorCodes::Error reason) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    uassert(ErrorCodes::ConflictingOperationInProgress, "Session already killed", !_killRequested);
+    _killRequested = true;
+
+    // For currently checked-out sessions, interrupt the operation context so that the current owner
+    // can release the session
+    if (_checkoutOpCtx) {
+        const auto serviceContext = _checkoutOpCtx->getServiceContext();
+
+        stdx::lock_guard<Client> clientLock(*_checkoutOpCtx->getClient());
+        serviceContext->killOperation(_checkoutOpCtx, reason);
+    }
+
+    return KillToken(getSessionId());
+}
+
+bool Session::killed() const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    return _killRequested;
 }
 
 void Session::_markCheckedOut(WithLock sessionCatalogLock, OperationContext* checkoutOpCtx) {
@@ -51,6 +75,12 @@ void Session::_markCheckedIn(WithLock sessionCatalogLock) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_checkoutOpCtx);
     _checkoutOpCtx = nullptr;
+}
+
+void Session::_markNotKilled(WithLock sessionCatalogLock, KillToken killToken) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    invariant(_killRequested);
+    _killRequested = false;
 }
 
 }  // namespace mongo

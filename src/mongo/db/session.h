@@ -64,6 +64,35 @@ public:
      */
     OperationContext* currentOperation() const;
 
+    /**
+     * Marks the session as killed and returns a 'kill token' to to be passed later on to
+     * 'checkOutSessionForKill' method of the SessionCatalog in order to permit the caller to
+     * execute any kill cleanup tasks and pass further on to '_markNotKilled' in order to reset the
+     * kill state. Marking session as killed is an internal property only that will cause any
+     * further calls to 'checkOutSession' to block until 'checkOutSessionForKill' is called and the
+     * returned scoped object destroyed.
+     *
+     * If the session is currently checked-out, this method will also interrupt the operation
+     * context which has it checked-out.
+     *
+     * If the session is already killed throws ConflictingOperationInProgress exception.
+     *
+     * Must be called under the owning SessionCatalog's lock.
+     */
+    struct KillToken {
+        KillToken(LogicalSessionId lsid) : lsidToKill(std::move(lsid)) {}
+        KillToken(KillToken&&) = default;
+        KillToken& operator=(KillToken&&) = default;
+
+        LogicalSessionId lsidToKill;
+    };
+    KillToken kill(WithLock sessionCatalogLock, ErrorCodes::Error reason = ErrorCodes::Interrupted);
+
+    /**
+     * Returns whether 'kill' has been called on this session.
+     */
+    bool killed() const;
+
 private:
     /**
      * Set/clear the current check-out state of the session by storing the operation which has this
@@ -73,6 +102,12 @@ private:
      */
     void _markCheckedOut(WithLock sessionCatalogLock, OperationContext* checkoutOpCtx);
     void _markCheckedIn(WithLock sessionCatalogLock);
+
+    /**
+     * Used by the session catalog when checking a session back in after a call to 'kill'. See the
+     * comments for 'kill for more details.
+     */
+    void _markNotKilled(WithLock sessionCatalogLock, KillToken killToken);
 
     // The id of the session with which this object is associated
     const LogicalSessionId _sessionId;
@@ -87,6 +122,9 @@ private:
     // A pointer back to the currently running operation on this Session, or nullptr if there
     // is no operation currently running for the Session.
     OperationContext* _checkoutOpCtx{nullptr};
+
+    // Set to true if markKilled has been invoked for this session.
+    bool _killRequested{false};
 };
 
 }  // namespace mongo

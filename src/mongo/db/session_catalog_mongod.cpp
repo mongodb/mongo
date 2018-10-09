@@ -38,12 +38,15 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
-    SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
+    invalidateSessions(opCtx, boost::none);
 
     const size_t initialExtentSize = 0;
     const bool capped = false;
@@ -83,6 +86,56 @@ boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationCon
     }
 
     return coll->uuid();
+}
+
+void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
+                                              boost::optional<BSONObj> singleSessionDoc) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    if (isReplSet) {
+        uassert(40528,
+                str::stream() << "Direct writes against "
+                              << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                              << " cannot be performed using a transaction or on a session.",
+                !opCtx->getLogicalSessionId());
+    }
+
+    const auto catalog = SessionCatalog::get(opCtx);
+
+    std::vector<Session::KillToken> sessionKillTokens;
+
+    if (singleSessionDoc) {
+        sessionKillTokens.emplace_back(catalog->killSession(LogicalSessionId::parse(
+            IDLParserErrorContext("lsid"), singleSessionDoc->getField("_id").Obj())));
+    } else {
+        SessionKiller::Matcher matcher(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        catalog->scanSessions(matcher,
+                              [&sessionKillTokens](WithLock sessionCatalogLock, Session* session) {
+                                  sessionKillTokens.emplace_back(session->kill(sessionCatalogLock));
+                              });
+    }
+
+    if (sessionKillTokens.empty())
+        return;
+
+    stdx::thread([
+        service = opCtx->getServiceContext(),
+        sessionKillTokens = std::move(sessionKillTokens)
+    ]() mutable {
+        auto uniqueClient = service->makeClient("Session catalog kill");
+        auto uniqueOpCtx = uniqueClient->makeOperationContext();
+        const auto opCtx = uniqueOpCtx.get();
+        const auto catalog = SessionCatalog::get(opCtx);
+
+        for (auto& sessionKillToken : sessionKillTokens) {
+            auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
+
+            auto const txnParticipant =
+                TransactionParticipant::getFromNonCheckedOutSession(session.get());
+            txnParticipant->invalidate();
+        }
+    }).detach();
 }
 
 }  // namespace mongo

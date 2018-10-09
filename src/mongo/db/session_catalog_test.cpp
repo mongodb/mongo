@@ -174,7 +174,9 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, NestedOperationContextSession) {
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
     std::vector<LogicalSessionId> lsids;
-    auto workerFn = [&](Session* session) { lsids.push_back(session->getSessionId()); };
+    const auto workerFn = [&lsids](WithLock, Session* session) {
+        lsids.push_back(session->getSessionId());
+    };
 
     // Scan over zero Sessions.
     SessionKiller::Matcher matcherAllSessions(
@@ -204,6 +206,247 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
     catalog()->scanSessions(matcherLSID2, workerFn);
     ASSERT_EQ(lsids.size(), 1U);
     ASSERT_EQ(lsids.front(), lsid2);
+}
+
+TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
+    const auto lsid = makeLogicalSessionIdForTest();
+
+    // Create the session so there is something to kill
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+    }
+
+    auto killToken = catalog()->killSession(lsid);
+
+    // Make sure that regular session check-out will fail because the session is marked as killed
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(OperationContextSession(opCtx.get(), true),
+                           AssertionException,
+                           ErrorCodes::MaxTimeMSExpired);
+    }
+
+    // Schedule a separate "regular operation" thread, which will block on checking-out the session,
+    // which we will use to confirm that session kill completion actually unblocks check-out
+    auto future = stdx::async(stdx::launch::async, [lsid] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready();
+        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+        sideOpCtx->setLogicalSessionId(lsid);
+
+        OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+    });
+    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+
+    // Make sure that "for kill" session check-out succeeds
+    {
+        auto opCtx = makeOperationContext();
+        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken));
+        ASSERT_EQ(opCtx.get(), scopedSession->currentOperation());
+    }
+
+    // Make sure that session check-out after kill succeeds again
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+    }
+
+    // Make sure the "regular operation" eventually is able to proceed and use the just killed
+    // session
+    future.get();
+}
+
+TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
+    const auto lsid = makeLogicalSessionIdForTest();
+
+    auto killToken = [this, &lsid] {
+        // Create the session so there is something to kill
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession operationContextSession(opCtx.get(), true);
+
+        auto killToken = catalog()->killSession(lsid);
+
+        // Make sure the owning operation context is interrupted
+        ASSERT_THROWS_CODE(opCtx->checkForInterrupt(), AssertionException, ErrorCodes::Interrupted);
+
+        // Make sure that the checkOutForKill call will wait for the owning operation context to
+        // check the session back in
+        auto future = stdx::async(stdx::launch::async, [lsid] {
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready();
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(lsid);
+            sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+
+            OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+        });
+
+        ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+
+        return killToken;
+    }();
+
+    // Make sure that regular session check-out will fail because the session is marked as killed
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(OperationContextSession(opCtx.get(), true),
+                           AssertionException,
+                           ErrorCodes::MaxTimeMSExpired);
+    }
+
+    // Schedule a separate "regular operation" thread, which will block on checking-out the session,
+    // which we will use to confirm that session kill completion actually unblocks check-out
+    auto future = stdx::async(stdx::launch::async, [lsid] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready();
+        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+        sideOpCtx->setLogicalSessionId(lsid);
+
+        OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+    });
+    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+
+    // Make sure that "for kill" session check-out succeeds
+    {
+        auto opCtx = makeOperationContext();
+        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken));
+        ASSERT_EQ(opCtx.get(), scopedSession->currentOperation());
+    }
+
+    // Make sure that session check-out after kill succeeds again
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+    }
+
+    // Make sure the "regular operation" eventually is able to proceed and use the just killed
+    // session
+    future.get();
+}
+
+TEST_F(SessionCatalogTest, MarkSessionAsKilledThrowsWhenCalledTwice) {
+    const auto lsid = makeLogicalSessionIdForTest();
+
+    // Create the session so there is something to kill
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+    }
+
+    auto killToken = catalog()->killSession(lsid);
+
+    // Second mark as killed attempt will throw since the session is already killed
+    ASSERT_THROWS_CODE(catalog()->killSession(lsid),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    // Make sure that regular session check-out will fail because the session is marked as killed
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(OperationContextSession(opCtx.get(), true),
+                           AssertionException,
+                           ErrorCodes::MaxTimeMSExpired);
+    }
+
+    // Finish "killing" the session so the SessionCatalog destructor doesn't complain
+    {
+        auto opCtx = makeOperationContext();
+        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken));
+        ASSERT_EQ(opCtx.get(), scopedSession->currentOperation());
+    }
+}
+
+TEST_F(SessionCatalogTest, MarkSessionsAsKilledWhenSessionDoesNotExist) {
+    const auto nonExistentLsid = makeLogicalSessionIdForTest();
+    ASSERT_THROWS_CODE(
+        catalog()->killSession(nonExistentLsid), AssertionException, ErrorCodes::NoSuchSession);
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
+    // Create three sessions
+    const std::vector<LogicalSessionId> lsids{makeLogicalSessionIdForTest(),
+                                              makeLogicalSessionIdForTest(),
+                                              makeLogicalSessionIdForTest()};
+
+    std::vector<stdx::future<void>> futures;
+
+    for (const auto& lsid : lsids) {
+        futures.emplace_back(stdx::async(stdx::launch::async, [lsid] {
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready();
+
+            {
+                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+                sideOpCtx->setLogicalSessionId(lsid);
+
+                OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+                ASSERT_THROWS_CODE(sideOpCtx->sleepFor(Hours{6}),
+                                   AssertionException,
+                                   ErrorCodes::ExceededTimeLimit);
+            }
+
+            {
+                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+                sideOpCtx->setLogicalSessionId(lsid);
+
+                OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+            }
+        }));
+
+        ASSERT(stdx::future_status::ready !=
+               futures.back().wait_for(Milliseconds(10).toSystemDuration()));
+    }
+
+    // Kill the first and the third sessions
+    {
+        std::vector<Session::KillToken> firstAndThirdTokens;
+        catalog()->scanSessions(
+            SessionKiller::Matcher(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)}),
+            [&lsids, &firstAndThirdTokens](WithLock sessionCatalogLock, Session* session) {
+                if (session->getSessionId() == lsids[0] || session->getSessionId() == lsids[2])
+                    firstAndThirdTokens.emplace_back(
+                        session->kill(sessionCatalogLock, ErrorCodes::ExceededTimeLimit));
+            });
+        ASSERT_EQ(2U, firstAndThirdTokens.size());
+        for (auto& killToken : firstAndThirdTokens) {
+            auto unusedSheckedOutSessionForKill(
+                catalog()->checkOutSessionForKill(_opCtx, std::move(killToken)));
+        }
+        futures[0].get();
+        futures[2].get();
+    }
+
+    // Kill the second session
+    {
+        std::vector<Session::KillToken> secondToken;
+        catalog()->scanSessions(
+            SessionKiller::Matcher(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)}),
+            [&lsids, &secondToken](WithLock sessionCatalogLock, Session* session) {
+                if (session->getSessionId() == lsids[1])
+                    secondToken.emplace_back(
+                        session->kill(sessionCatalogLock, ErrorCodes::ExceededTimeLimit));
+            });
+        ASSERT_EQ(1U, secondToken.size());
+        for (auto& killToken : secondToken) {
+            auto unusedSheckedOutSessionForKill(
+                catalog()->checkOutSessionForKill(_opCtx, std::move(killToken)));
+        }
+        futures[1].get();
+    }
 }
 
 }  // namespace

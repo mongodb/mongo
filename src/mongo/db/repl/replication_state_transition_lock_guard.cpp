@@ -55,7 +55,8 @@ ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(Operati
         // Destroy all stashed transaction resources, in order to release locks.
         SessionKiller::Matcher matcherAllSessions(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
+        killSessionsLocalKillTransactions(
+            opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
     }
 
     _globalLock->waitForLockUntil(args.lockDeadline);

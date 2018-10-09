@@ -48,7 +48,8 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
  * Kills all transactions on mongod for sessions matching 'matcher'.
  */
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher);
+                                       const SessionKiller::Matcher& matcher,
+                                       ErrorCodes::Error reason = ErrorCodes::Interrupted);
 
 /**
  * Aborts any expired transactions.

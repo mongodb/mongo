@@ -345,62 +345,106 @@ public:
     }
 };
 
-TEST_F(OpObserverSessionCatalogTest, OnRollbackInvalidatesSessionCatalogIfSessionOpsRolledBack) {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
+using OpObserverSessionCatalogRollbackTest = OpObserverSessionCatalogTest;
+
+TEST_F(OpObserverSessionCatalogRollbackTest,
+       OnRollbackInvalidatesSessionCatalogIfSessionOpsRolledBack) {
     const NamespaceString nss("testDB", "testColl");
 
     // Create a session.
     auto sessionCatalog = SessionCatalog::get(getServiceContext());
     auto sessionId = makeLogicalSessionIdForTest();
-    auto session = sessionCatalog->getOrCreateSession(opCtx.get(), sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
-    txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
 
-    // Simulate a write occurring on that session.
     const TxnNumber txnNum = 0;
     const StmtId stmtId = 1000;
-    simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);
 
-    // Check that the statement executed.
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+    {
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setLogicalSessionId(sessionId);
+
+        // Create a session and sync it from disk
+        auto session = sessionCatalog->checkOutSession(opCtx.get());
+        const auto txnParticipant =
+            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
+
+        // Simulate a write occurring on that session
+        simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);
+
+        // Check that the statement executed
+        ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+    }
 
     // The OpObserver should invalidate in-memory session state, so the check after this should
     // fail.
-    OpObserver::RollbackObserverInfo rbInfo;
-    rbInfo.rollbackSessionIds = {UUID::gen()};
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId),
-                       DBException,
-                       ErrorCodes::ConflictingOperationInProgress);
+    {
+        auto opCtx = cc().makeOperationContext();
+
+        OpObserverImpl opObserver;
+        OpObserver::RollbackObserverInfo rbInfo;
+        rbInfo.rollbackSessionIds = {UUID::gen()};
+        opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    }
+
+    {
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setLogicalSessionId(sessionId);
+
+        auto session = sessionCatalog->checkOutSession(opCtx.get());
+        const auto txnParticipant =
+            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        ASSERT_THROWS_CODE(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId),
+                           DBException,
+                           ErrorCodes::ConflictingOperationInProgress);
+    }
 }
 
-TEST_F(OpObserverSessionCatalogTest,
+TEST_F(OpObserverSessionCatalogRollbackTest,
        OnRollbackDoesntInvalidateSessionCatalogIfNoSessionOpsRolledBack) {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
     const NamespaceString nss("testDB", "testColl");
 
-    // Create a session.
     auto sessionCatalog = SessionCatalog::get(getServiceContext());
     auto sessionId = makeLogicalSessionIdForTest();
-    auto session = sessionCatalog->getOrCreateSession(opCtx.get(), sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
-    txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
 
-    // Simulate a write occurring on that session.
     const TxnNumber txnNum = 0;
     const StmtId stmtId = 1000;
-    simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);
 
-    // Check that the statement executed.
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+    {
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setLogicalSessionId(sessionId);
 
-    // The OpObserver should not invalidate the in-memory session state, so the check after this
-    // should still succeed.
-    OpObserver::RollbackObserverInfo rbInfo;
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+        // Create a session and sync it from disk
+        auto session = sessionCatalog->checkOutSession(opCtx.get());
+        const auto txnParticipant =
+            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
+
+        // Simulate a write occurring on that session
+        simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);
+
+        // Check that the statement executed
+        ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+    }
+
+    // Because there are no sessions to rollback, the OpObserver should not invalidate the in-memory
+    // session state, so the check after this should still succeed.
+    {
+        auto opCtx = cc().makeOperationContext();
+
+        OpObserverImpl opObserver;
+        OpObserver::RollbackObserverInfo rbInfo;
+        opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    }
+
+    {
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setLogicalSessionId(sessionId);
+
+        auto session = sessionCatalog->checkOutSession(opCtx.get());
+        const auto txnParticipant =
+            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+    }
 }
 
 /**

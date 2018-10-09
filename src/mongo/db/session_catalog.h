@@ -31,6 +31,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
@@ -87,6 +88,13 @@ public:
     ScopedCheckedOutSession checkOutSession(OperationContext* opCtx);
 
     /**
+     * See the description of 'Session::kill' for more information on the session kill usage
+     * pattern.
+     */
+    ScopedCheckedOutSession checkOutSessionForKill(OperationContext* opCtx,
+                                                   Session::KillToken killToken);
+
+    /**
      * Returns a reference to the specified cached session regardless of whether it is checked-out
      * or not. The returned session is not returned checked-out and is allowed to be checked-out
      * concurrently.
@@ -98,29 +106,25 @@ public:
     ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
-     * Callback to be invoked when it is suspected that the on-disk session contents might not be in
-     * sync with what is in the sessions cache.
-     *
-     * If no specific document is available, the method will invalidate all sessions. Otherwise if
-     * one is avaiable (which is the case for insert/update/delete), it must contain _id field with
-     * a valid session entry, in which case only that particular session will be invalidated. If the
-     * _id field is missing or doesn't contain a valid serialization of logical session, the method
-     * will throw. This prevents invalid entries from making it in the collection.
-     */
-    void invalidateSessions(OperationContext* opCtx, boost::optional<BSONObj> singleSessionDoc);
-
-    /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
      * each Session which matches the specified 'matcher'.
      *
      * NOTE: Since this method runs with the session catalog mutex, the work done by 'workerFn' is
      * not allowed to block, perform I/O or acquire any lock manager locks.
+     * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
+     * SessionCatalog.
      *
      * TODO SERVER-33850: Take Matcher out of the SessionKiller namespace.
      */
-    using ScanSessionsCallbackFn = stdx::function<void(Session*)>;
+    using ScanSessionsCallbackFn = stdx::function<void(WithLock, Session*)>;
     void scanSessions(const SessionKiller::Matcher& matcher,
                       const ScanSessionsCallbackFn& workerFn);
+
+    /**
+     * Shortcut to invoke 'kill' on the specified session under the SessionCatalog mutex. Throws a
+     * NoSuchSession exception if the session doesn't exist.
+     */
+    Session::KillToken killSession(const LogicalSessionId& lsid);
 
 private:
     struct SessionRuntimeInfo {
@@ -146,7 +150,8 @@ private:
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
-    void _releaseSession(const LogicalSessionId& lsid);
+    void _releaseSession(const LogicalSessionId& lsid,
+                         boost::optional<Session::KillToken> killToken);
 
     stdx::mutex _mutex;
 
@@ -192,13 +197,16 @@ class ScopedCheckedOutSession {
     MONGO_DISALLOW_COPYING(ScopedCheckedOutSession);
 
     friend ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext*);
+    friend ScopedCheckedOutSession SessionCatalog::checkOutSessionForKill(OperationContext*,
+                                                                          Session::KillToken);
 
 public:
     ScopedCheckedOutSession(ScopedCheckedOutSession&&) = default;
 
     ~ScopedCheckedOutSession() {
         if (_scopedSession) {
-            SessionCatalog::get(_opCtx)->_releaseSession(_scopedSession->getSessionId());
+            SessionCatalog::get(_opCtx)->_releaseSession(_scopedSession->getSessionId(),
+                                                         std::move(_killToken));
         }
     }
 
@@ -219,10 +227,16 @@ public:
     }
 
 private:
-    ScopedCheckedOutSession(OperationContext* opCtx, ScopedSession scopedSession)
-        : _opCtx(opCtx), _scopedSession(std::move(scopedSession)) {}
+    ScopedCheckedOutSession(OperationContext* opCtx,
+                            ScopedSession scopedSession,
+                            boost::optional<Session::KillToken> killToken)
+        : _opCtx(opCtx),
+          _killToken(std::move(killToken)),
+          _scopedSession(std::move(scopedSession)) {}
 
     OperationContext* const _opCtx;
+
+    boost::optional<Session::KillToken> _killToken;
 
     ScopedSession _scopedSession;
 };

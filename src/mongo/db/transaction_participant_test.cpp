@@ -1111,8 +1111,9 @@ TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
     ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
-    txnParticipant->abortArbitraryTransactionIfExpired();
-    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    ASSERT(!txnParticipant->expired());
+    txnParticipant->abortArbitraryTransaction();
+    ASSERT(!txnParticipant->transactionIsAborted());
     ASSERT(_opObserver->transactionPrepared);
 }
 

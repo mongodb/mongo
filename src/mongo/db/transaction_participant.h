@@ -321,12 +321,9 @@ public:
     void abortArbitraryTransaction();
 
     /**
-     * Same as abortArbitraryTransaction, except only executes if _transactionExpireDate indicates
-     * that the transaction has expired.
-     *
-     * Not called with session checked out.
+     * Returns whether the transaction has exceedet its expiration time.
      */
-    void abortArbitraryTransactionIfExpired();
+    bool expired() const;
 
     /*
     * Aborts the transaction inside the transaction, releasing transaction resources.
