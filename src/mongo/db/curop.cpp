@@ -634,7 +634,10 @@ string OpDebug::report(Client* client,
 
     if (queryHash) {
         s << " queryHash:" << unsignedIntToFixedLengthHex(*queryHash);
+        invariant(planCacheKey);
+        s << " planCacheKey:" << unsignedIntToFixedLengthHex(*planCacheKey);
     }
+
     if (!errInfo.isOK()) {
         s << " ok:" << 0;
         if (!errInfo.reason().empty()) {
@@ -719,6 +722,8 @@ void OpDebug::append(const CurOp& curop,
 
     if (queryHash) {
         b.append("queryHash", unsignedIntToFixedLengthHex(*queryHash));
+        invariant(planCacheKey);
+        b.append("planCacheKey", unsignedIntToFixedLengthHex(*planCacheKey));
     }
 
     {

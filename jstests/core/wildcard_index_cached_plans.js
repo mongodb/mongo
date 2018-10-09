@@ -44,16 +44,17 @@
         return null;
     }
 
-    function getQueryHashFromExplain(explainRes) {
+    function getPlanCacheKeyFromExplain(explainRes) {
         const hash = FixtureHelpers.isMongos(db)
-            ? explainRes.queryPlanner.winningPlan.shards[0].queryHash
-            : explainRes.queryPlanner.queryHash;
+            ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
+            : explainRes.queryPlanner.planCacheKey;
         assert.eq(typeof(hash), "string");
         return hash;
     }
 
-    function getQueryHash(query) {
-        return getQueryHashFromExplain(assert.commandWorked(coll.explain().find(query).finish()));
+    function getPlanCacheKey(query) {
+        return getPlanCacheKeyFromExplain(
+            assert.commandWorked(coll.explain().find(query).finish()));
     }
 
     const query = {a: 1, b: 1};
@@ -88,7 +89,7 @@
     for (let i = 0; i < 2; i++) {
         assert.eq(coll.find({a: 1, b: null}).itcount(), 1000);
     }
-    assert.neq(getQueryHash(queryWithBNull), getQueryHash(query));
+    assert.neq(getPlanCacheKey(queryWithBNull), getPlanCacheKey(query));
 
     // There should only have been one solution for the above query, so it would not get cached.
     assert.eq(getCacheEntryForQuery({a: 1, b: null}), null);
@@ -117,8 +118,8 @@
 
         // Check that the shapes are different since the query which matches on a string will not
         // be eligible to use the b.$** index (since the index has a different collation).
-        assert.neq(getQueryHashFromExplain(queryWithoutStringExplain),
-                   getQueryHashFromExplain(queryWithStringExplain));
+        assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain),
+                   getPlanCacheKeyFromExplain(queryWithStringExplain));
     })();
 
     // Check that indexability discriminators work with partial wildcard indexes.
@@ -140,7 +141,7 @@
 
         // Check that the shapes are different since the query which searches for a value not
         // included by the partial filter expression won't be eligible to use the $** index.
-        assert.neq(getQueryHashFromExplain(queryIndexedExplain),
-                   getQueryHashFromExplain(queryUnindexedExplain));
+        assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain),
+                   getPlanCacheKeyFromExplain(queryUnindexedExplain));
     })();
 })();
