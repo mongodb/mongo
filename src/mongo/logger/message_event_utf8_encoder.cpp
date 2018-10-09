@@ -142,6 +142,10 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
 MessageEventWithContextEncoder::~MessageEventWithContextEncoder() {}
 std::ostream& MessageEventWithContextEncoder::encode(const MessageEventEphemeral& event,
                                                      std::ostream& os) {
+    LogComponent component = event.getComponent();
+    os << component;
+    os << ' ';
+
     StringData contextName = event.getContextName();
     if (!contextName.empty()) {
         os << '[' << contextName << "] ";
