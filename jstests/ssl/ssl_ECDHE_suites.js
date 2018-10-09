@@ -5,10 +5,6 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
     "use strict";
 
-    if (getBuildInfo().buildEnvironment.target_os === "macOS") {
-        return;
-    }
-
     const suites = [
         "SSLV2 Cipher Suites",
         "SSLV3 Cipher Suites",
@@ -20,6 +16,13 @@ load('jstests/ssl/libs/ssl_helpers.js');
     const SERVER_CERT = "jstests/libs/server.pem";
 
     function runSSLYze(port) {
+        let target_os = buildInfo().buildEnvironment.target_os;
+        let target_arch = buildInfo().buildEnvironment.target_arch;
+
+        if (target_os === "macOS" || target_arch !== "x86_64") {
+            return null;
+        }
+
         let python = "/usr/bin/env python3";
         let sslyze = " jstests/ssl/sslyze_tester.py ";
 
@@ -86,8 +89,9 @@ load('jstests/ssl/libs/ssl_helpers.js');
         };
         let mongod = MongoRunner.runMongod(x509_options);
         var cipherDict = runSSLYze(mongod.port);
-        testSSLYzeOutput(cipherDict);
-
+        if (cipherDict !== null) {
+            testSSLYzeOutput(cipherDict);
+        }
         MongoRunner.stopMongod(mongod);
     }
 }());
