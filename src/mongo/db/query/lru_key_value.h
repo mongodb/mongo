@@ -58,7 +58,7 @@ namespace mongo {
  * TODO: We could move this into the util/ directory and do any cleanup necessary to make it
  * fully general.
  */
-template <class K, class V>
+template <class K, class V, class KeyHasher = std::hash<K>>
 class LRUKeyValue {
 public:
     LRUKeyValue(size_t maxSize) : _maxSize(maxSize), _currentSize(0){};
@@ -73,7 +73,7 @@ public:
     typedef typename KVList::iterator KVListIt;
     typedef typename KVList::const_iterator KVListConstIt;
 
-    typedef stdx::unordered_map<K, KVListIt> KVMap;
+    typedef stdx::unordered_map<K, KVListIt, KeyHasher> KVMap;
     typedef typename KVMap::const_iterator KVMapConstIt;
 
     /**

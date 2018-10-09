@@ -49,7 +49,10 @@ struct CollationSpec {
         kLower,
 
         // Use default sorting behavior for the strength.
-        kOff
+        kOff,
+
+        // Update this if you add another value.
+        kMax = kOff,
     };
 
     // Controls the set of characteristics used to compare strings.
@@ -70,7 +73,10 @@ struct CollationSpec {
 
         // Equal Unicode point values.
         // E.g. Hebrew cantillation marks are only distinguished at this level.
-        kIdentical = 5
+        kIdentical = 5,
+
+        // Update this if you add another value.
+        kMax = kIdentical,
     };
 
     // Controls whether spaces and punctuation are considered base characters.
@@ -80,7 +86,10 @@ struct CollationSpec {
 
         // Spaces and punctuation are not considered base characters, and are only distinguished at
         // strength > 3.
-        kShifted
+        kShifted,
+
+        // Update this if you add another value.
+        kMax = kShifted,
     };
 
     // Controls which characters are affected by alternate=shifted.
@@ -89,7 +98,10 @@ struct CollationSpec {
         kPunct,
 
         // Only spaces are affected
-        kSpace
+        kSpace,
+
+        // Update this if you add another value.
+        kMax = kSpace,
     };
 
 

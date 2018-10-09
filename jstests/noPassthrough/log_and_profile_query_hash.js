@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    // For getLatestProfilerEntry
+    // For getLatestProfilerEntry().
     load("jstests/libs/profiler.js");
 
     // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
@@ -50,8 +50,8 @@
     }
 
     // Run the find command, retrieve the corresponding profile object and log line, then ensure
-    // that both the profile object and log line have matching query hashes (if any).
-    function runTestsAndGetHash(db, {comment, test, hasQueryHash}) {
+    // that both the profile object and log line have matching stable query hashes (if any).
+    function runTestsAndGetHashes(db, {comment, test, hasQueryHash}) {
         assert.commandWorked(db.adminCommand({clearLog: "global"}));
         assert.doesNotThrow(() => test(db, comment));
         const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
@@ -61,13 +61,19 @@
         const logLine = retrieveLogLine(log, profileEntry);
         assert.neq(logLine, null);
 
-        // Confirm that the query hash either exists or does not exist in both log and profile
-        // entries. If the queryHash exists, ensures that the hash from the profile entry
-        // exists withing the log line.
+        // Confirm that the query hashes either exist or don't exist in both log and profile
+        // entries. If the queryHash and planCacheKey exist, ensure that the hashes from the
+        // profile entry match the log line.
         assert.eq(hasQueryHash, profileEntry.hasOwnProperty("queryHash"));
+        assert.eq(hasQueryHash, profileEntry.hasOwnProperty("planCacheKey"));
         assert.eq(hasQueryHash, (logLine.indexOf(profileEntry["queryHash"]) >= 0));
-        if (hasQueryHash)
-            return profileEntry["queryHash"];
+        assert.eq(hasQueryHash, (logLine.indexOf(profileEntry["planCacheKey"]) >= 0));
+        if (hasQueryHash) {
+            return {
+                queryHash: profileEntry["queryHash"],
+                planCacheKey: profileEntry["planCacheKey"]
+            };
+        }
         return null;
     }
 
@@ -112,14 +118,14 @@
         }
     ];
 
-    const hashValues = testList.map((testCase) => runTestsAndGetHash(testDB, testCase));
+    const hashValues = testList.map((testCase) => runTestsAndGetHashes(testDB, testCase));
 
-    // Confirm that the same shape of query has the same queryHash.
+    // Confirm that the same shape of query has the same hashes.
     assert.neq(hashValues[0], hashValues[1]);
     assert.eq(hashValues[1], hashValues[2]);
 
-    // Test that the expected queryHash is included in the transitional log lines when an inactive
-    // cache entry is created.
+    // Test that the expected 'planCacheKey' and 'queryHash' are included in the transitional
+    // log lines when an inactive cache entry is created.
     assert.commandWorked(testDB.setLogLevel(1, "query"));
     const testInactiveCreationLog = {
         comment: "Test Creating inactive entry.",
@@ -134,14 +140,16 @@
         hasQueryHash: true
 
     };
-    const onCreationHash = runTestsAndGetHash(testDB, testInactiveCreationLog);
+    const onCreationHashes = runTestsAndGetHashes(testDB, testInactiveCreationLog);
     const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 
-    // Fetch the line that logs when an inactive cache entry is created for the query with queryHash
-    // onCreationHash. Confirm only one line does this.
+    // Fetch the line that logs when an inactive cache entry is created for the query with
+    // 'planCacheKey' and 'queryHash'. Confirm only one line does this.
     const creationLogList = log.filter(
-        logLine => (logLine.indexOf("Creating inactive cache entry for query shape query") != -1 &&
-                    logLine.indexOf(String(onCreationHash)) != -1));
+        logLine =>
+            (logLine.indexOf("Creating inactive cache entry for query shape query") != -1 &&
+             logLine.indexOf("planCacheKey " + String(onCreationHashes.planCacheKey)) != -1 &&
+             logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1));
     assert.eq(1, creationLogList.length);
 
     MongoRunner.stopMongod(conn);

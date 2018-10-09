@@ -117,7 +117,8 @@ public:
      * Returns AllowedIndicesFilter for the query if it is set in the query settings, or
      * boost::none if it isn't.
      */
-    boost::optional<AllowedIndicesFilter> getAllowedIndicesFilter(const PlanCacheKey& query) const;
+    boost::optional<AllowedIndicesFilter> getAllowedIndicesFilter(
+        const CanonicalQuery::QueryShapeString& query) const;
 
     /**
      * Returns copies of all overrides for the collection.
@@ -129,14 +130,13 @@ public:
      * If existing entry is found for the same key, replaces it.
      */
     void setAllowedIndices(const CanonicalQuery& canonicalQuery,
-                           const PlanCacheKey& key,
                            const BSONObjSet& indexKeyPatterns,
                            const stdx::unordered_set<std::string>& indexNames);
 
     /**
      * Removes single entry from query settings. No effect if query shape is not found.
      */
-    void removeAllowedIndices(const PlanCacheKey& canonicalQuery);
+    void removeAllowedIndices(const CanonicalQuery::QueryShapeString& canonicalQuery);
 
     /**
      * Clears all allowed indices from query settings.
@@ -145,7 +145,8 @@ public:
 
 private:
     // Allowed index entries owned here.
-    using AllowedIndexEntryMap = stdx::unordered_map<PlanCacheKey, AllowedIndexEntry>;
+    using AllowedIndexEntryMap =
+        stdx::unordered_map<CanonicalQuery::QueryShapeString, AllowedIndexEntry>;
     AllowedIndexEntryMap _allowedIndexEntryMap;
 
     /**

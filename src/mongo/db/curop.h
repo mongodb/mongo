@@ -185,6 +185,10 @@ public:
 
     BSONObj execStats;  // Owned here.
 
+    // The hash of the PlanCache key for the query being run. This may change depending on what
+    // indexes are present.
+    boost::optional<uint32_t> planCacheKey;
+    // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
 
     // Details of any error (whether from an exception or a command returning failure).

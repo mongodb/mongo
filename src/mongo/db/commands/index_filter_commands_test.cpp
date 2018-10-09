@@ -459,7 +459,8 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     ASSERT_EQUALS(StringData(filters[0].getObjectField("collation").getStringField("locale")),
                   "mock_reverse_string");
 
-    // Plan cache should only contain entry for query without collation.
+    // Setting a filter will remove the cache entry associated with the query so now the plan cache
+    // should only contain the entry for the query without collation.
     ASSERT_FALSE(planCacheContains(
         opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{}"));
