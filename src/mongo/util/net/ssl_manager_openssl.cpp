@@ -62,7 +62,9 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
+#ifndef _WIN32
 #include <netinet/in.h>
+#endif
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/evp.h>
