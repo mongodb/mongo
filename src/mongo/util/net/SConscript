@@ -119,6 +119,7 @@ env.Library(
         'ssl_types',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/db/commands/server_status',

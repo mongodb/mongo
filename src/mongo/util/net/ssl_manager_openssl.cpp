@@ -45,6 +45,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_parameters.h"
@@ -390,6 +391,55 @@ private:
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
 
+    /** Password caching helper class.
+     * Objects of this type will remember the config provided password they had access to at
+     * construction.
+     * If the config provides no password, fetching will invoke OpenSSL's password prompting
+     * routine, and cache the outcome.
+     */
+    class PasswordFetcher {
+    public:
+        PasswordFetcher(StringData configParameter, StringData prompt)
+            : _password(configParameter.begin(), configParameter.end()),
+              _prompt(prompt.toString()) {
+            invariant(!prompt.empty());
+        }
+
+        /** Either returns a cached password, or prompts the user to enter one. */
+        StatusWith<StringData> fetchPassword() {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (_password->size()) {
+                return StringData(_password->c_str());
+            }
+
+            std::array<char, 1025> pwBuf;
+            int ret = EVP_read_pw_string(pwBuf.data(), pwBuf.size() - 1, _prompt.c_str(), 0);
+            pwBuf.at(pwBuf.size() - 1) = '\0';
+
+            if (ret != 0) {
+                StringBuilder error;
+                if (ret == -1) {
+                    error << "Failed to read user provided decryption password: "
+                          << SSLManagerInterface::getSSLErrorMessage(ERR_get_error());
+                } else {
+                    error << "Failed to read user provided decryption password";
+                }
+                return Status(ErrorCodes::UnknownError, error.str());
+            }
+
+            _password = SecureString(pwBuf.data());
+            return StringData(_password->c_str());
+        }
+
+    private:
+        stdx::mutex _mutex;
+        SecureString _password;  // Protected by _mutex
+
+        std::string _prompt;
+    };
+    PasswordFetcher _serverPEMPassword;
+    PasswordFetcher _clusterPEMPassword;
+
     /**
      * creates an SSL object to be used for this file descriptor.
      * caller must SSL_free it.
@@ -427,7 +477,7 @@ private:
      * @return bool showing if the function was successful.
      */
     bool _parseAndValidateCertificate(const std::string& keyFile,
-                                      const std::string& keyPassword,
+                                      PasswordFetcher* keyPassword,
                                       SSLX509Name* subjectName,
                                       Date_t* serverNotAfter);
 
@@ -435,7 +485,7 @@ private:
     StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
     /** @return true if was successful, otherwise false */
-    bool _setupPEM(SSL_CTX* context, const std::string& keyFile, const std::string& password);
+    bool _setupPEM(SSL_CTX* context, const std::string& keyFile, PasswordFetcher* password);
 
     /*
      * Set up an SSL context for certificate validation by loading a CA
@@ -617,22 +667,25 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
-      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
+      _serverPEMPassword(params.sslPEMKeyPassword, "Enter PEM passphrase"),
+      _clusterPEMPassword(params.sslClusterPassword, "Enter cluster certificate passphrase") {
     if (!_initSynchronousSSLContext(&_clientContext, params, ConnectionDirection::kOutgoing)) {
         uasserted(16768, "ssl initialization problem");
     }
 
     // pick the certificate for use in outgoing connections,
-    std::string clientPEM, clientPassword;
+    std::string clientPEM;
+    PasswordFetcher* clientPassword;
     if (!isServer || params.sslClusterFile.empty()) {
         // We are either a client, or a server without a cluster key,
         // so use the PEM key file, if specified
         clientPEM = params.sslPEMKeyFile;
-        clientPassword = params.sslPEMKeyPassword;
+        clientPassword = &_serverPEMPassword;
     } else {
         // We are a server with a cluster key, so use the cluster key file
         clientPEM = params.sslClusterFile;
-        clientPassword = params.sslClusterPassword;
+        clientPassword = &_clusterPEMPassword;
     }
 
     if (!clientPEM.empty()) {
@@ -648,7 +701,7 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
         }
 
         if (!_parseAndValidateCertificate(params.sslPEMKeyFile,
-                                          params.sslPEMKeyPassword,
+                                          &_serverPEMPassword,
                                           &_sslConfiguration.serverSubjectName,
                                           &_sslConfiguration.serverCertificateExpirationDate)) {
             uasserted(16942, "ssl initialization problem");
@@ -663,11 +716,20 @@ int SSLManagerOpenSSL::password_cb(char* buf, int num, int rwflag, void* userdat
     // Unless OpenSSL misbehaves, num should always be positive
     fassert(17314, num > 0);
     invariant(userdata);
-    auto pw = static_cast<const std::string*>(userdata);
 
-    const size_t copied = pw->copy(buf, num - 1);
-    buf[copied] = '\0';
-    return copied;
+    auto pwFetcher = static_cast<PasswordFetcher*>(userdata);
+    auto swPassword = pwFetcher->fetchPassword();
+    if (!swPassword.isOK()) {
+        error() << "Unable to fetch password: " << swPassword.getStatus();
+        return -1;
+    }
+    StringData password = std::move(swPassword.getValue());
+
+    const size_t copyCount = std::min(password.size(), static_cast<size_t>(num));
+    std::copy_n(password.begin(), copyCount, buf);
+    buf[copyCount] = '\0';
+
+    return copyCount;
 }
 
 int SSLManagerOpenSSL::verify_cb(int ok, X509_STORE_CTX* ctx) {
@@ -763,16 +825,14 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
 
     } else if (direction == ConnectionDirection::kOutgoing && !params.sslClusterFile.empty()) {
         // Use the configured clusterFile as our client certificate.
-        ::EVP_set_pw_prompt("Enter cluster certificate passphrase");
-        if (!_setupPEM(context, params.sslClusterFile, params.sslClusterPassword)) {
+        if (!_setupPEM(context, params.sslClusterFile, &_clusterPEMPassword)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up ssl clusterFile.");
         }
 
     } else if (!params.sslPEMKeyFile.empty()) {
         // Use the base pemKeyFile for any other outgoing connections,
         // as well as all incoming connections.
-        ::EVP_set_pw_prompt("Enter PEM passphrase");
-        if (!_setupPEM(context, params.sslPEMKeyFile, params.sslPEMKeyPassword)) {
+        if (!_setupPEM(context, params.sslPEMKeyFile, &_serverPEMPassword)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up PEM key file.");
         }
     }
@@ -878,7 +938,7 @@ unsigned long long SSLManagerOpenSSL::_convertASN1ToMillis(ASN1_TIME* asn1time) 
 }
 
 bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
-                                                     const std::string& keyPassword,
+                                                     PasswordFetcher* keyPassword,
                                                      SSLX509Name* subjectName,
                                                      Date_t* serverCertificateExpirationDate) {
     BIO* inBIO = BIO_new(BIO_s_file());
@@ -894,11 +954,8 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
         return false;
     }
 
-    // Callback will not manipulate the password, so const_cast is safe.
-    X509* x509 = PEM_read_bio_X509(inBIO,
-                                   NULL,
-                                   &SSLManagerOpenSSL::password_cb,
-                                   const_cast<void*>(static_cast<const void*>(&keyPassword)));
+    X509* x509 = PEM_read_bio_X509(
+        inBIO, NULL, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
     if (x509 == NULL) {
         error() << "cannot retrieve certificate from keyfile: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
@@ -933,7 +990,7 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
 
 bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
                                   const std::string& keyFile,
-                                  const std::string& password) {
+                                  PasswordFetcher* password) {
     if (SSL_CTX_use_certificate_chain_file(context, keyFile.c_str()) != 1) {
         error() << "cannot read certificate file: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
@@ -953,15 +1010,9 @@ bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
         return false;
     }
 
-    // If password is empty, use default OpenSSL callback, which uses the terminal
-    // to securely request the password interactively from the user.
-    decltype(&SSLManagerOpenSSL::password_cb) password_cb = nullptr;
-    void* userdata = nullptr;
-    if (!password.empty()) {
-        password_cb = &SSLManagerOpenSSL::password_cb;
-        // SSLManagerOpenSSL::password_cb will not manipulate the password, so const_cast is safe.
-        userdata = const_cast<void*>(static_cast<const void*>(&password));
-    }
+    // Obtain the private key, using our callback to acquire a decryption password if necessary.
+    decltype(&SSLManagerOpenSSL::password_cb) password_cb = &SSLManagerOpenSSL::password_cb;
+    void* userdata = static_cast<void*>(password);
     EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(inBio, nullptr, password_cb, userdata);
     if (!privateKey) {
         error() << "cannot read PEM key file: " << keyFile << ' '
