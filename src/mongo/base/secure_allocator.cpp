@@ -116,6 +116,12 @@ void EnablePrivilege(const wchar_t* name) {
 stdx::mutex workingSizeMutex;
 
 /**
+ * There is a minimum gap between the minimum working set size and maximum working set size.
+ * On Windows 2008 R2, it is 0x9000 bytes. On Windows 10, 0x7000 bytes.
+ */
+constexpr size_t minGap = 0x9000;
+
+/**
  * Grow the minimum working set size of the process to the specified size.
  */
 void growWorkingSize(std::size_t bytes) {
@@ -132,7 +138,7 @@ void growWorkingSize(std::size_t bytes) {
 
     // Since allocation request is aligned to page size, we can just add it to the current working
     // set size.
-    maxWorkingSetSize = std::max(minWorkingSetSize + bytes, maxWorkingSetSize);
+    maxWorkingSetSize = std::max(minWorkingSetSize + bytes + minGap, maxWorkingSetSize);
 
     // Increase the working set size minimum to the new lower bound.
     if (!SetProcessWorkingSetSizeEx(GetCurrentProcess(),
