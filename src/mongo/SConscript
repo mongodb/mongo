@@ -355,6 +355,7 @@ env.Install(
             'util/clock_sources',
             'util/fail_point',
             'util/ntservice',
+            'util/net/ssl_manager_status',
             'util/options_parser/options_parser_init',
             'util/version_impl',
         ]))
