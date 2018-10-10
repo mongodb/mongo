@@ -299,7 +299,9 @@ modules:
 buildvariants:
 - name: linux-wt-shard
   display_name: Linux WT Shard
-  batchtime: 40320 # 4 weeks
+  # We set an exceptionally large batchtime because the intention is for builds on this Evergreen
+  # project to only be triggered manually.
+  batchtime: 524160 # 52 weeks
   modules: &modules
     - dsi
   expansions:
@@ -320,7 +322,9 @@ buildvariants:
 
 - name: linux-mmapv1-shard
   display_name: Linux MMAPv1 Shard
-  batchtime: 40320 # 4 week
+  # We set an exceptionally large batchtime because the intention is for builds on this Evergreen
+  # project to only be triggered manually.
+  batchtime: 524160 # 52 weeks
   modules: *modules
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
