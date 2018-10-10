@@ -78,7 +78,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/system_index.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -95,7 +95,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
@@ -779,7 +778,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
     }
 
-    SessionCatalog::get(_service)->onStepUp(opCtx);
+    MongoDSessionCatalog::onStepUp(opCtx);
 
     notifyFreeMonitoringOnTransitionToPrimary();
 }

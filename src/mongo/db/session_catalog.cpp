@@ -32,11 +32,7 @@
 
 #include "mongo/db/session_catalog.h"
 
-#include <boost/optional.hpp>
-
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -75,49 +71,6 @@ SessionCatalog* SessionCatalog::get(OperationContext* opCtx) {
 SessionCatalog* SessionCatalog::get(ServiceContext* service) {
     auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
     return &sessionTransactionTable;
-}
-
-boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
-
-    const auto coll = autoColl.getCollection();
-    if (coll == nullptr) {
-        return boost::none;
-    }
-
-    return coll->uuid();
-}
-
-void SessionCatalog::onStepUp(OperationContext* opCtx) {
-    invalidateSessions(opCtx, boost::none);
-
-    DBDirectClient client(opCtx);
-
-    const size_t initialExtentSize = 0;
-    const bool capped = false;
-    const bool maxSize = 0;
-
-    BSONObj result;
-
-    if (client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                                initialExtentSize,
-                                capped,
-                                maxSize,
-                                &result)) {
-        return;
-    }
-
-    const auto status = getStatusFromCommandResult(result);
-
-    if (status == ErrorCodes::NamespaceExists) {
-        return;
-    }
-
-    uassertStatusOKWithContext(status,
-                               str::stream()
-                                   << "Failed to create the "
-                                   << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                                   << " collection");
 }
 
 ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
@@ -204,17 +157,14 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
 
 void SessionCatalog::scanSessions(OperationContext* opCtx,
                                   const SessionKiller::Matcher& matcher,
-                                  stdx::function<void(OperationContext*, Session*)> workerFn) {
+                                  const ScanSessionsCallbackFn& workerFn) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     LOG(2) << "Beginning scanSessions. Scanning " << _sessions.size() << " sessions.";
 
-    for (auto it = _sessions.begin(); it != _sessions.end(); ++it) {
-        // TODO SERVER-33850: Rename KillAllSessionsByPattern and
-        // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill.
-        if (const KillAllSessionsByPattern* pattern = matcher.match(it->first)) {
-            ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
-            workerFn(opCtx, &(it->second->txnState));
+    for (auto& sessionEntry : _sessions) {
+        if (matcher.match(sessionEntry.first)) {
+            workerFn(opCtx, &sessionEntry.second->txnState);
         }
     }
 }

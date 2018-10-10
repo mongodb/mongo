@@ -26,8 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
@@ -37,13 +37,14 @@
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/config_server_test_fixture.h"
@@ -301,9 +302,15 @@ public:
     void setUp() override {
         OpObserverTest::setUp();
         auto opCtx = cc().makeOperationContext();
+
+        MongoDSessionCatalog::onStepUp(opCtx.get());
+    }
+
+    void tearDown() override {
         auto sessionCatalog = SessionCatalog::get(getServiceContext());
         sessionCatalog->reset_forTest();
-        sessionCatalog->onStepUp(opCtx.get());
+
+        OpObserverTest::tearDown();
     }
 
     /**

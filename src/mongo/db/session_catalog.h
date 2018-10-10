@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session.h"
@@ -66,32 +68,19 @@ public:
     static SessionCatalog* get(ServiceContext* service);
 
     /**
-     * Fetches the UUID of the transaction table, or an empty optional if the collection does not
-     * exist or has no UUID. Acquires a lock on the collection. Required for rollback via refetch.
-     */
-    static boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
-
-    /**
      * Resets the transaction table to an uninitialized state.
      * Meant only for testing.
      */
     void reset_forTest();
 
     /**
-     * Invoked when the node enters the primary state. Ensures that the transactions collection is
-     * created. Throws on severe exceptions due to which it is not safe to continue the step-up
-     * process.
-     */
-    void onStepUp(OperationContext* opCtx);
-
-    /**
      * Potentially blocking call, which uses the session information stored in the specified
-     * operation context and either creates a new session runtime state (if one doesn't exist) or
-     * "checks-out" the existing one (if it is not currently in use).
+     * operation context and either creates a brand new session object (if one doesn't exist) or
+     * "checks-out" the existing one (if it is not currently in use or marked for kill).
      *
-     * Checking out a session puts it in the 'in use' state and all subsequent calls to checkout
-     * will block until it is put back in the 'available' state when the returned object goes out of
-     * scope.
+     * Checking out a session puts it in the 'checked out' state and all subsequent calls to
+     * checkout will block until it is checked back in. This happens when the returned object goes
+     * out of scope.
      *
      * Throws exception on errors.
      */
@@ -125,9 +114,10 @@ public:
      * SessionCatalog.
      * TODO SERVER-33850: Take Matcher out of the SessionKiller namespace.
      */
+    using ScanSessionsCallbackFn = stdx::function<void(OperationContext*, Session*)>;
     void scanSessions(OperationContext* opCtx,
                       const SessionKiller::Matcher& matcher,
-                      stdx::function<void(OperationContext*, Session*)> workerFn);
+                      const ScanSessionsCallbackFn& workerFn);
 
 private:
     struct SessionRuntimeInfo {

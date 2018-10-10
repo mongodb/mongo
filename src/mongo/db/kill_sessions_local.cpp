@@ -37,27 +37,37 @@
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/session_killer.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
-void killSessionsLocalKillCursors(OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
 
-    auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
-    uassertStatusOK(res.first);
+void killSessionsAction(OperationContext* opCtx,
+                        const SessionKiller::Matcher& matcher,
+                        const SessionCatalog::ScanSessionsCallbackFn& killSessionFn) {
+    const auto catalog = SessionCatalog::get(opCtx);
+
+    catalog->scanSessions(opCtx, matcher, [&](OperationContext* opCtx, Session* session) {
+        // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
+        // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
+        const KillAllSessionsByPattern* pattern = matcher.match(session->getSessionId());
+        invariant(pattern);
+
+        ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
+        killSessionFn(opCtx, session);
+    });
 }
+
 }  // namespace
 
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
                                        const SessionKiller::Matcher& matcher) {
-    SessionCatalog::get(opCtx)->scanSessions(
-        opCtx, matcher, [](OperationContext* opCtx, Session* session) {
-            TransactionParticipant::getFromNonCheckedOutSession(session)
-                ->abortArbitraryTransaction();
-        });
+    killSessionsAction(opCtx, matcher, [](OperationContext* opCtx, Session* session) {
+        TransactionParticipant::getFromNonCheckedOutSession(session)->abortArbitraryTransaction();
+    });
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -65,43 +75,44 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         SessionKiller::UniformRandomBitGenerator* urbg) {
     killSessionsLocalKillTransactions(opCtx, matcher);
     uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
-    killSessionsLocalKillCursors(opCtx, matcher);
+
+    auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
+    uassertStatusOK(res.first);
+
     return {std::vector<HostAndPort>{}};
 }
 
 void killAllExpiredTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    SessionCatalog::get(opCtx)->scanSessions(
-        opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
-            try {
-                TransactionParticipant::getFromNonCheckedOutSession(session)
-                    ->abortArbitraryTransactionIfExpired();
-            } catch (const DBException& ex) {
-                Status status = ex.toStatus();
-                std::string errmsg = str::stream()
-                    << "May have failed to abort expired transaction with session id (lsid) '"
-                    << session->getSessionId() << "'."
-                    << " Caused by: " << status;
-                warning() << errmsg;
-            }
-        });
+    killSessionsAction(opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
+        try {
+            TransactionParticipant::getFromNonCheckedOutSession(session)
+                ->abortArbitraryTransactionIfExpired();
+        } catch (const DBException& ex) {
+            Status status = ex.toStatus();
+            std::string errmsg = str::stream()
+                << "May have failed to abort expired transaction with session id (lsid) '"
+                << session->getSessionId() << "'."
+                << " Caused by: " << status;
+            warning() << errmsg;
+        }
+    });
 }
 
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    SessionCatalog::get(opCtx)->scanSessions(
-        opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
-            TransactionParticipant::getFromNonCheckedOutSession(session)->shutdown();
-        });
+    killSessionsAction(opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
+        TransactionParticipant::getFromNonCheckedOutSession(session)->shutdown();
+    });
 }
 
 void killSessionsLocalAbortOrYieldAllTransactions(
     OperationContext* opCtx, std::vector<std::pair<Locker*, Locker::LockSnapshot>>* yieldedLocks) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    SessionCatalog::get(opCtx)->scanSessions(
+    killSessionsAction(
         opCtx, matcherAllSessions, [yieldedLocks](OperationContext* opCtx, Session* session) {
             TransactionParticipant::getFromNonCheckedOutSession(session)
                 ->abortOrYieldArbitraryTransaction(yieldedLocks);

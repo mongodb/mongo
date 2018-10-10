@@ -41,8 +41,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
-#include "mongo/db/stats/fill_locker_info.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -127,10 +126,9 @@ protected:
     void setUp() final {
         MockReplCoordServerFixture::setUp();
 
-        auto service = opCtx()->getServiceContext();
-        SessionCatalog::get(service)->reset_forTest();
-        SessionCatalog::get(service)->onStepUp(opCtx());
+        MongoDSessionCatalog::onStepUp(opCtx());
 
+        const auto service = opCtx()->getServiceContext();
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
         auto mockObserver = stdx::make_unique<OpObserverMock>();
@@ -139,8 +137,11 @@ protected:
     }
 
     void tearDown() final {
-        MockReplCoordServerFixture::tearDown();
         _opObserver = nullptr;
+
+        SessionCatalog::get(opCtx()->getServiceContext())->reset_forTest();
+
+        MockReplCoordServerFixture::tearDown();
     }
 
     SessionCatalog* catalog() {

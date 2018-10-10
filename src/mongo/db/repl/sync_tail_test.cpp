@@ -60,9 +60,8 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/death_test.h"
@@ -1562,7 +1561,7 @@ public:
     void setUp() override {
         SyncTailTest::setUp();
 
-        SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
+        MongoDSessionCatalog::onStepUp(_opCtx.get());
 
         DBDirectClient client(_opCtx.get());
         BSONObj result;

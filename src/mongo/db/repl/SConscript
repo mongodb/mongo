@@ -129,8 +129,6 @@ env.Library(
     ],
 )
 
-
-
 env.Library(
     target='bgsync',
     source=[

@@ -643,24 +643,25 @@ env.Library(
         'operation_context_session_mongod.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
-        'session.cpp',
+        'session_catalog_mongod.cpp',
         'session_catalog.cpp',
+        'session.cpp',
         'single_transaction_stats.cpp',
         'transaction_coordinator_factory.cpp',
+        'transaction_history_iterator.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
-        'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
-        env.Idlc('transactions_stats.idl')[0],
         env.Idlc('transaction_commit_decision.idl')[0],
+        env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'catalog/collection',
-        'catalog/database',
         'catalog/database_holder',
+        'catalog/database',
         'catalog/uuid_catalog',
+        'commands/test_commands_enabled',
         'commands/txn_cmd_request',
         'concurrency/lock_manager',
         'curop_failpoint_helpers',
@@ -673,9 +674,9 @@ env.Library(
         'repl/oplog_entry',
         'repl/oplog_shim',
         's/sharding_api_d',
-        "stats/top",
+        'stats/fill_locker_info',
         'views/views',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        "stats/top",
     ],
     LIBDEPS_PRIVATE=[
         'commands/server_status',
@@ -1960,15 +1961,14 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='sessions_test',
+    target='session_catalog_test',
     source=[
         'session_catalog_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
-        'query_exec',
+        'auth/authmocks',
+        'catalog_raii',
+        'repl/mock_repl_coord_server_fixture',
     ],
 )
 

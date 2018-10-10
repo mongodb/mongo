@@ -28,12 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -49,13 +44,11 @@ protected:
     void setUp() final {
         MockReplCoordServerFixture::setUp();
 
-        auto service = opCtx()->getServiceContext();
-        SessionCatalog::get(service)->reset_forTest();
-        SessionCatalog::get(service)->onStepUp(opCtx());
+        catalog()->reset_forTest();
     }
 
     SessionCatalog* catalog() {
-        return SessionCatalog::get(opCtx()->getServiceContext());
+        return SessionCatalog::get(getServiceContext());
     }
 };
 
@@ -63,8 +56,8 @@ protected:
 class DirectClientSetter {
 public:
     explicit DirectClientSetter(OperationContext* opCtx)
-        : _opCtx(opCtx), _wasInDirectClient(opCtx->getClient()->isInDirectClient()) {
-        opCtx->getClient()->setInDirectClient(true);
+        : _opCtx(opCtx), _wasInDirectClient(_opCtx->getClient()->isInDirectClient()) {
+        _opCtx->getClient()->setInDirectClient(true);
     }
 
     ~DirectClientSetter() {

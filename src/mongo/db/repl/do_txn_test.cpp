@@ -25,6 +25,7 @@
  * delete this exception statement from all source files in the program,
  * then also delete it in the license file.
  */
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection_options.h"
@@ -40,7 +41,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -121,7 +122,7 @@ void DoTxnTest::setUp() {
     // Set up mongod.
     ServiceContextMongoDTest::setUp();
 
-    auto service = getServiceContext();
+    const auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
     // Set up ReplicationCoordinator and create oplog.
@@ -134,8 +135,7 @@ void DoTxnTest::setUp() {
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
 
     // Set up session catalog
-    SessionCatalog::get(service)->reset_forTest();
-    SessionCatalog::get(service)->onStepUp(_opCtx.get());
+    MongoDSessionCatalog::onStepUp(_opCtx.get());
 
     // Need the OpObserverImpl in the registry in order for doTxn to work.
     OpObserverRegistry* opObserverRegistry =
@@ -165,6 +165,8 @@ void DoTxnTest::tearDown() {
     _opCtx = nullptr;
     _storage = {};
     _opObserver = nullptr;
+
+    SessionCatalog::get(getServiceContext())->reset_forTest();
 
     // Reset default log level in case it was changed.
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,

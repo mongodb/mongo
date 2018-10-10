@@ -44,6 +44,7 @@
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
@@ -131,7 +132,7 @@ public:
                 ->setFindHostReturnValue(kDonorConnStr.getServers()[0]);
         }
 
-        SessionCatalog::get(getServiceContext())->onStepUp(operationContext());
+        MongoDSessionCatalog::onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
     }
 

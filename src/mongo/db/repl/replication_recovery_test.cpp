@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/replication_recovery.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
@@ -38,9 +36,10 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
@@ -147,7 +146,7 @@ private:
         ASSERT_OK(_storageInterface->createCollection(
             getOperationContext(), testNs, generateOptionsWithUuid()));
 
-        SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
+        MongoDSessionCatalog::onStepUp(_opCtx.get());
     }
 
     void tearDown() override {

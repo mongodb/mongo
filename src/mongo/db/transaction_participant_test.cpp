@@ -41,7 +41,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/future.h"
@@ -176,7 +176,8 @@ protected:
         MockReplCoordServerFixture::setUp();
 
         auto service = opCtx()->getServiceContext();
-        SessionCatalog::get(service)->onStepUp(opCtx());
+
+        MongoDSessionCatalog::onStepUp(opCtx());
 
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());

@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -70,7 +69,8 @@
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -892,7 +892,7 @@ Status _syncRollback(OperationContext* opCtx,
 
     // Find the UUID of the transactions collection. An OperationContext is required because the
     // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
-    how.transactionTableUUID = SessionCatalog::getTransactionTableUUID(opCtx);
+    how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
 
     log() << "Finding the Common Point";
     try {
@@ -1425,7 +1425,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         oplogCollection->cappedTruncateAfter(opCtx, fixUpInfo.commonPointOurDiskloc, false);
     }
 
-    Status status = getGlobalAuthorizationManager()->initialize(opCtx);
+    Status status = AuthorizationManager::get(opCtx->getServiceContext())->initialize(opCtx);
     if (!status.isOK()) {
         severe() << "Failed to reinitialize auth data after rollback: " << redact(status);
         fassertFailedNoTrace(40496);

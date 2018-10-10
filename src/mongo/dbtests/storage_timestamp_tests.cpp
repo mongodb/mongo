@@ -72,6 +72,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/dbtests/dbtests.h"
@@ -2477,7 +2478,7 @@ public:
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
-        sessionCatalog->onStepUp(_opCtx);
+        MongoDSessionCatalog::onStepUp(_opCtx);
 
         reset(nss);
         UUID ui = UUID::gen();
