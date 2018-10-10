@@ -50,6 +50,7 @@ class SessionsCollection {
 
 public:
     static const NamespaceString kSessionsNamespaceString;
+    static constexpr StringData kSessionsTTLIndex = "lsidTTLIndex"_sd;
 
     virtual ~SessionsCollection();
 
@@ -57,6 +58,11 @@ public:
      * Ensures that the sessions collection exists and has the proper indexes.
      */
     virtual Status setupSessionsCollection(OperationContext* opCtx) = 0;
+
+    /**
+     * Checks if the sessions collection exists and has the proper indexes.
+     */
+    virtual Status checkSessionsCollectionExists(OperationContext* opCtx) = 0;
 
     /**
      * Updates the last-use times on the given sessions to be greater than
