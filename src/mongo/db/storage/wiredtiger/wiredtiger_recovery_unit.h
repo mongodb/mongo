@@ -107,7 +107,8 @@ public:
     }
 
     void setReadOnce(bool readOnce) override {
-        invariant(!_active);
+        // Do not allow a session to use readOnce and regular cursors at the same time.
+        invariant(!_active || readOnce == _readOnce || getSession()->cursorsOut() == 0);
         _readOnce = readOnce;
     };
 
