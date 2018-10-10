@@ -1817,4 +1817,27 @@ TEST_F(QueryPlannerWildcardTest, ContainedOrPushdownWorksWithWildcardIndex) {
         "{$_path: [['a','a',true,true]], a:[[1,1,true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerWildcardTest, TypeOfObjectWithWildcardIndex) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$type: 'object'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$type: [3]}}, node:"
+        "{ixscan: {filter: null, pattern: {$_path: 1, a: 1}, bounds:"
+        "{$_path: [['a','a',true,true], ['a.','a/', true, false]], "
+        "a:[['MinKey','MaxKey',true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, TypeOfArrayWithWildcardIndex) {
+    addWildcardIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$type: 'array'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$type: [4]}}, node:"
+        "{ixscan: {filter: null, pattern: {$_path: 1, a: 1}, bounds:"
+        "{$_path: [['a','a',true,true], ['a.','a/', true, false]], "
+        "a:[['MinKey','MaxKey',true,true]]}}}}}");
+}
 }  // namespace mongo
