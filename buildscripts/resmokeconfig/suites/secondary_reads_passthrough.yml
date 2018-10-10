@@ -14,9 +14,6 @@ selector:
   # These tests attempt to read from the "system.profile" collection, which may be missing entries
   # if a write was performed on the primary of the replica set instead.
   - jstests/core/*profile*.js
-  # Two cursors can be established on different secondaries, so the count of
-  # $listLocalCursors will not always be 2.
-  - jstests/core/list_all_local_cursors.js
 
   # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
   # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are

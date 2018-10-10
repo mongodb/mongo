@@ -89,12 +89,14 @@
 
     // Wait for the aggregate cursor to appear in currentOp on the current shard.
     function waitForShardCursor(rs) {
-        assert.soon(
-            () => st.rs0.getPrimary()
-                      .getDB('admin')
-                      .aggregate(
-                          [{"$listLocalCursors": {}}, {"$match": {ns: mongosColl.getFullName()}}])
-                      .itcount() === 1);
+        assert.soon(() => st.rs0.getPrimary()
+                              .getDB('admin')
+                              .aggregate([
+                                  {"$currentOp": {"idleCursors": true}},
+                                  {"$match": {ns: mongosColl.getFullName(), type: "idleCursor"}}
+
+                              ])
+                              .itcount() === 1);
     }
     // Make sure the shard 0 $changeStream cursor is established before doing the first writes.
     waitForShardCursor(st.rs0);

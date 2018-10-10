@@ -129,12 +129,6 @@
             }
         }
         if (commandName === "aggregate") {
-            if (OverrideHelpers.isAggregationWithListLocalCursorsStage(commandName,
-                                                                       commandObjUnwrapped)) {
-                // The $listLocalCursors stage can only be used with readConcern={level: "local"}.
-                shouldForceReadConcern = false;
-            }
-
             if (OverrideHelpers.isAggregationWithListLocalSessionsStage(commandName,
                                                                         commandObjUnwrapped)) {
                 // The $listLocalSessions stage can only be used with readConcern={level: "local"}.

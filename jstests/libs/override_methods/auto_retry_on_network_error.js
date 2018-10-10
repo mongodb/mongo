@@ -185,17 +185,15 @@
         } else if (cmdName === "aggregate") {
             var stages = cmdObj.pipeline;
 
-            // $listLocalCursors and $listLocalSessions must be the first stage in the pipeline.
+            // $listLocalSessions must be the first stage in the pipeline.
             const firstStage =
                 stages && Array.isArray(stages) && (stages.length > 0) ? stages[0] : undefined;
             const hasListLocalStage = firstStage && (typeof firstStage === "object") &&
-                (firstStage.hasOwnProperty("$listLocalCursors") ||
-                 firstStage.hasOwnProperty("$listLocalSessions"));
+                firstStage.hasOwnProperty("$listLocalSessions");
             if (hasListLocalStage) {
-                throw new Error(
-                    "Refusing to run a test that issues an aggregation command with" +
-                    " $listLocalCursors or $listLocalSessions because they rely on in-memory" +
-                    " state that may not survive failovers.");
+                throw new Error("Refusing to run a test that issues an aggregation command with" +
+                                " $listLocalSessions because it relies on in-memory" +
+                                " state that may not survive failovers.");
             }
 
             // Aggregate can be either a read or a write depending on whether it has a $out stage.

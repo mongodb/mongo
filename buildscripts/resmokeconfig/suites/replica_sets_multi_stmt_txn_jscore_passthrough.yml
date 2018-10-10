@@ -216,7 +216,6 @@ selector:
 
   # Creates sessions explicitly, resulting in txns being run through different sessions
   # using a single txnNumber.
-  - jstests/core/list_all_local_cursors.js
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/views/views_all_commands.js
 

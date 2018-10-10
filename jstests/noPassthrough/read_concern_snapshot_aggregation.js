@@ -52,10 +52,6 @@
     testSnapshotAggFailsWithCode(
         kCollName, [{$indexStats: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $listLocalCursors is disallowed with transactions.
-    testSnapshotAggFailsWithCode(
-        1, [{$listLocalCursors: {}}], ErrorCodes.OperationNotSupportedInTransaction);
-
     // Test that $listLocalSessions is disallowed with transactions.
     testSnapshotAggFailsWithCode(
         1, [{$listLocalSessions: {}}], ErrorCodes.OperationNotSupportedInTransaction);

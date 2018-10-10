@@ -53,13 +53,18 @@
     }
 
     // Check that there are no cursors still open on the source collection. If any are found, the
-    // test will fail and print the output of $listLocalCursors. This should be called each time we
+    // test will fail and print a list of idle cursors. This should be called each time we
     // expect a cursor to have been destroyed.
     function assertNoOpenCursorsOnSourceCollection() {
         const cursors =
-            testDB
-                .aggregate(
-                    [{"$listLocalCursors": {}}, {$match: {ns: sourceCollection.getFullName()}}])
+            testDB.getSiblingDB("admin")
+                .aggregate([
+                    {"$currentOp": {"idleCursors": true}},
+                    {
+                      "$match": {ns: sourceCollection.getFullName(), "type": "idleCursor"}
+
+                    }
+                ])
                 .toArray();
         assert.eq(
             cursors.length, 0, "Did not expect to find any cursors, but found " + tojson(cursors));

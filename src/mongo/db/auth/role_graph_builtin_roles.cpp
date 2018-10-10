@@ -182,7 +182,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::getParameter
         << ActionType::getShardMap
         << ActionType::hostInfo
-        << ActionType::listCursors // clusterManager gets this also
         << ActionType::listDatabases
         << ActionType::listSessions // clusterManager gets this also
         << ActionType::listShards  // clusterManager gets this also
@@ -238,7 +237,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::resync  // hostManager gets this also
         << ActionType::addShard 
         << ActionType::removeShard
-        << ActionType::listCursors // clusterManager gets this also
         << ActionType::listSessions  // clusterMonitor gets this also
         << ActionType::listShards  // clusterMonitor gets this also
         << ActionType::flushRouterConfig  // hostManager gets this also

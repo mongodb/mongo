@@ -97,8 +97,6 @@ var OverrideHelpers = (function() {
     }
 
     return {
-        isAggregationWithListLocalCursorsStage:
-            makeIsAggregationWithFirstStage("$listLocalCursors"),
         isAggregationWithListLocalSessionsStage:
             makeIsAggregationWithFirstStage("$listLocalSessions"),
         isAggregationWithOutStage: isAggregationWithOutStage,

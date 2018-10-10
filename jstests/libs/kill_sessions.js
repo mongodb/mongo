@@ -183,7 +183,8 @@ var _kill_sessions_api_module = (function() {
         this.visit(function(client) {
             var db = client.getDB("admin");
             db.setSlaveOk();
-            var cursors = db.aggregate([{"$listLocalCursors": {}}]).toArray();
+            var cursors =
+                db.aggregate([{"$currentOp": {"idleCursors": true, "allUsers": true}}]).toArray();
             cursors.forEach(function(cursor) {
                 assert(!cursor.lsid);
             });
@@ -203,7 +204,10 @@ var _kill_sessions_api_module = (function() {
 
             var db = client.getDB("admin");
             db.setSlaveOk();
-            var cursors = db.aggregate([{"$listLocalCursors": {}}]).toArray();
+            var cursors = db.aggregate([
+                                {"$currentOp": {"idleCursors": true, "allUsers": true}},
+                                {"$match": {type: "idleCursor"}}
+                            ]).toArray();
             cursors.forEach(function(cursor) {
                 if (cursor.lsid) {
                     checkNotExist.forEach(function(handle) {
@@ -218,8 +222,7 @@ var _kill_sessions_api_module = (function() {
                     }
                 }
             });
-
-            assert.eq(needToFind.length, 0);
+            assert.eq(needToFind.length, 0, cursors);
         });
     };
 

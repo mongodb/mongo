@@ -361,7 +361,6 @@ pipelineeEnv.Library(
         'document_source_internal_split_pipeline.cpp',
         'document_source_limit.cpp',
         'document_source_list_cached_and_active_users.cpp',
-        'document_source_list_local_cursors.cpp',
         'document_source_list_local_sessions.cpp',
         'document_source_list_sessions.cpp',
         'document_source_lookup.cpp',

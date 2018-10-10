@@ -1413,6 +1413,10 @@ var authCommandsLib = {
                 privileges: [{resource: {cluster: true}, actions: ["inprog"]}]
               },
               {
+                runOnDb: adminDbName,
+                privileges: [{resource: {cluster: true}, actions: ["inprog"]}]
+              },
+              {
                 runOnDb: firstDbName,
                 roles: roles_monitoring,
                 privileges: [{resource: {cluster: true}, actions: ["inprog"]}],
@@ -1434,15 +1438,6 @@ var authCommandsLib = {
               cursor: {}
           },
           testcases: [{runOnDb: adminDbName, roles: roles_all}]
-        },
-        {
-          testname: "aggregate_listLocalCursors",
-          command: {aggregate: 1, pipeline: [{$listLocalCursors: {}}], cursor: {}},
-          testcases: [{
-              runOnDb: adminDbName,
-              roles:
-                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1}
-          }],
         },
         {
           testname: "aggregate_listLocalSessions_allUsers_true",
