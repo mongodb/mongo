@@ -221,20 +221,30 @@ void generateErrorResponse(OperationContext* opCtx,
 
 BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
-                       ErrorCodes::Error code) {
+                       ErrorCodes::Error code,
+                       bool hasWriteConcernError) {
+
     // By specifying "autocommit", the user indicates they want to run a transaction.
     if (!sessionOptions.getAutocommit()) {
         return {};
     }
 
-    bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
+    // The errors that indicate the transaction fails without any persistent side-effect.
     bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
         || code == ErrorCodes::SnapshotUnavailable                        //
-        || code == ErrorCodes::NoSuchTransaction                          //
-        || code == ErrorCodes::LockTimeout                                //
-        // Clients can retry a single commitTransaction command, but cannot retry the whole
-        // transaction if commitTransaction fails due to NotMaster.
-        || (isRetryable && (commandName != "commitTransaction"));
+        || code == ErrorCodes::LockTimeout;
+
+    if (commandName == "commitTransaction") {
+        // NoSuchTransaction is determined based on the data. It's safe to retry the whole
+        // transaction, only if the data cannot be rolled back.
+        isTransientTransactionError |=
+            code == ErrorCodes::NoSuchTransaction && !hasWriteConcernError;
+    } else {
+        bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
+        // For commands other than "commitTransaction", we know there's no side-effect for these
+        // errors, but it's not true for "commitTransaction" if a failover happens.
+        isTransientTransactionError |= isRetryable || code == ErrorCodes::NoSuchTransaction;
+    }
 
     if (isTransientTransactionError) {
         return BSON("errorLabels" << BSON_ARRAY("TransientTransactionError"));
@@ -467,7 +477,7 @@ void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          const OpMsgRequest& request,
                          const OperationSessionInfoFromClient& sessionOptions,
-                         CommandReplyBuilder* replyBuilder) {
+                         CommandReplyBuilder* replyBuilder) try {
     auto session = OperationContextSession::get(opCtx);
     invariant(session);
     invariant(opCtx->getTxnNumber() || opCtx->getClient()->isInDirectClient());
@@ -495,6 +505,15 @@ void invokeInTransaction(OperationContext* opCtx,
     // Stash or commit the transaction when the command succeeds.
     session->stashTransactionResources(opCtx);
     guard.Dismiss();
+} catch (const ExceptionFor<ErrorCodes::NoSuchTransaction>&) {
+    // We make our decision about the transaction state based on the oplog we have, so
+    // we set the client last op to the last optime observed by the system to ensure that
+    // we wait for the specified write concern on an optime greater than or equal to the
+    // the optime of our decision basis. Thus we know our decision basis won't be rolled
+    // back.
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    replClient.setLastOpToSystemLastOpTime(opCtx);
+    throw;
 }
 
 bool runCommandImpl(OperationContext* opCtx,
@@ -590,7 +609,9 @@ bool runCommandImpl(OperationContext* opCtx,
         if (codeField.isNumber()) {
             auto code = ErrorCodes::Error(codeField.numberInt());
             // Append the error labels for transient transaction errors.
-            auto errorLabels = getErrorLabels(sessionOptions, command->getName(), code);
+            const auto hasWriteConcern = response.hasField("writeConcernError");
+            auto errorLabels =
+                getErrorLabels(sessionOptions, command->getName(), code, hasWriteConcern);
             crb.getBodyBuilder().appendElements(errorLabels);
         }
     }
@@ -911,7 +932,10 @@ void execCommandDatabase(OperationContext* opCtx,
         behaviors.handleException(e, opCtx);
 
         // Append the error labels for transient transaction errors.
-        auto errorLabels = getErrorLabels(sessionOptions, command->getName(), e.code());
+        auto response = extraFieldsBuilder.asTempObj();
+        auto hasWriteConcern = response.hasField("writeConcernError");
+        auto errorLabels =
+            getErrorLabels(sessionOptions, command->getName(), e.code(), hasWriteConcern);
         extraFieldsBuilder.appendElements(errorLabels);
 
         BSONObjBuilder metadataBob;

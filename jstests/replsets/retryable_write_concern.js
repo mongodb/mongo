@@ -17,16 +17,6 @@
 
     const kNodes = 2;
 
-    let checkWriteConcernTimedOut = function(result) {
-        let wcErr = result.writeConcernError;
-        assert.neq(null, wcErr, tojson(result));
-
-        let errInfo = wcErr.errInfo;
-        assert.neq(null, errInfo, tojson(result));
-
-        assert.eq(true, errInfo.wtimeout, tojson(result));
-    };
-
     /**
      * Tests that a retryable write properly waits for writeConcern on retry. Takes an optional
      * 'setupFunc' that sets up the database state. 'setupFunc' accepts a connection to the

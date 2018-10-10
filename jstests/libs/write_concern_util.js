@@ -99,3 +99,11 @@ function runCommandCheckAdmin(db, cmd) {
         return db.runCommand(cmd.req);
     }
 }
+
+// Asserts that writeConcern timed out.
+function checkWriteConcernTimedOut(res) {
+    assertWriteConcernError(res);
+    const errInfo = res.writeConcernError.errInfo;
+    assert(errInfo, "No writeConcernError errInfo, got: " + tojson(res));
+    assert(errInfo.wtimeout, "No errInfo wtimeout, got: " + tojson(res));
+}
