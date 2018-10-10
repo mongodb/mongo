@@ -34,22 +34,32 @@ namespace mongo {
 
 BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
-                       ErrorCodes::Error code) {
+                       ErrorCodes::Error code,
+                       bool hasWriteConcernError) {
+
     // By specifying "autocommit", the user indicates they want to run a transaction.
     // It is always false when set.
     if (!sessionOptions.getAutocommit()) {
         return {};
     }
 
-    bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
+    // The errors that indicate the transaction fails without any persistent side-effect.
     bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
         || code == ErrorCodes::SnapshotUnavailable                        //
-        || code == ErrorCodes::NoSuchTransaction                          //
         || code == ErrorCodes::LockTimeout                                //
-        || code == ErrorCodes::PreparedTransactionInProgress              //
-        // Clients can retry a single commitTransaction command, but cannot retry the whole
-        // transaction if commitTransaction fails due to NotMaster.
-        || (isRetryable && (commandName != "commitTransaction"));
+        || code == ErrorCodes::PreparedTransactionInProgress;
+
+    if (commandName == "commitTransaction") {
+        // NoSuchTransaction is determined based on the data. It's safe to retry the whole
+        // transaction, only if the data cannot be rolled back.
+        isTransientTransactionError |=
+            code == ErrorCodes::NoSuchTransaction && !hasWriteConcernError;
+    } else {
+        bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
+        // For commands other than "commitTransaction", we know there's no side-effect for these
+        // errors, but it's not true for "commitTransaction" if a failover happens.
+        isTransientTransactionError |= isRetryable || code == ErrorCodes::NoSuchTransaction;
+    }
 
     if (isTransientTransactionError) {
         return BSON("errorLabels" << BSON_ARRAY("TransientTransactionError"));

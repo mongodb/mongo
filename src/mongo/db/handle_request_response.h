@@ -39,6 +39,7 @@ namespace mongo {
  */
 BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
-                       ErrorCodes::Error code);
+                       ErrorCodes::Error code,
+                       bool hasWriteConcernError);
 
 }  // namespace mongo

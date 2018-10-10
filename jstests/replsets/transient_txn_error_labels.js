@@ -21,15 +21,17 @@
     const testColl = testDB.getCollection(collName);
 
     const sessionOptions = {causalConsistency: false};
-    let session = secondary.startSession(sessionOptions);
+    let session = primary.startSession(sessionOptions);
     let sessionDb = session.getDatabase(dbName);
     let sessionColl = sessionDb.getCollection(collName);
+    let secondarySession = secondary.startSession(sessionOptions);
+    let secondarySessionDb = secondarySession.getDatabase(dbName);
 
     assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
     jsTest.log("Insert inside a transaction on secondary should fail but return error labels");
     let txnNumber = 0;
-    let res = sessionDb.runCommand({
+    let res = secondarySessionDb.runCommand({
         insert: collName,
         documents: [{_id: "insert-1"}],
         readConcern: {level: "snapshot"},
@@ -43,26 +45,12 @@
     jsTest.log("Insert outside a transaction on secondary should fail but not return error labels");
     txnNumber++;
     // Insert as a retryable write.
-    res = sessionDb.runCommand(
+    res = secondarySessionDb.runCommand(
         {insert: collName, documents: [{_id: "insert-1"}], txnNumber: NumberLong(txnNumber)});
 
     assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
     assert(!res.hasOwnProperty("errorLabels"));
-    session.endSession();
-
-    jsTest.log("Write concern errors should not have error labels");
-    // Start a new session on the primary.
-    session = primary.startSession(sessionOptions);
-    sessionDb = session.getDatabase(dbName);
-    sessionColl = sessionDb.getCollection(collName);
-    stopServerReplication(secondary);
-    session.startTransaction({writeConcern: {w: "majority", wtimeout: 1}});
-    assert.commandWorked(sessionColl.insert({_id: "write-with-write-concern"}));
-    res = session.commitTransaction_forTesting();
-    assert.eq(res.writeConcernError.code, ErrorCodes.WriteConcernFailed);
-    assert(!res.hasOwnProperty("code"));
-    assert(!res.hasOwnProperty("errorLabels"));
-    restartServerReplication(secondary);
+    secondarySession.endSession();
 
     jsTest.log("failCommand should be able to return errors with TransientTransactionError");
     assert.commandWorked(testDB.adminCommand({

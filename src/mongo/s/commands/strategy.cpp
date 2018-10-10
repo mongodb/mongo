@@ -527,7 +527,7 @@ void runCommand(OperationContext* opCtx,
     } catch (const DBException& e) {
         command->incrementCommandsFailed();
         LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
-        auto errorLabels = getErrorLabels(osi, command->getName(), e.code());
+        auto errorLabels = getErrorLabels(osi, command->getName(), e.code(), false);
         errorBuilder->appendElements(errorLabels);
         throw;
     }
