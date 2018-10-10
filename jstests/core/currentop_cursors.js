@@ -8,6 +8,8 @@
 (function() {
     "use strict";
     const coll = db.jstests_currentop_cursors;
+    // Will skip lsid tests if not in commands read mode.
+    const commandReadMode = db.getMongo().readMode() == "commands";
 
     load("jstests/libs/fixture_helpers.js");  // for FixtureHelpers
 
@@ -19,8 +21,7 @@
     }
     /**
      * runTest creates a new collection called jstests_currentop_cursors and then runs the provided
-     * find
-     * query. It calls $currentOp and does some basic assertions to make sure idleCursors is
+     * find query. It calls $currentOp and does some basic assertions to make sure idleCursors is
      * behaving as intended in each case.
      * findFunc: A function that runs a find query. Is expected to return a cursorID.
      *  Arbitrary code can be run in findFunc as long as it returns a cursorID.
@@ -40,7 +41,7 @@
                     {$match: {$and: [{type: "idleCursor"}, {"cursor.cursorId": findOut}]}}
                 ])
                 .toArray();
-        assert.eq(result[0].cursor.ns, coll.getFullName(), result);
+        assert.eq(result[0].ns, coll.getFullName(), result);
         assert.eq(result[0].cursor.originatingCommand.find, coll.getName(), result);
         assertFunc(findOut, result);
         const noIdle =
@@ -58,6 +59,7 @@
         assert.eq(noIdle.length, 0, tojson(noFlag));
     }
 
+    // Basic test with default values.
     runTest({
         findFunc: function() {
             return assert
@@ -72,6 +74,12 @@
             } else {
                 assert(!result[0].hasOwnProperty("planSummary"), result);
             }
+            // Lsid will not exist if not in command read mode.
+            if (commandReadMode) {
+                assert(result[0].lsid.hasOwnProperty('id'), result);
+                assert(result[0].lsid.hasOwnProperty('uid'), result);
+            }
+            assert.eq(result[0].host, getHostName(), result);
             const idleCursor = result[0].cursor;
             assert.eq(idleCursor.nDocsReturned, 2, result);
             assert.eq(idleCursor.nBatchesReturned, 1, result);
@@ -80,9 +88,14 @@
             assert.eq(idleCursor.noCursorTimeout, false, result);
             assert.eq(idleCursor.originatingCommand.batchSize, 2, result);
             assert.lte(idleCursor.createdDate, idleCursor.lastAccessDate, result);
+            // Make sure that the top level fields do not also appear in the cursor subobject.
             assert(!idleCursor.hasOwnProperty("planSummary"), result);
+            assert(!idleCursor.hasOwnProperty('host'), result);
+            assert(!idleCursor.hasOwnProperty('lsid'), result);
         }
     });
+
+    // Test that tailable, awaitData, and noCursorTimeout are set.
     runTest({
         findFunc: function() {
             return assert
@@ -105,6 +118,8 @@
             assert.eq(idleCursor.originatingCommand.batchSize, 2, result);
         }
     });
+
+    // Test that dates are set correctly.
     runTest({
         findFunc: function() {
             return assert
@@ -137,6 +152,7 @@
         }
     });
 
+    // Test larger batch size.
     runTest({
         findFunc: function() {
             return assert
@@ -154,6 +170,7 @@
         }
     });
 
+    // Test batchSize and nDocs are incremented correctly.
     runTest({
         findFunc: function() {
             return assert
@@ -220,4 +237,22 @@
             }
         });
     }
+    // Test lsid.id value is correct if in commandReadMode.
+    if (commandReadMode) {
+        const session = db.getMongo().startSession();
+        runTest({
+            findFunc: function() {
+                const sessionDB = session.getDatabase("test");
+                return assert
+                    .commandWorked(
+                        sessionDB.runCommand({find: "jstests_currentop_cursors", batchSize: 2}))
+                    .cursor.id;
+            },
+            assertFunc: function(cursorId, result) {
+                assert.eq(result.length, 1, result);
+                assert.eq(session.getSessionId().id, result[0].lsid.id);
+            }
+        });
+    }
+
 })();

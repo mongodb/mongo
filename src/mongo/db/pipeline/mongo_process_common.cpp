@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 
@@ -79,7 +80,17 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
 
         for (auto&& cursor : getIdleCursors(expCtx, userMode)) {
             BSONObjBuilder cursorObj;
+            auto ns = cursor.getNs();
+            auto lsid = cursor.getLsid();
             cursorObj.append("type", "idleCursor");
+            cursorObj.append("host", getHostNameCached());
+            cursorObj.append("ns", ns->toString());
+            // If in legacy read mode, lsid is not present.
+            if (lsid) {
+                cursorObj.append("lsid", lsid->toBSON());
+            }
+            cursor.setNs(boost::none);
+            cursor.setLsid(boost::none);
             // On mongos, planSummary is not present.
             auto planSummaryData = cursor.getPlanSummary();
             if (planSummaryData) {
@@ -94,6 +105,8 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
                 cursorObj.append("cursor", cursor.toBSON());
             }
             ops.emplace_back(cursorObj.obj());
+            cursor.setNs(ns);
+            cursor.setLsid(lsid);
         }
     }
 
