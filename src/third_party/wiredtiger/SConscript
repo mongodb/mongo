@@ -196,6 +196,7 @@ wtlib = env.Library(
     source=wtsources,
     LIBDEPS=[
         'wiredtiger_checksum',
+        '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
     ],
@@ -205,3 +206,28 @@ wtlib = env.Library(
 )
 
 env.Depends([cslib, wtlib], [filelistfile, version_file])
+
+wtbinEnv = env.Clone()
+
+if wtbinEnv.TargetOSIs("windows"):
+    # C4996: 'strdup': The POSIX name for this item is deprecated. Instead, use the ISO C and C++
+    # conformant name: _strdup. See online help for details.
+    wtbinEnv.Append(CFLAGS=["/wd4996"])
+
+wtbin = wtbinEnv.Program(
+    target="wt",
+    source=Glob("src/utilities/*.c"),
+    LIBDEPS=["wiredtiger"],
+    # SCons's smart_link() decides to try and link as C because all of the file extensions are .c;
+    # however, we must link with snappy, etc. as C++. The smart_link() function isn't used by
+    # default on Windows, so we leave the value unchanged on other platforms.
+    LINK="$CXX" if wtbinEnv["LINK"] == "$SMARTLINK" else wtbinEnv["LINK"],
+    INSTALL_ALIAS=[
+        "tools",
+    ],
+)
+
+hygienic = get_option("install-mode") == "hygienic"
+
+if not hygienic:
+    wtbinEnv.Alias("tools", wtbinEnv.Install("#/", wtbin))

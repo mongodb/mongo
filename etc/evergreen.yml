@@ -3455,6 +3455,7 @@ tasks:
             cat build/integration_tests.txt | xargs ${strip_command|/usr/bin/strip}
             ${strip_command|/usr/bin/strip} dbtest
             ${strip_command|/usr/bin/strip} mongobridge
+            ${strip_command|/usr/bin/strip} wt
           fi
 
 
@@ -3506,6 +3507,7 @@ tasks:
           - "./mongobridge*"
           - "./mongoebench*"
           - "./mongoed*"
+          - "./wt*"
           - "buildscripts/**"
           - "*Example"
           - "*Test"
