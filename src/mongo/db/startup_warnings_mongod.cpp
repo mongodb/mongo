@@ -278,8 +278,9 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     StatusWith<std::string> transparentHugePagesDefragResult =
         StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
-    if (shouldWarnAboutDefragAlways && transparentHugePagesDefragResult.isOK()) {
-        if (transparentHugePagesDefragResult.getValue() == "always") {
+    if (transparentHugePagesDefragResult.isOK()) {
+        if (shouldWarnAboutDefragAlways &&
+            transparentHugePagesDefragResult.getValue() == "always") {
             log() << startupWarningsLog;
             log() << "** WARNING: " << kTransparentHugePagesDirectory << "/defrag is 'always'."
                   << startupWarningsLog;
