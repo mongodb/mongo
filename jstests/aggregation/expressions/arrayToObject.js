@@ -110,4 +110,9 @@
 
     assert.writeOK(coll.insert({_id: 25, expanded: NaN}));
     assertErrorCode(coll, [{$match: {_id: 25}}, array_to_object_expr], 40386);
+
+    // check that if duplicate keys exist, the value of the first key is used
+    assert.writeOK(coll.insert({ _id: 26, expanded: [["duplicate", 1], ["duplicate", 2]] }));
+    result = coll.aggregate([{ $match: { _id: 26 } }, array_to_object_expr]).toArray();
+    assert.eq(result, [{ _id: 26, collapsed: { "duplicate": 1 } }]);
 }());
