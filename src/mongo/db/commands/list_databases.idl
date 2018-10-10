@@ -29,6 +29,10 @@ commands:
                 description: "Return just the database name without metadata"
                 type: safeBool
                 default: false
+            authorizedDatabases:
+                description: "Only return those databases for which the user is authorized"
+                type: bool
+                optional: true
             filter:
                 description: "Filter description to limit results"
                 type: object
