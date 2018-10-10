@@ -457,7 +457,7 @@ buildvariants:
 # proper artifacts directly from that project, we should do that and remove these tasks.
 - name: compile-rhel70
   display_name: Compile on rhel70
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules:
     - wtdevelop
   expansions:
