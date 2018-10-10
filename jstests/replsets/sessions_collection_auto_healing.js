@@ -45,7 +45,7 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(secondary, false, false);
     }
 
-    // Test that a refresh on a secondary creates the sessions collection.
+    // Test that a refresh on a secondary does not create the sessions collection.
     {
         validateSessionsCollection(primary, false, false);
 
@@ -54,15 +54,13 @@ load('jstests/libs/sessions_collection.js');
 
         assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
-        validateSessionsCollection(primary, true, true);
+        validateSessionsCollection(primary, false, false);
 
         replTest.awaitReplication();
-        validateSessionsCollection(secondary, true, true);
+        validateSessionsCollection(secondary, false, false);
     }
     // Test that a refresh on the primary creates the sessions collection.
     {
-        assert.commandWorked(primary.getDB("config").runCommand(
-            {drop: "system.sessions", writeConcern: {w: "majority"}}));
         validateSessionsCollection(primary, false, false);
 
         replTest.awaitReplication();
@@ -73,7 +71,7 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(primary, true, true);
     }
 
-    // Test that a refresh on a secondary will create the TTL index on the sessions collection.
+    // Test that a refresh on a secondary will not create the TTL index on the sessions collection.
     {
         assert.commandWorked(primary.getDB("config").system.sessions.dropIndex({lastUse: 1}));
 
@@ -81,13 +79,11 @@ load('jstests/libs/sessions_collection.js');
 
         assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
-        validateSessionsCollection(primary, true, true);
+        validateSessionsCollection(primary, true, false);
     }
 
     // Test that a refresh on the primary will create the TTL index on the sessions collection.
     {
-        assert.commandWorked(primary.getDB("config").system.sessions.dropIndex({lastUse: 1}));
-
         validateSessionsCollection(primary, true, false);
 
         assert.commandWorked(primaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
