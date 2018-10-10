@@ -33,9 +33,23 @@ if get_option('link-model') == 'static':
         ],
     )
 
+# Please see the note in ../mongo_embedded/SConscript about how to
+# interpret and adjust the current and compatibility versinos.
 mongocEmbeddedEnv.AppendUnique(
-    SHLINKFLAGS=['$MONGO_EXPORT_FILE_SHLINKFLAGS']
+    SHLINKFLAGS=[
+        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+    ],
 )
+
+if mongocEmbeddedEnv.TargetOSIs('darwin'):
+    # Please see the note in ../mongo_embedded/SConscript about how to
+    # interpret and adjust the current and compatibility versinos.
+    mongocEmbeddedEnv.AppendUnique(
+        SHLINKFLAGS=[
+            '-Wl,-current_version,1',
+            '-Wl,-compatibility_version,1',
+        ],
+    )
 
 mongocEmbeddedEnv.Library(
     target='mongoc_embedded',
