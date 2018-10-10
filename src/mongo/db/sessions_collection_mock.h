@@ -108,6 +108,10 @@ public:
         return Status::OK();
     }
 
+    Status checkSessionsCollectionExists(OperationContext* opCtx) override {
+        return Status::OK();
+    }
+
     Status refreshSessions(OperationContext* opCtx,
                            const LogicalSessionRecordSet& sessions) override {
         return _impl->refreshSessions(sessions);

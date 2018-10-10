@@ -74,10 +74,14 @@ Status SessionsCollectionSharded::_checkCacheForSessionsCollection(OperationCont
         return Status::OK();
     }
 
-    return {ErrorCodes::NamespaceNotFound, "config.system.sessions is not yet sharded"};
+    return {ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist"};
 }
 
 Status SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCtx) {
+    return checkSessionsCollectionExists(opCtx);
+}
+
+Status SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* opCtx) {
     return _checkCacheForSessionsCollection(opCtx);
 }
 

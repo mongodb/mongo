@@ -50,6 +50,12 @@ public:
     Status setupSessionsCollection(OperationContext* opCtx) override;
 
     /**
+     * Checks if the sessions collection exists. Does not check if the index exists in the sharded
+     * version of this function.
+     */
+    virtual Status checkSessionsCollectionExists(OperationContext* opCtx) override;
+
+    /**
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the current time.
      */

@@ -55,6 +55,27 @@ Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* o
     return Status::OK();
 }
 
+Status SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+
+    auto indexes = client.getIndexSpecs(NamespaceString::kLogicalSessionsNamespace.toString());
+
+    if (indexes.size() == 0u) {
+        return Status{ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist"};
+    }
+
+    auto indexExists = std::find_if(indexes.begin(), indexes.end(), [](const BSONObj& index) {
+        return index.getField("name").String() == kSessionsTTLIndex;
+    });
+
+    if (indexExists == indexes.end()) {
+        return Status{ErrorCodes::IndexNotFound,
+                      "config.system.sessions does not have the required TTL index"};
+    };
+
+    return Status::OK();
+}
+
 Status SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
                                                      const LogicalSessionRecordSet& sessions) {
     DBDirectClient client(opCtx);

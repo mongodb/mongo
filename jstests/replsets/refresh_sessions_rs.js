@@ -26,9 +26,13 @@
 
     var res;
 
-    // Trigger an initial refresh on all members, as a sanity check.
+    // The primary needs to create the sessions collection so that the secondaries can act upon it.
+    // This is done by an initial refresh of the primary.
     res = db1.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
+    replTest.awaitReplication();
+
+    // Trigger an initial refresh on secondaries as a sanity check.
     res = db2.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
     res = db3.runCommand(refresh);

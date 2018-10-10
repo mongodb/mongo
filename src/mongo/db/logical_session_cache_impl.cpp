@@ -219,10 +219,18 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             return uniqueCtx->get();
         }();
 
-        auto res = _sessionsColl->setupSessionsCollection(opCtx);
-        if (!res.isOK()) {
-            log() << "Sessions collection is not set up; "
-                  << "waiting until next sessions reap interval: " << res.reason();
+        auto existsStatus = _sessionsColl->checkSessionsCollectionExists(opCtx);
+        if (!existsStatus.isOK()) {
+            StringData notSetUpWarning =
+                "Sessions collection is not set up; "
+                "waiting until next sessions reap interval";
+            if (existsStatus.code() != ErrorCodes::NamespaceNotFound ||
+                existsStatus.code() != ErrorCodes::NamespaceNotSharded) {
+                log() << notSetUpWarning << ": " << existsStatus.reason();
+            } else {
+                log() << notSetUpWarning;
+            }
+
             return Status::OK();
         }
 
@@ -282,10 +290,11 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         return uniqueCtx->get();
     }();
 
-    auto res = _sessionsColl->setupSessionsCollection(opCtx);
-    if (!res.isOK()) {
+    auto setupStatus = _sessionsColl->setupSessionsCollection(opCtx);
+
+    if (!setupStatus.isOK()) {
         log() << "Sessions collection is not set up; "
-              << "waiting until next sessions refresh interval: " << res.reason();
+              << "waiting until next sessions refresh interval: " << setupStatus.reason();
         return;
     }
 

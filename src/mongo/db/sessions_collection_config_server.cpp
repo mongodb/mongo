@@ -122,4 +122,8 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
     }
 }
 
+Status SessionsCollectionConfigServer::checkSessionsCollectionExists(OperationContext* opCtx) {
+    return _checkCacheForSessionsCollection(opCtx);
+}
+
 }  // namespace mongo

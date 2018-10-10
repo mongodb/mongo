@@ -54,6 +54,11 @@ public:
     */
     Status setupSessionsCollection(OperationContext* opCtx) override;
 
+    /**
+    * Checks if the sessions collection exists.
+    */
+    Status checkSessionsCollectionExists(OperationContext* opCtx) override;
+
 private:
     Status _shardCollectionIfNeeded(OperationContext* opCtx);
     Status _generateIndexesIfNeeded(OperationContext* opCtx);

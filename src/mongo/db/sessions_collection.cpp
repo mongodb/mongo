@@ -46,6 +46,8 @@
 
 namespace mongo {
 
+constexpr StringData SessionsCollection::kSessionsTTLIndex;
+
 namespace {
 
 // This batch size is chosen to ensure that we don't form requests larger than the 16mb limit.
@@ -299,7 +301,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollection::doFetch(const NamespaceStrin
 BSONObj SessionsCollection::generateCreateIndexesCmd() {
     NewIndexSpec index;
     index.setKey(BSON("lastUse" << 1));
-    index.setName("lsidTTLIndex");
+    index.setName(kSessionsTTLIndex);
     index.setExpireAfterSeconds(localLogicalSessionTimeoutMinutes * 60);
 
     std::vector<NewIndexSpec> indexes;

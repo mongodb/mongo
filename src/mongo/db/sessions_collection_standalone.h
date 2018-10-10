@@ -48,6 +48,11 @@ public:
     Status setupSessionsCollection(OperationContext* opCtx) override;
 
     /**
+     * Checks if the sessions collection exists and has the proper indexes.
+     */
+    Status checkSessionsCollectionExists(OperationContext* opCtx) override;
+
+    /**
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the current time.
      */
