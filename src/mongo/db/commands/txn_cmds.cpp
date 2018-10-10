@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
 
 #include "mongo/platform/basic.h"
 
@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -73,6 +74,9 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        LOG(3) << "Participant shard received commitTransaction for transaction with txnNumber "
+               << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
+
         IDLParserErrorContext ctx("commitTransaction");
         auto cmd = CommitTransaction::parse(ctx, cmdObj);
 
@@ -139,6 +143,9 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        LOG(3) << "Participant shard received abortTransaction for transaction with txnNumber "
+               << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
+
         auto txnParticipant = TransactionParticipant::get(opCtx);
         uassert(ErrorCodes::CommandFailed,
                 "abortTransaction must be run within a transaction",

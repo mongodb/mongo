@@ -69,6 +69,11 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            LOG(3)
+                << "Participant shard received prepareTransaction for transaction with txnNumber "
+                << opCtx->getTxnNumber() << " on session "
+                << opCtx->getLogicalSessionId()->toBSON();
+
             // In production, only config servers or initialized shard servers can participate in a
             // sharded transaction. However, many test suites test the replication and storage parts
             // of prepareTransaction against a standalone replica set, so allow skipping the check.
@@ -174,6 +179,8 @@ public:
                 // TODO (SERVER-37328): Participant should wait for writeConcern before sending its
                 // vote.
 
+                LOG(3) << "Participant shard sending " << voteObj << " to " << coordinatorId;
+
                 const auto coordinatorPrimaryHost = [&] {
                     auto coordinatorShard = uassertStatusOK(
                         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, coordinatorId));
@@ -194,7 +201,7 @@ public:
                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()->scheduleRemoteCommand(
                         request, noOp));
             } catch (const DBException& ex) {
-                LOG(0) << "Failed to send vote " << voteObj << " to " << coordinatorId
+                LOG(3) << "Participant shard failed to send " << voteObj << " to " << coordinatorId
                        << causedBy(ex.toStatus());
             }
         }
@@ -244,6 +251,11 @@ public:
                  ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
 
             const auto& cmd = request();
+
+            LOG(3) << "Coordinator shard received voteCommit from " << cmd.getShardId()
+                   << " with prepare timestamp " << cmd.getPrepareTimestamp() << " for transaction "
+                   << opCtx->getTxnNumber() << " on session "
+                   << opCtx->getLogicalSessionId()->toBSON();
 
             TransactionCoordinatorService::get(opCtx)->voteCommit(
                 opCtx,
@@ -298,6 +310,10 @@ public:
                      ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
 
             const auto& cmd = request();
+
+            LOG(3) << "Coordinator shard received voteAbort from " << cmd.getShardId()
+                   << " for transaction " << opCtx->getTxnNumber() << " on session "
+                   << opCtx->getLogicalSessionId()->toBSON();
 
             TransactionCoordinatorService::get(opCtx)->voteAbort(opCtx,
                                                                  opCtx->getLogicalSessionId().get(),
@@ -357,6 +373,8 @@ public:
             // the list are unique.
             // TODO (PM-564): Propagate the 'readOnly' flag down into the TransactionCoordinator.
             std::set<ShardId> participantList;
+            StringBuilder ss;
+            ss << "[";
             for (const auto& participant : cmd.getParticipants()) {
                 const auto shardId = participant.getShardId();
                 uassert(ErrorCodes::InvalidOptions,
@@ -364,7 +382,12 @@ public:
                         std::find(participantList.begin(), participantList.end(), shardId) ==
                             participantList.end());
                 participantList.insert(shardId);
+                ss << shardId << " ";
             }
+            ss << "]";
+            LOG(3) << "Coordinator shard received participant list with shards " << ss.str()
+                   << " for transaction " << opCtx->getTxnNumber() << " on session "
+                   << opCtx->getLogicalSessionId()->toBSON();
 
             auto commitDecisionFuture = TransactionCoordinatorService::get(opCtx)->coordinateCommit(
                 opCtx,
@@ -410,6 +433,11 @@ public:
                 guard.Dismiss();
                 return prepareTimestamp;
             }();
+
+            LOG(3) << "Participant shard delivering voteCommit with prepareTimestamp "
+                   << localParticipantPrepareTimestamp << " to local coordinator for transaction "
+                   << opCtx->getTxnNumber() << " on session "
+                   << opCtx->getLogicalSessionId()->toBSON();
 
             // Deliver the local participant's vote to the coordinator.
             TransactionCoordinatorService::get(opCtx)->voteCommit(

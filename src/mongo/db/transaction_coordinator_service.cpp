@@ -117,16 +117,6 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
         return TransactionCoordinatorService::CommitDecision::kAbort;
     }
 
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
-    StringBuilder ss;
-    ss << "[";
-    for (const auto& shardId : participantList) {
-        ss << shardId << " ";
-    }
-    ss << "]";
-    LOG(0) << "Coordinator shard received participant list with shards " << ss.str();
-
     auto actionToTake = coordinator.get()->recvCoordinateCommit(participantList);
     doCoordinatorAction(opCtx, coordinator.get(), actionToTake);
 
@@ -153,11 +143,6 @@ void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,
         return;
     }
 
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
-    LOG(0) << "Coordinator shard received voteCommit from " << shardId << " with prepare timestamp "
-           << prepareTimestamp;
-
     auto actionToTake = coordinator.get()->recvVoteCommit(shardId, prepareTimestamp);
     doCoordinatorAction(opCtx, coordinator.get(), actionToTake);
 }
@@ -169,9 +154,6 @@ void TransactionCoordinatorService::voteAbort(OperationContext* opCtx,
     auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
 
     if (coordinator) {
-        // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-        // transactions are stable.
-        LOG(0) << "Coordinator shard received voteAbort from " << shardId;
         auto actionToTake = coordinator.get()->recvVoteAbort(shardId);
         doCoordinatorAction(opCtx, coordinator.get(), actionToTake);
     }

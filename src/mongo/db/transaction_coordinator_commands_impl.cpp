@@ -67,8 +67,7 @@ using CallbackFn = stdx::function<void(Status status, const ShardId& shardID)>;
  * Sends the given command object to the given shard ID. If scheduling and running the command is
  * successful, calls the callback with the status of the command response and the shard ID.
  */
-void sendAsyncCommandToShard(StringData commandName,
-                             OperationContext* opCtx,
+void sendAsyncCommandToShard(OperationContext* opCtx,
                              executor::TaskExecutor* executor,
                              const ShardId& shardId,
                              const BSONObj& commandObj,
@@ -76,26 +75,24 @@ void sendAsyncCommandToShard(StringData commandName,
     auto readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly);
     auto swShardHostAndPort = targetHost(opCtx, shardId, readPref);
     if (!swShardHostAndPort.isOK()) {
-        LOG(0) << "Targeting shard for " << commandName << " failed"
-               << causedBy(swShardHostAndPort.getStatus());
+        LOG(3) << "Coordinator shard failed to target primary host of participant shard for "
+               << commandObj << causedBy(swShardHostAndPort.getStatus());
         return;
     }
 
     executor::RemoteCommandRequest request(
         swShardHostAndPort.getValue(), "admin", commandObj, readPref.toContainingBSON(), nullptr);
 
-    auto scheduleRemoteCommandStatus = executor->scheduleRemoteCommand(
+    auto swCallbackHandle = executor->scheduleRemoteCommand(
         request,
-        [commandName, shardId, callbackOnCommandResponse](
+        [commandObj, shardId, callbackOnCommandResponse](
             const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
 
             auto status = (!args.response.isOK()) ? args.response.status
                                                   : getStatusFromCommandResult(args.response.data);
 
-            // TODO (SERVER-36687): Remove log line or demote to lower log level
-            // once cross-shard transactions are stable.
-            LOG(0) << "Coordinator shard got response " << status << " for " << commandName
-                   << " to " << shardId;
+            LOG(3) << "Coordinator shard got response " << status << " for " << commandObj << " to "
+                   << shardId;
 
             // Only call callback if command successfully executed and got a response.
             if (args.response.isOK()) {
@@ -103,10 +100,12 @@ void sendAsyncCommandToShard(StringData commandName,
             }
         });
 
-    if (!scheduleRemoteCommandStatus.isOK()) {
-        LOG(0) << "Coordinator shard failed to schedule the task to send " << commandName
-               << " to shard " << shardId;
+    if (!swCallbackHandle.isOK()) {
+        LOG(3) << "Coordinator shard failed to schedule the task to send " << commandObj
+               << " to shard " << shardId << causedBy(swCallbackHandle.getStatus());
     }
+
+    // Do not wait for the callback to run.
 }
 
 /**
@@ -114,8 +113,7 @@ void sendAsyncCommandToShard(StringData commandName,
  * scheduling and running the command is successful, calls the callback with the status of the
  * command response and the shard ID.
  */
-void sendAsyncCommandToShards(StringData commandName,
-                              OperationContext* opCtx,
+void sendAsyncCommandToShards(OperationContext* opCtx,
                               const std::set<ShardId>& shardIds,
                               const BSONObj& commandObj,
                               CallbackFn callbackOnCommandResponse) {
@@ -128,15 +126,12 @@ void sendAsyncCommandToShards(StringData commandName,
     // For each non-acked participant, launch an async task to target its shard
     // and then asynchronously send the command.
     for (const auto& shardId : shardIds) {
-        sendAsyncCommandToShard(
-            commandName, opCtx, exec, shardId, commandObj, callbackOnCommandResponse);
+        sendAsyncCommandToShard(opCtx, exec, shardId, commandObj, callbackOnCommandResponse);
         ss << shardId << " ";
     }
 
-    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
-    // transactions are stable.
     ss << "]";
-    LOG(0) << "Coordinator shard sending " << commandObj << " to " << ss.str();
+    LOG(3) << "Coordinator shard sending " << commandObj << " to " << ss.str();
 }
 
 }  // namespace
@@ -157,8 +152,7 @@ void sendCommit(OperationContext* opCtx,
                << "autocommit"
                << false));
 
-    sendAsyncCommandToShards(CommitTransaction::kCommandName,
-                             opCtx,
+    sendAsyncCommandToShards(opCtx,
                              nonAckedParticipants,
                              commitObj,
                              [coordinator](Status commandResponseStatus, const ShardId& shardId) {
@@ -179,8 +173,7 @@ void sendAbort(OperationContext* opCtx, const std::set<ShardId>& nonVotedAbortPa
                            << false);
 
     sendAsyncCommandToShards(
-        "abortTransaction", opCtx, nonVotedAbortParticipants, abortObj, [](Status, const ShardId&) {
-        });
+        opCtx, nonVotedAbortParticipants, abortObj, [](Status, const ShardId&) {});
 }
 
 }  // namespace txn
