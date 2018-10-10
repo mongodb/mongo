@@ -104,7 +104,7 @@ DBClientBase* MongoInterfaceStandalone::directClient() {
 }
 
 bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    AutoGetCollectionForRead autoColl(opCtx, nss);
     auto const css = CollectionShardingState::get(opCtx, nss);
     return css->getMetadata(opCtx)->isSharded();
 }

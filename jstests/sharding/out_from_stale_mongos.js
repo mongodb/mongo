@@ -36,10 +36,8 @@
     }
 
     // Configures the two mongos, staleMongosSource and staleMongosTarget, to be stale on the source
-    // and target
-    // collections, respectively. For instance, if 'shardedSource' is true then staleMongosSource
-    // will
-    // believe that the source collection is unsharded.
+    // and target collections, respectively. For instance, if 'shardedSource' is true then
+    // staleMongosSource will believe that the source collection is unsharded.
     function setupStaleMongos({shardedSource, shardedTarget}) {
         // Initialize both mongos to believe the collections are unsharded.
         sourceColl.drop();
@@ -55,8 +53,7 @@
 
         if (shardedSource) {
             // Shard the source collection through the staleMongosTarget mongos, keeping the
-            // staleMongosSource
-            // unaware.
+            // staleMongosSource unaware.
             shardCollWithMongos(staleMongosTarget, sourceColl);
         } else {
             // Shard the collection through staleMongosSource.
@@ -69,8 +66,7 @@
 
         if (shardedTarget) {
             // Shard the target collection through the staleMongosSource mongos, keeping the
-            // staleMongosTarget
-            // unaware.
+            // staleMongosTarget unaware.
             shardCollWithMongos(staleMongosSource, targetColl);
         } else {
             // Shard the collection through staleMongosTarget.
@@ -214,7 +210,7 @@
 
     setupStaleMongos({shardedSource: false, shardedTarget: true});
     assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosSource)).code, 28769);
-    assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosTarget)).code, 28769);
+    assert.eq(assert.throws(() => runOutTest("replaceCollection", staleMongosTarget)).code, 17017);
 
     st.stop();
 }());
