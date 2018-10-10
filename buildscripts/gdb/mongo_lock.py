@@ -180,8 +180,10 @@ class Graph(object):
         """Return the 'to_graph'."""
         sb = []
         sb.append('# Legend:')
-        sb.append('#    Thread 1 -> Lock 1 indicates Thread 1 is waiting on Lock 1')
-        sb.append('#    Lock 2 -> Thread 2 indicates Lock 2 is held by Thread 2')
+        sb.append('#    Thread 1 -> Lock C (MODE_IX) indicates Thread 1 is waiting on Lock C and'
+                  ' Lock C is currently held in MODE_IX')
+        sb.append('#    Lock C (MODE_IX) -> Thread 2 indicates Lock C is held by Thread 2 in'
+                  ' MODE_IX')
         if message is not None:
             sb.append(message)
         sb.append('digraph "mongod+lock-status" {')
@@ -350,8 +352,8 @@ def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-
         else:
             lock_holder = find_thread(thread_dict, lock_holder_id)
         if show:
-            print("MongoDB Lock at {} ({}) held by {} waited on by {}".format(
-                lock_head, lock_request["mode"], lock_holder, lock_waiter))
+            print("MongoDB Lock at {} held by {} ({}) waited on by {}".format(
+                lock_head, lock_holder, lock_request["mode"], lock_waiter))
         if graph:
             graph.add_edge(lock_waiter, Lock(long(lock_head), lock_request["mode"]))
             graph.add_edge(Lock(long(lock_head), lock_request["mode"]), lock_holder)
