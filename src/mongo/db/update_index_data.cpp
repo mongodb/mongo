@@ -167,7 +167,8 @@ bool getCanonicalIndexField(StringData fullName, string* out) {
                 // The second set of digits may end at the end of the path or a '.'.
                 if (k == fullName.size() || fullName[k] == '.') {
                     // Found consecutive numerical path components. Since this implies a numeric
-                    // field name, return the prefix as the canonical index field. This is meant to fix SERVER-37058.
+                    // field name, return the prefix as the canonical index field. This is meant to
+                    // fix SERVER-37058.
                     modified = true;
                     break;
                 }
