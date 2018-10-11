@@ -49,17 +49,18 @@
          {user: "user5", dbs: admin_dbs, authDbs: ["db5"]},
          {user: "admin", dbs: admin_dbs, authDbs: admin_dbs},
         ].forEach(function(test) {
+            function filterSpecial(db) {
+                // Returning of local/config varies with sharding/mobile/etc..
+                // Ignore these for simplicity.
+                return (db !== 'local') && (db !== 'config');
+            }
             function tryList(cmd, expect_dbs) {
                 const dbs = assert.commandWorked(admin.runCommand(cmd));
                 assert.eq(dbs.databases
                               .map(function(db) {
                                   return db.name;
                               })
-                              .filter(function(db) {
-                                  // Returning of local/config varies with sharding/mobile/etc..
-                                  // Ignore these for simplicity.
-                                  return (db !== 'local') && (db !== 'config');
-                              })
+                              .filter(filterSpecial)
                               .sort(),
                           expect_dbs,
                           test.user + " permissions");
@@ -72,9 +73,18 @@
             if (test.authDbs) {
                 tryList({listDatabases: 1, authorizedDatabases: false}, test.dbs);
             } else {
-                // Users without listDatabases cliuster perm may not
+                // Users without listDatabases cluster perm may not
                 // request authorizedDatabases: false.
                 assert.throws(tryList, [{listDatabases: 1, authorizedDatabases: false}, test.dbs]);
+            }
+
+            // Test using shell helper Mongo.getDBs().
+            assert.eq(mongod.getDBs(undefined, {}, true).filter(filterSpecial),
+                      test.dbs,
+                      "Shell helper speaking to same version");
+            if (test.user !== 'admin') {
+                // Admin doesn't have an explicit list of DBs to parse.
+                assert.eq(mongod._getDatabaseNamesFromPrivileges(), test.authDbs || test.dbs);
             }
 
             admin.logout();

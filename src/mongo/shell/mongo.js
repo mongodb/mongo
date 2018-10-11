@@ -56,15 +56,80 @@ Mongo.prototype.getDB = function(name) {
     return new DB(this, name);
 };
 
-Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession()) {
-    var cmdObj = {listDatabases: 1};
+Mongo.prototype._getDatabaseNamesFromPrivileges = function() {
+    'use strict';
+
+    const ret = this.adminCommand({connectionStatus: 1, showPrivileges: 1});
+    if (!ret.ok) {
+        throw _getErrorWithCode(res, "Failed to acquire database information from privileges");
+    }
+
+    const privileges = (ret.authInfo || {}).authenticatedUserPrivileges;
+    if (privileges === undefined) {
+        return [];
+    }
+
+    return privileges
+        .filter(function(priv) {
+            // Find all named databases in priv list.
+            return ((priv.resource || {}).db || '').length > 0;
+        })
+        .map(function(priv) {
+            // Return just the names.
+            return priv.resource.db;
+        })
+        .filter(function(db, idx, arr) {
+            // Make sure the list is unique
+            return arr.indexOf(db) === idx;
+        })
+        .sort();
+};
+
+Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
+                                  filter = {},
+                                  nameOnly = undefined,
+                                  authorizedDatabases = undefined) {
+    'use strict';
+
+    let cmdObj = {listDatabases: 1};
+    if (filter) {
+        cmdObj.filter = filter;
+    }
+    if (nameOnly !== undefined) {
+        cmdObj.nameOnly = nameOnly;
+    }
+    if (authorizedDatabases !== undefined) {
+        cmdObj.authorizedDatabases = authorizedDatabases;
+    }
+
     if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
         cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
     }
 
-    var res = this.adminCommand(cmdObj);
-    if (!res.ok)
+    const res = this.adminCommand(cmdObj);
+    if (!res.ok) {
+        // If "Unauthorized" was returned by the back end and we haven't explicitly
+        // asked for anything difficult to provide from userspace, then we can
+        // fallback on inspecting the user's permissions.
+        // This means that:
+        //   * filter should be empty, as reimplementing that logic is out of scope.
+        //   * nameOnly should not be false as we can't infer size information.
+        //   * authorizedDatabases should not be false as those are the only DBs we can infer.
+        // Note that if the above are true and we get Unauthorized, that also means
+        // that we MUST be talking to a pre-4.0 mongod.
+        if ((res.code === ErrorCodes.Unauthorized) && !filter && (nameOnly !== false) &&
+            (authorizedDatabases !== false)) {
+            return this._getDatabaseNamesFromPrivileges();
+        }
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
+    }
+
+    if (nameOnly) {
+        return res.databases.map(function(db) {
+            return db.name;
+        });
+    }
+
     return res;
 };
 
