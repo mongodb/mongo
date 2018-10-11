@@ -40,7 +40,6 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/capped_utils.h"
@@ -75,7 +74,6 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
-#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -643,6 +641,8 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet) {
     Lock::GlobalWrite lk(opCtx);
 
+    const auto service = opCtx->getServiceContext();
+
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName);
@@ -685,13 +685,13 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
         invariant(ctx.db()->createCollection(opCtx, oplogCollectionName, options));
         acquireOplogCollectionForLogging(opCtx);
         if (!isReplSet) {
-            opCtx->getServiceContext()->getOpObserver()->onOpMessage(opCtx, BSONObj());
+            service->getOpObserver()->onOpMessage(opCtx, BSONObj());
         }
         uow.commit();
     });
 
     /* sync here so we don't get any surprising lag later when we try to sync */
-    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
+    StorageEngine* storageEngine = service->getStorageEngine();
     storageEngine->flushAllFiles(opCtx, true);
 
     log() << "******" << endl;
@@ -1692,8 +1692,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-
-    getGlobalAuthorizationManager()->logOp(opCtx, opType, nss, o, nullptr);
+    AuthorizationManager::get(opCtx->getServiceContext())->logOp(opCtx, opType, nss, o, nullptr);
     return Status::OK();
 }
 
@@ -1720,7 +1719,6 @@ void oplogCheckCloseDatabase(OperationContext* opCtx, Database* db) {
         localOplogInfo(opCtx->getServiceContext()).oplog = nullptr;
     }
 }
-
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());

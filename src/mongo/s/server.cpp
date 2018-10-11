@@ -44,7 +44,6 @@
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
@@ -582,7 +581,9 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
         return EXIT_ABRUPT;
     }
 
-    registerShutdownTask([&]() { cleanupTask(getGlobalServiceContext()); });
+    const auto service = getGlobalServiceContext();
+
+    registerShutdownTask([service]() { cleanupTask(service); });
 
     ErrorExtraInfo::invariantHaveAllParsers();
 
@@ -592,12 +593,12 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
     logCommonStartupWarnings(serverGlobalParams);
 
     try {
-        if (!initializeServerGlobalState())
+        if (!initializeServerGlobalState(service))
             return EXIT_ABRUPT;
 
         startSignalProcessingThread();
 
-        return main(getGlobalServiceContext());
+        return main(service);
     } catch (const DBException& e) {
         error() << "uncaught DBException in mongos main: " << redact(e);
         return EXIT_UNCAUGHT;

@@ -66,7 +66,6 @@ namespace repl {
 
 class BackgroundSync;
 class IsMasterResponse;
-class OplogReader;
 class OpTime;
 class ReadConcernArgs;
 class ReplSetConfig;

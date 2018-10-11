@@ -34,7 +34,6 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/user_management_commands.h"
@@ -137,10 +136,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserByName(opCtx, args.userName);
-
         return ok;
     }
 
@@ -188,10 +185,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserByName(opCtx, userName);
-
         return ok;
     }
 
@@ -230,10 +225,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUsersFromDB(opCtx, dbname);
-
         return ok;
     }
 
@@ -279,10 +272,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserByName(opCtx, UserName(userNameString, dbname));
-
         return ok;
     }
 
@@ -328,10 +319,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserByName(opCtx, UserName(userNameString, dbname));
-
         return ok;
     }
 
@@ -438,10 +427,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -481,10 +468,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -523,10 +508,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -565,10 +548,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -607,10 +588,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -652,10 +631,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -699,10 +676,8 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             &result);
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
-
         return ok;
     }
 
@@ -771,8 +746,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        invariant(authzManager);
+        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         authzManager->invalidateUserCache(opCtx);
         return true;
     }

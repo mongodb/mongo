@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include "authorization_session.h"
-
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,7 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
@@ -48,9 +46,9 @@
 namespace mongo {
 
 namespace auth {
-
 struct CreateOrUpdateRoleArgs;
 }
+
 class Client;
 
 /**

@@ -37,7 +37,6 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -49,9 +48,7 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-using std::string;
-using std::stringstream;
+namespace {
 
 class TouchCmd : public ErrmsgCommandDeprecated {
 public:
@@ -83,9 +80,9 @@ public:
     TouchCmd() : ErrmsgCommandDeprecated("touch") {}
 
     virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
+                           const std::string& dbname,
                            const BSONObj& cmdObj,
-                           string& errmsg,
+                           std::string& errmsg,
                            BSONObjBuilder& result) {
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
         if (!nss.isNormal()) {
@@ -112,6 +109,8 @@ public:
         uassertStatusOK(collection->touch(opCtx, touch_data, touch_indexes, &result));
         return true;
     }
-};
-static TouchCmd touchCmd;
-}
+
+} touchCmd;
+
+}  // namespace
+}  // namespace mongo

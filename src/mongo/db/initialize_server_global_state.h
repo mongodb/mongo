@@ -30,12 +30,14 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 /**
  * Perform initialization activity common across all mongo server types.
  *
  * Set up logging, daemonize the process, configure SSL, etc.
  */
-bool initializeServerGlobalState();
+bool initializeServerGlobalState(ServiceContext* service);
 
 /**
  * Forks and detaches the server, on platforms that support it, if serverGlobalParams.doFork is

@@ -72,7 +72,6 @@ namespace repl {
 
 class HeartbeatResponseAction;
 class LastVote;
-class OplogReader;
 class ReplicationProcess;
 class ReplSetRequestVotesArgs;
 class ReplSetConfig;

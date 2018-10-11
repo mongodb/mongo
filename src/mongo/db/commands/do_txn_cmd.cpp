@@ -34,8 +34,6 @@
 
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/uuid_catalog.h"

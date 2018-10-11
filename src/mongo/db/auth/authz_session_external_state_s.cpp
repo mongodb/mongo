@@ -26,12 +26,13 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authz_session_external_state_s.h"
 
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/grid.h"
 

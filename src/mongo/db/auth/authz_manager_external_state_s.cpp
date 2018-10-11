@@ -35,8 +35,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -101,11 +99,9 @@ AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationMana
 
 Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,
                                                                       int* outVersion) {
-    // Note: we are treating
-    // { 'getParameter' : 1, <authSchemaVersionServerParameter> : 1 }
-    // as a user management command since this is the *only* part of mongos
-    // that runs this command
-    BSONObj getParameterCmd = BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1);
+    // NOTE: We are treating the command "{ 'getParameter' : 1, 'authSchemaVersion' : 1 }" as a user
+    // management command since this is the *only* part of mongos that runs this command.
+    BSONObj getParameterCmd = BSON("getParameter" << 1 << "authSchemaVersion" << 1);
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", getParameterCmd, &builder);
@@ -114,7 +110,7 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
         return getStatusFromCommandResult(cmdResult);
     }
 
-    BSONElement versionElement = cmdResult[authSchemaVersionServerParameter];
+    BSONElement versionElement = cmdResult["authSchemaVersion"];
     if (versionElement.eoo()) {
         return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
     }

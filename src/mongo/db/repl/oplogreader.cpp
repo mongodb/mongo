@@ -35,19 +35,25 @@
 #include <string>
 
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::endl;
-using std::string;
-
 namespace repl {
+namespace {
+
+// Gets the singleton AuthorizationManager object for this server process
+//
+// TODO (SERVER-37563): Pass the service context instead of calling getGlobalServiceContext.
+AuthorizationManager* getGlobalAuthorizationManager() {
+    AuthorizationManager* globalAuthManager = AuthorizationManager::get(getGlobalServiceContext());
+    fassert(16842, globalAuthManager != nullptr);
+    return globalAuthManager;
+}
+
+}  // namespace
 
 bool replAuthenticate(DBClientBase* conn) {
     if (isInternalAuthSet())
@@ -70,12 +76,13 @@ OplogReader::OplogReader() {
 bool OplogReader::connect(const HostAndPort& host) {
     if (conn() == NULL || _host != host) {
         resetConnection();
-        _conn = shared_ptr<DBClientConnection>(
+        _conn = std::shared_ptr<DBClientConnection>(
             new DBClientConnection(false, durationCount<Seconds>(kSocketTimeout)));
-        string errmsg;
+
+        std::string errmsg;
         if (!_conn->connect(host, StringData(), errmsg) || !replAuthenticate(_conn.get())) {
             resetConnection();
-            error() << errmsg << endl;
+            error() << errmsg;
             return false;
         }
         _conn->setTags(transport::Session::kKeepOpen);
@@ -93,7 +100,7 @@ void OplogReader::tailCheck() {
 
 void OplogReader::tailingQuery(const char* ns, const BSONObj& query) {
     verify(!haveCursor());
-    LOG(2) << ns << ".find(" << redact(query) << ')' << endl;
+    LOG(2) << ns << ".find(" << redact(query) << ')';
     cursor.reset(
         _conn->query(NamespaceString(ns), query, 0, 0, nullptr, _tailingQueryOptions).release());
 }

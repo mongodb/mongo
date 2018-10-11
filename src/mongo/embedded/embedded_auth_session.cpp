@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/util/assert_util.h"
@@ -36,6 +35,7 @@
 namespace mongo {
 namespace embedded {
 namespace {
+
 class Impl : public UserNameIterator::Impl {
     bool more() const override {
         return false;
@@ -52,7 +52,6 @@ class Impl : public UserNameIterator::Impl {
         return new Impl(*this);
     }
 };
-
 
 class AuthorizationSession : public mongo::AuthorizationSession {
 public:
@@ -267,6 +266,7 @@ protected:
 private:
     AuthorizationManager* const _authzManager;
 };
+
 }  // namespace
 }  // namespace embedded
 
@@ -274,4 +274,5 @@ MONGO_REGISTER_SHIM(AuthorizationSession::create)
 (AuthorizationManager* const authzManager)->std::unique_ptr<AuthorizationSession> {
     return std::make_unique<embedded::AuthorizationSession>(authzManager);
 }
+
 }  // namespace mongo

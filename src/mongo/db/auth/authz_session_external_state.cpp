@@ -31,7 +31,6 @@
 #include "mongo/db/auth/authz_session_external_state.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {

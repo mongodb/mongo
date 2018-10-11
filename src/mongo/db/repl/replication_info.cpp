@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"

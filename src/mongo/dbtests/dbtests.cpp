@@ -36,7 +36,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -169,7 +168,8 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     setGlobalServiceContext(ServiceContext::make());
-    ServiceContext* service = getGlobalServiceContext();
+
+    const auto service = getGlobalServiceContext();
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 
     auto logicalClock = stdx::make_unique<LogicalClock>(service);
@@ -196,7 +196,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
         service,
         std::unique_ptr<repl::ReplicationCoordinator>(
             new repl::ReplicationCoordinatorMock(service, replSettings)));
-    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+    repl::ReplicationCoordinator::get(service)
         ->setFollowerMode(repl::MemberState::RS_PRIMARY)
         .ignore();
 
@@ -204,7 +204,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     repl::DropPendingCollectionReaper::set(
         service, stdx::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
 
-    getGlobalAuthorizationManager()->setAuthEnabled(false);
+    AuthorizationManager::get(service)->setAuthEnabled(false);
     ScriptEngine::setup();
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);

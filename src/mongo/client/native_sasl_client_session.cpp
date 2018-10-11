@@ -1,4 +1,5 @@
-/*    Copyright 2014 MongoDB Inc.
+/**
+ *   Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -34,6 +35,8 @@
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scram_client_conversation.h"
 #include "mongo/client/scram_client_cache.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

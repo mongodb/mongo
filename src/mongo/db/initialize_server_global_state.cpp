@@ -47,7 +47,6 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/security_key.h"
@@ -364,8 +363,7 @@ MONGO_INITIALIZER(MungeUmask)(InitializerContext*) {
 }  // namespace
 #endif
 
-bool initializeServerGlobalState() {
-
+bool initializeServerGlobalState(ServiceContext* service) {
 #ifndef _WIN32
     if (!serverGlobalParams.noUnixSocket && !fs::is_directory(serverGlobalParams.socket)) {
         cout << serverGlobalParams.socket << " must be a directory" << endl;
@@ -393,11 +391,10 @@ bool initializeServerGlobalState() {
     // clusterAuthMode defaults to "keyFile" if a --keyFile parameter is provided.
     if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined &&
         !serverGlobalParams.transitionToAuth) {
-        getGlobalAuthorizationManager()->setAuthEnabled(true);
+        AuthorizationManager::get(service)->setAuthEnabled(true);
     }
 
 #ifdef MONGO_CONFIG_SSL
-
     if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
         setInternalUserAuthParams(
@@ -409,6 +406,7 @@ bool initializeServerGlobalState() {
                  << getSSLManager()->getSSLConfiguration().clientSubjectName.toString()));
     }
 #endif
+
     return true;
 }
 

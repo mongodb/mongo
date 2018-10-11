@@ -32,8 +32,6 @@
 
 #include <string>
 
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -46,9 +44,7 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::string;
-using std::stringstream;
+namespace {
 
 class CmdReplSetResizeOplog : public BasicCommand {
 public:
@@ -82,7 +78,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         const NamespaceString nss("local", "oplog.rs");
@@ -116,5 +112,8 @@ public:
         LOG(0) << "replSetResizeOplog success, currentSize:" << size;
         return true;
     }
+
 } cmdReplSetResizeOplog;
-}
+
+}  // namespace
+}  // namespace mongo

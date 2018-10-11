@@ -35,7 +35,6 @@
 #include <mutex>
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/debug_util.h"

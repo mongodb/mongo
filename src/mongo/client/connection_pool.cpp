@@ -32,7 +32,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"

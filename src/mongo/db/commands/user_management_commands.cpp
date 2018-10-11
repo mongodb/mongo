@@ -47,7 +47,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
@@ -2350,7 +2349,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
         authzManager->invalidateUserCache(opCtx);
         return true;
@@ -2388,7 +2387,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         result.append("cacheGeneration", authzManager->getCacheGeneration());
         return true;
     }

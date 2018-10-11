@@ -31,9 +31,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -42,6 +41,9 @@
 
 namespace mongo {
 namespace {
+
+const std::string kAuthSchemaVersionServerParameter = "authSchemaVersion";
+
 class AuthzVersionParameter : public ServerParameter {
     MONGO_DISALLOW_COPYING(AuthzVersionParameter);
 
@@ -56,7 +58,7 @@ MONGO_INITIALIZER_GENERAL(AuthzSchemaParameter,
                           MONGO_NO_PREREQUISITES,
                           ("BeginStartupOptionParsing"))
 (InitializerContext*) {
-    new AuthzVersionParameter(ServerParameterSet::getGlobal(), authSchemaVersionServerParameter);
+    new AuthzVersionParameter(ServerParameterSet::getGlobal(), kAuthSchemaVersionServerParameter);
     return Status::OK();
 }
 
@@ -67,7 +69,8 @@ void AuthzVersionParameter::append(OperationContext* opCtx,
                                    BSONObjBuilder& b,
                                    const std::string& name) {
     int authzVersion;
-    uassertStatusOK(getGlobalAuthorizationManager()->getAuthorizationVersion(opCtx, &authzVersion));
+    uassertStatusOK(AuthorizationManager::get(opCtx->getServiceContext())
+                        ->getAuthorizationVersion(opCtx, &authzVersion));
     b.append(name, authzVersion);
 }
 
@@ -80,14 +83,6 @@ Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
 }
 
 }  // namespace
-
-const std::string authSchemaVersionServerParameter = "authSchemaVersion";
-
-AuthorizationManager* getGlobalAuthorizationManager() {
-    AuthorizationManager* globalAuthManager = AuthorizationManager::get(getGlobalServiceContext());
-    fassert(16842, globalAuthManager != nullptr);
-    return globalAuthManager;
-}
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(startupAuthSchemaValidation, bool, true);
 
@@ -103,4 +98,5 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
         authzManager->setShouldValidateAuthSchemaOnStartup(startupAuthSchemaValidation);
         AuthorizationManager::set(service, std::move(authzManager));
     });
+
 }  // namespace mongo

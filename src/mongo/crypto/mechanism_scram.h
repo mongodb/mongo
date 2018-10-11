@@ -36,7 +36,6 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/crypto/sha1_block.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
