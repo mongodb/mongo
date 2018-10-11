@@ -146,5 +146,6 @@
     Object.assign(rst.nodeOptions[`n${rst.getNodeId(secondaries[0])}`], nodeOptions42);
     rst.start(secondaries[0], nodeOptions42);
 
+    rst.awaitReplication();
     rst.stopSet();
 }());
