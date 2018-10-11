@@ -54,7 +54,7 @@ class OperationContext;
  *   bucketSize specifies the dimension of the square bucket for the data in pos.
  * ALL fields are mandatory.
  */
-class HaystackAccessMethod : public IndexAccessMethod {
+class HaystackAccessMethod : public AbstractIndexAccessMethod {
 public:
     HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 

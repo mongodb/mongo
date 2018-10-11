@@ -39,7 +39,7 @@ class IndexCatalogEntry;
 class IndexDescriptor;
 struct TwoDIndexingParams;
 
-class TwoDAccessMethod : public IndexAccessMethod {
+class TwoDAccessMethod : public AbstractIndexAccessMethod {
 public:
     TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 

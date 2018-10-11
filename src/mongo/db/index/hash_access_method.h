@@ -43,7 +43,7 @@ class CollatorInterface;
 /**
  * This is the access method for "hashed" indices.
  */
-class HashAccessMethod : public IndexAccessMethod {
+class HashAccessMethod : public AbstractIndexAccessMethod {
 public:
     HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 

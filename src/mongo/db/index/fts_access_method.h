@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class FTSAccessMethod : public IndexAccessMethod {
+class FTSAccessMethod : public AbstractIndexAccessMethod {
 public:
     FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 

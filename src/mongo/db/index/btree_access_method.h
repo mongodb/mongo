@@ -42,7 +42,7 @@ class IndexDescriptor;
  * The IndexAccessMethod for a Btree index.
  * Any index created with {field: 1} or {field: -1} uses this.
  */
-class BtreeAccessMethod : public IndexAccessMethod {
+class BtreeAccessMethod : public AbstractIndexAccessMethod {
 public:
     BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 

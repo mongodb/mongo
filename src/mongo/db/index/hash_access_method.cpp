@@ -36,7 +36,7 @@
 namespace mongo {
 
 HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
-    : IndexAccessMethod(btreeState, btree) {
+    : AbstractIndexAccessMethod(btreeState, btree) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     // We can change these if the single-field limitation is lifted later.

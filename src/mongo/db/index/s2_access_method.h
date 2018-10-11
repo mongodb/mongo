@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class S2AccessMethod : public IndexAccessMethod {
+class S2AccessMethod : public AbstractIndexAccessMethod {
 public:
     S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 

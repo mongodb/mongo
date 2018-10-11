@@ -36,7 +36,7 @@ namespace mongo {
 
 WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                                            SortedDataInterface* btree)
-    : IndexAccessMethod(wildcardState, btree),
+    : AbstractIndexAccessMethod(wildcardState, btree),
       _keyGen(
           _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
 

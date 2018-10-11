@@ -53,7 +53,7 @@ namespace dps = ::mongo::dotted_path_support;
 
 HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
                                            SortedDataInterface* btree)
-    : IndexAccessMethod(btreeState, btree) {
+    : AbstractIndexAccessMethod(btreeState, btree) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     ExpressionParams::parseHaystackParams(
