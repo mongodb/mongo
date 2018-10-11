@@ -48,6 +48,10 @@ using std::map;
 using std::string;
 using std::stringstream;
 
+namespace {
+constexpr auto kTimingSection = "timing"_sd;
+}  // namespace
+
 class CmdServerStatus : public BasicCommand {
 public:
     CmdServerStatus() : BasicCommand("serverStatus"), _started(Date_t::now()), _runCalled(false) {}
@@ -152,13 +156,24 @@ public:
         if (runElapsed > Milliseconds(1000)) {
             BSONObj t = timeBuilder.obj();
             log() << "serverStatus was very slow: " << t;
-            result.append("timing", t);
+
+            bool include_timing = true;
+            const auto& elem = cmdObj[kTimingSection];
+            if (!elem.eoo()) {
+                include_timing = elem.trueValue();
+            }
+
+            if (include_timing) {
+                result.append(kTimingSection, t);
+            }
         }
 
         return true;
     }
 
     void addSection(ServerStatusSection* section) {
+        // Disallow adding a section named "timing" as it is reserved for the server status command.
+        dassert(section->getSectionName() != kTimingSection);
         verify(!_runCalled);
         _sections[section->getSectionName()] = section;
     }

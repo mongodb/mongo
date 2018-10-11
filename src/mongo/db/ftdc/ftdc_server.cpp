@@ -291,12 +291,14 @@ void startFTDC(boost::filesystem::path& path,
     // migration status. This section triggers too many schema changes in the serverStatus which
     // hurt ftdc compression efficiency, because its output varies depending on the list of active
     // migrations.
+    // "timing" is filtered out because it triggers frequent schema changes.
     // TODO: do we need to enable "sharding" on MongoS?
     controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
         "serverStatus",
         "serverStatus",
         "",
-        BSON("serverStatus" << 1 << "tcMalloc" << true << "sharding" << false)));
+        BSON("serverStatus" << 1 << "tcMalloc" << true << "sharding" << false << "timing"
+                            << false)));
 
     registerCollectors(controller.get());
 
