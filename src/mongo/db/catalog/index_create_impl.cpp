@@ -381,8 +381,8 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
            (PlanExecutor::ADVANCED == (state = exec->getNextSnapshotted(&objToIndex, &loc))) ||
            MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
         try {
-            if (_allowInterruption)
-                _opCtx->checkForInterrupt();
+            if (_allowInterruption && !_opCtx->checkForInterruptNoAssert().isOK())
+                return _opCtx->checkForInterruptNoAssert();
 
             if (!(retries || PlanExecutor::ADVANCED == state) ||
                 MONGO_FAIL_POINT(slowBackgroundIndexBuild)) {

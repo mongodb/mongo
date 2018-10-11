@@ -29,6 +29,8 @@
     var master = replTest.getPrimary();
     var second = replTest.getSecondary();
 
+    var secondaryId = replTest.getNodeId(second);
+
     var masterDB = master.getDB(dbname);
     var secondDB = second.getDB(dbname);
 
@@ -36,7 +38,7 @@
     jsTest.log("creating test data " + size + " documents");
     var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
     for (var i = 0; i < size; ++i) {
-        bulk.insert({i: i});
+        bulk.insert({i: i, j: i * i});
     }
     assert.writeOK(bulk.execute());
 
@@ -49,14 +51,19 @@
     // the background index build finishes).
     assert.commandWorked(masterDB.runCommand({
         createIndexes: collection,
-        indexes: [{key: {i: 1}, name: "i1", background: true}],
+        indexes: [
+            {key: {i: -1, j: -1}, name: 'ij1', background: true},
+            {key: {i: -1, j: 1}, name: 'ij2', background: true},
+            {key: {i: 1, j: -1}, name: 'ij3', background: true},
+            {key: {i: 1, j: 1}, name: 'ij4', background: true}
+        ],
         writeConcern: {w: 2}
     }));
-    assert.eq(2, masterDB.getCollection(collection).getIndexes().length);
+    assert.eq(5, masterDB.getCollection(collection).getIndexes().length);
 
-    // Secondary should shut down cleanly, and not return an fassert.  This is checked when we
-    // shut down the ReplSetTest.
-    second.getDB("admin").shutdownServer();
+    jsTest.log("Restarting secondary to retry replication");
 
+    // Secondary should restart cleanly.
+    replTest.restart(secondaryId, {}, /*wait=*/true);
     replTest.stopSet();
 }());
