@@ -146,35 +146,30 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
 }
 
 /**
- * Test the SubplanStage's ability to plan an individual branch using the plan cache.
+ * Helper function to verify that branches of an $or can be subplanned from the cache. Assumes that
+ * the indexes to be tested have already been created for the given WriteContextForTest.
  */
-TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
-    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
-
-    addIndex(BSON("a" << 1));
-    addIndex(BSON("a" << 1 << "b" << 1));
-    addIndex(BSON("c" << 1));
-
-    for (int i = 0; i < 10; i++) {
-        insert(BSON("a" << 1 << "b" << i << "c" << i));
-    }
-
+void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteContextForTests& ctx) {
     // This query should result in a plan cache entry for the first $or branch, because
     // there are two competing indices. The second branch has only one relevant index, so
     // its winning plan should not be cached.
     BSONObj query = fromjson("{$or: [{a: 1, b: 3}, {c: 1}]}");
 
+    for (int i = 0; i < 10; i++) {
+        test->insert(BSON("a" << 1 << "b" << i << "c" << i));
+    }
+
     Collection* collection = ctx.getCollection();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+    auto statusWithCQ = CanonicalQuery::canonicalize(test->opCtx(), std::move(qr));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // Get planner params.
     QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    fillOutPlannerParams(test->opCtx(), collection, cq.get(), &plannerParams);
 
     // For the remainder of this test, ensure that cache entries are available immediately, and
     // don't need go through an 'inactive' state before being usable.
@@ -182,9 +177,10 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(opCtx(), collection, &ws, plannerParams, cq.get()));
+        new SubplanStage(test->opCtx(), collection, &ws, plannerParams, cq.get()));
 
-    PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
+    PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
+                                test->serviceContext()->getFastClockSource());
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
     // Nothing is in the cache yet, so neither branch should have been planned from
@@ -195,12 +191,37 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
     // If we repeat the same query, the plan for the first branch should have come from
     // the cache.
     ws.clear();
-    subplan.reset(new SubplanStage(opCtx(), collection, &ws, plannerParams, cq.get()));
+    subplan.reset(new SubplanStage(test->opCtx(), collection, &ws, plannerParams, cq.get()));
 
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
     ASSERT_TRUE(subplan->branchPlannedFromCache(0));
     ASSERT_FALSE(subplan->branchPlannedFromCache(1));
+}
+
+/**
+ * Test the SubplanStage's ability to plan an individual branch using the plan cache.
+ */
+TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+    addIndex(BSON("c" << 1));
+
+    assertSubplanFromCache(this, ctx);
+}
+
+/**
+ * Test that the SubplanStage can plan an individual branch from the cache using a $** index.
+ */
+TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCacheWithWildcardIndex) {
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+
+    addIndex(BSON("$**" << 1));
+    addIndex(BSON("a.$**" << 1));
+
+    assertSubplanFromCache(this, ctx);
 }
 
 /**
@@ -212,6 +233,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1));
     addIndex(BSON("c" << 1));
+    addIndex(BSON("$**" << 1));
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "b" << i << "c" << i));
@@ -259,7 +281,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
 }
 
 /**
- * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
+ * Ensure that the subplan stage doesn't create a plan cache entry if the candidate plans tie.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
@@ -267,6 +289,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
     addIndex(BSON("d" << 1));
+    addIndex(BSON("$**" << 1));
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "e" << 1 << "d" << 1));
