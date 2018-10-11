@@ -86,16 +86,13 @@ Status makePrimaryConnection(OperationContext* opCtx, boost::optional<ScopedDbCo
 }
 
 template <typename Callback>
-auto runIfStandaloneOrPrimary(const NamespaceString& ns,
-                              LockMode mode,
-                              OperationContext* opCtx,
-                              Callback callback)
+auto runIfStandaloneOrPrimary(const NamespaceString& ns, OperationContext* opCtx, Callback callback)
     -> boost::optional<decltype(std::declval<Callback>()())> {
     bool isStandaloneOrPrimary;
     {
-        Lock::DBLock lk(opCtx, ns.db(), mode);
+        Lock::DBLock lk(opCtx, ns.db(), MODE_IS);
         Lock::CollectionLock lock(
-            opCtx->lockState(), SessionsCollection::kSessionsNamespaceString.ns(), mode);
+            opCtx->lockState(), SessionsCollection::kSessionsNamespaceString.ns(), MODE_IS);
 
         auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
 
@@ -136,13 +133,12 @@ auto sendToPrimary(OperationContext* opCtx, Callback callback)
 
 template <typename LocalCallback, typename RemoteCallback>
 auto dispatch(const NamespaceString& ns,
-              LockMode mode,
               OperationContext* opCtx,
               LocalCallback localCallback,
               RemoteCallback remoteCallback)
     -> decltype(std::declval<RemoteCallback>()(static_cast<DBClientBase*>(nullptr))) {
     // If we are the primary, write directly to ourself.
-    auto result = runIfStandaloneOrPrimary(ns, mode, opCtx, [&] { return localCallback(); });
+    auto result = runIfStandaloneOrPrimary(ns, opCtx, [&] { return localCallback(); });
 
     if (result) {
         return *result;
@@ -163,7 +159,6 @@ Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
 
     return dispatch(
         kSessionsNamespaceString,
-        MODE_IX,
         opCtx,
         [&] {
             // Creating the TTL index will auto-generate the collection.
@@ -203,7 +198,6 @@ Status SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opC
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                              const LogicalSessionRecordSet& sessions) {
     return dispatch(kSessionsNamespaceString,
-                    MODE_IX,
                     opCtx,
                     [&] {
                         DBDirectClient client(opCtx);
@@ -222,7 +216,6 @@ Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
 Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
                                            const LogicalSessionIdSet& sessions) {
     return dispatch(kSessionsNamespaceString,
-                    MODE_IX,
                     opCtx,
                     [&] {
                         DBDirectClient client(opCtx);
@@ -240,7 +233,6 @@ Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
 StatusWith<LogicalSessionIdSet> SessionsCollectionRS::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
     return dispatch(kSessionsNamespaceString,
-                    MODE_IS,
                     opCtx,
                     [&] {
                         DBDirectClient client(opCtx);
@@ -259,7 +251,6 @@ Status SessionsCollectionRS::removeTransactionRecords(OperationContext* opCtx,
                                                       const LogicalSessionIdSet& sessions) {
     return dispatch(
         NamespaceString::kSessionTransactionsTableNamespace,
-        MODE_IX,
         opCtx,
         [&] {
             DBDirectClient client(opCtx);
