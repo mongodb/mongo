@@ -126,4 +126,26 @@ TEST(UpdateIndexDataTest, getCanonicalIndexField1) {
 
     ASSERT_FALSE(getCanonicalIndexField("a.", &x));
 }
+
+TEST(UpdateIndexDataTest, CanonicalIndexFieldForConsecutiveDigits) {
+    std::string indexField;
+
+    ASSERT_TRUE(getCanonicalIndexField("a.0.0", &indexField));
+    ASSERT_EQ(indexField, "a");
+
+    ASSERT_TRUE(getCanonicalIndexField("a.55.01", &indexField));
+    ASSERT_EQ(indexField, "a");
+
+    ASSERT_TRUE(getCanonicalIndexField("a.0.0.b.1", &indexField));
+    ASSERT_EQ(indexField, "a");
+
+    ASSERT_TRUE(getCanonicalIndexField("a.0b.1", &indexField));
+    ASSERT_EQ(indexField, "a.0b");
+
+    ASSERT_TRUE(getCanonicalIndexField("a.0.b.1.2", &indexField));
+    ASSERT_EQ(indexField, "a.b");
+
+    ASSERT_TRUE(getCanonicalIndexField("a.0.11b", &indexField));
+    ASSERT_EQ(indexField, "a.11b");
+}
 }
