@@ -49,7 +49,8 @@ LogicalTime _computeAtClusterTime(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const BSONObj query,
                                   const BSONObj collation) {
-    // TODO: SERVER-31767
+    // TODO SERVER-36312: Re-enable algorithm using the cached opTimes of the targeted shards.
+    // TODO SERVER-37549: Use the shard's cached lastApplied opTime instead of lastCommitted.
     return LogicalClock::get(opCtx)->getClusterTime();
 }
 }  // namespace
@@ -122,19 +123,9 @@ boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* o
         return boost::none;
     }
 
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    invariant(shardRegistry);
-
-    auto shard = shardRegistry->getShardNoReload(shardId);
-    uassert(ErrorCodes::ShardNotFound, str::stream() << "Could not find shard " << shardId, shard);
-
-    // Return the cached last committed opTime for the shard if there is one, otherwise return the
-    // latest cluster time from the logical clock.
-    auto lastCommittedOpTime = shard->getLastCommittedOpTime();
-
-    auto atClusterTime = lastCommittedOpTime != LogicalTime::kUninitialized
-        ? lastCommittedOpTime
-        : LogicalClock::get(opCtx)->getClusterTime();
+    // TODO SERVER-36312: Re-enable algorithm using the cached opTimes of the targeted shard.
+    // TODO SERVER-37549: Use the shard's cached lastApplied opTime instead of lastCommitted.
+    auto atClusterTime = LogicalClock::get(opCtx)->getClusterTime();
 
     // If the user passed afterClusterTime, atClusterTime must be greater than or equal to it.
     const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();

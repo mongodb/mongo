@@ -91,7 +91,7 @@ TEST_F(AtClusterTimeTest, ComputeValidValid) {
 
     auto maxTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    // TODO: SERVER-31767
+    // TODO: SERVER-36312
     // ASSERT_EQ(*maxTime, timeTwo);
     ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
 }
@@ -107,7 +107,7 @@ TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
 
     auto maxTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    // TODO: SERVER-31767
+    // TODO: SERVER-36312
     // ASSERT_EQ(*maxTime, timeTwo);
     ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
 }
@@ -133,7 +133,9 @@ TEST_F(AtClusterTimeTest, ComputeForOneShard) {
 
     auto atClusterTime =
         at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), shardOneId);
-    ASSERT_EQ(*atClusterTime, timeOne);
+    // TODO SERVER-36312
+    // ASSERT_EQ(*atClusterTime, timeOne);
+    ASSERT_EQ(*atClusterTime, kInMemoryLogicalTime);
 }
 
 TEST_F(AtClusterTimeTest, ComputeForOneShardNoCachedOpTime) {
@@ -145,12 +147,8 @@ TEST_F(AtClusterTimeTest, ComputeForOneShardNoCachedOpTime) {
     ASSERT_EQ(*atClusterTime, kInMemoryLogicalTime);
 }
 
-TEST_F(AtClusterTimeTest, ComputeForOneShardNoShard) {
-    ASSERT_THROWS_CODE(at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(),
-                                                                             ShardId("fakeShard")),
-                       AssertionException,
-                       ErrorCodes::ShardNotFound);
-}
+// TODO SERVER-36312: Verify computing atClusterTime for a single shard that does not exist returns
+// an error.
 
 class AtClusterTimeTargetingTest : public CatalogCacheTestFixture {
 protected:
@@ -203,7 +201,7 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestTimeFromShard) {
 
     repl::ReadConcernArgs::get(operationContext()) =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    // TODO: SERVER-31767
+    // TODO: SERVER-36312
     // ASSERT_EQ(time2,
     //           *at_cluster_time_util::computeAtClusterTime(operationContext(), true, shards, kNss,
     //           query, collation));
