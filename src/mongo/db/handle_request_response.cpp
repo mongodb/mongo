@@ -32,11 +32,12 @@
 
 namespace mongo {
 
-BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
+BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
                        ErrorCodes::Error code) {
     // By specifying "autocommit", the user indicates they want to run a transaction.
-    if (!sessionOptions || !sessionOptions->getAutocommit()) {
+    // It is always false when set.
+    if (!sessionOptions.getAutocommit()) {
         return {};
     }
 

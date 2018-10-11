@@ -102,6 +102,13 @@ private:
     }
 };
 
+OperationSessionInfoFromClient makeSessionInfo() {
+    OperationSessionInfoFromClient sessionInfo;
+    sessionInfo.setAutocommit(false);
+    sessionInfo.setStartTransaction(true);
+    return sessionInfo;
+}
+
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
@@ -428,7 +435,7 @@ TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx.get(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx.get(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx.get());
     txnParticipant->unstashTransactionResources(opCtx.get(), "insert");
 
@@ -609,7 +616,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -708,7 +715,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -778,7 +785,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -843,7 +850,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -871,7 +878,7 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->transitionToPreparedforTest();
@@ -898,7 +905,7 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->transitionToPreparedforTest();
@@ -922,7 +929,7 @@ TEST_F(OpObserverTransactionTest, AbortingUnpreparedTransactionDoesNotWriteToTra
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -939,7 +946,7 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -973,7 +980,7 @@ TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesT
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -998,7 +1005,7 @@ TEST_F(OpObserverTransactionTest,
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1016,7 +1023,7 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1050,7 +1057,7 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -1127,7 +1134,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     const TxnNumber txnNum = 3;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "update");
 
@@ -1193,7 +1200,7 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     const TxnNumber txnNum = 3;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSessionMongod sessionTxnState(opCtx(), true, false, true);
+    OperationContextSessionMongod sessionTxnState(opCtx(), true, makeSessionInfo());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "delete");

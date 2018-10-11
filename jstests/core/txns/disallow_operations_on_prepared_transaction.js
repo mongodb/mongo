@@ -71,7 +71,7 @@
         stmtId: NumberInt(1),
         autocommit: false
     }),
-                                 ErrorCodes.ConflictingOperationInProgress);
+                                 ErrorCodes.OperationNotSupportedInTransaction);
 
     jsTestLog("Test that you can't run find on a prepared transaction.");
     assert.commandFailedWithCode(assert.throws(function() {

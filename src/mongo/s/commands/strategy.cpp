@@ -388,7 +388,7 @@ void runCommand(OperationContext* opCtx,
         initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
 
     try {
-        if (osi && osi->getAutocommit()) {
+        if (osi.getAutocommit()) {
             scopedSession.emplace(opCtx);
 
             auto txnRouter = TransactionRouter::get(opCtx);
@@ -397,7 +397,7 @@ void runCommand(OperationContext* opCtx,
             auto txnNumber = opCtx->getTxnNumber();
             invariant(txnNumber);
 
-            auto startTxnSetting = osi->getStartTransaction();
+            auto startTxnSetting = osi.getStartTransaction();
             bool startTransaction = startTxnSetting ? *startTxnSetting : false;
 
             uassertStatusOK(CommandHelpers::canUseTransactions(nss.db(), command->getName()));

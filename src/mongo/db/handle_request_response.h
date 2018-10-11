@@ -37,7 +37,7 @@ namespace mongo {
 /**
  * Returns the error labels for the given error.
  */
-BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
+BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
                        ErrorCodes::Error code);
 

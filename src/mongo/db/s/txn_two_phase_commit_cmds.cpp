@@ -419,8 +419,10 @@ public:
     private:
         void _callPrepareOnLocalParticipant(OperationContext* opCtx) {
             auto localParticipantPrepareTimestamp = [&]() -> Timestamp {
-                OperationContextSessionMongod checkOutSession(
-                    opCtx, true, false, boost::none, false);
+                OperationSessionInfoFromClient sessionInfo;
+                sessionInfo.setAutocommit(false);
+                sessionInfo.setCoordinator(false);
+                OperationContextSessionMongod checkOutSession(opCtx, true, sessionInfo);
 
                 auto txnParticipant = TransactionParticipant::get(opCtx);
 

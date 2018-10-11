@@ -2499,7 +2499,10 @@ public:
         _opCtx->setLogicalSessionId(sessionId);
         _opCtx->setTxnNumber(26);
 
-        ocs = std::make_unique<OperationContextSessionMongod>(_opCtx, true, false, true);
+        OperationSessionInfoFromClient sessionInfo;
+        sessionInfo.setAutocommit(false);
+        sessionInfo.setStartTransaction(true);
+        ocs = std::make_unique<OperationContextSessionMongod>(_opCtx, true, sessionInfo);
 
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);

@@ -89,6 +89,15 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none);                  // post-image optime
 }
 
+OperationSessionInfoFromClient makeSessionInfo(bool startTransaction = true) {
+    OperationSessionInfoFromClient sessionInfo;
+    sessionInfo.setAutocommit(false);
+    if (startTransaction) {
+        sessionInfo.setStartTransaction(startTransaction);
+    }
+    return sessionInfo;
+}
+
 class OpObserverMock : public OpObserverNoop {
 public:
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override;
@@ -281,7 +290,7 @@ protected:
 TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
     const std::string dbName = "TestDB";
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -310,7 +319,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
 
-        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, false, true);
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, makeSessionInfo());
 
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "insert");
@@ -337,7 +346,7 @@ TEST_F(TxnParticipantTest, StashAndUnstashResources) {
     ASSERT(originalLocker);
     ASSERT(originalRecoveryUnit);
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
 
     repl::ReadConcernArgs readConcernArgs;
@@ -378,7 +387,7 @@ TEST_F(TxnParticipantTest, StashAndUnstashResources) {
 
 TEST_F(TxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
     // Must specify startTransaction=true and autocommit=false to start a transaction.
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant->inMultiDocumentTransaction());
 
@@ -389,7 +398,7 @@ TEST_F(TxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
 }
 
 TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // We must have stashed transaction resources to do a second operation on the transaction.
@@ -409,7 +418,7 @@ TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
 }
 
 DEATH_TEST_F(TxnParticipantTest, AutocommitCannotBeTrue, "invariant") {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Passing 'autocommit=true' is not allowed and should crash.
@@ -417,7 +426,7 @@ DEATH_TEST_F(TxnParticipantTest, AutocommitCannotBeTrue, "invariant") {
 }
 
 DEATH_TEST_F(TxnParticipantTest, StartTransactionCannotBeFalse, "invariant") {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Passing 'startTransaction=false' is not allowed and should crash.
@@ -425,7 +434,7 @@ DEATH_TEST_F(TxnParticipantTest, StartTransactionCannotBeFalse, "invariant") {
 }
 
 TEST_F(TxnParticipantTest, SameTransactionPreservesStoredStatements) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // We must have stashed transaction resources to re-open the transaction.
@@ -449,7 +458,7 @@ TEST_F(TxnParticipantTest, SameTransactionPreservesStoredStatements) {
 }
 
 TEST_F(TxnParticipantTest, AbortClearsStoredStatements) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
@@ -468,7 +477,7 @@ TEST_F(TxnParticipantTest, AbortClearsStoredStatements) {
 // This test makes sure the commit machinery works even when no operations are done on the
 // transaction.
 TEST_F(TxnParticipantTest, EmptyTransactionCommit) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -481,7 +490,7 @@ TEST_F(TxnParticipantTest, EmptyTransactionCommit) {
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -513,7 +522,7 @@ TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransac
 TEST_F(TxnParticipantTest, CommitTransactionWithCommitTimestampFailsOnUnpreparedTransaction) {
     const auto commitTimestamp = Timestamp(6, 6);
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -525,7 +534,7 @@ TEST_F(TxnParticipantTest, CommitTransactionWithCommitTimestampFailsOnUnprepared
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionDoesNotSetCommitTimestampOnUnpreparedTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     auto originalFn = _opObserver->onTransactionCommitFn;
     _opObserver->onTransactionCommitFn = [&](boost::optional<OplogSlot> commitOplogEntryOpTime,
@@ -551,7 +560,7 @@ TEST_F(TxnParticipantTest, CommitTransactionDoesNotSetCommitTimestampOnUnprepare
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionWithoutCommitTimestampFailsOnPreparedTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -565,7 +574,7 @@ TEST_F(TxnParticipantTest, CommitTransactionWithoutCommitTimestampFailsOnPrepare
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionWithNullCommitTimestampFailsOnPreparedTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -580,7 +589,7 @@ TEST_F(TxnParticipantTest, CommitTransactionWithNullCommitTimestampFailsOnPrepar
 
 TEST_F(TxnParticipantTest,
        CommitTransactionWithCommitTimestampLessThanPrepareTimestampFailsOnPreparedTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -597,7 +606,7 @@ TEST_F(TxnParticipantTest,
 // This test makes sure the abort machinery works even when no operations are done on the
 // transaction.
 TEST_F(TxnParticipantTest, EmptyTransactionAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
 
@@ -609,7 +618,7 @@ TEST_F(TxnParticipantTest, EmptyTransactionAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfUnstashAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // The transaction may be aborted without checking out the txnParticipant.
@@ -622,7 +631,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfUnstashAndAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfUnstashAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -644,7 +653,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfUnstashAndMigration) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfStashAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "find");
 
@@ -656,7 +665,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfStashAndAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfStashAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -675,7 +684,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfStashAndMigration) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfAddTransactionOperationAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -690,7 +699,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfAddTransactionOperationAndAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfAddTransactionOperationAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "find");
@@ -710,7 +719,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfAddTransactionOperationAndMigration) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -724,7 +733,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAb
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -743,7 +752,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndMi
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfCommitUnpreparedTransactionAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -758,7 +767,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfCommitUnpreparedTransactionAndAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfCommitPreparedTransactionAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -775,7 +784,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfCommitPreparedTransactionAndAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfActiveUnpreparedAbortAndArbitraryAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -792,7 +801,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfActiveUnpreparedAbortAndArbitraryAbort) 
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfActiveUnpreparedAbortAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -815,7 +824,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfActiveUnpreparedAbortAndMigration) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfActivePreparedAbortAndArbitraryAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -833,7 +842,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfActivePreparedAbortAndArbitraryAbort) {
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
@@ -851,7 +860,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndAbort) {
 }
 
 TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
@@ -879,7 +888,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
 }
 
 DEATH_TEST_F(TxnParticipantTest, AbortDuringPrepareIsFatal, "Invariant") {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -896,7 +905,7 @@ DEATH_TEST_F(TxnParticipantTest, AbortDuringPrepareIsFatal, "Invariant") {
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
@@ -911,7 +920,7 @@ TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
 }
 
 TEST_F(TxnParticipantTest, KillSessionsDuringPreparedCommitDoesNotAbortTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -942,7 +951,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedCommitDoesNotAbortTransacti
 }
 
 TEST_F(TxnParticipantTest, ArbitraryAbortDuringPreparedCommitDoesNotAbortTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -976,7 +985,7 @@ TEST_F(TxnParticipantTest, ArbitraryAbortDuringPreparedCommitDoesNotAbortTransac
 DEATH_TEST_F(TxnParticipantTest,
              ThrowDuringPreparedOnTransactionCommitIsFatal,
              "Caught exception during commit") {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -987,7 +996,7 @@ DEATH_TEST_F(TxnParticipantTest,
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringUnpreparedCommitLetsTheAbortAtEntryPointToCleanUp) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -1006,7 +1015,7 @@ TEST_F(TxnParticipantTest, ThrowDuringUnpreparedCommitLetsTheAbortAtEntryPointTo
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfCommitUnpreparedTransactionAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1025,7 +1034,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfCommitUnpreparedTransactionAndMigration)
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndMigration) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1045,14 +1054,14 @@ TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndMigration) {
 }
 
 TEST_F(TxnParticipantTest, ContinuingATransactionWithNoResourcesAborts) {
-    OperationContextSessionMongod(opCtx(), true, false, true);
-    ASSERT_THROWS_CODE(OperationContextSessionMongod(opCtx(), true, false, boost::none),
+    OperationContextSessionMongod(opCtx(), true, makeSessionInfo());
+    ASSERT_THROWS_CODE(OperationContextSessionMongod(opCtx(), true, makeSessionInfo(false)),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TxnParticipantTest, KillSessionsDoesNotAbortPreparedTransactions) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1078,7 +1087,7 @@ TEST_F(TxnParticipantTest, KillSessionsDoesNotAbortPreparedTransactions) {
 }
 
 TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1104,7 +1113,7 @@ TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
 }
 
 TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInProgress) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1150,7 +1159,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
 }
 
 TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
-    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1168,7 +1177,7 @@ TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
 }
 
 TEST_F(TxnParticipantTest, MigrationThrowsOnPreparedTransaction) {
-    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1188,7 +1197,7 @@ TEST_F(TxnParticipantTest, MigrationThrowsOnPreparedTransaction) {
 }
 
 TEST_F(TxnParticipantTest, ImplictAbortDoesNotAbortPreparedTransaction) {
-    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1205,7 +1214,7 @@ TEST_F(TxnParticipantTest, ImplictAbortDoesNotAbortPreparedTransaction) {
 }
 
 DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransaction, "invariant") {
-    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1237,14 +1246,14 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
-    ASSERT_THROWS_CODE(OperationContextSessionMongod(opCtx(), true, false, boost::none),
+    ASSERT_THROWS_CODE(OperationContextSessionMongod(opCtx(), true, makeSessionInfo(false)),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
 
 // Tests that a transaction aborts if it becomes too large before trying to commit it.
 TEST_F(TxnParticipantTest, TransactionTooLargeWhileBuilding) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -1264,7 +1273,7 @@ TEST_F(TxnParticipantTest, TransactionTooLargeWhileBuilding) {
 }
 
 TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
-    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, makeSessionInfo());
     Locker* originalLocker = opCtx()->lockState();
     RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
     ASSERT(originalLocker);
@@ -1289,7 +1298,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     {
         // Make it look like we're in a DBDirectClient running a nested operation.
         DirectClientSetter inDirectClient(opCtx());
-        OperationContextSessionMongod innerScopedSession(opCtx(), true, boost::none, boost::none);
+        OperationContextSessionMongod innerScopedSession(opCtx(), true, {});
 
         txnParticipant->stashTransactionResources(opCtx());
 
@@ -1303,7 +1312,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
 
 TEST_F(TxnParticipantTest, UnstashInNestedSessionIsANoop) {
 
-    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, makeSessionInfo());
 
     Locker* originalLocker = opCtx()->lockState();
     RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
@@ -1322,7 +1331,7 @@ TEST_F(TxnParticipantTest, UnstashInNestedSessionIsANoop) {
     {
         // Make it look like we're in a DBDirectClient running a nested operation.
         DirectClientSetter inDirectClient(opCtx());
-        OperationContextSessionMongod innerScopedSession(opCtx(), true, boost::none, boost::none);
+        OperationContextSessionMongod innerScopedSession(opCtx(), true, {});
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->unstashTransactionResources(opCtx(), "find");
@@ -1347,7 +1356,7 @@ protected:
         auto autocommit = false;
         auto startTransaction = true;
         OperationContextSessionMongod opCtxSession(
-            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+            opCtx(), true /* shouldCheckOutSession */, makeSessionInfo());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT(txnParticipant->inMultiDocumentTransaction());
@@ -1360,7 +1369,7 @@ protected:
         auto autocommit = false;
         auto startTransaction = true;
         OperationContextSessionMongod opCtxSession(
-            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+            opCtx(), true /* shouldCheckOutSession */, makeSessionInfo());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT(txnParticipant->inMultiDocumentTransaction());
@@ -1376,7 +1385,7 @@ protected:
         auto autocommit = false;
         auto startTransaction = true;
         OperationContextSessionMongod opCtxSession(
-            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+            opCtx(), true /* shouldCheckOutSession */, makeSessionInfo());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT(txnParticipant->inMultiDocumentTransaction());
@@ -1394,7 +1403,7 @@ protected:
         auto autocommit = false;
         auto startTransaction = true;
         OperationContextSessionMongod opCtxSession(
-            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+            opCtx(), true /* shouldCheckOutSession */, makeSessionInfo());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT(txnParticipant->inMultiDocumentTransaction());
@@ -1411,16 +1420,13 @@ protected:
     }
 
     void cannotSpecifyStartTransactionOnStartedRetryableWrite() {
-        boost::optional<bool> autocommit = boost::none;
-        boost::optional<bool> startTransaction = boost::none;
-        OperationContextSessionMongod opCtxSession(
-            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+        OperationContextSessionMongod opCtxSession(opCtx(), true /* shouldCheckOutSession */, {});
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT_FALSE(txnParticipant->inMultiDocumentTransaction());
 
-        autocommit = false;
-        startTransaction = true;
+        auto autocommit = false;
+        auto startTransaction = true;
         ASSERT_THROWS_CODE(
             txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
             AssertionException,
@@ -1505,7 +1511,7 @@ TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryable
 }
 
 TEST_F(TxnParticipantTest, KillSessionsDuringUnpreparedAbortSucceeds) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
 
@@ -1525,7 +1531,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringUnpreparedAbortSucceeds) {
 }
 
 TEST_F(TxnParticipantTest, ActiveAbortIsLegalDuringUnpreparedAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
 
@@ -1553,7 +1559,7 @@ TEST_F(TxnParticipantTest, ActiveAbortIsLegalDuringUnpreparedAbort) {
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
 
@@ -1565,7 +1571,7 @@ TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionAbort) {
 }
 
 TEST_F(TxnParticipantTest, KillSessionsDuringPreparedAbortFails) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
     txnParticipant->prepareTransaction(opCtx(), {});
@@ -1587,7 +1593,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedAbortFails) {
 }
 
 TEST_F(TxnParticipantTest, ActiveAbortSucceedsDuringPreparedAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
     txnParticipant->prepareTransaction(opCtx(), {});
@@ -1616,7 +1622,7 @@ TEST_F(TxnParticipantTest, ActiveAbortSucceedsDuringPreparedAbort) {
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
     txnParticipant->prepareTransaction(opCtx(), {});
@@ -1661,7 +1667,7 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
     unsigned long long beforeTransactionStart =
         ServerTransactionsMetrics::get(opCtx())->getTotalStarted();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     // Tests that the total transactions started counter is incremented by 1 when a new transaction
     // is started.
@@ -1670,7 +1676,7 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
 }
 
 TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -1684,7 +1690,7 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
 }
 
 TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -1702,7 +1708,7 @@ TEST_F(TransactionsMetricsTest, TrackTotalOpenTransactionsWithAbort) {
         ServerTransactionsMetrics::get(opCtx())->getCurrentOpen();
 
     // Tests that starting a transaction increments the open transactions counter by 1.
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(),
@@ -1724,7 +1730,7 @@ TEST_F(TransactionsMetricsTest, TrackTotalOpenTransactionsWithCommit) {
         ServerTransactionsMetrics::get(opCtx())->getCurrentOpen();
 
     // Tests that starting a transaction increments the open transactions counter by 1.
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(),
@@ -1750,7 +1756,7 @@ TEST_F(TransactionsMetricsTest, TrackTotalActiveAndInactiveTransactionsWithCommi
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
     // Starting the transaction should put it into an inactive state.
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
               beforeInactiveCounter + 1);
 
@@ -1790,7 +1796,7 @@ TEST_F(TransactionsMetricsTest, TrackTotalActiveAndInactiveTransactionsWithStash
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
     // Starting the transaction should put it into an inactive state.
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
               beforeInactiveCounter + 1);
 
@@ -1823,7 +1829,7 @@ TEST_F(TransactionsMetricsTest, TrackTotalActiveAndInactiveTransactionsWithUnsta
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
     // Starting the transaction should put it into an inactive state.
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
               beforeInactiveCounter + 1);
 
@@ -1844,7 +1850,7 @@ TEST_F(TransactionsMetricsTest, TrackTotalActiveAndInactiveTransactionsWithUnsta
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCommit) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
@@ -1862,7 +1868,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCom
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbort) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -1878,7 +1884,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbo
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilCommit) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
@@ -1909,7 +1915,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilAbort) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -1940,7 +1946,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time active should be zero.
@@ -1987,7 +1993,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndAbort) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time active should be zero.
@@ -2015,7 +2021,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndAbort) 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetUponAbortOnly) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time active should be zero.
@@ -2037,7 +2043,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetUponAbortOnly) {
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilStash) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time active should be zero.
@@ -2074,7 +2080,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilStash) {
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilCommit) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time active should be zero.
@@ -2110,7 +2116,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilCommit) {
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetIfUnstashHasBadReadConcernArgs) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize bad read concern args (!readConcernArgs.isEmpty()).
@@ -2146,7 +2152,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetIfUnstashHasBadRea
 }
 
 TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponStash) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize field values for both AdditiveMetrics objects.
@@ -2182,7 +2188,7 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponS
 }
 
 TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponCommit) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize field values for both AdditiveMetrics objects.
@@ -2218,7 +2224,7 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponC
 }
 
 TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponAbort) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Initialize field values for both AdditiveMetrics objects.
@@ -2255,7 +2261,7 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time inactive should have increased.
@@ -2294,7 +2300,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndStash
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndAbort) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time inactive should be greater than or equal to zero.
@@ -2327,7 +2333,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndAbort
 TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Time inactive should be greater than or equal to zero.
@@ -2366,7 +2372,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     ASSERT(opCtx()->lockState());
     ASSERT(opCtx()->recoveryUnit());
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, autocommit, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     // Create a ClientMetadata object and set it on ClientMetadataIsMasterState.
     BSONObjBuilder builder;
@@ -2462,7 +2468,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     ASSERT(opCtx()->recoveryUnit());
 
     const auto autocommit = false;
-    OperationContextSessionMongod opCtxSession(opCtx(), true, autocommit, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2520,7 +2526,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     ASSERT(opCtx()->lockState());
     ASSERT(opCtx()->recoveryUnit());
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, boost::none, boost::none);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, {});
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "find");
 
@@ -2567,7 +2573,7 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponStash) {
     clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
                                                   std::move(clientMetadata.getValue()));
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -2604,7 +2610,7 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponCommit) {
     clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
                                                   std::move(clientMetadata.getValue()));
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -2628,7 +2634,7 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponAbort) {
     clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
                                                   std::move(clientMetadata.getValue()));
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     txnParticipant->abortActiveTransaction(opCtx());
@@ -2767,7 +2773,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     const int metricValue = 1;
     setupAdditiveMetrics(metricValue, opCtx());
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2804,7 +2810,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     const int metricValue = 1;
     setupAdditiveMetrics(metricValue, opCtx());
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2837,7 +2843,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
 }
 
 DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoStats, "invariant") {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2861,7 +2867,7 @@ DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoS
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2896,7 +2902,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2931,7 +2937,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     auto tickSource = initMockTickSource();
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -2970,7 +2976,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
 
 TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
     auto totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Check that there are no Timestamps in the set.
@@ -3008,7 +3014,7 @@ TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
 
-        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, false, true);
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, makeSessionInfo());
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "prepareTransaction");
 
@@ -3041,7 +3047,7 @@ TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
 
 TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
     auto totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Check that there are no Timestamps in the set.
@@ -3075,7 +3081,7 @@ TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
 
-        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, false, true);
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, makeSessionInfo());
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "prepareTransaction");
 

@@ -105,32 +105,31 @@ using logger::LogComponent;
 // session for commands that can take a lock and then run another whitelisted command in
 // DBDirectClient. Otherwise, the nested command would try to check out a session under a lock,
 // which is not allowed.
-const StringMap<int> sessionCommandAutomaticCheckOutWhiteList = {
-    {"abortTransaction", 1},
-    {"aggregate", 1},
-    {"applyOps", 1},
-    {"commitTransaction", 1},
-    {"count", 1},
-    {"dbHash", 1},
-    {"delete", 1},
-    {"distinct", 1},
-    {"doTxn", 1},
-    {"explain", 1},
-    {"filemd5", 1},
-    {"find", 1},
-    {"findandmodify", 1},
-    {"findAndModify", 1},
-    {"geoNear", 1},
-    {"geoSearch", 1},
-    {"getMore", 1},
-    {"group", 1},
-    {"insert", 1},
-    {"killCursors", 1},
-    {"prepareTransaction", 1},
-    {"refreshLogicalSessionCacheNow", 1},
-    {"update", 1}};
+const StringMap<int> sessionCheckOutList = {{"abortTransaction", 1},
+                                            {"aggregate", 1},
+                                            {"applyOps", 1},
+                                            {"commitTransaction", 1},
+                                            {"count", 1},
+                                            {"dbHash", 1},
+                                            {"delete", 1},
+                                            {"distinct", 1},
+                                            {"doTxn", 1},
+                                            {"explain", 1},
+                                            {"filemd5", 1},
+                                            {"find", 1},
+                                            {"findandmodify", 1},
+                                            {"findAndModify", 1},
+                                            {"geoNear", 1},
+                                            {"geoSearch", 1},
+                                            {"getMore", 1},
+                                            {"group", 1},
+                                            {"insert", 1},
+                                            {"killCursors", 1},
+                                            {"prepareTransaction", 1},
+                                            {"refreshLogicalSessionCacheNow", 1},
+                                            {"update", 1}};
 
-const StringMap<int> sessionCommandNoCheckOutWhiteList = {
+const StringMap<int> skipSessionCheckOutList = {
     {"coordinateCommitTransaction", 1}, {"voteAbortTransaction", 1}, {"voteCommitTransaction", 1}};
 
 bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName) {
@@ -391,7 +390,7 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          TransactionParticipant* txnParticipant,
-                         const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
+                         const OperationSessionInfoFromClient& sessionOptions,
                          rpc::ReplyBuilderInterface* replyBuilder) {
     txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
@@ -404,8 +403,8 @@ void invokeInTransaction(OperationContext* opCtx,
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.
 
-        auto startTransaction = sessionOptions->getStartTransaction();
-        if (startTransaction && *startTransaction) {
+        // If "startTransaction" is present, it must be true.
+        if (sessionOptions.getStartTransaction()) {
             // If the first command a shard receives in a transactions fails with this code, the
             // shard may not be included in the final participant list if the router's retry after
             // resolving the view does not re-target it, which is possible if the underlying
@@ -442,7 +441,7 @@ bool runCommandImpl(OperationContext* opCtx,
                     LogicalTime startOperationTime,
                     const ServiceEntryPointCommon::Hooks& behaviors,
                     BSONObjBuilder* extraFieldsBuilder,
-                    const boost::optional<OperationSessionInfoFromClient>& sessionOptions) {
+                    const OperationSessionInfoFromClient& sessionOptions) {
     const Command* command = invocation->definition();
     auto bytesToReserve = command->reserveBytesForReply();
 // SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
@@ -577,7 +576,7 @@ void execCommandDatabase(OperationContext* opCtx,
     BSONObjBuilder extraFieldsBuilder;
     auto startOperationTime = getClientOperationTime(opCtx);
     auto invocation = command->parse(opCtx, request);
-    boost::optional<OperationSessionInfoFromClient> sessionOptions = boost::none;
+    OperationSessionInfoFromClient sessionOptions;
 
     try {
         {
@@ -611,54 +610,37 @@ void execCommandDatabase(OperationContext* opCtx,
         // using to service an earlier operation in the command's chain. To avoid this, only check
         // out sessions for commands that require them.
         const bool shouldCheckoutSession = static_cast<bool>(opCtx->getTxnNumber()) &&
-            sessionCommandAutomaticCheckOutWhiteList.find(command->getName()) !=
-                sessionCommandAutomaticCheckOutWhiteList.cend();
-
-        // Parse the arguments specific to multi-statement transactions.
-        boost::optional<bool> startMultiDocTxn = boost::none;
-        boost::optional<bool> autocommitVal = boost::none;
-        boost::optional<bool> coordinatorVal = boost::none;
-        if (sessionOptions) {
-            startMultiDocTxn = sessionOptions->getStartTransaction();
-            autocommitVal = sessionOptions->getAutocommit();
-            coordinatorVal = sessionOptions->getCoordinator();
-            if (command->getName() == "doTxn") {
-                // Autocommit and 'startMultiDocTxn' are overridden for 'doTxn' to get the oplog
-                // entry generation behavior used for multi-document transactions. The 'doTxn'
-                // command still logically behaves as a commit.
-                autocommitVal = false;
-                startMultiDocTxn = true;
-            }
-        }
+            sessionCheckOutList.find(command->getName()) != sessionCheckOutList.cend();
 
         // Reject commands with 'txnNumber' that do not check out the Session, since no retryable
         // writes or transaction machinery will be used to execute commands that do not check out
         // the Session. Do not check this if we are in DBDirectClient because the outer command is
         // responsible for checking out the Session.
-        if (!opCtx->getClient()->isInDirectClient()) {
+        const auto skipSessionCheckout =
+            skipSessionCheckOutList.find(command->getName()) != skipSessionCheckOutList.cend();
+        const auto shouldNotCheckOutSession = !shouldCheckoutSession  //
+            && !opCtx->getClient()->isInDirectClient()                // Skip DBDirectClient.
+            && !skipSessionCheckout;  // If we know they cannot check out, don't bother.
+
+        if (shouldNotCheckOutSession) {
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     str::stream() << "It is illegal to run command " << command->getName()
                                   << " in a multi-document transaction.",
-                    shouldCheckoutSession || !autocommitVal || command->getName() == "doTxn" ||
-                        sessionCommandNoCheckOutWhiteList.find(command->getName()) !=
-                            sessionCommandNoCheckOutWhiteList.cend());
+                    !sessionOptions.getAutocommit());
             uassert(50768,
                     str::stream() << "It is illegal to provide a txnNumber for command "
                                   << command->getName(),
-                    shouldCheckoutSession || !opCtx->getTxnNumber() ||
-                        sessionCommandNoCheckOutWhiteList.find(command->getName()) !=
-                            sessionCommandNoCheckOutWhiteList.cend());
+                    !opCtx->getTxnNumber());
         }
 
-        if (autocommitVal) {
+        if (sessionOptions.getAutocommit()) {
             uassertStatusOK(CommandHelpers::canUseTransactions(dbname, command->getName()));
         }
 
         // This constructor will check out the session and start a transaction, if necessary. It
         // handles the appropriate state management for both multi-statement transactions and
         // retryable writes.
-        OperationContextSessionMongod sessionTxnState(
-            opCtx, shouldCheckoutSession, autocommitVal, startMultiDocTxn, coordinatorVal);
+        OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckoutSession, sessionOptions);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
@@ -771,8 +753,8 @@ void execCommandDatabase(OperationContext* opCtx,
         if (!opCtx->getClient()->isInDirectClient() || !txnParticipant ||
             !txnParticipant->inMultiDocumentTransaction()) {
             const bool upconvertToSnapshot = txnParticipant &&
-                txnParticipant->inMultiDocumentTransaction() && sessionOptions &&
-                (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
+                txnParticipant->inMultiDocumentTransaction() &&
+                sessionOptions.getStartTransaction();
             readConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
         }

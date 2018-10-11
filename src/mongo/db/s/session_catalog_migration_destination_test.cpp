@@ -251,8 +251,7 @@ public:
             // requests with txnNumbers aren't allowed. To get around this, we have to manually set
             // up the session state and perform the insert.
             initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
-            OperationContextSessionMongod sessionTxnState(
-                innerOpCtx.get(), true, boost::none, boost::none);
+            OperationContextSessionMongod sessionTxnState(innerOpCtx.get(), true, {});
 
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);

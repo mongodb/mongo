@@ -37,23 +37,24 @@
 
 namespace mongo {
 
-OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* opCtx,
-                                                             bool shouldCheckOutSession,
-                                                             boost::optional<bool> autocommit,
-                                                             boost::optional<bool> startTransaction,
-                                                             boost::optional<bool> coordinator)
+OperationContextSessionMongod::OperationContextSessionMongod(
+    OperationContext* opCtx,
+    bool shouldCheckOutSession,
+    const OperationSessionInfoFromClient& sessionInfo)
     : _operationContextSession(opCtx, shouldCheckOutSession) {
     if (shouldCheckOutSession && !opCtx->getClient()->isInDirectClient()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
         const auto clientTxnNumber = *opCtx->getTxnNumber();
 
         txnParticipant->refreshFromStorageIfNeeded(opCtx);
-        txnParticipant->beginOrContinue(clientTxnNumber, autocommit, startTransaction);
+        txnParticipant->beginOrContinue(
+            clientTxnNumber, sessionInfo.getAutocommit(), sessionInfo.getStartTransaction());
 
-        if (startTransaction && *startTransaction) {
+        // If "startTransaction" is present, it must be true.
+        if (sessionInfo.getStartTransaction()) {
             // If this shard has been selected as the coordinator, set up the coordinator state
             // to be ready to receive votes.
-            if (coordinator && *coordinator) {
+            if (sessionInfo.getCoordinator() == boost::optional<bool>(true)) {
                 createTransactionCoordinator(opCtx, clientTxnNumber);
             }
         }
