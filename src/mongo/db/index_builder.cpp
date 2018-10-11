@@ -232,6 +232,13 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         status = indexer.insertAllDocumentsInCollection();
     }
     if (!status.isOK()) {
+        if (allowBackgroundBuilding) {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            dbLock->relockWithMode(MODE_X);
+            if (status == ErrorCodes::InterruptedAtShutdown)
+                return _failIndexBuild(indexer, status, allowBackgroundBuilding);
+            opCtx->checkForInterrupt();
+        }
         return _failIndexBuild(indexer, status, allowBackgroundBuilding);
     }
 

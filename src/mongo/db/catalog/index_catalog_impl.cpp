@@ -378,6 +378,9 @@ void IndexCatalogImpl::IndexBuildBlock::fail() {
     invariant(_opCtx->lockState()->inAWriteUnitOfWork());
     fassert(17204, _catalog->_getCollection()->ok());  // defensive
 
+    NamespaceString ns(_indexNamespace);
+    invariant(_opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
+
     IndexCatalogEntry* entry = IndexCatalog::_getEntries(_catalog).find(_indexName);
     invariant(entry == _entry);
 
