@@ -1,0 +1,52 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # These tests are not expected to pass with replica-sets:
+  - jstests/core/dbadmin.js
+  - jstests/core/opcounters_write_cmd.js
+  - jstests/core/read_after_optime.js
+  - jstests/core/capped_update.js
+  # These tests expect the logical session cache refresh thread to be turned off, so that refreshes
+  # can be triggered deterministically.
+  - jstests/core/list_all_local_sessions.js
+  - jstests/core/list_all_sessions.js
+  - jstests/core/list_local_sessions.js
+  - jstests/core/list_sessions.js
+  # The awaitdata_getmore_cmd.js test tails the oplog and waits for the getMore batch size to equal
+  # zero. The CheckReplDBHashInBackground hook consistently runs and creates sessions. At the same
+  # time, the logical session cache refresh thread will flush these sessions to disk, creating more
+  # opLog entries. To avoid this infinite loop, we will blacklist the test from this suite.
+  - jstests/core/awaitdata_getmore_cmd.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+      readMode: commands
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 511
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+        disableLogicalSessionCacheRefresh: false
+        logicalSessionRefreshMillis: 1000
+    num_nodes: 3

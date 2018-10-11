@@ -4765,6 +4765,94 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: logical_session_cache_replication_default_refresh_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_default_refresh_jscore_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_default_refresh_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_100ms_refresh_jscore_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_1sec_refresh_jscore_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_10sec_refresh_jscore_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=logical_session_cache_replication_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: logical_session_cache_sharding_default_refresh_jscore_passthrough
   depends_on:
   - name: jsCore
@@ -5755,6 +5843,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: read_concern_linearizable_passthrough_WT
@@ -5807,6 +5896,10 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: jsCore_WT
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_WT
@@ -5873,6 +5966,10 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal_WT
   - name: jsonSchema
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_WT
@@ -6029,6 +6126,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: replica_sets_WT
@@ -6134,6 +6232,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -6218,6 +6317,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -6346,6 +6446,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: replica_sets_WT
@@ -6435,6 +6536,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -6525,6 +6627,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: noPassthrough_WT
@@ -6618,6 +6721,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: replica_sets_WT
@@ -6696,6 +6800,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal_WT
   - name: jsonSchema
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: master_slave_WT
@@ -6955,6 +7060,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: master_slave_WT
@@ -7044,6 +7150,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: read_concern_linearizable_passthrough
@@ -7128,6 +7235,7 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency_WT
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: master_slave_WT
@@ -7277,6 +7385,7 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency_WT
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: master_slave_WT
@@ -7380,6 +7489,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
@@ -7504,6 +7614,10 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency_WT
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session_WT
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_WT
@@ -7862,6 +7976,7 @@ buildvariants:
   - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: master_slave_WT
@@ -7957,6 +8072,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: external_auth_WT
@@ -8050,6 +8166,10 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_WT
@@ -8144,6 +8264,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -8256,6 +8377,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -8366,6 +8488,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -8486,6 +8609,7 @@ buildvariants:
   # - name: jsCore_minimum_batch_size_WT
   # - name: jsCore_op_query
   - name: jsCore_op_query_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   # - name: mmap
@@ -8591,6 +8715,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
@@ -8669,6 +8794,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
@@ -8751,6 +8877,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
@@ -8834,6 +8961,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -8940,6 +9068,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: replica_sets_WT
@@ -9008,6 +9137,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
@@ -9063,6 +9193,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
@@ -9141,6 +9272,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: replica_sets_WT
@@ -9233,6 +9365,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: replica_sets_WT
@@ -9342,6 +9475,10 @@ buildvariants:
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session_WT
   - name: jstestfuzz_sharded_causal_consistency_WT
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_WT
@@ -9442,6 +9579,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -9525,6 +9663,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -9618,6 +9757,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -9730,6 +9870,10 @@ buildvariants:
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query_WT
   - name: jsonSchema
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_WT
@@ -9898,6 +10042,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query_WT
   - name: jsonSchema
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: master_slave_WT
@@ -9976,6 +10121,7 @@ buildvariants:
   - name: compile_all
   - name: dbtest_WT
   - name: jsCore_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: watchdog_WT
@@ -10042,6 +10188,7 @@ buildvariants:
   - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -10152,6 +10299,7 @@ buildvariants:
   - name: jsCore_decimal_WT
   - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
   - name: mongosTest
@@ -10303,6 +10451,7 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: master_slave
@@ -10434,6 +10583,7 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: master_slave
@@ -10545,6 +10695,7 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: master_slave
@@ -10619,6 +10770,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: master_slave
