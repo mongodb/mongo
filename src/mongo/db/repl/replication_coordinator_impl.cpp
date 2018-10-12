@@ -94,6 +94,7 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
 MONGO_FAIL_POINT_DEFINE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
+MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
@@ -2776,6 +2777,10 @@ void ReplicationCoordinatorImpl::signalDropPendingCollectionsRemovedFromStorage(
     _wakeReadyWaiters_inlock();
 }
 
+boost::optional<Timestamp> ReplicationCoordinatorImpl::getRecoveryTimestamp() {
+    return _storage->getRecoveryTimestamp(getServiceContext());
+}
+
 void ReplicationCoordinatorImpl::_enterDrainMode_inlock() {
     _applierState = ApplierState::Draining;
     _externalState->stopProducer();
@@ -3056,6 +3061,13 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime_inloc
         maximumStableTimestamp =
             std::min(_storage->getAllCommittedTimestamp(_service), commitPoint.getTimestamp());
     }
+
+    MONGO_FAIL_POINT_BLOCK(holdStableTimestampAtSpecificTimestamp, data) {
+        const BSONObj& dataObj = data.getData();
+        const auto holdStableTimestamp = dataObj["timestamp"].timestamp();
+        maximumStableTimestamp = std::min(maximumStableTimestamp, holdStableTimestamp);
+    }
+
     const auto maximumStableOpTime = OpTime(maximumStableTimestamp, commitPoint.getTerm());
 
     // Find the greatest optime candidate that is less than or equal to the commit point.

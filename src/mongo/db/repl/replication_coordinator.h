@@ -783,6 +783,12 @@ public:
      */
     bool isOplogDisabledFor(OperationContext* opCtx, const NamespaceString& nss);
 
+    /**
+     * Returns the stable timestamp that the storage engine recovered to on startup. If the
+     * recovery point was not stable, returns "none".
+     */
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() = 0;
+
 protected:
     ReplicationCoordinator();
 };

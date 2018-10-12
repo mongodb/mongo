@@ -139,8 +139,8 @@ private:
         _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
 
         auto service = getServiceContext();
-        ReplicationCoordinator::set(service,
-                                    stdx::make_unique<ReplicationCoordinatorMock>(service));
+        ReplicationCoordinator::set(
+            service, stdx::make_unique<ReplicationCoordinatorMock>(service, getStorageInterface()));
 
         ASSERT_OK(
             ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
@@ -995,6 +995,163 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     serverGlobalParams.enableMajorityReadConcern = false;
 
     recovery.recoverFromOplog(opCtx, boost::none);
+}
+
+TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfigTransactions) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
+    getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
+    _setUpOplog(opCtx, getStorageInterface(), {1});
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+
+    const auto txnOperations = BSON_ARRAY(BSON("op"
+                                               << "i"
+                                               << "ns"
+                                               << testNs.toString()
+                                               << "o"
+                                               << BSON("_id" << 1)));
+    const auto prepareDate = Date_t::now();
+    const auto prepareOp =
+        _makeTransactionOplogEntry({Timestamp(2, 0), 1},
+                                   repl::OpTypeEnum::kCommand,
+                                   BSON("applyOps" << txnOperations << "prepare" << true),
+                                   OpTime(Timestamp(0, 0), -1),
+                                   true,  // prepare
+                                   0,
+                                   sessionInfo,
+                                   prepareDate);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+
+    const auto commitDate = Date_t::now();
+    const auto commitOp = _makeTransactionOplogEntry(
+        {Timestamp(3, 0), 1},
+        repl::OpTypeEnum::kCommand,
+        BSON("commitTransaction" << 1 << "commitTimestamp" << Timestamp(2, 1)),
+        OpTime(Timestamp(2, 0), 1),
+        false,  // prepare
+        1,
+        sessionInfo,
+        commitDate);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {commitOp.toBSON(), Timestamp(3, 0)}, 1));
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    SessionTxnRecord expectedTxnRecord;
+    expectedTxnRecord.setSessionId(*sessionInfo.getSessionId());
+    expectedTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+    expectedTxnRecord.setLastWriteOpTime({Timestamp(3, 0), 1});
+    expectedTxnRecord.setLastWriteDate(commitDate);
+    expectedTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+    std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
+
+    // Make sure that the transaction table shows that the transaction is commited.
+    _assertDocumentsInCollectionEquals(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
+
+    // Make sure the data from the transaction is applied.
+    std::vector<BSONObj> expectedColl{BSON("_id" << 1)};
+    _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
+}
+
+TEST_F(ReplicationRecoveryTest,
+       CommitTransactionBeforeRecoveryTimestampCorrectlyUpdatesConfigTransactions) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    // Make the appliedThrough optime to be after the commit timestamp but before the
+    // commitTransaction oplog entry. This way we can check that there are no idempotency concerns
+    // when updating the transactions table during startup recovery when the table already reflects
+    // the committed transaction.
+    const auto appliedThrough = OpTime(Timestamp(2, 2), 1);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
+    getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
+    _setUpOplog(opCtx, getStorageInterface(), {1});
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+
+    const auto txnOperations = BSON_ARRAY(BSON("op"
+                                               << "i"
+                                               << "ns"
+                                               << testNs.toString()
+                                               << "o"
+                                               << BSON("_id" << 1)));
+    const auto prepareDate = Date_t::now();
+    const auto prepareOp =
+        _makeTransactionOplogEntry({Timestamp(2, 0), 1},
+                                   repl::OpTypeEnum::kCommand,
+                                   BSON("applyOps" << txnOperations << "prepare" << true),
+                                   OpTime(Timestamp(0, 0), -1),
+                                   true,  // prepare
+                                   0,
+                                   sessionInfo,
+                                   prepareDate);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+
+    // Add an operation here so that we can have the appliedThrough time be in-between the commit
+    // timestamp and the commitTransaction oplog entry.
+    const auto insertOp = _makeOplogEntry({Timestamp(2, 2), 1},
+                                          repl::OpTypeEnum::kInsert,
+                                          BSON("_id" << 2),
+                                          boost::none,
+                                          sessionInfo,
+                                          Date_t::now());
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {insertOp.toBSON(), Timestamp(2, 2)}, 1));
+
+    const auto commitDate = Date_t::now();
+    const auto commitOp = _makeTransactionOplogEntry(
+        {Timestamp(3, 0), 1},
+        repl::OpTypeEnum::kCommand,
+        BSON("commitTransaction" << 1 << "commitTimestamp" << Timestamp(2, 1)),
+        OpTime(Timestamp(2, 0), 1),
+        false,  // prepare
+        1,
+        sessionInfo,
+        commitDate);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {commitOp.toBSON(), Timestamp(3, 0)}, 1));
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    SessionTxnRecord expectedTxnRecord;
+    expectedTxnRecord.setSessionId(*sessionInfo.getSessionId());
+    expectedTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+    expectedTxnRecord.setLastWriteOpTime({Timestamp(3, 0), 1});
+    expectedTxnRecord.setLastWriteDate(commitDate);
+    expectedTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+    std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
+
+    // Make sure that the transaction table shows that the transaction is commited.
+    _assertDocumentsInCollectionEquals(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
 }  // namespace

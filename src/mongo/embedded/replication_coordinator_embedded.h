@@ -227,6 +227,8 @@ public:
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
+    boost::optional<Timestamp> getRecoveryTimestamp() override;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

@@ -427,5 +427,9 @@ void ReplicationCoordinatorEmbedded::signalDropPendingCollectionsRemovedFromStor
     UASSERT_NOT_IMPLEMENTED;
 }
 
+boost::optional<Timestamp> ReplicationCoordinatorEmbedded::getRecoveryTimestamp() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

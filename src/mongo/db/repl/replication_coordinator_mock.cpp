@@ -62,6 +62,12 @@ ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service,
                                                        const ReplSettings& settings)
     : _service(service), _settings(settings) {}
 
+ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service,
+                                                       StorageInterface* storage)
+    : ReplicationCoordinatorMock(service, createReplSettingsForSingleNodeReplSet()) {
+    _storage = storage;
+}
+
 ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service)
     : ReplicationCoordinatorMock(service, createReplSettingsForSingleNodeReplSet()) {}
 
@@ -468,6 +474,13 @@ Status ReplicationCoordinatorMock::abortCatchupIfNeeded() {
 }
 
 void ReplicationCoordinatorMock::signalDropPendingCollectionsRemovedFromStorage() {}
+
+boost::optional<Timestamp> ReplicationCoordinatorMock::getRecoveryTimestamp() {
+    if (_storage) {
+        return _storage->getRecoveryTimestamp(getServiceContext());
+    }
+    return boost::none;
+}
 
 }  // namespace repl
 }  // namespace mongo

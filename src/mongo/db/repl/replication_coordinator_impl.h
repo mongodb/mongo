@@ -299,6 +299,8 @@ public:
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
+
     // ================== Test support API ===================
 
     /**

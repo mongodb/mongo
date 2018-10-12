@@ -34,6 +34,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
 
@@ -54,6 +55,8 @@ class ReplicationCoordinatorMock : public ReplicationCoordinator {
 
 public:
     ReplicationCoordinatorMock(ServiceContext* service, const ReplSettings& settings);
+
+    ReplicationCoordinatorMock(ServiceContext* service, StorageInterface* storage);
 
     /**
      * Creates a ReplicationCoordinatorMock with ReplSettings for a one-node replica set.
@@ -279,10 +282,13 @@ public:
 
     void signalDropPendingCollectionsRemovedFromStorage() final;
 
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     ServiceContext* const _service;
     ReplSettings _settings;
+    StorageInterface* _storage;
     MemberState _memberState;
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;
