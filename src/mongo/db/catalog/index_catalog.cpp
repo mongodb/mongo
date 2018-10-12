@@ -35,38 +35,69 @@
 
 
 namespace mongo {
-IndexCatalog::Impl::~Impl() = default;
 
-MONGO_DEFINE_SHIM(IndexCatalog::makeImpl);
+IndexCatalog::IndexIterator::IndexIterator(OperationContext* opCtx,
+                                           IndexCatalogEntryContainer::const_iterator beginIterator,
+                                           IndexCatalogEntryContainer::const_iterator endIterator,
+                                           bool includeUnfinishedIndexes)
+    : _includeUnfinishedIndexes(includeUnfinishedIndexes),
+      _opCtx(opCtx),
+      _iterator(beginIterator),
+      _endIterator(endIterator),
+      _start(true),
+      _prev(nullptr),
+      _next(nullptr) {}
 
-void IndexCatalog::TUHook::hook() noexcept {}
-
-IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(
-    OperationContext* const opCtx,
-    std::unique_ptr<IndexDescriptor> descriptor,
-    const bool initFromDisk) {
-    return this->_impl()._setupInMemoryStructures(opCtx, std::move(descriptor), initFromDisk);
-}
-
-
-IndexCatalog::IndexIterator::Impl::~Impl() = default;
-
-MONGO_DEFINE_SHIM(IndexCatalog::IndexIterator::makeImpl);
-
-void IndexCatalog::IndexIterator::TUHook::hook() noexcept {}
-
-MONGO_DEFINE_SHIM(IndexCatalog::fixIndexKey);
-
-std::string::size_type IndexCatalog::getLongestIndexNameLength(OperationContext* opCtx) const {
-    IndexCatalog::IndexIterator it = getIndexIterator(opCtx, true);
-    std::string::size_type longestIndexNameLength = 0;
-    while (it.more()) {
-        auto thisLength = it.next()->indexName().length();
-        if (thisLength > longestIndexNameLength)
-            longestIndexNameLength = thisLength;
+bool IndexCatalog::IndexIterator::more() {
+    if (_start) {
+        _advance();
+        _start = false;
     }
-    return longestIndexNameLength;
+    return _next != nullptr;
 }
 
-MONGO_DEFINE_SHIM(IndexCatalog::prepareInsertDeleteOptions);
+IndexDescriptor* IndexCatalog::IndexIterator::next() {
+    if (!more())
+        return nullptr;
+    _prev = _next;
+    _advance();
+    return _prev->descriptor();
+}
+
+IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod(const IndexDescriptor* desc) {
+    invariant(desc == _prev->descriptor());
+    return _prev->accessMethod();
+}
+
+IndexCatalogEntry* IndexCatalog::IndexIterator::catalogEntry(const IndexDescriptor* desc) {
+    invariant(desc == _prev->descriptor());
+    return _prev;
+}
+
+void IndexCatalog::IndexIterator::_advance() {
+    _next = nullptr;
+
+    while (_iterator != _endIterator) {
+        IndexCatalogEntry* entry = _iterator->get();
+        ++_iterator;
+
+        if (!_includeUnfinishedIndexes) {
+            if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
+                if (auto mySnapshot = _opCtx->recoveryUnit()->getPointInTimeReadTimestamp()) {
+                    if (mySnapshot < minSnapshot) {
+                        // This index isn't finished in my snapshot.
+                        continue;
+                    }
+                }
+            }
+
+            if (!entry->isReady(_opCtx))
+                continue;
+        }
+
+        _next = entry;
+        return;
+    }
+}
+
 }  // namespace mongo

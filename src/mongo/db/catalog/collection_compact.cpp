@@ -94,10 +94,10 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
             return StatusWith<CompactStats>(status);
 
         // Compact all indexes (not including unfinished indexes)
-        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(opCtx, false));
+        IndexCatalog::IndexIterator ii(_indexCatalog->getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
-            IndexAccessMethod* index = _indexCatalog.getIndex(descriptor);
+            IndexAccessMethod* index = _indexCatalog->getIndex(descriptor);
 
             LOG(1) << "compacting index: " << descriptor->toString();
             Status status = index->compact(opCtx);
@@ -110,13 +110,13 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
         return StatusWith<CompactStats>(stats);
     }
 
-    if (_indexCatalog.numIndexesInProgress(opCtx))
+    if (_indexCatalog->numIndexesInProgress(opCtx))
         return StatusWith<CompactStats>(ErrorCodes::BadValue,
                                         "cannot compact when indexes in progress");
 
     std::vector<BSONObj> indexSpecs;
     {
-        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(opCtx, false));
+        IndexCatalog::IndexIterator ii(_indexCatalog->getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
 
@@ -147,7 +147,7 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
         // which is important and wanted here
         WriteUnitOfWork wunit(opCtx);
         log() << "compact dropping indexes";
-        _indexCatalog.dropAllIndexes(opCtx, true);
+        _indexCatalog->dropAllIndexes(opCtx, true);
         wunit.commit();
     }
 

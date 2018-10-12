@@ -191,7 +191,7 @@ private:
     class CleanupIndexesVectorOnRollback;
 
     struct IndexToBuild {
-        std::unique_ptr<IndexCatalogImpl::IndexBuildBlock> block;
+        std::unique_ptr<IndexCatalog::IndexBuildBlockInterface> block;
 
         IndexAccessMethod* real = NULL;           // owned elsewhere
         const MatchExpression* filterExpression;  // might be NULL, owned elsewhere

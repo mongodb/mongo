@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
@@ -155,7 +156,8 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
       _dbce(dbce),
       _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
       _infoCache(_this_init, _ns),
-      _indexCatalog(_this_init, this->getCatalogEntry()->getMaxAllowedIndexes()),
+      _indexCatalog(std::make_unique<IndexCatalogImpl>(_this_init,
+                                                       getCatalogEntry()->getMaxAllowedIndexes())),
       _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
       _validatorDoc(_details->getCollectionOptions(opCtx).validator.getOwned()),
       _validator(uassertStatusOK(
@@ -171,7 +173,7 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
 
 void CollectionImpl::init(OperationContext* opCtx) {
     _magic = kMagicNumber;
-    _indexCatalog.init(opCtx).transitional_ignore();
+    _indexCatalog->init(opCtx).transitional_ignore();
     if (isCapped())
         _recordStore->setCappedCallback(this);
 
@@ -309,7 +311,7 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     // This also means that we do not need to forward this object to the OpObserver, which is good
     // because it would defeat the purpose of using DocWriter.
     invariant(!_validator);
-    invariant(!_indexCatalog.haveAnyIndexes());
+    invariant(!_indexCatalog->haveAnyIndexes());
 
     Status status = _recordStore->insertRecordsWithDocWriter(opCtx, docs, timestamps, nDocs);
     if (!status.isOK())
@@ -342,7 +344,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     }
 
     // Should really be done in the collection object at creation and updated on index create.
-    const bool hasIdIndex = _indexCatalog.findIdIndex(opCtx);
+    const bool hasIdIndex = _indexCatalog->findIdIndex(opCtx);
 
     for (auto it = begin; it != end; it++) {
         if (hasIdIndex && it->doc["_id"].eoo()) {
@@ -462,7 +464,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
     const size_t count = std::distance(begin, end);
-    if (isCapped() && _indexCatalog.haveAnyIndexes() && count > 1) {
+    if (isCapped() && _indexCatalog->haveAnyIndexes() && count > 1) {
         // We require that inserts to indexed capped collections be done one-at-a-time to avoid the
         // possibility that a later document causes an earlier document to be deleted before it can
         // be indexed.
@@ -507,7 +509,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     }
 
     int64_t keysInserted;
-    status = _indexCatalog.indexRecords(opCtx, bsonRecords, &keysInserted);
+    status = _indexCatalog->indexRecords(opCtx, bsonRecords, &keysInserted);
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
     }
@@ -533,7 +535,7 @@ Status CollectionImpl::aboutToDeleteCapped(OperationContext* opCtx,
                                            RecordData data) {
     BSONObj doc = data.releaseToBson();
     int64_t* const nullKeysDeleted = nullptr;
-    _indexCatalog.unindexRecord(opCtx, doc, loc, false, nullKeysDeleted);
+    _indexCatalog->unindexRecord(opCtx, doc, loc, false, nullKeysDeleted);
 
     // We are not capturing and reporting to OpDebug the 'keysDeleted' by unindexRecord(). It is
     // questionable whether reporting will add diagnostic value to users and may instead be
@@ -566,7 +568,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 
     int64_t keysDeleted;
-    _indexCatalog.unindexRecord(opCtx, doc.value(), loc, noWarn, &keysDeleted);
+    _indexCatalog->unindexRecord(opCtx, doc.value(), loc, noWarn, &keysDeleted);
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
     }
@@ -641,14 +643,14 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     // newDoc.
     OwnedPointerMap<IndexDescriptor*, UpdateTicket> updateTickets;
     if (indexesAffected) {
-        IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(opCtx, true);
+        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, true);
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
             IndexCatalogEntry* entry = ii.catalogEntry(descriptor);
             IndexAccessMethod* iam = ii.accessMethod(descriptor);
 
             InsertDeleteOptions options;
-            IndexCatalog::prepareInsertDeleteOptions(opCtx, descriptor, &options);
+            _indexCatalog->prepareInsertDeleteOptions(opCtx, descriptor, &options);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
             uassertStatusOK(iam->validateUpdate(opCtx,
@@ -668,7 +670,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 
     // Update each index with each respective UpdateTicket.
     if (indexesAffected) {
-        IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(opCtx, true);
+        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, true);
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
             IndexAccessMethod* iam = ii.accessMethod(descriptor);
@@ -774,12 +776,12 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx, BSONObjBuilder* d
 Status CollectionImpl::truncate(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
-    invariant(_indexCatalog.numIndexesInProgress(opCtx) == 0);
+    invariant(_indexCatalog->numIndexesInProgress(opCtx) == 0);
 
     // 1) store index specs
     vector<BSONObj> indexSpecs;
     {
-        IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(opCtx, false);
+        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, false);
         while (ii.more()) {
             const IndexDescriptor* idx = ii.next();
             indexSpecs.push_back(idx->infoObj().getOwned());
@@ -787,7 +789,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     }
 
     // 2) drop indexes
-    _indexCatalog.dropAllIndexes(opCtx, true);
+    _indexCatalog->dropAllIndexes(opCtx, true);
     _cursorManager.invalidateAll(opCtx, false, "collection truncated");
 
     // 3) truncate record store
@@ -797,7 +799,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
 
     // 4) re-create indexes
     for (size_t i = 0; i < indexSpecs.size(); i++) {
-        status = _indexCatalog.createIndexOnEmptyCollection(opCtx, indexSpecs[i]).getStatus();
+        status = _indexCatalog->createIndexOnEmptyCollection(opCtx, indexSpecs[i]).getStatus();
         if (!status.isOK())
             return status;
     }
@@ -809,7 +811,7 @@ void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx, RecordId end, 
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
     invariant(isCapped());
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
-    invariant(_indexCatalog.numIndexesInProgress(opCtx) == 0);
+    invariant(_indexCatalog->numIndexesInProgress(opCtx) == 0);
 
     _cursorManager.invalidateAll(opCtx, false, "capped collection truncated");
     _recordStore->cappedTruncateAfter(opCtx, end, inclusive);
@@ -1197,7 +1199,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
         IndexConsistency indexConsistency(
             opCtx, _this, ns(), _recordStore, std::move(collLk), background);
         RecordStoreValidateAdaptor indexValidator = RecordStoreValidateAdaptor(
-            opCtx, &indexConsistency, level, &_indexCatalog, &indexNsResultsMap);
+            opCtx, &indexConsistency, level, _indexCatalog.get(), &indexNsResultsMap);
 
         // Validate the record store
         std::string uuidString = str::stream()
@@ -1213,7 +1215,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
         // Validate indexes and check for mismatches.
         if (results->valid) {
             _validateIndexes(opCtx,
-                             &_indexCatalog,
+                             _indexCatalog.get(),
                              &keysPerIndex,
                              &indexValidator,
                              level,
@@ -1228,12 +1230,12 @@ Status CollectionImpl::validate(OperationContext* opCtx,
         // Validate index key count.
         if (results->valid) {
             _validateIndexKeyCount(
-                opCtx, &_indexCatalog, _recordStore, &indexValidator, &indexNsResultsMap);
+                opCtx, _indexCatalog.get(), _recordStore, &indexValidator, &indexNsResultsMap);
         }
 
         // Report the validation results for the user to see
         _reportValidationResults(
-            opCtx, &_indexCatalog, &indexNsResultsMap, &keysPerIndex, level, results, output);
+            opCtx, _indexCatalog.get(), &indexNsResultsMap, &keysPerIndex, level, results, output);
 
         if (!results->valid) {
             log(LogComponent::kIndex) << "validating collection " << ns().toString() << " failed"
@@ -1268,10 +1270,10 @@ Status CollectionImpl::touch(OperationContext* opCtx,
 
     if (touchIndexes) {
         Timer t;
-        IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(opCtx, false);
+        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, false);
         while (ii.more()) {
             const IndexDescriptor* desc = ii.next();
-            const IndexAccessMethod* iam = _indexCatalog.getIndex(desc);
+            const IndexAccessMethod* iam = _indexCatalog->getIndex(desc);
             Status status = iam->touch(opCtx);
             if (!status.isOK())
                 return status;
@@ -1279,7 +1281,7 @@ Status CollectionImpl::touch(OperationContext* opCtx,
 
         output->append(
             "indexes",
-            BSON("num" << _indexCatalog.numIndexesTotal(opCtx) << "millis" << t.millis()));
+            BSON("num" << _indexCatalog->numIndexesTotal(opCtx) << "millis" << t.millis()));
     }
 
     return Status::OK();

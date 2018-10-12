@@ -83,11 +83,11 @@ public:
     }
 
     const IndexCatalog* getIndexCatalog() const final {
-        return &_indexCatalog;
+        return _indexCatalog.get();
     }
 
     IndexCatalog* getIndexCatalog() final {
-        return &_indexCatalog;
+        return _indexCatalog.get();
     }
 
     const RecordStore* getRecordStore() const final {
@@ -393,7 +393,7 @@ private:
     DatabaseCatalogEntry* const _dbce;
     const bool _needCappedLock;
     CollectionInfoCache _infoCache;
-    IndexCatalog _indexCatalog;
+    std::unique_ptr<IndexCatalog> _indexCatalog;
 
 
     // The default collation which is applied to operations and indices which have no collation of

@@ -253,7 +253,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         indexInfoObjs.push_back(info);
 
         IndexToBuild index;
-        index.block.reset(new IndexCatalogImpl::IndexBuildBlock(_opCtx, _collection, info));
+        index.block = _collection->getIndexCatalog()->createIndexBuildBlock(_opCtx, info);
         status = index.block->init();
         if (!status.isOK())
             return status;
@@ -271,7 +271,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
 
         const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
-        IndexCatalog::prepareInsertDeleteOptions(_opCtx, descriptor, &index.options);
+        _collection->getIndexCatalog()->prepareInsertDeleteOptions(
+            _opCtx, descriptor, &index.options);
         index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
         if (_ignoreUnique) {
             index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;

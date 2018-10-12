@@ -633,14 +633,16 @@ protected:
     }
 };
 
-class IndexCatatalogFixIndexKey {
+class IndexCatatalogFixIndexKey : public IndexBuildBase {
 public:
     void run() {
-        ASSERT_BSONOBJ_EQ(BSON("x" << 1), IndexCatalog::fixIndexKey(BSON("x" << 1)));
+        auto indexCatalog = collection()->getIndexCatalog();
 
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), IndexCatalog::fixIndexKey(BSON("_id" << 1)));
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), indexCatalog->fixIndexKey(BSON("x" << 1)));
 
-        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), IndexCatalog::fixIndexKey(BSON("_id" << true)));
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), indexCatalog->fixIndexKey(BSON("_id" << 1)));
+
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), indexCatalog->fixIndexKey(BSON("_id" << true)));
     }
 };
 

@@ -106,6 +106,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'index_catalog_entry',
     ],
 )
 
