@@ -67,6 +67,8 @@ namespace {
 // databases if none are provided).
 MONGO_FAIL_POINT_DEFINE(hangBeforeDatabaseUpgrade);
 
+MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
+
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
@@ -398,10 +400,13 @@ Status _collModInternal(OperationContext* opCtx,
             // Notify the index catalog that the definition of this index changed.
             cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
             result->appendAs(newExpireSecs, "expireAfterSeconds_new");
-            opCtx->recoveryUnit()->onRollback([ opCtx, idx = cmr.idx, coll ]() {
-                coll->getIndexCatalog()->refreshEntry(opCtx, idx);
-            });
+
+            if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+                log() << "collMod - assertAfterIndexUpdate fail point enabled.";
+                uasserted(50968, "trigger rollback after the index update");
+            }
         }
+
 
         // Save previous TTL index expiration.
         ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
@@ -444,8 +449,10 @@ Status _collModInternal(OperationContext* opCtx,
             // Refresh the in-memory instance of the index.
             desc = coll->getIndexCatalog()->refreshEntry(opCtx, desc);
 
-            opCtx->recoveryUnit()->onRollback(
-                [opCtx, desc, coll]() { coll->getIndexCatalog()->refreshEntry(opCtx, desc); });
+            if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+                log() << "collMod - assertAfterIndexUpdate fail point enabled.";
+                uasserted(50969, "trigger rollback for unique index update");
+            }
         }
     }
 
