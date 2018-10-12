@@ -28,7 +28,7 @@
 
 Pod::Spec.new do |s|
 
-  s.name         = "mongo-c-driver"
+  s.name         = "mongo-embedded-c-driver"
   s.version      = "@VERSION@"
   s.summary      = "MongoDB C Driver"
 
