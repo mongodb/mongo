@@ -170,6 +170,7 @@ IndexToDiscriminatorMap PlanCacheIndexabilityState::buildWildcardDiscriminators(
 
 void PlanCacheIndexabilityState::updateDiscriminators(const std::vector<IndexEntry>& indexEntries) {
     _pathDiscriminatorsMap = PathDiscriminatorsMap();
+    _wildcardIndexDiscriminators.clear();
 
     for (const IndexEntry& idx : indexEntries) {
         if (idx.type == IndexType::INDEX_WILDCARD) {
