@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    const coll = db.coll;
+    const coll = db.update_numeric_field_name;
     coll.drop();
 
     assert.commandWorked(coll.insert({_id: 0, 'a': [{}]}));
