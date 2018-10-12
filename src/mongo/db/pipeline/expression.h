@@ -435,7 +435,7 @@ public:
     explicit ExpressionSingleNumericArg(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<SubClass, 1>(expCtx) {}
 
-    virtual ~ExpressionSingleNumericArg() {}
+    virtual ~ExpressionSingleNumericArg() = default;
 
     Value evaluate(const Document& root) const final {
         Value arg = this->vpOperand[0]->evaluate(root);
@@ -451,6 +451,49 @@ public:
     }
 
     virtual Value evaluateNumericArg(const Value& numericArg) const = 0;
+};
+
+/**
+ * Inherit from this class if your expression takes exactly two numeric arguments.
+ */
+template <typename SubClass>
+class ExpressionTwoNumericArgs : public ExpressionFixedArity<SubClass, 2> {
+public:
+    explicit ExpressionTwoNumericArgs(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<SubClass, 2>(expCtx) {}
+
+    virtual ~ExpressionTwoNumericArgs() = default;
+
+    /**
+     * Evaluate performs the type checking necessary to make sure that both arguments are numeric,
+     * then calls the evaluateNumericArgs on the two numeric args:
+     * 1. If either input is nullish, it returns null.
+     * 2. If either input is not numeric, it throws an error.
+     * 3. Call evaluateNumericArgs on the two numeric args.
+     */
+    Value evaluate(const Document& root) const final {
+        Value arg1 = this->vpOperand[0]->evaluate(root);
+        if (arg1.nullish())
+            return Value(BSONNULL);
+        uassert(51044,
+                str::stream() << this->getOpName() << " only supports numeric types, not "
+                              << typeName(arg1.getType()),
+                arg1.numeric());
+        Value arg2 = this->vpOperand[1]->evaluate(root);
+        if (arg2.nullish())
+            return Value(BSONNULL);
+        uassert(51045,
+                str::stream() << this->getOpName() << " only supports numeric types, not "
+                              << typeName(arg2.getType()),
+                arg2.numeric());
+
+        return evaluateNumericArgs(arg1, arg2);
+    }
+
+    /**
+     *  Evaluate the expression on exactly two numeric arguments.
+     */
+    virtual Value evaluateNumericArgs(const Value& numericArg1, const Value& numericArg2) const = 0;
 };
 
 /**
@@ -664,7 +707,6 @@ public:
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
 };
-
 
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
