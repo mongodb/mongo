@@ -48,7 +48,8 @@ public:
      *  setShardVersion command will be invoked to initialize the remote shard. Otherwise, the
      *  chunk manager will be used to obtain the shard version to set on the connection.
      */
-    ShardConnection(const ConnectionString& connectionString,
+    ShardConnection(OperationContext* opCtx,
+                    const ConnectionString& connectionString,
                     const std::string& ns,
                     std::shared_ptr<ChunkManager> manager = nullptr);
 

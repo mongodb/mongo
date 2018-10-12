@@ -70,7 +70,7 @@ public:
         for (std::set<std::string>::const_iterator i = shards->begin(); i != shards->end(); i++) {
             const std::string shardName = *i;
 
-            ShardConnection conn(ConnectionString(shardName, ConnectionString::SET), "");
+            ShardConnection conn(opCtx, ConnectionString(shardName, ConnectionString::SET), "");
 
             BSONObj res;
 

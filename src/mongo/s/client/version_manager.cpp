@@ -42,6 +42,7 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -113,6 +114,9 @@ bool setShardVersion(OperationContext* opCtx,
                      ChunkManager* manager,
                      bool authoritative,
                      BSONObj& result) {
+    // This code should never run under a cross-shard transaction
+    invariant(!TransactionRouter::get(opCtx));
+
     ShardId shardId;
     ConnectionString shardCS;
     {

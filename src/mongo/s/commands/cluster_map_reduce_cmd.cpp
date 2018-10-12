@@ -287,7 +287,7 @@ public:
 
             invariant(inputRoutingInfo.db().primary());
 
-            ShardConnection conn(inputRoutingInfo.db().primary()->getConnString(), "");
+            ShardConnection conn(opCtx, inputRoutingInfo.db().primary()->getConnString(), "");
 
             BSONObj res;
             bool ok = conn->runCommand(
@@ -449,7 +449,7 @@ public:
             const auto outputShard =
                 uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
 
-            ShardConnection conn(outputShard->getConnString(), outputCollNss.ns());
+            ShardConnection conn(opCtx, outputShard->getConnString(), outputCollNss.ns());
             ok = conn->runCommand(
                 outDB, appendAllowImplicitCreate(finalCmd.obj(), true), singleResult);
 

@@ -44,6 +44,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -375,11 +376,15 @@ MONGO_INITIALIZER(InitializeShardedConnectionPool)(InitializerContext* context) 
 
 DBConnectionPool shardConnectionPool;
 
-ShardConnection::ShardConnection(const ConnectionString& connectionString,
+ShardConnection::ShardConnection(OperationContext* opCtx,
+                                 const ConnectionString& connectionString,
                                  const std::string& ns,
                                  std::shared_ptr<ChunkManager> manager)
     : _cs(connectionString), _ns(ns), _manager(manager), _finishedInit(false) {
     invariant(_cs.isValid());
+
+    // This code should never run under a cross-shard transaction
+    invariant(!TransactionRouter::get(opCtx));
 
     // Make sure we specified a manager for the correct namespace
     if (_ns.size() && _manager) {
@@ -387,11 +392,12 @@ ShardConnection::ShardConnection(const ConnectionString& connectionString,
     }
 
     auto csString = _cs.toString();
+
     _conn = ClientConnections::threadInstance()->get(csString, _ns);
     if (isMongos()) {
         // In mongos, we record this connection as having been used for useful work to provide
         // useful information in getLastError.
-        ClusterLastErrorInfo::get(cc())->addShardHost(csString);
+        ClusterLastErrorInfo::get(opCtx->getClient())->addShardHost(csString);
     }
 }
 

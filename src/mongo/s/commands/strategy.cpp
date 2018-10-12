@@ -430,7 +430,13 @@ void runCommand(OperationContext* opCtx,
 
                 // Send setShardVersion on this thread's versioned connections to shards (to support
                 // commands that use the legacy (ShardConnection) versioning protocol).
-                if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError)) {
+                //
+                // Versioned connections are a legacy concept, which is never used from code running
+                // under a transaction (see the invariant inside ShardConnection). Because of this,
+                // the retargeting error could not have come from a ShardConnection, so we don't
+                // need to reset the connection's in-memory state.
+                if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
+                    !TransactionRouter::get(opCtx)) {
                     ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
                 }
 
@@ -858,7 +864,13 @@ void Strategy::explainFind(OperationContext* opCtx,
 
             // Send setShardVersion on this thread's versioned connections to shards (to support
             // commands that use the legacy (ShardConnection) versioning protocol).
-            if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError)) {
+            //
+            // Versioned connections are a legacy concept, which is never used from code running
+            // under a transaction (see the invariant inside ShardConnection). Because of this, the
+            // retargeting error could not have come from a ShardConnection, so we don't need to
+            // reset the connection's in-memory state.
+            if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
+                !TransactionRouter::get(opCtx)) {
                 ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
             }
 

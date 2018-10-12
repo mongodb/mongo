@@ -155,7 +155,7 @@ private:
                                       std::shared_ptr<ChunkManager> manager /* in */);
 
     // LEGACY init - Needed for map reduce
-    void _oldInit();
+    void _oldInit(OperationContext* opCtx);
 
     // LEGACY - Needed ONLY for _oldInit
     std::string _ns;

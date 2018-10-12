@@ -46,6 +46,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/lasterror',
         'cluster_last_error_info',
         'grid',
+        'sharding_router_api',
         'sharding_routing_table',
     ],
 )

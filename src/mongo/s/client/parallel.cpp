@@ -218,7 +218,7 @@ void ParallelSortClusteredCursor::init(OperationContext* opCtx) {
     } else {
         // You can only get here by using the legacy constructor
         // TODO: Eliminate this
-        _oldInit();
+        _oldInit(opCtx);
     }
 }
 
@@ -351,7 +351,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
     if (!state->conn) {
         const auto shard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-        state->conn.reset(new ShardConnection(shard->getConnString(), ns.ns(), manager));
+        state->conn.reset(new ShardConnection(opCtx, shard->getConnString(), ns.ns(), manager));
     }
 
     const DBClientBase* rawConn = state->conn->getRawConn();
@@ -911,7 +911,7 @@ std::shared_ptr<DBClientCursor> ParallelSortClusteredCursor::getShardCursor(
 }
 
 // DEPRECATED (but still used by map/reduce)
-void ParallelSortClusteredCursor::_oldInit() {
+void ParallelSortClusteredCursor::_oldInit(OperationContext* opCtx) {
     // make sure we're not already initialized
     verify(!_cursors);
     _cursors = new DBClientCursorHolder[_numServers];
@@ -970,7 +970,7 @@ void ParallelSortClusteredCursor::_oldInit() {
                 // here
                 try {
                     conns.push_back(shared_ptr<ShardConnection>(new ShardConnection(
-                        uassertStatusOK(ConnectionString::parse(serverHost)), _ns)));
+                        opCtx, uassertStatusOK(ConnectionString::parse(serverHost)), _ns)));
                 } catch (std::exception& e) {
                     socketExs.push_back(e.what() + errLoc);
                     if (!returnPartial) {
