@@ -183,9 +183,7 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                                          const BSONObj& obj,
                                          const RecordId& loc,
                                          const InsertDeleteOptions& options,
-                                         int64_t* numInserted) {
-    invariant(numInserted);
-    *numInserted = 0;
+                                         InsertResult* result) {
     bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
     BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -201,9 +199,27 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
         for (const auto& key : *keySet) {
             Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
             if (status.isOK()) {
+                bool unique = _descriptor->unique();
                 StatusWith<SpecialFormatInserted> ret =
-                    _newInterface->insert(opCtx, key, recordId, options.dupsAllowed);
+                    _newInterface->insert(opCtx, key, recordId, !unique /* dupsAllowed */);
                 status = ret.getStatus();
+
+                // When duplicates are encountered and allowed, retry with dupsAllowed. Add the
+                // key to the output vector so callers know which duplicate keys were inserted.
+                if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
+                    invariant(unique);
+                    ret = _newInterface->insert(opCtx, key, recordId, true /* dupsAllowed */);
+                    status = ret.getStatus();
+
+                    // This is speculative in that the 'dupsInserted' vector is not used by any code
+                    // today. It is currently in place to test detecting duplicate key errors during
+                    // hybrid index builds. Duplicate detection in the future will likely not take
+                    // place in this insert() method.
+                    if (status.isOK() && result) {
+                        result->dupsInserted.push_back(key);
+                    }
+                }
+
                 if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
                     _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
             }
@@ -213,7 +229,9 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
         }
     }
 
-    *numInserted = keys.size() + multikeyMetadataKeys.size();
+    if (result) {
+        result->numInserted += keys.size() + multikeyMetadataKeys.size();
+    }
 
     if (shouldMarkIndexAsMultikey(keys, multikeyMetadataKeys, multikeyPaths)) {
         _btreeState->setMultikey(opCtx, multikeyPaths);
@@ -595,7 +613,12 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              BulkBuilder* bulk,
                                              bool mayInterrupt,
                                              bool dupsAllowed,
-                                             set<RecordId>* dupsToDrop) {
+                                             set<RecordId>* dupRecords,
+                                             std::vector<BSONObj>* dupKeysInserted) {
+    // Cannot simultaneously report uninserted duplicates 'dupRecords' and inserted duplicates
+    // 'dupKeysInserted'.
+    invariant(!(dupRecords && dupKeysInserted));
+
     Timer timer;
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
@@ -613,6 +636,9 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
 
+    BSONObj previousKey;
+    const Ordering ordering = Ordering::make(_descriptor->keyPattern());
+
     while (it->more()) {
         if (mayInterrupt) {
             opCtx->checkForInterrupt();
@@ -623,6 +649,22 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();
 
+        // Before attempting to insert, perform a duplicate key check.
+        bool isDup = false;
+        if (_descriptor->unique()) {
+            isDup = data.first.woCompare(previousKey, ordering) == 0;
+            if (isDup && !dupsAllowed) {
+                if (dupRecords) {
+                    dupRecords->insert(data.second);
+                    continue;
+                }
+                return buildDupKeyErrorStatus(data.first,
+                                              _descriptor->parentNS(),
+                                              _descriptor->indexName(),
+                                              _descriptor->keyPattern());
+            }
+        }
+
         Status status = checkIndexKeySize ? checkKeySize(data.first) : Status::OK();
         if (status.isOK()) {
             StatusWith<SpecialFormatInserted> ret = builder->addKey(data.first, data.second);
@@ -632,23 +674,22 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         }
 
         if (!status.isOK()) {
+            // Duplicates are checked before inserting.
+            invariant(status.code() != ErrorCodes::DuplicateKey);
+
             // Overlong key that's OK to skip?
             // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
             if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong()) {
                 continue;
             }
 
-            // Check if this is a duplicate that's OK to skip
-            if (status.code() == ErrorCodes::DuplicateKey) {
-                invariant(!dupsAllowed);  // shouldn't be getting DupKey errors if dupsAllowed.
-
-                if (dupsToDrop) {
-                    dupsToDrop->insert(data.second);
-                    continue;
-                }
-            }
-
             return status;
+        }
+
+        previousKey = data.first.getOwned();
+
+        if (isDup && dupsAllowed && dupKeysInserted) {
+            dupKeysInserted->push_back(data.first.getOwned());
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.
@@ -748,7 +789,7 @@ bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
     return (keys.size() > 1 || isMultikeyFromPaths(multikeyPaths));
 }
 
-SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface_forTest() const {
+SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {
     return _newInterface.get();
 }
 

@@ -467,31 +467,47 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
     return Status::OK();
 }
 
-Status MultiIndexBlockImpl::insert(const BSONObj& doc, const RecordId& loc) {
+Status MultiIndexBlockImpl::insert(const BSONObj& doc,
+                                   const RecordId& loc,
+                                   std::vector<BSONObj>* const dupKeysInserted) {
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
             continue;
         }
 
-        int64_t unused;
+        InsertResult result;
         Status idxStatus(ErrorCodes::InternalError, "");
         if (_indexes[i].bulk) {
             idxStatus = _indexes[i].bulk->insert(_opCtx, doc, loc, _indexes[i].options);
         } else {
-            idxStatus = _indexes[i].real->insert(_opCtx, doc, loc, _indexes[i].options, &unused);
+            idxStatus = _indexes[i].real->insert(_opCtx, doc, loc, _indexes[i].options, &result);
         }
 
         if (!idxStatus.isOK())
             return idxStatus;
+
+        if (dupKeysInserted) {
+            dupKeysInserted->insert(
+                dupKeysInserted->end(), result.dupsInserted.begin(), result.dupsInserted.end());
+        }
     }
     return Status::OK();
 }
 
 Status MultiIndexBlockImpl::doneInserting() {
-    return doneInserting(nullptr);
+    return _doneInserting(nullptr, nullptr);
 }
 
-Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
+Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupRecords) {
+    return _doneInserting(dupRecords, nullptr);
+}
+
+Status MultiIndexBlockImpl::doneInserting(std::vector<BSONObj>* dupKeysInserted) {
+    return _doneInserting(nullptr, dupKeysInserted);
+}
+
+Status MultiIndexBlockImpl::_doneInserting(std::set<RecordId>* dupRecords,
+                                           std::vector<BSONObj>* dupKeysInserted) {
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == NULL)
@@ -502,7 +518,8 @@ Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
                                                      _indexes[i].bulk.get(),
                                                      _allowInterruption,
                                                      _indexes[i].options.dupsAllowed,
-                                                     dupsOut);
+                                                     dupRecords,
+                                                     dupKeysInserted);
         if (!status.isOK()) {
             return status;
         }

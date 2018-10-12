@@ -1224,7 +1224,6 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
     prepareInsertDeleteOptions(opCtx, index->descriptor(), &options);
 
     for (auto bsonRecord : bsonRecords) {
-        int64_t inserted;
         invariant(bsonRecord.id != RecordId());
 
         if (!bsonRecord.ts.isNull()) {
@@ -1233,13 +1232,14 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                 return status;
         }
 
+        InsertResult result;
         Status status = index->accessMethod()->insert(
-            opCtx, *bsonRecord.docPtr, bsonRecord.id, options, &inserted);
+            opCtx, *bsonRecord.docPtr, bsonRecord.id, options, &result);
         if (!status.isOK())
             return status;
 
         if (keysInsertedOut) {
-            *keysInsertedOut += inserted;
+            *keysInsertedOut += result.numInserted;
         }
     }
     return Status::OK();

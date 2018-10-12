@@ -865,17 +865,17 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             int64_t numDeleted;
-            int64_t numInserted;
+            InsertResult insertResult;
             const BSONObj actualKey = BSON("a" << 1);
             const BSONObj badKey = BSON("a" << -1);
             InsertDeleteOptions options;
             options.dupsAllowed = true;
             options.logIfError = true;
             auto removeStatus = iam->remove(&_opCtx, actualKey, id1, options, &numDeleted);
-            auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &numInserted);
+            auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
 
             ASSERT_EQUALS(numDeleted, 1);
-            ASSERT_EQUALS(numInserted, 1);
+            ASSERT_EQUALS(insertResult.numInserted, 1);
             ASSERT_OK(removeStatus);
             ASSERT_OK(insertStatus);
             wunit.commit();
@@ -1018,8 +1018,7 @@ public:
         const RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
         IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto sortedDataInterface =
-            indexCatalog->getIndex(descriptor)->getSortedDataInterface_forTest();
+        auto sortedDataInterface = indexCatalog->getIndex(descriptor)->getSortedDataInterface();
         {
             WriteUnitOfWork wunit(&_opCtx);
             const BSONObj indexKey = BSON("" << 1 << ""
@@ -1125,8 +1124,7 @@ public:
         lockDb(MODE_X);
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
         IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto sortedDataInterface =
-            indexCatalog->getIndex(descriptor)->getSortedDataInterface_forTest();
+        auto sortedDataInterface = indexCatalog->getIndex(descriptor)->getSortedDataInterface();
 
         // Removing a multikey metadata path for a path included in the projection causes validate
         // to fail.

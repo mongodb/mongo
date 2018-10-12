@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -135,13 +134,16 @@ public:
     Status insertAllDocumentsInCollection() override;
 
     /**
-     * Call this after init() for each document in the collection.
+     * Call this after init() for each document in the collection. Any duplicate keys inserted will
+     * be appended to 'dupKeysInserted' if it is not null.
      *
      * Do not call if you called insertAllDocumentsInCollection();
      *
      * Should be called inside of a WriteUnitOfWork.
      */
-    Status insert(const BSONObj& wholeDocument, const RecordId& loc) override;
+    Status insert(const BSONObj& doc,
+                  const RecordId& loc,
+                  std::vector<BSONObj>* const dupKeysInserted = nullptr) override;
 
     /**
      * Call this after the last insert(). This gives the index builder a chance to do any
@@ -149,14 +151,20 @@ public:
      *
      * Do not call if you called insertAllDocumentsInCollection();
      *
-     * If dupsOut is passed as non-NULL, violators of uniqueness constraints will be added to
-     * the set. Documents added to this set are not indexed, so callers MUST either fail this
-     * index build or delete the documents from the collection.
+     * If 'dupRecords' is passed as non-NULL and duplicates are not allowed for the index, violators
+     * of uniqueness constraints will be added to the set. Records added to this set are not
+     * indexed, so callers MUST either fail this index build or delete the documents from the
+     * collection.
      *
-     * Must not be called inside of a WriteUnitOfWork.
+     * If 'dupKeysInserted' is passed as non-NULL and duplicates are allowed for the unique index,
+     * violators of uniqueness constraints will still be indexed, and the keys will be appended to
+     * the vector. No DuplicateKey errors will be returned.
+     *
+     * Should not be called inside of a WriteUnitOfWork.
      */
     Status doneInserting() override;
-    Status doneInserting(std::set<RecordId>* dupsOut) override;
+    Status doneInserting(std::set<RecordId>* dupRecords) override;
+    Status doneInserting(std::vector<BSONObj>* dupKeysInserted) override;
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -203,6 +211,8 @@ private:
 
         InsertDeleteOptions options;
     };
+
+    Status _doneInserting(std::set<RecordId>* dupRecords, std::vector<BSONObj>* dupKeysInserted);
 
     std::vector<IndexToBuild> _indexes;
 
