@@ -117,7 +117,6 @@ Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
     insertOp.setWriteCommandBase([&] {
         write_ops::WriteCommandBase wcb;
         wcb.setOrdered(false);
-        // wcb.setOrdered(true);
         wcb.setBypassDocumentValidation(bypassDocValidation);
         return wcb;
     }());
@@ -148,7 +147,6 @@ Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
     updateOp.setWriteCommandBase([&] {
         write_ops::WriteCommandBase wcb;
         wcb.setOrdered(false);
-        // wcb.setOrdered(true);
         wcb.setBypassDocumentValidation(bypassDocValidation);
         return wcb;
     }());
