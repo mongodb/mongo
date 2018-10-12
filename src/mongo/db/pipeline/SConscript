@@ -135,6 +135,7 @@ env.Library(
     target='expression',
     source=[
         'expression.cpp',
+        'expression_trigonometric.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
@@ -445,6 +446,7 @@ env.CppUnitTest(
         'expression_convert_test.cpp',
         'expression_date_test.cpp',
         'expression_test.cpp',
+        'expression_trigonometric_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

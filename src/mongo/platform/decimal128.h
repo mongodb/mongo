@@ -72,6 +72,10 @@ public:
     static const Decimal128 kPositiveNaN;
     static const Decimal128 kNegativeNaN;
 
+    static const Decimal128 kPi;
+    static const Decimal128 kPiOver180;
+    static const Decimal128 k180OverPi;
+
     static const uint32_t kMaxBiasedExponent = 6143 + 6144;
     // Biased exponent of a Decimal128 with least significant digit in the units place
     static const int32_t kExponentBias = 6143 + 33;
@@ -240,6 +244,90 @@ public:
      * Returns the absolute value of this.
      */
     Decimal128 toAbs() const;
+
+    /**
+     * Returns the acos value of this.
+     */
+    Decimal128 acos(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 acos(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the acosh value of this.
+     */
+    Decimal128 acosh(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 acosh(std::uint32_t* signalingFlags,
+                     RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the asin value of this.
+     */
+    Decimal128 asin(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 asin(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the asinh value of this.
+     */
+    Decimal128 asinh(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 asinh(std::uint32_t* signalingFlags,
+                     RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the atan value of this.
+     */
+    Decimal128 atan(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 atan(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the atan2(this, other) rather than atan2(other,this), which
+     * would produce different results.
+     */
+    Decimal128 atan2(const Decimal128& other, RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 atan2(const Decimal128& other,
+                     std::uint32_t* signalingFlags,
+                     RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the atanh value of this.
+     */
+    Decimal128 atanh(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 atanh(std::uint32_t* signalingFlags,
+                     RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the cos value of this.
+     */
+    Decimal128 cos(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 cos(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the cosh value of this.
+     */
+    Decimal128 cosh(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 cosh(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the sin value of this.
+     */
+    Decimal128 sin(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 sin(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the sinh value of this.
+     */
+    Decimal128 sinh(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 sinh(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+    /**
+     * Returns the tan value of this.
+     */
+    Decimal128 tan(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 tan(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
+    /**
+     * Returns the tanh value of this.
+     */
+    Decimal128 tanh(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 tanh(std::uint32_t* signalingFlags, RoundingMode roundMode = kRoundTiesToEven) const;
+
 
     /**
      * Returns `this` with inverted sign bit
