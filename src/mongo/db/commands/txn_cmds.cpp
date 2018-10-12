@@ -74,9 +74,6 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        LOG(3) << "Participant shard received commitTransaction for transaction with txnNumber "
-               << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
-
         IDLParserErrorContext ctx("commitTransaction");
         auto cmd = CommitTransaction::parse(ctx, cmdObj);
 
@@ -84,6 +81,9 @@ public:
         uassert(ErrorCodes::CommandFailed,
                 "commitTransaction must be run within a transaction",
                 txnParticipant);
+
+        LOG(3) << "Participant shard received commitTransaction for transaction with txnNumber "
+               << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
 
         // commitTransaction is retryable.
         if (txnParticipant->transactionIsCommitted()) {
@@ -143,13 +143,13 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        LOG(3) << "Participant shard received abortTransaction for transaction with txnNumber "
-               << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
-
         auto txnParticipant = TransactionParticipant::get(opCtx);
         uassert(ErrorCodes::CommandFailed,
                 "abortTransaction must be run within a transaction",
                 txnParticipant);
+
+        LOG(3) << "Participant shard received abortTransaction for transaction with txnNumber "
+               << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",

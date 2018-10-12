@@ -69,11 +69,6 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            LOG(3)
-                << "Participant shard received prepareTransaction for transaction with txnNumber "
-                << opCtx->getTxnNumber() << " on session "
-                << opCtx->getLogicalSessionId()->toBSON();
-
             // In production, only config servers or initialized shard servers can participate in a
             // sharded transaction. However, many test suites test the replication and storage parts
             // of prepareTransaction against a standalone replica set, so allow skipping the check.
@@ -87,6 +82,11 @@ public:
             uassert(ErrorCodes::CommandFailed,
                     "prepareTransaction must be run within a transaction",
                     txnParticipant);
+
+            LOG(3)
+                << "Participant shard received prepareTransaction for transaction with txnNumber "
+                << opCtx->getTxnNumber() << " on session "
+                << opCtx->getLogicalSessionId()->toBSON();
 
             uassert(ErrorCodes::CommandNotSupported,
                     "'prepareTransaction' is only supported in feature compatibility version 4.2",
