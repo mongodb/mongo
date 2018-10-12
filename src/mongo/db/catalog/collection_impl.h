@@ -356,6 +356,8 @@ public:
      */
     const CollatorInterface* getDefaultCollator() const final;
 
+    std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) final;
+
 private:
     inline DatabaseCatalogEntry* dbce() const final {
         return this->_dbce;

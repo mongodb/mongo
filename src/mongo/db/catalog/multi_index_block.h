@@ -34,10 +34,8 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/functional.h"
@@ -61,73 +59,8 @@ class OperationContext;
  */
 class MultiIndexBlock {
 public:
-    class Impl {
-    public:
-        virtual ~Impl() = 0;
-
-        virtual void allowBackgroundBuilding() = 0;
-
-        virtual void allowInterruption() = 0;
-
-        virtual void ignoreUniqueConstraint() = 0;
-
-        virtual void removeExistingIndexes(std::vector<BSONObj>* specs) const = 0;
-
-        virtual StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) = 0;
-
-        virtual StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) = 0;
-
-        virtual Status insertAllDocumentsInCollection() = 0;
-
-        virtual Status insert(const BSONObj& wholeDocument, const RecordId& loc) = 0;
-
-        virtual Status doneInserting(std::set<RecordId>* dupsOut = NULL) = 0;
-
-        virtual void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
-
-        virtual void abortWithoutCleanup() = 0;
-
-        virtual bool getBuildInBackground() const = 0;
-    };
-
-private:
-    std::unique_ptr<Impl> _pimpl;
-
-    // This structure exists to give us a customization point to decide how to force users of this
-    // class to depend upon the corresponding `index_create.cpp` Translation Unit (TU).  All public
-    // forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
-    struct TUHook {
-        static void hook() noexcept;
-
-        explicit inline TUHook() noexcept {
-            if (kDebugBuild)
-                this->hook();
-        }
-    };
-
-    inline const Impl& _impl() const {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-    inline Impl& _impl() {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-public:
-    static MONGO_DECLARE_SHIM((OperationContext * opCtx,
-                               Collection* collection,
-                               PrivateTo<MultiIndexBlock>)
-                                  ->std::unique_ptr<Impl>) makeImpl;
-
-    inline ~MultiIndexBlock() = default;
-
-    /**
-     * Neither pointer is owned.
-     */
-    inline explicit MultiIndexBlock(OperationContext* const opCtx, Collection* const collection)
-        : _pimpl(makeImpl(opCtx, collection, PrivateCall<MultiIndexBlock>{})) {}
+    MultiIndexBlock() = default;
+    virtual ~MultiIndexBlock() = default;
 
     /**
      * By default we ignore the 'background' flag in specs when building an index. If this is
@@ -137,17 +70,13 @@ public:
      * indexes in the background, but there is a performance benefit to building all in the
      * foreground.
      */
-    inline void allowBackgroundBuilding() {
-        return this->_impl().allowBackgroundBuilding();
-    }
+    virtual void allowBackgroundBuilding() = 0;
 
     /**
      * Call this before init() to allow the index build to be interrupted.
      * This only affects builds using the insertAllDocumentsInCollection helper.
      */
-    inline void allowInterruption() {
-        return this->_impl().allowInterruption();
-    }
+    virtual void allowInterruption() = 0;
 
     /**
      * By default we enforce the 'unique' flag in specs when building an index by failing.
@@ -156,17 +85,13 @@ public:
      *
      * If this is called, any dupsOut sets passed in will never be filled.
      */
-    inline void ignoreUniqueConstraint() {
-        return this->_impl().ignoreUniqueConstraint();
-    }
+    virtual void ignoreUniqueConstraint() = 0;
 
     /**
      * Removes pre-existing indexes from 'specs'. If this isn't done, init() may fail with
      * IndexAlreadyExists.
      */
-    inline void removeExistingIndexes(std::vector<BSONObj>* const specs) const {
-        return this->_impl().removeExistingIndexes(specs);
-    }
+    virtual void removeExistingIndexes(std::vector<BSONObj>* const specs) const = 0;
 
     /**
      * Prepares the index(es) for building and returns the canonicalized form of the requested index
@@ -176,13 +101,9 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    inline StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) {
-        return this->_impl().init(specs);
-    }
+    virtual StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) = 0;
 
-    inline StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) {
-        return this->_impl().init(spec);
-    }
+    virtual StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) = 0;
 
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.
@@ -196,9 +117,7 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    inline Status insertAllDocumentsInCollection() {
-        return this->_impl().insertAllDocumentsInCollection();
-    }
+    virtual Status insertAllDocumentsInCollection() = 0;
 
     /**
      * Call this after init() for each document in the collection.
@@ -207,9 +126,7 @@ public:
      *
      * Should be called inside of a WriteUnitOfWork.
      */
-    inline Status insert(const BSONObj& wholeDocument, const RecordId& loc) {
-        return this->_impl().insert(wholeDocument, loc);
-    }
+    virtual Status insert(const BSONObj& wholeDocument, const RecordId& loc) = 0;
 
     /**
      * Call this after the last insert(). This gives the index builder a chance to do any
@@ -223,9 +140,7 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    inline Status doneInserting(std::set<RecordId>* const dupsOut = nullptr) {
-        return this->_impl().doneInserting(dupsOut);
-    }
+    virtual Status doneInserting(std::set<RecordId>* const dupsOut = nullptr) = 0;
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -238,9 +153,7 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    inline void commit(stdx::function<void(const BSONObj& spec)> onCreateFn = nullptr) {
-        return this->_impl().commit(onCreateFn);
-    }
+    virtual void commit(stdx::function<void(const BSONObj& spec)> onCreateFn = nullptr) = 0;
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
@@ -256,12 +169,8 @@ public:
      * Does not matter whether it is called inside of a WriteUnitOfWork. Will not be rolled
      * back.
      */
-    inline void abortWithoutCleanup() {
-        return this->_impl().abortWithoutCleanup();
-    }
+    virtual void abortWithoutCleanup() = 0;
 
-    inline bool getBuildInBackground() const {
-        return this->_impl().getBuildInBackground();
-    }
+    virtual bool getBuildInBackground() const = 0;
 };
 }  // namespace mongo

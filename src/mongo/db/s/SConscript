@@ -66,7 +66,6 @@ env.Library(
         'split_vector.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',

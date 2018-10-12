@@ -147,7 +147,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'database',
-        'index_create',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
@@ -175,16 +174,6 @@ env.Library(
     target='collection_info_cache',
     source=[
         'collection_info_cache.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
-    target='index_create',
-    source=[
-        'index_create.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -253,7 +242,7 @@ env.Library(
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "index_consistency.cpp",
-        "index_create_impl.cpp",
+        "multi_index_block_impl.cpp",
         "private/record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[
@@ -265,7 +254,6 @@ env.Library(
         'health_log',
         'index_catalog',
         'index_catalog_entry',
-        'index_create',
         'index_key_validate',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
@@ -318,7 +306,6 @@ env.Library(
         'collection',
         'database',
         'index_catalog',
-        'index_create',
     ],
 )
 
@@ -364,7 +351,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        'index_create',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',

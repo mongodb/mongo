@@ -41,8 +41,8 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -200,7 +200,7 @@ public:
             WriteUnitOfWork wunit(opCtx);
             collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-            indexer = stdx::make_unique<MultiIndexBlock>(opCtx, collection);
+            indexer = collection->createMultiIndexBlock(opCtx);
 
             swIndexesToRebuild = indexer->init(all);
             uassertStatusOK(swIndexesToRebuild.getStatus());

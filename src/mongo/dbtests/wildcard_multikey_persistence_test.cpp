@@ -188,7 +188,8 @@ protected:
         AutoGetCollection autoColl(opCtx(), nss, MODE_X);
         auto coll = autoColl.getCollection();
 
-        MultiIndexBlock indexer(opCtx(), coll);
+        auto indexerPtr = coll->createMultiIndexBlock(opCtx());
+        MultiIndexBlock& indexer(*indexerPtr);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
 

@@ -753,7 +753,6 @@ env.Library(
     ],
     LIBDEPS=[
         'db_raii',
-        'catalog/index_create',
         'catalog/index_key_validate',
         'concurrency/write_conflict_exception',
     ],
@@ -866,7 +865,6 @@ env.Library(
         'write_ops',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/catalog/index_create',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/internal_user_auth',
@@ -896,7 +894,6 @@ env.Library(
         'db_raii',
         'index/index_access_methods',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/catalog/index_create',
     ],
     LIBDEPS_PRIVATE=[
         "logical_clock",
@@ -962,7 +959,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/repl/oplog',

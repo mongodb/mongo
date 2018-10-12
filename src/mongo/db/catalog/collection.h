@@ -32,6 +32,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_consistency.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -64,7 +66,6 @@ class IndexCatalog;
 class IndexDescriptor;
 class DatabaseImpl;
 class MatchExpression;
-class MultiIndexBlock;
 class OpDebug;
 class OperationContext;
 class RecordCursor;
@@ -339,6 +340,8 @@ public:
         virtual void notifyCappedWaitersIfNeeded() = 0;
 
         virtual const CollatorInterface* getDefaultCollator() const = 0;
+
+        virtual std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) = 0;
     };
 
 public:
@@ -724,6 +727,12 @@ public:
         return this->_impl().getDefaultCollator();
     }
 
+    /**
+     * Creates an instance of MultiIndexBlock.
+     */
+    inline std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) {
+        return this->_impl().createMultiIndexBlock(opCtx);
+    }
 
 private:
     inline DatabaseCatalogEntry* dbce() const {

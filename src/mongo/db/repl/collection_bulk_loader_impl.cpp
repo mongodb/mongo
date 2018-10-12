@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -59,9 +59,8 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient&
       _opCtx{std::move(opCtx)},
       _autoColl{std::move(autoColl)},
       _nss{_autoColl->getCollection()->ns()},
-      _idIndexBlock(stdx::make_unique<MultiIndexBlock>(_opCtx.get(), _autoColl->getCollection())),
-      _secondaryIndexesBlock(
-          stdx::make_unique<MultiIndexBlock>(_opCtx.get(), _autoColl->getCollection())),
+      _idIndexBlock(_autoColl->getCollection()->createMultiIndexBlock(_opCtx.get())),
+      _secondaryIndexesBlock(_autoColl->getCollection()->createMultiIndexBlock(_opCtx.get())),
       _idIndexSpec(idIndexSpec.getOwned()) {
 
     invariant(_opCtx);

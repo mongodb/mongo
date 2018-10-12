@@ -35,7 +35,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -195,7 +195,8 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         CurOp::get(opCtx)->setOpDescription_inlock(_index);
     }
 
-    MultiIndexBlock indexer(opCtx, coll);
+    auto indexerPtr = coll->createMultiIndexBlock(opCtx);
+    MultiIndexBlock& indexer(*indexerPtr);
     indexer.allowInterruption();
     if (allowBackgroundBuilding)
         indexer.allowBackgroundBuilding();

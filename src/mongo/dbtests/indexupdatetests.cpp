@@ -34,7 +34,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -74,7 +74,8 @@ protected:
 
     bool buildIndexInterrupted(const BSONObj& key, bool allowInterruption) {
         try {
-            MultiIndexBlock indexer(&_opCtx, collection());
+            auto indexerPtr = collection()->createMultiIndexBlock(&_opCtx);
+            MultiIndexBlock& indexer(*indexerPtr);
             if (allowInterruption)
                 indexer.allowInterruption();
 
@@ -127,7 +128,8 @@ public:
             wunit.commit();
         }
 
-        MultiIndexBlock indexer(&_opCtx, coll);
+        auto indexerPtr = coll->createMultiIndexBlock(&_opCtx);
+        MultiIndexBlock& indexer(*indexerPtr);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
         indexer.ignoreUniqueConstraint();
@@ -183,7 +185,8 @@ public:
             wunit.commit();
         }
 
-        MultiIndexBlock indexer(&_opCtx, coll);
+        auto indexerPtr = coll->createMultiIndexBlock(&_opCtx);
+        MultiIndexBlock& indexer(*indexerPtr);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
         // indexer.ignoreUniqueConstraint(); // not calling this
@@ -369,7 +372,8 @@ public:
 };
 
 Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& indexSpec) {
-    MultiIndexBlock indexer(&_opCtx, collection());
+    auto indexerPtr = collection()->createMultiIndexBlock(&_opCtx);
+    MultiIndexBlock& indexer(*indexerPtr);
     Status status = indexer.init(indexSpec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();

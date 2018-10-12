@@ -35,7 +35,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
-#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/btree_access_method.h"

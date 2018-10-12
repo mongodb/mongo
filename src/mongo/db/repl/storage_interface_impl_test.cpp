@@ -134,7 +134,8 @@ int createIndexForColl(OperationContext* opCtx, NamespaceString nss, BSONObj ind
     AutoGetCollection autoColl(opCtx, nss, MODE_X);
     auto coll = autoColl.getCollection();
 
-    MultiIndexBlock indexer(opCtx, coll);
+    auto indexerPtr = coll->createMultiIndexBlock(opCtx);
+    MultiIndexBlock& indexer(*indexerPtr);
     ASSERT_OK(indexer.init(indexSpec).getStatus());
 
     WriteUnitOfWork wunit(opCtx);

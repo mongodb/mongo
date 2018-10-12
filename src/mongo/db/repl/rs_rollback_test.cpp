@@ -37,7 +37,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -174,7 +174,8 @@ int createIndexForColl(OperationContext* opCtx,
                        NamespaceString nss,
                        BSONObj indexSpec) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-    MultiIndexBlock indexer(opCtx, coll);
+    auto indexerPtr = coll->createMultiIndexBlock(opCtx);
+    MultiIndexBlock& indexer(*indexerPtr);
     ASSERT_OK(indexer.init(indexSpec).getStatus());
     WriteUnitOfWork wunit(opCtx);
     indexer.commit();

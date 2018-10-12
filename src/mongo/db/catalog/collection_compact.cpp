@@ -34,8 +34,8 @@
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
@@ -153,7 +153,8 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
 
     CompactStats stats;
 
-    MultiIndexBlock indexer(opCtx, _this);
+    auto indexerPtr = createMultiIndexBlock(opCtx);
+    MultiIndexBlock& indexer(*indexerPtr);
     indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 

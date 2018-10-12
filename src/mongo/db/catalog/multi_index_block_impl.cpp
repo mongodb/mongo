@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/index_create_impl.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"
@@ -73,12 +73,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
 
 AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
-
-MONGO_REGISTER_SHIM(MultiIndexBlock::makeImpl)
-(OperationContext* const opCtx, Collection* const collection, PrivateTo<MultiIndexBlock>)
-    ->std::unique_ptr<MultiIndexBlock::Impl> {
-    return stdx::make_unique<MultiIndexBlockImpl>(opCtx, collection);
-}
 
 class ExportedMaxIndexBuildMemoryUsageParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {

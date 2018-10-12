@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/multi_index_block.h"
 
 #include <memory>
 #include <set>
@@ -60,7 +60,7 @@ class OperationContext;
  * destructed from inside of a WriteUnitOfWork as any cleanup needed should never be rolled back
  * (as it is itself essentially a form of rollback, you don't want to "rollback the rollback").
  */
-class MultiIndexBlockImpl : public MultiIndexBlock::Impl {
+class MultiIndexBlockImpl : public MultiIndexBlock {
     MONGO_DISALLOW_COPYING(MultiIndexBlockImpl);
 
 public:
