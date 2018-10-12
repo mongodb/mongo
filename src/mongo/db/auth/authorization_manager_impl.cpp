@@ -214,7 +214,7 @@ private:
     }
     stdx::mutex _mutex;
     std::vector<UserName> _userNames;
-    AuthorizationManager* _authzManager;
+    AuthorizationManager* _authzManager = nullptr;
 } authorizationManagerPinnedUsers;
 
 const auto inUserManagementCommandsFlag = OperationContext::declareDecoration<bool>();
