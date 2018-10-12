@@ -4336,17 +4336,18 @@ tasks:
           set -o verbose
 
           ${activate_virtualenv}
-          python3 -m pip install -r etc/pip/lint-requirements.txt
-          python2 -m pip install -r etc/pip/lint-requirements.txt
+          python3 -m pip install -I -r etc/pip/lint-requirements.txt
+          python2 -m pip install -I -r etc/pip/lint-requirements.txt
           export MYPY="$(
-            PATH+=':/opt/mongodbtoolchain/v2/bin'
             if command -V cygpath 2>/dev/null; then
                 PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
             else
                 PATH+=":${workdir}/venv_3/bin"
             fi
+            PATH+=':/opt/mongodbtoolchain/v2/bin'
             which mypy
           )"
+          echo "Found mypy executable at '$MYPY'"
           ${compile_env|} python2 ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - name: verify_pip
@@ -4370,8 +4371,8 @@ tasks:
         ${activate_virtualenv}
         # This installs the explicit project versions which would be installed in the toolchain
         # from this patch
-        python2 -m pip install -r etc/pip/constraints.txt
-        python3 -m pip install -r etc/pip/constraints.txt
+        python2 -m pip install -I -r etc/pip/constraints.txt
+        python3 -m pip install -I -r etc/pip/constraints.txt
 
         python2 -m pip freeze >requirements.txt.python2.old
         python3 -m pip freeze >requirements.txt.python3.old

@@ -1,6 +1,5 @@
 # Linters
-pylint
-yapf
-# typing in Python 2 for mypy
-typing; python_version < "3"
-pydocstyle
+# Note: These versions are checked by python modules in buildscripts/linter/
+pylint == 1.9.3
+yapf == 0.21.0
+pydocstyle == 2.1.1
