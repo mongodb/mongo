@@ -72,7 +72,7 @@ public:
     }
 
     bool supportsDocLocking() final {
-        return false;
+        return true;
     }
 };
 

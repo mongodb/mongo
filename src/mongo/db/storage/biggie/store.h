@@ -1196,7 +1196,7 @@ private:
      * Resolves conflicts within subtrees due to the complicated structure of path-compressed radix
      * tries.
      */
-    void _mergeResolveConflict(Node* current, const Node* baseNode, const Node* otherNode) {
+    void _mergeResolveConflict(const Node* current, const Node* baseNode, const Node* otherNode) {
 
         // Merges all differences between this and other, using base to determine whether operations
         // are allowed or should throw a merge conflict.
@@ -1259,6 +1259,25 @@ private:
                     throw merge_conflict_exception();
                 }
             }
+        }
+    }
+
+    /**
+     * Merges elements from the master tree into the working copy if they have no presence in the
+     * working copy, otherwise we throw a merge conflict.
+     */
+    void _mergeTwoBranches(const Node* current, const Node* otherNode) {
+
+        RadixStore other, node;
+        node._root = std::make_shared<Node>(*current);
+        other._root = std::make_shared<Node>(*otherNode);
+
+        for (const value_type otherVal : other) {
+            RadixStore::const_iterator thisIter = node.find(otherVal.first);
+
+            if (thisIter != node.end())
+                throw merge_conflict_exception();
+            this->insert(RadixStore::value_type(otherVal));
         }
     }
 
@@ -1368,11 +1387,16 @@ private:
                     _mergeResolveConflict(node, baseNode, otherNode);
                     _rebuildContext(context, trieKeyIndex);
                 }
-            } else if ((baseNode && !otherNode) || (!baseNode && otherNode)) {
+            } else if (baseNode && !otherNode) {
                 // Throw a write conflict since current has modified a branch but master has
-                // removed it or because both current and master added branches that were
-                // nonexistent in base.
+                // removed it.
                 throw merge_conflict_exception();
+            } else if (!baseNode && otherNode) {
+                // Both the working tree and master added branches that were nonexistent in base.
+                // This requires us to resolve these differences element by element since the
+                // changes may not be conflicting.
+                _mergeTwoBranches(node, otherNode);
+                _rebuildContext(context, trieKeyIndex);
             }
         }
 
