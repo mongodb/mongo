@@ -62,6 +62,9 @@
     dollarOutAggregationShell();
     assert.eq(db['favorite'].count(), 1);
 
+    // Stopping the mongod also waits until all of its logs have been read by the mongo shell.
+    MongoRunner.stopMongod(conn);
+
     let mongodLogs = rawMongoProgramOutput();
     let lines = mongodLogs.split('\n');
     const lockWaitTimeRegex = /timeAcquiringMicros: { [wW]: ([0-9]+)/;
@@ -69,7 +72,7 @@
     let supposedLockWaitTime;
     let numWaitedForLocks = 0;
 
-    // Only the logs of 'parent' (aggregation with $out) and the first
+    // Only the logs of 'parent command' (aggregation with $out) and the first
     // sub-operation(createCollection) have the information about the long wait for the lock.
     for (let line of lines) {
         if ((match = lockWaitTimeRegex.exec(line)) !== null) {
@@ -84,6 +87,4 @@
         }
     }
     assert.eq(numWaitedForLocks, 2);
-
-    MongoRunner.stopMongod(conn);
 })();
