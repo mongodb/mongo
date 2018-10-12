@@ -36,30 +36,6 @@
 #include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
-IndexCatalogEntry::Impl::~Impl() = default;
-
-MONGO_DEFINE_SHIM(IndexCatalogEntry::makeImpl);
-
-void IndexCatalogEntry::TUHook::hook() noexcept {}
-
-IndexCatalogEntry::IndexCatalogEntry(OperationContext* opCtx,
-                                     StringData ns,
-                                     CollectionCatalogEntry* collection,
-                                     std::unique_ptr<IndexDescriptor> descriptor,
-                                     CollectionInfoCache* infoCache)
-    : _pimpl(makeImpl(this,
-                      opCtx,
-                      ns,
-                      collection,
-                      std::move(descriptor),
-                      infoCache,
-                      PrivateCall<IndexCatalogEntry>{})) {}
-
-void IndexCatalogEntry::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
-    return this->_impl().init(std::move(accessMethod));
-}
-
-// ------------------
 
 const IndexCatalogEntry* IndexCatalogEntryContainer::find(const IndexDescriptor* desc) const {
     if (desc->_cachedEntry)
@@ -104,4 +80,5 @@ IndexCatalogEntry* IndexCatalogEntryContainer::release(const IndexDescriptor* de
     }
     return nullptr;
 }
+
 }  // namespace mongo

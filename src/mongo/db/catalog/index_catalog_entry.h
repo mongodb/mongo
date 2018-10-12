@@ -32,7 +32,6 @@
 #include <string>
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/shim.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -55,144 +54,46 @@ class OperationContext;
 
 class IndexCatalogEntry {
 public:
-    // This class represents the internal vtable for the (potentially polymorphic) implementation of
-    // the `IndexCatalogEntry` class.  This allows us to expose an interface to this object without
-    // requiring a dependency upon the implementation's definition library.
-    class Impl {
-    public:
-        virtual ~Impl() = 0;
-
-        virtual const std::string& ns() const = 0;
-
-        virtual void init(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
-
-        virtual IndexDescriptor* descriptor() = 0;
-
-        virtual const IndexDescriptor* descriptor() const = 0;
-
-        virtual IndexAccessMethod* accessMethod() = 0;
-
-        virtual const IndexAccessMethod* accessMethod() const = 0;
-
-        virtual const Ordering& ordering() const = 0;
-
-        virtual const MatchExpression* getFilterExpression() const = 0;
-
-        virtual const CollatorInterface* getCollator() const = 0;
-
-        virtual const RecordId& head(OperationContext* opCtx) const = 0;
-
-        virtual void setHead(OperationContext* opCtx, RecordId newHead) = 0;
-
-        virtual void setIsReady(bool newIsReady) = 0;
-
-        virtual HeadManager* headManager() const = 0;
-
-        virtual bool isMultikey(OperationContext* opCtx) const = 0;
-
-        virtual MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const = 0;
-
-        virtual void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) = 0;
-
-        // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4
-        // because 4.4 can only downgrade to 4.2 which can read long TypeBits.
-        virtual void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) = 0;
-
-        virtual bool isReady(OperationContext* opCtx) const = 0;
-
-        virtual KVPrefix getPrefix() const = 0;
-
-        virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
-
-        virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
-    };
-
-public:
-    static MONGO_DECLARE_SHIM((IndexCatalogEntry * this_,
-                               OperationContext* opCtx,
-                               StringData ns,
-                               CollectionCatalogEntry* collection,
-                               std::unique_ptr<IndexDescriptor> descriptor,
-                               CollectionInfoCache* infoCache,
-                               PrivateTo<IndexCatalogEntry>)
-                                  ->std::unique_ptr<Impl>) makeImpl;
-
-    explicit IndexCatalogEntry(
-        OperationContext* opCtx,
-        StringData ns,
-        CollectionCatalogEntry* collection,           // not owned
-        std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-        CollectionInfoCache* infoCache);              // not owned, optional
-
-    // Do not call this function.  It exists for use with test drivers that need to inject
-    // alternative implementations.
-    explicit IndexCatalogEntry(std::unique_ptr<Impl> impl) : _pimpl(std::move(impl)) {}
-
-    inline ~IndexCatalogEntry() = default;
+    IndexCatalogEntry() = default;
+    virtual ~IndexCatalogEntry() = default;
 
     inline IndexCatalogEntry(IndexCatalogEntry&&) = delete;
     inline IndexCatalogEntry& operator=(IndexCatalogEntry&&) = delete;
 
-    inline const std::string& ns() const {
-        return this->_impl().ns();
-    }
+    virtual const std::string& ns() const = 0;
 
-    void init(std::unique_ptr<IndexAccessMethod> accessMethod);
+    virtual void init(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 
-    inline IndexDescriptor* descriptor() {
-        return this->_impl().descriptor();
-    }
+    virtual IndexDescriptor* descriptor() = 0;
 
-    inline const IndexDescriptor* descriptor() const {
-        return this->_impl().descriptor();
-    }
+    virtual const IndexDescriptor* descriptor() const = 0;
 
-    inline IndexAccessMethod* accessMethod() {
-        return this->_impl().accessMethod();
-    }
+    virtual IndexAccessMethod* accessMethod() = 0;
 
-    inline const IndexAccessMethod* accessMethod() const {
-        return this->_impl().accessMethod();
-    }
+    virtual const IndexAccessMethod* accessMethod() const = 0;
 
-    inline const Ordering& ordering() const {
-        return this->_impl().ordering();
-    }
+    virtual const Ordering& ordering() const = 0;
 
-    inline const MatchExpression* getFilterExpression() const {
-        return this->_impl().getFilterExpression();
-    }
+    virtual const MatchExpression* getFilterExpression() const = 0;
 
-    inline const CollatorInterface* getCollator() const {
-        return this->_impl().getCollator();
-    }
+    virtual const CollatorInterface* getCollator() const = 0;
 
     /// ---------------------
 
-    inline const RecordId& head(OperationContext* const opCtx) const {
-        return this->_impl().head(opCtx);
-    }
+    virtual const RecordId& head(OperationContext* const opCtx) const = 0;
 
-    inline void setHead(OperationContext* const opCtx, const RecordId newHead) {
-        return this->_impl().setHead(opCtx, newHead);
-    }
+    virtual void setHead(OperationContext* const opCtx, const RecordId newHead) = 0;
 
-    inline void setIsReady(const bool newIsReady) {
-        return this->_impl().setIsReady(newIsReady);
-    }
+    virtual void setIsReady(const bool newIsReady) = 0;
 
-    inline HeadManager* headManager() const {
-        return this->_impl().headManager();
-    }
+    virtual HeadManager* headManager() const = 0;
 
     // --
 
     /**
      * Returns true if this index is multikey and false otherwise.
      */
-    inline bool isMultikey(OperationContext* opCtx) const {
-        return this->_impl().isMultikey(opCtx);
-    }
+    virtual bool isMultikey(OperationContext* opCtx) const = 0;
 
     /**
      * Returns the path components that cause this index to be multikey if this index supports
@@ -203,9 +104,7 @@ public:
      * returns a vector with size equal to the number of elements in the index key pattern where
      * each element in the vector is an empty set.
      */
-    inline MultikeyPaths getMultikeyPaths(OperationContext* const opCtx) const {
-        return this->_impl().getMultikeyPaths(opCtx);
-    }
+    virtual MultikeyPaths getMultikeyPaths(OperationContext* const opCtx) const = 0;
 
     /**
      * Sets this index to be multikey. Information regarding which newly detected path components
@@ -222,59 +121,26 @@ public:
      * namespace, index name, and multikey paths on the OperationContext rather than set the index
      * as multikey here.
      */
-    void setMultikey(OperationContext* const opCtx, const MultikeyPaths& multikeyPaths) {
-        return this->_impl().setMultikey(opCtx, multikeyPaths);
-    }
+    virtual void setMultikey(OperationContext* const opCtx, const MultikeyPaths& multikeyPaths) = 0;
 
-    void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* const opCtx) {
-        return this->_impl().setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
-    }
+    /**
+     * TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4
+     * because 4.4 can only downgrade to 4.2 which can read long TypeBits.
+     */
+    virtual void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* const opCtx) = 0;
 
     // if this ready is ready for queries
-    bool isReady(OperationContext* const opCtx) const {
-        return this->_impl().isReady(opCtx);
-    }
+    virtual bool isReady(OperationContext* const opCtx) const = 0;
 
-    KVPrefix getPrefix() const {
-        return this->_impl().getPrefix();
-    }
+    virtual KVPrefix getPrefix() const = 0;
 
     /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
      */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() {
-        return this->_impl().getMinimumVisibleSnapshot();
-    }
+    virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
 
-    void setMinimumVisibleSnapshot(const Timestamp name) {
-        return this->_impl().setMinimumVisibleSnapshot(name);
-    }
-
-private:
-    // This structure exists to give us a customization point to decide how to force users of this
-    // class to depend upon the corresponding `index_catalog_entry.cpp` Translation Unit (TU).  All
-    // public forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
-    struct TUHook {
-        static void hook() noexcept;
-
-        explicit inline TUHook() noexcept {
-            if (kDebugBuild)
-                this->hook();
-        }
-    };
-
-    inline const Impl& _impl() const {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-    inline Impl& _impl() {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-    std::unique_ptr<Impl> _pimpl;
+    virtual void setMinimumVisibleSnapshot(const Timestamp name) = 0;
 };
 
 class IndexCatalogEntryContainer {

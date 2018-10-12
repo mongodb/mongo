@@ -53,12 +53,11 @@ class IndexDescriptor;
 class MatchExpression;
 class OperationContext;
 
-class IndexCatalogEntryImpl : public IndexCatalogEntry::Impl {
+class IndexCatalogEntryImpl : public IndexCatalogEntry {
     MONGO_DISALLOW_COPYING(IndexCatalogEntryImpl);
 
 public:
     explicit IndexCatalogEntryImpl(
-        IndexCatalogEntry* this_,
         OperationContext* opCtx,
         StringData ns,
         CollectionCatalogEntry* collection,           // not owned

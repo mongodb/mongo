@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
@@ -143,11 +144,11 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
     }
 
     auto* const descriptorPtr = descriptor.get();
-    auto entry = stdx::make_unique<IndexCatalogEntry>(opCtx,
-                                                      _collection->ns().ns(),
-                                                      _collection->getCatalogEntry(),
-                                                      std::move(descriptor),
-                                                      _collection->infoCache());
+    auto entry = stdx::make_unique<IndexCatalogEntryImpl>(opCtx,
+                                                          _collection->ns().ns(),
+                                                          _collection->getCatalogEntry(),
+                                                          std::move(descriptor),
+                                                          _collection->infoCache());
     std::unique_ptr<IndexAccessMethod> accessMethod(
         _collection->dbce()->getIndex(opCtx, _collection->getCatalogEntry(), entry.get()));
     entry->init(std::move(accessMethod));

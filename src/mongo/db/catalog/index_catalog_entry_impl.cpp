@@ -54,18 +54,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(IndexCatalogEntry::makeImpl)
-(IndexCatalogEntry* const this_,
- OperationContext* const opCtx,
- const StringData ns,
- CollectionCatalogEntry* const collection,
- std::unique_ptr<IndexDescriptor> descriptor,
- CollectionInfoCache* const infoCache,
- PrivateTo<IndexCatalogEntry>)
-    ->std::unique_ptr<IndexCatalogEntry::Impl> {
-    return std::make_unique<IndexCatalogEntryImpl>(
-        this_, opCtx, ns, collection, std::move(descriptor), infoCache);
-}
 
 using std::string;
 
@@ -87,8 +75,7 @@ private:
     IndexCatalogEntry* _catalogEntry;
 };
 
-IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
-                                             OperationContext* const opCtx,
+IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              const StringData ns,
                                              CollectionCatalogEntry* const collection,
                                              std::unique_ptr<IndexDescriptor> descriptor,
@@ -97,11 +84,11 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
       _collection(collection),
       _descriptor(std::move(descriptor)),
       _infoCache(infoCache),
-      _headManager(stdx::make_unique<HeadManagerImpl>(this_)),
+      _headManager(stdx::make_unique<HeadManagerImpl>(this)),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
-    _descriptor->_cachedEntry = this_;
+    _descriptor->_cachedEntry = this;
 
     _isReady = _catalogIsReady(opCtx);
     _head = _catalogHead(opCtx);
