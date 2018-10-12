@@ -4085,7 +4085,7 @@ tasks:
         aws_secret: ${aws_secret}
         remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.10/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
-        local_file: "MacOS/embedded-sdk.tgz"
+        local_file: "mongo-embedded-sdk-${version}/MacOS/embedded-sdk.tgz"
 
     - command: s3.get
       params:
@@ -4279,7 +4279,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-c-driver.podspec.in | tee mongo-c-driver.podspec
+          sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-embedded-c-driver.podspec.in | tee mongo-embedded-c-driver.podspec
           sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongo_embedded/mongo_embedded.podspec.in | tee mongo_embedded.podspec
           sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongoc_embedded/mongoc_embedded.podspec.in | tee mongoc_embedded.podspec
 
