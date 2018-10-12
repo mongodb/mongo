@@ -4160,9 +4160,9 @@ tasks:
 
           tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./mongo-embedded-sdk-${version}/*OS
 
-          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz ./*OS/Frameworks/bson.framework ./*OS/Frameworks/mongoc.framework ./COPYING
-          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz ./*OS/Frameworks/mongo_embedded.framework
-          tar --exclude "*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz ./*OS/Frameworks/mongoc_embedded.framework
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/bson.framework ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc.framework ./mongo-embedded-sdk-${version}/COPYING
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongo_embedded.framework
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc_embedded.framework
 
     - command: s3.put
       params:
