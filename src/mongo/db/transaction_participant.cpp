@@ -1081,7 +1081,7 @@ void TransactionParticipant::abortActiveTransaction(OperationContext* opCtx) {
 void TransactionParticipant::abortActiveUnpreparedOrStashPreparedTransaction(
     OperationContext* opCtx) try {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    if (_txnState.isInSet(lock, TransactionState::kNone)) {
+    if (_txnState.isInSet(lock, TransactionState::kNone | TransactionState::kCommitted)) {
         // If there is no active transaction, do nothing.
         return;
     }

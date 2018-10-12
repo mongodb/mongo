@@ -20,14 +20,18 @@
 
     const doc = {x: 1};
 
-    jsTestLog("Test that calling prepare on a committed transaction fails.");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc));
     session.commitTransaction();
+
+    const txnNumber = NumberLong(session.getTxnNumber_forTesting());
+
+    // Call prepare on committed transaction.
+    jsTestLog("Test that calling prepare on a committed transaction fails.");
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
         coordinatorId: "dummy",
-        txnNumber: NumberLong(0),
+        txnNumber: txnNumber,
         autocommit: false
     }),
                                  ErrorCodes.TransactionCommitted);
@@ -42,7 +46,7 @@
               "providing autocommit to prepareTransaction.");
     assert.commandFailedWithCode(
         sessionDB.adminCommand(
-            {prepareTransaction: 1, coordinatorId: "dummy", txnNumber: NumberLong(0)}),
+            {prepareTransaction: 1, coordinatorId: "dummy", txnNumber: txnNumber}),
         ErrorCodes.InvalidOptions);
 
     jsTestLog("Test the error precedence when calling prepare on a committed transaction and " +
@@ -50,11 +54,30 @@
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
         coordinatorId: "dummy",
-        txnNumber: NumberLong(0),
+        txnNumber: txnNumber,
         autocommit: false,
         startTransaction: true
     }),
                                  ErrorCodes.ConflictingOperationInProgress);
+
+    // Call commit on committed transaction without shell helper.
+    jsTestLog("Test that calling commit with invalid fields on a committed transaction fails.");
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand(
+            {commitTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
+        40415 /* IDL unknown field error */);
+
+    // Call abort on committed transaction without shell helper.
+    jsTestLog("Test that calling abort on a committed transaction fails.");
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand({abortTransaction: 1, txnNumber: txnNumber, autocommit: false}),
+        ErrorCodes.TransactionCommitted);
+
+    jsTestLog("Test that calling abort with invalid fields on a committed transaction fails.");
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand(
+            {abortTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
+        ErrorCodes.TransactionCommitted);
 
     session.endSession();
 }());
