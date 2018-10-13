@@ -1,31 +1,33 @@
 # MongoDB README
 
-Welcome to MongoDB!
 
-## COMPONENTS
+
+## Welcome to MongoDB!
+
+### COMPONENTS
 
   mongod - The database server.
   mongos - Sharding router.
   mongo  - The database shell (uses interactive javascript).
 
-UTILITIES
+### UTILITIES
 
-  mongodump         - Create a binary dump of the contents of a database.
-  mongorestore      - Restore data from the output created by mongodump.
-  mongoexport       - Export the contents of a collection to JSON or CSV.
-  mongoimport       - Import data from JSON, CSV or TSV.
-  mongofiles        - Put, get and delete files from GridFS.
-  mongostat         - Show the status of a running mongod/mongos.
-  bsondump          - Convert BSON files into human-readable formats.
-  mongoreplay       - Traffic capture and replay tool.
-  mongotop          - Track time spent reading and writing data.
-  install_compass   - Installs MongoDB Compass for your platform.
+* mongodump         - Create a binary dump of the contents of a database.
+* mongorestore      - Restore data from the output created by mongodump.
+* mongoexport       - Export the contents of a collection to JSON or CSV.
+* mongoimport       - Import data from JSON, CSV or TSV.
+* mongofiles        - Put, get and delete files from GridFS.
+* mongostat         - Show the status of a running mongod/mongos.
+* bsondump          - Convert BSON files into human-readable formats.
+* mongoreplay       - Traffic capture and replay tool.
+* mongotop          - Track time spent reading and writing data.
+* install_compass   - Installs MongoDB Compass for your platform.
 
-### BUILDING
+## BUILDING
 
   See docs/building.md.
 
-### RUNNING
+## RUNNING
 
   For command line options invoke:
 
@@ -55,30 +57,30 @@ $ ./install_compass
   This will download the appropriate MongoDB Compass package for your platform
   and install it.
 
-### DRIVERS
+## DRIVERS
 
   Client drivers for most programming languages are available at
   https://docs.mongodb.com/manual/applications/drivers/. Use the shell
   ("mongo") for administrative tasks.
 
-### BUG REPORTS
+## BUG REPORTS
 
   See [Bug Reports](https://github.com/mongodb/mongo/wiki/Submit-Bug-Reports.)
 
-### PACKAGING
+## PACKAGING
 
   Packages are created dynamically by the package.py script located in the
   buildscripts directory. This will generate RPM and Debian packages.
 
-### DOCUMENTATION
+## DOCUMENTATION
 ```
 https://docs.mongodb.com/manual/
 ```
-### CLOUD HOSTED MONGODB
+## CLOUD HOSTED MONGODB
 ```
 https://www.mongodb.com/cloud/atlas
 ```
-### MAIL LISTS
+## MAIL LISTS
 
 A forum for technical questions about using MongoDB.
 ```
