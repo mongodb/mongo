@@ -1,8 +1,6 @@
 # MongoDB README
 
-
-
-## Welcome to MongoDB!
+ Welcome to MongoDB!
 
 ### COMPONENTS
 
@@ -73,29 +71,29 @@ $ ./install_compass
   buildscripts directory. This will generate RPM and Debian packages.
 
 ## DOCUMENTATION
-```
-https://docs.mongodb.com/manual/
-```
+
+See our [documentation manual.](https://docs.mongodb.com/manual/)
+
 ## CLOUD HOSTED MONGODB
-```
-https://www.mongodb.com/cloud/atlas
-```
+
+See our [cloud atlas.](https://www.mongodb.com/cloud/atlas)
+
 ## MAIL LISTS
 
 A forum for technical questions about using MongoDB.
-```
-https://groups.google.com/forum/#!forum/mongodb-user
-```
+
+* https://groups.google.com/forum/#!forum/mongodb-user
+
 
 A forum for technical questions about building and developing MongoDB.
-```
-https://groups.google.com/forum/#!forum/mongodb-dev
-```
+
+* https://groups.google.com/forum/#!forum/mongodb-dev
+
 
 ## LEARN MONGODB
-```
-https://university.mongodb.com/
-```
+
+See [MongoDB university.](https://university.mongodb.com/)
+
 ## LICENSE
 
   Most MongoDB source files (src/mongo folder and below) are made available
