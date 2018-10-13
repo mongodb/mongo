@@ -23,7 +23,7 @@ class WaitForReplication(interface.Hook):
     def after_test(self, test, test_report):
         """Run mongo shell to call replSetTest.awaitReplication()."""
         start_time = time.time()
-        client_conn = self.fixture.get_internal_connection_string()
+        client_conn = self.fixture.get_driver_connection_url()
         js_cmds = "conn = '{}'; rst = new ReplSetTest(conn); rst.awaitReplication();".format(
             client_conn)
         shell_options = {"nodb": "", "eval": js_cmds}
