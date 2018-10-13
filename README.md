@@ -71,27 +71,29 @@ $ ./mongo
   buildscripts directory. This will generate RPM and Debian packages.
 
 ### DOCUMENTATION
-
+```
   https://docs.mongodb.com/manual/
-
+```
 ### CLOUD HOSTED MONGODB
-
+```
   https://www.mongodb.com/cloud/atlas
-
+```
 ### MAIL LISTS
 
+A forum for technical questions about using MongoDB.
+```
   https://groups.google.com/forum/#!forum/mongodb-user
+```
 
-    A forum for technical questions about using MongoDB.
-
+A forum for technical questions about building and developing MongoDB.
+```
   https://groups.google.com/forum/#!forum/mongodb-dev
-
-    A forum for technical questions about building and developing MongoDB.
+```
 
 ## LEARN MONGODB
-
-  https://university.mongodb.com/
-
+```
+https://university.mongodb.com/
+```
 ## LICENSE
 
   Most MongoDB source files (src/mongo folder and below) are made available
