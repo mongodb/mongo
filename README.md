@@ -1,6 +1,6 @@
 # MongoDB README
 
-## Welcome to MongoDB!
+Welcome to MongoDB!
 
 ## COMPONENTS
 
@@ -49,7 +49,7 @@ $ ./mongo
   You can install compass using the install_compass script packaged with MongoDB:
 
 ```
-    $ ./install_compass
+$ ./install_compass
 ```
 
   This will download the appropriate MongoDB Compass package for your platform
@@ -72,22 +72,22 @@ $ ./mongo
 
 ### DOCUMENTATION
 ```
-  https://docs.mongodb.com/manual/
+https://docs.mongodb.com/manual/
 ```
 ### CLOUD HOSTED MONGODB
 ```
-  https://www.mongodb.com/cloud/atlas
+https://www.mongodb.com/cloud/atlas
 ```
 ### MAIL LISTS
 
 A forum for technical questions about using MongoDB.
 ```
-  https://groups.google.com/forum/#!forum/mongodb-user
+https://groups.google.com/forum/#!forum/mongodb-user
 ```
 
 A forum for technical questions about building and developing MongoDB.
 ```
-  https://groups.google.com/forum/#!forum/mongodb-dev
+https://groups.google.com/forum/#!forum/mongodb-dev
 ```
 
 ## LEARN MONGODB
