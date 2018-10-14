@@ -10,6 +10,18 @@ env = env.Clone()
 if not env['MONGO_HAVE_LIBMONGOC']:
     Return()
 
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'share/doc/mongoc_embedded',
+        source=[
+            '#/LICENSE-Community.txt',
+            '../LICENSE-Embedded.txt',
+        ],
+        INSTALL_ALIAS=[
+            'embedded-dev',
+        ],
+    )
+
 def create_mongoc_env(env):
     mongocEnv = env.Clone()
     if mongocEnv['MONGO_HAVE_LIBMONGOC'] == "framework":
@@ -114,6 +126,21 @@ installHeaderRoot = env.Dir('$INSTALL_DIR/include/mongoc_embedded/v1/mongoc_embe
 frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongoc_embedded.framework')
 env.Alias('install-embedded-dev', frameworkDir)
 
+resourceDir = frameworkDir
+if env.TargetOSIs('macOS'):
+    resourceDir = resourceDir.Dir('Resources')
+
+env.Install(
+    target=resourceDir,
+    source=env.File(
+        name=[
+            'LICENSE-Community.txt',
+            'LICENSE-Embedded.txt',
+        ],
+        directory=env.Dir('$INSTALL_DIR/share/doc/mongoc_embedded'),
+    ),
+)
+
 env.Install(
     target=frameworkDir.Dir('Headers'),
     source=installHeaderRoot.File('mongoc_embedded.h'),
@@ -136,7 +163,7 @@ mongocEmbeddedPlist = env.Substfile(
 )
 
 env.Install(
-    target=frameworkDir,
+    target=resourceDir,
     source=mongocEmbeddedPlist,
 )
 
