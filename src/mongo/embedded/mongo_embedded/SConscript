@@ -7,6 +7,20 @@ Import("get_option")
 
 env = env.Clone()
 
+
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'share/doc/mongo_embedded',
+        source=[
+            '#/LICENSE-Community.txt',
+            '#/distsrc/THIRD-PARTY-NOTICES',
+            '../LICENSE-Embedded.txt',
+        ],
+        INSTALL_ALIAS=[
+            'embedded-dev',
+        ],
+    )
+
 mongoEmbeddedEnv = env.Clone()
 mongoEmbeddedEnv.AppendUnique(
     CPPDEFINES=[
@@ -115,6 +129,22 @@ installHeaderRoot = env.Dir('$INSTALL_DIR/include/mongo_embedded/v1/mongo_embedd
 frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongo_embedded.framework')
 env.Alias('install-embedded-dev', frameworkDir)
 
+resourceDir = frameworkDir
+if env.TargetOSIs('macOS'):
+    resourceDir = resourceDir.Dir('Resources')
+
+env.Install(
+    target=resourceDir,
+    source=env.File(
+        name=[
+            'LICENSE-Community.txt',
+            'LICENSE-Embedded.txt',
+            'THIRD-PARTY-NOTICES',
+        ],
+        directory=env.Dir('$INSTALL_DIR/share/doc/mongo_embedded'),
+    ),
+)
+
 env.Install(
     target=frameworkDir.Dir('Headers'),
     source=installHeaderRoot.File('mongo_embedded.h')
@@ -137,7 +167,7 @@ mongoEmbeddedPlist = env.Substfile(
 )
 
 env.Install(
-    target=frameworkDir,
+    target=resourceDir,
     source=mongoEmbeddedPlist,
 )
 

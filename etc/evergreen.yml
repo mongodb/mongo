@@ -3680,7 +3680,36 @@ tasks:
           export ${compile_env|}
           ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
           make install VERBOSE=1
-          cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp
+
+          # TODO: Remove this when we upgrade to a version of the C driver that has CDRIVER-2854 fixed.
+          mkdir -p $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/share/doc/mongo-c-driver
+          cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/share/doc/mongo-c-driver
+          cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/share/doc/mongo-c-driver
+          if [ -d $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks ]; then
+
+              # We need to account for the fact that on the Darwin
+              # mobile platforms, things shouldn't go to the Resources
+              # directory but on macOS they should. If the Resources
+              # directory is there (it should be for the plist file),
+              # then use it, otherwise just use the framework root.
+              if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources ]; then
+                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources
+                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources
+              else
+                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework
+                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework
+              fi
+
+              if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources ]; then
+                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources
+                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources
+              else
+                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework
+                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework
+              fi
+
+          fi
+
           mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
 
 - name: embedded_sdk_install_dev
@@ -3712,6 +3741,14 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
+
+          cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
+          The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
+          is licensed to you on the terms set forth in the following files:
+            - mongo-c-driver: share/doc/mongo-c-driver/COPYING
+            - mongo_embedded: share/doc/mongo_embedded/LICENSE-Embedded.txt
+            - mongoc_embedded: share/doc/mongo_embedded/LICENSE-Embedded.txt
+          EOF
 
           tar cfvz embedded-sdk.tgz mongo-embedded-sdk-${version}
 
@@ -4142,10 +4179,10 @@ tasks:
           set -o verbose
 
           pushd mongo-embedded-sdk-${version}
+
           for directory in *OS *Simulator; do
               pushd $directory
-              tar --include "*/Frameworks*" --include "*/LICENSE*" --include "*/COPYING" --strip-components=1 -xf ./embedded-sdk.tgz
-              cp ./COPYING ../COPYING
+              tar --include "*/Frameworks/*" --strip-components=1 -xf ./embedded-sdk.tgz
               popd
           done
 
@@ -4156,13 +4193,38 @@ tasks:
                   ${compile_env|} xcrun lipo $_OSFile $_SimulatorFile -create -output $_OSFile
               done
           done
+
           popd
 
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./mongo-embedded-sdk-${version}/*OS
+          cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
+          The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
+          is licensed to you on the terms set forth in the following files:
+            - mongo-c-driver: iPhoneOS/Frameworks/mongoc.framework/COPYING
+            - mongo_embedded: iPhoneOS/Frameworks/mongo_embedded.framework/LICENSE-Embedded.txt
+            - mongoc_embedded: iPhoneOS/Frameworks/mongoc_embedded.framework/LICENSE-Embedded.txt
+          EOF
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./mongo-embedded-sdk-${version}/*OS ./mongo-embedded-sdk-${version}/README-Licenses.txt
 
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/bson.framework ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc.framework ./mongo-embedded-sdk-${version}/COPYING
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongo_embedded.framework
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc_embedded.framework
+          cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
+          The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
+          is licensed to you on the terms set forth in the following files:
+            - mongo-c-driver: iPhoneOS/Frameworks/mongoc.framework/COPYING
+          EOF
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/bson.framework ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc.framework  ./mongo-embedded-sdk-${version}/README-Licenses.txt
+
+          cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
+          The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
+          is licensed to you on the terms set forth in the following files:
+            - mongo_embedded: iPhoneOS/Frameworks/mongo_embedded.framework/LICENSE-Embedded.txt
+          EOF
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongo_embedded.framework  ./mongo-embedded-sdk-${version}/README-Licenses.txt
+
+          cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
+          The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
+          is licensed to you on the terms set forth in the following files:
+            - mongoc_embedded: iPhoneOS/Frameworks/mongoc_embedded.framework/LICENSE-Embedded.txt
+          EOF
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc_embedded.framework  ./mongo-embedded-sdk-${version}/README-Licenses.txt
 
     - command: s3.put
       params:
@@ -4202,7 +4264,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "mongo-embedded-sdk-${version}-mongoc-embedded.tgz"
-        remote_file: "${project}/embedded-sdk/mongoc-embedded-apple-multiarch/${revision}/${version}.tgz"
+        remote_file: "${project}/embedded-sdk/mongoc-embedded-apple-multiarch/${revision}/mongo-embedded-sdk-${version}.tgz"
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
