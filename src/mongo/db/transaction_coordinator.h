@@ -291,4 +291,23 @@ inline std::ostream& operator<<(std::ostream& os,
     return os << sb.str();
 }
 
+inline StringBuilder& operator<<(StringBuilder& sb,
+                                 const TransactionCoordinator::StateMachine::Action& action) {
+    using Action = TransactionCoordinator::StateMachine::Action;
+    // clang-format off
+    switch (action) {
+        case Action::kSendCommit:        return sb << "kSendCommit";
+        case Action::kSendAbort:         return sb << "kSendAbort";
+        case Action::kNone:              return sb << "kNone";
+    };
+    // clang-format on
+    MONGO_UNREACHABLE;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const TransactionCoordinator::StateMachine::Action& action) {
+    StringBuilder sb;
+    sb << action;
+    return os << sb.str();
+}
 }  // namespace mongo

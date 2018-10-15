@@ -114,7 +114,7 @@ const std::map<State, std::map<Event, TransactionCoordinator::StateMachine::Tran
         }},
         {State::kAborted, {
             {Event::kRecvVoteAbort,         {}},
-            {Event::kRecvVoteCommit,        {}},
+            {Event::kRecvVoteCommit,        {Action::kSendAbort}},
             {Event::kRecvParticipantList,   {}},
             {Event::kRecvTryAbort,          {}},
         }},

@@ -128,6 +128,15 @@ TEST(Coordinator, TryAbortWhileWaitingForCommitAcksDoesNotCancelCommit) {
     ASSERT_EQ(State::kCommitted, coordinator.state());
 }
 
+TEST(Coordinator, VoteCommitToAbortedCoordinatorRespondsWithAbort) {
+    TransactionCoordinator coordinator;
+    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.recvVoteAbort(ShardId("shard0000"));
+    ASSERT_EQ(State::kAborted, coordinator.state());
+    auto action = coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
+    ASSERT_EQ(TransactionCoordinator::StateMachine::Action::kSendAbort, action);
+}
+
 TEST(Coordinator, WaitForCompletionReturnsOnChangeToCommitted) {
     TransactionCoordinator coordinator;
     auto future = coordinator.waitForCompletion();
