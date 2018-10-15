@@ -12,9 +12,9 @@ ext.pomScmUrl = 'https://github.com/mongodb/mongo'
 
 buildscript {
     repositories {
+        google()
         jcenter()
         mavenCentral()
-        google()
     }
     dependencies {
         classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.+'
