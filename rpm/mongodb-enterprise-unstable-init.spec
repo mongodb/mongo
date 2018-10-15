@@ -244,7 +244,7 @@ fi
 
 %files tools
 %defattr(-,root,root,-)
-#%doc README GNU-AGPL-3.0.txt
+#%doc README
 
 %{_bindir}/bsondump
 %{_bindir}/install_compass
