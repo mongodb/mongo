@@ -1190,15 +1190,11 @@ TEST_F(CollectionClonerTest,
     // Wait for the _runQuery method to exit.  We can't get at it directly but we can wait
     // for a task scheduled after it to complete.
     auto& executor = getExecutor();
-    auto& event = executor.makeEvent().getValue();
+    // Schedule no-op task.
     auto nextTask =
-        executor
-            .scheduleWork([&executor, event](const executor::TaskExecutor::CallbackArgs&) {
-                executor.signalEvent(event);
-            })
-            .getValue();
+        executor.scheduleWork([](const executor::TaskExecutor::CallbackArgs&) {}).getValue();
     pauser.resume();
-    executor.waitForEvent(event);
+    executor.wait(nextTask);
 
     // CollectionCloner should still be active because we have not finished processing the
     // insertDocuments task.
