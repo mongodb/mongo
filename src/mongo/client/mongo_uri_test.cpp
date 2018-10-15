@@ -57,7 +57,11 @@ struct URITestCase {
 
 struct InvalidURITestCase {
     std::string URI;
-    boost::optional<Status> status = boost::none;
+    boost::optional<Status> status;
+    InvalidURITestCase(std::string aURI, boost::optional<Status> aStatus = boost::none) {
+        URI = std::move(aURI);
+        status = std::move(aStatus);
+    }
 };
 
 const ConnectionString::ConnectionType kMaster = ConnectionString::MASTER;
@@ -552,7 +556,7 @@ TEST(MongoURI, specTests) {
 
             if (!valid) {
                 // This uri string is invalid --> parse the uri and ensure it fails
-                const InvalidURITestCase testCase = {uri};
+                const InvalidURITestCase testCase = InvalidURITestCase{uri};
                 unittest::log() << "Testing URI: " << testCase.URI << '\n';
                 auto cs_status = MongoURI::parse(testCase.URI);
                 ASSERT_NOT_OK(cs_status);
