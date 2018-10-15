@@ -192,8 +192,9 @@ public:
                     continue;
 
                 const string msg = str::stream()
-                    << "found missing value in key " << redact(currKey)
-                    << " for doc: " << (obj.hasField("_id") ? redact(obj) : redact(obj["_id"]));
+                    << "There are documents which have missing or incomplete shard key fields ("
+                    << redact(currKey) << "). Please ensure that all documents in the collection "
+                                          "include all fields from the shard key.";
                 log() << "checkShardingIndex for '" << nss.toString() << "' failed: " << msg;
 
                 errmsg = msg;
