@@ -65,8 +65,15 @@ public:
             uassertStatusOK(getStatusFromCommandResult(currOp));
 
         for (auto&& op : currOp["inprog"].Obj()) {
-            if (op["clientMetadata"]["application"]["name"].String() != kAppName)
+            try {
+                if (op["clientMetadata"]["application"]["name"].String() != kAppName) {
+                    continue;
+                }
+            } catch (const DBException&) {
+                // Ignore ops that don't have the right format since they can't be the one we are
+                // looking for.
                 continue;
+            }
 
             // Ignore failures to clean up.
             BSONObj ignored;
