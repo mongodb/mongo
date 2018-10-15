@@ -288,9 +288,10 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           false /* sparse */,
                           false /* unique */,
                           IndexEntry::Identifier{"shardkey"},
-                          NULL /* filterExpr */,
+                          nullptr /* filterExpr */,
                           BSONObj(),
-                          NULL /* collator */);
+                          nullptr, /* collator */
+                          nullptr /* projExec */);
     plannerParams.indices.push_back(indexEntry);
 
     auto solutions = uassertStatusOK(QueryPlanner::plan(canonicalQuery, plannerParams));

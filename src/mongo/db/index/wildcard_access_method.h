@@ -59,6 +59,13 @@ public:
                                    const MultikeyPaths& multikeyPaths) const final;
 
     /**
+     * Returns a pointer to the ProjectionExecAgg owned by the underlying WildcardKeyGenerator.
+     */
+    const ProjectionExecAgg* getProjectionExec() const {
+        return _keyGen.getProjectionExec();
+    }
+
+    /**
      * Returns the set of paths included in this $** index that could be multikey.
      */
     std::set<FieldRef> getMultikeyPathSet(OperationContext*) const final;

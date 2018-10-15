@@ -305,8 +305,9 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     // fixed-size vector of multikey metadata until after they are expanded.
     invariant(wildcardIndex.multikeyPaths.empty());
 
-    const auto projExec = WildcardKeyGenerator::createProjectionExec(
-        wildcardIndex.keyPattern, wildcardIndex.infoObj.getObjectField("wildcardProjection"));
+    // Obtain the projection executor from the parent wildcard IndexEntry.
+    const auto* projExec = wildcardIndex.wildcardProjection;
+    invariant(projExec);
 
     const auto projectedFields = projExec->applyProjectionToFields(fields);
 
@@ -351,7 +352,8 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                          {wildcardIndex.identifier.catalogName, fieldName},
                          wildcardIndex.filterExpr,
                          wildcardIndex.infoObj,
-                         wildcardIndex.collator);
+                         wildcardIndex.collator,
+                         wildcardIndex.wildcardProjection);
 
         invariant("$_path"_sd != fieldName);
         out->push_back(std::move(entry));

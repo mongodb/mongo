@@ -117,21 +117,21 @@ private:
      * index.
      */
     struct WildcardIndexDiscriminatorContext {
-        WildcardIndexDiscriminatorContext(std::unique_ptr<ProjectionExecAgg> proj,
+        WildcardIndexDiscriminatorContext(const ProjectionExecAgg* proj,
                                           std::string name,
                                           const MatchExpression* filter,
                                           const CollatorInterface* coll)
-            : projectionExec(std::move(proj)),
-              catalogName(std::move(name)),
+            : projectionExec(proj),
               filterExpr(filter),
-              collator(coll) {}
-
-        std::unique_ptr<ProjectionExecAgg> projectionExec;
-        std::string catalogName;
+              collator(coll),
+              catalogName(std::move(name)) {}
 
         // These are owned by the catalog.
+        const ProjectionExecAgg* projectionExec;
         const MatchExpression* filterExpr;  // For partial indexes.
         const CollatorInterface* collator;
+
+        std::string catalogName;
     };
 
     /**

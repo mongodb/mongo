@@ -134,6 +134,11 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexC
 
     const bool isMultikey = desc->isMultikey(opCtx);
 
+    const auto* projExec =
+        (desc->getIndexType() == IndexType::INDEX_WILDCARD
+             ? static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec()
+             : nullptr);
+
     return {desc->keyPattern(),
             desc->getIndexType(),
             isMultikey,
@@ -149,7 +154,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexC
             IndexEntry::Identifier{desc->indexName()},
             ice.getFilterExpression(),
             desc->infoObj(),
-            ice.getCollator()};
+            ice.getCollator(),
+            projExec};
 }
 
 void fillOutPlannerParams(OperationContext* opCtx,
@@ -1473,8 +1479,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
             plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
-            const auto proj = WildcardKeyGenerator::createProjectionExec(desc->keyPattern(),
-                                                                         desc->pathProjection());
+            const auto* proj =
+                static_cast<WildcardAccessMethod*>(ii.accessMethod(desc))->getProjectionExec();
             if (proj->applyProjectionToOneField(parsedDistinct.getKey())) {
                 plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
             }

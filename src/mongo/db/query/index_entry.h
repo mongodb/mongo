@@ -33,6 +33,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/db/exec/projection_exec_agg.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -106,7 +107,8 @@ struct IndexEntry {
                Identifier ident,
                const MatchExpression* fe,
                const BSONObj& io,
-               const CollatorInterface* ci)
+               const CollatorInterface* ci,
+               const ProjectionExecAgg* projExec)
         : keyPattern(kp),
           multikey(mk),
           multikeyPaths(mkp),
@@ -117,9 +119,12 @@ struct IndexEntry {
           filterExpr(fe),
           infoObj(io),
           type(type),
-          collator(ci) {
+          collator(ci),
+          wildcardProjection(projExec) {
         // The caller must not supply multikey metadata in two different formats.
         invariant(multikeyPaths.empty() || multikeyPathSet.empty());
+        // We always expect a projection executor for $** indexes, and none otherwise.
+        invariant((type == IndexType::INDEX_WILDCARD) == (projExec != nullptr));
     }
 
     /**
@@ -131,14 +136,16 @@ struct IndexEntry {
                bool unq,
                Identifier ident,
                const MatchExpression* fe,
-               const BSONObj& io)
+               const BSONObj& io,
+               const ProjectionExecAgg* projExec = nullptr)
         : keyPattern(kp),
           multikey(mk),
           sparse(sp),
           unique(unq),
           identifier(std::move(ident)),
           filterExpr(fe),
-          infoObj(io) {
+          infoObj(io),
+          wildcardProjection(projExec) {
         type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
     }
 
@@ -219,6 +226,10 @@ struct IndexEntry {
     // Null if this index orders strings according to the simple binary compare. If non-null,
     // represents the collator used to generate index keys for indexed strings.
     const CollatorInterface* collator = nullptr;
+
+    // For $** indexes, a pointer to the projection executor owned by the index access method. Null
+    // unless this IndexEntry represents a wildcard index, in which case this is always non-null.
+    const ProjectionExecAgg* wildcardProjection = nullptr;
 };
 
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident);

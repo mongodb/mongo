@@ -34,6 +34,7 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -1032,9 +1033,19 @@ TEST(QueryPlannerIXSelectTest, NoStringComparisonType) {
     }
 }
 
-IndexEntry makeIndexEntry(BSONObj keyPattern,
-                          MultikeyPaths multiKeyPaths,
-                          std::set<FieldRef> multikeyPathSet = {}) {
+// Helper which constructs an IndexEntry and returns it along with an owned ProjectionExecAgg, which
+// is non-null if the requested entry represents a wildcard index and null otherwise. When non-null,
+// it simulates the ProjectionExecAgg that is owned by the $** IndexAccessMethod.
+std::pair<IndexEntry, std::unique_ptr<ProjectionExecAgg>> makeIndexEntry(
+    BSONObj keyPattern,
+    MultikeyPaths multiKeyPaths,
+    std::set<FieldRef> multikeyPathSet = {},
+    BSONObj infoObj = BSONObj()) {
+    auto projExec = (keyPattern.firstElement().fieldNameStringData().endsWith("$**"_sd)
+                         ? WildcardKeyGenerator::createProjectionExec(
+                               keyPattern, infoObj.getObjectField("wildcardProjection"))
+                         : nullptr);
+
     IndexEntry entry{std::move(keyPattern)};
     entry.multikeyPaths = std::move(multiKeyPaths);
     entry.multikey =
@@ -1042,30 +1053,24 @@ IndexEntry makeIndexEntry(BSONObj keyPattern,
                                                 entry.multikeyPaths.cend(),
                                                 [](const auto& entry) { return !entry.empty(); });
     entry.multikeyPathSet = std::move(multikeyPathSet);
-    return entry;
-}
-
-IndexEntry makeIndexEntryWithInfoObj(BSONObj keyPattern,
-                                     MultikeyPaths multiKeyPaths,
-                                     BSONObj infoObj) {
-    IndexEntry entry = makeIndexEntry(keyPattern, multiKeyPaths);
+    entry.wildcardProjection = projExec.get();
     entry.infoObj = infoObj;
-    return entry;
+    return {entry, std::move(projExec)};
 }
 
 TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseMultiKeyIndex) {
-    IndexEntry entry = makeIndexEntry(BSON("a" << 1), {{0U}});
+    auto entry = makeIndexEntry(BSON("a" << 1), {{0U}});
     std::vector<IndexEntry> indices;
-    indices.push_back(entry);
+    indices.push_back(entry.first);
     std::set<size_t> expectedIndices;
     testRateIndices(
         "{a: {$_internalExprEq: 1}}", "", kSimpleCollator, indices, "a", expectedIndices);
 }
 
 TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseNonMultikeyFieldOfMultikeyIndex) {
-    IndexEntry entry = makeIndexEntry(BSON("a" << 1 << "b" << 1), {{0U}, {}});
+    auto entry = makeIndexEntry(BSON("a" << 1 << "b" << 1), {{0U}, {}});
     std::vector<IndexEntry> indices;
-    indices.push_back(entry);
+    indices.push_back(entry.first);
     std::set<size_t> expectedIndices = {0};
     testRateIndices(
         "{b: {$_internalExprEq: 1}}", "", kSimpleCollator, indices, "b", expectedIndices);
@@ -1295,18 +1300,18 @@ TEST(QueryPlannerIXSelectTest, ExpandWildcardIndices) {
 
     // Case where no fields are specified.
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(stdx::unordered_set<string>(), {indexEntry});
+        QueryPlannerIXSelect::expandIndexes(stdx::unordered_set<string>(), {indexEntry.first});
     ASSERT_TRUE(result.empty());
 
     stdx::unordered_set<string> fields = {"fieldA", "fieldB"};
 
-    result = QueryPlannerIXSelect::expandIndexes(fields, {indexEntry});
+    result = QueryPlannerIXSelect::expandIndexes(fields, {indexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {BSON("fieldA" << 1), BSON("fieldB" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 
     const auto wildcardIndexWithSubpath = makeIndexEntry(BSON("a.b.$**" << 1), {});
     fields = {"a.b", "a.b.c", "a.d"};
-    result = QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexWithSubpath});
+    result = QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexWithSubpath.first});
     expectedKeyPatterns = {BSON("a.b" << 1), BSON("a.b.c" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
@@ -1321,18 +1326,20 @@ TEST(QueryPlannerIXSelectTest, ExpandWildcardIndicesInPresenceOfOtherIndices) {
     std::vector<BSONObj> expectedKeyPatterns = {
         BSON("fieldA" << 1), BSON("fieldA" << 1), BSON("fieldB" << 1), BSON("fieldC" << 1)};
 
-    auto result = QueryPlannerIXSelect::expandIndexes(fields, {aIndexEntry, wildcardIndexEntry});
+    auto result =
+        QueryPlannerIXSelect::expandIndexes(fields, {aIndexEntry.first, wildcardIndexEntry.first});
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
     result.clear();
 
     expectedKeyPatterns = {
         BSON("fieldB" << 1), BSON("fieldA" << 1), BSON("fieldB" << 1), BSON("fieldC" << 1)};
-    result = QueryPlannerIXSelect::expandIndexes(fields, {bIndexEntry, wildcardIndexEntry});
+    result =
+        QueryPlannerIXSelect::expandIndexes(fields, {bIndexEntry.first, wildcardIndexEntry.first});
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
     result.clear();
 
-    result =
-        QueryPlannerIXSelect::expandIndexes(fields, {aIndexEntry, wildcardIndexEntry, bIndexEntry});
+    result = QueryPlannerIXSelect::expandIndexes(
+        fields, {aIndexEntry.first, wildcardIndexEntry.first, bIndexEntry.first});
     expectedKeyPatterns = {BSON("fieldA" << 1),
                            BSON("fieldA" << 1),
                            BSON("fieldB" << 1),
@@ -1341,7 +1348,8 @@ TEST(QueryPlannerIXSelectTest, ExpandWildcardIndicesInPresenceOfOtherIndices) {
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
     result.clear();
 
-    result = QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry, abIndexEntry});
+    result =
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first, abIndexEntry.first});
     expectedKeyPatterns = {BSON("fieldA" << 1),
                            BSON("fieldB" << 1),
                            BSON("fieldC" << 1),
@@ -1355,7 +1363,7 @@ TEST(QueryPlannerIXSelectTest, ExpandedIndexEntriesAreCorrectlyMarkedAsMultikeyO
     const stdx::unordered_set<string> fields = {"a.b", "c.d"};
     std::vector<BSONObj> expectedKeyPatterns = {BSON("a.b" << 1), BSON("c.d" << 1)};
 
-    auto result = QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+    auto result = QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 
     for (auto&& entry : result) {
@@ -1378,19 +1386,20 @@ TEST(QueryPlannerIXSelectTest, WildcardIndexExpansionExcludesIdField) {
 
     stdx::unordered_set<string> fields = {"_id", "abc", "def"};
 
-    std::vector<IndexEntry> result = QueryPlannerIXSelect::expandIndexes(fields, {indexEntry});
+    std::vector<IndexEntry> result =
+        QueryPlannerIXSelect::expandIndexes(fields, {indexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {BSON("abc" << 1), BSON("def" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesExpandedEntryHasCorrectProperties) {
     auto wildcardIndexEntry = makeIndexEntry(BSON("$**" << 1), {});
-    wildcardIndexEntry.identifier = IndexEntry::Identifier("someIndex");
+    wildcardIndexEntry.first.identifier = IndexEntry::Identifier("someIndex");
 
     stdx::unordered_set<string> fields = {"abc", "def"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {BSON("abc" << 1), BSON("def" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 
@@ -1409,7 +1418,7 @@ TEST(QueryPlannerIXSelectTest, WildcardIndicesExpandedEntryHasCorrectProperties)
         ASSERT_FALSE(ie.unique);
 
         ASSERT_EQ(ie.identifier,
-                  IndexEntry::Identifier(wildcardIndexEntry.identifier.catalogName,
+                  IndexEntry::Identifier(wildcardIndexEntry.first.identifier.catalogName,
                                          ie.keyPattern.firstElementFieldName()));
     }
 }
@@ -1420,40 +1429,47 @@ TEST(QueryPlannerIXSelectTest, WildcardIndicesExcludeNonMatchingKeySubpath) {
     stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {
         BSON("subpath.abc" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesExcludeNonMatchingPathsWithInclusionProjection) {
-    auto wildcardIndexEntry = makeIndexEntryWithInfoObj(
-        BSON("$**" << 1), {}, BSON("wildcardProjection" << BSON("abc" << 1 << "subpath.abc" << 1)));
+    auto wildcardIndexEntry =
+        makeIndexEntry(BSON("$**" << 1),
+                       {},
+                       {},
+                       BSON("wildcardProjection" << BSON("abc" << 1 << "subpath.abc" << 1)));
 
     stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {BSON("abc" << 1), BSON("subpath.abc" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesExcludeNonMatchingPathsWithExclusionProjection) {
-    auto wildcardIndexEntry = makeIndexEntryWithInfoObj(
-        BSON("$**" << 1), {}, BSON("wildcardProjection" << BSON("abc" << 0 << "subpath.abc" << 0)));
+    auto wildcardIndexEntry =
+        makeIndexEntry(BSON("$**" << 1),
+                       {},
+                       {},
+                       BSON("wildcardProjection" << BSON("abc" << 0 << "subpath.abc" << 0)));
 
     stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {
         BSON("def" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesWithInclusionProjectionAllowIdExclusion) {
-    auto wildcardIndexEntry = makeIndexEntryWithInfoObj(
+    auto wildcardIndexEntry = makeIndexEntry(
         BSON("$**" << 1),
+        {},
         {},
         BSON("wildcardProjection" << BSON("_id" << 0 << "abc" << 1 << "subpath.abc" << 1)));
 
@@ -1461,14 +1477,15 @@ TEST(QueryPlannerIXSelectTest, WildcardIndicesWithInclusionProjectionAllowIdExcl
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {BSON("abc" << 1), BSON("subpath.abc" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesWithInclusionProjectionAllowIdInclusion) {
-    auto wildcardIndexEntry = makeIndexEntryWithInfoObj(
+    auto wildcardIndexEntry = makeIndexEntry(
         BSON("$**" << 1),
+        {},
         {},
         BSON("wildcardProjection" << BSON("_id" << 1 << "abc" << 1 << "subpath.abc" << 1)));
 
@@ -1476,15 +1493,16 @@ TEST(QueryPlannerIXSelectTest, WildcardIndicesWithInclusionProjectionAllowIdIncl
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {
         BSON("_id" << 1), BSON("abc" << 1), BSON("subpath.abc" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesWithExclusionProjectionAllowIdInclusion) {
-    auto wildcardIndexEntry = makeIndexEntryWithInfoObj(
+    auto wildcardIndexEntry = makeIndexEntry(
         BSON("$**" << 1),
+        {},
         {},
         BSON("wildcardProjection" << BSON("_id" << 1 << "abc" << 0 << "subpath.abc" << 0)));
 
@@ -1492,21 +1510,21 @@ TEST(QueryPlannerIXSelectTest, WildcardIndicesWithExclusionProjectionAllowIdIncl
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {
         BSON("_id" << 1), BSON("def" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 TEST(QueryPlannerIXSelectTest, WildcardIndicesIncludeMatchingInternalNodes) {
-    auto wildcardIndexEntry = makeIndexEntryWithInfoObj(
-        BSON("$**" << 1), {}, BSON("wildcardProjection" << BSON("_id" << 1 << "subpath" << 1)));
+    auto wildcardIndexEntry = makeIndexEntry(
+        BSON("$**" << 1), {}, {}, BSON("wildcardProjection" << BSON("_id" << 1 << "subpath" << 1)));
 
     stdx::unordered_set<string> fields = {
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
     std::vector<IndexEntry> result =
-        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry});
+        QueryPlannerIXSelect::expandIndexes(fields, {wildcardIndexEntry.first});
     std::vector<BSONObj> expectedKeyPatterns = {
         BSON("_id" << 1), BSON("subpath.abc" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));

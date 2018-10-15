@@ -38,6 +38,7 @@
 #include <memory>
 #include <ostream>
 
+#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -225,6 +226,23 @@ void assertEquivalent(const char* queryStr,
        << "\nOriginal query: " << queryStr << "\nExpected: " << expected->toString()
        << "\nActual: " << actual->toString();
     FAIL(ss);
+}
+
+// Helper which constructs a $** IndexEntry and returns it along with an owned ProjectionExecAgg.
+// The latter simulates the ProjectionExecAgg which, during normal operation, is owned and
+// maintained by the $** index's IndexAccessMethod, and is required because the plan cache will
+// obtain unowned pointers to it.
+std::pair<IndexEntry, std::unique_ptr<ProjectionExecAgg>> makeWildcardEntry(BSONObj keyPattern) {
+    auto projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, {});
+    return {IndexEntry(keyPattern,
+                       false,  // multikey
+                       false,  // sparse
+                       false,  // unique
+                       IndexEntry::Identifier{"indexName"},
+                       nullptr,
+                       BSONObj(),
+                       projExec.get()),
+            std::move(projExec)};
 }
 
 //
@@ -1282,17 +1300,9 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
 
 // $** index
 TEST_F(CachePlanSelectionTest, WildcardIxScan) {
-    params.indices.push_back(IndexEntry(BSON("$**" << 1),
-                                        IndexType::INDEX_WILDCARD,
-                                        false,  // multikey
-                                        {},     // multikey paths
-                                        {},     // multikeyPathSet
-                                        true,   // sparse
-                                        false,  // unique
-                                        IndexEntry::Identifier{"anIndex"},
-                                        nullptr,
-                                        BSONObj(),
-                                        nullptr));
+    auto entryProjExecPair = makeWildcardEntry(BSON("$**" << 1));
+    params.indices.push_back(entryProjExecPair.first);
+
     BSONObj query = fromjson("{a: 1, b: 1}");
     runQuery(query);
 
@@ -2036,15 +2046,10 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
+    auto entryProjExecPair = makeWildcardEntry(BSON("a.$**" << 1));
+
     PlanCache planCache;
-    IndexEntry entry(BSON("a.$**" << 1),
-                     false,                       // multikey
-                     false,                       // sparse
-                     false,                       // unique
-                     IndexEntry::Identifier{""},  // name
-                     nullptr,                     // filterExpr
-                     BSONObj());
-    planCache.notifyOfIndexEntries({entry});
+    planCache.notifyOfIndexEntries({entryProjExecPair.first});
 
     // Used to check that two queries have the same shape when no indexes are present.
     PlanCache planCacheWithNoIndexes;
@@ -2096,15 +2101,10 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
+    auto entryProjExecPair = makeWildcardEntry(BSON("a.$**" << 1));
+
     PlanCache planCache;
-    IndexEntry entry(BSON("a.$**" << 1),
-                     false,                       // multikey
-                     false,                       // sparse
-                     false,                       // unique
-                     IndexEntry::Identifier{""},  // name
-                     nullptr,                     // filterExpr
-                     BSONObj());
-    planCache.notifyOfIndexEntries({entry});
+    planCache.notifyOfIndexEntries({entryProjExecPair.first});
 
     // Equality to empty obj and equality to non-empty obj have different plan cache keys.
     std::unique_ptr<CanonicalQuery> equalsEmptyObj(canonicalize("{a: {}}"));

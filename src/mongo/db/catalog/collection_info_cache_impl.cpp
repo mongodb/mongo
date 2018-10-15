@@ -40,7 +40,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
@@ -94,8 +94,8 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
 
         if (descriptor->getAccessMethodName() == IndexNames::WILDCARD) {
             // Obtain the projection used by the $** index's key generator.
-            auto pathProj = WildcardKeyGenerator::createProjectionExec(
-                descriptor->keyPattern(), descriptor->pathProjection());
+            const auto* pathProj =
+                static_cast<WildcardAccessMethod*>(i.accessMethod(descriptor))->getProjectionExec();
             // If the projection is an exclusion, then we must check the new document's keys on all
             // updates, since we do not exhaustively know the set of paths to be indexed.
             if (pathProj->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection) {

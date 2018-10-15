@@ -58,6 +58,13 @@ public:
                          const CollatorInterface* collator);
 
     /**
+     * Returns a pointer to the key generator's underlying ProjectionExecAgg.
+     */
+    const ProjectionExecAgg* getProjectionExec() const {
+        return _projExec.get();
+    }
+
+    /**
      * Applies the appropriate Wildcard projection to the input doc, and then adds one key-value
      * pair to the BSONObjSet 'keys' for each leaf node in the post-projection document:
      *      { '': 'path.to.field', '': <collation-aware-field-value> }
