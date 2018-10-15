@@ -87,7 +87,7 @@ public final class MongoEmbeddedCAPI {
                     format("Unable to load the Mongo Embedded Library.%n"
                          + "Please either: Set the libraryPath when calling MongoEmbeddedCAPI.create or %n"
                          + "Ensure the library is set on the jna.library.path or the java.library.path system property."
-                    )
+                    ), t
             );
         }
         return new MongoEmbeddedLibraryImpl(yamlConfig != null ? yamlConfig : "", logLevel != null ? logLevel : LogLevel.LOGGER);

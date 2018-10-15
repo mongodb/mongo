@@ -59,7 +59,8 @@ final class CAPIHelper {
                                        final int errorCode) {
         throw new MongoEmbeddedCAPIException(errorCode,
                 CAPI.mongo_embedded_v1_status_get_code(statusPointer),
-                CAPI.mongo_embedded_v1_status_get_explanation(statusPointer).toString());
+                CAPI.mongo_embedded_v1_status_get_explanation(statusPointer).toString(),
+                null);
     }
 
     static void destroyStatusPointer(final CAPI.mongo_embedded_v1_status statusPointer) {

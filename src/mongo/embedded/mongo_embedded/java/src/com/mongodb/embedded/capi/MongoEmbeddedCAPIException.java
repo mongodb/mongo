@@ -42,14 +42,6 @@ public class MongoEmbeddedCAPIException extends RuntimeException {
 
     /**
      * @param msg   the message
-     */
-    public MongoEmbeddedCAPIException(final String msg) {
-        super(msg);
-        this.code = -1;
-    }
-
-    /**
-     * @param msg   the message
      * @param cause the cause
      */
     public MongoEmbeddedCAPIException(final String msg, final Throwable cause) {
@@ -60,21 +52,23 @@ public class MongoEmbeddedCAPIException extends RuntimeException {
     /**
      * @param code the error code
      * @param msg  the message
+     * @param cause the cause
      */
-    public MongoEmbeddedCAPIException(final int code, final String msg) {
-        super(msg);
+    public MongoEmbeddedCAPIException(final int code, final String msg, final Throwable cause) {
+        super(msg, cause);
         this.code = code;
     }
-
+    
     /**
      * Constructs a new instance
      *
      * @param errorCode the error code
      * @param subErrorCode the sub category error code
      * @param reason the reason for the exception
+     * @param cause the cause
      */
-    public MongoEmbeddedCAPIException(final int errorCode, final int subErrorCode, final String reason) {
-        this(errorCode, format("%s (%s:%s)", reason, errorCode, subErrorCode));
+    public MongoEmbeddedCAPIException(final int errorCode, final int subErrorCode, final String reason, final Throwable cause) {
+        this(errorCode, format("%s (%s:%s)", reason, errorCode, subErrorCode), cause);
     }
 
     /**
