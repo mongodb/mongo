@@ -130,7 +130,7 @@ fi
 
 %files
 %defattr(-,root,root,-)
-%doc README GNU-AGPL-3.0.txt
+%doc README
 
 %{_bindir}/install_compass
 %{_bindir}/mongo
