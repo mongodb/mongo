@@ -352,16 +352,14 @@ __wt_txn_resolve_prepared_op(
 	 * eviction free those updates before subsequent ops are processed,
 	 * which means a search could reasonably not find an update in that
 	 * case.
-	 */
-	WT_ASSERT(session, upd != NULL || txn->multi_update_count != 0);
-
-	/*
 	 * We track the update count only for commit, but not for rollback, as
 	 * our tracking is based on transaction id, and in case of rollback, we
 	 * set it to aborted.
 	 */
-	if (upd == NULL && commit)
+	if (upd == NULL && commit) {
+		WT_ASSERT(session, txn->multi_update_count > 0);
 		--txn->multi_update_count;
+	}
 #endif
 
 	WT_STAT_CONN_INCR(session, txn_prepared_updates_resolved);

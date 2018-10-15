@@ -16,6 +16,11 @@ functions:
         remote_file: wiredtiger/${build_variant}/${revision}/binaries/${build_id}.tgz
         bucket: build_external
         extract_to: wiredtiger
+  "fetch mongo-tests repo" :
+    command: shell.exec
+    params:
+      script: | 
+        git clone https://github.com/wiredtiger/mongo-tests
 
 pre:
   - command: shell.exec
@@ -156,6 +161,22 @@ tasks:
             # format assumes we run it from the format directory
             cmd.exe /c "cd test\\format && ..\\..\\t_format.exe reverse=0 encryption=none logging_compression=none runs=20"
 
+  - name: million-collection-test
+    depends_on: []
+    run_on: 
+      - rhel62-large
+    commands: 
+      - func: "fetch mongo-tests repo"
+      - command: shell.exec
+        params:
+          working_dir: mongo-tests
+          script: | 
+            set -o errexit
+            set -o verbose
+            ulimit -n 1000000
+            ulimit -c unlimited 
+            largescale/run-million-collection-test.sh .
+
 buildvariants:
 - name: ubuntu1404
   display_name: Ubuntu 14.04
@@ -170,6 +191,16 @@ buildvariants:
     - name: compile
     - name: unit-test
     - name: fops
+
+- name: large-scale-test
+  display_name: Large scale testing
+  batchtime: 1440 # 1 day
+  run_on:
+  - rhel62-large
+  expansions:
+    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+  tasks:
+    - name: million-collection-test
 
 - name: windows-64
   display_name: Windows 64-bit
