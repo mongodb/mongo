@@ -4,7 +4,7 @@ Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, m
 Version: %{dynamic_version}
 Release: %{dynamic_release}%{?dist}
 Summary: MongoDB open source document-oriented database system (metapackage)
-License: AGPL 3.0
+License: SSPL 1.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
 Requires: mongodb-org-unstable-server = %{version}, mongodb-org-unstable-shell = %{version}, mongodb-org-unstable-mongos = %{version}, mongodb-org-unstable-tools = %{version}
@@ -221,7 +221,7 @@ fi
 %attr(0755,mongod,mongod) %dir /var/log/mongodb
 %attr(0755,mongod,mongod) %dir /var/run/mongodb
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
-%doc GNU-AGPL-3.0
+%doc LICENSE-Community.txt
 %doc README
 %doc THIRD-PARTY-NOTICES
 %doc MPL-2
@@ -238,7 +238,7 @@ fi
 
 %files tools
 %defattr(-,root,root,-)
-#%doc README GNU-AGPL-3.0.txt
+#%doc README LICENSE-Community.txt
 
 %{_bindir}/bsondump
 %{_bindir}/install_compass

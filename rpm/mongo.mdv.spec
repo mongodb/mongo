@@ -6,7 +6,7 @@ Name:    %{name}
 Version: %{version}
 Release: %{release}
 Summary: MongoDB client shell and tools
-License: AGPL 3.0
+License: SSPL 1.0
 URL: http://www.mongodb.org
 Group: Databases
 
@@ -130,7 +130,7 @@ fi
 
 %files
 %defattr(-,root,root,-)
-%doc README GNU-AGPL-3.0.txt
+%doc README LICENSE-Community.txt
 
 %{_bindir}/install_compass
 %{_bindir}/mongo
