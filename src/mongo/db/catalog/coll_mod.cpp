@@ -403,7 +403,7 @@ Status _collModInternal(OperationContext* opCtx,
 
             if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
                 log() << "collMod - assertAfterIndexUpdate fail point enabled.";
-                uasserted(50968, "trigger rollback after the index update");
+                uasserted(50970, "trigger rollback after the index update");
             }
         }
 
@@ -451,7 +451,7 @@ Status _collModInternal(OperationContext* opCtx,
 
             if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
                 log() << "collMod - assertAfterIndexUpdate fail point enabled.";
-                uasserted(50969, "trigger rollback for unique index update");
+                uasserted(50971, "trigger rollback for unique index update");
             }
         }
     }

@@ -32,7 +32,7 @@
     assert.commandFailedWithCode(
         adminDB.runCommand(
             {"collMod": collName, "index": {"name": "index1", "expireAfterSeconds": 100}}),
-        50968);
+        50970);
 
     const index = coll.getIndexes();
     var ttlAfterRollback = index[1].expireAfterSeconds;
@@ -46,7 +46,7 @@
     assert.writeOK(coll.insert({_id: 0, a: 1}));
 
     assert.commandFailedWithCode(adminDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 50969);
+                                 50971);
 
     MongoRunner.stopMongod(conn);
 })();
