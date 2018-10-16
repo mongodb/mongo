@@ -606,7 +606,7 @@ env.Append(MODULE_BANNERS = [distsrc.File('README'),
 
 # If no module has introduced a file named LICENSE.txt, then inject the AGPL.
 if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:
-    env.Append(MODULE_BANNERS = [distsrc.File('GNU-AGPL-3.0')])
+    env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
 
 # All module banners get staged to the top level of the tarfile, so we
 # need to fail if we are going to have a name collision.
