@@ -28,19 +28,17 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/snapshot_window_options.h"
+#include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/log.h"
-
 
 namespace mongo {
 namespace biggie {
@@ -70,17 +68,19 @@ std::unique_ptr<::mongo::RecordStore> KVEngine::getRecordStore(OperationContext*
     return std::make_unique<RecordStore>(ns, ident);
 }
 
-void KVEngine::setMaster_inlock(std::unique_ptr<StringStore> newMaster) {
-    _master.reset(newMaster.release());
-}
-
 std::shared_ptr<StringStore> KVEngine::getMaster() const {
-    stdx::lock_guard<stdx::mutex> lk(_masterLock);
+    stdx::lock_guard<stdx::mutex> lock(_masterLock);
     return _master;
 }
 
-std::shared_ptr<StringStore> KVEngine::getMaster_inlock() const {
-    return _master;
+bool KVEngine::compareAndSwapMaster(std::shared_ptr<StringStore> compareAgainst,
+                                    std::unique_ptr<StringStore>& newMaster) {
+    stdx::lock_guard<stdx::mutex> lock(_masterLock);
+    if (compareAgainst->sameRoot(*_master)) {
+        _master.reset(newMaster.release());
+        return true;
+    }
+    return false;
 }
 
 

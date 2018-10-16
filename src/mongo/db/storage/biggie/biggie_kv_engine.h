@@ -135,20 +135,14 @@ public:
 
     // Biggie Specific
 
-    /**
-     * Used to replace the master branch of the store with an updated copy.
-     * Appropriate lock must be taken externally.
-     */
-    void setMaster_inlock(std::unique_ptr<StringStore> newMaster);
-
     std::shared_ptr<StringStore> getMaster() const;
-    std::shared_ptr<StringStore> getMaster_inlock() const;
+
     /**
-     * Get the lock around the master branch.
+     * Returns true and swaps _master to newMaster if both _master and compareAgainst are
+     * equivalent.
      */
-    stdx::mutex& getMasterLock() {
-        return _masterLock;
-    }
+    bool compareAndSwapMaster(std::shared_ptr<StringStore> compareAgainst,
+                              std::unique_ptr<StringStore>& newMaster);
 
 private:
     std::shared_ptr<void> _catalogInfo;

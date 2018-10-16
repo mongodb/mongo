@@ -26,13 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/biggie/biggie_record_store.h"
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
+#include "mongo/db/storage/biggie/biggie_record_store.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/biggie/store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 

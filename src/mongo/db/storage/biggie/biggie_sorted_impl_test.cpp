@@ -26,13 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
 #include "mongo/db/storage/biggie/store.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -49,8 +50,8 @@ public:
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique) final {
         return std::make_unique<SortedDataInterface>(_order, unique, "ident"_sd);
     }
+
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
-        //! not correct lol
         return std::make_unique<RecoveryUnit>(&_kvEngine);
     }
 };

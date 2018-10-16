@@ -29,28 +29,25 @@
  *    it in the license file.
  */
 
-
-// ALERT: need to remodify db.cpp to actually create an fcv on line about 422.
-// (!storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");)
-// once this stuff actually gets implemented!!!
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/biggie/biggie_record_store.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/db/storage/biggie/store.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
+#include "mongo/platform/basic.h"
 
 #include <cstring>
 #include <iomanip>
 #include <memory>
 #include <sstream>
 #include <utility>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/biggie/biggie_record_store.h"
+#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace biggie {
@@ -228,6 +225,7 @@ std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* o
 }
 
 Status RecordStore::truncate(OperationContext* opCtx) {
+
     StringStore* str = getRecoveryUnitBranch_forking(opCtx);
     StringStore::const_iterator end = str->upper_bound(_postfix);
     std::vector<std::string> toDelete;

@@ -30,11 +30,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/platform/basic.h"
 
 #include <mutex>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -47,18 +48,23 @@ void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {}
 
 void RecoveryUnit::commitUnitOfWork() {
     if (_dirty && _workingCopy) {
+
         while (true) {
             std::shared_ptr<StringStore> master = _KVEngine->getMaster();
+
             try {
                 _workingCopy->merge3(*_mergeBase, *master);
             } catch (const merge_conflict_exception&) {
                 throw WriteConflictException();
             }
-            stdx::lock_guard<stdx::mutex> lkOnMaster(_KVEngine->getMasterLock());
-            if (_KVEngine->getMaster_inlock() == master) {
-                _KVEngine->setMaster_inlock(std::move(_workingCopy));
+
+            if (_KVEngine->compareAndSwapMaster(master, _workingCopy)) {
+                // Merged successfully
                 _mergeBase.reset();
                 break;
+            } else {
+                // Retry the merge, but update the mergeBase since some progress was made merging.
+                _mergeBase = master;
             }
         }
         _dirty = false;
@@ -113,8 +119,10 @@ bool RecoveryUnit::forkIfNeeded() {
     if (_mergeBase) {
         return false;
     }
+
     _mergeBase = _KVEngine->getMaster();
     _workingCopy = std::make_unique<StringStore>(*_mergeBase);
+
     return true;
 }
 

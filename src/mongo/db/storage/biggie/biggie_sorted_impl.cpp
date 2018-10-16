@@ -28,21 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
-#include "mongo/db/storage/biggie/store.h"
-#include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/key_string.h"
 #include "mongo/platform/basic.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/bufreader.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/shared_buffer.h"
 
 #include <cstring>
 #include <iomanip>
@@ -50,6 +36,20 @@
 #include <set>
 #include <sstream>
 #include <utility>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
+#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 namespace biggie {
