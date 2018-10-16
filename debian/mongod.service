@@ -25,6 +25,10 @@ LimitMEMLOCK=infinity
 TasksMax=infinity
 TasksAccounting=false
 
+# Never use kill -9 (i.e. SIGKILL) to terminate a mongod instance.
+# https://docs.mongodb.com/manual/tutorial/manage-mongodb-processes/#use-kill
+SendSIGKILL=no
+
 # Recommended limits for for mongod as specified in
 # http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
 
