@@ -604,7 +604,7 @@ env.Append(MODULE_BANNERS = [distsrc.File('README'),
                              distsrc.File('THIRD-PARTY-NOTICES'),
                              distsrc.File('MPL-2')])
 
-# If no module has introduced a file named LICENSE.txt, then inject the AGPL.
+# If no module has introduced a file named LICENSE.txt, then inject the license.
 if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:
     env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
 
