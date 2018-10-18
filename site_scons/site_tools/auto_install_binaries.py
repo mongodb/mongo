@@ -10,6 +10,12 @@ def generate(env):
     suffix_map = {
         env.subst('$PROGSUFFIX') : 'bin',
         '.dylib' : 'lib',
+        # TODO: These 'lib' answers are incorrect. The location for the debug info
+        # should be the same as the target itself, which might be bin or lib. We need
+        # a solution for that. When that is fixed, add 'Program' back into the list
+        # of separate debug targets in the separate_debug.py tool.
+        '.dSYM' : 'lib',
+        '.debug' : 'lib',
         '.so' : 'lib',
         '.dll' : 'bin',
         '.lib' : 'lib',
