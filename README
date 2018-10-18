@@ -1,3 +1,18 @@
+Issues seen with https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/:
+1) The package does not create /data/db
+2) The package does not create a service unit for systemd
+3) Because of the issue in #2, trying to removing mongo package causes a failure in /var/lib/dpkg/info/mongodb-org-server.prerm
+  and makes it impossible to remove it or reinstall mongo from the default package repository without editing that file
+ 
+ #3 Error: 
+ 
+Failed to stop mongod.service: Unit mongod.service not loaded.
+invoke-rc.d: initscript mongod, action "stop" failed.
+dpkg: error processing package mongodb-org-server (--remove):
+ installed mongodb-org-server package pre-removal script subprocess returned error exit status 5
+
+Unrelated, but having issues in your project would probably be helpful for reporting issues like these
+
 MongoDB README
 
 Welcome to MongoDB!
