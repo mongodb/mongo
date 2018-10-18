@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/session_update_tracker.h"
@@ -35,6 +37,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -105,10 +108,11 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateOrFlush(
     const OplogEntry& entry) {
-    auto ns = entry.getNss();
+    const auto& ns = entry.getNss();
+
     if (ns == NamespaceString::kSessionTransactionsTableNamespace ||
         (ns.isConfigDB() && ns.isCommand())) {
-        return flush(entry);
+        return _flush(entry);
     }
 
     _updateSessionInfo(entry);
@@ -116,14 +120,14 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateOrFlush(
 }
 
 void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
-    auto sessionInfo = entry.getOperationSessionInfo();
+    const auto& sessionInfo = entry.getOperationSessionInfo();
 
     if (!sessionInfo.getTxnNumber()) {
         return;
     }
 
-    auto lsid = sessionInfo.getSessionId();
-    fassert(50842, lsid.is_initialized());
+    const auto& lsid = sessionInfo.getSessionId();
+    invariant(lsid);
 
     auto iter = _sessionsToUpdate.find(lsid->getId());
     if (iter == _sessionsToUpdate.end()) {
@@ -131,12 +135,21 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
         return;
     }
 
-    auto existingSessionInfo = iter->second.getOperationSessionInfo();
-    fassert(50843, *sessionInfo.getTxnNumber() >= *existingSessionInfo.getTxnNumber());
-    iter->second = entry;
+    const auto& existingSessionInfo = iter->second.getOperationSessionInfo();
+    if (*sessionInfo.getTxnNumber() >= *existingSessionInfo.getTxnNumber()) {
+        iter->second = entry;
+        return;
+    }
+
+    severe() << "Entry for session " << lsid->getId() << " has txnNumber "
+             << *sessionInfo.getTxnNumber() << " < " << *existingSessionInfo.getTxnNumber();
+    severe() << "New oplog entry: " << redact(entry.toString());
+    severe() << "Existing oplog entry: " << redact(iter->second.toString());
+
+    fassertFailedNoTrace(50843);
 }
 
-std::vector<OplogEntry> SessionUpdateTracker::flush(const OplogEntry& entry) {
+std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {
     switch (entry.getOpType()) {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kNoop:

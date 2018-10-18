@@ -55,20 +55,20 @@ public:
     boost::optional<std::vector<OplogEntry>> updateOrFlush(const OplogEntry& entry);
 
     /**
-     * Analyzes the given oplog entry and determines which transactions stored so far needs to be
-     * converted to oplog writes.
-     *
-     * Note: should only be called when oplog entry's ns target config.transactions or config.$cmd.
-     */
-    std::vector<OplogEntry> flush(const OplogEntry& entry);
-
-    /**
      * Converts all stored transaction infos to oplog writes to config.transactions.
      * Can return an empty vector if there is nothing to flush.
      */
     std::vector<OplogEntry> flushAll();
 
 private:
+    /**
+     * Analyzes the given oplog entry and determines which transactions stored so far needs to be
+     * converted to oplog writes.
+     *
+     * Note: should only be called when oplog entry's ns target config.transactions or config.$cmd.
+     */
+    std::vector<OplogEntry> _flush(const OplogEntry& entry);
+
     /**
      * Converts stored transaction infos that has a matching transcation id with the given
      * query predicate. Can return an empty vector if there is nothing to flush.

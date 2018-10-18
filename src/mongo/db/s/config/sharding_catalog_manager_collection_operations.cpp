@@ -79,8 +79,6 @@ using std::set;
 
 namespace {
 
-const Seconds kDefaultFindHostMaxWaitTime(20);
-
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 const char kWriteConcernField[] = "writeConcern";
