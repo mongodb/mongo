@@ -686,9 +686,6 @@ void fillWriterVectors(OperationContext* opCtx,
     }
 }
 
-}  // namespace
-
-namespace {
 void tryToGoLiveAsASecondary(OperationContext* opCtx,
                              ReplicationCoordinator* replCoord,
                              OpTime minValid) {
@@ -735,7 +732,8 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
                   << ". Current state: " << replCoord->getMemberState() << causedBy(status);
     }
 }
-}
+
+}  // namespace
 
 class SyncTail::OpQueueBatcher {
     MONGO_DISALLOW_COPYING(OpQueueBatcher);
