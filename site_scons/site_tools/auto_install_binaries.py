@@ -1,19 +1,19 @@
-# TODO: implement sdk_headers
-# TODO: Namedtuple for alias_map
+# TODO: Distfiles and equivalent for the dist target
 # TODO: move keep_targetinfo to tag_install
 # TODO: Add test tag automatically for unit tests, etc.
 # TODO: Test tag still leaves things in the runtime component
-# TODO: library dependency chaining for windows dynamic builds, static dev packages
-# TODO: Separate debug info (different tool?)
+# TODO: Debug info locations should follow associated binary
 # TODO: How should debug info work for tests?
 # TODO: Handle chmod state
 # TODO: tarfile generation
+# TODO: library dependency chaining for windows dynamic builds, static dev packages
 # TODO: Injectible component dependencies (jscore -> resmoke, etc.)
 # TODO: Installing resmoke and configurations
-# TODO: Distfiles and equivalent for the dist target
 # TODO: package decomposition
 # TODO: Install/package target help text
-# TODO: destdir vs prefix
+# TODO: destdir vs prefix (what about --install-sandbox?)
+# TODO: implement sdk_headers
+# TODO: Namedtuple for alias_map
 
 import itertools
 from collections import defaultdict
