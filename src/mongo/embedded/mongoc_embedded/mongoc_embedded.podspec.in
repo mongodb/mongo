@@ -26,4 +26,7 @@ Pod::Spec.new do |s|
   s.dependency "mongo_embedded", "~> 4.0"
   s.dependency "mongo-c-driver", "~> 1.13"
 
+  # See notes in mongo_embedded.podspec.in.
+  s.preserve_path = '**/*.bcsymbolmap'
+
 end

@@ -63,7 +63,7 @@ if mongocEmbeddedEnv.TargetOSIs('darwin'):
         ],
     )
 
-mongocEmbeddedEnv.Library(
+mongocEmbeddedTargets = mongocEmbeddedEnv.Library(
     target='mongoc_embedded',
     source=[
         'mongoc_embedded.cpp',
@@ -121,8 +121,6 @@ if get_option('link-model') != 'dynamic-sdk':
 if get_option('link-model') != 'dynamic-sdk' or get_option('install-mode') != 'hygienic' or not env.TargetOSIs('darwin') or env.TargetOSIs('macOS'):
     Return()
 
-installHeaderRoot = env.Dir('$INSTALL_DIR/include/mongoc_embedded/v1/mongoc_embedded')
-
 frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongoc_embedded.framework')
 env.Alias('install-embedded-dev', frameworkDir)
 
@@ -143,7 +141,7 @@ env.Install(
 
 env.Install(
     target=frameworkDir.Dir('Headers'),
-    source=installHeaderRoot.File('mongoc_embedded.h'),
+    source=env.File('mongoc_embedded.h'),
 )
 
 env.InstallAs(
@@ -170,13 +168,31 @@ env.Install(
 
 mongocEmbeddedFwLib = env.InstallAs(
     target=frameworkDir.File('mongoc_embedded'),
-    source='$INSTALL_DIR/lib/libmongoc_embedded.dylib',
+    source=mongocEmbeddedTargets[0],
 )
 
 env.AddPostAction(
     files=mongocEmbeddedFwLib,
     action=[
+        "install_name_tool -delete_rpath @loader_path/../lib $TARGET",
         "install_name_tool -id @rpath/mongoc_embedded.framework/mongoc_embedded $TARGET",
         "install_name_tool -change @rpath/libmongo_embedded.dylib @rpath/mongo_embedded.framework/mongo_embedded $TARGET",
     ],
 )
+
+mongocEmbeddedDSYM = getattr(mongocEmbeddedTargets[0].attributes, "separate_debug_file", None)
+if mongocEmbeddedDSYM:
+    frameworkDSYMDir = '$INSTALL_DIR/Frameworks/mongoc_embedded.framework.dSYM'
+    env.Alias('install-embedded-dev', frameworkDSYMDir)
+
+    env.InstallAs(
+        target=frameworkDSYMDir,
+        source=mongocEmbeddedDSYM,
+    )
+
+mongocEmbeddedBCSymbolMap = getattr(mongocEmbeddedTargets[0].attributes, "bcsymbolmap_file", None)
+if mongocEmbeddedBCSymbolMap:
+    env.Install(
+        target=frameworkDir.Dir('BCSymbolMaps'),
+        source=mongocEmbeddedBCSymbolMap,
+    )

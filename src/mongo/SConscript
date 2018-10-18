@@ -570,6 +570,10 @@ def failMissingObjCopy(env, target, source):
     env.FatalError("Generating debug symbols requires objcopy, please set the OBJCOPY variable.")
 
 def installBinary( e, name ):
+
+    if hygienic:
+        return
+
     debug_sym_name = name
     name = add_exe( name )
 
@@ -594,8 +598,7 @@ def installBinary( e, name ):
             name,
             debug_sym_cmd
         )
-        if not hygienic:
-            e.Install("#/", debug_sym)
+        e.Install("#/", debug_sym)
         e.Alias('debugsymbols', debug_sym)
         distDebugSymbols.append(debug_sym)
 
@@ -609,24 +612,26 @@ def installBinary( e, name ):
     else:
         distBinaries.append(name)
 
-    if not hygienic:
-        inst = e.Install( "$INSTALL_DIR/bin", name )
+    inst = e.Install( "$INSTALL_DIR/bin", name )
 
-        if env.TargetOSIs('posix'):
-            e.AddPostAction( inst, 'chmod 755 $TARGET' )
+    if env.TargetOSIs('posix'):
+        e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
 def installExternalBinary( e, name_str ):
+
+    if hygienic:
+        return
+
     name = env.File("#/%s" % add_exe(name_str))
     if not name.isfile():
         env.FatalError("ERROR: external binary not found: {0}", name)
 
     distBinaries.append(name)
 
-    if not hygienic:
-        inst = e.Install( "$INSTALL_DIR/bin", name )
+    inst = e.Install( "$INSTALL_DIR/bin", name )
 
-        if env.TargetOSIs('posix'):
-            e.AddPostAction( inst, 'chmod 755 $TARGET' )
+    if env.TargetOSIs('posix'):
+        e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
 # "--use-new-tools" adds dependencies for rewritten (Go) tools
 # It is required for "dist" but optional for "install"

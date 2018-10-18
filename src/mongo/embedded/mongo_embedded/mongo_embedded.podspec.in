@@ -23,4 +23,10 @@ Pod::Spec.new do |s|
   s.watchos.vendored_frameworks = "WatchOS/Frameworks/mongo_embedded.framework"
   s.tvos.vendored_frameworks = "AppleTVOS/Frameworks/mongo_embedded.framework"
 
+  # My current best understanding is that apple uses these to inject
+  # back in when running dsymutil on their side after regenerating a
+  # binary from the bitcode slices. So we need to keep these available
+  # in the pod so they get archived into end user application.
+  s.preserve_path = '**/*.bcsymbolmap'
+
 end

@@ -3718,6 +3718,16 @@ tasks:
 
           fi
 
+          # CMake doesn't seem to do the dSYM for us for the framework
+          if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks ]; then
+              pushd $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks
+              xcrun dsymutil -o bson.framework.dSYM bson.framework/bson
+              xcrun strip -Sx bson.framework/bson
+              xcrun dsymutil -o mongoc.framework.dSYM mongoc.framework/mongoc
+              xcrun strip -Sx mongoc.framework/mongoc
+              popd
+          fi
+
           mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
 
 - name: embedded_sdk_install_dev
@@ -3736,9 +3746,35 @@ tasks:
           --use-system-mongo-c=on
           --wiredtiger=off
           --allocator=system
+          --separate-debug
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
         task_compile_flags_extra: >-
           --link-model=dynamic-sdk
+
+    # Unfortunately, it is very hard to get the symbol map filename
+    # correct in SCons. We work around that here by letting SCons give
+    # them a well known name, and then renaming them appropriately
+    # once we have finished the build.
+    - command: shell.exec
+      params:
+        working_dir: "src/build"
+        script: |
+          set -o errexit
+          set -o verbose
+
+          cd mongo-embedded-sdk-${version}
+
+          if [ -e Frameworks/mongo_embedded.framework/BCSymbolMaps ]; then
+              pushd Frameworks/mongo_embedded.framework
+              mv BCSymbolMaps/libmongo_embedded.dylib.bcsymbolmap BCSymbolMaps/$(dwarfdump -u mongo_embedded | awk '{ print $2 }').bcsymbolmap
+              popd
+          fi
+
+          if [ -e Frameworks/mongoc_embedded.framework/BCSymbolMaps ]; then
+              pushd Frameworks/mongoc_embedded.framework
+              mv BCSymbolMaps/libmongoc_embedded.dylib.bcsymbolmap BCSymbolMaps/$(dwarfdump -u mongoc_embedded | awk '{ print $2 }').bcsymbolmap
+              popd
+          fi
 
 - name: embedded_sdk_s3_put
   commands:
@@ -3834,11 +3870,10 @@ tasks:
               ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_test" --tempPath /data
               ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongoc_embedded_test" --tempPath /data
           elif [ ${enable_embedded_tests|false} = "android_emulator" ]; then
-              # strip because the binaries with debug symbols are too big for the default storage on the emulator
-              find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
-              find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
-              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_test" --tempPath /data
-              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongoc_embedded_test" --tempPath /data
+              cp -r build/mongo-embedded-sdk-${version} build/mongo-embedded-sdk-${version}-exec
+              find build/mongo-embedded-sdk-${version}-exec/bin build/mongo-embedded-sdk-${version}-exec/lib -type f -name "*.debug" -delete
+              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}-exec" "bin/mongo_embedded_test" --tempPath /data
+              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}-exec" "bin/mongoc_embedded_test" --tempPath /data
           elif [ ${enable_embedded_tests|false} = "native" ]; then
             "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_test"
             "build/mongo-embedded-sdk-${version}/bin/mongoc_embedded_test"
@@ -4202,6 +4237,30 @@ tasks:
               done
           done
 
+          for platform in iPhone AppleTV Watch; do
+              for framework in bson mongoc; do
+                  _OSDSYM=$(printf ./%sOS/Frameworks/%s.framework.dSYM/Contents/Resources/DWARF/%s $platform $framework $framework)
+                  _SimulatorDSYM=$(printf ./%sSimulator/Frameworks/%s.framework.dSYM/Contents/Resources/DWARF/%s $platform $framework $framework)
+                  ${compile_env|} xcrun lipo $_OSDSYM $_SimulatorDSYM -create -output $_OSDSYM
+              done
+
+              for framework in mongo_embedded mongoc_embedded; do
+                  _OSDSYM=$(printf ./%sOS/Frameworks/%s.framework.dSYM/Contents/Resources/DWARF/lib%s.dylib $platform $framework $framework)
+                  _SimulatorDSYM=$(printf ./%sSimulator/Frameworks/%s.framework.dSYM/Contents/Resources/DWARF/lib%s.dylib $platform $framework $framework)
+                  ${compile_env|} xcrun lipo $_OSDSYM $_SimulatorDSYM -create -output $_OSDSYM
+              done
+          done
+
+          for platform in iPhone AppleTV Watch; do
+              for framework in mongo_embedded mongoc_embedded; do
+                  _OSBCSymbolMaps=$(printf ./%sOS/Frameworks/%s.framework/BCSymbolMaps $platform $framework)
+                  _SimulatorBCSymbolMaps=$(printf ./%sSimulator/Frameworks/%s.framework/BCSymbolMaps $platform $framework)
+                  if [ -e $_SimulatorBCSymbolMaps -a -e $_OSBCSymbolMaps ]; then
+                      cp $_SimulatorBCSymbolMaps/* $_OSBCSymbolMaps/
+                  fi
+              done
+          done
+
           popd
 
           cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
@@ -4211,28 +4270,37 @@ tasks:
             - mongo_embedded: iPhoneOS/Frameworks/mongo_embedded.framework/LICENSE-Embedded.txt
             - mongoc_embedded: iPhoneOS/Frameworks/mongoc_embedded.framework/LICENSE-Embedded.txt
           EOF
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz ./mongo-embedded-sdk-${version}/*OS ./mongo-embedded-sdk-${version}/README-Licenses.txt
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}.tgz \
+              ./mongo-embedded-sdk-${version}/*OS \
+              ./mongo-embedded-sdk-${version}/README-Licenses.txt
 
           cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
           The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
           is licensed to you on the terms set forth in the following files:
             - mongo-c-driver: iPhoneOS/Frameworks/mongoc.framework/COPYING
           EOF
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/bson.framework ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc.framework  ./mongo-embedded-sdk-${version}/README-Licenses.txt
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-c-driver.tgz \
+              ./mongo-embedded-sdk-${version}/*OS/Frameworks/bson.framework{,.dSYM} \
+              ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc.framework{,.dSYM} \
+              ./mongo-embedded-sdk-${version}/README-Licenses.txt
 
           cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
           The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
           is licensed to you on the terms set forth in the following files:
             - mongo_embedded: iPhoneOS/Frameworks/mongo_embedded.framework/LICENSE-Embedded.txt
           EOF
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongo_embedded.framework  ./mongo-embedded-sdk-${version}/README-Licenses.txt
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongo-embedded.tgz \
+              ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongo_embedded.framework{,.dSYM} \
+              ./mongo-embedded-sdk-${version}/README-Licenses.txt
 
           cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
           The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
           is licensed to you on the terms set forth in the following files:
             - mongoc_embedded: iPhoneOS/Frameworks/mongoc_embedded.framework/LICENSE-Embedded.txt
           EOF
-          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc_embedded.framework  ./mongo-embedded-sdk-${version}/README-Licenses.txt
+          tar --exclude "mongo-embedded-sdk-${version}/*/*.tgz" -zcvf mongo-embedded-sdk-${version}-mongoc-embedded.tgz \
+              ./mongo-embedded-sdk-${version}/*OS/Frameworks/mongoc_embedded.framework{,.dSYM} \
+              ./mongo-embedded-sdk-${version}/README-Licenses.txt
 
     - command: s3.put
       params:
@@ -10970,8 +11038,7 @@ buildvariants:
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=DARWIN
         -DENABLE_ZLIB=BUNDLED
-        -DCMAKE_C_FLAGS="-flto -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_C_FLAGS="-Wunguarded-availability"
     disable_unit_tests: true
     enable_embedded_tests: native
     dump_scons_config_on_failure: true
@@ -11003,8 +11070,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -Wunguarded-availability"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -11035,8 +11102,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -Wunguarded-availability"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: iPhone-7
@@ -11070,8 +11137,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -Wunguarded-availability"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -11102,8 +11169,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -Wunguarded-availability"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-TV-1080p
@@ -11137,8 +11204,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto -fapplication-extension"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -fapplication-extension -Wunguarded-availability"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -fapplication-extension"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -11169,8 +11236,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension -Wunguarded-availability"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto -fapplication-extension"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -fapplication-extension -Wunguarded-availability"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -fapplication-extension"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-Watch-Series-3-42mm
