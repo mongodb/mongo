@@ -671,28 +671,6 @@ void fillWriterVectors(OperationContext* opCtx,
     }
 }
 
-}  // namespace
-
-/**
- * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then using
- * a set of threads to apply the operations. If the batch application is successful, returns the
- * optime of the last op applied, which should be the last op in the batch. To provide crash
- * resilience, this function will advance the persistent value of 'minValid' to at least the
- * last optime of the batch. If 'minValid' is already greater than or equal to the last optime of
- * this batch, it will not be updated.
- */
-OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
-    auto applyOperation = [this](MultiApplier::OperationPtrs* ops) -> Status {
-        _applyFunc(ops, this);
-        // This function is used by 3.2 initial sync and steady state data replication.
-        // _applyFunc() will throw or abort on error, so we return OK here.
-        return Status::OK();
-    };
-    return fassertStatusOK(
-        34437, repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation));
-}
-
-namespace {
 void tryToGoLiveAsASecondary(OperationContext* opCtx,
                              ReplicationCoordinator* replCoord,
                              OpTime minValid) {
@@ -739,6 +717,26 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
                   << ". Current state: " << replCoord->getMemberState() << causedBy(status);
     }
 }
+
+}  // namespace
+
+/**
+ * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then using
+ * a set of threads to apply the operations. If the batch application is successful, returns the
+ * optime of the last op applied, which should be the last op in the batch. To provide crash
+ * resilience, this function will advance the persistent value of 'minValid' to at least the
+ * last optime of the batch. If 'minValid' is already greater than or equal to the last optime of
+ * this batch, it will not be updated.
+ */
+OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
+    auto applyOperation = [this](MultiApplier::OperationPtrs* ops) -> Status {
+        _applyFunc(ops, this);
+        // This function is used by 3.2 initial sync and steady state data replication.
+        // _applyFunc() will throw or abort on error, so we return OK here.
+        return Status::OK();
+    };
+    return fassertStatusOK(
+        34437, repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation));
 }
 
 class SyncTail::OpQueueBatcher {

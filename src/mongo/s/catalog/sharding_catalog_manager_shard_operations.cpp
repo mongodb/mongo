@@ -85,8 +85,6 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
 
-const Seconds kDefaultFindHostMaxWaitTime(20);
-
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
