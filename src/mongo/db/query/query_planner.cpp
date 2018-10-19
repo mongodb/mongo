@@ -619,9 +619,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // Figure out what fields we care about.
     stdx::unordered_set<string> fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
-    for (stdx::unordered_set<string>::const_iterator it = fields.begin(); it != fields.end();
-         ++it) {
-        LOG(5) << "Predicate over field '" << *it << "'";
+    for (auto&& field : fields) {
+        LOG(5) << "Predicate over field '" << field << "'";
     }
 
     fullIndexList = QueryPlannerIXSelect::expandIndexes(fields, std::move(fullIndexList));

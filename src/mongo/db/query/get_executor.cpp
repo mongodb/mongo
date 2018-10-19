@@ -68,6 +68,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -125,7 +126,9 @@ namespace wcp = ::mongo::wildcard_planning;
 bool turnIxscanIntoCount(QuerySolution* soln);
 }  // namespace
 
-IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexCatalogEntry& ice) {
+IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                           const IndexCatalogEntry& ice,
+                                           const CanonicalQuery* canonicalQuery) {
     auto desc = ice.descriptor();
     invariant(desc);
 
@@ -134,10 +137,29 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexC
 
     const bool isMultikey = desc->isMultikey(opCtx);
 
-    const auto* projExec =
-        (desc->getIndexType() == IndexType::INDEX_WILDCARD
-             ? static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec()
-             : nullptr);
+    const ProjectionExecAgg* projExec = nullptr;
+    std::set<FieldRef> multikeyPathSet;
+    if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
+        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec();
+        if (isMultikey) {
+            MultikeyMetadataAccessStats mkAccessStats;
+
+            if (canonicalQuery) {
+                stdx::unordered_set<std::string> fields;
+                QueryPlannerIXSelect::getFields(canonicalQuery->root(), &fields);
+                const auto projectedFields = projExec->applyProjectionToFields(fields);
+
+                multikeyPathSet =
+                    accessMethod->getMultikeyPathSet(opCtx, projectedFields, &mkAccessStats);
+            } else {
+                multikeyPathSet = accessMethod->getMultikeyPathSet(opCtx, &mkAccessStats);
+            }
+
+            LOG(2) << "Multikey path metadata range index scan stats: { index: "
+                   << desc->indexName() << ", numSeeks: " << mkAccessStats.keysExamined
+                   << ", keysExamined: " << mkAccessStats.keysExamined << "}";
+        }
+    }
 
     return {desc->keyPattern(),
             desc->getIndexType(),
@@ -148,7 +170,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexC
             // Indexes that have these metadata keys do not store a fixed-size vector of multikey
             // metadata in the index catalog. Depending on the index type, an index uses one of
             // these mechanisms (or neither), but not both.
-            isMultikey ? accessMethod->getMultikeyPathSet(opCtx) : std::set<FieldRef>{},
+            multikeyPathSet,
             desc->isSparse(),
             desc->unique(),
             IndexEntry::Identifier{desc->indexName()},
@@ -162,12 +184,14 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           Collection* collection,
                           CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams) {
+    invariant(canonicalQuery);
     // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
     IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
-        plannerParams->indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
+        plannerParams->indices.push_back(
+            indexEntryFromIndexCatalogEntry(opCtx, *ice, canonicalQuery));
     }
 
     // If query supports index filters, filter params.indices by indices in query settings.
@@ -289,7 +313,6 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                                                     unique_ptr<CanonicalQuery> canonicalQuery,
                                                     size_t plannerOptions) {
     invariant(canonicalQuery);
-
     unique_ptr<PlanStage> root;
 
     // This can happen as we're called by internal clients as well.
@@ -1475,13 +1498,15 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         const IndexDescriptor* desc = ii.next();
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
-            plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
+            plannerParams.indices.push_back(
+                indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
             const auto* proj =
                 static_cast<WildcardAccessMethod*>(ii.accessMethod(desc))->getProjectionExec();
             if (proj->applyProjectionToOneField(parsedDistinct.getKey())) {
-                plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
+                plannerParams.indices.push_back(
+                    indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
             }
         }
     }

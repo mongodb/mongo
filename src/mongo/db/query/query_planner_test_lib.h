@@ -46,6 +46,25 @@ namespace mongo {
 class QueryPlannerTestLib {
 public:
     /**
+     * Returns whether the BSON representation of the index bounds in
+     * 'testBounds' matches 'trueBounds'.
+     *
+     * 'testBounds' should be of the following format:
+     *    {<field 1>: <oil 1>, <field 2>: <oil 2>, ...}
+     * Each ordered interval list (e.g. <oil 1>) is an array of arrays of
+     * the format:
+     *    [[<low 1>,<high 1>,<lowInclusive 1>,<highInclusive 1>], ...]
+     *
+     * For example,
+     *    {a: [[1,2,true,false], [3,4,false,true]], b: [[-Infinity, Infinity]]}
+     * Means that the index bounds on field 'a' consist of the two intervals
+     * [1, 2) and (3, 4] and the index bounds on field 'b' are [-Infinity, Infinity].
+     */
+    static bool boundsMatch(const BSONObj& testBounds,
+                            const IndexBounds trueBounds,
+                            bool relaxBoundsCheck);
+
+    /**
      * @param testSoln -- a BSON representation of a query solution
      * @param trueSoln -- the root node of a query solution tree
      * @param: relaxBoundsCheck -- If 'true', will perform a relaxed "subset" check on index bounds.

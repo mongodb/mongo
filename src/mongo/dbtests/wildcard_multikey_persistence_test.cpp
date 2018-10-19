@@ -35,7 +35,9 @@
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -138,7 +140,8 @@ protected:
         AutoGetCollectionForRead autoColl(opCtx(), nss);
         auto collection = autoColl.getCollection();
         auto indexAccessMethod = getIndex(collection, indexName);
-        auto multikeyPathSet = indexAccessMethod->getMultikeyPathSet(opCtx());
+        MultikeyMetadataAccessStats stats;
+        auto multikeyPathSet = indexAccessMethod->getMultikeyPathSet(opCtx(), &stats);
 
         ASSERT(expectedFieldRefs == multikeyPathSet);
     }
@@ -218,11 +221,11 @@ protected:
         return collection->getIndexCatalog()->findIndexByName(opCtx(), indexName);
     }
 
-    const IndexAccessMethod* getIndex(const Collection* collection, const StringData indexName) {
+    IndexAccessMethod* getIndex(Collection* collection, const StringData indexName) {
         return collection->getIndexCatalog()->getIndex(getIndexDesc(collection, indexName));
     }
 
-    std::unique_ptr<SortedDataInterface::Cursor> getIndexCursor(const Collection* collection,
+    std::unique_ptr<SortedDataInterface::Cursor> getIndexCursor(Collection* collection,
                                                                 const StringData indexName) {
         return getIndex(collection, indexName)->newCursor(opCtx());
     }

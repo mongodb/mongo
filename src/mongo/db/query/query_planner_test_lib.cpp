@@ -131,59 +131,6 @@ bool intervalMatches(const BSONObj& testInt, const Interval trueInt) {
     return trueInt.equals(toCompare);
 }
 
-/**
- * Returns whether the BSON representation of the index bounds in
- * 'testBounds' matches 'trueBounds'.
- *
- * 'testBounds' should be of the following format:
- *    {<field 1>: <oil 1>, <field 2>: <oil 2>, ...}
- * Each ordered interval list (e.g. <oil 1>) is an array of arrays of
- * the format:
- *    [[<low 1>,<high 1>,<lowInclusive 1>,<highInclusive 1>], ...]
- *
- * For example,
- *    {a: [[1,2,true,false], [3,4,false,true]], b: [[-Infinity, Infinity]]}
- * Means that the index bounds on field 'a' consist of the two intervals
- * [1, 2) and (3, 4] and the index bounds on field 'b' are [-Infinity, Infinity].
- */
-bool boundsMatch(const BSONObj& testBounds, const IndexBounds trueBounds, bool relaxBoundsCheck) {
-    // Iterate over the fields on which we have index bounds.
-    BSONObjIterator fieldIt(testBounds);
-    size_t fieldItCount = 0;
-    while (fieldIt.more()) {
-        BSONElement arrEl = fieldIt.next();
-        if (arrEl.fieldNameStringData() != trueBounds.getFieldName(fieldItCount)) {
-            return false;
-        }
-        if (arrEl.type() != Array) {
-            return false;
-        }
-        // Iterate over an ordered interval list for
-        // a particular field.
-        BSONObjIterator oilIt(arrEl.Obj());
-        size_t oilItCount = 0;
-        while (oilIt.more()) {
-            BSONElement intervalEl = oilIt.next();
-            if (intervalEl.type() != Array) {
-                return false;
-            }
-            Interval trueInt = trueBounds.getInterval(fieldItCount, oilItCount);
-            if (!intervalMatches(intervalEl.Obj(), trueInt)) {
-                return false;
-            }
-            ++oilItCount;
-        }
-
-        if (!relaxBoundsCheck && oilItCount != trueBounds.getNumIntervals(fieldItCount)) {
-            return false;
-        }
-
-        ++fieldItCount;
-    }
-
-    return true;
-}
-
 bool bsonObjFieldsAreInSet(BSONObj obj, const std::set<std::string>& allowedFields) {
     BSONObjIterator i(obj);
     while (i.more()) {
@@ -251,6 +198,46 @@ static bool childrenMatch(const BSONObj& testSoln,
 
     // Ensure we've matched all children of the QuerySolutionNode.
     return matchedNodeIndexes.size() == trueSoln->children.size();
+}
+
+bool QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
+                                      const IndexBounds trueBounds,
+                                      bool relaxBoundsCheck) {
+    // Iterate over the fields on which we have index bounds.
+    BSONObjIterator fieldIt(testBounds);
+    size_t fieldItCount = 0;
+    while (fieldIt.more()) {
+        BSONElement arrEl = fieldIt.next();
+        if (arrEl.fieldNameStringData() != trueBounds.getFieldName(fieldItCount)) {
+            return false;
+        }
+        if (arrEl.type() != Array) {
+            return false;
+        }
+        // Iterate over an ordered interval list for
+        // a particular field.
+        BSONObjIterator oilIt(arrEl.Obj());
+        size_t oilItCount = 0;
+        while (oilIt.more()) {
+            BSONElement intervalEl = oilIt.next();
+            if (intervalEl.type() != Array) {
+                return false;
+            }
+            Interval trueInt = trueBounds.getInterval(fieldItCount, oilItCount);
+            if (!intervalMatches(intervalEl.Obj(), trueInt)) {
+                return false;
+            }
+            ++oilItCount;
+        }
+
+        if (!relaxBoundsCheck && oilItCount != trueBounds.getNumIntervals(fieldItCount)) {
+            return false;
+        }
+
+        ++fieldItCount;
+    }
+
+    return true;
 }
 
 // static

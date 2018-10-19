@@ -871,7 +871,7 @@ Interval IndexBoundsBuilder::makePointInterval(const BSONObj& obj) {
 }
 
 // static
-Interval IndexBoundsBuilder::makePointInterval(const string& str) {
+Interval IndexBoundsBuilder::makePointInterval(StringData str) {
     BSONObjBuilder bob;
     bob.append("", str);
     return makePointInterval(bob.obj());

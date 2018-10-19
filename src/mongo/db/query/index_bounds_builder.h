@@ -135,7 +135,7 @@ public:
      * The object must have exactly one field which is the value of the point interval.
      */
     static Interval makePointInterval(const BSONObj& obj);
-    static Interval makePointInterval(const std::string& str);
+    static Interval makePointInterval(StringData str);
     static Interval makePointInterval(double d);
 
     /**

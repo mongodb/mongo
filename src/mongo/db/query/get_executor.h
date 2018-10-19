@@ -69,8 +69,14 @@ void fillOutPlannerParams(OperationContext* opCtx,
 /**
  * Converts the catalog metadata for an index into an IndexEntry, which is a format that is meant to
  * be consumed by the query planner.
+ *
+ * When 'canonicalQuery' is not null, only multikey metadata paths that intersect with the query
+ * field set will be retrieved for a multikey wildcard index. Otherwise all multikey metadata paths
+ * will be retrieved.
  */
-IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexCatalogEntry& ice);
+IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                           const IndexCatalogEntry& ice,
+                                           const CanonicalQuery* canonicalQuery = nullptr);
 
 /**
  * Determines whether or not to wait for oplog visibility for a query. This is only used for

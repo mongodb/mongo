@@ -38,6 +38,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -307,11 +308,25 @@ public:
                                            const MultikeyPaths& multikeyPaths) const = 0;
 
     /**
-     * Returns the set of multikey metadata paths stored in the index. Only index types which can
-     * store metadata describing an arbitrarily large set of multikey paths need to override this
-     * method.
+     * Returns the intersection of 'fields' and the set of multikey metadata paths stored in the
+     * index. Only index types which can store metadata describing an arbitrarily large set of
+     * multikey paths need to override this method. Statistics reporting index seeks and keys
+     * examined are written to 'stats'.
      */
-    virtual std::set<FieldRef> getMultikeyPathSet(OperationContext* opCtx) const {
+    virtual std::set<FieldRef> getMultikeyPathSet(OperationContext*,
+                                                  const stdx::unordered_set<std::string>& fields,
+                                                  MultikeyMetadataAccessStats* stats) const {
+        return {};
+    }
+
+    /**
+     * Returns the set of all paths for which the index has multikey metadata keys. Only index types
+     * which can store metadata describing an arbitrarily large set of multikey paths need to
+     * override this method. Statistics reporting index seeks and keys examined are written to
+     * 'stats'.
+     */
+    virtual std::set<FieldRef> getMultikeyPathSet(OperationContext* opCtx,
+                                                  MultikeyMetadataAccessStats* stats) const {
         return {};
     }
 
