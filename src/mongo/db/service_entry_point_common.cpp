@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -127,7 +126,6 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"group", 1},
                                                  {"insert", 1},
                                                  {"killCursors", 1},
-                                                 {"mapReduce", 1},
                                                  {"parallelCollectionScan", 1},
                                                  {"prepareTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},

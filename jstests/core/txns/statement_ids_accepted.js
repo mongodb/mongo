@@ -216,24 +216,19 @@
         insert: collName,
         documents: [{_id: "doc1"}],
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
+        txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
         startTransaction: true,
         autocommit: false
     }));
 
-    jsTestLog("Check that mapreduce accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        mapreduce: collName,
-        map: function() {
-            emit(this, this);
-        },
-        reduce: function(key, values) {
-            return key;
-        },
-        out: {inline: 1},
+    // Abort the transaction to release locks.
+    // abortTransaction can only be run on the admin database.
+    assert.commandWorked(sessionDb.adminCommand({
+        abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0)
+        stmtId: NumberInt(1),
+        autocommit: false
     }));
 
     jsTestLog("Check that prepareTransaction accepts a statement ID");
