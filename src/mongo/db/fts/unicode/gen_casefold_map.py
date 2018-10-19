@@ -36,8 +36,8 @@ def generate(unicode_casefold_file, target):
 
         status = values[1]
         if status == 'C' or status == 'S':
-            # We only include the "Common" and "Simple" mappings. "Full" case 
-            # folding mappings expand certain letters to multiple codepoints, 
+            # We only include the "Common" and "Simple" mappings. "Full" case
+            # folding mappings expand certain letters to multiple codepoints,
             # which we currently do not support.
             original_codepoint = int(values[0], 16)
             codepoint_mapping  = int(values[2], 16)

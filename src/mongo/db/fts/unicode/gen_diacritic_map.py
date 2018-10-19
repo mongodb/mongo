@@ -30,7 +30,7 @@ def load_diacritics(unicode_proplist_file):
                 end   = int(codepoint_range[1], 16) + 1
 
                 for i in range(start, end):
-                    if i not in diacritics: 
+                    if i not in diacritics:
                         diacritics.add(i)
             else:
                 if int(values[0], 16) not in diacritics:
@@ -64,7 +64,7 @@ def add_diacritic_range(start, end):
         add_diacritic_mapping(x)
 
 def generate(target):
-    """Generates a C++ source file that contains a diacritic removal mapping 
+    """Generates a C++ source file that contains a diacritic removal mapping
        function.
 
     The delimiter checking function contains a switch statement with cases for

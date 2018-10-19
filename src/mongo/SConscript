@@ -641,7 +641,7 @@ env.Append(MODULE_BANNERS = [distsrc.File('README'),
                              distsrc.File('MPL-2')])
 
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
-# is a Community build, so inject the AGPL and the Community license
+# is a Community build, so inject the Community license
 if sum(itertools.imap(lambda x: x.name == "LICENSE-Enterprise.txt", env['MODULE_BANNERS'])) == 0:
     env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
 

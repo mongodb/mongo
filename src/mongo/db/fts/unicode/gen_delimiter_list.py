@@ -8,8 +8,8 @@ from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
 def generate(unicode_proplist_file, target):
     """Generates a C++ source file that contains a delimiter checking function.
 
-    The delimiter checking function contains a switch statement with cases for 
-    every delimiter in the Unicode Character Database with the properties 
+    The delimiter checking function contains a switch statement with cases for
+    every delimiter in the Unicode Character Database with the properties
     specified in delim_properties.
     """
     out = open(target, "w")
@@ -23,12 +23,12 @@ def generate(unicode_proplist_file, target):
 
     proplist_file = open(unicode_proplist_file, 'rU')
 
-    delim_properties = ["White_Space", 
-                        "Dash", 
-                        "Hyphen", 
-                        "Quotation_Mark", 
-                        "Terminal_Punctuation", 
-                        "Pattern_Syntax", 
+    delim_properties = ["White_Space",
+                        "Dash",
+                        "Hyphen",
+                        "Quotation_Mark",
+                        "Terminal_Punctuation",
+                        "Pattern_Syntax",
                         "STerm"]
 
     for line in proplist_file:
@@ -50,13 +50,13 @@ def generate(unicode_proplist_file, target):
                 end   = int(codepoint_range[1], 16) + 1
 
                 for i in range(start, end):
-                    if i not in delim_codepoints: 
+                    if i not in delim_codepoints:
                         delim_codepoints.add(i)
             else:
                 if int(values[0], 16) not in delim_codepoints:
                     delim_codepoints.add(int(values[0], 16))
 
-    # As of Unicode 8.0.0, all of the delimiters we used for text index 
+    # As of Unicode 8.0.0, all of the delimiters we used for text index
     # version 2 are also in the list.
     out.write("static const bool englishAsciiDelimiters[128] = {\n")
     for cp in range(0x80):
