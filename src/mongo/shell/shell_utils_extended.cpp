@@ -33,8 +33,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/filesystem/convenience.hpp>
-#include <boost/filesystem/fstream.hpp>
+#ifndef _WIN32
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
+#include <boost/filesystem.hpp>
 #include <fstream>
 
 #include "mongo/scripting/engine.h"
@@ -308,6 +312,35 @@ BSONObj passwordPrompt(const BSONObj& a, void* data) {
     return BSON("" << askPassword());
 }
 
+BSONObj changeUmask(const BSONObj& a, void* data) {
+#ifdef _WIN32
+    uasserted(50977, "umask is not supported on windows");
+#else
+    uassert(50976,
+            "umask takes 1 argument, the octal mode of the umask",
+            a.nFields() == 1 && isNumericBSONType(a.firstElementType()));
+    auto val = a.firstElement().Number();
+    return BSON("" << umask(static_cast<mode_t>(val)));
+#endif
+}
+
+BSONObj getFileMode(const BSONObj& a, void* data) {
+    uassert(50975,
+            "getFileMode() takes one argument, the absolute path to a file",
+            a.nFields() == 1 && a.firstElementType() == String);
+    auto pathStr = a.firstElement().checkAndGetStringData();
+    boost::filesystem::path path(pathStr.rawData());
+    boost::system::error_code ec;
+    auto fileStatus = boost::filesystem::status(path, ec);
+    if (ec) {
+        uasserted(50974,
+                  str::stream() << "Unable to get status for file \"" << pathStr << "\": "
+                                << ec.message());
+    }
+
+    return BSON("" << fileStatus.permissions());
+}
+
 void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getHostName", getHostName);
     scope.injectNative("removeFile", removeFile);
@@ -322,6 +355,8 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("md5sumFile", md5sumFile);
     scope.injectNative("mkdir", mkdir);
     scope.injectNative("passwordPrompt", passwordPrompt);
+    scope.injectNative("umask", changeUmask);
+    scope.injectNative("getFileMode", getFileMode);
 }
 }
 }
