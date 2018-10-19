@@ -69,6 +69,8 @@ public:
         constexpr auto upsert = true;
         constexpr auto multi = false;
         try {
+            LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+
             pExpCtx->mongoProcessInterface->update(pExpCtx,
                                                    getWriteNs(),
                                                    std::move(batch.uniqueKeys),

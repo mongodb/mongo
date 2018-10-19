@@ -530,8 +530,7 @@ void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
     LOG(3) << "setting timestamp read source: " << static_cast<int>(readSource)
            << ", provided timestamp: " << ((provided) ? provided->toString() : "none");
 
-    invariant(!_active || _timestampReadSource == ReadSource::kUnset ||
-              _timestampReadSource == readSource);
+    invariant(!_active || _timestampReadSource == readSource);
     invariant(!provided == (readSource != ReadSource::kProvided));
     invariant(!(provided && provided->isNull()));
 

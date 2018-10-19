@@ -38,6 +38,8 @@ namespace mongo {
 static AtomicUInt32 aggOutCounter;
 
 void DocumentSourceOutReplaceColl::initializeWriteNs() {
+    LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+
     DBClientBase* conn = pExpCtx->mongoProcessInterface->directClient();
 
     const auto& outputNs = getOutputNs();
@@ -97,6 +99,8 @@ void DocumentSourceOutReplaceColl::initializeWriteNs() {
 };
 
 void DocumentSourceOutReplaceColl::finalize() {
+    LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+
     const auto& outputNs = getOutputNs();
     auto renameCommandObj =
         BSON("renameCollection" << _tempNs.ns() << "to" << outputNs.ns() << "dropTarget" << true);

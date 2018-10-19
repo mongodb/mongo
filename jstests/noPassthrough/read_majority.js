@@ -8,7 +8,6 @@
  *  - Dropping an index, repairing, and reIndexing should bump the min snapshot version.
  *  - Dropping a collection is visible in committed snapshot, since metadata changes are special.
  *  - 'local'-only commands should error on majority-committed levels, and accept 'local' level.
- *  - An aggregation with '$out' should fail with majority-committed levels.
  *
  * All of this requires support for committed reads, so this test will be skipped if the storage
  * engine does not support them.
@@ -206,12 +205,11 @@ load("jstests/libs/analyze_plan.js");
         var res = assert.commandFailed(db.adminCommand({ping: 1, readConcern: {level: level}}));
         assert.eq(res.code, ErrorCodes.InvalidOptions);
 
-        // Agg $out also doesn't support majority committed reads.
+        // Agg $out supports majority committed reads.
         assert.commandWorked(t.runCommand(
             'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: 'local'}}));
-        var res = assert.commandFailed(t.runCommand(
+        assert.commandWorked(t.runCommand(
             'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: level}}));
-        assert.eq(res.code, ErrorCodes.InvalidOptions);
 
         replTest.stopSet();
     }

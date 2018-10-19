@@ -279,21 +279,19 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
 
     auto readConcernLevel = repl::ReadConcernArgs::get(expCtx->opCtx).getLevel();
     uassert(ErrorCodes::InvalidOptions,
-            "$out cannot be used with a 'majority' read concern level",
-            readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
-    uassert(ErrorCodes::InvalidOptions,
             "$out cannot be used with a 'linearizable' read concern level",
             readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
 
     // Although we perform a check for "replaceCollection" mode with a sharded output collection
     // during lite parsing, we need to do it here as well in case mongos is stale or the command is
     // sent directly to the shard.
-    uassert(17017,
-            str::stream() << "$out with mode " << WriteMode_serializer(mode)
-                          << " is not supported to an existing *sharded* output collection.",
-            !(mode == WriteModeEnum::kModeReplaceCollection &&
-              expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs)));
-
+    if (mode == WriteModeEnum::kModeReplaceCollection) {
+        LocalReadConcernBlock readLocal(expCtx->opCtx);
+        uassert(17017,
+                str::stream() << "$out with mode " << WriteMode_serializer(mode)
+                              << " is not supported to an existing *sharded* output collection.",
+                !expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs));
+    }
     uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
 
     switch (mode) {

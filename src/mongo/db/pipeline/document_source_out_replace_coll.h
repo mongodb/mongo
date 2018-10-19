@@ -49,6 +49,8 @@ public:
             // here because nothing can be done about them. Additionally, if this fails and the
             // collection is left behind, it will be cleaned up next time the server is started.
             if (_tempNs.size()) {
+                LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+
                 pExpCtx->mongoProcessInterface->directClient()->dropCollection(_tempNs.ns());
             });
     }

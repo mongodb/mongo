@@ -37,6 +37,31 @@
 namespace mongo {
 
 /**
+ * Manipulates the state of the OperationContext so that while this object is in scope, reads and
+ * writes will use a local read concern and see the latest version of the data. Resets the
+ * OperationContext back to its original state upon destruction.
+ */
+class LocalReadConcernBlock {
+    OperationContext* _opCtx;
+    repl::ReadConcernArgs _originalArgs;
+    RecoveryUnit::ReadSource _originalSource;
+
+public:
+    LocalReadConcernBlock(OperationContext* opCtx) : _opCtx(opCtx) {
+        _originalArgs = repl::ReadConcernArgs::get(_opCtx);
+        _originalSource = _opCtx->recoveryUnit()->getTimestampReadSource();
+
+        repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();
+        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::kUnset);
+    }
+
+    ~LocalReadConcernBlock() {
+        repl::ReadConcernArgs::get(_opCtx) = _originalArgs;
+        _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource);
+    }
+};
+
+/**
  * Abstract class for the $out aggregation stage.
  */
 class DocumentSourceOut : public DocumentSource, public NeedsMergerDocumentSource {
@@ -167,6 +192,8 @@ public:
      * Writes the documents in 'batch' to the write namespace.
      */
     virtual void spill(BatchedObjects&& batch) {
+        LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+
         pExpCtx->mongoProcessInterface->insert(
             pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch);
     };
