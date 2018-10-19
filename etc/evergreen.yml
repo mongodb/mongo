@@ -9884,7 +9884,6 @@ buildvariants:
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
-  - name: aggregation_multiversion_fuzzer
   - name: aggregation_expression_multiversion_fuzzer
   - name: auth
   - name: causally_consistent_jscore_passthrough
@@ -12465,7 +12464,6 @@ buildvariants:
   - name: aggregation_ese
   - name: aggregation_auth
   - name: aggregation_mongos_passthrough
-  - name: aggregation_multiversion_fuzzer
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
