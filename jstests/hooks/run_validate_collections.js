@@ -108,12 +108,13 @@
             }
         }
 
-        if (originalFCV !== jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
-            assert.commandWorked(adminDB.adminCommand({
-                setFeatureCompatibilityVersion:
-                    jsTest.options().forceValidationWithFeatureCompatibilityVersion
-            }));
-        }
+        // The sharded cluster could be in a state where the config servers are in FCV 3.4 but the
+        // shard servers are in FCV 3.2.  Therefore, we set the FCV to
+        // forceValidationWithFeatureCompatibilityVersion even if it is the same as originalFCV.
+        assert.commandWorked(adminDB.adminCommand({
+            setFeatureCompatibilityVersion:
+                jsTest.options().forceValidationWithFeatureCompatibilityVersion
+        }));
     }
 
     try {
