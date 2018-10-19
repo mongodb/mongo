@@ -209,7 +209,7 @@ void forkServerOrDie() {
 }
 
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                          ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
+                          ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer", "MungeUmask"),
                           ("default"))
 (InitializerContext*) {
     using logger::LogManager;
@@ -347,17 +347,22 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
 // restrictions we want to apply and set it back. The overall effect
 // is to set the bits for 'other' and 'group', but leave umask bits
 // bits for 'user' unaltered.
-#ifndef _WIN32
 namespace {
+#ifndef _WIN32
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(honorSystemUmask, bool, false);
-MONGO_INITIALIZER(MungeUmask)(InitializerContext*) {
+#endif
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(MungeUmask, ("EndStartupOptionHandling"))
+(InitializerContext*) {
+#ifndef _WIN32
     if (!honorSystemUmask) {
         umask(umask(S_IRWXU | S_IRWXG | S_IRWXO) | S_IRWXG | S_IRWXO);
     }
+#endif
+
     return Status::OK();
 }
 }  // namespace
-#endif
 
 bool initializeServerGlobalState() {
     Listener::globalTicketHolder.resize(serverGlobalParams.maxConns).transitional_ignore();
