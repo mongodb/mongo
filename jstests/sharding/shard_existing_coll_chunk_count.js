@@ -8,11 +8,12 @@
     'use strict';
     load('jstests/sharding/autosplit_include.js');
 
+    // TODO (SERVER-37699): Lower logging verbosity.
     var s = new ShardingTest({
         name: "shard_existing_coll_chunk_count",
-        shards: [{verbose: 2}],
+        shards: [{verbose: 3}],
         mongos: 1,
-        other: {enableAutoSplit: true},
+        other: {mongosOptions: {verbose: 3}, enableAutoSplit: true},
     });
 
     assert.commandWorked(s.s.adminCommand({enablesharding: "test"}));
