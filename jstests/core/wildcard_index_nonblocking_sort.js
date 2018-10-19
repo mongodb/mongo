@@ -13,14 +13,14 @@
         assert.commandWorked(coll.insert({a: i, b: -i, x: [123], excludedField: i}));
     }
 
-    function checkQueryHasSameResultsWhenUsingIdIndex(query, sort) {
-        const l = coll.find(query).sort(sort).toArray();
-        const r = coll.find(query).sort(sort).hint({$natural: 1}).toArray();
+    function checkQueryHasSameResultsWhenUsingIdIndex(query, sort, projection) {
+        const l = coll.find(query, projection).sort(sort).toArray();
+        const r = coll.find(query, projection).sort(sort).hint({$natural: 1}).toArray();
         assert(arrayEq(l, r));
     }
 
-    function checkQueryUsesSortType(query, sort, isBlocking) {
-        const explain = assert.commandWorked(coll.find(query).sort(sort).explain());
+    function checkQueryUsesSortType(query, sort, projection, isBlocking) {
+        const explain = assert.commandWorked(coll.find(query, projection).sort(sort).explain());
         const plan = explain.queryPlanner.winningPlan;
 
         const ixScans = getPlanStages(plan, "IXSCAN");
@@ -41,24 +41,44 @@
         }
     }
 
-    function checkQueryUsesNonBlockingSortAndGetsCorrectResults(query, sort) {
-        checkQueryUsesSortType(query, sort, false);
-        checkQueryHasSameResultsWhenUsingIdIndex(query, sort);
+    function checkQueryUsesNonBlockingSortAndGetsCorrectResults(query, sort, projection) {
+        checkQueryUsesSortType(query, sort, projection, false);
+        checkQueryHasSameResultsWhenUsingIdIndex(query, sort, projection);
     }
 
-    function checkQueryUsesBlockingSortAndGetsCorrectResults(query, sort) {
-        checkQueryUsesSortType(query, sort, true);
-        checkQueryHasSameResultsWhenUsingIdIndex(query, sort);
+    function checkQueryUsesBlockingSortAndGetsCorrectResults(query, sort, projection) {
+        checkQueryUsesSortType(query, sort, projection, true);
+        checkQueryHasSameResultsWhenUsingIdIndex(query, sort, projection);
     }
 
-    checkQueryUsesNonBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: 1});
-    checkQueryUsesNonBlockingSortAndGetsCorrectResults({a: {$gte: 0}, x: 123}, {a: 1});
+    function runSortTests(dir, proj) {
+        // Test that the $** index can provide a non-blocking sort where appropriate.
+        checkQueryUsesNonBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: dir}, proj);
+        checkQueryUsesNonBlockingSortAndGetsCorrectResults({a: {$gte: 0}, x: 123}, {a: dir}, proj);
 
-    checkQueryUsesBlockingSortAndGetsCorrectResults({x: {$elemMatch: {$eq: 123}}}, {x: 1});
-    checkQueryUsesBlockingSortAndGetsCorrectResults({x: {$elemMatch: {$eq: 123}}}, {a: 1});
-    checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: 1, b: 1});
-    checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$exists: true}}, {a: 1});
-    checkQueryUsesBlockingSortAndGetsCorrectResults({}, {a: 1});
-    checkQueryUsesBlockingSortAndGetsCorrectResults({x: 123}, {a: 1});
-    checkQueryUsesBlockingSortAndGetsCorrectResults({excludedField: {$gte: 0}}, {excludedField: 1});
+        // Test that the $** index can produce a solution with a blocking sort where appropriate.
+        checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: dir, b: dir}, proj);
+        checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: dir, b: -dir}, proj);
+        checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: -dir, b: dir}, proj);
+        checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$exists: true}}, {a: dir}, proj);
+        checkQueryUsesBlockingSortAndGetsCorrectResults({}, {a: dir}, proj);
+
+        // Test sorted queries on a field that is excluded by the $** index's wildcardProjection.
+        checkQueryUsesBlockingSortAndGetsCorrectResults(
+            {excludedField: {$gte: 0}}, {excludedField: dir}, proj);
+
+        // Test sorted queries on a multikey field, with and without $elemMatch.
+        checkQueryUsesBlockingSortAndGetsCorrectResults({x: 123}, {a: dir}, proj);
+        checkQueryUsesBlockingSortAndGetsCorrectResults(
+            {x: {$elemMatch: {$eq: 123}}}, {x: dir}, proj);
+        checkQueryUsesBlockingSortAndGetsCorrectResults(
+            {x: {$elemMatch: {$eq: 123}}}, {a: dir}, proj);
+    }
+
+    // Run each test for both ascending and descending sorts, with and without a projection.
+    for (let dir of[1, -1]) {
+        for (let proj of[{}, {_id: 0, a: 1}]) {
+            runSortTests(dir, proj);
+        }
+    }
 })();

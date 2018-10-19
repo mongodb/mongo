@@ -267,12 +267,15 @@ bool boundsOverlapObjectTypeBracket(const OrderedIntervalList& oil) {
                                                      BoundInclusion::kExcludeBothStartAndEndKeys);
     }();
 
-    // Determine whether any of the ordered intervals overlap with the object type bracket. If the
-    // current interval precedes the bracket, we must check the next interval in sequence. If the
-    // interval succeeds the bracket then we can stop checking, since the ordered list is never
-    // descending. If we neither precede nor succeed the object type bracket, then we overlap it.
-    invariant(oil.computeDirection() != Interval::Direction::kDirectionDescending);
-    for (const auto& interval : oil.intervals) {
+    // Determine whether any of the ordered intervals overlap with the object type bracket. Because
+    // Interval's various bounds-comparison methods all depend upon the bounds being in ascending
+    // order, we reverse the direction of the input OIL if necessary here.
+    const bool isDescending = (oil.computeDirection() == Interval::Direction::kDirectionDescending);
+    const auto& oilAscending = (isDescending ? oil.reverseClone() : oil);
+    // Iterate through each of the OIL's intervals. If the current interval precedes the bracket, we
+    // must check the next interval in sequence. If the interval succeeds the bracket then we can
+    // stop checking. If we neither precede nor succeed the object type bracket, then they overlap.
+    for (const auto& interval : oilAscending.intervals) {
         switch (interval.compare(objectTypeBracketBounds)) {
             case Interval::IntervalComparison::INTERVAL_PRECEDES_COULD_UNION:
             case Interval::IntervalComparison::INTERVAL_PRECEDES:
