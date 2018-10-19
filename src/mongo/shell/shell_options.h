@@ -59,6 +59,7 @@ struct ShellGlobalParams {
     std::string authenticationDatabase;
     std::string gssapiServiceName;
     std::string gssapiHostName;
+    std::string networkMessageCompressors;
 
     bool runShell;
     bool nodb;
