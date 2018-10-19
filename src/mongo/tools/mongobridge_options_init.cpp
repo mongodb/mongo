@@ -65,10 +65,13 @@ MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
         quickExit(EXIT_BADOPTIONS);
     }
 
-    ret = storeMessageCompressionOptions(moe::startupOptionsParsed);
-    if (!ret.isOK()) {
-        std::cerr << ret.toString() << std::endl;
-        quickExit(EXIT_BADOPTIONS);
+    if (moe::startupOptionsParsed.count("net.compression.compressors")) {
+        const auto ret = storeMessageCompressionOptions(
+            moe::startupOptionsParsed["net.compression.compressors"].as<std::string>());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            quickExit(EXIT_BADOPTIONS);
+        }
     }
 
     return Status::OK();

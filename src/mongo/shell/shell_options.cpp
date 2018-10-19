@@ -343,6 +343,13 @@ Status storeMongoShellOptions(const moe::Environment& params,
         shellGlobalParams.gssapiHostName = params["gssapiHostName"].as<string>();
     }
 
+    if (params.count("net.compression.compressors")) {
+        auto compressors = params["net.compression.compressors"].as<string>();
+        if (compressors != "disabled") {
+            shellGlobalParams.networkMessageCompressors = std::move(compressors);
+        }
+    }
+
     if (params.count("shell")) {
         shellGlobalParams.runShell = true;
     }
@@ -458,37 +465,55 @@ Status storeMongoShellOptions(const moe::Environment& params,
 
         auto cs = cs_status.getValue();
         auto uriOptions = cs.getOptions();
-        StringBuilder sb;
-        sb << "ERROR: Cannot specify ";
 
-        if (!shellGlobalParams.username.empty() && !cs.getUser().empty() &&
-            shellGlobalParams.username != cs.getUser()) {
-            sb << "different usernames";
-        } else if (!shellGlobalParams.password.empty() && !cs.getPassword().empty() &&
-                   shellGlobalParams.password != cs.getPassword()) {
-            sb << "different passwords";
-        } else if (!shellGlobalParams.authenticationMechanism.empty() &&
-                   uriOptions.count("authMechanism") &&
-                   uriOptions["authMechanism"] != shellGlobalParams.authenticationMechanism) {
-            sb << "different authentication mechanisms";
-        } else if (!shellGlobalParams.authenticationDatabase.empty() &&
-                   uriOptions.count("authSource") &&
-                   uriOptions["authSource"] != shellGlobalParams.authenticationDatabase) {
-            sb << "different authentication databases ";
-        } else if (shellGlobalParams.gssapiServiceName != saslDefaultServiceName &&
-                   uriOptions.count("gssapiServiceName")) {
-            sb << "the GSSAPI service name";
-        } else {
-            return Status::OK();
-        }
+        auto handleURIOptions = [&] {
+            StringBuilder sb;
+            sb << "ERROR: Cannot specify ";
 
-        sb << " in connection URI and as a command-line option";
-        return Status(ErrorCodes::InvalidOptions, sb.str());
+            if (!shellGlobalParams.username.empty() && !cs.getUser().empty() &&
+                shellGlobalParams.username != cs.getUser()) {
+                sb << "different usernames";
+            } else if (!shellGlobalParams.password.empty() && !cs.getPassword().empty() &&
+                       shellGlobalParams.password != cs.getPassword()) {
+                sb << "different passwords";
+            } else if (!shellGlobalParams.authenticationMechanism.empty() &&
+                       uriOptions.count("authMechanism") &&
+                       uriOptions["authMechanism"] != shellGlobalParams.authenticationMechanism) {
+                sb << "different authentication mechanisms";
+            } else if (!shellGlobalParams.authenticationDatabase.empty() &&
+                       uriOptions.count("authSource") &&
+                       uriOptions["authSource"] != shellGlobalParams.authenticationDatabase) {
+                sb << "different authentication databases";
+            } else if (shellGlobalParams.gssapiServiceName != saslDefaultServiceName &&
+                       uriOptions.count("gssapiServiceName")) {
+                sb << "the GSSAPI service name";
+            } else if (!shellGlobalParams.networkMessageCompressors.empty() &&
+                       uriOptions.count("compressors") &&
+                       uriOptions["compressors"] != shellGlobalParams.networkMessageCompressors) {
+                sb << "different network message compressors";
+            } else {
+                return Status::OK();
+            }
+
+            sb << " in connection URI and as a command-line option";
+            return Status(ErrorCodes::InvalidOptions, sb.str());
+        };
+
+        auto uriStatus = handleURIOptions();
+        if (!uriStatus.isOK())
+            return uriStatus;
+
+        if (uriOptions.count("compressors"))
+            shellGlobalParams.networkMessageCompressors = uriOptions["compressors"];
     }
 
-    auto ret = storeMessageCompressionOptions(params);
-    if (!ret.isOK())
-        return ret;
+    if (!shellGlobalParams.networkMessageCompressors.empty()) {
+        const auto ret =
+            storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
+        if (!ret.isOK()) {
+            return ret;
+        }
+    }
 
     if (params.count("setShellParameter")) {
         auto ssp = params["setShellParameter"].as<std::map<std::string, std::string>>();

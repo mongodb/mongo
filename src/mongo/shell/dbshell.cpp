@@ -815,6 +815,11 @@ int _main(int argc, char* argv[], char** envp) {
         mongo::shell_utils::_dbConnect = ss.str();
 
         if (cmdlineURI.size()) {
+            const auto compressionKey = parsedURI.getOptions().find("compressors");
+            if (compressionKey != end(parsedURI.getOptions()) &&
+                shellGlobalParams.networkMessageCompressors.empty()) {
+                shellGlobalParams.networkMessageCompressors = compressionKey->second;
+            }
             const auto mechanismKey = parsedURI.getOptions().find("authMechanism");
             if (mechanismKey != end(parsedURI.getOptions()) &&
                 shellGlobalParams.authenticationMechanism.empty()) {

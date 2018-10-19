@@ -129,13 +129,10 @@ Status addMessageCompressionOptions(moe::OptionSection* options, bool forShell) 
     return Status::OK();
 }
 
-Status storeMessageCompressionOptions(const moe::Environment& params) {
+Status storeMessageCompressionOptions(const std::string& compressors) {
     std::vector<std::string> restrict;
-    if (params.count("net.compression.compressors")) {
-        auto compressorListStr = params["net.compression.compressors"].as<std::string>();
-        if (compressorListStr != kDisabledConfigValue) {
-            boost::algorithm::split(restrict, compressorListStr, boost::is_any_of(", "));
-        }
+    if (compressors != kDisabledConfigValue) {
+        boost::algorithm::split(restrict, compressors, boost::is_any_of(", "));
     }
 
     auto& compressorFactory = MessageCompressorRegistry::get();

@@ -726,9 +726,12 @@ Status storeServerOptions(const moe::Environment& params) {
                       "--transitionToAuth must be used with keyFile or x509 authentication");
     }
 
-    ret = storeMessageCompressionOptions(params);
-    if (!ret.isOK()) {
-        return ret;
+    if (params.count("net.compression.compressors")) {
+        const auto ret =
+            storeMessageCompressionOptions(params["net.compression.compressors"].as<string>());
+        if (!ret.isOK()) {
+            return ret;
+        }
     }
 
     return Status::OK();
