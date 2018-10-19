@@ -95,7 +95,6 @@
         {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]},
         {explain: {find: collName}},
         {filemd5: 1, root: "fs"},
-        {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
     ];
 
     sessionCommands.forEach(testCommand);
@@ -116,7 +115,8 @@
           createIndexes: collName,
           indexes: [{name: "a_1", key: {a: 1}}],
           writeConcern: {w: "majority"}
-        }
+        },
+        {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
     ];
 
     nonSessionCommands.forEach(testCommand);
