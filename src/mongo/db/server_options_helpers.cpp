@@ -1129,17 +1129,21 @@ Status storeServerOptions(const moe::Environment& params) {
         return Status(ErrorCodes::BadValue,
                       "--transitionToAuth must be used with keyFile or x509 authentication");
     }
+
+    if (params.count("net.compression.compressors")) {
+        const auto ret =
+            storeMessageCompressionOptions(params["net.compression.compressors"].as<string>());
+        if (!ret.isOK()) {
+            return ret;
+        }
+    }
+
 #ifdef MONGO_CONFIG_SSL
     ret = storeSSLServerOptions(params);
     if (!ret.isOK()) {
         return ret;
     }
 #endif
-
-    ret = storeMessageCompressionOptions(params);
-    if (!ret.isOK()) {
-        return ret;
-    }
 
     return Status::OK();
 }
