@@ -1187,7 +1187,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             } catch (e) {
                 var res = checkProgram(pid);
                 if (!res.alive) {
-                    print("Could not start mongo program at " + port + ", process ended");
+                    print("Could not start mongo program at " + port +
+                          ", process ended with exit code: " + res.exitCode);
                     serverExitCodeMap[port] = res.exitCode;
                     return true;
                 }
@@ -1223,9 +1224,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 m.pid = pid;
                 return true;
             } catch (e) {
-                if (!checkProgram(pid).alive) {
-                    print("Could not start mongo program at " + port + ", process ended");
-
+                var res = checkProgram(pid);
+                if (!res.alive) {
+                    print("Could not start mongo program at " + port +
+                          ", process ended with exit code: " + res.exitCode);
                     // Break out
                     m = null;
                     return true;
