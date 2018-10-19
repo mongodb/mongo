@@ -1,7 +1,6 @@
 // unordered_fast_key_table_internal.h
 
 
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

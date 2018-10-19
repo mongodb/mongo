@@ -6,7 +6,6 @@
    todo: switch to asio...this will fit nicely with that.
 */
 
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

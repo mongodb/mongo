@@ -1,6 +1,6 @@
 // @file winutil.cpp : Windows related utility functions
 //
-// 
+//
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
