@@ -7,7 +7,12 @@
  */
 (function() {
 
-    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
+    // TODO (SERVER-37698): Lower logging level.
+    var s = new ShardingTest({
+        shards: [{verbose: 3}, {verbose: 3}],
+        mongos: 1,
+        other: {chunkSize: 1, enableAutoSplit: true, mongosOptions: {verbose: 3}}
+    });
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', s.shard1.shardName);
@@ -88,8 +93,6 @@
                 print("not asserting for key failure: " + x + " want: " + e + " got: " + tojson(z));
                 return false;
             }
-
-            s.s.getDB("admin").runCommand({setParameter: 1, logLevel: 2});
 
             printjson(db.foo.findOne({_id: parseInt(x)}));
 
