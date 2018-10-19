@@ -519,8 +519,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert([
             "sh", "-c",
-            "(cd \"%s\" && tar cf - %s ) | (cd \"%s\" && tar xvf -)" %
-            (srcdir, pkgdir, sdir)
+            "(cd \"%s\" && tar cf - %s ) | (cd \"%s\" && tar xvf -)" % (srcdir, pkgdir, sdir)
         ])
     # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the files to wherever they
