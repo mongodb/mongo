@@ -364,12 +364,12 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: genny
+- name: genny_workloads
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "genny"
+        test: "genny_workloads"
         authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
@@ -742,7 +742,7 @@ buildvariants:
     - name: snapshot_reads
     - name: linkbench
     - name: tpcc
-    - name: genny
+    - name: genny_workloads
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -763,7 +763,7 @@ buildvariants:
   tasks: &standalonetasks
     - name: industry_benchmarks
     - name: crud_workloads
-    - name: genny
+    - name: genny_workloads
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -813,7 +813,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
-    - name: genny
+    - name: genny_workloads
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -845,7 +845,7 @@ buildvariants:
     - name: bestbuy_query
     - name: change_streams_latency
     - name: change_streams_throughput
-    - name: genny
+    - name: genny_workloads
     - name: industry_benchmarks
     - name: industry_benchmarks_wmajority
     - name: mixed_workloads
@@ -876,7 +876,7 @@ buildvariants:
     - name: industry_benchmarks
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
-    - name: genny
+    - name: genny_workloads
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
