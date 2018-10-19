@@ -48,8 +48,7 @@ Pod::Spec.new do |s|
 
   s.license      = { :type => "APACHE", :file => "COPYING" }
 
-  s.platform     = :ios, :osx, :watchos, :tvos
-  s.ios.deployment_target = "10.2"
+  s.ios.deployment_target = "11.0"
   s.osx.deployment_target = "10.10"
   s.watchos.deployment_target = "4.3"
   s.tvos.deployment_target = "10.2"

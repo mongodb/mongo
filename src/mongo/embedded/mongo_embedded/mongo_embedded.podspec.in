@@ -47,8 +47,7 @@ Pod::Spec.new do |s|
   s.license      = "GNU Affero General Public License v3.0"
   # s.license      = { :type => "AGPLv3", :file => "FILE_LICENSE" }
 
-  s.platform     = :ios, :watchos, :tvos
-  s.ios.deployment_target = "10.2"
+  s.ios.deployment_target = "11.0"
   s.watchos.deployment_target = "4.3"
   s.tvos.deployment_target = "10.2"
 
