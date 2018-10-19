@@ -36,54 +36,57 @@ def main():
 
     with utils.open_or_use_stdout(options.outfile) as fp:
         while True:
-            # Requires the Evergreen agent to be running on port 2285.
-            response = requests.get("http://localhost:2285/status")
-            if response.status_code != requests.codes.ok:
-                print("Received a {} HTTP response: {}".format(response.status_code, response.text),
-                      file=sys.stderr)
-                time.sleep(options.interval)
-                continue
-
-            timestamp = datetime.now()
             try:
-                res_json = response.json()
-            except ValueError:
-                print("Invalid JSON object returned with response: {}".format(response.text),
-                      file=sys.stderr)
-                time.sleep(options.interval)
-                continue
-
-            sys_res_dict = {}
-            sys_res_dict["timestamp"] = timestamp
-            sys_info = res_json["sys_info"]
-            sys_res_dict["num_cpus"] = sys_info["num_cpus"]
-            sys_res_dict["mem_total"] = sys_info["vmstat"]["total"]
-            sys_res_dict["mem_avail"] = sys_info["vmstat"]["available"]
-            ps_info = res_json["ps_info"]
-            for process in ps_info:
-                try:
-                    sys_res_dict["pid"] = process["pid"]
-                    sys_res_dict["ppid"] = process["parentPid"]
-                    sys_res_dict["num_threads"] = process["numThreads"]
-                    sys_res_dict["command"] = process.get("command", "")
-                    sys_res_dict["cpu_user"] = process["cpu"]["user"]
-                    sys_res_dict["cpu_sys"] = process["cpu"]["system"]
-                    sys_res_dict["io_wait"] = process["cpu"]["iowait"]
-                    sys_res_dict["io_write"] = process["io"]["writeBytes"]
-                    sys_res_dict["io_read"] = process["io"]["readBytes"]
-                    sys_res_dict["mem_used"] = process["mem"]["rss"]
-                except KeyError:
-                    # KeyError may occur as a result of file missing from /proc, likely due to
-                    # process exiting.
+                # Requires the Evergreen agent to be running on port 2285.
+                response = requests.get("http://localhost:2285/status")
+                if response.status_code != requests.codes.ok:
+                    print("Received a {} HTTP response: {}".format(response.status_code,
+                                                                   response.text), file=sys.stderr)
+                    time.sleep(options.interval)
                     continue
 
-                print(dumps(sys_res_dict, sort_keys=True), file=fp)
+                timestamp = datetime.now()
+                try:
+                    res_json = response.json()
+                except ValueError:
+                    print("Invalid JSON object returned with response: {}".format(response.text),
+                          file=sys.stderr)
+                    time.sleep(options.interval)
+                    continue
 
-                if fp.fileno() != sys.stdout.fileno():
-                    # Flush internal buffers associated with file to disk.
-                    fp.flush()
-                    os.fsync(fp.fileno())
-            time.sleep(options.interval)
+                sys_res_dict = {}
+                sys_res_dict["timestamp"] = timestamp
+                sys_info = res_json["sys_info"]
+                sys_res_dict["num_cpus"] = sys_info["num_cpus"]
+                sys_res_dict["mem_total"] = sys_info["vmstat"]["total"]
+                sys_res_dict["mem_avail"] = sys_info["vmstat"]["available"]
+                ps_info = res_json["ps_info"]
+                for process in ps_info:
+                    try:
+                        sys_res_dict["pid"] = process["pid"]
+                        sys_res_dict["ppid"] = process["parentPid"]
+                        sys_res_dict["num_threads"] = process["numThreads"]
+                        sys_res_dict["command"] = process.get("command", "")
+                        sys_res_dict["cpu_user"] = process["cpu"]["user"]
+                        sys_res_dict["cpu_sys"] = process["cpu"]["system"]
+                        sys_res_dict["io_wait"] = process["cpu"]["iowait"]
+                        sys_res_dict["io_write"] = process["io"]["writeBytes"]
+                        sys_res_dict["io_read"] = process["io"]["readBytes"]
+                        sys_res_dict["mem_used"] = process["mem"]["rss"]
+                    except KeyError:
+                        # KeyError may occur as a result of file missing from /proc, likely due to
+                        # process exiting.
+                        continue
+
+                    print(dumps(sys_res_dict, sort_keys=True), file=fp)
+
+                    if fp.fileno() != sys.stdout.fileno():
+                        # Flush internal buffers associated with file to disk.
+                        fp.flush()
+                        os.fsync(fp.fileno())
+                time.sleep(options.interval)
+            except requests.ConnectionError as error:
+                print(error, file=sys.stderr)
 
 
 if __name__ == "__main__":
