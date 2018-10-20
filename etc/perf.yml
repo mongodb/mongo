@@ -475,7 +475,17 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --inMemoryEngineConfigString 'eviction=(threads_min=1),' --inMemorySizeGB 60 --auth"
+    mongod_flags: >-
+      --auth
+      --fork
+      --inMemoryEngineConfigString 'eviction=(threads_min=1),'
+      --inMemorySizeGB 60
+      --logpath ./mongod.log
+      --setParameter diagnosticDataCollectionEnabled=false
+      --setParameter enableTestCommands=1
+      --setParameter ttlMonitorEnabled=false
+      --storageEngine inMemory
+      --syncdelay 0
     use_scons_cache: true
     project: &project perf-3.4
   run_on:
@@ -501,7 +511,16 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth"
+    mongod_flags: >-
+      --auth
+      --fork
+      --logpath ./mongod.log
+      --nojournal
+      --setParameter diagnosticDataCollectionEnabled=false
+      --setParameter enableTestCommands=1
+      --setParameter ttlMonitorEnabled=false
+      --storageEngine mmapv1
+      --syncdelay 0
     project: *project
   run_on:
   - "centos6-perf"
@@ -523,7 +542,19 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --inMemoryEngineConfigString 'eviction=(threads_min=1),' --inMemorySizeGB 60 --auth --oplogSize 30000"
+    mongod_flags: >-
+      --auth
+      --fork
+      --inMemoryEngineConfigString 'eviction=(threads_min=1),'
+      --inMemorySizeGB 60
+      --logpath ./mongod.log
+      --oplogSize 30000
+      --replSet test
+      --setParameter diagnosticDataCollectionEnabled=false
+      --setParameter enableTestCommands=1
+      --setParameter ttlMonitorEnabled=false
+      --storageEngine inMemory
+      --syncdelay 0
     project: *project
   run_on:
   - "centos6-perf"
@@ -539,7 +570,18 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth --oplogSize 100000"
+    mongod_flags: >-
+      --auth
+      --fork
+      --logpath ./mongod.log
+      --nojournal
+      --oplogSize 100000
+      --replSet test
+      --setParameter diagnosticDataCollectionEnabled=false
+      --setParameter enableTestCommands=1
+      --setParameter ttlMonitorEnabled=false
+      --storageEngine mmapv1
+      --syncdelay 0
     project: *project
   run_on:
   - "centos6-perf"
