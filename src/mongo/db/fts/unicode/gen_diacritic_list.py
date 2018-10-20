@@ -8,7 +8,7 @@ from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
 def generate(unicode_proplist_file, target):
     """Generates a C++ source file that contains a diacritic checking function.
 
-    The diacritic checking function contains a switch statement with cases for 
+    The diacritic checking function contains a switch statement with cases for
     every diacritic in the Unicode Character Database.
     """
     out = open(target, "w")
@@ -41,7 +41,7 @@ def generate(unicode_proplist_file, target):
                 end   = int(codepoint_range[1], 16) + 1
 
                 for i in range(start, end):
-                    if i not in diacritics: 
+                    if i not in diacritics:
                         diacritics.add(i)
             else:
                 if int(values[0], 16) not in diacritics:
