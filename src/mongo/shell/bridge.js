@@ -298,3 +298,8 @@ function MongoBridge(options) {
         },
     });
 }
+
+// The number of ports that ReplSetTest and ShardingTest should stagger the port number of the
+// mongobridge process and its corresponding mongod/mongos process by. The resulting port number of
+// the mongod/mongos process is MongoBridge#port + MongoBridge.kBridgeOffset.
+MongoBridge.kBridgeOffset = 10;
