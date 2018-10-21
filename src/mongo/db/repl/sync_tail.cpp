@@ -387,7 +387,13 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         return writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
             // a command may need a global write lock. so we will conservatively go
             // ahead and grab one here. suboptimal. :-(
-            Lock::GlobalWrite globalWriteLock(opCtx);
+            boost::optional<Lock::GlobalWrite> globalWriteLock;
+
+            const StringData commandName(op["o"].embeddedObject().firstElementFieldName());
+            // SERVER-37313: createIndex does not need to take the Global X lock.
+            if (commandName != "createIndexes") {
+                globalWriteLock.emplace(opCtx);
+            }
 
             // special case apply for commands to avoid implicit database creation
             Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);

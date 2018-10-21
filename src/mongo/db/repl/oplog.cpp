@@ -231,6 +231,11 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const NamespaceString& indexNss,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
                             OplogApplication::Mode mode) {
+    // Lock the database if it's not locked.
+    boost::optional<Lock::DBLock> dbLock;
+    if (!opCtx->lockState()->isDbLockedForMode(indexNss.db(), MODE_X)) {
+        dbLock.emplace(opCtx, indexNss.db(), MODE_X);
+    }
     // Check if collection exists.
     Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, indexNss.ns());
     auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
@@ -1525,6 +1530,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
     }
     {
+        Lock::DBLock lock(opCtx, nss.db(), MODE_IS);
         Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
         if (db && !db->getCollection(opCtx, nss) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
@@ -1548,10 +1554,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                        "collection not supported in initial sync: "
                                     << redact(op));
     }
-
-    // Applying commands in repl is done under Global W-lock, so it is safe to not
-    // perform the current DB checks after reacquiring the lock.
-    invariant(opCtx->lockState()->isW());
 
     // Parse optime from oplog entry unless we are applying this command in standalone or on a
     // primary (replicated writes enabled).
