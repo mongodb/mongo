@@ -232,6 +232,11 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const NamespaceString& indexNss,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
                             OplogApplication::Mode mode) {
+    // Lock the database if it's not locked.
+    boost::optional<Lock::DBLock> dbLock;
+    if (!opCtx->lockState()->isLocked()) {
+        dbLock.emplace(opCtx, indexNss.db(), MODE_X);
+    }
     // Check if collection exists.
     Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, indexNss.ns());
     auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;

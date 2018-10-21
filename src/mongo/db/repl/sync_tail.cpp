@@ -312,7 +312,9 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             // The command entry has been parsed before, so it must be valid.
             auto entry = uassertStatusOK(OplogEntry::parse(op));
             const StringData commandName(op["o"].embeddedObject().firstElementFieldName());
-            if (!op.getBoolField("prepare") && commandName != "abortTransaction") {
+            // SERVER-37313: createIndex does not need to take the Global X lock.
+            if (!op.getBoolField("prepare") && commandName != "abortTransaction" &&
+                commandName != "createIndexes") {
                 globalWriteLock.emplace(opCtx);
             }
 
