@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/log.h"
@@ -246,6 +247,9 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     bob->append("current", static_cast<int>(sessionCount));
     bob->append("available", static_cast<int>(_maxNumConnections - sessionCount));
     bob->append("totalCreated", static_cast<int>(_createdConnections.load()));
+    if (auto sc = getGlobalServiceContext()) {
+        bob->append("active", static_cast<int>(sc->getActiveClientOperations()));
+    }
 
     if (_adminInternalPool) {
         BSONObjBuilder section(bob->subobjStart("adminConnections"));
