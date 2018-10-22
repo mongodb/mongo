@@ -632,6 +632,7 @@ void TransactionRouter::commitTransaction(OperationContext* opCtx) {
 
     if (_participants.size() == 1) {
         _commitSingleShardTransaction(opCtx);
+        return;
     }
 
     _commitMultiShardTransaction(opCtx);
