@@ -99,6 +99,15 @@ def load_yaml_file(filename):
         raise ValueError("File '%s' contained invalid YAML: %s" % (filename, err))
 
 
+def dump_yaml_file(value, filename):
+    """Attempt to write YAML object to filename."""
+    try:
+        with open(filename, "w") as fp:
+            return yaml.safe_dump(value, fp)
+    except yaml.YAMLError as err:
+        raise ValueError("Could not write YAML to file '%s': %s" % (filename, err))
+
+
 def dump_yaml(value):
     """Return 'value' formatted as YAML."""
     # Use block (indented) style for formatting YAML.

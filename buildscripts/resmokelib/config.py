@@ -37,6 +37,10 @@ DEFAULT_BENCHMARK_MIN_TIME = datetime.timedelta(seconds=5)
 # starts, as well as those started by individual tests.
 DEFAULT_DBPATH_PREFIX = os.path.normpath("/data/db")
 
+# Default location for the genny executable. Override this in the YAML suite configuration if
+# desired.
+DEFAULT_GENNY_EXECUTABLE = os.path.normpath("genny/build/src/driver/genny")
+
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
     "archive_file": None,

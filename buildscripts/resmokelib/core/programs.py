@@ -336,6 +336,12 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
 
 
+def genny_program(logger, executable, process_kwargs=None, **kwargs):
+    """Return a Process instance that starts a genny executable with arguments constructed from 'kwargs'."""
+    args = [executable]
+    return generic_program(logger, args, process_kwargs, **kwargs)
+
+
 def generic_program(logger, args, process_kwargs=None, **kwargs):
     """Return a Process instance that starts an arbitrary executable.
 
