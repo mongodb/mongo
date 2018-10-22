@@ -15,6 +15,29 @@
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
     /**
+     * Test that shardCollection correctly validates that a zone is associated with a shard.
+     */
+    function testShardZoneAssociationValidation(proposedShardKey, numberLongMin, numberLongMax) {
+        var zoneMin = numberLongMin ? {x: NumberLong(0)} : {x: 0};
+        var zoneMax = numberLongMax ? {x: NumberLong(10)} : {x: 10};
+        assert.commandWorked(configDB.tags.insert(
+            {_id: {ns: ns, min: zoneMin}, ns: ns, min: zoneMin, max: zoneMax, tag: zoneName}));
+
+        var tagDoc = configDB.tags.findOne();
+        assert.eq(ns, tagDoc.ns);
+        assert.eq(zoneMin, tagDoc.min);
+        assert.eq(zoneMax, tagDoc.max);
+        assert.eq(zoneName, tagDoc.tag);
+
+        assert.commandFailed(mongos.adminCommand({shardCollection: ns, key: proposedShardKey}));
+
+        assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: zoneName}));
+        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: proposedShardKey}));
+
+        assert.commandWorked(testDB.runCommand({drop: kCollName}));
+    }
+
+    /**
      * Test that shardCollection correctly validates shard key against existing zones.
      */
     function testShardKeyValidation(proposedShardKey, numberLongMin, numberLongMax, success) {
@@ -27,6 +50,7 @@
             {updateZoneKeyRange: ns, min: zoneMin, max: zoneMax, zone: zoneName}));
 
         var tagDoc = configDB.tags.findOne();
+        jsTestLog("xxx tag doc " + tojson(tagDoc));
         assert.eq(ns, tagDoc.ns);
         assert.eq(zoneMin, tagDoc.min);
         assert.eq(zoneMax, tagDoc.max);
@@ -104,8 +128,10 @@
         assert.commandWorked(testDB.runCommand({drop: kCollName}));
     }
 
-    // test that shardCollection uses existing zones to validate shard key
+    // test that shardCollection checks that a zone is associated with a shard.
+    testShardZoneAssociationValidation({x: 1}, false, false);
 
+    // test that shardCollection uses existing zones to validate shard key
     testShardKeyValidation({x: 1}, false, false, true);
 
     // cannot use a completely different key from the zone shard key or a key

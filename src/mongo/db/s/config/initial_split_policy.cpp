@@ -232,13 +232,24 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
             const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
             appendChunk(nss, lastChunkMax, tag.getMinKey(), &version, validAfter, shardId, &chunks);
         }
-        // create a chunk for the zone
+
+        // check that this tag is associated with a shard and if so create a chunk for the zone.
+        const auto& shardIdsForChunk = tagToShards.find(tag.getTag())->second;
+        uassert(50973,
+                str::stream()
+                    << "cannot shard collection "
+                    << tag.getNS().ns()
+                    << " because it is associated with zone: "
+                    << tag.getTag()
+                    << " which is not associated with a shard. please add this zone to a shard.",
+                !shardIdsForChunk.empty());
+
         appendChunk(nss,
                     tag.getMinKey(),
                     tag.getMaxKey(),
                     &version,
                     validAfter,
-                    tagToShards.find(tag.getTag())->second[0],
+                    shardIdsForChunk[0],
                     &chunks);
         lastChunkMax = tag.getMaxKey();
     }
