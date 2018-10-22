@@ -134,17 +134,20 @@ private:
                                       const NamespaceString nss,
                                       const BSONObj& insertedDoc,
                                       const repl::OpTime& opTime,
-                                      const bool fromMigrate) {}
+                                      const bool fromMigrate,
+                                      const bool inMultiDocumentTransaction) {}
     virtual void shardObserveUpdateOp(OperationContext* opCtx,
                                       const NamespaceString nss,
                                       const BSONObj& updatedDoc,
                                       const repl::OpTime& opTime,
-                                      const repl::OpTime& prePostImageOpTime) {}
+                                      const repl::OpTime& prePostImageOpTime,
+                                      const bool inMultiDocumentTransaction) {}
     virtual void shardObserveDeleteOp(OperationContext* opCtx,
                                       const NamespaceString nss,
                                       const BSONObj& documentKey,
                                       const repl::OpTime& opTime,
-                                      const repl::OpTime& preImageOpTime) {}
+                                      const repl::OpTime& preImageOpTime,
+                                      const bool inMultiDocumentTransaction) {}
 };
 
 }  // namespace mongo

@@ -60,7 +60,7 @@ const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) con
         return _shardId;
     }
 
-    // If the tiemstamp is not provided than we return the latest shardid
+    // If the timestamp is not provided than we return the latest shardid
     if (!ts) {
         invariant(_shardId == _history.front().getShard());
         return _history.front().getShard();
@@ -73,8 +73,27 @@ const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) con
     }
 
     uasserted(ErrorCodes::StaleChunkHistory,
-              str::stream() << "Cant find shardId the chunk belonged to at cluster time "
+              str::stream() << "Cannot find shardId the chunk belonged to at cluster time "
                             << ts.get().toString());
+}
+
+void ChunkInfo::throwIfMovedSince(const Timestamp& ts) const {
+    uassert(50978, "Chunk has no history entries", !_history.empty());
+
+    const auto& latestValidAfter = _history.front().getValidAfter();
+    if (latestValidAfter <= ts) {
+        return;
+    }
+
+    uassert(ErrorCodes::StaleChunkHistory,
+            str::stream() << "Cannot find shardId the chunk belonged to at cluster time "
+                          << ts.toString(),
+            _history.back().getValidAfter() <= ts);
+
+    uasserted(ErrorCodes::MigrationConflict,
+              str::stream() << "Chunk has moved since timestamp: " << ts.toString()
+                            << ", most recently at timestamp: "
+                            << latestValidAfter.toString());
 }
 
 bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
@@ -88,6 +107,14 @@ std::string ChunkInfo::toString() const {
 
 void ChunkInfo::markAsJumbo() {
     _jumbo = true;
+}
+
+void Chunk::throwIfMoved() const {
+    if (!_atClusterTime) {
+        return;
+    }
+
+    _chunkInfo.throwIfMovedSince(*_atClusterTime);
 }
 
 }  // namespace mongo

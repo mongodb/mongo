@@ -51,17 +51,20 @@ protected:
                               const NamespaceString nss,
                               const BSONObj& insertedDoc,
                               const repl::OpTime& opTime,
-                              const bool fromMigrate) override;
+                              const bool fromMigrate,
+                              const bool inMultiDocumentTransaction) override;
     void shardObserveUpdateOp(OperationContext* opCtx,
                               const NamespaceString nss,
                               const BSONObj& updatedDoc,
                               const repl::OpTime& opTime,
-                              const repl::OpTime& prePostImageOpTime) override;
+                              const repl::OpTime& prePostImageOpTime,
+                              const bool inMultiDocumentTransaction) override;
     void shardObserveDeleteOp(OperationContext* opCtx,
                               const NamespaceString nss,
                               const BSONObj& documentKey,
                               const repl::OpTime& opTime,
-                              const repl::OpTime& preImageOpTime) override;
+                              const repl::OpTime& preImageOpTime,
+                              const bool inMultiDocumentTransaction) override;
 };
 
 }  // namespace mongo

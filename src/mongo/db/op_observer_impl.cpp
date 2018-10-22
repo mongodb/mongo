@@ -420,7 +420,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         AuthorizationManager::get(opCtx->getServiceContext())
             ->logOp(opCtx, "i", nss, it->doc, nullptr);
         auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
-        shardObserveInsertOp(opCtx, nss, it->doc, opTime, fromMigrate);
+        shardObserveInsertOp(opCtx, nss, it->doc, opTime, fromMigrate, inMultiDocumentTransaction);
     }
 
     if (nss.coll() == "system.js") {
@@ -489,7 +489,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                                  args.nss,
                                  args.updateArgs.updatedDoc,
                                  opTime.writeOpTime,
-                                 opTime.prePostImageOpTime);
+                                 opTime.prePostImageOpTime,
+                                 inMultiDocumentTransaction);
         }
     }
 
@@ -549,8 +550,12 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!fromMigrate) {
-            shardObserveDeleteOp(
-                opCtx, nss, documentKey, opTime.writeOpTime, opTime.prePostImageOpTime);
+            shardObserveDeleteOp(opCtx,
+                                 nss,
+                                 documentKey,
+                                 opTime.writeOpTime,
+                                 opTime.prePostImageOpTime,
+                                 inMultiDocumentTransaction);
         }
     }
 

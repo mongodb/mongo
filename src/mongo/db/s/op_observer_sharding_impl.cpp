@@ -38,6 +38,23 @@
 namespace mongo {
 namespace {
 const auto getIsMigrating = OperationContext::declareDecoration<bool>();
+
+void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
+                                        CollectionShardingRuntime* csr,
+                                        const BSONObj& doc) {
+    auto metadata = csr->getMetadata(opCtx);
+    if (!metadata->isSharded()) {
+        return;
+    }
+
+    // We can assume the simple collation because shard keys do not support non-simple collations.
+    auto chunk = metadata->getChunkManager()->findIntersectingChunkWithSimpleCollation(
+        metadata->extractDocumentKey(doc));
+
+    // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
+    // read concern parameter.
+    chunk.throwIfMoved();
+}
 }
 
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
@@ -58,15 +75,22 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& insertedDoc,
                                                   const repl::OpTime& opTime,
-                                                  const bool fromMigrate) {
+                                                  const bool fromMigrate,
+                                                  const bool inMultiDocumentTransaction) {
     auto* const css = (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         ? nullptr
         : CollectionShardingRuntime::get(opCtx, nss);
     if (css) {
         css->checkShardVersionOrThrow(opCtx);
+
         auto msm = MigrationSourceManager::get(css);
         if (msm) {
             msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
+        }
+
+        if (inMultiDocumentTransaction &&
+            repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+            assertIntersectingChunkHasNotMoved(opCtx, css, insertedDoc);
         }
     }
 }
@@ -75,12 +99,18 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& updatedDoc,
                                                   const repl::OpTime& opTime,
-                                                  const repl::OpTime& prePostImageOpTime) {
+                                                  const repl::OpTime& prePostImageOpTime,
+                                                  const bool inMultiDocumentTransaction) {
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
     css->checkShardVersionOrThrow(opCtx);
+
     auto msm = MigrationSourceManager::get(css);
     if (msm) {
         msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
+    }
+
+    if (inMultiDocumentTransaction && repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+        assertIntersectingChunkHasNotMoved(opCtx, css, updatedDoc);
     }
 }
 
@@ -88,13 +118,19 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& documentKey,
                                                   const repl::OpTime& opTime,
-                                                  const repl::OpTime& preImageOpTime) {
+                                                  const repl::OpTime& preImageOpTime,
+                                                  const bool inMultiDocumentTransaction) {
     auto& isMigrating = getIsMigrating(opCtx);
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
     css->checkShardVersionOrThrow(opCtx);
+
     auto msm = MigrationSourceManager::get(css);
     if (msm && isMigrating) {
         msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
+    }
+
+    if (inMultiDocumentTransaction && repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+        assertIntersectingChunkHasNotMoved(opCtx, css, documentKey);
     }
 }
 

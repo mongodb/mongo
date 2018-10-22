@@ -70,8 +70,7 @@
               (coll) => coll.find({_id: -5}).itcount(),
               (coll) => coll.find({_id: 5}).itcount(),
           ]
-        },
-        // TODO SERVER-37350: Verify writes to chunks a shard no longer owns are rejected.
+        }
     ];
 
     function runTest(testCase) {

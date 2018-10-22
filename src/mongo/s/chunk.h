@@ -56,6 +56,14 @@ public:
 
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
 
+    /**
+     * Throws MigrationConflict if the history entry valid for the given timestamp is not the most
+     * recent entry (meaning the chunk has moved).
+     *
+     * Throws StaleChunkHistory if no history entry is valid for the given timestamp.
+     */
+    void throwIfMovedSince(const Timestamp& ts) const;
+
     ChunkVersion getLastmod() const {
         return _lastmod;
     }
@@ -126,6 +134,14 @@ public:
     const ShardId& getShardId() const {
         return _chunkInfo.getShardIdAt(_atClusterTime);
     }
+
+    /**
+     * Throws MigrationConflict if the history entry valid for the chunk's pinned cluster time, if
+     * it has one, is not the most recent entry (meaning the chunk has moved).
+     *
+     * Throws StaleChunkHistory if no history entry is valid for the chunk's cluster time.
+     */
+    void throwIfMoved() const;
 
     ChunkVersion getLastmod() const {
         return _chunkInfo.getLastmod();

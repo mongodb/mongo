@@ -269,6 +269,7 @@ error_code("CannotBackup", 268);
 error_code("DataModifiedByRepair", 269);
 error_code("RepairedReplicaSetNode", 270);
 error_code("JSInterpreterFailureWithStack", 271, extra="JSExceptionInfo")
+error_code("MigrationConflict", 272)
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)
@@ -329,4 +330,4 @@ error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
 
 error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", "NetworkInterfaceExceededTimeLimit"])
 
-error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory"])
+error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory", "MigrationConflict"])
