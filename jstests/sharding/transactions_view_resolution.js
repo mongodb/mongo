@@ -77,9 +77,7 @@
     function readFromViewOnFirstParticipantStatement(session, view, viewFunc, numDocsExpected) {
         session.startTransaction();
         assert.eq(viewFunc(view), numDocsExpected);
-        // TODO SERVER-37363: Change this to commitTransaction once the coordinator waits for all
-        // participants to receive the commit decision before returning to the client.
-        assert.commandWorked(session.abortTransaction_forTesting());
+        session.commitTransaction();
     }
 
     // Unsharded view.
@@ -123,9 +121,7 @@
         session.startTransaction();
         assert.eq(view.aggregate({$match: {}}).itcount(), numDocsExpected);
         assert.eq(viewFunc(view), numDocsExpected);
-        // TODO SERVER-37363: Change this to commitTransaction once the coordinator waits for all
-        // participants to receive the commit decision before returning to the client.
-        assert.commandWorked(session.abortTransaction_forTesting());
+        session.commitTransaction();
     }
 
     // Unsharded view.
@@ -230,9 +226,7 @@
         assert.eq(view.aggregate({$match: {_id: -1}}).itcount(), 1);
         // Targets the primary first, but the resolved retry only targets Shard1.
         assert.eq(viewFunc(view), numDocsExpected);
-        // TODO SERVER-37363: Change this to commitTransaction once the coordinator waits for all
-        // participants to receive the commit decision before returning to the client.
-        assert.commandWorked(session.abortTransaction_forTesting());
+        session.commitTransaction();
     }
 
     // This is only possible against sharded views.
@@ -265,9 +259,7 @@
         session.startTransaction();
         const resArray = coll.aggregate(pipeline).toArray();
         assert(arrayEq(resArray, expected), tojson({got: resArray, expected: expected}));
-        // TODO SERVER-37363: Change this to commitTransaction once the coordinator waits for all
-        // participants to receive the commit decision before returning to the client.
-        assert.commandWorked(session.abortTransaction_forTesting());
+        session.commitTransaction();
     }
 
     // Set up an unsharded collection to use for $lookup. We cannot lookup into sharded collections.
