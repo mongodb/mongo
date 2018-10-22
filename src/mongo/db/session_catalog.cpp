@@ -188,7 +188,7 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
                           << " cannot be performed using a transaction or on a session.",
             !opCtx->getLogicalSessionId());
 
-    const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
+    const auto invalidateSessionFn = [&](WithLock, decltype(_txnTable)::iterator it) {
         auto& sri = it->second;
         sri->txnState.invalidate();
 

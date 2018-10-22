@@ -143,10 +143,6 @@ private:
         Session txnState;
     };
 
-    using SessionRuntimeInfoMap = stdx::unordered_map<LogicalSessionId,
-                                                      std::shared_ptr<SessionRuntimeInfo>,
-                                                      LogicalSessionIdHash>;
-
     /**
      * Must be called with _mutex locked and returns it locked. May release and re-acquire it zero
      * or more times before returning. The returned 'SessionRuntimeInfo' is guaranteed to be linked
@@ -163,7 +159,7 @@ private:
     ServiceContext* const _serviceContext;
 
     stdx::mutex _mutex;
-    SessionRuntimeInfoMap _txnTable;
+    LogicalSessionIdMap<std::shared_ptr<SessionRuntimeInfo>> _txnTable;
 };
 
 /**

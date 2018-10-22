@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/util/uuid.h"
 
@@ -82,7 +83,7 @@ private:
      */
     void _updateSessionInfo(const OplogEntry& entry);
 
-    std::map<UUID, OplogEntry> _sessionsToUpdate;
+    LogicalSessionIdMap<OplogEntry> _sessionsToUpdate;
 };
 
 }  // namespace repl
