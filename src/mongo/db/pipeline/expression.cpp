@@ -4745,19 +4745,117 @@ void ExpressionTrim::_doAddDependencies(DepsTracker* deps) const {
     }
 }
 
-/* ------------------------- ExpressionTrunc -------------------------- */
+/* ------------------------- ExpressionRound and ExpressionTrunc -------------------------- */
 
-Value ExpressionTrunc::evaluateNumericArg(const Value& numericArg) const {
-    // There's no point in truncating integers or longs, it will have no effect.
-    switch (numericArg.getType()) {
-        case NumberDecimal:
-            return Value(numericArg.getDecimal().quantize(Decimal128::kNormalizedZero,
-                                                          Decimal128::kRoundTowardZero));
-        case NumberDouble:
-            return Value(std::trunc(numericArg.getDouble()));
-        default:
-            return numericArg;
+void assertFlagsValid(uint32_t flags,
+                      const std::string& opName,
+                      long long numericValue,
+                      long long precisionValue) {
+    uassert(51080,
+            str::stream() << "invalid conversion from Decimal128 result in " << opName
+                          << " resulting from arguments: ["
+                          << numericValue
+                          << ", "
+                          << precisionValue
+                          << "]",
+            !Decimal128::hasFlag(flags, Decimal128::kInvalid));
+}
+
+static Value evaluateRoundOrTrunc(const Document& root,
+                                  const std::vector<boost::intrusive_ptr<Expression>>& vpOperand,
+                                  const std::string& opName,
+                                  Decimal128::RoundingMode roundingMode,
+                                  double (*doubleOp)(double)) {
+    constexpr auto maxPrecision = 100LL;
+    constexpr auto minPrecision = -20LL;
+    auto numericArg = Value(vpOperand[0]->evaluate(root));
+    if (numericArg.nullish()) {
+        return Value(BSONNULL);
     }
+    uassert(51081,
+            str::stream() << opName << " only supports numeric types, not "
+                          << typeName(numericArg.getType()),
+            numericArg.numeric());
+    if (vpOperand.size() == 1) {
+        switch (numericArg.getType()) {
+            case BSONType::NumberDecimal:
+                return Value(
+                    numericArg.getDecimal().quantize(Decimal128::kNormalizedZero, roundingMode));
+            case BSONType::NumberDouble:
+                return Value(doubleOp(numericArg.getDouble()));
+            // There's no point to round/trunc integers or longs without precision argument, it will
+            // have no effect.
+            default:
+                return numericArg;
+        }
+    }
+    // Else, if precision is specified, round to the specified precision.
+    auto precisionArg = Value(vpOperand[1]->evaluate(root));
+    if (precisionArg.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(51082,
+            str::stream() << "precision argument to  " << opName << " must be a integral value",
+            precisionArg.integral());
+    auto precisionValue = precisionArg.coerceToLong();
+    uassert(51083,
+            str::stream() << "cannot apply " << opName << " with precision value " << precisionValue
+                          << " value must be in [-20, 100]",
+            minPrecision <= precisionValue && precisionValue <= maxPrecision);
+    // Construct 10^-precisionValue, which will be used as the quantize reference.
+    auto quantum = Decimal128(0LL, Decimal128::kExponentBias - precisionValue, 0LL, 1LL);
+    switch (numericArg.getType()) {
+        case BSONType::NumberDecimal: {
+            if (numericArg.getDecimal().isInfinite()) {
+                return numericArg;
+            }
+            auto out = numericArg.getDecimal().quantize(quantum, roundingMode);
+            return Value(out);
+        }
+        case BSONType::NumberDouble: {
+            auto dec = Decimal128(numericArg.getDouble(), Decimal128::kRoundTo34Digits);
+            if (dec.isInfinite()) {
+                return numericArg;
+            }
+            auto out = dec.quantize(quantum, roundingMode);
+            return Value(out.toDouble());
+        }
+        case BSONType::NumberInt:
+        case BSONType::NumberLong: {
+            if (precisionValue >= 0) {
+                return numericArg;
+            }
+            auto numericArgll = numericArg.getLong();
+            auto out =
+                Decimal128(static_cast<int64_t>(numericArgll)).quantize(quantum, roundingMode);
+            uint32_t flags = 0;
+            auto outll = out.toLong(&flags);
+            assertFlagsValid(flags, opName, numericArgll, precisionValue);
+            if (numericArg.getType() == BSONType::NumberLong ||
+                outll > std::numeric_limits<int>::max()) {
+                // Even if the original was an int to begin with - it has to be a long now.
+                return Value(static_cast<long long>(outll));
+            }
+            return Value(static_cast<int>(outll));
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+Value ExpressionRound::evaluate(const Document& root) const {
+    return evaluateRoundOrTrunc(
+        root, vpOperand, getOpName(), Decimal128::kRoundTiesToEven, &std::round);
+}
+
+REGISTER_EXPRESSION(round, ExpressionRound::parse);
+const char* ExpressionRound::getOpName() const {
+    return "$round";
+}
+
+Value ExpressionTrunc::evaluate(const Document& root) const {
+    return evaluateRoundOrTrunc(
+        root, vpOperand, getOpName(), Decimal128::kRoundTowardZero, &std::trunc);
 }
 
 REGISTER_EXPRESSION(trunc, ExpressionTrunc::parse);

@@ -1,14 +1,15 @@
-// SERVER-19548: Add $floor, $ceil, and $trunc aggregation expressions.
-
-// For assertErrorCode.
-load("jstests/aggregation/extras/utils.js");
+// The following are integration tests for $floor and $ceil.
 
 (function() {
     "use strict";
+
+    // For assertErrorCode.
+    load("jstests/aggregation/extras/utils.js");
+
     var coll = db.server19548;
     coll.drop();
-    // Seed collection so that the pipeline will execute.
-    assert.writeOK(coll.insert({}));
+    // We need at least one document in the collection in order to test expressions, add it here.
+    assert.commandWorked(coll.insert({}));
 
     // Helper for testing that op returns expResult.
     function testOp(op, expResult) {
@@ -34,22 +35,7 @@ load("jstests/aggregation/extras/utils.js");
     testOp({$floor: 0.9}, 0.0);
     testOp({$floor: -1.2}, -2.0);
 
-    testOp({$trunc: NumberLong(4)}, NumberLong(4));
-    testOp({$trunc: NaN}, NaN);
-    testOp({$trunc: Infinity}, Infinity);
-    testOp({$trunc: -Infinity}, -Infinity);
-    testOp({$trunc: null}, null);
-    testOp({$trunc: -2.0}, -2.0);
-    testOp({$trunc: 0.9}, 0.0);
-    testOp({$trunc: -1.2}, -1.0);
-
-    // More than 1 argument.
-    assertErrorCode(coll, [{$project: {a: {$ceil: [1, 2]}}}], 16020);
-    assertErrorCode(coll, [{$project: {a: {$floor: [1, 2]}}}], 16020);
-    assertErrorCode(coll, [{$project: {a: {$trunc: [1, 2]}}}], 16020);
-
     // Non-numeric input.
     assertErrorCode(coll, [{$project: {a: {$ceil: "string"}}}], 28765);
     assertErrorCode(coll, [{$project: {a: {$floor: "string"}}}], 28765);
-    assertErrorCode(coll, [{$project: {a: {$trunc: "string"}}}], 28765);
 }());

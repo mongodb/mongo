@@ -156,7 +156,7 @@ public:
      * uint64_t's. This class performs an endian check on the system to ensure
      * that the Value.high64 represents the higher 64 bits.
      */
-    explicit Decimal128(Decimal128::Value dec128Value) : _value(dec128Value) {}
+    constexpr explicit Decimal128(Decimal128::Value dec128Value) : _value(dec128Value) {}
 
     /**
      * Constructs a Decimal128 from parts, dealing with proper encoding of the combination field.
@@ -527,6 +527,16 @@ private:
 
     std::string _convertToScientificNotation(StringData coefficient, int adjustedExponent) const;
     std::string _convertToStandardDecimalNotation(StringData coefficient, int exponent) const;
+
+    /**
+     * This function quantizes the current decimal given a quantum reference without normalizing its
+     * arguments.
+     */
+    Decimal128 nonNormalizingQuantize(const Decimal128& reference,
+                                      RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 nonNormalizingQuantize(const Decimal128& reference,
+                                      std::uint32_t* signalingFlags,
+                                      RoundingMode roundMode = kRoundTiesToEven) const;
 
     uint64_t _getCombinationField() const {
         return (_value.high64 >> kCombinationFieldPos) & kCombinationFieldMask;

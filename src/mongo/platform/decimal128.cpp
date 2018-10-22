@@ -275,7 +275,7 @@ Decimal128::Decimal128(double doubleValue,
         base10Exp--;
 
     Decimal128 Q(0, base10Exp - 14 + Decimal128::kExponentBias, 0, 1);
-    *this = convertedDoubleValue.quantize(Q, roundMode);
+    *this = convertedDoubleValue.nonNormalizingQuantize(Q, roundMode);
 
     // Check if the quantization was done correctly: _value stores exactly 15
     // decimal digits of precision (15 digits can fit into the low 64 bits of the decimal)
@@ -285,7 +285,7 @@ Decimal128::Decimal128(double doubleValue,
         // If we didn't precisely get 15 digits of precision, the original base 10 exponent
         // guess was 1 off, so quantize once more with base10Exp + 1
         Q = Decimal128(0, base10Exp - 13 + Decimal128::kExponentBias, 0, 1);
-        *this = convertedDoubleValue.quantize(Q, roundMode);
+        *this = convertedDoubleValue.nonNormalizingQuantize(Q, roundMode);
     }
 
     // The decimal must have exactly 15 digits of precision
@@ -848,6 +848,23 @@ Decimal128 Decimal128::power(const Decimal128& other,
     return Decimal128{libraryTypeToValue(result)}.add(kLargestNegativeExponentZero);
 }
 
+Decimal128 Decimal128::nonNormalizingQuantize(const Decimal128& other,
+                                              RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return nonNormalizingQuantize(other, &throwAwayFlag, roundMode);
+}
+
+Decimal128 Decimal128::nonNormalizingQuantize(const Decimal128& reference,
+                                              std::uint32_t* signalingFlags,
+                                              RoundingMode roundMode) const {
+    BID_UINT128 current = decimal128ToLibraryType(_value);
+    BID_UINT128 q = decimal128ToLibraryType(reference.getValue());
+    BID_UINT128 quantizedResult = bid128_quantize(current, q, roundMode, signalingFlags);
+    Decimal128::Value value = libraryTypeToValue(quantizedResult);
+    Decimal128 result(value);
+    return result;
+}
+
 Decimal128 Decimal128::quantize(const Decimal128& other, RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
     return quantize(other, &throwAwayFlag, roundMode);
@@ -856,12 +873,16 @@ Decimal128 Decimal128::quantize(const Decimal128& other, RoundingMode roundMode)
 Decimal128 Decimal128::quantize(const Decimal128& reference,
                                 std::uint32_t* signalingFlags,
                                 RoundingMode roundMode) const {
-    BID_UINT128 current = decimal128ToLibraryType(_value);
-    BID_UINT128 q = decimal128ToLibraryType(reference.getValue());
-    BID_UINT128 quantizedResult = bid128_quantize(current, q, roundMode, signalingFlags);
-    Decimal128::Value value = libraryTypeToValue(quantizedResult);
-    Decimal128 result(value);
-    return result;
+
+    auto normalizedThis = this->normalize();
+    auto normalizedReferenceExponent =
+        static_cast<int32_t>(reference.normalize().getBiasedExponent());
+    if (normalizedReferenceExponent != 0 &&
+        (static_cast<int32_t>(normalizedThis.getBiasedExponent()) - normalizedReferenceExponent) >
+            33) {
+        return normalizedThis;
+    }
+    return nonNormalizingQuantize(reference, signalingFlags, roundMode);
 }
 
 Decimal128 Decimal128::squareRoot(RoundingMode roundMode) const {
@@ -958,9 +979,6 @@ const Decimal128 Decimal128::kSmallestNegative(1, 0, 0, 1);
 const Decimal128 Decimal128::kNormalizedZero(Decimal128::Value(
     {0, static_cast<uint64_t>(Decimal128::kExponentBias) << Decimal128::kExponentFieldPos}));
 
-// Get the representation of 0 with the most negative exponent
-const Decimal128 Decimal128::kLargestNegativeExponentZero(Decimal128::Value({0ull, 0ull}));
-
 // Shift the format of the combination bits to the right position to get Inf and NaN
 // +Inf = 0111 1000 ... ... = 0x78 ... ..., -Inf = 1111 1000 ... ... = 0xf8 ... ...
 // +NaN = 0111 1100 ... ... = 0x7c ... ..., -NaN = 1111 1100 ... ... = 0xfc ... ...
@@ -969,9 +987,13 @@ const Decimal128 Decimal128::kNegativeInfinity(Decimal128::Value({0ull, 0xf8ull 
 const Decimal128 Decimal128::kPositiveNaN(Decimal128::Value({0ull, 0x7cull << 56}));
 const Decimal128 Decimal128::kNegativeNaN(Decimal128::Value({0ull, 0xfcull << 56}));
 
+// Get the representation of 0 with the most negative exponent
+const Decimal128 Decimal128::kLargestNegativeExponentZero(Decimal128::Value({0ull, 0ull}));
+
 const Decimal128 Decimal128::kPi("3.14159265358979323846264338327950288419716939937510");
 const Decimal128 Decimal128::kPiOver180(Decimal128::kPi.divide(Decimal128("180")));
 const Decimal128 Decimal128::k180OverPi(Decimal128("180").divide(Decimal128::kPi));
+
 
 std::ostream& operator<<(std::ostream& stream, const Decimal128& value) {
     return stream << value.toString();
