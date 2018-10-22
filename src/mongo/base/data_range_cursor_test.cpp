@@ -67,7 +67,7 @@ TEST(DataRangeCursor, ConstDataRangeCursorType) {
 
     ConstDataRangeCursor out(nullptr, nullptr);
 
-    auto inner = cdrc.read(&out);
+    auto inner = cdrc.readInto(&out);
 
     ASSERT_OK(inner);
     ASSERT_EQUALS(buf, out.data());
@@ -100,7 +100,7 @@ TEST(DataRangeCursor, DataRangeCursorType) {
 
     DataRangeCursor out(nullptr, nullptr);
 
-    Status status = drc.read(&out);
+    Status status = drc.readInto(&out);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(buf, out.data());

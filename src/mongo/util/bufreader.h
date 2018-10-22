@@ -78,7 +78,7 @@ public:
     /** read in the object specified, but do not advance buffer pointer */
     template <typename T>
     void peek(T& t) const {
-        uassertStatusOK(ConstDataRange(_pos, _end).read(&t));
+        uassertStatusOK(ConstDataRange(_pos, _end).readInto(&t));
     }
 
     /** read in and return an object of the specified type, but do not advance buffer pointer */

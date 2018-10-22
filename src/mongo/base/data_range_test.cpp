@@ -66,7 +66,7 @@ TEST(DataRange, ConstDataRangeType) {
 
     ConstDataRange out(nullptr, nullptr);
 
-    auto inner = cdr.read(&out);
+    auto inner = cdr.readInto(&out);
 
     ASSERT_OK(inner);
     ASSERT_EQUALS(buf, out.data());
@@ -101,7 +101,7 @@ TEST(DataRange, DataRangeType) {
 
     DataRange out(nullptr, nullptr);
 
-    Status status = dr.read(&out);
+    Status status = dr.readInto(&out);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(buf, out.data());

@@ -45,20 +45,20 @@ public:
 
     ConstDataCursor(ConstDataView::bytes_type bytes) : ConstDataView(bytes) {}
 
-    ConstDataCursor operator+(std::size_t s) const {
+    ConstDataCursor operator+(std::ptrdiff_t s) const {
         return view() + s;
     }
 
-    ConstDataCursor& operator+=(std::size_t s) {
+    ConstDataCursor& operator+=(std::ptrdiff_t s) {
         *this = view() + s;
         return *this;
     }
 
-    ConstDataCursor operator-(std::size_t s) const {
+    ConstDataCursor operator-(std::ptrdiff_t s) const {
         return view() - s;
     }
 
-    ConstDataCursor& operator-=(std::size_t s) {
+    ConstDataCursor& operator-=(std::ptrdiff_t s) {
         *this = view() - s;
         return *this;
     }
@@ -121,20 +121,20 @@ public:
         return view();
     }
 
-    DataCursor operator+(std::size_t s) const {
+    DataCursor operator+(std::ptrdiff_t s) const {
         return view() + s;
     }
 
-    DataCursor& operator+=(std::size_t s) {
+    DataCursor& operator+=(std::ptrdiff_t s) {
         *this = view() + s;
         return *this;
     }
 
-    DataCursor operator-(std::size_t s) const {
+    DataCursor operator-(std::ptrdiff_t s) const {
         return view() - s;
     }
 
-    DataCursor& operator-=(std::size_t s) {
+    DataCursor& operator-=(std::ptrdiff_t s) {
         *this = view() - s;
         return *this;
     }

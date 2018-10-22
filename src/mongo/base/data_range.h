@@ -73,7 +73,7 @@ public:
     }
 
     template <typename T>
-    Status read(T* t, size_t offset = 0) const {
+    Status readInto(T* t, size_t offset = 0) const {
         if (offset > length()) {
             return makeOffsetStatus(offset);
         }
@@ -85,7 +85,7 @@ public:
     template <typename T>
     StatusWith<T> read(std::size_t offset = 0) const {
         T t(DataType::defaultConstruct<T>());
-        Status s = read(&t, offset);
+        Status s = readInto(&t, offset);
 
         if (s.isOK()) {
             return StatusWith<T>(std::move(t));

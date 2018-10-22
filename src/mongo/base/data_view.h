@@ -45,22 +45,22 @@ public:
 
     ConstDataView(bytes_type bytes) : _bytes(bytes) {}
 
-    bytes_type view(std::size_t offset = 0) const {
+    bytes_type view(std::ptrdiff_t offset = 0) const {
         return _bytes + offset;
     }
 
     template <typename T>
-    const ConstDataView& read(T* t, size_t offset = 0) const {
+    const ConstDataView& readInto(T* t, std::ptrdiff_t offset = 0) const {
         DataType::unsafeLoad(t, view(offset), nullptr);
 
         return *this;
     }
 
     template <typename T>
-    T read(std::size_t offset = 0) const {
+    T read(std::ptrdiff_t offset = 0) const {
         T t(DataType::defaultConstruct<T>());
 
-        read(&t, offset);
+        readInto(&t, offset);
 
         return t;
     }
@@ -75,14 +75,14 @@ public:
 
     DataView(bytes_type bytes) : ConstDataView(bytes) {}
 
-    bytes_type view(std::size_t offset = 0) const {
+    bytes_type view(std::ptrdiff_t offset = 0) const {
         // It is safe to cast away const here since the pointer stored in our base class was
         // originally non-const by way of our constructor.
         return const_cast<bytes_type>(ConstDataView::view(offset));
     }
 
     template <typename T>
-    DataView& write(const T& value, std::size_t offset = 0) {
+    DataView& write(const T& value, std::ptrdiff_t offset = 0) {
         DataType::unsafeStore(value, view(offset), nullptr);
 
         return *this;
