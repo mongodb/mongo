@@ -382,7 +382,7 @@ ShardConnection::ShardConnection(OperationContext* opCtx,
                                  const ConnectionString& connectionString,
                                  const std::string& ns,
                                  std::shared_ptr<ChunkManager> manager)
-    : _cs(connectionString), _ns(ns), _manager(manager), _finishedInit(false) {
+    : _cs(connectionString), _ns(ns), _manager(manager) {
     invariant(_cs.isValid());
 
     // This code should never run under a cross-shard transaction

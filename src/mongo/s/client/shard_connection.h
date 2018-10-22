@@ -105,8 +105,9 @@ public:
     }
 
     void donotCheckVersion() {
-        _setVersion = false;
+        invariant(!_finishedInit);
         _finishedInit = true;
+        _setVersion = false;
     }
 
     bool ok() const {
@@ -143,10 +144,12 @@ private:
     const std::string _ns;
     const std::shared_ptr<ChunkManager> _manager;
 
-    bool _finishedInit;
+    bool _finishedInit{false};
+
+    // Specifies whether the call to _finishInit established a version on the connection
+    bool _setVersion{false};
 
     DBClientBase* _conn;
-    bool _setVersion;
 };
 
 /**
