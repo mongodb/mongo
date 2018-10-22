@@ -65,9 +65,9 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
     const auto& lsid = sessionInfo.getSessionId();
     invariant(lsid);
 
-    auto iter = _sessionsToUpdate.find(lsid->getId());
+    auto iter = _sessionsToUpdate.find(*lsid);
     if (iter == _sessionsToUpdate.end()) {
-        _sessionsToUpdate.emplace(lsid->getId(), entry);
+        _sessionsToUpdate.emplace(*lsid, entry);
         return;
     }
 
@@ -125,7 +125,7 @@ std::vector<OplogEntry> SessionUpdateTracker::_flushForQueryPredicate(
     const BSONObj& queryPredicate) {
     auto idField = queryPredicate["_id"].Obj();
     auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsidInOplogQuery"), idField);
-    auto iter = _sessionsToUpdate.find(lsid.getId());
+    auto iter = _sessionsToUpdate.find(lsid);
 
     if (iter == _sessionsToUpdate.end()) {
         return {};

@@ -146,10 +146,6 @@ private:
         Session txnState;
     };
 
-    using SessionRuntimeInfoMap = stdx::unordered_map<LogicalSessionId,
-                                                      std::shared_ptr<SessionRuntimeInfo>,
-                                                      LogicalSessionIdHash>;
-
     /**
      * May release and re-acquire it zero or more times before returning. The returned
      * 'SessionRuntimeInfo' is guaranteed to be linked on the catalog's _txnTable as long as the
@@ -164,7 +160,7 @@ private:
     void _releaseSession(const LogicalSessionId& lsid);
 
     stdx::mutex _mutex;
-    SessionRuntimeInfoMap _txnTable;
+    LogicalSessionIdMap<std::shared_ptr<SessionRuntimeInfo>> _txnTable;
 };
 
 /**

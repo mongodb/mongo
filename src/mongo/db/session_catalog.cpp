@@ -170,7 +170,7 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
                 !opCtx->getLogicalSessionId());
     }
 
-    const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
+    const auto invalidateSessionFn = [&](WithLock, decltype(_txnTable)::iterator it) {
         auto& sri = it->second;
         sri->txnState.invalidate();
 
