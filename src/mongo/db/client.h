@@ -1,12 +1,3 @@
-/* @file db/client.h
-
-   "Client" represents a connection to the database (the server-side) and corresponds
-   to an open socket (or logical connection if pooling on sockets) from a client.
-
-   todo: switch to asio...this will fit nicely with that.
-*/
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -35,6 +26,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+/* @file db/client.h
+
+   "Client" represents a connection to the database (the server-side) and corresponds
+   to an open socket (or logical connection if pooling on sockets) from a client.
+
+   todo: switch to asio...this will fit nicely with that.
+*/
 
 #pragma once
 
