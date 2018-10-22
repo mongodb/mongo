@@ -432,6 +432,11 @@ public:
      */
     void notifyStartupComplete();
 
+    /*
+     * Returns the number of active client operations
+     */
+    int getActiveClientOperations();
+
     /**
      * Set the OpObserver.
      */
