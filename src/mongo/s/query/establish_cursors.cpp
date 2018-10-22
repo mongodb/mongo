@@ -55,7 +55,8 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const ReadPreferenceSetting readPref,
                                            const std::vector<std::pair<ShardId, BSONObj>>& remotes,
-                                           bool allowPartialResults) {
+                                           bool allowPartialResults,
+                                           Shard::RetryPolicy retryPolicy) {
     // Construct the requests
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& remote : remotes) {
@@ -63,12 +64,8 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
     }
 
     // Send the requests
-    MultiStatementTransactionRequestsSender ars(opCtx,
-                                                executor,
-                                                nss.db().toString(),
-                                                std::move(requests),
-                                                readPref,
-                                                Shard::RetryPolicy::kIdempotent);
+    MultiStatementTransactionRequestsSender ars(
+        opCtx, executor, nss.db().toString(), std::move(requests), readPref, retryPolicy);
 
     std::vector<RemoteCursor> remoteCursors;
     try {

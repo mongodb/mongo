@@ -78,12 +78,8 @@ public:
             const auto& nss = aggregationRequest.getNamespaceString();
 
             try {
-                uassertStatusOK(
-                    ClusterAggregate::runAggregate(opCtx,
-                                                   ClusterAggregate::Namespaces{nss, nss},
-                                                   aggregationRequest,
-                                                   cmdObj,
-                                                   result));
+                uassertStatusOK(ClusterAggregate::runAggregate(
+                    opCtx, ClusterAggregate::Namespaces{nss, nss}, aggregationRequest, result));
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 // If the aggregation failed because the namespace is a view, re-run the command
                 // with the resolved view pipeline and namespace.

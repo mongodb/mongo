@@ -112,7 +112,8 @@ public:
      */
     virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& ns,
-                        std::vector<BSONObj>&& objs) = 0;
+                        std::vector<BSONObj>&& objs,
+                        const WriteConcernOptions& wc) = 0;
 
     /**
      * Updates the documents matching 'queries' with the objects 'updates'. Throws a UserException
@@ -122,6 +123,7 @@ public:
                         const NamespaceString& ns,
                         std::vector<BSONObj>&& queries,
                         std::vector<BSONObj>&& updates,
+                        const WriteConcernOptions& wc,
                         bool upsert,
                         bool multi) = 0;
 

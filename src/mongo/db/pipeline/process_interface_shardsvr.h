@@ -52,7 +52,8 @@ public:
      */
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                std::vector<BSONObj>&& objs) final;
+                std::vector<BSONObj>&& objs,
+                const WriteConcernOptions& wc) final;
 
     /**
      * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
@@ -62,6 +63,7 @@ public:
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& queries,
                 std::vector<BSONObj>&& updates,
+                const WriteConcernOptions& wc,
                 bool upsert,
                 bool multi) final;
 };

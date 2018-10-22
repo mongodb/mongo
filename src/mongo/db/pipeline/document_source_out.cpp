@@ -289,6 +289,7 @@ DocumentSourceOut::DocumentSourceOut(NamespaceString outputNs,
                                      WriteModeEnum mode,
                                      std::set<FieldPath> uniqueKey)
     : DocumentSource(expCtx),
+      _writeConcern(expCtx->opCtx->getWriteConcern()),
       _done(false),
       _outputNs(std::move(outputNs)),
       _mode(mode),

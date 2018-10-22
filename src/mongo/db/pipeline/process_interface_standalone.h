@@ -58,11 +58,13 @@ public:
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                std::vector<BSONObj>&& objs) override;
+                std::vector<BSONObj>&& objs,
+                const WriteConcernOptions& wc) override;
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& queries,
                 std::vector<BSONObj>&& updates,
+                const WriteConcernOptions& wc,
                 bool upsert,
                 bool multi) override;
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;

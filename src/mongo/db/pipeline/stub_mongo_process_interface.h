@@ -61,7 +61,8 @@ public:
 
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                std::vector<BSONObj>&& objs) override {
+                std::vector<BSONObj>&& objs,
+                const WriteConcernOptions& wc) override {
         MONGO_UNREACHABLE;
     }
 
@@ -69,6 +70,7 @@ public:
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& queries,
                 std::vector<BSONObj>&& updates,
+                const WriteConcernOptions& wc,
                 bool upsert,
                 bool multi) final {
         MONGO_UNREACHABLE;

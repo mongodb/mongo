@@ -375,7 +375,8 @@ selector:
   - jstests/sharding/txn_coordinator_commands_basic_requirements.js
   - jstests/sharding/txn_writes_during_movechunk.js
   - jstests/sharding/update_sharded.js
-  # Enable if SERVER-20865 is backported or 4.2 becomes last-stable
+  - jstests/sharding/out_write_concern.js
+# Enable if SERVER-20865 is backported or 4.2 becomes last-stable
   - jstests/sharding/sharding_statistics_server_status.js
 
 executor:

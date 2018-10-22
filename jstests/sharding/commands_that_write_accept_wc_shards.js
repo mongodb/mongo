@@ -127,63 +127,6 @@ load('jstests/libs/write_concern_util.js');
         admin: false
     });
 
-    // Aggregate with passthrough.
-    commands.push({
-        req: {aggregate: collName, pipeline: [{$sort: {type: 1}}, {$out: "foo"}], cursor: {}},
-        setupFunc: function() {
-            coll.insert({_id: 1, x: 3, type: 'oak'});
-            coll.insert({_id: 2, x: 13, type: 'maple'});
-        },
-        confirmFunc: function() {
-            assert.eq(db.foo.find({type: 'oak'}).itcount(), 1);
-            assert.eq(db.foo.find({type: 'maple'}).itcount(), 1);
-            db.foo.drop();
-        },
-        admin: false
-    });
-
-    // Aggregate that only matches one shard.
-    commands.push({
-        req: {
-            aggregate: collName,
-            pipeline: [{$match: {x: -3}}, {$match: {type: {$exists: 1}}}, {$out: "foo"}],
-            cursor: {}
-        },
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            coll.insert({_id: 1, x: -3, type: 'oak'});
-            coll.insert({_id: 2, x: -4, type: 'maple'});
-        },
-        confirmFunc: function() {
-            assert.eq(db.foo.find().itcount(), 1);
-            assert.eq(db.foo.find({type: 'oak'}).itcount(), 1);
-            assert.eq(db.foo.find({type: 'maple'}).itcount(), 0);
-            db.foo.drop();
-        },
-        admin: false
-    });
-
-    // Aggregate that must go to multiple shards.
-    commands.push({
-        req: {
-            aggregate: collName,
-            pipeline: [{$match: {type: {$exists: 1}}}, {$sort: {type: 1}}, {$out: "foo"}],
-            cursor: {}
-        },
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            coll.insert({_id: 1, x: -3, type: 'oak'});
-            coll.insert({_id: 2, x: 23, type: 'maple'});
-        },
-        confirmFunc: function() {
-            assert.eq(db.foo.find().itcount(), 2);
-            assert.eq(db.foo.find({type: 'oak'}).itcount(), 1);
-            assert.eq(db.foo.find({type: 'maple'}).itcount(), 1);
-            db.foo.drop();
-        },
-        admin: false
-    });
-
     // MapReduce on an unsharded collection.
     commands.push({
         req: {

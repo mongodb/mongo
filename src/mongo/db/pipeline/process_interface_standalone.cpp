@@ -155,7 +155,8 @@ Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
 
 void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& ns,
-                                      std::vector<BSONObj>&& objs) {
+                                      std::vector<BSONObj>&& objs,
+                                      const WriteConcernOptions& wc) {
     auto writeResults = performInserts(
         expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
@@ -176,6 +177,7 @@ void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionConte
                                       const NamespaceString& ns,
                                       std::vector<BSONObj>&& queries,
                                       std::vector<BSONObj>&& updates,
+                                      const WriteConcernOptions& wc,
                                       bool upsert,
                                       bool multi) {
     auto writeResults = performUpdates(expCtx->opCtx,

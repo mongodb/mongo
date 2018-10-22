@@ -32,6 +32,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -165,7 +166,8 @@ public:
      * Writes the documents in 'batch' to the write namespace.
      */
     virtual void spill(BatchedObjects&& batch) {
-        pExpCtx->mongoProcessInterface->insert(pExpCtx, getWriteNs(), std::move(batch.objects));
+        pExpCtx->mongoProcessInterface->insert(
+            pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern);
     };
 
     /**
@@ -187,6 +189,14 @@ public:
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+protected:
+    // Stash the writeConcern of the original command as the operation context may change by the
+    // time we start to spill $out writes. This is because certain aggregations (e.g. $exchange)
+    // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
+    // context. The getMore's will not have an attached writeConcern however we still want to
+    // respect the writeConcern of the original command.
+    WriteConcernOptions _writeConcern;
 
 private:
     bool _initialized = false;

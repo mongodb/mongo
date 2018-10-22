@@ -73,6 +73,7 @@ public:
                                                    getWriteNs(),
                                                    std::move(batch.uniqueKeys),
                                                    std::move(batch.objects),
+                                                   _writeConcern,
                                                    upsert,
                                                    multi);
         } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {

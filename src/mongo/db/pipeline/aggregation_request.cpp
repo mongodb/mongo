@@ -46,7 +46,6 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -225,6 +224,16 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             }
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
+        } else if (WriteConcernOptions::kWriteConcernField == fieldName) {
+            if (elem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << fieldName << " must be an object, not a "
+                                      << typeName(elem.type())};
+            }
+
+            WriteConcernOptions writeConcern;
+            uassertStatusOK(writeConcern.parse(elem.embeddedObject()));
+            request.setWriteConcern(writeConcern);
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -324,7 +333,10 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize maxTimeMs if specified.
         {QueryRequest::cmdOptionMaxTimeMS,
          _maxTimeMS == 0 ? Value() : Value(static_cast<int>(_maxTimeMS))},
-        {kExchangeName, _exchangeSpec ? Value(_exchangeSpec->toBSON()) : Value()}};
+        {kExchangeName, _exchangeSpec ? Value(_exchangeSpec->toBSON()) : Value()},
+        {WriteConcernOptions::kWriteConcernField,
+         _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
+    };
 }
 
 }  // namespace mongo

@@ -61,6 +61,18 @@ using write_ops::Insert;
 using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
+namespace {
+
+// Attaches the write concern to the given batch request. If it looks like 'writeConcern' has
+// been default initialized to {w: 0, wtimeout: 0} then we do not bother attaching it.
+void attachWriteConcern(BatchedCommandRequest* request, const WriteConcernOptions& writeConcern) {
+    if (!writeConcern.wMode.empty() || writeConcern.wNumNodes > 0) {
+        request->setWriteConcern(writeConcern.toBSON());
+    }
+}
+
+}  // namespace
+
 std::pair<std::vector<FieldPath>, bool> MongoInterfaceShardServer::collectDocumentKeyFields(
     OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
@@ -121,15 +133,19 @@ std::pair<std::vector<FieldPath>, bool> MongoInterfaceShardServer::collectDocume
 
 void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const NamespaceString& ns,
-                                       std::vector<BSONObj>&& objs) {
+                                       std::vector<BSONObj>&& objs,
+                                       const WriteConcernOptions& wc) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    ClusterWriter::write(
-        expCtx->opCtx,
-        BatchedCommandRequest(buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation)),
-        &stats,
-        &response);
+    BatchedCommandRequest insertCommand(
+        buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+
+    // If applicable, attach a write concern to the batched command request.
+    attachWriteConcern(&insertCommand, wc);
+
+    ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response);
+
     // TODO SERVER-35403: Add more context for which shard produced the error.
     uassertStatusOKWithContext(response.toStatus(), "Insert failed: ");
 }
@@ -138,19 +154,24 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
                                        const NamespaceString& ns,
                                        std::vector<BSONObj>&& queries,
                                        std::vector<BSONObj>&& updates,
+                                       const WriteConcernOptions& wc,
                                        bool upsert,
                                        bool multi) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
-    ClusterWriter::write(expCtx->opCtx,
-                         BatchedCommandRequest(buildUpdateOp(ns,
-                                                             std::move(queries),
-                                                             std::move(updates),
-                                                             upsert,
-                                                             multi,
-                                                             expCtx->bypassDocumentValidation)),
-                         &stats,
-                         &response);
+
+    BatchedCommandRequest updateCommand(buildUpdateOp(ns,
+                                                      std::move(queries),
+                                                      std::move(updates),
+                                                      upsert,
+                                                      multi,
+                                                      expCtx->bypassDocumentValidation));
+
+    // If applicable, attach a write concern to the batched command request.
+    attachWriteConcern(&updateCommand, wc);
+
+    ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response);
+
     // TODO SERVER-35403: Add more context for which shard produced the error.
     uassertStatusOKWithContext(response.toStatus(), "Update failed: ");
 }
