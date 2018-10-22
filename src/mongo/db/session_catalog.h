@@ -139,10 +139,6 @@ private:
         Session txnState;
     };
 
-    using SessionRuntimeInfoMap = stdx::unordered_map<LogicalSessionId,
-                                                      std::shared_ptr<SessionRuntimeInfo>,
-                                                      LogicalSessionIdHash>;
-
     /**
      * May release and re-acquire it zero or more times before returning. The returned
      * 'SessionRuntimeInfo' is guaranteed to be linked on the catalog's _txnTable as long as the
@@ -164,7 +160,7 @@ private:
     stdx::mutex _mutex;
 
     // Owns the Session objects for all current Sessions.
-    SessionRuntimeInfoMap _sessions;
+    LogicalSessionIdMap<std::shared_ptr<SessionRuntimeInfo>> _sessions;
 
     // Count of the number of Sessions that are currently checked out.
     uint32_t _numCheckedOutSessions{0};

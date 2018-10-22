@@ -126,7 +126,7 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
                 !opCtx->getLogicalSessionId());
     }
 
-    const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
+    const auto invalidateSessionFn = [&](WithLock, decltype(_sessions)::iterator it) {
         auto& sri = it->second;
         auto const txnParticipant =
             TransactionParticipant::getFromNonCheckedOutSession(&sri->txnState);
