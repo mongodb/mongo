@@ -80,14 +80,14 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     WriteConcernOptions writeConcern = wcResult.getValue();
 
-    if (writeConcern.usedDefault) {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-            !opCtx->getClient()->isInDirectClient()) {
-            // This is here only for backwards compatibility with 3.2 clusters which have commands
-            // that do not specify write concern when writing to the config server.
-            writeConcern = {
-                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(30)};
-        }
+    if (writeConcern.usedDefault && serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !opCtx->getClient()->isInDirectClient() &&
+        (opCtx->getClient()->session()->getTags() | transport::Session::kInternalClient)) {
+        // Upconvert the writeConcern of any incoming requests from internal connections (i.e.,
+        // from other nodes in the clustser) to "majority." This protects against internal code
+        // that does not specify writeConcern when writing to the config server.
+        writeConcern = {
+            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(30)};
     } else {
         Status wcStatus = validateWriteConcern(opCtx, writeConcern);
         if (!wcStatus.isOK()) {
