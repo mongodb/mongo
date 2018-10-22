@@ -1062,6 +1062,12 @@ static void shutdownTask() {
     Client::initThreadIfNotAlready();
     Client& client = cc();
 
+    // Terminate the balancer thread so it doesn't leak memory.
+    if (auto balancer = Balancer::get(serviceContext)) {
+        balancer->interruptBalancer();
+        balancer->waitForBalancerToStop();
+    }
+
     ServiceContext::UniqueOperationContext uniqueTxn;
     OperationContext* txn = client.getOperationContext();
     if (!txn && serviceContext->getGlobalStorageEngine()) {
