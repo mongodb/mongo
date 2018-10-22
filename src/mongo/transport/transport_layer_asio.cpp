@@ -105,7 +105,9 @@ private:
 
             armTimer();
             return _timer->async_wait(UseFuture{}).tapError([timer = _timer](const Status& status) {
-                LOG(2) << "Timer received error: " << status;
+                if (status != ErrorCodes::CallbackCanceled) {
+                    LOG(2) << "Timer received error: " << status;
+                }
             });
 
         } catch (asio::system_error& ex) {
