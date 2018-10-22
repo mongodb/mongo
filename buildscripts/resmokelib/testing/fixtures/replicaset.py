@@ -122,11 +122,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         config = {"_id": self.replset_name}
         client = self.nodes[0].mongo_client()
 
-        if self.auth_options is not None:
-            auth_db = client[self.auth_options["authenticationDatabase"]]
-            auth_db.authenticate(self.auth_options["username"],
-                                 password=self.auth_options["password"],
-                                 mechanism=self.auth_options["authenticationMechanism"])
+        self.auth(client, self.auth_options)
 
         if client.local.system.replset.count():
             # Skip initializing the replset if there is an existing configuration.
@@ -196,6 +192,7 @@ class ReplicaSetFixture(interface.ReplFixture):
     def await_ready(self):
         self._await_primary()
         self._await_secondaries()
+        self._setup_sessions_collection()
 
     def _await_primary(self):
         # Wait for the primary to be elected.
@@ -229,6 +226,24 @@ class ReplicaSetFixture(interface.ReplFixture):
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info("Secondary on port %d is now available.", secondary.port)
+
+    @staticmethod
+    def auth(client, auth_options=None):
+        """Auth a client connection."""
+        if auth_options is not None:
+            auth_db = client[auth_options["authenticationDatabase"]]
+            auth_db.authenticate(auth_options["username"], password=auth_options["password"],
+                                 mechanism=auth_options["authenticationMechanism"])
+
+        return client
+
+    def _setup_sessions_collection(self):
+        """Set up the sessions collection so that it will not attempt to set up during a test."""
+        primary = self.nodes[0].mongo_client()
+        # Prior to the changes from SERVER-34653, running the refreshLogicalSessionCacheNow
+        # command with a logical session requires being authenticated.
+        self.auth(primary, self.auth_options)
+        primary.admin.command({"refreshLogicalSessionCacheNow": 1})
 
     def _do_teardown(self):
         running_at_start = self.is_running()
