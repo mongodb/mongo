@@ -845,7 +845,6 @@ buildvariants:
     - name: bestbuy_query
     - name: change_streams_latency
     - name: change_streams_throughput
-    - name: genny_workloads
     - name: industry_benchmarks
     - name: industry_benchmarks_wmajority
     - name: mixed_workloads
