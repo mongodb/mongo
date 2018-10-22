@@ -84,4 +84,8 @@ BackupCursorState BackupCursorHooks::openBackupCursor(OperationContext* opCtx) {
 void BackupCursorHooks::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
     MONGO_UNREACHABLE;
 }
+
+bool BackupCursorHooks::isBackupCursorOpen() const {
+    return false;
+}
 }  // namespace mongo

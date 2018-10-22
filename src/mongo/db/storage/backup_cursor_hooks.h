@@ -64,6 +64,8 @@ public:
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx);
 
     virtual void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId);
+
+    virtual bool isBackupCursorOpen() const;
 };
 
 }  // namespace mongo

@@ -228,6 +228,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
+        'backup_cursor_hooks'
     ]
 )
 

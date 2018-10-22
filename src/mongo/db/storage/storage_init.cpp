@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 
@@ -54,7 +55,10 @@ public:
 
     virtual BSONObj generateSection(OperationContext* opCtx,
                                     const BSONElement& configElement) const {
-        auto engine = opCtx->getClient()->getServiceContext()->getStorageEngine();
+        auto svcCtx = opCtx->getClient()->getServiceContext();
+        auto engine = svcCtx->getStorageEngine();
+        auto backupCursorHooks = BackupCursorHooks::get(svcCtx);
+
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
                            << engine->supportsReadConcernMajority()
                            << "supportsSnapshotReadConcern"
@@ -62,7 +66,9 @@ public:
                            << "readOnly"
                            << storageGlobalParams.readOnly
                            << "persistent"
-                           << !engine->isEphemeral());
+                           << !engine->isEphemeral()
+                           << "backupCursorOpen"
+                           << backupCursorHooks->isBackupCursorOpen());
     }
 
 } storageSSS;
