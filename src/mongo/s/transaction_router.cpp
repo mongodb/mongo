@@ -555,8 +555,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     }
 }
 
-
-Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
+void TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     auto citer = _participants.cbegin();
@@ -567,7 +566,7 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
     commitCmd.setDbName("admin");
 
     const auto& participant = citer->second;
-    return uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+    uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
@@ -576,7 +575,7 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
         Shard::RetryPolicy::kIdempotent));
 }
 
-Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
+void TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
     invariant(_coordinatorId);
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -619,7 +618,7 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
     auto coordinatorIter = _participants.find(*_coordinatorId);
     invariant(coordinatorIter != _participants.end());
 
-    return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
+    uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
@@ -628,14 +627,14 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
         Shard::RetryPolicy::kIdempotent));
 }
 
-Shard::CommandResponse TransactionRouter::commitTransaction(OperationContext* opCtx) {
+void TransactionRouter::commitTransaction(OperationContext* opCtx) {
     uassert(50940, "cannot commit with no participants", !_participants.empty());
 
     if (_participants.size() == 1) {
-        return _commitSingleShardTransaction(opCtx);
+        _commitSingleShardTransaction(opCtx);
     }
 
-    return _commitMultiShardTransaction(opCtx);
+    _commitMultiShardTransaction(opCtx);
 }
 
 std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
