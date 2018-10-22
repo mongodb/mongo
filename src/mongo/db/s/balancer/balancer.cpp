@@ -168,15 +168,6 @@ Balancer::~Balancer() {
 void Balancer::create(ServiceContext* serviceContext) {
     invariant(!getBalancer(serviceContext));
     getBalancer(serviceContext) = stdx::make_unique<Balancer>(serviceContext);
-
-    // Register a shutdown task to terminate the balancer thread so that it doesn't leak memory.
-    registerShutdownTask([serviceContext] {
-        auto balancer = Balancer::get(serviceContext);
-        // Make sure that the balancer thread has been interrupted.
-        balancer->interruptBalancer();
-        // Make sure the balancer thread has terminated.
-        balancer->waitForBalancerToStop();
-    });
 }
 
 Balancer* Balancer::get(ServiceContext* serviceContext) {

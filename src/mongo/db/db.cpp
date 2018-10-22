@@ -870,6 +870,12 @@ void shutdownTask() {
     auto const client = Client::getCurrent();
     auto const serviceContext = client->getServiceContext();
 
+    // Terminate the balancer thread so it doesn't leak memory.
+    if (auto balancer = Balancer::get(serviceContext)) {
+        balancer->interruptBalancer();
+        balancer->waitForBalancerToStop();
+    }
+
     // Shutdown the TransportLayer so that new connections aren't accepted
     if (auto tl = serviceContext->getTransportLayer()) {
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets...";
