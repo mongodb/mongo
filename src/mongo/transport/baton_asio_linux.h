@@ -218,7 +218,7 @@ public:
     }
 
     void notify() noexcept override {
-        schedule([] {});
+        _efd.notify();
     }
 
     /**
