@@ -1,0 +1,89 @@
+/**
+ *    Copyright (C) 2018-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/idl/server_parameter.h"
+#include "mongo/unittest/unittest.h"
+
+namespace mongo {
+namespace {
+
+TEST(ServerParameter, setAppendBSON) {
+    IDLServerParameter param("setAppendBSON"_sd, ServerParameterType::kStartupOnly);
+
+    param.setAppendBSON([](OperationContext*, BSONObjBuilder* builder, StringData name) {
+        builder->append(name, 42);
+    });
+    BSONObjBuilder builder;
+    param.append(nullptr, builder, param.name());
+    auto obj = builder.obj();
+    ASSERT_EQ(obj.nFields(), 1);
+    ASSERT_EQ(obj[param.name()].Int(), 42);
+}
+
+TEST(ServerParameter, setFromString) {
+    IDLServerParameter param("setFromString"_sd, ServerParameterType::kStartupOnly);
+
+    param.setFromString([](StringData) { return Status::OK(); });
+    ASSERT_OK(param.setFromString("A value"));
+
+    param.setFromString([](StringData) { return Status(ErrorCodes::BadValue, "Can't set me."); });
+    ASSERT_NOT_OK(param.setFromString("A value"));
+}
+
+TEST(ServerParameter, setFromBSON) {
+    IDLServerParameter param("setFromBSON"_sd, ServerParameterType::kStartupOnly);
+    BSONElement elem;
+
+    param.setFromBSON([](const BSONElement&) { return Status::OK(); });
+    ASSERT_OK(param.set(elem));
+
+    param.setFromBSON(
+        [](const BSONElement&) { return Status(ErrorCodes::BadValue, "Can't set me."); });
+    ASSERT_NOT_OK(param.set(elem));
+}
+
+TEST(ServerParameter, deprecatedAlias) {
+    IDLServerParameter param("basename"_sd, ServerParameterType::kStartupOnly);
+    IDLServerParameterDeprecatedAlias alias("aliasname"_sd, &param);
+    std::string value;
+    param.setFromString([&value](StringData str) {
+        value = str.toString();
+        return Status::OK();
+    });
+    ASSERT_OK(param.setFromString("alpha"));
+    ASSERT_EQ("alpha", value);
+
+    ASSERT_OK(alias.setFromString("bravo"));
+    ASSERT_EQ("bravo", value);
+}
+
+}  // namespace
+}  // namespace mongo

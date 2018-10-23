@@ -49,10 +49,10 @@ ServerParameterSet* GLOBAL = NULL;
 }
 
 ServerParameter::ServerParameter(ServerParameterSet* sps,
-                                 const std::string& name,
+                                 StringData name,
                                  bool allowedToChangeAtStartup,
                                  bool allowedToChangeAtRuntime)
-    : _name(name),
+    : _name(name.toString()),
       _allowedToChangeAtStartup(allowedToChangeAtStartup),
       _allowedToChangeAtRuntime(allowedToChangeAtRuntime) {
     if (sps) {
@@ -60,8 +60,8 @@ ServerParameter::ServerParameter(ServerParameterSet* sps,
     }
 }
 
-ServerParameter::ServerParameter(ServerParameterSet* sps, const std::string& name)
-    : _name(name), _allowedToChangeAtStartup(true), _allowedToChangeAtRuntime(true) {
+ServerParameter::ServerParameter(ServerParameterSet* sps, StringData name)
+    : _name(name.toString()), _allowedToChangeAtStartup(true), _allowedToChangeAtRuntime(true) {
     if (sps) {
         sps->add(this);
     }

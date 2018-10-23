@@ -27,3 +27,24 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
+
+env.Library(
+    target='server_parameter',
+    source=[
+        'server_parameter.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters',
+    ],
+)
+
+env.CppUnitTest(
+    target='idl_server_parameter_test',
+    source=[
+        'server_parameter_test.cpp',
+    ],
+    LIBDEPS=[
+        'server_parameter',
+    ],
+)

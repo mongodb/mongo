@@ -63,10 +63,10 @@ public:
     typedef std::map<std::string, ServerParameter*> Map;
 
     ServerParameter(ServerParameterSet* sps,
-                    const std::string& name,
+                    StringData name,
                     bool allowedToChangeAtStartup,
                     bool allowedToChangeAtRuntime);
-    ServerParameter(ServerParameterSet* sps, const std::string& name);
+    ServerParameter(ServerParameterSet* sps, StringData name);
     virtual ~ServerParameter();
 
     std::string name() const {
