@@ -191,6 +191,8 @@ public:
     boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
         ServiceContext* serviceCtx) const override;
 
+    Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override;
+
 private:
     const NamespaceString _rollbackIdNss;
 };

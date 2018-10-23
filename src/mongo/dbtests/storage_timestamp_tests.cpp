@@ -2506,6 +2506,9 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
+        txnParticipant->beginOrContinue(*_opCtx->getTxnNumber(),
+                                        sessionInfo.getAutocommit(),
+                                        sessionInfo.getStartTransaction());
         txnParticipant->unstashTransactionResources(_opCtx, "insert");
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);

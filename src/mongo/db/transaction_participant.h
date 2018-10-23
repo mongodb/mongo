@@ -166,12 +166,6 @@ public:
     void shutdown();
 
     /**
-     * Called for speculative transactions to fix the optime of the snapshot to read from.
-     */
-    void setSpeculativeTransactionOpTime(OperationContext* opCtx,
-                                         SpeculativeTransactionOpTime opTimeChoice);
-
-    /**
      * Transfers management of transaction resources from the OperationContext to the Session.
      */
     void stashTransactionResources(OperationContext* opCtx);
@@ -644,6 +638,11 @@ private:
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
+
+    // Called for speculative transactions to fix the optime of the snapshot to read from.
+    void _setSpeculativeTransactionOpTime(WithLock,
+                                          OperationContext* opCtx,
+                                          SpeculativeTransactionOpTime opTimeChoice);
 
     // Finishes committing the multi-document transaction after the storage-transaction has been
     // committed, the oplog entry has been inserted into the oplog, and the transactions table has

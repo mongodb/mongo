@@ -44,6 +44,13 @@ var $config = (function() {
         },
 
         incrementTxnNumber: function incrementTxnNumber(db, collName) {
+            const abortErrorCodes = [
+                ErrorCodes.NoSuchTransaction,
+                ErrorCodes.TransactionCommitted,
+                ErrorCodes.TransactionTooOld,
+                ErrorCodes.Interrupted
+            ];
+            abortTransaction(this.sessionDb, this.txnNumber, abortErrorCodes);
             this.txnNumber++;
         },
 

@@ -51,6 +51,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_transactions_metrics.h"
@@ -438,9 +439,8 @@ void TransactionParticipant::beginOrContinueTransactionUnconditionally(TxnNumber
     }
 }
 
-void TransactionParticipant::setSpeculativeTransactionOpTime(
-    OperationContext* opCtx, SpeculativeTransactionOpTime opTimeChoice) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
+void TransactionParticipant::_setSpeculativeTransactionOpTime(
+    WithLock, OperationContext* opCtx, SpeculativeTransactionOpTime opTimeChoice) {
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
     opCtx->recoveryUnit()->setTimestampReadSource(
@@ -448,13 +448,12 @@ void TransactionParticipant::setSpeculativeTransactionOpTime(
             ? RecoveryUnit::ReadSource::kAllCommittedSnapshot
             : RecoveryUnit::ReadSource::kLastAppliedSnapshot);
     opCtx->recoveryUnit()->preallocateSnapshot();
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
-    invariant(readTimestamp);
+    auto readTimestamp = repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
     // Transactions do not survive term changes, so combining "getTerm" here with the
     // recovery unit timestamp does not cause races.
-    _speculativeTransactionReadOpTime = {*readTimestamp, replCoord->getTerm()};
+    _speculativeTransactionReadOpTime = {readTimestamp, replCoord->getTerm()};
     stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
-    _transactionMetricsObserver.onChooseReadTimestamp(*readTimestamp);
+    _transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
 }
 
 TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx) {
@@ -678,6 +677,21 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
             // At this point we're either committed and this is a 'commitTransaction' command, or we
             // are in the process of committing.
             return;
+        }
+
+        // Set speculative execution.
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        const bool speculative =
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+            !readConcernArgs.getArgsAtClusterTime();
+        // Only set speculative on primary.
+        if (opCtx->writesAreReplicated() && speculative) {
+            _setSpeculativeTransactionOpTime(lg,
+                                             opCtx,
+                                             readConcernArgs.getOriginalLevel() ==
+                                                     repl::ReadConcernLevel::kSnapshotReadConcern
+                                                 ? SpeculativeTransactionOpTime::kAllCommitted
+                                                 : SpeculativeTransactionOpTime::kLastApplied);
         }
 
         // Stashed transaction resources do not exist for this in-progress multi-document

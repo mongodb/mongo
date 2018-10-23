@@ -1391,8 +1391,7 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     invariant(!readConcern.getArgsOpTime());
 
     // TODO SERVER-34620: Re-enable speculative behavior when "atClusterTime" is specified.
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool speculative = txnParticipant && txnParticipant->inMultiDocumentTransaction() &&
+    const bool speculative = readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern &&
         !readConcern.getArgsAtClusterTime();
 
     const bool isMajorityCommittedRead =

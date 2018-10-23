@@ -74,6 +74,7 @@
 #include "mongo/db/snapshot_window_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/transaction_coordinator_factory.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/rpc/factory.h"
@@ -226,8 +227,9 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
         // We must be in a transaction if the readConcern level was upconverted to snapshot and the
         // command must support readConcern level snapshot in order to be supported in transactions.
         if (upconvertToSnapshot) {
-            return {ErrorCodes::OperationNotSupportedInTransaction,
-                    str::stream() << "Command is not supported in a transaction"};
+            return {
+                ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Command is not supported as the first command in a transaction"};
         }
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Command does not support read concern "
@@ -346,6 +348,21 @@ void invokeInTransaction(OperationContext* opCtx,
                          TransactionParticipant* txnParticipant,
                          const OperationSessionInfoFromClient& sessionOptions,
                          rpc::ReplyBuilderInterface* replyBuilder) {
+
+    if (!opCtx->getClient()->isInDirectClient()) {
+        txnParticipant->beginOrContinue(*sessionOptions.getTxnNumber(),
+                                        sessionOptions.getAutocommit(),
+                                        sessionOptions.getStartTransaction());
+        // Create coordinator if needed. If "startTransaction" is present, it must be true.
+        if (sessionOptions.getStartTransaction()) {
+            // If this shard has been selected as the coordinator, set up the coordinator state
+            // to be ready to receive votes.
+            if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
+                createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
+            }
+        }
+    }
+
     txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
         txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
@@ -417,7 +434,7 @@ bool runCommandImpl(OperationContext* opCtx,
         }
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
+        if (sessionOptions.getAutocommit()) {
             validateWriteConcernForTransaction(wcResult, invocation->definition()->getName());
         }
 
@@ -649,26 +666,26 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        if (!opCtx->getClient()->isInDirectClient() || !txnParticipant ||
-            !txnParticipant->inMultiDocumentTransaction()) {
-            const bool upconvertToSnapshot = txnParticipant &&
-                txnParticipant->inMultiDocumentTransaction() &&
-                sessionOptions.getStartTransaction();
+        // If the parent operation runs in snapshot isolation, we don't override the read concern.
+        auto skipReadConcern = opCtx->getClient()->isInDirectClient() &&
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern;
+        if (!skipReadConcern) {
+            // If "startTransaction" is present, it must be true due to the parsing above.
+            const bool upconvertToSnapshot(sessionOptions.getStartTransaction());
             auto newReadConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
             {
                 // We must obtain the client lock to set the ReadConcernArgs on the operation
                 // context as it may be concurrently read by CurrentOp.
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                readConcernArgs = newReadConcernArgs;
+                readConcernArgs = std::move(newReadConcernArgs);
             }
         }
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot is only valid in multi-statement transactions",
-                    txnParticipant && txnParticipant->inActiveOrKilledMultiDocumentTransaction());
+                    "readConcern level snapshot is only valid for the first transaction operation",
+                    opCtx->getClient()->isInDirectClient() || sessionOptions.getStartTransaction());
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());

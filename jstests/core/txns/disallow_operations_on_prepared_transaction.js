@@ -83,7 +83,6 @@
     assert.commandFailedWithCode(sessionDB.runCommand({
         findandmodify: collName,
         remove: true,
-        readConcern: {level: "snapshot"},
         txnNumber: NumberLong(session.getTxnNumber_forTesting()),
         stmtId: NumberInt(1),
         autocommit: false

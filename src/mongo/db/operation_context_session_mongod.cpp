@@ -32,7 +32,6 @@
 
 #include "mongo/db/operation_context_session_mongod.h"
 
-#include "mongo/db/transaction_coordinator_factory.h"
 #include "mongo/db/transaction_participant.h"
 
 namespace mongo {
@@ -44,20 +43,7 @@ OperationContextSessionMongod::OperationContextSessionMongod(
     : _operationContextSession(opCtx, shouldCheckOutSession) {
     if (shouldCheckOutSession && !opCtx->getClient()->isInDirectClient()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
-        const auto clientTxnNumber = *opCtx->getTxnNumber();
-
         txnParticipant->refreshFromStorageIfNeeded(opCtx);
-        txnParticipant->beginOrContinue(
-            clientTxnNumber, sessionInfo.getAutocommit(), sessionInfo.getStartTransaction());
-
-        // If "startTransaction" is present, it must be true.
-        if (sessionInfo.getStartTransaction()) {
-            // If this shard has been selected as the coordinator, set up the coordinator state
-            // to be ready to receive votes.
-            if (sessionInfo.getCoordinator() == boost::optional<bool>(true)) {
-                createTransactionCoordinator(opCtx, clientTxnNumber);
-            }
-        }
     }
 }
 

@@ -252,6 +252,8 @@ public:
             // up the session state and perform the insert.
             initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
             OperationContextSessionMongod sessionTxnState(innerOpCtx.get(), true, {});
+            auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());
+            txnParticipant->beginOrContinue(*sessionInfo.getTxnNumber(), boost::none, boost::none);
 
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);

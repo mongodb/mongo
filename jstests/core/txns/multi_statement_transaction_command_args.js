@@ -145,7 +145,7 @@
         txnNumber: NumberLong(txnNumber),
         autocommit: false
     }),
-                                 ErrorCodes.NoSuchTransaction);
+                                 [ErrorCodes.InvalidOptions, ErrorCodes.NoSuchTransaction]);
 
     jsTestLog("Try to begin a transaction with startTransaction=false and autocommit=false");
     txnNumber++;

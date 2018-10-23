@@ -51,7 +51,7 @@
         autocommit: false,
         startTransaction: true
     }),
-                                 ErrorCodes.ConflictingOperationInProgress);
+                                 ErrorCodes.OperationNotSupportedInTransaction);
 
     // Call commit on committed transaction without shell helper.
     jsTestLog("Test that calling commit with invalid fields on a committed transaction fails.");

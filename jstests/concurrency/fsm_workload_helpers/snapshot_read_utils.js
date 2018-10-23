@@ -19,6 +19,13 @@ function parseCursor(cmdResult) {
  */
 function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
     // Reset txnNumber and stmtId for this transaction.
+    const abortErrorCodes = [
+        ErrorCodes.NoSuchTransaction,
+        ErrorCodes.TransactionCommitted,
+        ErrorCodes.TransactionTooOld,
+        ErrorCodes.Interrupted
+    ];
+    abortTransaction(data.sessionDb, data.txnNumber, abortErrorCodes);
     data.txnNumber++;
     data.stmtId = 0;
 

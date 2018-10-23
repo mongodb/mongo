@@ -341,6 +341,10 @@ public:
         return boost::none;
     }
 
+    Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override {
+        return {};
+    }
+
     // Testing functions.
     CreateCollectionForBulkFn createCollectionForBulkFn =
         [](const NamespaceString& nss,

@@ -162,6 +162,7 @@ void DoTxnTest::setUp() {
     _ocs.emplace(_opCtx.get(), true /* checkOutSession */, sessionInfo);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
     txnParticipant->unstashTransactionResources(opCtx(), "doTxn");
 }
 

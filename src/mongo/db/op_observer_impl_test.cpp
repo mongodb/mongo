@@ -102,13 +102,6 @@ private:
     }
 };
 
-OperationSessionInfoFromClient makeSessionInfo() {
-    OperationSessionInfoFromClient sessionInfo;
-    sessionInfo.setAutocommit(false);
-    sessionInfo.setStartTransaction(true);
-    return sessionInfo;
-}
-
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
@@ -307,7 +300,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */
-class OpObserverSessionCatalogTest : public OpObserverTest {
+class OpObserverSessionCatalogRollbackTest : public OpObserverTest {
 public:
     void setUp() override {
         OpObserverTest::setUp();
@@ -344,8 +337,6 @@ public:
         }
     }
 };
-
-using OpObserverSessionCatalogRollbackTest = OpObserverSessionCatalogTest;
 
 TEST_F(OpObserverSessionCatalogRollbackTest,
        OnRollbackInvalidatesSessionCatalogIfSessionOpsRolledBack) {
@@ -447,60 +438,6 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     }
 }
 
-/**
- * Test fixture with sessions and an extra-large oplog for testing large transactions.
- */
-class OpObserverLargeTransactionTest : public OpObserverSessionCatalogTest {
-private:
-    repl::ReplSettings createReplSettings() override {
-        repl::ReplSettings settings;
-        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the BSON
-        // size limit.  Otherwise we will get the wrong error code when trying to write one.
-        settings.setOplogSizeBytes(BSONObjMaxInternalSize + 2 * 1024 * 1024);
-        settings.setReplSetString("mySet/node1:12345");
-        return settings;
-    }
-};
-
-// Tests that a transaction aborts if it becomes too large only during the commit.
-TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
-    const NamespaceString nss("testDB", "testColl");
-
-    // Create a session.
-    auto sessionCatalog = SessionCatalog::get(getServiceContext());
-    auto sessionId = makeLogicalSessionIdForTest();
-    auto session = sessionCatalog->getOrCreateSession(opCtx.get(), sessionId);
-    auto uuid = CollectionUUID::gen();
-
-    // Simulate adding transaction data to a session.
-    const TxnNumber txnNum = 0;
-    opCtx->setLogicalSessionId(sessionId);
-    opCtx->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx.get(), true, makeSessionInfo());
-    auto txnParticipant = TransactionParticipant::get(opCtx.get());
-    txnParticipant->unstashTransactionResources(opCtx.get(), "insert");
-
-    // This size is crafted such that two operations of this size are not too big to fit in a single
-    // oplog entry, but two operations plus oplog overhead are too big to fit in a single oplog
-    // entry.
-    constexpr size_t kHalfTransactionSize = BSONObjMaxInternalSize / 2 - 175;
-    std::unique_ptr<uint8_t[]> halfTransactionData(new uint8_t[kHalfTransactionSize]());
-    auto operation = repl::OplogEntry::makeInsertOperation(
-        nss,
-        uuid,
-        BSON(
-            "_id" << 0 << "data"
-                  << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
-    txnParticipant->addTransactionOperation(opCtx.get(), operation);
-    txnParticipant->addTransactionOperation(opCtx.get(), operation);
-    ASSERT_THROWS_CODE(opObserver.onTransactionCommit(opCtx.get(), boost::none, boost::none),
-                       AssertionException,
-                       ErrorCodes::TransactionTooLarge);
-}
-
 TEST_F(OpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolledBack) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
@@ -585,29 +522,41 @@ DEATH_TEST_F(OpObserverTest,
 /**
  * Test fixture for testing OpObserver behavior specific to multi-document transactions.
  */
-class OpObserverTransactionTest : public OpObserverSessionCatalogTest {
+
+class OpObserverTransactionTest : public OpObserverTest {
 public:
     void setUp() override {
-        OpObserverSessionCatalogTest::setUp();
+        OpObserverTest::setUp();
+        _opCtx = cc().makeOperationContext();
+        _opObserver.emplace();
+
+        MongoDSessionCatalog::onStepUp(opCtx());
 
         // Create a session.
-        _opCtx = cc().makeOperationContext();
         auto sessionCatalog = SessionCatalog::get(getServiceContext());
         auto sessionId = makeLogicalSessionIdForTest();
         _session = sessionCatalog->getOrCreateSession(opCtx(), sessionId);
 
-        const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session());
-        txnParticipant->refreshFromStorageIfNeeded(opCtx());
-
-        opCtx()->setLogicalSessionId(sessionId);
-        _opObserver.emplace();
         _times.emplace(opCtx());
+        opCtx()->setLogicalSessionId(session()->getSessionId());
+        opCtx()->setTxnNumber(txnNum());
+        OperationSessionInfoFromClient sessionInfo;
+        sessionInfo.setAutocommit(false);
+        sessionInfo.setStartTransaction(true);
+        _sessionCheckout =
+            std::make_unique<OperationContextSessionMongod>(opCtx(), true, sessionInfo);
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
     }
 
     void tearDown() override {
+        _sessionCheckout.reset();
         _times.reset();
         _opCtx.reset();
-        OpObserverSessionCatalogTest::tearDown();
+        auto sessionCatalog = SessionCatalog::get(getServiceContext());
+        sessionCatalog->reset_forTest();
+
+        OpObserverTest::tearDown();
     }
 
 
@@ -618,18 +567,6 @@ protected:
         ASSERT_BSONOBJ_EQ(session()->getSessionId().toBSON(), oplogEntry.getObjectField("lsid"));
         ASSERT_EQ(*opCtx()->getTxnNumber(), oplogEntry.getField("txnNumber").safeNumberLong());
         ASSERT_EQ(expectedStmtId, oplogEntry.getIntField("stmtId"));
-    }
-
-    OperationContext* opCtx() {
-        return _opCtx.get();
-    }
-
-    Session* session() {
-        return _session->get();
-    }
-
-    OpObserverImpl& opObserver() {
-        return *_opObserver;
     }
 
     void assertTxnRecord(TxnNumber txnNum,
@@ -668,27 +605,82 @@ protected:
         ASSERT(!cursor->more());
     }
 
+    Session* session() {
+        return _session->get();
+    }
+
+    OpObserverImpl& opObserver() {
+        return *_opObserver;
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    TxnNumber& txnNum() {
+        return _txnNum;
+    }
+
 private:
     class ExposeOpObserverTimes : public OpObserver {
     public:
         typedef OpObserver::ReservedTimes ReservedTimes;
     };
 
-    ServiceContext::UniqueOperationContext _opCtx;
     boost::optional<OpObserverImpl> _opObserver;
-    boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
     boost::optional<ScopedSession> _session;
+    ServiceContext::UniqueOperationContext _opCtx;
+    boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
+    std::unique_ptr<OperationContextSessionMongod> _sessionCheckout;
+    TxnNumber _txnNum = 0;
 };
+
+/**
+ * Test fixture with sessions and an extra-large oplog for testing large transactions.
+ */
+class OpObserverLargeTransactionTest : public OpObserverTransactionTest {
+private:
+    repl::ReplSettings createReplSettings() override {
+        repl::ReplSettings settings;
+        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the BSON
+        // size limit.  Otherwise we will get the wrong error code when trying to write one.
+        settings.setOplogSizeBytes(BSONObjMaxInternalSize + 2 * 1024 * 1024);
+        settings.setReplSetString("mySet/node1:12345");
+        return settings;
+    }
+};
+
+// Tests that a transaction aborts if it becomes too large only during the commit.
+TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
+    const NamespaceString nss("testDB", "testColl");
+    auto uuid = CollectionUUID::gen();
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+
+    // This size is crafted such that two operations of this size are not too big to fit in a single
+    // oplog entry, but two operations plus oplog overhead are too big to fit in a single oplog
+    // entry.
+    constexpr size_t kHalfTransactionSize = BSONObjMaxInternalSize / 2 - 175;
+    std::unique_ptr<uint8_t[]> halfTransactionData(new uint8_t[kHalfTransactionSize]());
+    auto operation = repl::OplogEntry::makeInsertOperation(
+        nss,
+        uuid,
+        BSON(
+            "_id" << 0 << "data"
+                  << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+    ASSERT_THROWS_CODE(opObserver().onTransactionCommit(opCtx(), boost::none, boost::none),
+                       AssertionException,
+                       ErrorCodes::TransactionTooLarge);
+}
 
 TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
     auto uuid1 = CollectionUUID::gen();
     auto uuid2 = CollectionUUID::gen();
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -784,10 +776,6 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     const auto doc = BSON("_id" << 0 << "data"
                                 << "x");
 
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -854,10 +842,6 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     const auto doc = BSON("_id" << 0 << "data"
                                 << "x");
 
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -919,10 +903,6 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
 TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
     const NamespaceString nss("testDB", "testColl");
     const auto uuid = CollectionUUID::gen();
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -947,10 +927,6 @@ TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
 }
 
 TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->transitionToPreparedforTest();
@@ -974,10 +950,6 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
 }
 
 TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) {
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->transitionToPreparedforTest();
@@ -993,15 +965,11 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
     txnParticipant->stashTransactionResources(opCtx());
-    assertTxnRecord(txnNum, prepareOpTime, DurableTxnStateEnum::kPrepared);
+    assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
 }
 
 TEST_F(OpObserverTransactionTest, AbortingUnpreparedTransactionDoesNotWriteToTransactionTable) {
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1015,10 +983,6 @@ TEST_F(OpObserverTransactionTest, AbortingUnpreparedTransactionDoesNotWriteToTra
 }
 
 TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransactionTable) {
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1043,16 +1007,12 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
     // Abort the storage-transaction without calling the OpObserver.
     txnParticipant->shutdown();
 
-    assertTxnRecord(txnNum, {}, DurableTxnStateEnum::kAborted);
+    assertTxnRecord(txnNum(), {}, DurableTxnStateEnum::kAborted);
 }
 
 TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesToTransactionTable) {
     const NamespaceString nss("testDB", "testColl");
     const auto uuid = CollectionUUID::gen();
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1069,15 +1029,11 @@ TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesT
     opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
     opCtx()->getWriteUnitOfWork()->commit();
 
-    assertTxnRecord(txnNum, {}, DurableTxnStateEnum::kCommitted);
+    assertTxnRecord(txnNum(), {}, DurableTxnStateEnum::kCommitted);
 }
 
 TEST_F(OpObserverTransactionTest,
        CommittingUnpreparedEmptyTransactionDoesNotWriteToTransactionTable) {
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1092,10 +1048,6 @@ TEST_F(OpObserverTransactionTest,
 }
 
 TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransactionTable) {
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1118,7 +1070,7 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     opCtx()->lockState()->unsetMaxLockTimeout();
     opObserver().onTransactionCommit(opCtx(), commitSlot, prepareOpTime.getTimestamp());
 
-    assertTxnRecord(txnNum, commitOpTime, DurableTxnStateEnum::kCommitted);
+    assertTxnRecord(txnNum(), commitOpTime, DurableTxnStateEnum::kCommitted);
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
@@ -1126,10 +1078,6 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     const NamespaceString nss2("testDB2", "testColl2");
     auto uuid1 = CollectionUUID::gen();
     auto uuid2 = CollectionUUID::gen();
-    const TxnNumber txnNum = 2;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
 
@@ -1203,10 +1151,6 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     const NamespaceString nss2("testDB2", "testColl2");
     auto uuid1 = CollectionUUID::gen();
     auto uuid2 = CollectionUUID::gen();
-    const TxnNumber txnNum = 3;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod opSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "update");
 
@@ -1269,10 +1213,6 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     const NamespaceString nss2("testDB2", "testColl2");
     auto uuid1 = CollectionUUID::gen();
     auto uuid2 = CollectionUUID::gen();
-    const TxnNumber txnNum = 3;
-    opCtx()->setTxnNumber(txnNum);
-
-    OperationContextSessionMongod sessionTxnState(opCtx(), true, makeSessionInfo());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "delete");

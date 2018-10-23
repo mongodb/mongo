@@ -440,6 +440,11 @@ public:
      */
     virtual boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
         ServiceContext* serviceCtx) const = 0;
+
+    /**
+     * Returns the read timestamp of the recovery unit of the given operation context.
+     */
+    virtual Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const = 0;
 };
 
 }  // namespace repl
