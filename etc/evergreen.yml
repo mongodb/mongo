@@ -11031,8 +11031,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto -fapplication-extension"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
@@ -11098,8 +11098,8 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension"
+        -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto -fapplication-extension"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
