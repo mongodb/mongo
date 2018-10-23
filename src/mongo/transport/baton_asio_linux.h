@@ -201,6 +201,10 @@ public:
         }
     }
 
+    void notify() noexcept override {
+        _efd.notify();
+    }
+
     bool run(OperationContext* opCtx, boost::optional<Date_t> deadline) override {
         std::vector<SharedPromise<void>> toFulfill;
 

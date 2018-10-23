@@ -35,6 +35,7 @@
 #include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
@@ -136,6 +137,23 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
 
         assertOK(future.get());
     }
+}
+
+TEST(TransportLayerASIO, KillOpWithBatonDoesntCrash) {
+    auto sc = getGlobalServiceContext();
+    auto client = sc->makeClient(__FILE__);
+    auto opCtx = client->makeOperationContext();
+
+    auto baton = sc->getTransportLayer()->makeBaton(opCtx.get());
+    if (!baton)
+        return;  // This is a test of baton functionality.
+
+    {
+        stdx::lock_guard<Client> lk(*client);
+        opCtx->markKilled();
+    }
+
+    baton->detach();  // Used to go boom. No longer does.
 }
 
 TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {

@@ -366,7 +366,7 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
 
     // If we have a baton, we need to wake it up.  The baton itself will check for interruption
     if (_baton) {
-        _baton->schedule([] {});
+        _baton->notify();
     }
 }
 

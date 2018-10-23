@@ -87,6 +87,14 @@ public:
     virtual void schedule(stdx::function<void()> func) = 0;
 
     /**
+     * Wakes the Baton up if it is currently blocked, or ensures that the next time it tries to
+     * block it is woken immediately.
+     *
+     * Does not actually schedule any work.
+     */
+    virtual void notify() noexcept = 0;
+
+    /**
      * Adds a session, returning a future which activates on read/write-ability of the session.
      */
     enum class Type {
