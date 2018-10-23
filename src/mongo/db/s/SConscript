@@ -32,6 +32,18 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='sharding_task_executor_test',
+    source=[
+        'sharding_task_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'sharding_task_executor',
+    ],
+)
+
 env.Library(
     target='migration_types',
     source=[
