@@ -109,7 +109,7 @@ void OpCounters::gotOp(int op, bool isCommand) {
 }
 
 void OpCounters::_checkWrap() {
-    const unsigned MAX = 1 << 30;
+    const int64_t MAX = 1ULL << 60;
 
     bool wrap = _insert.loadRelaxed() > MAX || _query.loadRelaxed() > MAX ||
         _update.loadRelaxed() > MAX || _delete.loadRelaxed() > MAX ||

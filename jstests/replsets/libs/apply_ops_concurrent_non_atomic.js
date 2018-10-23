@@ -193,7 +193,8 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
         // holding the global lock, the insert opcounter will eventually be incremented to 2.
         try {
             let insertOpCount = 0;
-            const expectedFinalOpCount = 2;
+            // Expecting two HMAC inserts and two applyOps in-progress.
+            const expectedFinalOpCount = 4;
             assert.soon(
                 function() {
                     const serverStatus = adminDb.serverStatus();
@@ -206,7 +207,7 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
                                'Expected at most ' + expectedFinalOpCount +
                                    ' documents inserted with fail point enabled. ' +
                                    'Most recent insert operation count = ' + insertOpCount);
-                    return insertOpCount === expectedFinalOpCount;
+                    return insertOpCount == expectedFinalOpCount;
                 },
                 'Insert operation count did not reach ' + expectedFinalOpCount +
                     ' as expected with fail point enabled. Most recent insert operation count = ' +

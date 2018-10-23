@@ -61,34 +61,34 @@ public:
     BSONObj getObj() const;
 
     // thse are used by snmp, and other things, do not remove
-    const AtomicUInt32* getInsert() const {
+    const AtomicInt64* getInsert() const {
         return &_insert;
     }
-    const AtomicUInt32* getQuery() const {
+    const AtomicInt64* getQuery() const {
         return &_query;
     }
-    const AtomicUInt32* getUpdate() const {
+    const AtomicInt64* getUpdate() const {
         return &_update;
     }
-    const AtomicUInt32* getDelete() const {
+    const AtomicInt64* getDelete() const {
         return &_delete;
     }
-    const AtomicUInt32* getGetMore() const {
+    const AtomicInt64* getGetMore() const {
         return &_getmore;
     }
-    const AtomicUInt32* getCommand() const {
+    const AtomicInt64* getCommand() const {
         return &_command;
     }
 
 private:
     void _checkWrap();
 
-    CacheAligned<AtomicUInt32> _insert;
-    CacheAligned<AtomicUInt32> _query;
-    CacheAligned<AtomicUInt32> _update;
-    CacheAligned<AtomicUInt32> _delete;
-    CacheAligned<AtomicUInt32> _getmore;
-    CacheAligned<AtomicUInt32> _command;
+    CacheAligned<AtomicInt64> _insert;
+    CacheAligned<AtomicInt64> _query;
+    CacheAligned<AtomicInt64> _update;
+    CacheAligned<AtomicInt64> _delete;
+    CacheAligned<AtomicInt64> _getmore;
+    CacheAligned<AtomicInt64> _command;
 };
 
 extern OpCounters globalOpCounters;
