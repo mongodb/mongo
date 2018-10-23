@@ -21,9 +21,7 @@ tasks:
         cd mms/scripts
         ./init_virtualenv.sh ${workdir} 'no-om'
         VIRTUAL_ENV_DISABLE_PROMPT=true source venv-activate
-        cd evergreen
-        sleep ${compile_wait_duration_seconds}
-        ./mongo_cloud_nightly/generate_cloud_nightly.py > ${workdir}/cloud_nightly.json
+        generate_cloud_nightly > "${workdir}/cloud_nightly.json"
   - command: s3.put
     params:
       aws_key: ${aws_key}
@@ -34,6 +32,12 @@ tasks:
       content_type: application/json
       display_name: "Generated tasks (cloud_nightly.json)"
       permissions: private
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -ex
+        sleep ${compile_wait_duration_seconds}
   - command: generate.tasks
     params:
       files:
