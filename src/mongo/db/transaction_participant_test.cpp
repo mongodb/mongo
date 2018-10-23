@@ -2046,6 +2046,42 @@ TEST_F(TransactionsMetricsTest,
               beforeInactivePreparedCounter);
 }
 
+TEST_F(TransactionsMetricsTest, TransactionErrorsBeforeUnstash) {
+    unsigned long long beforeActiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentActive();
+    unsigned long long beforeInactiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
+    unsigned long long beforeAbortedCounter =
+        ServerTransactionsMetrics::get(opCtx())->getTotalAborted();
+
+    // The first transaction statement checks out the session and begins the transaction but returns
+    // before unstashTransactionResources().
+    auto sessionCheckout = checkOutSession();
+
+    // The transaction is now inactive.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortedCounter);
+
+    // The second transaction statement continues the transaction. Since there are no stashed
+    // transaction resources, it is not safe to continue the transaction, so the transaction is
+    // aborted.
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    const bool autocommit = false;
+    const boost::optional<bool> startTransaction = boost::none;
+    ASSERT_THROWS_CODE(
+        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
+        AssertionException,
+        ErrorCodes::NoSuchTransaction);
+
+    // The transaction is now aborted.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(),
+              beforeAbortedCounter + 1U);
+}
+
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCommit) {
     auto tickSource = initMockTickSource();
 

@@ -323,7 +323,12 @@ void TransactionParticipant::_continueMultiDocumentTransaction(WithLock wl, TxnN
     if (_txnState.isInProgress(wl) && !_txnResourceStash) {
         // This indicates that the first command in the transaction failed but did not implicitly
         // abort the transaction. It is not safe to continue the transaction, in particular because
-        // we have not saved the readConcern from the first statement of the transaction.
+        // we have not saved the readConcern from the first statement of the transaction. Mark the
+        // transaction as active here, since _abortTransactionOnSession() will assume we are
+        // aborting an active transaction since there are no stashed resources.
+        _transactionMetricsObserver.onUnstash(
+            ServerTransactionsMetrics::get(getGlobalServiceContext()),
+            getGlobalServiceContext()->getTickSource());
         _abortTransactionOnSession(wl);
 
         uasserted(ErrorCodes::NoSuchTransaction,
@@ -709,10 +714,6 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
 
         // On secondaries, max lock timeout must not be set.
         invariant(opCtx->writesAreReplicated() || !opCtx->lockState()->hasMaxLockTimeout());
-
-        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
-        _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
-                                              opCtx->getServiceContext()->getTickSource());
     }
 
     // Storage engine transactions may be started in a lazy manner. By explicitly
@@ -731,6 +732,13 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
     if (MONGO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangAfterPreallocateSnapshot, opCtx, "hangAfterPreallocateSnapshot");
+    }
+
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
+                                              opCtx->getServiceContext()->getTickSource());
     }
 }
 
