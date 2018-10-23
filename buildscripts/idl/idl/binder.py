@@ -819,6 +819,67 @@ def _bind_enum(ctxt, idl_enum):
     return ast_enum
 
 
+def _bind_server_parameter(ctxt, param):
+    # type: (errors.ParserContext, syntax.ServerParameter) -> ast.ServerParameter
+    # pylint: disable=too-many-branches
+    """Bind a serverParameter setting."""
+    ast_param = ast.ServerParameter(param.file_name, param.line, param.column)
+    ast_param.name = param.name
+    ast_param.description = param.description
+    ast_param.cpp_vartype = param.cpp_vartype
+    ast_param.cpp_varname = param.cpp_varname
+    ast_param.deprecated_name = param.deprecated_name
+
+    custom_required_fields = ["from_string", "from_bson", "append_bson"]
+    standard_optional_fields = ["default", "on_update", "validator"]
+
+    if param.cpp_varname is None:
+        # Custom SCP, requires callbacks.
+        for req in custom_required_fields:
+            if getattr(param, req) is None:
+                ctxt.add_missing_server_parameter_method(param, req)
+            setattr(ast_param, req, getattr(param, req))
+
+        for conflict in standard_optional_fields:
+            if getattr(param, conflict) is not None:
+                ctxt.add_server_parameter_attr_without_storage(param, conflict)
+    else:
+        # Standard SCP, allows optional fields.
+        for conflict in custom_required_fields:
+            if getattr(param, conflict) is not None:
+                ctxt.add_server_parameter_attr_with_storage(param, conflict)
+
+        ast_param.default = param.default
+        ast_param.on_update = param.on_update
+
+    set_at = 0
+    for psa in param.set_at:
+        if psa.lower() == 'startup':
+            set_at |= 1
+        elif psa.lower() == 'runtime':
+            set_at |= 2
+        else:
+            ctxt.add_bad_setat_specifier(param, psa)
+            return None
+
+    if set_at == 1:
+        ast_param.set_at = "ServerParameterType::kStartupOnly"
+    elif set_at == 2:
+        ast_param.set_at = "ServerParameterType::kRuntimeOnly"
+    elif set_at == 3:
+        ast_param.set_at = "ServerParameterType::kStartupAndRuntime"
+    else:
+        # Can't happen based on above logic.
+        ctxt.add_bad_setat_specifier(param, ','.join(param.set_at))
+
+    if param.validator is not None:
+        ast_param.validator = _bind_validator(ctxt, param.validator)
+        if ast_param.validator is None:
+            return None
+
+    return ast_param
+
+
 def bind(parsed_spec):
     # type: (syntax.IDLSpec) -> ast.IDLBoundSpec
     """Read an idl.syntax, create an idl.ast tree, and validate the final IDL Specification."""
@@ -843,6 +904,9 @@ def bind(parsed_spec):
     for struct in parsed_spec.symbols.structs:
         if not struct.imported:
             bound_spec.structs.append(_bind_struct(ctxt, parsed_spec, struct))
+
+    for server_parameter in parsed_spec.server_parameters:
+        bound_spec.server_parameters.append(_bind_server_parameter(ctxt, server_parameter))
 
     if ctxt.errors.has_errors():
         return ast.IDLBoundSpec(None, ctxt.errors)

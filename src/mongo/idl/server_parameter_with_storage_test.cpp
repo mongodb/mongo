@@ -30,9 +30,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/idl/server_parameter_with_storage.h"
+#include "mongo/idl/server_parameter_with_storage_test_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+AtomicInt32 test::gStdIntPreallocated;
+AtomicInt32 test::gStdIntPreallocatedUpdateCount;
+
 namespace {
 
 using SPT = ServerParameterType;
@@ -171,6 +175,61 @@ TEST(ServerParameterWithStorage, BoundsTest) {
     status = param.setValue(25);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.reason(), "Invalid value for parameter BoundsTest: 25 is not less than 20");
+}
+
+ServerParameter* getServerParameter(const std::string& name) {
+    const auto& spMap = ServerParameterSet::getGlobal()->getMap();
+    const auto& spIt = spMap.find(name);
+    ASSERT(spIt != spMap.end());
+
+    auto* sp = spIt->second;
+    ASSERT(sp);
+    return sp;
+}
+
+TEST(IDLServerParameterWithStorage, stdIntDeclared) {
+    // 42 is set by "default" attribute in the IDL file.
+    ASSERT_EQ(test::gStdIntDeclared.load(), 42);
+
+    auto* stdIntDeclared = getServerParameter("stdIntDeclared");
+    ASSERT_OK(stdIntDeclared->setFromString("999"));
+    ASSERT_EQ(test::gStdIntDeclared.load(), 999);
+    ASSERT_NOT_OK(stdIntDeclared->setFromString("1000"));
+    ASSERT_NOT_OK(stdIntDeclared->setFromString("-1"));
+    ASSERT_NOT_OK(stdIntDeclared->setFromString("alpha"));
+}
+
+TEST(IDLServerParameterWithStorage, stdIntPreallocated) {
+    // 11 is set by "default" attribute in the IDL file.
+    ASSERT_EQ(test::gStdIntPreallocated.load(), 11);
+    // The Default set counts as an update.
+    ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 1);
+
+    auto* stdIntPreallocated = getServerParameter("stdIntPreallocated");
+    ASSERT_OK(stdIntPreallocated->setFromString("41"));
+    ASSERT_EQ(test::gStdIntPreallocated.load(), 41);
+    ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 2);
+
+    ASSERT_NOT_OK(stdIntPreallocated->setFromString("42"));
+    ASSERT_NOT_OK(stdIntPreallocated->setFromString("-1"));
+    ASSERT_NOT_OK(stdIntPreallocated->setFromString("alpha"));
+    ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 2);
+}
+
+TEST(IDLServerParameterWithStorage, startupString) {
+    auto* sp = getServerParameter("startupString");
+    ASSERT_EQ(sp->allowedToChangeAtStartup(), true);
+    ASSERT_EQ(sp->allowedToChangeAtRuntime(), false);
+    ASSERT_OK(sp->setFromString("New Value"));
+    ASSERT_EQ(test::gStartupString, "New Value");
+}
+
+TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
+    auto* sp = getServerParameter("runtimeBoostDouble");
+    ASSERT_EQ(sp->allowedToChangeAtStartup(), false);
+    ASSERT_EQ(sp->allowedToChangeAtRuntime(), true);
+    ASSERT_OK(sp->setFromString("1.0"));
+    ASSERT_EQ(test::gRuntimeBoostDouble.get(), 1.0);
 }
 
 }  // namespace

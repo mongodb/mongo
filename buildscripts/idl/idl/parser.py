@@ -488,6 +488,33 @@ def _parse_command(ctxt, spec, name, node):
     spec.symbols.add_command(ctxt, command)
 
 
+def _parse_server_parameter(ctxt, spec, name, node):
+    # type: (errors.ParserContext, syntax.IDLSpec, unicode, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
+    """Parse a server_parameters section in the IDL file."""
+    if not ctxt.is_mapping_node(node, "server_parameters"):
+        return
+
+    param = syntax.ServerParameter(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+    param.name = name
+
+    _generic_parser(
+        ctxt, node, "server_parameters", param, {
+            "set_at": _RuleDesc('scalar_or_sequence', _RuleDesc.REQUIRED),
+            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "cpp_vartype": _RuleDesc('scalar'),
+            "cpp_varname": _RuleDesc('scalar'),
+            "default": _RuleDesc('scalar'),
+            "deprecated_name": _RuleDesc('scalar_or_sequence'),
+            "from_bson": _RuleDesc('scalar'),
+            "append_bson": _RuleDesc('scalar'),
+            "from_string": _RuleDesc('scalar'),
+            "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),
+            "on_update": _RuleDesc("scalar"),
+        })
+
+    spec.server_parameters.append(param)
+
+
 def _prefix_with_namespace(cpp_namespace, cpp_name):
     # type: (unicode, unicode) -> unicode
     """Preface a C++ type name with a namespace if not already qualified or a primitive type."""
@@ -566,6 +593,8 @@ def _parse(stream, error_file_name):
             _parse_mapping(ctxt, spec, second_node, 'structs', _parse_struct)
         elif first_name == "commands":
             _parse_mapping(ctxt, spec, second_node, 'commands', _parse_command)
+        elif first_name == "server_parameters":
+            _parse_mapping(ctxt, spec, second_node, "server_parameters", _parse_server_parameter)
         else:
             ctxt.add_unknown_root_node_error(first_node)
 

@@ -33,6 +33,27 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace test {
+
+namespace {
+std::string gCustomSetting;
+}  // namespace
+
+void customSettingAppendBSON(OperationContext*, BSONObjBuilder* builder, StringData name) {
+    builder->append(name, gCustomSetting);
+}
+
+Status customSettingFromBSON(const BSONElement& element) {
+    gCustomSetting = element.String();
+    return Status::OK();
+}
+
+Status customSettingFromString(StringData str) {
+    gCustomSetting = str.toString();
+    return Status::OK();
+}
+}  // namespace test
+
 namespace {
 
 TEST(ServerParameter, setAppendBSON) {
@@ -83,6 +104,26 @@ TEST(ServerParameter, deprecatedAlias) {
 
     ASSERT_OK(alias.setFromString("bravo"));
     ASSERT_EQ("bravo", value);
+}
+
+ServerParameter* getServerParameter(const std::string& name) {
+    const auto& spMap = ServerParameterSet::getGlobal()->getMap();
+    const auto& spIt = spMap.find(name);
+    ASSERT(spIt != spMap.end());
+
+    auto* sp = spIt->second;
+    ASSERT(sp);
+    return sp;
+}
+
+TEST(IDLServerParameter, customSettingTest) {
+    auto* cst = getServerParameter("customSettingTest");
+    ASSERT_OK(cst->setFromString("New Value"));
+    ASSERT_EQ(test::gCustomSetting, "New Value");
+
+    auto* depr = getServerParameter("customSettingTestDeprecated");
+    ASSERT_OK(depr->setFromString("Value via depr name"));
+    ASSERT_EQ(test::gCustomSetting, "Value via depr name");
 }
 
 }  // namespace

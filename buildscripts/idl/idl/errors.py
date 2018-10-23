@@ -99,6 +99,10 @@ ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT = "ID0050"
 ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER = "ID0051"
 ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS = "ID0052"
 ERROR_ID_VALUE_NOT_NUMERIC = "ID0053"
+ERROR_ID_SERVER_PARAM_MISSING_METHOD = "ID0054"
+ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE = "ID0055"
+ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE = "ID0056"
+ERROR_ID_BAD_SETAT_SPECIFIER = "ID0057"
 
 
 class IDLError(Exception):
@@ -390,6 +394,14 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE,
                         ("The bindata_subtype field's value '%s' for %s '%s' is not valid") %
                         (value, ast_type, ast_parent))
+
+    def add_bad_setat_specifier(self, location, specifier):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about a bad set_at specifier."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_BAD_SETAT_SPECIFIER,
+                        ("Unexpected set_at specifier: '%s', expected 'startup' or 'runtime'") %
+                        (specifier))
 
     def add_no_string_data_error(self, location, ast_type, ast_parent):
         # type: (common.SourceLocation, unicode, unicode) -> None
@@ -686,6 +698,30 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_VALUE_NOT_NUMERIC,
                         ("'%s' requires a numeric value, but %s can not be cast") % (attrname,
                                                                                      value))
+
+    def add_missing_server_parameter_method(self, location, attrname):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about missing server_parameter method."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_SERVER_PARAM_MISSING_METHOD,
+                        ("'%s' required in server parameter definition without storage") %
+                        (attrname))
+
+    def add_server_parameter_attr_without_storage(self, location, attrname):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about unexpected attribute on server_parameter without storage."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE,
+                        ("'%s' conflicts with server parameter definition without storage") %
+                        (attrname))
+
+    def add_server_parameter_attr_with_storage(self, location, attrname):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about unexpected attribute on server_paramter with storage."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE,
+                        ("'%s' conflicts with server parameter definition with storage") %
+                        (attrname))
 
 
 def _assert_unique_error_messages():

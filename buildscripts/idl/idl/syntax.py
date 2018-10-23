@@ -67,6 +67,7 @@ class IDLSpec(object):
         self.symbols = SymbolTable()  # type: SymbolTable
         self.globals = None  # type: Optional[Global]
         self.imports = None  # type: Optional[Import]
+        self.server_parameters = []  # type: List[ServerParameter]
 
 
 def parse_array_type(name):
@@ -102,7 +103,7 @@ class SymbolTable(object):
     """
     IDL Symbol Table.
 
-    - Contains all information to resolve commands, enums, structs, and types.
+    - Contains all information to resolve commands, enums, structs, types, and server parameters.
     - Checks for duplicate names across the union of (commands, enums, types, structs)
     """
 
@@ -454,3 +455,31 @@ class Enum(common.SourceLocation):
         self.cpp_namespace = None  # type: unicode
 
         super(Enum, self).__init__(file_name, line, column)
+
+
+class ServerParameter(common.SourceLocation):
+    """IDL ServerParameter information."""
+
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a ServerParameter."""
+        self.name = None  # type: unicode
+        self.set_at = None  # type: List[unicode]
+        self.description = None  # type: unicode
+        self.cpp_vartype = None  # type: unicode
+        self.cpp_varname = None  # type: unicode
+        self.deprecated_name = []  # type: List[unicode]
+
+        # Only valid if cppStorage is specified.
+        self.validator = None  # type: Validator
+        self.on_update = None  # type: unicode
+        self.default = None  # type: unicode
+
+        # Required if cppStorage is not specified.
+        self.from_bson = None  # type: unicode
+        self.append_bson = None  # type: unicode
+        self.from_string = None  # type: unicode
+
+        super(ServerParameter, self).__init__(file_name, line, column)
