@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <iostream>
-
 #include "mongo/db/storage/biggie/store.h"
 #include "mongo/unittest/unittest.h"
 
@@ -2205,6 +2203,83 @@ TEST_F(RadixStoreTest, MergeSevenTest) {
     ASSERT_TRUE(thisStore.size() == 2);
     ASSERT_TRUE(thisStore.dataSize() == 2);
 }
+
+TEST_F(RadixStoreTest, SizeTest) {
+    value_type value1 = std::make_pair("<index", ".");
+    value_type value2 = std::make_pair("<collection", "..");
+    value_type value3 = std::make_pair("<collection-1", "...");
+    value_type value4 = std::make_pair("<collection-2", "....");
+
+    thisStore.insert(value_type(value1));
+    ASSERT_TRUE(thisStore.size() == 1);
+    ASSERT_TRUE(thisStore.dataSize() == 1);
+
+    thisStore.insert(value_type(value2));
+    ASSERT_TRUE(thisStore.size() == 2);
+    ASSERT_TRUE(thisStore.dataSize() == 3);
+
+    thisStore.insert(value_type(value3));
+    ASSERT_TRUE(thisStore.size() == 3);
+    ASSERT_TRUE(thisStore.dataSize() == 6);
+
+    thisStore.insert(value_type(value4));
+    ASSERT_TRUE(thisStore.size() == 4);
+    ASSERT_TRUE(thisStore.dataSize() == 10);
+
+    thisStore.erase(value2.first);
+    ASSERT_TRUE(thisStore.size() == 3);
+    ASSERT_TRUE(thisStore.dataSize() == 8);
+
+    thisStore.erase(value4.first);
+    ASSERT_TRUE(thisStore.size() == 2);
+    ASSERT_TRUE(thisStore.dataSize() == 4);
+
+    thisStore.erase(value1.first);
+    ASSERT_TRUE(thisStore.size() == 1);
+    ASSERT_TRUE(thisStore.dataSize() == 3);
+
+    thisStore.erase(value3.first);
+    ASSERT_TRUE(thisStore.size() == 0);
+    ASSERT_TRUE(thisStore.dataSize() == 0);
+
+    thisStore.insert(value_type(value4));
+    ASSERT_TRUE(thisStore.size() == 1);
+    ASSERT_TRUE(thisStore.dataSize() == 4);
+
+    thisStore.insert(value_type(value3));
+    ASSERT_TRUE(thisStore.size() == 2);
+    ASSERT_TRUE(thisStore.dataSize() == 7);
+
+    thisStore.insert(value_type(value2));
+    ASSERT_TRUE(thisStore.size() == 3);
+    ASSERT_TRUE(thisStore.dataSize() == 9);
+
+    thisStore.insert(value_type(value1));
+    ASSERT_TRUE(thisStore.size() == 4);
+    ASSERT_TRUE(thisStore.dataSize() == 10);
+}
+
+TEST_F(RadixStoreTest, SubtreeSizeTest) {
+    value_type value1 = std::make_pair("<index", ".");
+    value_type value2 = std::make_pair("<collection-1", "..");
+    value_type value3 = std::make_pair("<collection-2", "...");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+    ASSERT_TRUE(thisStore.size() == 2);
+    ASSERT_TRUE(thisStore.dataSize() == 3);
+
+    ASSERT_TRUE(thisStore.subtreeSize("<collection-") == 1);
+    ASSERT_TRUE(thisStore.subtreeDataSize("<collection-") == 2);
+
+    thisStore.insert(value_type(value3));
+    ASSERT_TRUE(thisStore.size() == 3);
+    ASSERT_TRUE(thisStore.dataSize() == 6);
+
+    ASSERT_TRUE(thisStore.subtreeSize("<collection-") == 2);
+    ASSERT_TRUE(thisStore.subtreeDataSize("<collection-") == 5);
+}
+
 }  // namespace
 }  // mongo namespace
 }  // biggie namespace

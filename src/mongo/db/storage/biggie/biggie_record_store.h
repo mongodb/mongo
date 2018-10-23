@@ -33,7 +33,6 @@
 #pragma once
 
 #include <atomic>
-#include <boost/shared_array.hpp>
 #include <map>
 
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -57,6 +56,8 @@ class RecordStore : public ::mongo::RecordStore {
     std::string _prefix;
     std::string _postfix;
     CappedCallback* _cappedCallback;
+    mutable stdx::mutex _cappedCallbackMutex;  // Guards _cappedCallback
+    mutable stdx::mutex _cappedDeleterMutex;
 
 public:
     explicit RecordStore(StringData ns,
@@ -71,6 +72,7 @@ public:
     virtual long long dataSize(OperationContext* opCtx) const;
     virtual long long numRecords(OperationContext* opCtx) const;
     virtual bool isCapped() const;
+    virtual void setCappedCallback(CappedCallback*);
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const;
@@ -136,6 +138,10 @@ private:
     inline int64_t nextRecordId() {
         return _highest_record_id.fetchAndAdd(1);
     }
+
+    bool cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy);
+    void cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* workingCopy);
+
     class Cursor final : public SeekableRecordCursor {
         OperationContext* opCtx;
         StringData _ident;
@@ -145,6 +151,7 @@ private:
         boost::optional<std::string> _savedPosition;
         bool _needFirstSeek = true;
         bool _lastMoveWasRestore = false;
+        bool _isCapped;
 
     public:
         Cursor(OperationContext* opCtx, const RecordStore& rs);
@@ -168,6 +175,7 @@ private:
         boost::optional<std::string> _savedPosition;
         bool _needFirstSeek = true;
         bool _lastMoveWasRestore = false;
+        bool _isCapped;
 
     public:
         ReverseCursor(OperationContext* opCtx, const RecordStore& rs);

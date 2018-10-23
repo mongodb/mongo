@@ -65,9 +65,19 @@ std::unique_ptr<::mongo::RecordStore> KVEngine::getRecordStore(OperationContext*
                                                                StringData ns,
                                                                StringData ident,
                                                                const CollectionOptions& options) {
-    // TODO: deal with options.
+    std::unique_ptr<::mongo::RecordStore> recordStore;
+    if (options.capped) {
+        recordStore = stdx::make_unique<RecordStore>(
+            ns,
+            ident,
+            true,
+            options.cappedSize ? options.cappedSize : kDefaultCappedSizeBytes,
+            options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+    } else {
+        recordStore = stdx::make_unique<RecordStore>(ns, ident, false);
+    }
     _idents[ident.toString()] = true;
-    return std::make_unique<RecordStore>(ns, ident);
+    return recordStore;
 }
 
 std::shared_ptr<StringStore> KVEngine::getMaster() const {

@@ -86,7 +86,7 @@ public:
     }
 
     virtual bool supportsCappedCollections() const {
-        return false;  // TODO : do this later.
+        return true;
     }
 
     /**

@@ -1059,7 +1059,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
         if (options.cappedSize) {
             params.cappedMaxSize = options.cappedSize;
         } else {
-            params.cappedMaxSize = 4096;
+            params.cappedMaxSize = kDefaultCappedSizeBytes;
         }
     }
     params.cappedMaxDocs = -1;

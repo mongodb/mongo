@@ -70,7 +70,7 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
             ns,
             &_dataMap[ident],
             true,
-            options.cappedSize ? options.cappedSize : 4096,
+            options.cappedSize ? options.cappedSize : kDefaultCappedSizeBytes,
             options.cappedMaxDocs ? options.cappedMaxDocs : -1);
     } else {
         return stdx::make_unique<EphemeralForTestRecordStore>(ns, &_dataMap[ident]);

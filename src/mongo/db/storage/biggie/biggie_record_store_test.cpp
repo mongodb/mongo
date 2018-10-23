@@ -54,7 +54,12 @@ public:
     }
 
     virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        return std::make_unique<RecordStore>(ns, "ident"_sd, false, 0, 0, nullptr);
+        return std::make_unique<RecordStore>(ns,
+                                             "ident"_sd /* ident */,
+                                             false /* isCapped */,
+                                             -1 /* cappedMaxSize */,
+                                             -1 /* cappedMaxDocs */,
+                                             nullptr /* cappedCallback */);
     }
 
     virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,

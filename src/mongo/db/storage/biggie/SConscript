@@ -21,6 +21,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
     ],
 )
 
@@ -38,13 +39,14 @@ env.Library(
     ],
 )
 
+# Testing
 env.CppUnitTest(
     target='storage_biggie_store_test',
     source=[
         'store_test.cpp',
     ],
 )
-# Testing
+
 env.CppUnitTest(
     target='biggie_record_store_test',
     source=['biggie_record_store_test.cpp'

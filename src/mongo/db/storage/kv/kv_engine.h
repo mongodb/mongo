@@ -394,5 +394,11 @@ public:
      * cleanShutdown() hasn't been called.
      */
     virtual ~KVEngine() {}
+
+protected:
+    /**
+     * The default capped size (in bytes) for capped collections, unless overridden.
+     */
+    static const int64_t kDefaultCappedSizeBytes = 4096;
 };
 }

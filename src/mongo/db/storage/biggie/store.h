@@ -502,6 +502,20 @@ public:
         return _root->_sizeSubtreeElems;
     }
 
+    size_type subtreeSize(const Key& key) const {
+        Node* node = _findNode(key, /* allowNext */ true, /* allowEmpty */ true);
+        if (node)
+            return node->_numSubtreeElems;
+        return 0;
+    }
+
+    size_type subtreeDataSize(const Key& key) const {
+        Node* node = _findNode(key, /* allowNext */ true, /* allowEmpty */ true);
+        if (node)
+            return node->_sizeSubtreeElems;
+        return 0;
+    }
+
     // Modifiers
     void clear() noexcept {
         _root = std::make_shared<Node>();
@@ -511,8 +525,8 @@ public:
         Key key = value.first;
         mapped_type m = value.second;
 
-        Node* item = _findNode(key);
-        if (item != nullptr || key.size() == 0)
+        Node* node = _findNode(key, /* allowNext */ false, /* allowEmpty */ false);
+        if (node != nullptr || key.size() == 0)
             return std::make_pair(end(), false);
 
         return _upsertWithCopyOnSharedNodes(key, std::move(value));
@@ -654,7 +668,7 @@ public:
     const_iterator find(const Key& key) const {
         RadixStore::const_iterator it = RadixStore::end();
 
-        Node* node = _findNode(key);
+        Node* node = _findNode(key, /* allowNext */ false, /* allowEmpty */ false);
         if (node == nullptr)
             return it;
         else
@@ -861,7 +875,7 @@ private:
         return ret;
     }
 
-    Node* _findNode(const Key& key) const {
+    Node* _findNode(const Key& key, bool allowNext, bool allowEmpty) const {
         const char* charKey = key.data();
 
         unsigned int depth = _root->depth;
@@ -889,8 +903,13 @@ private:
 
             size_t mismatchIdx = _comparePrefix(node->trieKey, charKey + depth, key.size() - depth);
             if (mismatchIdx != node->trieKey.size()) {
+                // The node with the key was not found in the tree. This could be because the
+                // node which will be located at that key was not yet compressed due to the
+                // prefixes. Until then we return its future children.
+                if (allowNext && node->_numSubtreeElems > 0)
+                    return node.get();
                 return nullptr;
-            } else if (mismatchIdx == key.size() - depth && node->data) {
+            } else if (mismatchIdx == key.size() - depth && (node->data || allowEmpty)) {
                 return node.get();
             }
 
