@@ -383,10 +383,15 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     _oplogApplierTaskExecutor->shutdown();
 
     _oplogApplierTaskExecutor->join();
-    _taskExecutor->join();
     lk.unlock();
 
     // Perform additional shutdown steps below that must be done outside _threadMutex.
+
+    // We must wait for _taskExecutor outside of _threadMutex, since _taskExecutor is used to run
+    // the dropPendingCollectionReaper, which takes database locks. It is safe to access
+    // _taskExecutor outside of _threadMutex because once _startedThreads is set to true, the
+    // _taskExecutor pointer never changes.
+    _taskExecutor->join();
 
     if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
         loadLastOpTime(opCtx) ==
