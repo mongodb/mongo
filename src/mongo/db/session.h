@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -45,6 +46,8 @@ class OperationContext;
 class Session : public Decorable<Session> {
     MONGO_DISALLOW_COPYING(Session);
 
+    friend class SessionCatalog;
+
 public:
     explicit Session(LogicalSessionId sessionId);
 
@@ -56,31 +59,34 @@ public:
     }
 
     /**
-     * Sets the current operation running on this Session.
-     */
-    void setCurrentOperation(OperationContext* currentOperation);
-
-    /**
-     * Clears the current operation running on this Session.
-     */
-    void clearCurrentOperation();
-
-    /**
      * Returns a pointer to the current operation running on this Session, or nullptr if there is no
      * operation currently running on this Session.
      */
-    OperationContext* getCurrentOperation() const;
+    OperationContext* currentOperation() const;
 
 private:
+    /**
+     * Set/clear the current check-out state of the session by storing the operation which has this
+     * session currently checked-out.
+     *
+     * Must be called under the SessionCatalog mutex and internally will acquire the Session mutex.
+     */
+    void _markCheckedOut(WithLock sessionCatalogLock, OperationContext* checkoutOpCtx);
+    void _markCheckedIn(WithLock sessionCatalogLock);
+
     // The id of the session with which this object is associated
     const LogicalSessionId _sessionId;
 
-    // Protects the member variables below.
+    // Protects the member variables below. The order of lock acquisition should always be:
+    //
+    // 1) SessionCatalog mutex (if applicable)
+    // 2) Session mutex
+    // 3) Any decoration mutexes and/or the currently running Client's lock
     mutable stdx::mutex _mutex;
 
     // A pointer back to the currently running operation on this Session, or nullptr if there
     // is no operation currently running for the Session.
-    OperationContext* _currentOperation{nullptr};
+    OperationContext* _checkoutOpCtx{nullptr};
 };
 
 }  // namespace mongo

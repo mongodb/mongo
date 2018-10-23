@@ -57,7 +57,7 @@ SessionCatalog::~SessionCatalog() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     for (const auto& entry : _sessions) {
         auto& sri = entry.second;
-        invariant(!sri->checkedOut);
+        invariant(!sri->session.currentOperation());
     }
 }
 
@@ -76,21 +76,24 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
 }
 
 ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
+    // This method is not supposed to be called with an already checked-out session due to risk of
+    // deadlock
+    invariant(!operationSessionDecoration(opCtx));
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     invariant(!opCtx->lockState()->isLocked());
-    invariant(opCtx->getLogicalSessionId());
 
+    invariant(opCtx->getLogicalSessionId());
     const auto lsid = *opCtx->getLogicalSessionId();
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
-
     auto sri = _getOrCreateSessionRuntimeInfo(ul, opCtx, lsid);
 
     // Wait until the session is no longer checked out
     opCtx->waitForConditionOrInterrupt(
-        sri->availableCondVar, ul, [&sri]() { return !sri->checkedOut; });
+        sri->availableCondVar, ul, [&sri]() { return !sri->session.currentOperation(); });
 
-    invariant(!sri->checkedOut);
-    sri->checkedOut = true;
+    invariant(!sri->session.currentOperation());
+    sri->session._markCheckedOut(ul, opCtx);
 
     return ScopedCheckedOutSession(opCtx, ScopedSession(std::move(sri)));
 }
@@ -124,12 +127,12 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
     const auto invalidateSessionFn = [&](WithLock, decltype(_sessions)::iterator it) {
         auto& sri = it->second;
         auto const txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(&sri->txnState);
+            TransactionParticipant::getFromNonCheckedOutSession(&sri->session);
         txnParticipant->invalidate();
 
         // We cannot remove checked-out sessions from the cache, because operations expect to find
         // them there to check back in
-        if (!sri->checkedOut) {
+        if (!sri->session.currentOperation()) {
             _sessions.erase(it);
         }
     };
@@ -152,8 +155,7 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
     }
 }
 
-void SessionCatalog::scanSessions(OperationContext* opCtx,
-                                  const SessionKiller::Matcher& matcher,
+void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
                                   const ScanSessionsCallbackFn& workerFn) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
@@ -161,7 +163,7 @@ void SessionCatalog::scanSessions(OperationContext* opCtx,
 
     for (auto& sessionEntry : _sessions) {
         if (matcher.match(sessionEntry.first)) {
-            workerFn(opCtx, &sessionEntry.second->txnState);
+            workerFn(&sessionEntry.second->session);
         }
     }
 }
@@ -185,9 +187,9 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     invariant(it != _sessions.end());
 
     auto& sri = it->second;
-    invariant(sri->checkedOut);
+    invariant(sri->session.currentOperation());
 
-    sri->checkedOut = false;
+    sri->session._markCheckedIn(lg);
     sri->availableCondVar.notify_one();
 }
 
@@ -218,7 +220,6 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx, bool c
 
     const auto session = checkedOutSession->get();
     invariant(opCtx->getLogicalSessionId() == session->getSessionId());
-    session->setCurrentOperation(opCtx);
 }
 
 OperationContextSession::~OperationContextSession() {
@@ -230,8 +231,6 @@ OperationContextSession::~OperationContextSession() {
 
     auto& checkedOutSession = operationSessionDecoration(_opCtx);
     if (checkedOutSession) {
-        checkedOutSession->get()->clearCurrentOperation();
-
         // Removing the checkedOutSession from the OperationContext must be done under the Client
         // lock, but destruction of the checkedOutSession must not be, as it takes the
         // SessionCatalog mutex, and other code may take the Client lock while holding that mutex.

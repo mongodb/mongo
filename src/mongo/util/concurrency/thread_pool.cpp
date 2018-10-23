@@ -72,7 +72,7 @@ ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
                  << options.maxThreads;
         fassertFailed(28686);
     }
-    return options;
+    return {std::move(options)};
 }
 
 }  // namespace

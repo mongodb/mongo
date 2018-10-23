@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -41,10 +41,10 @@
 namespace mongo {
 namespace {
 
-class SessionCatalogTest : public MockReplCoordServerFixture {
+class SessionCatalogTest : public ServiceContextMongoDTest {
 protected:
     void setUp() final {
-        MockReplCoordServerFixture::setUp();
+        ServiceContextMongoDTest::setUp();
 
         catalog()->reset_forTest();
     }
@@ -52,6 +52,12 @@ protected:
     SessionCatalog* catalog() {
         return SessionCatalog::get(getServiceContext());
     }
+};
+
+class SessionCatalogTestWithDefaultOpCtx : public SessionCatalogTest {
+protected:
+    const ServiceContext::UniqueOperationContext _uniqueOpCtx = makeOperationContext();
+    OperationContext* const _opCtx = _uniqueOpCtx.get();
 };
 
 // When this class is in scope, makes the system behave as if we're in a DBDirectClient
@@ -71,49 +77,49 @@ private:
     const bool _wasInDirectClient;
 };
 
-TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSession) {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
 
-    auto scopedSession = catalog()->checkOutSession(opCtx());
+    auto scopedSession = catalog()->checkOutSession(_opCtx);
 
     ASSERT(scopedSession.get());
-    ASSERT_EQ(*opCtx()->getLogicalSessionId(), scopedSession->getSessionId());
+    ASSERT_EQ(*_opCtx->getLogicalSessionId(), scopedSession->getSessionId());
 }
 
-TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+TEST_F(SessionCatalogTestWithDefaultOpCtx, OperationContextCheckedOutSession) {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     const TxnNumber txnNum = 20;
-    opCtx()->setTxnNumber(txnNum);
+    _opCtx->setTxnNumber(txnNum);
 
-    OperationContextSession ocs(opCtx(), true);
-    auto session = OperationContextSession::get(opCtx());
+    OperationContextSession ocs(_opCtx, true);
+    auto session = OperationContextSession::get(_opCtx);
     ASSERT(session);
-    ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
+    ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
 }
 
-TEST_F(SessionCatalogTest, OperationContextNonCheckedOutSession) {
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+TEST_F(SessionCatalogTestWithDefaultOpCtx, OperationContextNonCheckedOutSession) {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
 
-    OperationContextSession ocs(opCtx(), false);
-    auto session = OperationContextSession::get(opCtx());
+    OperationContextSession ocs(_opCtx, false);
+    auto session = OperationContextSession::get(_opCtx);
 
     ASSERT(!session);
 }
 
-TEST_F(SessionCatalogTest, GetOrCreateNonExistentSession) {
+TEST_F(SessionCatalogTestWithDefaultOpCtx, GetOrCreateNonExistentSession) {
     const auto lsid = makeLogicalSessionIdForTest();
-    auto scopedSession = catalog()->getOrCreateSession(opCtx(), lsid);
+    auto scopedSession = catalog()->getOrCreateSession(_opCtx, lsid);
 
     ASSERT(scopedSession.get());
     ASSERT_EQ(lsid, scopedSession->getSessionId());
 }
 
-TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
+TEST_F(SessionCatalogTestWithDefaultOpCtx, GetOrCreateSessionAfterCheckOutSession) {
     const auto lsid = makeLogicalSessionIdForTest();
-    opCtx()->setLogicalSessionId(lsid);
+    _opCtx->setLogicalSessionId(lsid);
 
     boost::optional<OperationContextSession> ocs;
-    ocs.emplace(opCtx(), true);
+    ocs.emplace(_opCtx, true);
 
     stdx::async(stdx::launch::async, [&] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
@@ -140,42 +146,40 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     }).get();
 }
 
-TEST_F(SessionCatalogTest, NestedOperationContextSession) {
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+TEST_F(SessionCatalogTestWithDefaultOpCtx, NestedOperationContextSession) {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(opCtx(), true);
+        OperationContextSession outerScopedSession(_opCtx, true);
 
         {
-            DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(opCtx(), true);
+            DirectClientSetter inDirectClient(_opCtx);
+            OperationContextSession innerScopedSession(_opCtx, true);
 
-            auto session = OperationContextSession::get(opCtx());
+            auto session = OperationContextSession::get(_opCtx);
             ASSERT(session);
-            ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
+            ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
         }
 
         {
-            DirectClientSetter inDirectClient(opCtx());
-            auto session = OperationContextSession::get(opCtx());
+            DirectClientSetter inDirectClient(_opCtx);
+            auto session = OperationContextSession::get(_opCtx);
             ASSERT(session);
-            ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
+            ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
         }
     }
 
-    ASSERT(!OperationContextSession::get(opCtx()));
+    ASSERT(!OperationContextSession::get(_opCtx));
 }
 
-TEST_F(SessionCatalogTest, ScanSessions) {
+TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
     std::vector<LogicalSessionId> lsids;
-    auto workerFn = [&](OperationContext* opCtx, Session* session) {
-        lsids.push_back(session->getSessionId());
-    };
+    auto workerFn = [&](Session* session) { lsids.push_back(session->getSessionId()); };
 
     // Scan over zero Sessions.
     SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx())});
-    catalog()->scanSessions(opCtx(), matcherAllSessions, workerFn);
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
+    catalog()->scanSessions(matcherAllSessions, workerFn);
     ASSERT(lsids.empty());
 
     // Create three sessions in the catalog.
@@ -183,21 +187,21 @@ TEST_F(SessionCatalogTest, ScanSessions) {
     auto lsid2 = makeLogicalSessionIdForTest();
     auto lsid3 = makeLogicalSessionIdForTest();
     {
-        auto scopedSession1 = catalog()->getOrCreateSession(opCtx(), lsid1);
-        auto scopedSession2 = catalog()->getOrCreateSession(opCtx(), lsid2);
-        auto scopedSession3 = catalog()->getOrCreateSession(opCtx(), lsid3);
+        auto scopedSession1 = catalog()->getOrCreateSession(_opCtx, lsid1);
+        auto scopedSession2 = catalog()->getOrCreateSession(_opCtx, lsid2);
+        auto scopedSession3 = catalog()->getOrCreateSession(_opCtx, lsid3);
     }
 
     // Scan over all Sessions.
     lsids.clear();
-    catalog()->scanSessions(opCtx(), matcherAllSessions, workerFn);
+    catalog()->scanSessions(matcherAllSessions, workerFn);
     ASSERT_EQ(lsids.size(), 3U);
 
     // Scan over all Sessions, visiting a particular Session.
     SessionKiller::Matcher matcherLSID2(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx(), lsid2)});
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx, lsid2)});
     lsids.clear();
-    catalog()->scanSessions(opCtx(), matcherLSID2, workerFn);
+    catalog()->scanSessions(matcherLSID2, workerFn);
     ASSERT_EQ(lsids.size(), 1U);
     ASSERT_EQ(lsids.front(), lsid2);
 }

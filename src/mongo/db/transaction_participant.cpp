@@ -1053,7 +1053,7 @@ void TransactionParticipant::abortArbitraryTransactionIfExpired() {
     }
 
     const auto* session = getTransactionParticipant.owner(this);
-    auto currentOperation = session->getCurrentOperation();
+    auto currentOperation = session->currentOperation();
     if (currentOperation) {
         // If an operation is still running for this transaction when it expires, kill the currently
         // running operation.

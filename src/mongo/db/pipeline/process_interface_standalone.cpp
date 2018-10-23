@@ -494,9 +494,8 @@ void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext
                               : KillAllSessionsByPatternSet{{}});
 
     sessionCatalog->scanSessions(
-        opCtx,
         {std::move(sessionFilter)},
-        [&](OperationContext* opCtx, Session* session) {
+        [&](Session* session) {
             auto op =
                 TransactionParticipant::getFromNonCheckedOutSession(session)->reportStashedState();
             if (!op.isEmpty()) {

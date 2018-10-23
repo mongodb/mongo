@@ -509,10 +509,38 @@ TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     opObserver.onDelete(opCtx.get(), nss, uuid, {}, false, {});
 }
 
+DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    opCtx->swapLockState(stdx::make_unique<LockerNoop>());
+    NamespaceString nss = {"test", "coll"};
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+}
+
+DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    opCtx->swapLockState(stdx::make_unique<LockerNoop>());
+    NamespaceString nss = {"test", "coll"};
+    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+}
+
+DEATH_TEST_F(OpObserverTest,
+             NodeCrashesIfShardIdentityDocumentRolledBack,
+             "Fatal Assertion 50712") {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    OpObserver::RollbackObserverInfo rbInfo;
+    rbInfo.shardIdentityRolledBack = true;
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to multi-document transactions.
  */
-
 class OpObserverTransactionTest : public OpObserverSessionCatalogTest {
 public:
     void setUp() override {
@@ -1241,35 +1269,6 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
     ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
-}
-
-DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
-    opCtx->swapLockState(stdx::make_unique<LockerNoop>());
-    NamespaceString nss = {"test", "coll"};
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
-}
-
-DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
-    opCtx->swapLockState(stdx::make_unique<LockerNoop>());
-    NamespaceString nss = {"test", "coll"};
-    opObserver.aboutToDelete(opCtx.get(), nss, {});
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
-}
-
-DEATH_TEST_F(OpObserverTest,
-             NodeCrashesIfShardIdentityDocumentRolledBack,
-             "Fatal Assertion 50712") {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
-
-    OpObserver::RollbackObserverInfo rbInfo;
-    rbInfo.shardIdentityRolledBack = true;
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
 }
 
 }  // namespace

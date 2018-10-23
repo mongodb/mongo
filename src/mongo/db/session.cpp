@@ -36,21 +36,21 @@ namespace mongo {
 
 Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
-void Session::setCurrentOperation(OperationContext* currentOperation) {
+OperationContext* Session::currentOperation() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(!_currentOperation);
-    _currentOperation = currentOperation;
+    return _checkoutOpCtx;
 }
 
-void Session::clearCurrentOperation() {
+void Session::_markCheckedOut(WithLock sessionCatalogLock, OperationContext* checkoutOpCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_currentOperation);
-    _currentOperation = nullptr;
+    invariant(!_checkoutOpCtx);
+    _checkoutOpCtx = checkoutOpCtx;
 }
 
-OperationContext* Session::getCurrentOperation() const {
+void Session::_markCheckedIn(WithLock sessionCatalogLock) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _currentOperation;
+    invariant(_checkoutOpCtx);
+    _checkoutOpCtx = nullptr;
 }
 
 }  // namespace mongo
