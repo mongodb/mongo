@@ -470,6 +470,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         }
     } else if (ComparisonMatchExpressionBase::isEquality(expr->matchType())) {
         const auto* node = static_cast<const ComparisonMatchExpressionBase*>(expr);
+        // There is no need to sort intervals or merge overlapping intervals here since the output
+        // is from one element.
         translateEquality(node->getData(), index, isHashed, oilOut, tightnessOut);
     } else if (MatchExpression::LTE == expr->matchType()) {
         const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
@@ -672,8 +674,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // Create our various intervals.
 
         IndexBoundsBuilder::BoundsTightness tightness;
+        bool arrayOrNullPresent = false;
         for (auto&& equality : ime->getEqualities()) {
             translateEquality(equality, index, isHashed, oilOut, &tightness);
+            // The ordering invariant of oil has been violated by the call to translateEquality.
+            arrayOrNullPresent = arrayOrNullPresent || equality.type() == BSONType::jstNULL ||
+                equality.type() == BSONType::Array;
             if (tightness != IndexBoundsBuilder::EXACT) {
                 *tightnessOut = tightness;
             }
@@ -701,7 +707,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
 
-        unionize(oilOut);
+        // Equalities are already sorted and deduped so unionize is unneccesary if no regexes
+        // are present. Hashed indexes may also cause the bounds to be out-of-order.
+        // Arrays and nulls introduce multiple elements that neccesitate a sort and deduping.
+        if (!ime->getRegexes().empty() || index.type == IndexType::INDEX_HASHED ||
+            arrayOrNullPresent)
+            unionize(oilOut);
     } else if (MatchExpression::GEO == expr->matchType()) {
         const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
 
