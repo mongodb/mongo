@@ -32,6 +32,7 @@ env.Library(
     target='server_parameter',
     source=[
         'server_parameter.cpp',
+        'server_parameter_with_storage.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -43,6 +44,7 @@ env.CppUnitTest(
     target='idl_server_parameter_test',
     source=[
         'server_parameter_test.cpp',
+        'server_parameter_with_storage_test.cpp',
     ],
     LIBDEPS=[
         'server_parameter',
