@@ -427,7 +427,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter->computeAtClusterTime(
+        txnRouter->computeAndSetAtClusterTime(
             opCtx, mustRunOnAll, shardIds, executionNss, shardQuery, aggRequest.getCollation());
     }
 
@@ -1236,7 +1236,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
 
     auto txnRouter = TransactionRouter::get(opCtx);
     if (txnRouter) {
-        txnRouter->computeAtClusterTimeForOneShard(opCtx, shardId);
+        txnRouter->computeAndSetAtClusterTimeForUnsharded(opCtx, shardId);
     }
 
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an

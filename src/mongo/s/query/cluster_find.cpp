@@ -223,12 +223,12 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                               query.getQueryRequest().getCollation());
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter->computeAtClusterTime(opCtx,
-                                        false,
-                                        shardIds,
-                                        query.nss(),
-                                        query.getQueryRequest().getFilter(),
-                                        query.getQueryRequest().getCollation());
+        txnRouter->computeAndSetAtClusterTime(opCtx,
+                                              false,
+                                              shardIds,
+                                              query.nss(),
+                                              query.getQueryRequest().getFilter(),
+                                              query.getQueryRequest().getCollation());
     }
 
     // Construct the query and parameters.

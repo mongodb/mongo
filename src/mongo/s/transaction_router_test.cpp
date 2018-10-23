@@ -1419,5 +1419,72 @@ TEST_F(TransactionRouterTest, SubsequentStatementCanSelectAtClusterTimeIfNotSele
 // TODO SERVER-37630: Verify transactions with majority level read concern don't have and cannot
 // select an atClusterTime once they are allowed.
 
+// Begins a transaction with snapshot level read concern and sets a default cluster time.
+class TransactionRouterStartedTransactionTest : public TransactionRouterTest {
+public:
+    const TxnNumber kTxnNumber = 10;
+    const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
+
+    const BSONObj rcLatestInMemoryAtClusterTime = BSON("level"
+                                                       << "snapshot"
+                                                       << "atClusterTime"
+                                                       << kInMemoryLogicalTime.asTimestamp());
+
+    void setUp() override {
+        TransactionRouterTest::setUp();
+
+        operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        operationContext()->setTxnNumber(kTxnNumber);
+
+        _scopedSession.emplace(operationContext());
+
+        txnRouter()->checkOut();
+        txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        txnRouter()->setDefaultAtClusterTime(operationContext());
+    }
+
+    TransactionRouter* txnRouter() const {
+        return TransactionRouter::get(operationContext());
+    }
+
+private:
+    boost::optional<ScopedRouterSession> _scopedSession;
+};
+
+TEST_F(TransactionRouterStartedTransactionTest, AddAtClusterTimeNormal) {
+    auto newCmd = txnRouter()->attachTxnFieldsIfNeeded(shard1,
+                                                       BSON("aggregate"
+                                                            << "testColl"
+                                                            << "readConcern"
+                                                            << BSON("level"
+                                                                    << "snapshot")));
+    ASSERT_BSONOBJ_EQ(rcLatestInMemoryAtClusterTime, newCmd["readConcern"].Obj());
+}
+
+TEST_F(TransactionRouterStartedTransactionTest,
+       AddingAtClusterTimeOverwritesExistingAfterClusterTime) {
+    const auto existingAfterClusterTime = Timestamp(1, 1);
+    auto newCmd = txnRouter()->attachTxnFieldsIfNeeded(shard1,
+                                                       BSON("aggregate"
+                                                            << "testColl"
+                                                            << "readConcern"
+                                                            << BSON("level"
+                                                                    << "snapshot"
+                                                                    << "afterClusterTime"
+                                                                    << existingAfterClusterTime)));
+    ASSERT_BSONOBJ_EQ(rcLatestInMemoryAtClusterTime, newCmd["readConcern"].Obj());
+}
+
+TEST_F(TransactionRouterStartedTransactionTest, AddingAtClusterTimeAddsLevelSnapshotIfNotThere) {
+    const auto existingAfterClusterTime = Timestamp(1, 1);
+    auto newCmd = txnRouter()->attachTxnFieldsIfNeeded(shard1,
+                                                       BSON("aggregate"
+                                                            << "testColl"
+                                                            << "readConcern"
+                                                            << BSON("afterClusterTime"
+                                                                    << existingAfterClusterTime)));
+    ASSERT_BSONOBJ_EQ(rcLatestInMemoryAtClusterTime, newCmd["readConcern"].Obj());
+}
+
 }  // unnamed namespace
 }  // namespace mongo

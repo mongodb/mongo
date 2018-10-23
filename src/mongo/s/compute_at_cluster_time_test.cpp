@@ -35,12 +35,12 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/s/at_cluster_time_util.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -59,6 +59,8 @@ const BSONObj kEmptyQuery;
 const BSONObj kEmptyCollation;
 const LogicalTime kInMemoryLogicalTime(Timestamp(3, 1));
 
+const TxnNumber kTxnNumber = 3;
+
 class AtClusterTimeTest : public ShardingTestFixture {
 protected:
     void setUp() {
@@ -70,14 +72,32 @@ protected:
 
         ShardingTestFixture::addRemoteShards(shardInfos);
 
-        repl::ReadConcernArgs::get(operationContext()) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-
         // Set up a logical clock with an initial time.
         auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+
+        operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        operationContext()->setTxnNumber(kTxnNumber);
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        _scopedSession.emplace(operationContext());
+
+        txnRouter()->checkOut();
+        txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
     }
+
+    TransactionRouter* txnRouter() const {
+        return TransactionRouter::get(operationContext());
+    }
+
+    LogicalTime getSelectedTime() {
+        return txnRouter()->getAtClusterTime()->getTime();
+    }
+
+private:
+    boost::optional<ScopedRouterSession> _scopedSession;
 };
 
 TEST_F(AtClusterTimeTest, ComputeValidValid) {
@@ -91,11 +111,11 @@ TEST_F(AtClusterTimeTest, ComputeValidValid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    // TODO: SERVER-36312
-    // ASSERT_EQ(*maxTime, timeTwo);
-    ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
+    // TODO SERVER-36312:
+    // ASSERT_EQ(getSelectedTime(), timeTwo);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
 TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
@@ -107,11 +127,11 @@ TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    // TODO: SERVER-36312
-    // ASSERT_EQ(*maxTime, timeTwo);
-    ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
+    // TODO SERVER-36312:
+    // ASSERT_EQ(getSelectedTime(), timeTwo);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
 TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
@@ -121,32 +141,30 @@ TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
     auto shardTwo = shardRegistry()->getShardNoReload(shardTwoId);
     ASSERT_EQ(LogicalTime(), shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
-TEST_F(AtClusterTimeTest, ComputeForOneShard) {
+TEST_F(AtClusterTimeTest, ComputeForUnsharded) {
     auto shardOne = shardRegistry()->getShardNoReload(shardOneId);
 
     LogicalTime timeOne(Timestamp(10, 2));
     shardOne->updateLastCommittedOpTime(timeOne);
     ASSERT_EQ(timeOne, shardOne->getLastCommittedOpTime());
 
-    auto atClusterTime =
-        at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), shardOneId);
-    // TODO SERVER-36312
-    // ASSERT_EQ(*atClusterTime, timeOne);
-    ASSERT_EQ(*atClusterTime, kInMemoryLogicalTime);
+    txnRouter()->computeAndSetAtClusterTimeForUnsharded(operationContext(), shardOneId);
+    // TODO SERVER-36312:
+    // ASSERT_EQ(getSelectedTime(), timeOne);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
-TEST_F(AtClusterTimeTest, ComputeForOneShardNoCachedOpTime) {
+TEST_F(AtClusterTimeTest, ComputeForUnshardedNoCachedOpTime) {
     auto shardOne = shardRegistry()->getShardNoReload(shardOneId);
     ASSERT_EQ(LogicalTime(), shardOne->getLastCommittedOpTime());
 
-    auto atClusterTime =
-        at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), shardOneId);
-    ASSERT_EQ(*atClusterTime, kInMemoryLogicalTime);
+    txnRouter()->computeAndSetAtClusterTimeForUnsharded(operationContext(), shardOneId);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
 // TODO SERVER-36312: Verify computing atClusterTime for a single shard that does not exist returns
@@ -162,11 +180,32 @@ protected:
         auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+
+        operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        operationContext()->setTxnNumber(kTxnNumber);
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        _scopedSession.emplace(operationContext());
+
+        txnRouter()->checkOut();
+        txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
     }
+
+    TransactionRouter* txnRouter() const {
+        return TransactionRouter::get(operationContext());
+    }
+
+    LogicalTime getSelectedTime() {
+        return txnRouter()->getAtClusterTime()->getTime();
+    }
+
+private:
+    boost::optional<ScopedRouterSession> _scopedSession;
 };
 
-// Verifies that the latest in-memory logical time is returned when one shard lastCommittedOpTime on
-// one shard is not initialized.
+// Verifies that the latest in-memory logical time is returned when lastCommittedOpTime on one
+// targeted shard is not initialized.
 TEST_F(AtClusterTimeTargetingTest, ReturnsLatestInMemoryTime) {
     auto routingInfo = loadRoutingTableWithTwoChunksAndTwoShards(kNss);
     auto query = BSON("find" << kNss.coll());
@@ -177,11 +216,10 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestInMemoryTime) {
     shardRegistry()->getShardNoReload(ShardId("0"))->updateLastCommittedOpTime(time);
 
     ASSERT_LT(time, kInMemoryLogicalTime);
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    ASSERT_EQ(kInMemoryLogicalTime,
-              *at_cluster_time_util::computeAtClusterTime(
-                  operationContext(), true, shards, kNss, query, collation));
+
+    txnRouter()->computeAndSetAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
 // Verifies that the greatest logical time is returned when all shard's lastCommittedOpTime values
@@ -201,15 +239,11 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestTimeFromShard) {
     ASSERT_LT(time1, kInMemoryLogicalTime);
     ASSERT_GT(time2, kInMemoryLogicalTime);
 
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    // TODO: SERVER-36312
-    // ASSERT_EQ(time2,
-    //           *at_cluster_time_util::computeAtClusterTime(operationContext(), true, shards, kNss,
-    //           query, collation));
-    ASSERT_EQ(kInMemoryLogicalTime,
-              *at_cluster_time_util::computeAtClusterTime(
-                  operationContext(), true, shards, kNss, query, collation));
+    txnRouter()->computeAndSetAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation);
+    // TODO SERVER-36312:
+    // ASSERT_EQ(getSelectedTime(), time2);
+    ASSERT_EQ(getSelectedTime(), kInMemoryLogicalTime);
 }
 
 // Verifies that if atClusterTime is specified in the request, atClusterTime is always greater than
@@ -229,20 +263,17 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     // Neither shard has a last committed optime.
 
     // Target one shard.
-    auto computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
-    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    txnRouter()->computeAndSetAtClusterTimeForUnsharded(operationContext(), s0);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
     // Target all shards.
-    computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
     // One shard has a last committed optime.
 
@@ -251,20 +282,17 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     ASSERT_LT(time1, afterClusterTime);
 
     // Target one shard.
-    computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
-    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    txnRouter()->computeAndSetAtClusterTimeForUnsharded(operationContext(), s0);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
     // Target all shards.
-    computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
     // Both shards have a last committed optime.
 
@@ -273,16 +301,14 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     ASSERT_LT(time2, afterClusterTime);
 
     // Target one shard.
-    computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 
     // Target all shards.
-    computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_GTE(*computedTime, afterClusterTime);
+    ASSERT_GTE(getSelectedTime(), afterClusterTime);
 }
 
 // Verify that when afterClusterTime is given, the smallest computed atClusterTime is equal to
@@ -298,14 +324,12 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
 
     // Target one shard without a last committed optime. The computed value should equal
     // afterClusterTime.
-    auto computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_EQ(*computedTime, afterClusterTime);
+    ASSERT_EQ(getSelectedTime(), afterClusterTime);
 
-    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
-    ASSERT(computedTime);
-    ASSERT_EQ(*computedTime, afterClusterTime);
+    txnRouter()->computeAndSetAtClusterTimeForUnsharded(operationContext(), s0);
+    ASSERT_EQ(getSelectedTime(), afterClusterTime);
 
     // Target one shard with a last committed optime less than afterClusterTime. The computed value
     // should still equal afterClusterTime.
@@ -313,14 +337,12 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
     shardRegistry()->getShardNoReload(s0)->updateLastCommittedOpTime(time1);
     ASSERT_LT(time1, afterClusterTime);
 
-    computedTime = at_cluster_time_util::computeAtClusterTime(
+    txnRouter()->computeAndSetAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT(computedTime);
-    ASSERT_EQ(*computedTime, afterClusterTime);
+    ASSERT_EQ(getSelectedTime(), afterClusterTime);
 
-    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
-    ASSERT(computedTime);
-    ASSERT_EQ(*computedTime, afterClusterTime);
+    txnRouter()->computeAndSetAtClusterTimeForUnsharded(operationContext(), s0);
+    ASSERT_EQ(getSelectedTime(), afterClusterTime);
 }
 
 }  // namespace

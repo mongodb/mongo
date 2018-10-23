@@ -109,7 +109,7 @@ std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForShards(
         // requests to unsharded collections, so they should only be targeting
         // the primary shard.
         if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter->computeAtClusterTimeForOneShard(opCtx, shardIds[0]);
+            txnRouter->computeAndSetAtClusterTimeForUnsharded(opCtx, shardIds[0]);
         }
     } else {
         invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
@@ -163,7 +163,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter->computeAtClusterTime(opCtx, false, shardIds, nss, query, collation);
+        txnRouter->computeAndSetAtClusterTime(opCtx, false, shardIds, nss, query, collation);
     }
 
     for (const ShardId& shardId : shardIds) {
