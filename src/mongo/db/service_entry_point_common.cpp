@@ -698,16 +698,6 @@ void execCommandDatabase(OperationContext* opCtx,
                     shouldCheckoutSession || !opCtx->getTxnNumber());
         }
 
-        // This constructor will check out the session and start a transaction, if necessary. It
-        // handles the appropriate state management for both multi-statement transactions and
-        // retryable writes.
-        OperationContextSession sessionTxnState(opCtx,
-                                                shouldCheckoutSession,
-                                                autocommitVal,
-                                                startMultiDocTxn,
-                                                dbname,
-                                                command->getName());
-
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
         BSONElement cmdOptionMaxTimeMSField;
@@ -751,12 +741,14 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (!opCtx->getClient()->isInDirectClient() &&
             !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
+            const bool inMultiDocumentTransaction = (autocommitVal == false);
             auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
-            bool couldHaveOptedIn = allowed == Command::AllowedOnSecondary::kOptIn;
+            bool couldHaveOptedIn =
+                allowed == Command::AllowedOnSecondary::kOptIn && !inMultiDocumentTransaction;
             bool optedIn =
                 couldHaveOptedIn && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
-            bool canRunHere = commandCanRunHere(opCtx, dbname, command);
+            bool canRunHere = commandCanRunHere(opCtx, dbname, command, inMultiDocumentTransaction);
             if (!canRunHere && couldHaveOptedIn) {
                 uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
@@ -813,6 +805,16 @@ void execCommandDatabase(OperationContext* opCtx,
                     !opCtx->getClient()->isInDirectClient());
             opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
         }
+
+        // This constructor will check out the session and start a transaction, if necessary. It
+        // handles the appropriate state management for both multi-statement transactions and
+        // retryable writes.
+        OperationContextSession sessionTxnState(opCtx,
+                                                shouldCheckoutSession,
+                                                autocommitVal,
+                                                startMultiDocTxn,
+                                                dbname,
+                                                command->getName());
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         auto session = OperationContextSession::get(opCtx);

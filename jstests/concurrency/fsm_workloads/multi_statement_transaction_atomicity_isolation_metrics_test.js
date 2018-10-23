@@ -45,6 +45,20 @@ var $config = extendWorkload($config, function($config, $super) {
     }
 
     /**
+     * serverStatus invariant: all counts are non-negative
+     */
+    function allCountsNonNegative(serverStatusTxnStats) {
+        let active = Number(serverStatusTxnStats["currentActive"]);
+        let inactive = Number(serverStatusTxnStats["currentInactive"]);
+        let committed = Number(serverStatusTxnStats["totalCommitted"]);
+        let aborted = Number(serverStatusTxnStats["totalAborted"]);
+        let open = Number(serverStatusTxnStats["currentOpen"]);
+        let started = Number(serverStatusTxnStats["totalStarted"]);
+        return (active >= 0) && (inactive >= 0) && (committed >= 0) && (aborted >= 0) &&
+            (open >= 0) && (started >= 0);
+    }
+
+    /**
      * Check invariants of transactions metrics reported in 'serverStatus' (server-wide metrics),
      * using the number of given samples.
      *
@@ -90,6 +104,14 @@ var $config = extendWorkload($config, function($config, $super) {
             let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
             return "'committedPlusAbortedPlusOpenEqualsStarted' invariant violated." +
                 "Failed samples: " + failedSamplesStr;
+        });
+
+        // allCountsNonNegative() is always expected to succeed.
+        failedSamples = filterFalse(samples, allCountsNonNegative);
+        assertAlways.eq(0, failedSamples.length, () => {
+            let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
+            return "'allCountsNonNegative' invariant violated." + "Failed samples: " +
+                failedSamplesStr;
         });
     }
 

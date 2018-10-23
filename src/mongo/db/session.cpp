@@ -582,7 +582,13 @@ void Session::_beginOrContinueTxn(WithLock wl,
                 // This indicates that the first command in the transaction failed but did not
                 // implicitly abort the transaction. It is not safe to continue the transaction, in
                 // particular because we have not saved the readConcern from the first statement of
-                // the transaction.
+                // the transaction. Mark the transaction as active here, since
+                // _abortTransaction() will assume we are aborting an active transaction since there
+                // are no stashed resources.
+                _singleTransactionStats.setActive(curTimeMicros64());
+                ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
+                ServerTransactionsMetrics::get(getGlobalServiceContext())
+                    ->decrementCurrentInactive();
                 _abortTransaction(wl);
                 uasserted(ErrorCodes::NoSuchTransaction,
                           str::stream() << "Transaction " << txnNumber << " has been aborted.");
@@ -820,8 +826,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             return;
         }
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
 
         // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
         // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
@@ -831,10 +835,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
         if (maxTransactionLockMillis >= 0) {
             opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
         }
-
-        // Set the starting active time for this transaction.
-        stdx::lock_guard<stdx::mutex> ls(_statsMutex);
-        _singleTransactionStats.setActive(curTimeMicros64());
     }
 
     // Storage engine transactions may be started in a lazy manner. By explicitly
@@ -853,6 +853,14 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
     if (MONGO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangAfterPreallocateSnapshot, opCtx, "hangAfterPreallocateSnapshot");
+    }
+
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> ls(_statsMutex);
+        _singleTransactionStats.setActive(curTimeMicros64());
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
     }
 }
 

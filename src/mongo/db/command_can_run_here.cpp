@@ -33,17 +33,23 @@
 #include "mongo/db/command_can_run_here.h"
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-bool commandCanRunHere(OperationContext* opCtx, const std::string& dbname, const Command* command) {
+bool commandCanRunHere(OperationContext* opCtx,
+                       const std::string& dbname,
+                       const Command* command,
+                       bool inMultiDocumentTransaction) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname))
         return true;  // primary: always ok
     if (!opCtx->writesAreReplicated())
         return true;  // standalone: always ok
+    if (inMultiDocumentTransaction && !getTestCommandsEnabled())
+        return false;  // Transactions are not allowed on secondaries.
     switch (command->secondaryAllowed(opCtx->getServiceContext())) {
         case Command::AllowedOnSecondary::kAlways:
             return true;
