@@ -145,7 +145,8 @@ op_bulk(void *arg)
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	if ((ret = session->create(session, opts->uri, NULL)) != 0)
+	if ((ret = session->create(session,
+	    opts->uri, DEFAULT_TABLE_SCHEMA)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			testutil_die(ret, "session.create");
 
@@ -187,7 +188,7 @@ op_bulk_unique(void *arg)
 	testutil_check(__wt_snprintf(
 	    new_uri, sizeof(new_uri), "%s.%" PRIu64,
 	    opts->uri, __wt_atomic_add64(&opts->unique_id, 1)));
-	testutil_check(session->create(session, new_uri, NULL));
+	testutil_check(session->create(session, new_uri, DEFAULT_TABLE_SCHEMA));
 
 	__wt_yield();
 
@@ -228,7 +229,7 @@ op_cursor(void *arg)
 	TEST_PER_THREAD_OPTS *args;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int ret;
+	int i, ret;
 
 	args = (TEST_PER_THREAD_OPTS *)arg;
 	opts = args->testopts;
@@ -240,8 +241,17 @@ op_cursor(void *arg)
 	    session, opts->uri, NULL, NULL, &cursor)) != 0) {
 		if (ret != ENOENT && ret != EBUSY)
 			testutil_die(ret, "session.open_cursor");
-	} else
+	} else {
+		/* Put some data in if asked to. */
+		if (args->testopts->do_data_ops) {
+			for (i = 0; i < 1000; i++) {
+				cursor->set_key(cursor, i);
+				cursor->set_value(cursor, "abcdef");
+				cursor->insert(cursor);
+			}
+		}
 		testutil_check(cursor->close(cursor));
+	}
 
 	testutil_check(session->close(session, NULL));
 	args->thread_counter++;
@@ -264,7 +274,8 @@ op_create(void *arg)
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-	if ((ret = session->create(session, opts->uri, NULL)) != 0)
+	if ((ret = session->create(session,
+	    opts->uri, DEFAULT_TABLE_SCHEMA)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			testutil_die(ret, "session.create");
 
@@ -296,7 +307,7 @@ op_create_unique(void *arg)
 	testutil_check(__wt_snprintf(
 	    new_uri, sizeof(new_uri), "%s.%" PRIu64,
 	    opts->uri, __wt_atomic_add64(&opts->unique_id, 1)));
-	testutil_check(session->create(session, new_uri, NULL));
+	testutil_check(session->create(session, new_uri, DEFAULT_TABLE_SCHEMA));
 
 	__wt_yield();
 	while ((ret = session->drop(session, new_uri, __wt_random(&rnd) & 1 ?

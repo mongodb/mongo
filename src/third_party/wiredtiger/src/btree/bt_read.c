@@ -390,8 +390,8 @@ __page_read_lookaside(WT_SESSION_IMPL *session, WT_REF *ref,
 			WT_STAT_CONN_INCR(
 			    session, cache_read_lookaside_skipped);
 			ref->page_las->eviction_to_lookaside = true;
-			*final_statep = WT_REF_LIMBO;
 		}
+		*final_statep = WT_REF_LIMBO;
 		return (0);
 	}
 

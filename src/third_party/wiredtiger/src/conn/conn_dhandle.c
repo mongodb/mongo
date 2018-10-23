@@ -244,12 +244,10 @@ __wt_conn_dhandle_close(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	bool close_handle, is_btree, is_mapped, no_schema_lock;
+	bool discard, is_btree, is_mapped, marked_dead, no_schema_lock;
 
 	conn = S2C(session);
 	dhandle = session->dhandle;
-	close_handle = true;
-	is_mapped = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
@@ -267,9 +265,6 @@ __wt_conn_dhandle_close(
 
 		/* Reset the tree's eviction priority (if any). */
 		__wt_evict_priority_clear(session);
-
-		if ((bm = btree->bm) != NULL)
-			is_mapped = bm->is_mapped(bm, session);
 	}
 
 	/*
@@ -293,48 +288,67 @@ __wt_conn_dhandle_close(
 	 */
 	__wt_spin_lock(session, &dhandle->close_lock);
 
-	/*
-	 * Discard memory-mapped trees immediately because we close the
-	 * underlying file handle to allow the file to be removed and
-	 * memory-mapped trees contain pointers into memory that become invalid
-	 * if the mapping is closed.
-	 */
-	if (is_mapped)
-		WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
-	else if (is_btree && !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
-	    !F_ISSET(btree,
+	discard = is_mapped = marked_dead = false;
+	if (is_btree && !F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		/*
-		 * Leave the handle open, marked dead (letting the tree be
-		 * discarded later) if it's not already marked dead.
+		 * If the handle is already marked dead, we're just here to
+		 * discard it.
 		 */
-		if (mark_dead)
-			close_handle = false;
+		if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
+			discard = true;
 
 		/*
-		 * Flush dirty data from any durable trees we are closing.
-		 * That involves writing a checkpoint, which can fail if an
-		 * update cannot be written, causing the close to fail: if not
-		 * the final close, return the EBUSY error to our caller for
-		 * eventual retry.
+		 * Mark the handle dead (letting the tree be discarded later) if
+		 * it's not already marked dead, and it's not a memory-mapped
+		 * tree. (We can't mark memory-mapped tree handles dead because
+		 * we close the underlying file handle to allow the file to be
+		 * removed and memory-mapped trees contain pointers into memory
+		 * that become invalid if the mapping is closed.)
+		 */
+		bm = btree->bm;
+		if (bm != NULL)
+			is_mapped = bm->is_mapped(bm, session);
+		if (!discard && mark_dead && (bm == NULL || !is_mapped))
+			marked_dead = true;
+
+		/*
+		 * Flush dirty data from any durable trees we couldn't mark
+		 * dead.  That involves writing a checkpoint, which can fail if
+		 * an update cannot be written, causing the close to fail: if
+		 * not the final close, return the EBUSY error to our caller
+		 * for eventual retry.
 		 *
 		 * We can't discard non-durable trees yet: first we have to
-		 * close the underlying btree handle, then we can mark the data
-		 * handle dead.
+		 * close the underlying btree handle, then we can mark the
+		 * data handle dead.
 		 *
 		 * If we are closing with timestamps enforced, then we have
 		 * already checkpointed as of the timestamp as needed and any
 		 * remaining dirty data should be discarded.
 		 */
-		if (close_handle &&
-		    !F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) &&
-		    !F_ISSET(conn, WT_CONN_IN_MEMORY) &&
-		    !F_ISSET(btree, WT_BTREE_NO_CHECKPOINT)) {
-			WT_TRET(__wt_checkpoint_close(session, final));
-			if (!final && ret == EBUSY)
-				WT_ERR(ret);
+		if (!discard && !marked_dead) {
+			if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) ||
+			    F_ISSET(conn, WT_CONN_IN_MEMORY) ||
+			    F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+				discard = true;
+			else {
+				WT_TRET(__wt_checkpoint_close(session, final));
+				if (!final && ret == EBUSY)
+					WT_ERR(ret);
+			}
 		}
 	}
+
+	/*
+	 * We close the underlying handle before discarding pages from the cache
+	 * for performance reasons. However, the underlying block manager "owns"
+	 * information about memory mappings, and memory-mapped pages contain
+	 * pointers into memory that becomes invalid if the mapping is closed,
+	 * so discard mapped files before closing, otherwise, close first.
+	 */
+	if (discard && is_mapped)
+		WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
 
 	/* Close the underlying handle. */
 	switch (dhandle->type) {
@@ -348,31 +362,39 @@ __wt_conn_dhandle_close(
 	}
 
 	/*
-	 * Mark the handle dead.  Don't do this before closing the tree, the
-	 * block manager asserts there are never two references to a block
-	 * manager object, and re-opening the handle can succeed once we mark
-	 * this handle dead.
+	 * If marking the handle dead, do so after closing the underlying btree.
+	 * (Don't do it before that, the block manager asserts there are never
+	 * two references to a block manager object, and re-opening the handle
+	 * can succeed once we mark this handle dead.)
 	 *
-	 * We do this even if closing the handle: we expect the handle to be
-	 * marked dead when discarding modified pages from cache.
+	 * Check discard too, code we call to clear the cache expects the data
+	 * handle dead flag to be set when discarding modified pages.
 	 */
-	F_SET(dhandle, WT_DHANDLE_DEAD);
+	if (marked_dead || discard)
+		F_SET(dhandle, WT_DHANDLE_DEAD);
 
 	/*
-	 * If we are closing the handle, discard the tree from cache then mark
-	 * the handle closed.  Otherwise, leave it marked dead and sweep will
-	 * close it, via another call to this function.
+	 * Discard from cache any trees not marked dead in this call (that is,
+	 * including trees previously marked dead). Done after marking the data
+	 * handle dead for a couple reasons: first, we don't need to hold an
+	 * exclusive handle to do it, second, code we call to clear the cache
+	 * expects the data handle dead flag to be set when discarding modified
+	 * pages.
 	 */
-	if (close_handle) {
-		if (is_btree)
-			WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
+	if (discard && !is_mapped)
+		WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
 
-		F_CLR(dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_OPEN);
+	/*
+	 * If we marked a handle dead it will be closed by sweep, via another
+	 * call to this function. Otherwise, we're done with this handle.
+	 */
+	if (!marked_dead) {
+		F_CLR(dhandle, WT_DHANDLE_OPEN);
 		if (dhandle->checkpoint == NULL)
 			--conn->open_btree_count;
 	}
 	WT_ASSERT(session,
-	    (F_ISSET(dhandle, WT_DHANDLE_DEAD) && !is_mapped) ||
+	    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
 err:	__wt_spin_unlock(session, &dhandle->close_lock);
