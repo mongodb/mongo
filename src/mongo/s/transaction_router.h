@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/string_map.h"
 
@@ -230,7 +231,7 @@ public:
      * Commits the transaction. For transactions with multiple participants, this will initiate
      * the two phase commit procedure.
      */
-    void commitTransaction(OperationContext* opCtx);
+    Shard::CommandResponse commitTransaction(OperationContext* opCtx);
 
     /**
      * Sends abort to all participants and returns the responses from all shards.
@@ -258,12 +259,12 @@ private:
     /**
      * Run basic commit for transactions that touched a single shard.
      */
-    void _commitSingleShardTransaction(OperationContext* opCtx);
+    Shard::CommandResponse _commitSingleShardTransaction(OperationContext* opCtx);
 
     /**
      * Run two phase commit for transactions that touched multiple shards.
      */
-    void _commitMultiShardTransaction(OperationContext* opCtx);
+    Shard::CommandResponse _commitMultiShardTransaction(OperationContext* opCtx);
 
     /**
      * Returns true if the current transaction can retry on a stale version error from a contacted

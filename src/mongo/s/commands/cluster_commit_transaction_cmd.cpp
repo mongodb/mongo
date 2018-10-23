@@ -77,7 +77,8 @@ public:
                 "commitTransaction can only be run within a context of a session",
                 txnRouter != nullptr);
 
-        txnRouter->commitTransaction(opCtx);
+        auto cmdResponse = txnRouter->commitTransaction(opCtx);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 } clusterCommitTransactionCmd;
