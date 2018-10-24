@@ -31,7 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <CommonCrypto/CommonDigest.h>
-#include <CommonCrypto/CommonHmac.h>
+#include <CommonCrypto/CommonHMAC.h>
 
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
