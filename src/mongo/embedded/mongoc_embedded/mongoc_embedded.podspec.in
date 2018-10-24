@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.homepage     = "https://www.mongodb.com"
   s.author       = { "MongoDB, Inc" => "cocoapods@mongodb.com" }
 
-  s.license      = { :type => "MongoDB Embedded License", :file => "iPhoneOS/Frameworks/mongoc_embedded/LICENSE-Embedded.txt" }
+  s.license      = { :type => "MongoDB Embedded License", :file => "iPhoneOS/Frameworks/mongoc_embedded.framework/LICENSE-Embedded.txt" }
 
   s.ios.deployment_target = "11.0"
   s.watchos.deployment_target = "4.3"
