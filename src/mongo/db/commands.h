@@ -50,9 +50,12 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DECLARE(failCommand);
 
 class Command;
 class CommandInvocation;
@@ -245,6 +248,16 @@ struct CommandHelpers {
     static Status canUseTransactions(StringData dbName, StringData cmdName);
 
     static constexpr StringData kHelpFieldName = "help"_sd;
+
+    /**
+     * Checks if the command passed in is in the list of failCommands defined in the fail point.
+     */
+    static bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName);
+
+    /**
+     * Possibly uasserts according to the "failCommand" fail point.
+     */
+    static void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName);
 };
 
 /**
@@ -333,7 +346,7 @@ public:
 
     /**
      * Return true if the command requires auth.
-    */
+     */
     virtual bool requiresAuth() const {
         return true;
     }

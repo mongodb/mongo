@@ -298,9 +298,20 @@ void execCommandClient(OperationContext* opCtx,
         } else {
             invocation->run(opCtx, result);
         }
+
+        auto body = result->getBodyBuilder();
+
+        MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+            return CommandHelpers::shouldActivateFailCommandFailPoint(data,
+                                                                      request.getCommandName()) &&
+                data.hasField("writeConcernError");
+        }) {
+            body.append(data.getData()["writeConcernError"]);
+        }
     }
 
     auto body = result->getBodyBuilder();
+
     bool ok = CommandHelpers::extractOrAppendOk(body);
     if (!ok) {
         c->incrementCommandsFailed();
@@ -388,6 +399,7 @@ void runCommand(OperationContext* opCtx,
         initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
 
     try {
+        CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName);
         if (osi.getAutocommit()) {
             scopedSession.emplace(opCtx);
 

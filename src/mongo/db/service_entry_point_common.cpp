@@ -92,7 +92,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(failCommand);
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
@@ -131,19 +130,6 @@ const StringMap<int> sessionCheckOutList = {{"abortTransaction", 1},
 
 const StringMap<int> skipSessionCheckOutList = {
     {"coordinateCommitTransaction", 1}, {"voteAbortTransaction", 1}, {"voteCommitTransaction", 1}};
-
-bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName) {
-    if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
-        return false;
-
-    for (auto&& failCommand : data.getObjectField("failCommands")) {
-        if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 void generateLegacyQueryErrorResponse(const AssertionException& exception,
                                       const QueryMessage& queryMessage,
@@ -476,7 +462,8 @@ bool runCommandImpl(OperationContext* opCtx,
 
         auto waitForWriteConcern = [&](auto&& bb) {
             MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-                return shouldActivateFailCommandFailPoint(data, request.getCommandName()) &&
+                return CommandHelpers::shouldActivateFailCommandFailPoint(
+                           data, request.getCommandName()) &&
                     data.hasField("writeConcernError");
             }) {
                 bb.append(data.getData()["writeConcernError"]);
@@ -533,34 +520,6 @@ bool runCommandImpl(OperationContext* opCtx,
 }
 
 /**
- * Maybe uassert according to the 'failCommand' fail point.
- */
-void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
-    MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-        return shouldActivateFailCommandFailPoint(data, commandName) &&
-            (data.hasField("closeConnection") || data.hasField("errorCode"));
-    }) {
-        bool closeConnection;
-        if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
-            closeConnection) {
-            opCtx->getClient()->session()->end();
-            log() << "Failing command '" << commandName
-                  << "' via 'failCommand' failpoint. Action: closing connection.";
-            uasserted(50838, "Failing command due to 'failCommand' failpoint");
-        }
-
-        long long errorCode;
-        if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
-            log() << "Failing command '" << commandName
-                  << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
-                  << ".";
-            uasserted(ErrorCodes::Error(errorCode),
-                      "Failing command due to 'failCommand' failpoint");
-        }
-    }
-}
-
-/**
  * Executes a command after stripping metadata, performing authorization checks,
  * handling audit impersonation, and (potentially) setting maintenance mode. This method
  * also checks that the command is permissible to run on the node given its current
@@ -597,7 +556,7 @@ void execCommandDatabase(OperationContext* opCtx,
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
 
-        evaluateFailCommandFailPoint(opCtx, command->getName());
+        CommandHelpers::evaluateFailCommandFailPoint(opCtx, command->getName());
 
         const auto dbname = request.getDatabase().toString();
         uassert(

@@ -40,6 +40,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -58,6 +59,7 @@
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/invariant.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -460,6 +462,46 @@ Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName)
 }
 
 constexpr StringData CommandHelpers::kHelpFieldName;
+
+MONGO_FAIL_POINT_DEFINE(failCommand);
+
+bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName) {
+    if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
+        return false;
+
+    for (auto&& failCommand : data.getObjectField("failCommands")) {
+        if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
+    MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+        return shouldActivateFailCommandFailPoint(data, commandName) &&
+            (data.hasField("closeConnection") || data.hasField("errorCode"));
+    }) {
+        bool closeConnection;
+        if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
+            closeConnection) {
+            opCtx->getClient()->session()->end();
+            log() << "Failing command '" << commandName
+                  << "' via 'failCommand' failpoint. Action: closing connection.";
+            uasserted(50985, "Failing command due to 'failCommand' failpoint");
+        }
+
+        long long errorCode;
+        if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
+            log() << "Failing command '" << commandName
+                  << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
+                  << ".";
+            uasserted(ErrorCodes::Error(errorCode),
+                      "Failing command due to 'failCommand' failpoint");
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////
 // CommandInvocation
