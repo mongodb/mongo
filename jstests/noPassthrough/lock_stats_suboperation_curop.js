@@ -62,10 +62,11 @@
     // Unlock the database. Sub-operation createCollection can proceed.
     db.fsyncUnlock();
 
-    // Wait for sub-operation createIndex to get blocked.
+    // Wait for sub-operation createIndex to get blocked after acquiring all the locks.
     let res;
     assert.soon(function() {
-        res = db.currentOp({"command.createIndexes": {$exists: true}});
+        res = db.currentOp(
+            {"command.createIndexes": {$exists: true}, "lockStats.Global": {$exists: true}});
         return res.inprog.length == 1;
     });
     jsTestLog(tojson(res.inprog[0]));
