@@ -1765,7 +1765,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // The stepdown attempt failed. We now release the global lock to allow secondaries
             // to read the oplog, then wait until enough secondaries are caught up for us to
             // finish stepdown.
-            transitionGuard.releaseGlobalLockForStepdownAttempt();
+            transitionGuard.releaseGlobalLock();
             invariant(!opCtx->lockState()->isLocked());
 
             // Make sure we re-acquire the global lock before returning so that we're always holding
@@ -1782,7 +1782,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 // clean up a failed stepdown attempt, we might as well spend whatever time we need
                 // to acquire it now.  For the same reason, we also disable lock acquisition
                 // interruption, to guarantee that we get the lock eventually.
-                transitionGuard.reacquireGlobalLockForStepdownAttempt();
+                transitionGuard.reacquireGlobalLock();
                 invariant(opCtx->lockState()->isW());
                 lk.lock();
             });

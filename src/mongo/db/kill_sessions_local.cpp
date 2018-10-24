@@ -110,15 +110,4 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     });
 }
 
-void killSessionsLocalAbortOrYieldAllTransactions(
-    OperationContext* opCtx, std::vector<std::pair<Locker*, Locker::LockSnapshot>>* yieldedLocks) {
-    SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(
-        opCtx, matcherAllSessions, [yieldedLocks](OperationContext* opCtx, Session* session) {
-            TransactionParticipant::getFromNonCheckedOutSession(session)
-                ->abortOrYieldArbitraryTransaction(yieldedLocks);
-        });
-}
-
 }  // namespace mongo

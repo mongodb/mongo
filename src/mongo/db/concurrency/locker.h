@@ -361,38 +361,11 @@ public:
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut) = 0;
 
     /**
-     * Like saveLockStateAndUnlock but allows saving locks from within a WUOW.  Used during
-     * replication state transitions for yielding locks held by prepared transactions.
-     */
-    virtual bool saveLockStateAndUnlockForPrepare(LockSnapshot* stateOut) = 0;
-
-    /**
      * Re-locks all locks whose state was stored in 'stateToRestore'.
      * @param opCtx An operation context that enables the restoration to be interrupted.
      */
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) = 0;
     virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
-
-    /**
-     * Works like restoreLockState but for any global locks in the state to restore, rather than
-     * restoring them into the true global lock resource owned by the LockManager,
-     * restores the global locks into the TemporaryResourceQueue for the global resource that is
-     * provided.  Locks on resources other than the global lock are restored to their true
-     * LockManager-owned resource objects.
-     * Also allows restoring locks from within a WUOW.
-     */
-    virtual void restoreLockStateWithTemporaryGlobalResource(
-        OperationContext* opCtx,
-        const LockSnapshot& stateToRestore,
-        LockManager::TemporaryResourceQueue* tempGlobalResource) = 0;
-
-    /**
-     * Atomically releases the global X lock from the true global resource managed by the
-     * LockManager and transfers the locks from the 'tempGlobalResource' into the true global
-     * resource.
-     */
-    virtual void replaceGlobalLockStateWithTemporaryGlobalResource(
-        LockManager::TemporaryResourceQueue* tempGlobalResource) = 0;
 
     /**
      * Releases the ticket associated with the Locker. This allows locks to be held without

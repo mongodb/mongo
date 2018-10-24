@@ -173,26 +173,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual bool saveLockStateAndUnlockForPrepare(LockSnapshot* stateOut) {
-        MONGO_UNREACHABLE;
-    }
-
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) {
         MONGO_UNREACHABLE;
     }
     virtual void restoreLockState(const LockSnapshot& stateToRestore) {
-        MONGO_UNREACHABLE;
-    }
-
-    void restoreLockStateWithTemporaryGlobalResource(
-        OperationContext* opCtx,
-        const LockSnapshot& stateToRestore,
-        LockManager::TemporaryResourceQueue* tempGlobalResource) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void replaceGlobalLockStateWithTemporaryGlobalResource(
-        LockManager::TemporaryResourceQueue* tempGlobalResource) override {
         MONGO_UNREACHABLE;
     }
 

@@ -39,7 +39,6 @@
 #include "mongo/config.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -660,102 +659,4 @@ TEST(LockerImpl, ConvertLockPendingUnlockAndUnlock) {
     locker.unlockGlobal();
 }
 
-/**
- * This test mimics the process that replica set state transitions go through.
- * First a request for the global X lock is enqueued, then the existing locks held by various
- * ongoing prepared transactions are yielded so that the global X lock request can succeed.
- * When the state transition is complete we then need to atomically restore the locks that were
- * yielded while dropping the global X lock that was held for the transition.
- */
-TEST(LockerImpl, AtomicLockRestoreAndGlobalLockReleaseForReplStateTransitions) {
-    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, "TestDB"_sd);
-    const ResourceId resIdCollection1(RESOURCE_COLLECTION, "TestDB.collection1"_sd);
-    const ResourceId resIdCollection2(RESOURCE_COLLECTION, "TestDB.collection2"_sd);
-    const ResourceId resIdCollection3(RESOURCE_COLLECTION, "TestDB.collection2"_sd);
-
-    Locker::LockSnapshot lockInfo1, lockInfo2, lockInfo3;
-    LockerImpl stepUpLocker, txnLocker1, txnLocker2, txnLocker3, randomOpLocker1, randomOpLocker2;
-    OperationContextNoop opCtx1, opCtx2, opCtx3;
-    ON_BLOCK_EXIT([&] {
-        // clean up locks on test completion.
-        stepUpLocker.unlockGlobal();
-        txnLocker1.unlockGlobal();
-        txnLocker2.unlockGlobal();
-        txnLocker3.unlockGlobal();
-        randomOpLocker1.unlockGlobal();
-        randomOpLocker2.unlockGlobal();
-    });
-
-    // Take some locks, mimicking the locks that would be held by ongoing prepared transactions.
-    txnLocker1.lockGlobal(&opCtx1, MODE_IX);
-    ASSERT_EQUALS(LOCK_OK, txnLocker1.lock(&opCtx1, resIdDatabase, MODE_IX));
-    ASSERT_EQUALS(LOCK_OK, txnLocker1.lock(&opCtx1, resIdCollection1, MODE_IX));
-    ASSERT_EQUALS(LOCK_OK, txnLocker1.lock(&opCtx1, resIdCollection2, MODE_IX));
-
-    txnLocker2.lockGlobal(&opCtx2, MODE_IX);
-    ASSERT_EQUALS(LOCK_OK, txnLocker2.lock(&opCtx2, resIdDatabase, MODE_IX));
-    ASSERT_EQUALS(LOCK_OK, txnLocker2.lock(&opCtx2, resIdCollection2, MODE_IX));
-
-    txnLocker3.lockGlobal(&opCtx3, MODE_IX);
-    ASSERT_EQUALS(LOCK_OK, txnLocker3.lock(&opCtx3, resIdDatabase, MODE_IX));
-    ASSERT_EQUALS(LOCK_OK, txnLocker3.lock(&opCtx3, resIdCollection3, MODE_IX));
-
-    // Enqueue request for global X lock in stepUpLocker, mimicking the lock held by the thread
-    // performing the state transition.
-    ASSERT_EQUALS(LockResult::LOCK_WAITING, stepUpLocker.lockGlobalBegin(MODE_X, Date_t::max()));
-
-    // Enqueue a lock request behind the pending global X request to ensure that it gets granted
-    // later when the global X lock is released.
-    ASSERT_EQUALS(LockResult::LOCK_WAITING,
-                  randomOpLocker1.lockGlobalBegin(MODE_IS, Date_t::max()));
-
-    // Yield locks on all txn threads.
-    ASSERT_TRUE(txnLocker1.saveLockStateAndUnlock(&lockInfo1));
-    ASSERT_TRUE(txnLocker2.saveLockStateAndUnlock(&lockInfo2));
-    ASSERT_TRUE(txnLocker3.saveLockStateAndUnlock(&lockInfo3));
-
-    // Ensure that stepUpLocker is now able to acquire the global X lock.
-    ASSERT_EQUALS(LockResult::LOCK_OK, stepUpLocker.lockGlobalComplete(Date_t::max()));
-
-    // Enqueue a lock request behind the global X lock to ensure that it gets granted
-    // later when the global X lock is released.
-    ASSERT_EQUALS(LockResult::LOCK_WAITING,
-                  randomOpLocker2.lockGlobalBegin(MODE_IX, Date_t::max()));
-
-    // Now we need to atomically release the global X lock from stepUpLocker and restore the lock
-    // state for the txn threads. We start by restoring the lock state from the txn threads with
-    // the global locks placed into a temporary LockHead.
-    LockManager::TemporaryResourceQueue tempGlobalResource(globalResId);
-
-    txnLocker1.restoreLockStateWithTemporaryGlobalResource(&opCtx1, lockInfo1, &tempGlobalResource);
-    txnLocker2.restoreLockStateWithTemporaryGlobalResource(&opCtx2, lockInfo2, &tempGlobalResource);
-    txnLocker3.restoreLockStateWithTemporaryGlobalResource(&opCtx3, lockInfo3, &tempGlobalResource);
-
-    // Atomically release the global X lock from stepUpLocker and move the global locks for the
-    // txn threads from the temporary LockHead into the true LockHead for the global lock.
-    stepUpLocker.replaceGlobalLockStateWithTemporaryGlobalResource(&tempGlobalResource);
-
-    // Make sure all the locks were acquired and released appropriately.
-    ASSERT_EQUALS(MODE_NONE, stepUpLocker.getLockMode(globalResId));
-
-    ASSERT_EQUALS(MODE_IX, txnLocker1.getLockMode(globalResId));
-    ASSERT_EQUALS(MODE_IX, txnLocker1.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_IX, txnLocker1.getLockMode(resIdCollection1));
-    ASSERT_EQUALS(MODE_IX, txnLocker1.getLockMode(resIdCollection2));
-
-    ASSERT_EQUALS(MODE_IX, txnLocker2.getLockMode(globalResId));
-    ASSERT_EQUALS(MODE_IX, txnLocker2.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_IX, txnLocker2.getLockMode(resIdCollection2));
-
-    ASSERT_EQUALS(MODE_IX, txnLocker3.getLockMode(globalResId));
-    ASSERT_EQUALS(MODE_IX, txnLocker3.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_IX, txnLocker3.getLockMode(resIdCollection3));
-
-    // Make sure the pending global lock requests got granted when the global X lock was released.
-    ASSERT_EQUALS(LockResult::LOCK_OK, randomOpLocker1.lockGlobalComplete(Date_t::now()));
-    ASSERT_EQUALS(LockResult::LOCK_OK, randomOpLocker2.lockGlobalComplete(Date_t::now()));
-    ASSERT_EQUALS(MODE_IS, randomOpLocker1.getLockMode(globalResId));
-    ASSERT_EQUALS(MODE_IX, randomOpLocker2.getLockMode(globalResId));
-}
 }  // namespace mongo
