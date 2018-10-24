@@ -207,7 +207,10 @@ class _TestList(object):
             else:
                 path = os.path.normpath(path)
                 if path not in self._roots:
-                    raise ValueError("Unrecognized test file: {}".format(path))
+                    raise ValueError(
+                        ("Excluded test file {} does not exist, perhaps it was renamed or removed"
+                         " , and should be modified in, or removed from, the exclude_files list.".
+                         format(path)))
                 self._filtered.discard(path)
 
     def match_tag_expression(self, tag_expression, get_tags):
