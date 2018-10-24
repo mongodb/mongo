@@ -139,7 +139,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		/* Allocate a WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session,
 		    value, &upd, &upd_size, modify_type));
-		WT_ERR(__wt_txn_modify(session, cbt, upd));
+		WT_ERR(__wt_txn_modify(session, upd));
 		logged = true;
 
 		/* Avoid a data copy in WT_CURSOR.update. */
@@ -200,7 +200,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		if (upd_arg == NULL) {
 			WT_ERR(__wt_update_alloc(session,
 			    value, &upd, &upd_size, modify_type));
-			WT_ERR(__wt_txn_modify(session, cbt, upd));
+			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
 			/* Avoid a data copy in WT_CURSOR.update. */
@@ -241,11 +241,21 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			WT_ERR(__wt_insert_serial(
 			    session, page, cbt->ins_head, cbt->ins_stack,
 			    &ins, ins_size, skipdepth, exclusive));
+
 	}
 
 	/* If the update was successful, add it to the in-memory log. */
-	if (logged && modify_type != WT_UPDATE_RESERVE)
+	if (logged && modify_type != WT_UPDATE_RESERVE) {
 		WT_ERR(__wt_txn_log_op(session, cbt));
+
+		/*
+		 * In case of append, the recno (key) for the value is assigned
+		 * now. Set the recno in the transaction operation to be used
+		 * incase this transaction is prepared to retrieve the update
+		 * corresponding to this operation.
+		 */
+		__wt_txn_op_set_recno(session, cbt->recno);
+	}
 
 	if (0) {
 err:		/*

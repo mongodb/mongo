@@ -250,6 +250,10 @@ static CONFIG c[] = {
 	  "the number of LSM worker threads",
 	  0x0, 3, 4, 20, &g.c_lsm_worker_threads, NULL },
 
+	{ "memory_page_max",
+	  "maximum size of in-memory pages",
+	  0x0, 1, 10, 128, &g.c_memory_page_max, NULL },
+
 	{ "merge_max",
 	  "the maximum number of chunks to include in a merge operation",
 	  0x0, 4, 20, 100, &g.c_merge_max, NULL },

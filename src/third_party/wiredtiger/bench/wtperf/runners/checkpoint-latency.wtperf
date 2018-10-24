@@ -1,0 +1,25 @@
+# A stress configuration to create checkpoints while doing a mix of inserts
+# and reads.
+conn_config="cache_size=1200MB,eviction=(threads_max=8),log=(enabled=false)"
+table_config="leaf_page_max=32k,internal_page_max=16k,allocation_size=4k,split_pct=90,type=file"
+# Enough data for 10x cache. 200k records sized 60k = 12G
+# tables
+checkpoint_interval=60
+checkpoint_threads=1
+create=true
+close_conn=false
+icount=200000
+log_like_table=true
+populate_threads=4
+report_interval=1
+# Run for a longer duration to ensure checkpoints are completing.
+run_time=1200
+sample_interval=1
+sample_rate=1
+# MongoDB always has multiple tables, and checkpoints behave differently when
+# there is more than a single table.
+table_count=10
+threads=((count=8,inserts=1,throttle=125),(count=8,reads=1,throttle=500))
+value_sz=60000
+# Wait for the throughput to stabilize
+warmup=120

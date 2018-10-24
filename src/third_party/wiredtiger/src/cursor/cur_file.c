@@ -389,16 +389,31 @@ __curfile_remove(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t time_start, time_stop;
+	bool positioned;
+
+	/*
+	 * WT_CURSOR.remove has a unique semantic, the cursor stays positioned
+	 * if it starts positioned, otherwise clear the cursor on completion.
+	 * Track if starting with a positioned cursor and pass that information
+	 * into the underlying Btree remove function so it tries to maintain a
+	 * position in the tree. This is complicated by the loop in this code
+	 * that restarts operations if they return prepare-conflict or restart.
+	 */
+	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
 	time_start = __wt_clock(session);
-	WT_ERR(__wt_btcur_remove(cbt));
+	WT_ERR(__wt_btcur_remove(cbt, positioned));
 	time_stop = __wt_clock(session);
 	__wt_stat_usecs_hist_incr_opwrite(session,
 	    WT_CLOCKDIFF_US(time_stop, time_start));
+
+	/* If we've lost an initial position, we must fail. */
+	if (positioned && !F_ISSET(cursor, WT_CURSTD_KEY_INT))
+		WT_ERR(WT_ROLLBACK);
 
 	/*
 	 * Remove with a search-key is fire-and-forget, no position and no key.
@@ -552,43 +567,51 @@ __curfile_reopen(WT_CURSOR *cursor, bool check_only)
 	WT_SESSION_IMPL *session;
 	bool is_dead;
 
-	is_dead = false;
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	session = (WT_SESSION_IMPL *)cursor->session;
 	dhandle = cbt->dhandle;
+	session = (WT_SESSION_IMPL *)cursor->session;
 
-	if (!WT_DHANDLE_CAN_REOPEN(dhandle))
+	if (check_only)
+		return (WT_DHANDLE_CAN_REOPEN(dhandle) ? 0 : WT_NOTFOUND);
+
+	session->dhandle = dhandle;
+
+	/*
+	 * Lock the handle: we're only interested in open handles, any other
+	 * state disqualifies the cache.
+	 */
+	ret = __wt_session_lock_dhandle(session, 0, &is_dead);
+	if (!is_dead && ret == 0 && !F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+		WT_RET(__wt_session_release_dhandle(session));
+		ret = __wt_set_return(session, EBUSY);
+	}
+
+	/*
+	 * The data handle may not be available, in which case handle it like a
+	 * dead handle: fail the reopen, and flag the cursor so that the handle
+	 * won't be unlocked when subsequently closed.
+	 */
+	if (is_dead || ret == EBUSY) {
+		F_SET(cursor, WT_CURSTD_DEAD);
 		ret = WT_NOTFOUND;
-	if (!check_only) {
-		session->dhandle = dhandle;
-		WT_TRET(__wt_session_lock_dhandle(session, 0, &is_dead));
+	}
+	__wt_cursor_reopen(cursor, dhandle);
 
-		/*
-		 * If we get a busy return, the data handle may be involved
-		 * in an exclusive operation. We'll treat it in the same
-		 * way as a dead handle: fail the reopen, and flag the
-		 * cursor so that the handle won't be unlocked when it
-		 * is subsequently closed.
-		 */
-		if (is_dead || ret == EBUSY) {
-			F_SET(cursor, WT_CURSTD_DEAD);
-			ret = WT_NOTFOUND;
-		}
-		__wt_cursor_reopen(cursor, dhandle);
+	/*
+	 * The btree handle may have been reopened since we last accessed it.
+	 * Reset fields in the cursor that point to memory owned by the btree
+	 * handle.
+	 */
+	if (ret == 0) {
+		/* Assert a valid tree (we didn't race with eviction). */
+		WT_ASSERT(session, dhandle->type == WT_DHANDLE_TYPE_BTREE);
+		WT_ASSERT(session,
+		    ((WT_BTREE *)dhandle->handle)->root.page != NULL);
 
-		/*
-		 * The btree handle may have been reopened since we last
-		 * accessed it.  Reset fields in the cursor that point to
-		 * memory owned by the btree handle.
-		 */
-		if (ret == 0) {
-			WT_ASSERT(session,
-			    dhandle->type == WT_DHANDLE_TYPE_BTREE);
-			cbt->btree = dhandle->handle;
-			cursor->internal_uri = cbt->btree->dhandle->name;
-			cursor->key_format = cbt->btree->key_format;
-			cursor->value_format = cbt->btree->value_format;
-		}
+		cbt->btree = dhandle->handle;
+		cursor->internal_uri = cbt->btree->dhandle->name;
+		cursor->key_format = cbt->btree->key_format;
+		cursor->value_format = cbt->btree->value_format;
 	}
 	return (ret);
 }

@@ -76,7 +76,8 @@ class Translator:
         self.error(msg)
         raise TranslateException(errtype)
 
-    supported_opt_list = [ 'close_conn', 'compression', 'compact',
+    supported_opt_list = [ 'checkpoint_interval', 'checkpoint_threads',
+                           'close_conn', 'compact', 'compression',
                            'conn_config', 'create', 'icount',
                            'key_sz', 'log_like_table', 'pareto',
                            'populate_ops_per_txn', 'populate_threads',
@@ -219,13 +220,14 @@ class Translator:
                       str(factor) + ' to compensate for log_like operations.\n'
         return (new_throttle, comment)
 
-    def parse_threads(self, threads_config):
+    def parse_threads(self, threads_config, checkpoint_threads):
         opts = self.options
         tdecls = ''
         tlist = self.split_config_parens(threads_config)
         table_count = self.get_int_opt('table_count', 1)
         log_like_table = self.get_boolean_opt('log_like_table', False)
         txn_config = self.get_string_opt('transaction_config', '')
+        checkpoint_interval = self.get_int_opt('checkpoint_interval', 120)
         run_ops = self.get_int_opt('run_ops', -1)
         if log_like_table:
             tdecls += 'log_name = "table:log"\n'
@@ -315,6 +317,18 @@ class Translator:
             tdecls += '\n'
             if topts.count > 1:
                 tnames += str(topts.count) + ' * '
+            tnames += thread_name + ' + '
+
+        if checkpoint_threads != 0:
+            thread_name = 'checkpoint_thread'
+
+            tdecls += 'ops = Operation(Operation.OP_SLEEP, "' + \
+                str(checkpoint_interval) + \
+                '") + \\\n      Operation(Operation.OP_CHECKPOINT, "")\n'
+            tdecls += thread_name + ' = Thread(ops)\n'
+            tdecls += '\n'
+            if checkpoint_threads > 1:
+                tnames += str(checkpoint_threads) + ' * '
             tnames += thread_name + ' + '
 
         tnames = tnames.rstrip(' +')
@@ -552,8 +566,10 @@ class Translator:
             s += self.translate_populate()
 
         thread_config = self.get_string_opt('threads', '')
-        if thread_config != '':
-            (t_create, t_var) = self.parse_threads(thread_config)
+        checkpoint_threads = self.get_int_opt('checkpoint_threads', 0)
+        if thread_config != '' or checkpoint_threads != 0:
+            (t_create, t_var) = self.parse_threads(thread_config,
+                                                   checkpoint_threads)
             s += '\n' + t_create
             if reopen_connection:
                 s += '\n# reopen the connection\n'

@@ -38,8 +38,9 @@
 #define	RM_COMMAND		"rm -rf "
 #endif
 
-#define	DEFAULT_DIR	"WT_TEST"
-#define	MKDIR_COMMAND	"mkdir "
+#define	DEFAULT_DIR		"WT_TEST"
+#define	DEFAULT_TABLE_SCHEMA	"key_format=i,value_format=S"
+#define	MKDIR_COMMAND		"mkdir "
 
 #ifdef _WIN32
 #include "windows_shim.h"
@@ -56,6 +57,7 @@ typedef struct {
 	} table_type;
 	bool	     preserve;			/* Don't remove files on exit */
 	bool	     verbose;			/* Run in verbose mode */
+	bool	     do_data_ops;		/* Have schema ops use data */
 	uint64_t     nrecords;			/* Number of records */
 	uint64_t     nops;			/* Number of operations */
 	uint64_t     nthreads;			/* Number of threads */

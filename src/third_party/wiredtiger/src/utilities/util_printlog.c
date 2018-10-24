@@ -16,16 +16,14 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	uint32_t flags;
 	int ch;
+	char *ofile;
 
 	flags = 0;
+	ofile = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "f:x")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
-			if (freopen(__wt_optarg, "w", stdout) == NULL) {
-				fprintf(stderr, "%s: %s: reopen: %s\n",
-				    progname, __wt_optarg, strerror(errno));
-				return (1);
-			}
+			ofile = __wt_optarg;
 			break;
 		case 'x':			/* hex output */
 			LF_SET(WT_TXN_PRINTLOG_HEX);
@@ -40,7 +38,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((ret = __wt_txn_printlog(session, flags)) != 0)
+	if ((ret = __wt_txn_printlog(session, ofile, flags)) != 0)
 		(void)util_err(session, ret, "printlog");
 
 	return (ret);

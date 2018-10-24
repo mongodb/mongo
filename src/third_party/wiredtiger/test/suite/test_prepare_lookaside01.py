@@ -100,7 +100,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
 
         # Close all cursors and sessions, this will cause prepared updates to be
         # rollback-ed
-        for j in range (1, nsessions):
+        for j in range (0, nsessions):
             cursors[j].close()
             sessions[j].close()
 
@@ -127,9 +127,7 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         # Check if lookaside is working properly with prepare transactions.
         # We put prepared updates in multiple sessions so that we do not hang
         # because of cache being full with uncommitted updates.
-        # TODO: Increase the nsessions below to start testing lookaside eviction
-        # of prepared updates.
-        nsessions = 1
+        nsessions = 3
         nkeys = 4000
         self.prepare_updates(uri, ds, nrows, nsessions, nkeys)
 

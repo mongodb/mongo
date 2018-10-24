@@ -176,6 +176,48 @@ struct ContextInternal {
     int create_all();
 };
 
+struct OperationInternal {
+#define	WORKGEN_OP_REOPEN		0x0001 // reopen cursor for each op
+    uint32_t _flags;
+
+    OperationInternal() : _flags(0) {}
+    OperationInternal(const OperationInternal &other) : _flags(other._flags) {}
+    virtual ~OperationInternal() {}
+    virtual void parse_config(const std::string &config) {}
+    virtual int run(ThreadRunner *runner, WT_SESSION *session) {
+	(void)runner; (void)session; return (0); }
+};
+
+struct CheckpointOperationInternal : OperationInternal {
+    CheckpointOperationInternal() : OperationInternal() {}
+    CheckpointOperationInternal(const CheckpointOperationInternal &other) {}
+    virtual int run(ThreadRunner *runner, WT_SESSION *session);
+};
+
+struct TableOperationInternal : OperationInternal {
+    uint_t _keysize;    // derived from Key._size and Table.options.key_size
+    uint_t _valuesize;
+    uint_t _keymax;
+    uint_t _valuemax;
+
+    TableOperationInternal() : OperationInternal(), _keysize(0), _valuesize(0),
+			       _keymax(0),_valuemax(0) {}
+    TableOperationInternal(const TableOperationInternal &other) :
+	_keysize(other._keysize), _valuesize(other._valuesize),
+	_keymax(other._keymax), _valuemax(other._valuemax) {}
+    virtual void parse_config(const std::string &config);
+};
+
+struct SleepOperationInternal : OperationInternal {
+    float _sleepvalue;
+
+    SleepOperationInternal() : OperationInternal(), _sleepvalue(0) {}
+    SleepOperationInternal(const SleepOperationInternal &other) :
+	_sleepvalue(other._sleepvalue) {}
+    virtual void parse_config(const std::string &config);
+    virtual int run(ThreadRunner *runner, WT_SESSION *session);
+};
+
 struct TableInternal {
     tint_t _tint;
     uint32_t _context_count;

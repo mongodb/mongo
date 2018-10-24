@@ -119,7 +119,7 @@ __wt_session_lock_dhandle(
 	WT_DECL_RET;
 	bool is_open, lock_busy, want_exclusive;
 
-	*is_deadp = 0;
+	*is_deadp = false;
 
 	dhandle = session->dhandle;
 	btree = dhandle->handle;
@@ -158,7 +158,7 @@ __wt_session_lock_dhandle(
 	for (;;) {
 		/* If the handle is dead, give up. */
 		if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
-			*is_deadp = 1;
+			*is_deadp = true;
 			return (0);
 		}
 
@@ -182,7 +182,7 @@ __wt_session_lock_dhandle(
 		    (!want_exclusive || lock_busy)) {
 			__wt_readlock(session, &dhandle->rwlock);
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
-				*is_deadp = 1;
+				*is_deadp = true;
 				__wt_readunlock(session, &dhandle->rwlock);
 				return (0);
 			}
@@ -203,7 +203,7 @@ __wt_session_lock_dhandle(
 		if ((ret =
 		    __wt_try_writelock(session, &dhandle->rwlock)) == 0) {
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
-				*is_deadp = 1;
+				*is_deadp = true;
 				__wt_writeunlock(session, &dhandle->rwlock);
 				return (0);
 			}

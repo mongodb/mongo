@@ -27,12 +27,12 @@
  */
 
 /*
- * This test simulates system crashes. It uses direct IO, and currently
+ * This test simulates system crashes. It uses direct I/O, and currently
  * runs only on Linux.
  *
  * Our strategy is to run a subordinate 'writer' process that creates/modifies
  * data, including schema modifications. Every N seconds, asynchronously, we
- * send a stop signal to the writer and then copy (with direct IO) the entire
+ * send a stop signal to the writer and then copy (with direct I/O) the entire
  * contents of its database home to a new saved location where we can run and
  * verify the recovered home. Then we send a continue signal. We repeat this:
  *
@@ -41,7 +41,7 @@
  * which allows the writer to make continuing progress, while the main
  * process is verifying what's on disk.
  *
- * By using stop signal to suspend the process and copying with direct IO,
+ * By using stop signal to suspend the process and copying with direct I/O,
  * we are roughly simulating a system crash, by seeing what's actually on
  * disk (not in file system buffer cache) at the moment that the copy is
  * made. It's not quite as harsh as a system crash, as suspending does not
@@ -68,6 +68,7 @@
  */
 
 #include "test_util.h"
+#include "util.h"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -75,12 +76,7 @@
 
 static char home[1024];			/* Program working dir */
 
-/*
- * These two names for the URI and file system must be maintained in tandem.
- */
 static const char * const uri_main = "table:main";
-static const char * const fs_main = "main.wt";
-
 static const char * const uri_rev = "table:rev";
 
 /*
@@ -179,12 +175,13 @@ static const char * const uri_rev = "table:rev";
 #define	SCHEMA_DATA_CHECK	0x0004
 #define	SCHEMA_DROP		0x0008
 #define	SCHEMA_DROP_CHECK	0x0010
-#define	SCHEMA_RENAME		0x0020
-#define	SCHEMA_VERBOSE		0x0040
+#define	SCHEMA_INTEGRATED	0x0020
+#define	SCHEMA_RENAME		0x0040
+#define	SCHEMA_VERBOSE		0x0080
 #define	SCHEMA_ALL					\
 	(SCHEMA_CREATE | SCHEMA_CREATE_CHECK |	\
 	    SCHEMA_DATA_CHECK | SCHEMA_DROP |	\
-	    SCHEMA_DROP_CHECK | SCHEMA_RENAME)
+	    SCHEMA_DROP_CHECK | SCHEMA_INTEGRATED | SCHEMA_RENAME)
 
 extern int __wt_optind;
 extern char *__wt_optarg;
@@ -234,6 +231,8 @@ usage(void)
 	    "newly created tables are checked (requires create)");
 	fprintf(stderr, "  %-5s%-15s%s\n", "", "data_check",
 	    "check contents of files for various ops (requires create)");
+	fprintf(stderr, "  %-5s%-15s%s\n", "", "integrated",
+	    "schema operations are integrated into main table transactions");
 	fprintf(stderr, "  %-5s%-15s%s\n", "", "rename",
 	    "rename tables (requires create)");
 	fprintf(stderr, "  %-5s%-15s%s\n", "", "drop",
@@ -538,6 +537,16 @@ again:
 		testutil_check(rev->insert(rev));
 
 		/*
+		 * If we are not running integrated tests, then we commit the
+		 * transaction now so that schema operations are not part of
+		 * the transaction operations for the main table.  If we are
+		 * running 'integrated' then we'll first do the schema
+		 * operations and commit later.
+		 */
+		if (!F_ISSET(td, SCHEMA_INTEGRATED))
+			testutil_check(session->commit_transaction(session,
+			    NULL));
+		/*
 		 * If we are doing a schema test, generate operations
 		 * for additional tables.  Each table has a 'lifetime'
 		 * of 4 values of the id.
@@ -556,29 +565,71 @@ again:
 				ret = schema_operation(session, td->id, i, op,
 				    td->flags);
 			if (ret == EBUSY) {
-				testutil_check(session->rollback_transaction(
-				    session, NULL));
+				/*
+				 * Only rollback if integrated and we have
+				 * an active transaction.
+				 */
+				if (F_ISSET(td, SCHEMA_INTEGRATED))
+					testutil_check(
+					    session->rollback_transaction(
+					    session, NULL));
 				sleep(1);
 				goto again;
 			}
 		}
-		testutil_check(session->commit_transaction(session, NULL));
+		/*
+		 * If schema operations are integrated, commit the transaction
+		 * now that they're complete.
+		 */
+		if (F_ISSET(td, SCHEMA_INTEGRATED))
+			testutil_check(session->commit_transaction(session,
+			    NULL));
 	}
 	/* NOTREACHED */
 }
 
 /*
+ * create_db --
+ *	Creates the database and tables so they are fully ready to be
+ *	accessed by subordinate threads, and copied/recovered.
+ */
+static void
+create_db(const char *method)
+{
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	char envconf[512];
+
+	testutil_check(__wt_snprintf(envconf, sizeof(envconf),
+	    ENV_CONFIG, method));
+
+	testutil_check(wiredtiger_open(home, NULL, envconf, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->create(
+	    session, uri_main, "key_format=S,value_format=S"));
+	testutil_check(session->create(
+	    session, uri_rev, "key_format=S,value_format=S"));
+	/*
+	 * Checkpoint to help ensure that everything gets out to disk,
+	 * so any direct I/O copy will have at least have tables that
+	 * can be opened.
+	 */
+	testutil_check(session->checkpoint(session, NULL));
+	testutil_check(session->close(session, NULL));
+	testutil_check(conn->close(conn, NULL));
+}
+
+/*
  * fill_db --
- *	The child process creates the database and table, and then creates
- *	worker threads to add data until it is killed by the parent.
+ *	The child process creates worker threads to add data until it is
+ *	killed by the parent.
  */
 static void fill_db(uint32_t, uint32_t, const char *, uint32_t)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
-    fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
+fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_THREAD_DATA *td;
 	wt_thread_t *thr;
 	uint32_t i;
@@ -592,17 +643,6 @@ static void
 	    ENV_CONFIG, method));
 
 	testutil_check(wiredtiger_open(".", NULL, envconf, &conn));
-	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	testutil_check(session->create(
-	    session, uri_main, "key_format=S,value_format=S"));
-	testutil_check(session->create(
-	    session, uri_rev, "key_format=S,value_format=S"));
-	/*
-	 * Checkpoint to help ensure that at least the main tables
-	 * can be opened after recovery.
-	 */
-	testutil_check(session->checkpoint(session, NULL));
-	testutil_check(session->close(session, NULL));
 
 	datasize += 1;   /* Add an extra byte for string termination */
 	printf("Create %" PRIu32 " writer threads\n", nth);
@@ -725,7 +765,7 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid,
 {
 	char uri[50], uri2[50];
 
-	if (!LF_ISSET(SCHEMA_ALL))
+	if (!LF_ISSET(SCHEMA_ALL) || !LF_ISSET(SCHEMA_INTEGRATED))
 		return;
 
 	if (LF_ISSET(SCHEMA_VERBOSE))
@@ -786,15 +826,14 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid,
 static bool
 check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 {
-	struct sigaction sa;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *meta, *rev;
 	WT_SESSION *session;
 	uint64_t gotid, id;
 	uint64_t *lastid;
 	uint32_t gotth, kvsize, th, threadmap;
-	int ret, status;
-	char buf[4096];
+	int ret;
+	char checkdir[4096], savedir[4096];
 	char *gotkey, *gotvalue, *keybuf, *p;
 	char **large_arr;
 
@@ -806,36 +845,24 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 		large_arr[th] = dcalloc(LARGE_WRITE_SIZE, 1);
 		large_buf(large_arr[th], LARGE_WRITE_SIZE, th, true);
 	}
+	testutil_check(__wt_snprintf(checkdir, sizeof(checkdir),
+	    "%s.CHECK", home));
+	testutil_check(__wt_snprintf(savedir, sizeof(savedir),
+	    "%s.SAVE", home));
 
 	/*
-	 * We make a copy of the directory (possibly using direct IO)
+	 * We make a copy of the directory (possibly using direct I/O)
 	 * for recovery and checking, and an identical copy that
 	 * keeps the state of all files before recovery starts.
 	 */
-	testutil_check(__wt_snprintf(buf, sizeof(buf),
-	    "H='%s'; C=$H.CHECK; S=$H.SAVE; rm -rf $C $S;"
-	    " mkdir $C; for f in `ls $H/`; do "
-	    " dd if=$H/$f of=$C/$f bs=4096 %s >/dev/null 2>&1 || exit 1; done;"
-	    " cp -pr $C $S",
-	    home, directio ? "iflag=direct" : ""));
 	printf(
 	    "Copy database home directory using direct I/O to run recovery,\n"
 	    "along with a saved 'pre-recovery' copy.\n");
-	printf("Shell command: %s\n", buf);
-
-	/* Temporarily turn off the child handler while running 'system' */
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = SIG_DFL;
-	testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-	if ((status = system(buf)) < 0)
-		testutil_die(status, "system: %s", buf);
-	sa.sa_handler = handler;
-	testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-
-	testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.CHECK", home));
+	copy_directory(home, checkdir, directio);
+	copy_directory(checkdir, savedir, false);
 
 	printf("Open database, run recovery and verify content\n");
-	testutil_check(wiredtiger_open(buf, NULL, ENV_CONFIG_REC, &conn));
+	testutil_check(wiredtiger_open(checkdir, NULL, ENV_CONFIG_REC, &conn));
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	testutil_check(session->open_cursor(session, uri_main, NULL, NULL,
 	    &cursor));
@@ -1064,7 +1091,6 @@ int
 main(int argc, char *argv[])
 {
 	struct sigaction sa;
-	struct stat sb;
 	WT_RAND_STATE rnd;
 	pid_t pid;
 	size_t size;
@@ -1152,6 +1178,8 @@ main(int argc, char *argv[])
 					LF_SET(SCHEMA_DROP);
 				else if (WT_STREQ(arg, "drop_check"))
 					LF_SET(SCHEMA_DROP_CHECK);
+				else if (WT_STREQ(arg, "integrated"))
+					LF_SET(SCHEMA_INTEGRATED);
 				else if (WT_STREQ(arg, "none"))
 					flags = 0;
 				else if (WT_STREQ(arg, "rename"))
@@ -1201,6 +1229,12 @@ main(int argc, char *argv[])
 		fprintf(stderr, "Schema operations incompatible\n");
 		usage();
 	}
+	if (!LF_ISSET(SCHEMA_INTEGRATED) &&
+	    LF_ISSET(SCHEMA_CREATE_CHECK|SCHEMA_DATA_CHECK|SCHEMA_DROP_CHECK)) {
+		fprintf(stderr, "Schema '*check' options cannot be used "
+		    "without 'integrated'\n");
+		usage();
+	}
 	printf("CONFIG:%s\n", args);
 	if (!verify_only) {
 		testutil_check(__wt_snprintf(buf, sizeof(buf),
@@ -1223,6 +1257,7 @@ main(int argc, char *argv[])
 		printf("Parent: Create %" PRIu32
 		    " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
 
+		create_db(method);
 		if (!populate_only) {
 			/*
 			 * Fork a child to insert as many items.  We will
@@ -1244,14 +1279,8 @@ main(int argc, char *argv[])
 		/* parent */
 		/*
 		 * Sleep for the configured amount of time before killing
-		 * the child.  Start the timeout from the time we notice that
-		 * the table has been created.  That allows the test to run
-		 * correctly on really slow machines.
+		 * the child.
 		 */
-		testutil_check(__wt_snprintf(
-		    buf, sizeof(buf), "%s/%s", home, fs_main));
-		while (stat(buf, &sb) != 0 || sb.st_size < 4096)
-			testutil_sleep_wait(1, pid);
 		testutil_sleep_wait(timeout, pid);
 
 		/*
