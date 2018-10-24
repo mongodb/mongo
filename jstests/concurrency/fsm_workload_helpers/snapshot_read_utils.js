@@ -41,7 +41,7 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
 
     if (!cursor) {
         abortTransaction(data.sessionDb, data.txnNumber, [ErrorCodes.NoSuchTransaction]);
-        data.cursorId = 0;
+        data.cursorId = NumberLong(0);
     } else {
         assert(cursor.hasOwnProperty("firstBatch"), tojson(res));
         assert.eq(0, cursor.firstBatch.length, tojson(res));
@@ -57,7 +57,7 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
  */
 function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionErrorCodes) {
     // doSnapshotGetMore may be called even if doSnapshotFind fails to obtain a cursor.
-    if (!data.cursorId) {
+    if (bsonWoCompare({_: data.cursorId}, {_: NumberLong(0)}) === 0) {
         return;
     }
     const getMoreCmd = {

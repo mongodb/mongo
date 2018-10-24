@@ -38,9 +38,7 @@ var $config = (function() {
             ];
             const commitTransactionErrorCodes = readErrorCodes;
             doSnapshotFind(sortByAscending, collName, this, readErrorCodes);
-            if (this.cursorId) {
-                doSnapshotGetMore(collName, this, readErrorCodes, commitTransactionErrorCodes);
-            }
+            doSnapshotGetMore(collName, this, readErrorCodes, commitTransactionErrorCodes);
         },
 
         insertDocs: function insertDocs(db, collName) {
