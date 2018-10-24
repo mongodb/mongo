@@ -71,7 +71,7 @@ CollectionInfoCacheImpl::~CollectionInfoCacheImpl() {
     // Necessary because the collection cache will not explicitly get updated upon database drop.
     if (_hasTTLIndex) {
         TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-        ttlCollectionCache.unregisterCollection(_collection->ns());
+        ttlCollectionCache.unregisterCollection(_ns);
     }
 }
 
