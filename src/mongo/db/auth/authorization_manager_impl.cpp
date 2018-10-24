@@ -53,7 +53,6 @@
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -74,10 +73,10 @@
 namespace mongo {
 namespace {
 
+using std::back_inserter;
 using std::begin;
 using std::end;
 using std::endl;
-using std::back_inserter;
 using std::string;
 using std::vector;
 
@@ -419,22 +418,19 @@ bool AuthorizationManagerImpl::isAuthEnabled() const {
 }
 
 bool AuthorizationManagerImpl::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    stdx::unique_lock<stdx::mutex> lk(_privilegeDocsExistMutex);
-    if (_privilegeDocsExist) {
+    if (_privilegeDocsExist.load()) {
         // If we know that a user exists, don't re-check.
         return true;
     }
 
-    lk.unlock();
     auto stateLk = _externalState->lock(opCtx);
     bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(opCtx);
-    lk.lock();
 
     if (privDocsExist) {
-        _privilegeDocsExist = true;
+        _privilegeDocsExist.store(true);
     }
 
-    return _privilegeDocsExist;
+    return _privilegeDocsExist.load();
 }
 
 Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user,

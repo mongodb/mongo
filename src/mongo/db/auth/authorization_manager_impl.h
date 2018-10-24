@@ -50,6 +50,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -203,10 +204,7 @@ private:
     /**
      * A cache of whether there are any users set up for the cluster.
      */
-    bool _privilegeDocsExist;
-
-    // Protects _privilegeDocsExist
-    mutable stdx::mutex _privilegeDocsExistMutex;
+    AtomicBool _privilegeDocsExist;
 
     std::unique_ptr<AuthzManagerExternalState> _externalState;
 
