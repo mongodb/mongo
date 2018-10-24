@@ -463,10 +463,36 @@ double ProcessInfo::getSystemMemoryPressurePercentage() {
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
-    if (ru.ru_majflt <= std::numeric_limits<long long>::max())
-        info.appendNumber("page_faults", static_cast<long long>(ru.ru_majflt));
-    else
-        info.appendNumber("page_faults", static_cast<double>(ru.ru_majflt));
+
+    /*
+     * The actual rusage struct only works in terms of longs and time_ts.
+     * Since both are system dependent, I am converting to int64_t and taking a small hit from the
+     * FP processor and the BSONBuilder compression. At worst, this calls 100x/sec.
+     */
+    auto appendTime = [&info](StringData fieldName, struct timeval tv) {
+        auto value = (static_cast<int64_t>(tv.tv_sec) * 1000 * 1000) + tv.tv_usec;
+        info.append(fieldName, value);
+    };
+
+    auto appendNumber = [&info](StringData fieldName, auto value) {
+        info.append(fieldName, static_cast<int64_t>(value));
+    };
+
+    appendTime("user_time_us", ru.ru_utime);
+    appendTime("system_time_us", ru.ru_stime);
+
+    // ru_maxrss is duplicated in getResidentSizeInPages
+    // (/proc may or may not use getrusage(2) as well)
+    appendNumber("maximum_resident_set_kb", ru.ru_maxrss);
+
+    appendNumber("input_blocks", ru.ru_inblock);
+    appendNumber("output_blocks", ru.ru_oublock);
+
+    appendNumber("page_reclaims", ru.ru_minflt);
+    appendNumber("page_faults", ru.ru_majflt);
+
+    appendNumber("voluntary_context_switches", ru.ru_nvcsw);
+    appendNumber("involuntary_context_switches", ru.ru_nivcsw);
 }
 
 /**
