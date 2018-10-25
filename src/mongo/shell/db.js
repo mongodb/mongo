@@ -595,10 +595,11 @@ var DB;
         print(
             "\tdb.copyDatabase(fromdb, todb, fromhost) - will only function with MongoDB 4.0 and below");
         print("\tdb.createCollection(name, {size: ..., capped: ..., max: ...})");
-        print("\tdb.createView(name, viewOn, [{$operator: {...}}, ...], {viewOptions})");
         print("\tdb.createUser(userDocument)");
+        print("\tdb.createView(name, viewOn, [{$operator: {...}}, ...], {viewOptions})");
         print("\tdb.currentOp() displays currently executing operations in the db");
         print("\tdb.dropDatabase()");
+        print("\tdb.dropUser(username)");
         print("\tdb.eval() - deprecated");
         print("\tdb.fsyncLock() flush data to disk and lock server for backups");
         print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
@@ -630,22 +631,20 @@ var DB;
         print("\tdb.printReplicationInfo()");
         print("\tdb.printShardingStatus()");
         print("\tdb.printSlaveReplicationInfo()");
-        print("\tdb.dropUser(username)");
         print("\tdb.resetError()");
         print(
             "\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into {cmdObj: 1}");
         print("\tdb.serverStatus()");
         print("\tdb.setLogLevel(level,<component>)");
         print("\tdb.setProfilingLevel(level,slowms) 0=off 1=slow 2=all");
+        print("\tdb.setVerboseShell(flag) display extra information in shell output");
         print(
             "\tdb.setWriteConcern(<write concern doc>) - sets the write concern for writes to the db");
-        print(
-            "\tdb.unsetWriteConcern(<write concern doc>) - unsets the write concern for writes to the db");
-        print("\tdb.setVerboseShell(flag) display extra information in shell output");
         print("\tdb.shutdownServer()");
         print("\tdb.stats()");
+        print(
+            "\tdb.unsetWriteConcern(<write concern doc>) - unsets the write concern for writes to the db");
         print("\tdb.version() current version of the server");
-
         return __magicNoPrint;
     };
 
