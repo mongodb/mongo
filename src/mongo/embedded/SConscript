@@ -1,6 +1,6 @@
 # -*- mode: python; -*-
 
-# -*- mode: python; -*-
+import re
 
 Import("env")
 Import("get_option")
@@ -15,6 +15,7 @@ env.AppendUnique(
 # they can both use it.
 
 frameworksEnv = env.Clone()
+
 def mongo_export_file_generator(target, source, env, for_signature):
     if env.ToolchainIs('msvc'):
         script = env.File(env.subst("${TARGET.base}.def", target=target))
@@ -28,6 +29,22 @@ def mongo_export_file_generator(target, source, env, for_signature):
     else:
         pass
 frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
+
+# We need to set our bundle version in the plist file, but the format
+# is contrained to major.minor.patch. So trim off any '-pre' or '-rc'
+# information from the MONGO_VERSION and rename it to
+# MONGO_BUNDLE_VERSION.
+frameworksEnv['PLIST_MONGO_BUNDLE_VERSION'] = env['MONGO_VERSION'].split('-')[0]
+
+# Similarly, we need to derive a MinimumOSVersion based on the
+# -mXXX-version-minimum flag. Really, we should pull this out into an
+# SCons flag like OSX_DEPLOYMENT_TARGET so we don't need to grub
+# around in the flags.
+frameworksEnv['PLIST_MINIMUM_OS_VERSION'] = "0.0"
+for flag in frameworksEnv['CCFLAGS']:
+    if re.search('-m[a-z]+-version-min', flag):
+        frameworksEnv['PLIST_MINIMUM_OS_VERSION'] = flag.split('=')[1]
+        break
 
 env.SConscript(
     dirs=[

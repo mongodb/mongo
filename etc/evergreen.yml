@@ -3676,9 +3676,12 @@ tasks:
           git clone --branch r1.13 --depth 1 https://github.com/mongodb/mongo-c-driver.git
           cd mongo-c-driver
 
+          # Fixup VERSION so we don't end up with -dev on it. Remove this once we are building a stable version and CDRIVER-2861 is resolved.
+          cp -f VERSION_RELEASED VERSION_CURRENT
+
           trap "cat CMakeFiles/CMakeOutput.log" EXIT
           export ${compile_env|}
-          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
+          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=${cdriver_cmake_osx_deployment_target|} ${cdriver_cmake_flags}
           make install VERBOSE=1
 
           # TODO: Remove this when we upgrade to a version of the C driver that has CDRIVER-2854 fixed.
@@ -3695,17 +3698,21 @@ tasks:
               if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources ]; then
                   cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources
                   cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources/Info.plist
               else
                   cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework
                   cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Info.plist
               fi
 
               if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources ]; then
                   cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources
                   cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources/Info.plist
               else
                   cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework
                   cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Info.plist
               fi
 
           fi
@@ -10922,11 +10929,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 10.10
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=x86_64
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=DARWIN
@@ -10953,11 +10960,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 11.0
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=arm64
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=OFF
@@ -10985,11 +10992,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 11.0
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphonesimulator --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=x86_64
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=OFF
@@ -11020,11 +11027,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 10.2
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvos --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=arm64
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=OFF
@@ -11052,11 +11059,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 10.2
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvsimulator --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=x86_64
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=10.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=OFF
@@ -11087,11 +11094,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_watchos.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 4.2
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk watchos --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=armv7k
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=4.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=OFF
@@ -11119,11 +11126,11 @@ buildvariants:
       --variables-files=etc/scons/xcode_watchos_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+    cdriver_cmake_osx_deployment_target: 4.2
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk watchsimulator --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=i386
-        -DCMAKE_OSX_DEPLOYMENT_TARGET=4.2
         -DENABLE_APPLE_FRAMEWORK=ON
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=OFF
