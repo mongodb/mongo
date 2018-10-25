@@ -1336,7 +1336,7 @@ private:
 
                     sizeDelta += localSizeDelta;
                     numDelta += localNumDelta;
-                } else if (baseNode && (!otherNode || (otherNode && baseNode != otherNode))) {
+                } else if (!otherNode || (baseNode && baseNode != otherNode)) {
                     // Either the master tree and working tree remove the same branch, or the master
                     // tree updated the branch while the working tree removed the branch, resulting
                     // in a merge conflict.
