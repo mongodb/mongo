@@ -132,7 +132,7 @@ public:
         invariant(it != _dce->_collections.end());
         invariant(it->second == _coll);
         _dce->_collections[_fromNs.ns()] = _coll;
-        _dce->_collections.erase(it);
+        _dce->_collections.erase(_toNs.ns());
         _coll->setNs(_fromNs);
     }
 

@@ -179,7 +179,7 @@ public:
         invariant(it != _db->_collections.end());
         invariant(it->second == _coll);
         _db->_collections[_fromNs.ns()] = _coll;
-        _db->_collections.erase(it);
+        _db->_collections.erase(_toNs.ns());
         _coll->setNs(_fromNs);
     }
 
