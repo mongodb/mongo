@@ -209,50 +209,30 @@ public:
     public:
         using Sorter = mongo::Sorter<BSONObj, RecordId>;
 
+        virtual ~BulkBuilder() = default;
+
         /**
          * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
          */
-        Status insert(OperationContext* opCtx,
-                      const BSONObj& obj,
-                      const RecordId& loc,
-                      const InsertDeleteOptions& options);
+        virtual Status insert(OperationContext* opCtx,
+                              const BSONObj& obj,
+                              const RecordId& loc,
+                              const InsertDeleteOptions& options) = 0;
 
-        const MultikeyPaths& getMultikeyPaths() const {
-            return _indexMultikeyPaths;
-        }
+        virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 
-        bool isMultikey() const {
-            return _isMultiKey;
-        }
+        virtual bool isMultikey() const = 0;
 
         /**
          * Inserts all multikey metadata keys cached during the BulkBuilder's lifetime into the
          * underlying Sorter, finalizes it, and returns an iterator over the sorted dataset.
          */
-        Sorter::Iterator* done();
+        virtual Sorter::Iterator* done() = 0;
 
-    private:
-        friend class AbstractIndexAccessMethod;
-
-        BulkBuilder(const IndexAccessMethod* index,
-                    const IndexDescriptor* descriptor,
-                    size_t maxMemoryUsageBytes);
-
-        std::unique_ptr<Sorter> _sorter;
-        const IndexAccessMethod* _real;
-        int64_t _keysInserted = 0;
-
-        // Set to true if any document added to the BulkBuilder causes the index to become multikey.
-        bool _isMultiKey = false;
-
-        // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
-        // vector remains empty if this index doesn't support path-level multikey tracking.
-        MultikeyPaths _indexMultikeyPaths;
-
-        // Caches the set of all multikey metadata keys generated during the bulk build process.
-        // These are inserted into the sorter after all normal data keys have been added, just
-        // before the bulk build is committed.
-        BSONObjSet _multikeyMetadataKeys{SimpleBSONObjComparator::kInstance.makeBSONObjSet()};
+        /**
+         * Returns number of keys inserted using this BulkBuilder.
+         */
+        virtual int64_t getKeysInserted() const = 0;
     };
 
     /**
@@ -508,6 +488,8 @@ protected:
     const IndexDescriptor* const _descriptor;
 
 private:
+    class BulkBuilderImpl;
+
     /**
      * Determine whether the given Status represents an exception that should cause the indexing
      * process to abort. The 'key' argument is passed in to allow the offending entry to be logged

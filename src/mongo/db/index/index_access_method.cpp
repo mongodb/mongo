@@ -482,14 +482,55 @@ Status AbstractIndexAccessMethod::compact(OperationContext* opCtx) {
     return this->_newInterface->compact(opCtx);
 }
 
+class AbstractIndexAccessMethod::BulkBuilderImpl : public IndexAccessMethod::BulkBuilder {
+public:
+    BulkBuilderImpl(const IndexAccessMethod* index,
+                    const IndexDescriptor* descriptor,
+                    size_t maxMemoryUsageBytes);
+
+    Status insert(OperationContext* opCtx,
+                  const BSONObj& obj,
+                  const RecordId& loc,
+                  const InsertDeleteOptions& options) final;
+
+    const MultikeyPaths& getMultikeyPaths() const final;
+
+    bool isMultikey() const final;
+
+    /**
+     * Inserts all multikey metadata keys cached during the BulkBuilder's lifetime into the
+     * underlying Sorter, finalizes it, and returns an iterator over the sorted dataset.
+     */
+    Sorter::Iterator* done() final;
+
+    int64_t getKeysInserted() const final;
+
+private:
+    std::unique_ptr<Sorter> _sorter;
+    const IndexAccessMethod* _real;
+    int64_t _keysInserted = 0;
+
+    // Set to true if any document added to the BulkBuilder causes the index to become multikey.
+    bool _isMultiKey = false;
+
+    // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
+    // vector remains empty if this index doesn't support path-level multikey tracking.
+    MultikeyPaths _indexMultikeyPaths;
+
+    // Caches the set of all multikey metadata keys generated during the bulk build process.
+    // These are inserted into the sorter after all normal data keys have been added, just
+    // before the bulk build is committed.
+    BSONObjSet _multikeyMetadataKeys{SimpleBSONObjComparator::kInstance.makeBSONObjSet()};
+};
+
 std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initiateBulk(
     size_t maxMemoryUsageBytes) {
-    return std::unique_ptr<BulkBuilder>(new BulkBuilder(this, _descriptor, maxMemoryUsageBytes));
+    return std::make_unique<BulkBuilderImpl>(this, _descriptor, maxMemoryUsageBytes);
 }
 
-IndexAccessMethod::BulkBuilder::BulkBuilder(const IndexAccessMethod* index,
-                                            const IndexDescriptor* descriptor,
-                                            size_t maxMemoryUsageBytes)
+AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexAccessMethod* index,
+                                                            const IndexDescriptor* descriptor,
+                                                            size_t maxMemoryUsageBytes)
     : _sorter(Sorter::make(
           SortOptions()
               .TempDir(storageGlobalParams.dbpath + "/_tmp")
@@ -498,10 +539,10 @@ IndexAccessMethod::BulkBuilder::BulkBuilder(const IndexAccessMethod* index,
           BtreeExternalSortComparison(descriptor->keyPattern(), descriptor->version()))),
       _real(index) {}
 
-Status IndexAccessMethod::BulkBuilder::insert(OperationContext* opCtx,
-                                              const BSONObj& obj,
-                                              const RecordId& loc,
-                                              const InsertDeleteOptions& options) {
+Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
+                                                          const BSONObj& obj,
+                                                          const RecordId& loc,
+                                                          const InsertDeleteOptions& options) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
 
@@ -529,12 +570,25 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* opCtx,
     return Status::OK();
 }
 
-IndexAccessMethod::BulkBuilder::Sorter::Iterator* IndexAccessMethod::BulkBuilder::done() {
+const MultikeyPaths& AbstractIndexAccessMethod::BulkBuilderImpl::getMultikeyPaths() const {
+    return _indexMultikeyPaths;
+}
+
+bool AbstractIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
+    return _isMultiKey;
+}
+
+IndexAccessMethod::BulkBuilder::Sorter::Iterator*
+AbstractIndexAccessMethod::BulkBuilderImpl::done() {
     for (const auto& key : _multikeyMetadataKeys) {
         _sorter->add(key, kMultikeyMetadataKeyId);
         ++_keysInserted;
     }
     return _sorter->done();
+}
+
+int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
+    return _keysInserted;
 }
 
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
@@ -550,7 +604,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     ProgressMeterHolder pm(
         CurOp::get(opCtx)->setMessage_inlock("Index Bulk Build: (2/3) btree bottom up",
                                              "Index: (2/3) BTree Bottom Up Progress",
-                                             bulk->_keysInserted,
+                                             bulk->getKeysInserted(),
                                              10));
     lk.unlock();
 
