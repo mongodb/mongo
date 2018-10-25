@@ -19,10 +19,10 @@
 #include <cmath>
 #include <vector>
 
-#include <folly/Range.h>
-#include <folly/Utility.h>
+struct presorted_t {};
+constexpr presorted_t presorted{};
 
-namespace folly {
+namespace mongo {
 
 /*
  * TDigests are a biased quantile estimator designed to estimate the values of
@@ -53,7 +53,7 @@ class TDigest {
    public:
     explicit Centroid(double mean = 0.0, double weight = 1.0)
         : mean_(mean), weight_(weight) {
-      DCHECK_GT(weight, 0);
+      //DCHECK_GT(weight, 0);
     }
 
     inline double mean() const {
@@ -93,14 +93,14 @@ class TDigest {
    * Returns a new TDigest constructed with values merged from the current
    * digest and the given sortedValues.
    */
-  TDigest merge(presorted_t, Range<const double*> sortedValues) const;
-  TDigest merge(Range<const double*> unsortedValues) const;
+  TDigest merge(presorted_t, const std::vector<double> & sortedValues) const;
+  TDigest merge(const std::vector<double> & unsortedValues) const;
 
   /*
    * Returns a new TDigest constructed with values merged from the given
    * digests.
    */
-  static TDigest merge(Range<const TDigest*> digests);
+  static TDigest merge(std::vector<TDigest>& digests);
 
   /*
    * Estimates the value of the given quantile.

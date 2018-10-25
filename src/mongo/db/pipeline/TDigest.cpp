@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-#include <folly/stats/TDigest.h>
-#include <folly/stats/detail/DoubleRadixSort.h>
+#include "TDigest.h"
+#include "DoubleRadixSort.h"
 
 #include <algorithm>
 #include <limits>
+#include <array>
+#include <memory>
 
-namespace folly {
+namespace mongo {
 
 /*
  * A good biased scaling function has the following properties:
@@ -94,7 +96,7 @@ TDigest::TDigest(
     // Number of centroids is greater than maxSize, we need to compress them
     // When merging, resulting digest takes the maxSize of the first digest
     auto sz = centroids.size();
-    std::array<TDigest, 2> digests{{
+    std::vector<TDigest> digests{{
         TDigest(maxSize_),
         TDigest(std::move(centroids), sum_, count_, max_, min_, sz),
     }};
@@ -106,7 +108,7 @@ TDigest::TDigest(
 // possible.  This implementation puts all additional memory in the
 // heap, so that if called from fiber context we do not smash the
 // stack.  Otherwise it is very similar to boost::spreadsort.
-TDigest TDigest::merge(Range<const double*> unsortedValues) const {
+TDigest TDigest::merge(const std::vector<double> & unsortedValues) const {
   auto n = unsortedValues.size();
 
   // We require 256 buckets per byte level, plus one count array we can reuse.
@@ -118,12 +120,12 @@ TDigest TDigest::merge(Range<const double*> unsortedValues) const {
   std::copy(unsortedValues.begin(), unsortedValues.end(), in);
 
   detail::double_radix_sort(n, buckets.get(), in, out);
-  DCHECK(std::is_sorted(in, in + n));
+  //DCHECK(std::is_sorted(in, in + n));
 
-  return merge(presorted, Range<const double*>(in, in + n));
+  return merge(presorted, std::vector<double>(in, in + n));
 }
 
-TDigest TDigest::merge(presorted_t, Range<const double*> sortedValues) const {
+TDigest TDigest::merge(presorted_t, const std::vector<double> & sortedValues) const {
   if (sortedValues.empty()) {
     return *this;
   }
@@ -205,7 +207,7 @@ TDigest TDigest::merge(presorted_t, Range<const double*> sortedValues) const {
   return result;
 }
 
-TDigest TDigest::merge(Range<const TDigest*> digests) {
+TDigest TDigest::merge(std::vector<TDigest>& digests) {
   size_t nCentroids = 0;
   for (auto it = digests.begin(); it != digests.end(); it++) {
     nCentroids += it->centroids_.size();
@@ -232,8 +234,8 @@ TDigest TDigest::merge(Range<const TDigest*> digests) {
     starts.push_back(centroids.end());
     double curCount = it->count();
     if (curCount > 0) {
-      DCHECK(!std::isnan(it->min_));
-      DCHECK(!std::isnan(it->max_));
+      //DCHECK(!std::isnan(it->min_));
+      //DCHECK(!std::isnan(it->max_));
       min = std::min(min, it->min_);
       max = std::max(max, it->max_);
       count += curCount;
@@ -266,7 +268,7 @@ TDigest TDigest::merge(Range<const TDigest*> digests) {
     }
   }
 
-  DCHECK(std::is_sorted(centroids.begin(), centroids.end()));
+  //DCHECK(std::is_sorted(centroids.begin(), centroids.end()));
 
   size_t maxSize = digests.begin()->maxSize_;
   TDigest result(maxSize);
@@ -373,4 +375,4 @@ double TDigest::Centroid::add(double sum, double weight) {
   return sum;
 }
 
-} // namespace folly
+} // namespace folly => merged with existing mongo namespace
