@@ -84,6 +84,11 @@ private:
     template <typename F>
     Status _runTaskReleaseResourcesOnFailure(F task) noexcept;
 
+    /**
+     * Adds document and associated RecordId to index blocks after inserting into RecordStore.
+     */
+    Status _addDocumentToIndexBlocks(const BSONObj& doc, const RecordId& loc);
+
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<AutoGetCollection> _autoColl;

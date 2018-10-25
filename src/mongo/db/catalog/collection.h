@@ -189,8 +189,15 @@ public:
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
     enum class StoreDeletedDoc { Off, On };
 
+    /**
+     * Callback function for callers of insertDocumentForBulkLoader().
+     */
+    using OnRecordInsertedFn = stdx::function<Status(const RecordId& loc)>;
+
     class Impl : virtual CappedCallback {
     public:
+        using OnRecordInsertedFn = Collection::OnRecordInsertedFn;
+
         virtual ~Impl() = 0;
 
         virtual void init(OperationContext* opCtx) = 0;
@@ -262,9 +269,9 @@ public:
                                                Timestamp* timestamps,
                                                size_t nDocs) = 0;
 
-        virtual Status insertDocument(OperationContext* opCtx,
-                                      const BSONObj& doc,
-                                      const std::vector<MultiIndexBlock*>& indexBlocks) = 0;
+        virtual Status insertDocumentForBulkLoader(OperationContext* opCtx,
+                                                   const BSONObj& doc,
+                                                   const OnRecordInsertedFn& onRecordInserted) = 0;
 
         virtual RecordId updateDocument(OperationContext* opCtx,
                                         const RecordId& oldLocation,
@@ -511,14 +518,16 @@ public:
     }
 
     /**
-     * Inserts a document into the record store and adds it to the MultiIndexBlocks passed in.
+     * Inserts a document into the record store for a bulk loader that manages the index building
+     * outside this Collection. The bulk loader is notified with the RecordId of the document
+     * inserted into the RecordStore.
      *
      * NOTE: It is up to caller to commit the indexes.
      */
-    inline Status insertDocument(OperationContext* const opCtx,
-                                 const BSONObj& doc,
-                                 const std::vector<MultiIndexBlock*>& indexBlocks) {
-        return this->_impl().insertDocument(opCtx, doc, indexBlocks);
+    inline Status insertDocumentForBulkLoader(OperationContext* const opCtx,
+                                              const BSONObj& doc,
+                                              const OnRecordInsertedFn& onRecordInserted) {
+        return this->_impl().insertDocumentForBulkLoader(opCtx, doc, onRecordInserted);
     }
 
     /**

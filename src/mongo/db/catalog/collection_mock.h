@@ -153,9 +153,9 @@ public:
         std::abort();
     }
 
-    Status insertDocument(OperationContext* opCtx,
-                          const BSONObj& doc,
-                          const std::vector<MultiIndexBlock*>& indexBlocks) {
+    Status insertDocumentForBulkLoader(OperationContext* opCtx,
+                                       const BSONObj& doc,
+                                       const OnRecordInsertedFn& onRecordInserted) {
         std::abort();
     }
 

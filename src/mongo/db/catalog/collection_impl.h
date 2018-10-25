@@ -182,13 +182,15 @@ public:
                                    size_t nDocs) final;
 
     /**
-     * Inserts a document into the record store and adds it to the MultiIndexBlocks passed in.
+     * Inserts a document into the record store for a bulk loader that manages the index building
+     * outside this Collection. The bulk loader is notified with the RecordId of the document
+     * inserted into the RecordStore.
      *
      * NOTE: It is up to caller to commit the indexes.
      */
-    Status insertDocument(OperationContext* opCtx,
-                          const BSONObj& doc,
-                          const std::vector<MultiIndexBlock*>& indexBlocks) final;
+    Status insertDocumentForBulkLoader(OperationContext* opCtx,
+                                       const BSONObj& doc,
+                                       const OnRecordInsertedFn& onRecordInserted) final;
 
     /**
      * Updates the document @ oldLocation with newDoc.

@@ -118,8 +118,8 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAbo
             operationContext(), NamespaceString("admin.system.version"), MODE_IX);
 
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(autoColl.getCollection()->insertDocument(
-            operationContext(), shardIdentity.toShardIdentityDocument(), {}));
+        InsertStatement stmt(shardIdentity.toShardIdentityDocument());
+        ASSERT_OK(autoColl.getCollection()->insertDocument(operationContext(), stmt, nullptr));
         ASSERT_EQ(0, getInitCallCount());
     }
 

@@ -112,22 +112,18 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
         UnreplicatedWritesBlock uwb(_opCtx.get());
 
         for (auto iter = begin; iter != end; ++iter) {
-            std::vector<MultiIndexBlock*> indexers;
-            if (_idIndexBlock) {
-                indexers.push_back(_idIndexBlock.get());
-            }
-            if (_secondaryIndexesBlock) {
-                indexers.push_back(_secondaryIndexesBlock.get());
-            }
-
             Status status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::insertDocuments", _nss.ns(), [&] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    if (!indexers.empty()) {
+                    const auto& doc = *iter;
+                    if (_idIndexBlock || _secondaryIndexesBlock) {
                         // This flavor of insertDocument will not update any pre-existing indexes,
                         // only the indexers passed in.
-                        const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), *iter, indexers);
+                        auto onRecordInserted = [&](const RecordId& loc) {
+                            return _addDocumentToIndexBlocks(doc, loc);
+                        };
+                        const auto status = _autoColl->getCollection()->insertDocumentForBulkLoader(
+                            _opCtx.get(), doc, onRecordInserted);
                         if (!status.isOK()) {
                             return status;
                         }
@@ -135,7 +131,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                         // For capped collections, we use regular insertDocument, which will update
                         // pre-existing indexes.
                         const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), InsertStatement(*iter), nullptr);
+                            _opCtx.get(), InsertStatement(doc), nullptr);
                         if (!status.isOK()) {
                             return status;
                         }
@@ -256,6 +252,25 @@ Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(F task) noexc
     } catch (...) {
         std::terminate();
     }
+}
+
+Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
+                                                           const RecordId& loc) {
+    if (_idIndexBlock) {
+        auto status = _idIndexBlock->insert(doc, loc);
+        if (!status.isOK()) {
+            return status.withContext("failed to add document to _id index");
+        }
+    }
+
+    if (_secondaryIndexesBlock) {
+        auto status = _secondaryIndexesBlock->insert(doc, loc);
+        if (!status.isOK()) {
+            return status.withContext("failed to add document to secondary indexes");
+        }
+    }
+
+    return Status::OK();
 }
 
 CollectionBulkLoaderImpl::Stats CollectionBulkLoaderImpl::getStats() const {

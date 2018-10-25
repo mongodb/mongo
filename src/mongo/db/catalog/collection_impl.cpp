@@ -418,9 +418,9 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     return insertDocuments(opCtx, docs.begin(), docs.end(), opDebug, fromMigrate);
 }
 
-Status CollectionImpl::insertDocument(OperationContext* opCtx,
-                                      const BSONObj& doc,
-                                      const std::vector<MultiIndexBlock*>& indexBlocks) {
+Status CollectionImpl::insertDocumentForBulkLoader(OperationContext* opCtx,
+                                                   const BSONObj& doc,
+                                                   const OnRecordInsertedFn& onRecordInserted) {
 
     auto status = checkFailCollectionInsertsFailPoint(_ns, doc);
     if (!status.isOK()) {
@@ -442,11 +442,9 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     if (!loc.isOK())
         return loc.getStatus();
 
-    for (auto&& indexBlock : indexBlocks) {
-        Status status = indexBlock->insert(doc, loc.getValue());
-        if (!status.isOK()) {
-            return status;
-        }
+    status = onRecordInserted(loc.getValue());
+    if (!status.isOK()) {
+        return status;
     }
 
     vector<InsertStatement> inserts;
