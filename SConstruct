@@ -2247,6 +2247,12 @@ def doConfigure(myenv):
             myenv.Append( CXXFLAGS=["-Wnon-virtual-dtor"] )
         conf.Finish()
 
+        # As of XCode 9, this flag must be present (it is not enabled
+        # by -Wall), in order to enforce that -mXXX-version-min=YYY
+        # will enforce that you don't use APIs from ZZZ.
+        if env.TargetOSIs('darwin'):
+            AddToCCFLAGSIfSupported(env, '-Wunguarded-availability')
+
     if get_option('runtime-hardening') == "on":
         # Enable 'strong' stack protection preferentially, but fall back to 'all' if it is not
         # available. Note that we need to add these to the LINKFLAGS as well, since otherwise we

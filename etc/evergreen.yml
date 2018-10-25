@@ -10678,9 +10678,9 @@ buildvariants:
     push_name: macos
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
     num_jobs_available: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl openssl_pre_1.0'"
     build_mongoreplay: true
   display_tasks:
@@ -10787,8 +10787,8 @@ buildvariants:
   expansions:
     num_jobs_available: 1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
+    compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -10823,9 +10823,9 @@ buildvariants:
     push_name: macos
     push_arch: x86_64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
     num_jobs_available: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
   display_tasks:
@@ -10872,13 +10872,13 @@ buildvariants:
     push_name: osx
     push_arch: x86_64-enterprise
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
-    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
+    compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
     num_jobs_available: 1
     build_mongoreplay: true
     build_openssl: true
-    openssl_config_flags: "-mmacosx-version-min=10.10"
+    openssl_config_flags: "-mmacosx-version-min=10.11"
     openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
   display_tasks:
   - *dbtest
@@ -10931,7 +10931,7 @@ buildvariants:
         -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=DARWIN
         -DENABLE_ZLIB=BUNDLED
-        -DCMAKE_C_FLAGS="-flto"
+        -DCMAKE_C_FLAGS="-flto -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-flto"
     disable_unit_tests: true
     enable_embedded_tests: native
@@ -10964,7 +10964,7 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
@@ -10996,7 +10996,7 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -11031,7 +11031,7 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
@@ -11063,7 +11063,7 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -11098,7 +11098,7 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto -fapplication-extension"
     disable_unit_tests: true
     dump_scons_config_on_failure: true
@@ -11130,7 +11130,7 @@ buildvariants:
         -DENABLE_SASL=OFF
         -DENABLE_ZLIB=OFF
         -DENABLE_SNAPPY=OFF
-        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension"
+        -DCMAKE_C_FLAGS="-fembed-bitcode -flto -fapplication-extension -Wunguarded-availability"
         -DCMAKE_SHARED_LINKER_FLAGS="-fembed-bitcode -flto -fapplication-extension"
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
