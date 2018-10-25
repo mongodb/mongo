@@ -1044,7 +1044,7 @@ env.Library(
         'pipeline/pipeline_d.cpp',
         'query/get_executor.cpp',
         'query/internal_plans.cpp',
-        'query/plan_executor.cpp',
+        'query/plan_executor_impl.cpp',
         'query/plan_ranker.cpp',
         'query/plan_yield_policy.cpp',
         'query/query_yield.cpp',
