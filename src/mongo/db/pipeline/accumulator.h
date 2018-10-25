@@ -44,6 +44,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/summation.h"
+#include "mongo/db/pipeline/TDigest.h"
 
 namespace mongo {
 
@@ -296,6 +297,36 @@ private:
      * not decimals, so the decimal total needs to add the non-decimal.
      */
     Decimal128 _getDecimalTotal() const;
+
+    bool _isDecimal;
+    DoubleDoubleSummation _nonDecimalTotal;
+    Decimal128 _decimalTotal;
+    long long _count;
+};
+
+
+// Adding a new accumulator as 'percentile'
+class AccumulatorPercentile final : public Accumulator {
+public:
+    explicit AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    const char* getOpName() const final;
+    void reset() final;
+
+    static boost::intrusive_ptr<Accumulator> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+private:
+    /**
+     * The total of all values is partitioned between those that are decimals, and those that are
+     * not decimals, so the decimal total needs to add the non-decimal.
+     */
+    Decimal128 _getDecimalTotal() const;
+
+    // to feed TDigest
+    std::vector<double> values;
 
     bool _isDecimal;
     DoubleDoubleSummation _nonDecimalTotal;
