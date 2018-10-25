@@ -44,6 +44,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -629,90 +630,117 @@ public:
             IDLParserErrorContext("_shardsvrShardCollection"), cmdObj);
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        // Take the collection critical section so that no writes can happen.
-        CollectionCriticalSection critSec(opCtx, nss);
+        auto scopedShardCollection = uassertStatusOK(
+            ActiveShardCollectionRegistry::get(opCtx).registerShardCollection(request));
+        Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 
-        auto proposedKey(request.getKey().getOwned());
-        ShardKeyPattern shardKeyPattern(proposedKey);
-
-        createCollectionOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
-
-        // Read zone info
-        auto tags = getExistingTags(opCtx, nss);
-
-        if (!tags.empty()) {
-            validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tags);
-        }
-
-        boost::optional<UUID> uuid;
-        if (request.getGetUUIDfromPrimaryShard()) {
-            uuid = getUUIDFromPrimaryShard(opCtx, nss);
+        // Check if this collection is currently being sharded and if so, join it
+        if (!scopedShardCollection.mustExecute()) {
+            status = scopedShardCollection.waitForCompletion(opCtx);
         } else {
-            uuid = UUID::gen();
-        }
+            try {
+                // Take the collection critical section so that no writes can happen.
+                CollectionCriticalSection critSec(opCtx, nss);
 
-        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        shardRegistry->reload(opCtx);
+                auto proposedKey(request.getKey().getOwned());
+                ShardKeyPattern shardKeyPattern(proposedKey);
 
-        DBDirectClient localClient(opCtx);
-        bool isEmpty = (localClient.count(nss.ns()) == 0);
+                createCollectionOrValidateExisting(
+                    opCtx, nss, proposedKey, shardKeyPattern, request);
 
-        std::vector<ShardId> shardIds;
-        shardRegistry->getAllShardIds(opCtx, &shardIds);
-        const int numShards = shardIds.size();
+                // Read zone info
+                auto tags = getExistingTags(opCtx, nss);
 
-        std::vector<BSONObj> initialSplitPoints;
-        std::vector<BSONObj> finalSplitPoints;
+                if (!tags.empty()) {
+                    validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tags);
+                }
 
-        if (request.getInitialSplitPoints()) {
-            finalSplitPoints = std::move(*request.getInitialSplitPoints());
-        } else if (!tags.empty()) {
-            // no need to find split points since we will create chunks based on
-            // the existing zones
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "found existing zones but the collection is not empty",
-                    isEmpty);
-        } else {
-            InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
-                shardKeyPattern,
-                isEmpty,
-                numShards,
-                request.getNumInitialChunks(),
-                &initialSplitPoints,
-                &finalSplitPoints);
-        }
+                boost::optional<UUID> uuid;
+                if (request.getGetUUIDfromPrimaryShard()) {
+                    uuid = getUUIDFromPrimaryShard(opCtx, nss);
+                } else {
+                    uuid = UUID::gen();
+                }
 
-        result << "collectionsharded" << nss.ns();
-        if (uuid) {
-            result << "collectionUUID" << *uuid;
-        }
+                auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+                shardRegistry->reload(opCtx);
 
-        critSec.enterCommitPhase();
+                DBDirectClient localClient(opCtx);
+                bool isEmpty = (localClient.count(nss.ns()) == 0);
 
-        LOG(0) << "CMD: shardcollection: " << cmdObj;
+                std::vector<ShardId> shardIds;
+                shardRegistry->getAllShardIds(opCtx, &shardIds);
+                const int numShards = shardIds.size();
 
-        audit::logShardCollection(Client::getCurrent(), nss.ns(), proposedKey, request.getUnique());
+                std::vector<BSONObj> initialSplitPoints;
+                std::vector<BSONObj> finalSplitPoints;
 
-        // The initial chunks are distributed evenly across shards if the initial split points were
-        // specified in the request by mapReduce or if we are using a hashed shard key. Otherwise,
-        // all the initial chunks are placed on the primary shard.
-        const bool fromMapReduce = bool(request.getInitialSplitPoints());
-        const int numContiguousChunksPerShard = initialSplitPoints.empty()
-            ? 1
-            : (finalSplitPoints.size() + 1) / (initialSplitPoints.size() + 1);
-
-        // Step 6. Actually shard the collection.
-        shardCollection(opCtx,
-                        nss,
-                        uuid,
+                if (request.getInitialSplitPoints()) {
+                    finalSplitPoints = std::move(*request.getInitialSplitPoints());
+                } else if (!tags.empty()) {
+                    // no need to find split points since we will create chunks based on
+                    // the existing zones
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream() << "found existing zones but the collection is not empty",
+                            isEmpty);
+                } else {
+                    InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
                         shardKeyPattern,
-                        *request.getCollation(),
-                        request.getUnique(),
-                        finalSplitPoints,
-                        tags,
-                        fromMapReduce,
-                        ShardingState::get(opCtx)->shardId(),
-                        numContiguousChunksPerShard);
+                        isEmpty,
+                        numShards,
+                        request.getNumInitialChunks(),
+                        &initialSplitPoints,
+                        &finalSplitPoints);
+                }
+
+                result << "collectionsharded" << nss.ns();
+                if (uuid) {
+                    result << "collectionUUID" << *uuid;
+                }
+
+                critSec.enterCommitPhase();
+
+                LOG(0) << "CMD: shardcollection: " << cmdObj;
+
+                audit::logShardCollection(
+                    Client::getCurrent(), nss.ns(), proposedKey, request.getUnique());
+
+                // The initial chunks are distributed evenly across shards if the initial split
+                // points were specified in the request by mapReduce or if we are using a hashed
+                // shard key. Otherwise, all the initial chunks are placed on the primary shard.
+                const bool fromMapReduce = bool(request.getInitialSplitPoints());
+                const int numContiguousChunksPerShard = initialSplitPoints.empty()
+                    ? 1
+                    : (finalSplitPoints.size() + 1) / (initialSplitPoints.size() + 1);
+
+                // Step 6. Actually shard the collection.
+                shardCollection(opCtx,
+                                nss,
+                                uuid,
+                                shardKeyPattern,
+                                *request.getCollation(),
+                                request.getUnique(),
+                                finalSplitPoints,
+                                tags,
+                                fromMapReduce,
+                                ShardingState::get(opCtx)->shardId(),
+                                numContiguousChunksPerShard);
+
+                status = Status::OK();
+            } catch (const DBException& e) {
+                status = e.toStatus();
+            } catch (const std::exception& e) {
+                scopedShardCollection.signalComplete(
+                    {ErrorCodes::InternalError,
+                     str::stream()
+                         << "Severe error occurred while running shardCollection command: "
+                         << e.what()});
+                throw;
+            }
+            scopedShardCollection.signalComplete(status);
+        }
+
+        uassertStatusOK(status);
 
         return true;
     }
