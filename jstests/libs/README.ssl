@@ -17,7 +17,24 @@ cat client-multivalue-rdn.rsa >> client-multivalue-rdn.pem
 rm ca.srl client-multivalue-rdn.key client-multivalue-rdn.rsa client-multivalue-rdn.csr
 
 ---------------------------
+ecdsa-*.pem are ECDSA signed certificates:
 
+generate an ec-key (from a well known curve)
+opensl ecparam -name prime256v1 -genkey -out mykey.key
+
+create certificate request
+openssl req -new -key mykey.key -out mycsr.csr
+
+sign key and generate certificate
+openssl x509 -req -days 3650 -in mycsr.csr -CA ecdsa-ca.pem -CAcreateserial -out mycrt.crt -sha256
+
+to include SANs in the certificate, instead run
+openssl x509 -req -days 3650 -in mycsr.csr -CA ecdsa-ca.pem -CAcreateserial -out mycrt.crt -sha256 -extfile <(printf "subjectAltName=DNS:localhost,DNS:127.0.0.1")
+
+combine key and certificate
+cat mycrt.crt mykey.key > mycrt.pem
+
+---------------------------
 The other ceriticates in this directory come from x509gen.
 How to generate a certificate with a custom extension:
 
