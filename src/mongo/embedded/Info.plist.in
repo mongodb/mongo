@@ -22,5 +22,7 @@
 	<string>@CFBundleShortVersionString@</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
+	<key>MinimumOSVersion</key>
+	<string>@MinimumOSVersion@</string>
 </dict>
 </plist>
