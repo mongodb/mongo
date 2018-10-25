@@ -101,13 +101,38 @@ MONGO_REGISTER_SHIM(Collection::parseValidationAction)
 }
 
 namespace {
-// Used below to fail during inserts.
+//  This fail point injects insertion failures for all collections unless a collection name is
+//  provided in the optional data object during configuration:
+//  data: {
+//      collectionNS: <fully-qualified collection namespace>,
+//  }
 MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 
 // Used to pause after inserting collection data and calling the opObservers.  Inserts to
 // replicated collections that are not part of a multi-statement transaction will have generated
 // their OpTime and oplog entry.
 MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
+
+/**
+ * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if
+ * the insert should fail. Returns Status::OK if The function should proceed with the insertion.
+ * Otherwise, the function should fail and return early with the error Status.
+ */
+Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSONObj& firstDoc) {
+    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
+        const BSONObj& data = extraData.getData();
+        const auto collElem = data["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || ns.ns() == collElem.str()) {
+            const std::string msg = str::stream()
+                << "Failpoint (failCollectionInserts) has been enabled (" << data
+                << "), so rejecting insert (first doc): " << firstDoc;
+            log() << msg;
+            return {ErrorCodes::FailPointEnabled, msg};
+        }
+    }
+    return Status::OK();
+}
 
 // Uses the collator factory to convert the BSON representation of a collator to a
 // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
@@ -332,17 +357,9 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                                        OpDebug* opDebug,
                                        bool fromMigrate) {
 
-    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
-        const BSONObj& data = extraData.getData();
-        const auto collElem = data["collectionNS"];
-        // If the failpoint specifies no collection or matches the existing one, fail.
-        if (!collElem || _ns.ns() == collElem.str()) {
-            const std::string msg = str::stream()
-                << "Failpoint (failCollectionInserts) has been enabled (" << data
-                << "), so rejecting insert (first doc): " << begin->doc;
-            log() << msg;
-            return {ErrorCodes::FailPointEnabled, msg};
-        }
+    auto status = checkFailCollectionInsertsFailPoint(_ns, (begin != end ? begin->doc : BSONObj()));
+    if (!status.isOK()) {
+        return status;
     }
 
     // Should really be done in the collection object at creation and updated on index create.
@@ -363,9 +380,10 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
 
     const SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
 
-    Status status = _insertDocuments(opCtx, begin, end, opDebug);
-    if (!status.isOK())
+    status = _insertDocuments(opCtx, begin, end, opDebug);
+    if (!status.isOK()) {
         return status;
+    }
     invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
 
     getGlobalServiceContext()->getOpObserver()->onInserts(
@@ -404,23 +422,14 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
                                       const BSONObj& doc,
                                       const std::vector<MultiIndexBlock*>& indexBlocks) {
 
-    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
-        const BSONObj& data = extraData.getData();
-        const auto collElem = data["collectionNS"];
-        // If the failpoint specifies no collection or matches the existing one, fail.
-        if (!collElem || _ns.ns() == collElem.str()) {
-            const std::string msg = str::stream()
-                << "Failpoint (failCollectionInserts) has been enabled (" << data
-                << "), so rejecting insert: " << doc;
-            log() << msg;
-            return {ErrorCodes::FailPointEnabled, msg};
-        }
+    auto status = checkFailCollectionInsertsFailPoint(_ns, doc);
+    if (!status.isOK()) {
+        return status;
     }
 
-    {
-        auto status = checkValidation(opCtx, doc);
-        if (!status.isOK())
-            return status;
+    status = checkValidation(opCtx, doc);
+    if (!status.isOK()) {
+        return status;
     }
 
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
