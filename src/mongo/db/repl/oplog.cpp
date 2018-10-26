@@ -243,6 +243,12 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+    // Since 'createIndexes' is a 'c' oplog entry, it takes the Global X lock. However, we don't
+    // want index build to block FTDC thread which periodically gathers data with Global IS lock.
+    // Put this hack to release the Global X lock and take the Global IX instead.
+    Lock::TempRelease tempRelease(opCtx->lockState());
+    Lock::DBLock lock(opCtx, indexNss.db(), MODE_X);
+
     // Check if collection exists.
     Database* db = dbHolder().get(opCtx, indexNss.ns());
     auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
