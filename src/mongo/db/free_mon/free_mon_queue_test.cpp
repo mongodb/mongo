@@ -115,6 +115,28 @@ TEST_F(FreeMonQueueTest, TestDeadlinePriority) {
     ASSERT(item->getType() == FreeMonMessageType::RegisterServer);
 }
 
+// Positive: Ensure deadlines sort properly when they have the same deadlines
+TEST_F(FreeMonQueueTest, TestFIFO) {
+    FreeMonMessageQueue queue;
+
+    queue.enqueue(
+        FreeMonMessage::createWithDeadline(FreeMonMessageType::RegisterServer, Date_t::min()));
+    queue.enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::AsyncRegisterComplete,
+                                                     Date_t::min()));
+    queue.enqueue(
+        FreeMonMessage::createWithDeadline(FreeMonMessageType::RegisterCommand, Date_t::min()));
+
+    auto item = queue.dequeue(_opCtx.get()->getServiceContext()->getPreciseClockSource()).get();
+    ASSERT(item->getType() == FreeMonMessageType::RegisterServer);
+
+    item = queue.dequeue(_opCtx.get()->getServiceContext()->getPreciseClockSource()).get();
+    ASSERT(item->getType() == FreeMonMessageType::AsyncRegisterComplete);
+
+    item = queue.dequeue(_opCtx.get()->getServiceContext()->getPreciseClockSource()).get();
+    ASSERT(item->getType() == FreeMonMessageType::RegisterCommand);
+}
+
+
 // Positive: Test Queue Stop
 TEST_F(FreeMonQueueTest, TestQueueStop) {
     FreeMonMessageQueue queue;

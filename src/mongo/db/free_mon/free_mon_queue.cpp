@@ -82,6 +82,9 @@ void FreeMonMessageQueue::enqueue(std::shared_ptr<FreeMonMessage> msg) {
             return;
         }
 
+        ++_counter;
+        msg->setId(_counter);
+
         if (msg->getType() == FreeMonMessageType::MetricsSend) {
             _queue.eraseByType(FreeMonMessageType::MetricsSend);
         }
