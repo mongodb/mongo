@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -101,10 +100,17 @@ public:
         }
 
         long long sizeMb = jsobj["size"].numberLong();
-        long long size = sizeMb * 1024 * 1024;
         if (sizeMb < 990L) {
             uasserted(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least");
         }
+
+        const long long kMB = 1024 * 1024;
+        const long long kPB = kMB * 1024 * 1024 * 1024;
+        if (sizeMb > kPB / kMB) {
+            uasserted(ErrorCodes::InvalidOptions, "oplog size in MB cannot exceed maximum of 1PB");
+        }
+        long long size = sizeMb * kMB;
+
         WriteUnitOfWork wunit(opCtx);
         Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
         uassertStatusOK(status);
