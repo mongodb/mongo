@@ -93,6 +93,7 @@ scratch
 /libmongotestfiles.*
 /libmongoshellfiles.*
 /sharedclient
+/genny
 
 /emr.jar
 *.class
@@ -111,6 +112,7 @@ scratch
 /perftest
 /clientTest
 /httpClientTest
+/genny_results
 
 # benchrun files
 /benchrun_embedded
