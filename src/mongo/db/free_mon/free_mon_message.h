@@ -180,6 +180,20 @@ public:
         return _deadline;
     }
 
+    /**
+     * Get the unique message id for FIFO ordering messages with the same deadline.
+     */
+    uint64_t getId() const {
+        return _id;
+    }
+
+    /**
+     * Set the unique message id.
+     */
+    void setId(uint64_t id) {
+        _id = id;
+    }
+
 public:
     FreeMonMessage(FreeMonMessageType type, Date_t deadline) : _type(type), _deadline(deadline) {}
 
@@ -189,6 +203,10 @@ private:
 
     // Deadline for when to process message
     Date_t _deadline;
+
+    // Process-wide unique message id to ensure messages with the same deadlines are processed in
+    // FIFO order.
+    uint64_t _id{0};
 };
 
 

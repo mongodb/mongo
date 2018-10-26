@@ -49,7 +49,15 @@ namespace mongo {
 struct FreeMonMessageGreater {
     bool operator()(const std::shared_ptr<FreeMonMessage>& left,
                     const std::shared_ptr<FreeMonMessage>& right) const {
-        return (left->getDeadline() > right->getDeadline());
+        if (left->getDeadline() > right->getDeadline()) {
+            return true;
+        }
+
+        if (left->getDeadline() == right->getDeadline()) {
+            return left->getId() > right->getId();
+        }
+
+        return false;
     }
 };
 
@@ -136,6 +144,10 @@ private:
 
     // Use manual crank to process messages in-order instead of based on deadlines.
     bool _useCrank{false};
+
+    // Stamp each message with a unique counter. This ensures that if two messages are queued with
+    // the same deadline, FIFO is achieved.
+    uint64_t _counter;
 
     // Number of messages to ignore
     size_t _countMessagesToIgnore{0};
