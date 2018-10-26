@@ -434,7 +434,7 @@ TEST_F(GenerateShardCollectionInitialZonedChunksTest, ZoneNotAssociatedWithAnySh
     const std::vector<TagsType> tags = {
         makeTag(ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)), zoneName("0")),
         makeTag(ChunkRange(BSON(shardKey() << 0), keyPattern().globalMax()), zoneName("1"))};
-    StringMap<std::vector<ShardId>> tagToShards = {{zoneName("0"), {shardId("Shard0")}},
+    StringMap<std::vector<ShardId>> tagToShards = {{zoneName("0"), {ShardId("Shard0")}},
                                                    {zoneName("1"), {}}};
 
     ASSERT_THROWS_CODE(
