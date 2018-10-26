@@ -550,11 +550,14 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         });
 
         // Test that the currentOp command can see another user's operations with {$ownOps: false}.
-        assert.eq(
-            connAdminDB
-                .currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"})
-                .inprog.length,
-            1);
+        // Only test on a replica set since 'localOps' isn't supported by the currentOp command.
+        if (!isMongos) {
+            assert.eq(
+                connAdminDB
+                    .currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"})
+                    .inprog.length,
+                1);
+        }
 
         // Test that $currentOp succeeds with {allUsers: false} for a user without the "inprog"
         // privilege.
