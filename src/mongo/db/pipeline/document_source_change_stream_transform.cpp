@@ -434,6 +434,11 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamTransform::getModifi
 DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
     pExpCtx->checkForInterrupt();
 
+    uassert(50988,
+            "Illegal attempt to execute an internal change stream stage on mongos. A $changeStream "
+            "stage must be the first stage in a pipeline",
+            !pExpCtx->inMongos);
+
     // If we're unwinding an 'applyOps' from a transaction, check if there are any documents we have
     // stored that can be returned.
     if (_txnContext) {
