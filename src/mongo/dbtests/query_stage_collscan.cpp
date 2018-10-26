@@ -86,10 +86,10 @@ public:
 
     int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+        auto collection = ctx.getCollection();
 
         // Configure the scan.
         CollectionScanParams params;
-        params.collection = ctx.getCollection();
         params.direction = direction;
         params.tailable = false;
 
@@ -105,10 +105,10 @@ public:
         // Make a scan and have the runner own it.
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         unique_ptr<PlanStage> ps =
-            make_unique<CollectionScan>(&_opCtx, params, ws.get(), filterExpr.get());
+            make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::NO_YIELD);
+            &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -128,11 +128,10 @@ public:
         WorkingSet ws;
 
         CollectionScanParams params;
-        params.collection = collection;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -210,19 +209,20 @@ class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanB
 public:
     void run() {
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+        auto collection = ctx.getCollection();
 
         // Configure the scan.
         CollectionScanParams params;
-        params.collection = ctx.getCollection();
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
         // Make a scan and have the runner own it.
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_opCtx, params, ws.get(), nullptr);
+        unique_ptr<PlanStage> ps =
+            make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::NO_YIELD);
+            &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -246,17 +246,18 @@ class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScan
 public:
     void run() {
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+        auto collection = ctx.getCollection();
 
         CollectionScanParams params;
-        params.collection = ctx.getCollection();
         params.direction = CollectionScanParams::BACKWARD;
         params.tailable = false;
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_opCtx, params, ws.get(), nullptr);
+        unique_ptr<PlanStage> ps =
+            make_unique<CollectionScan>(&_opCtx, collection, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::NO_YIELD);
+            &_opCtx, std::move(ws), std::move(ps), collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -289,12 +290,11 @@ public:
 
         // Configure the scan.
         CollectionScanParams params;
-        params.collection = coll;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
         WorkingSet ws;
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, NULL));
 
         int count = 0;
         while (count < 10) {
@@ -349,12 +349,11 @@ public:
 
         // Configure the scan.
         CollectionScanParams params;
-        params.collection = coll;
         params.direction = CollectionScanParams::BACKWARD;
         params.tailable = false;
 
         WorkingSet ws;
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<PlanStage> scan(new CollectionScan(&_opCtx, coll, params, &ws, NULL));
 
         int count = 0;
         while (count < 10) {

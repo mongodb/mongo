@@ -412,7 +412,6 @@ public:
             return new SkipStage(opCtx, nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("cscan" == nodeName) {
             CollectionScanParams params;
-            params.collection = collection;
 
             // What direction?
             uassert(16963,
@@ -424,7 +423,7 @@ public:
                 params.direction = CollectionScanParams::BACKWARD;
             }
 
-            return new CollectionScan(opCtx, params, workingSet, matcher);
+            return new CollectionScan(opCtx, collection, params, workingSet, matcher);
         }
 // sort is disabled for now.
 #if 0

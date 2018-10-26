@@ -315,12 +315,8 @@ public:
                     break;
                 }
 
-                // Have the lock again. See if we were killed.
-                if (!exec->restoreState().isOK()) {
-                    if (!partialOk) {
-                        uasserted(13281, "File deleted during filemd5 command");
-                    }
-                }
+                // Now that we have the lock again, we can restore the PlanExecutor.
+                exec->restoreState();
             }
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {

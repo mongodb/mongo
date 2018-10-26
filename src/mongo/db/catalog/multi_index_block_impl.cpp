@@ -400,9 +400,10 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
             }
             wunit.commit();
             if (_buildInBackground) {
-                auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
-                if (!restoreStatus.isOK()) {
-                    return restoreStatus;
+                try {
+                    exec->restoreState();  // Handles any WCEs internally.
+                } catch (...) {
+                    return exceptionToStatus();
                 }
             }
 
@@ -422,9 +423,10 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
             // abandonSnapshot.
             exec->saveState();
             _opCtx->recoveryUnit()->abandonSnapshot();
-            auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
-            if (!restoreStatus.isOK()) {
-                return restoreStatus;
+            try {
+                exec->restoreState();  // Handles any WCEs internally.
+            } catch (...) {
+                return exceptionToStatus();
             }
         }
     }

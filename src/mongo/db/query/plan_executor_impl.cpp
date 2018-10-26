@@ -355,19 +355,19 @@ void PlanExecutorImpl::saveState() {
     _currentState = kSaved;
 }
 
-Status PlanExecutorImpl::restoreState() {
+void PlanExecutorImpl::restoreState() {
     try {
-        return restoreStateWithoutRetrying();
+        restoreStateWithoutRetrying();
     } catch (const WriteConflictException&) {
         if (!_yieldPolicy->canAutoYield())
             throw;
 
         // Handles retries by calling restoreStateWithoutRetrying() in a loop.
-        return _yieldPolicy->yieldOrInterrupt();
+        uassertStatusOK(_yieldPolicy->yieldOrInterrupt());
     }
 }
 
-Status PlanExecutorImpl::restoreStateWithoutRetrying() {
+void PlanExecutorImpl::restoreStateWithoutRetrying() {
     invariant(_currentState == kSaved);
 
     if (!isMarkedAsKilled()) {
@@ -375,7 +375,7 @@ Status PlanExecutorImpl::restoreStateWithoutRetrying() {
     }
 
     _currentState = kUsable;
-    return _killStatus;
+    uassertStatusOK(_killStatus);
 }
 
 void PlanExecutorImpl::detachFromOperationContext() {

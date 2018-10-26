@@ -88,11 +88,10 @@ public:
         WorkingSet ws;
 
         CollectionScanParams params;
-        params.collection = collection;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -139,7 +138,6 @@ public:
 
         // Configure the scan.
         CollectionScanParams collScanParams;
-        collScanParams.collection = coll;
         collScanParams.direction = CollectionScanParams::FORWARD;
         collScanParams.tailable = false;
 
@@ -152,7 +150,7 @@ public:
                                 deleteStageParams,
                                 &ws,
                                 coll,
-                                new CollectionScan(&_opCtx, collScanParams, &ws, NULL));
+                                new CollectionScan(&_opCtx, coll, collScanParams, &ws, NULL));
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
 

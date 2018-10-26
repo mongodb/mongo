@@ -382,12 +382,14 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
             collection->deleteDocument(opCtx, kUninitializedStmtId, rloc, nullptr, true);
             wuow.commit();
         });
-        auto restoreStateStatus = exec->restoreState();
-        if (!restoreStateStatus.isOK()) {
+
+        try {
+            exec->restoreState();
+        } catch (const DBException& ex) {
             warning() << "error restoring cursor state while trying to delete " << redact(min)
                       << " to " << redact(max) << " in " << nss
                       << ", stats: " << Explain::getWinningPlanStats(exec.get()) << ": "
-                      << redact(restoreStateStatus);
+                      << redact(ex.toStatus());
             break;
         }
         ShardingStatistics::get(opCtx).countDocsDeletedOnDonor.addAndFetch(1);

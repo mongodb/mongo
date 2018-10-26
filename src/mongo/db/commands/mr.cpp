@@ -1207,7 +1207,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
             all.push_back(o);
 
             _opCtx->checkForInterrupt();
-            uassertStatusOK(exec->restoreState());
+            exec->restoreState();
         }
 
         uassert(34428,
@@ -1553,8 +1553,7 @@ public:
                         state.reduceAndSpillInMemoryStateIfNeeded();
                         scopedAutoColl.emplace(opCtx, config.nss, MODE_S);
 
-                        auto restoreStatus = exec->restoreState();
-                        uassertStatusOK(restoreStatus);
+                        exec->restoreState();
 
                         reduceTime += t.micros();
 

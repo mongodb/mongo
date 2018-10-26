@@ -995,7 +995,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
-          return convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
+          convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
+          return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},
     {"emptycapped",

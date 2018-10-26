@@ -630,7 +630,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
 
     // Build our collection scan.
     CollectionScanParams params;
-    params.collection = collection;
     if (startLoc) {
         LOG(3) << "Using direct oplog seek";
         params.start = *startLoc;
@@ -652,7 +651,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     }
 
     auto ws = make_unique<WorkingSet>();
-    auto cs = make_unique<CollectionScan>(opCtx, params, ws.get(), cq->root());
+    auto cs = make_unique<CollectionScan>(opCtx, collection, params, ws.get(), cq->root());
     return PlanExecutor::make(
         opCtx, std::move(ws), std::move(cs), std::move(cq), collection, PlanExecutor::YIELD_AUTO);
 }

@@ -93,7 +93,7 @@ void DocumentSourceCursor::loadBatch() {
         uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
                             ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
 
-        uassertStatusOK(_exec->restoreState());
+        _exec->restoreState();
 
         int memUsageBytes = 0;
         {

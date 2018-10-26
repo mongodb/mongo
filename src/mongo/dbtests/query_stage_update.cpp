@@ -129,11 +129,10 @@ public:
         WorkingSet ws;
 
         CollectionScanParams params;
-        params.collection = collection;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -151,11 +150,10 @@ public:
         WorkingSet ws;
 
         CollectionScanParams params;
-        params.collection = collection;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, collection, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -300,7 +298,6 @@ public:
 
             // Configure the scan.
             CollectionScanParams collScanParams;
-            collScanParams.collection = coll;
             collScanParams.direction = CollectionScanParams::FORWARD;
             collScanParams.tailable = false;
 
@@ -310,7 +307,8 @@ public:
             updateParams.canonicalQuery = cq.get();
 
             auto ws = make_unique<WorkingSet>();
-            auto cs = make_unique<CollectionScan>(&_opCtx, collScanParams, ws.get(), cq->root());
+            auto cs =
+                make_unique<CollectionScan>(&_opCtx, coll, collScanParams, ws.get(), cq->root());
 
             auto updateStage =
                 make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, cs.release());

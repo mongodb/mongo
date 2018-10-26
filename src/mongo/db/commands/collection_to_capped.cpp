@@ -135,9 +135,7 @@ public:
                       str::stream() << "database " << dbname << " not found");
         }
 
-        Status status =
-            cloneCollectionAsCapped(opCtx, db, from.toString(), to.toString(), size, temp);
-        uassertStatusOK(status);
+        cloneCollectionAsCapped(opCtx, db, from.toString(), to.toString(), size, temp);
         return true;
     }
 } cmdCloneCollectionAsCapped;
@@ -180,7 +178,7 @@ public:
             return false;
         }
 
-        uassertStatusOK(convertToCapped(opCtx, nss, size));
+        convertToCapped(opCtx, nss, size);
         return true;
     }
 

@@ -62,10 +62,10 @@ public:
     const NamespaceString& nss() const final;
     OperationContext* getOpCtx() const final;
     void saveState() final;
-    Status restoreState() final;
+    void restoreState() final;
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
-    Status restoreStateWithoutRetrying() final;
+    void restoreStateWithoutRetrying() final;
     ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut) final;
     ExecState getNext(BSONObj* objOut, RecordId* dlOut) final;
     bool isEOF() final;

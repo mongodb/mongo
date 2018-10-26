@@ -180,7 +180,6 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(OperationContext* op
     invariant(collection);
 
     CollectionScanParams params;
-    params.collection = collection;
     params.start = startLoc;
     params.shouldWaitForOplogVisibility = shouldWaitForOplogVisibility(opCtx, collection, false);
 
@@ -190,7 +189,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(OperationContext* op
         params.direction = CollectionScanParams::BACKWARD;
     }
 
-    return stdx::make_unique<CollectionScan>(opCtx, params, ws, nullptr);
+    return stdx::make_unique<CollectionScan>(opCtx, collection, params, ws, nullptr);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* opCtx,

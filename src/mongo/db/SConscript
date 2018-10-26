@@ -1038,6 +1038,7 @@ env.Library(
         'exec/projection.cpp',
         'exec/projection_exec.cpp',
         'exec/queued_data_stage.cpp',
+        'exec/requires_collection_stage.cpp',
         'exec/shard_filter.cpp',
         'exec/skip.cpp',
         'exec/sort.cpp',

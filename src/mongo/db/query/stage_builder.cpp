@@ -77,13 +77,12 @@ PlanStage* buildStages(OperationContext* opCtx,
         case STAGE_COLLSCAN: {
             const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
             CollectionScanParams params;
-            params.collection = collection;
             params.tailable = csn->tailable;
             params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
             params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
-            return new CollectionScan(opCtx, params, ws, csn->filter.get());
+            return new CollectionScan(opCtx, collection, params, ws, csn->filter.get());
         }
         case STAGE_IXSCAN: {
             const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);

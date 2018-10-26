@@ -33,7 +33,7 @@
 #include <memory>
 
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/record_id.h"
 
@@ -50,9 +50,12 @@ class OperationContext;
  *
  * Preconditions: Valid RecordId.
  */
-class CollectionScan final : public PlanStage {
+class CollectionScan final : public RequiresCollectionStage {
 public:
+    static const char* kStageType;
+
     CollectionScan(OperationContext* opCtx,
+                   const Collection* collection,
                    const CollectionScanParams& params,
                    WorkingSet* workingSet,
                    const MatchExpression* filter);
@@ -60,8 +63,6 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -77,7 +78,10 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static const char* kStageType;
+protected:
+    void saveState(RequiresCollTag) final;
+
+    void restoreState(RequiresCollTag) final;
 
 private:
     /**
@@ -107,8 +111,6 @@ private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
 
     CollectionScanParams _params;
-
-    bool _isDead;
 
     RecordId _lastSeenId;  // Null if nothing has been returned from _cursor yet.
 

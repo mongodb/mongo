@@ -43,10 +43,6 @@ struct CollectionScanParams {
         BACKWARD = -1,
     };
 
-    // What collection?
-    // not owned
-    const Collection* collection = nullptr;
-
     // The RecordId to which we should seek to as the first document of the scan.
     RecordId start;
 

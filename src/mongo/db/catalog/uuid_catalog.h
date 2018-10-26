@@ -171,10 +171,11 @@ public:
     Collection* removeUUIDCatalogEntry(CollectionUUID uuid);
 
     /**
-     * This function gets the Collection* pointer that corresponds to
-     * CollectionUUID uuid. The required locks should be obtained prior
-     * to calling this function, or else the found Collection pointer
-     * might no longer be valid when the call returns.
+     * This function gets the Collection pointer that corresponds to the CollectionUUID. The
+     * required locks should be obtained prior to calling this function, or else the found
+     * Collection pointer might no longer be valid when the call returns.
+     *
+     * Returns nullptr if the 'uuid' is not known.
      */
     Collection* lookupCollectionByUUID(CollectionUUID uuid) const;
 

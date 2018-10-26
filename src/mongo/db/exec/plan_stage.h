@@ -223,6 +223,10 @@ public:
      * Can only be called while the stage in is the "saved" state.
      *
      * Propagates to all children, then calls doRestoreState().
+     *
+     * Throws a UserException on failure to restore due to a conflicting event such as a
+     * collection drop. May throw a WriteConflictException, in which case the caller may choose to
+     * retry.
      */
     void restoreState();
 

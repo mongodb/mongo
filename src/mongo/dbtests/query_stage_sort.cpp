@@ -366,7 +366,7 @@ public:
             coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, NULL, &args);
             wuow.commit();
         }
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         // Read the rest of the data from the queued data stage.
         while (!queuedDataStage->isEOF()) {
@@ -385,7 +385,7 @@ public:
                 wuow.commit();
             }
         }
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         // Verify that it's sorted, the right number of documents are returned, and they're all
         // in the expected range.
@@ -465,7 +465,7 @@ public:
             coll->deleteDocument(&_opCtx, kUninitializedStmtId, *it++, nullOpDebug);
             wuow.commit();
         }
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         // Read the rest of the data from the queued data stage.
         while (!queuedDataStage->isEOF()) {
@@ -482,7 +482,7 @@ public:
                 wuow.commit();
             }
         }
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         // Regardless of storage engine, all the documents should come back with their objects
         int count = 0;

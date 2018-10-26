@@ -171,10 +171,9 @@ unique_ptr<PlanStage> getCollScanPlan(OperationContext* opCtx,
                                       WorkingSet* sharedWs,
                                       MatchExpression* matchExpr) {
     CollectionScanParams csparams;
-    csparams.collection = coll;
     csparams.direction = CollectionScanParams::FORWARD;
 
-    unique_ptr<PlanStage> root(new CollectionScan(opCtx, csparams, sharedWs, matchExpr));
+    unique_ptr<PlanStage> root(new CollectionScan(opCtx, coll, csparams, sharedWs, matchExpr));
 
     return root;
 }
@@ -580,11 +579,6 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     // at least).
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
     unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(_opCtx.get(), coll, sharedWs.get(), 7);
-
-    // Plan 1: CollScan with matcher.
-    CollectionScanParams csparams;
-    csparams.collection = coll;
-    csparams.direction = CollectionScanParams::FORWARD;
 
     // Make the filter.
     BSONObj filterObj = BSON("foo" << 7);

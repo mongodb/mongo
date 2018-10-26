@@ -91,11 +91,10 @@ public:
         WorkingSet ws;
 
         CollectionScanParams params;
-        params.collection = _coll;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, _coll, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -221,10 +220,9 @@ public:
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {
         CollectionScanParams params;
-        params.collection = _coll;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new CollectionScan(&_opCtx, params, ws, expr);
+        return new CollectionScan(&_opCtx, _coll, params, ws, expr);
     }
 
     static const char* ns() {

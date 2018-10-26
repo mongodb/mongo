@@ -112,39 +112,37 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
     return Status::OK();
 }
 
-mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
-                                             Database* db,
-                                             const std::string& shortFrom,
-                                             const std::string& shortTo,
-                                             long long size,
-                                             bool temp) {
+void mongo::cloneCollectionAsCapped(OperationContext* opCtx,
+                                    Database* db,
+                                    const std::string& shortFrom,
+                                    const std::string& shortTo,
+                                    long long size,
+                                    bool temp) {
     NamespaceString fromNss(db->name(), shortFrom);
     NamespaceString toNss(db->name(), shortTo);
 
     Collection* fromCollection = db->getCollection(opCtx, fromNss);
     if (!fromCollection) {
-        if (db->getViewCatalog()->lookup(opCtx, fromNss.ns())) {
-            return Status(ErrorCodes::CommandNotSupportedOnView,
-                          str::stream() << "cloneCollectionAsCapped not supported for views: "
-                                        << fromNss.ns());
-        }
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "source collection " << fromNss.ns() << " does not exist");
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "cloneCollectionAsCapped not supported for views: "
+                              << fromNss.ns(),
+                !db->getViewCatalog()->lookup(opCtx, fromNss.ns()));
+
+        uasserted(ErrorCodes::NamespaceNotFound,
+                  str::stream() << "source collection " << fromNss.ns() << " does not exist");
     }
 
-    if (fromNss.isDropPendingNamespace()) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "source collection " << fromNss.ns()
-                                    << " is currently in a drop-pending state.");
-    }
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "source collection " << fromNss.ns()
+                          << " is currently in a drop-pending state.",
+            !fromNss.isDropPendingNamespace());
 
-    if (db->getCollection(opCtx, toNss)) {
-        return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "cloneCollectionAsCapped failed - destination collection "
-                                    << toNss.ns()
-                                    << " already exists. source collection: "
-                                    << fromNss.ns());
-    }
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "cloneCollectionAsCapped failed - destination collection "
+                          << toNss.ns()
+                          << " already exists. source collection: "
+                          << fromNss.ns(),
+            !db->getCollection(opCtx, toNss));
 
     // create new collection
     {
@@ -160,9 +158,7 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
         BSONObjBuilder cmd;
         cmd.append("create", toNss.coll());
         cmd.appendElements(options.toBSON());
-        Status status = createCollection(opCtx, toNss.db().toString(), cmd.done());
-        if (!status.isOK())
-            return status;
+        uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
     }
 
     Collection* toCollection = db->getCollection(opCtx, toNss);
@@ -197,7 +193,7 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
 
         switch (state) {
             case PlanExecutor::IS_EOF:
-                return Status::OK();
+                return;
             case PlanExecutor::ADVANCED: {
                 if (excessSize > 0) {
                     // 4x is for padding, power of 2, etc...
@@ -242,19 +238,16 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
             // abandonSnapshot.
             exec->saveState();
             opCtx->recoveryUnit()->abandonSnapshot();
-            auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
-            if (!restoreStatus.isOK()) {
-                return restoreStatus;
-            }
+            exec->restoreState();  // Handles any WCEs internally.
         }
     }
 
     MONGO_UNREACHABLE;
 }
 
-mongo::Status mongo::convertToCapped(OperationContext* opCtx,
-                                     const NamespaceString& collectionName,
-                                     long long size) {
+void mongo::convertToCapped(OperationContext* opCtx,
+                            const NamespaceString& collectionName,
+                            long long size) {
     StringData dbname = collectionName.db();
     StringData shortSource = collectionName.coll();
 
@@ -263,42 +256,33 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
 
-    if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while converting " << collectionName.ns()
-                                    << " to a capped collection");
-    }
+    uassert(ErrorCodes::NotMaster,
+            str::stream() << "Not primary while converting " << collectionName.ns()
+                          << " to a capped collection",
+            !userInitiatedWritesAndNotPrimary);
 
     Database* const db = autoDb.getDb();
-    if (!db) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "database " << dbname << " not found");
-    }
+    uassert(
+        ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbname);
 
     // Generate a temporary collection name that will not collide with any existing collections.
     auto tmpNameResult =
         db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
-    if (!tmpNameResult.isOK()) {
-        return tmpNameResult.getStatus().withContext(
-            str::stream() << "Cannot generate temporary collection namespace to convert "
-                          << collectionName.ns()
-                          << " to a capped collection");
-    }
+    uassertStatusOKWithContext(tmpNameResult,
+                               str::stream()
+                                   << "Cannot generate temporary collection namespace to convert "
+                                   << collectionName.ns()
+                                   << " to a capped collection");
+
     const auto& longTmpName = tmpNameResult.getValue();
     const auto shortTmpName = longTmpName.coll().toString();
 
-    {
-        Status status =
-            cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
-
-        if (!status.isOK())
-            return status;
-    }
+    cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
 
     RenameCollectionOptions options;
     options.dropTarget = true;
     options.stayTemp = false;
-    return renameCollection(opCtx, longTmpName, collectionName, options);
+    uassertStatusOK(renameCollection(opCtx, longTmpName, collectionName, options));
 }

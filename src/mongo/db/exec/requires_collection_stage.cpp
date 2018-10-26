@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -28,32 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/exec/requires_collection_stage.h"
+
+#include "mongo/db/catalog/uuid_catalog.h"
 
 namespace mongo {
-class Database;
-class NamespaceString;
-class OperationContext;
 
-/**
- * Drops all documents contained in the capped collection, "collectionName".
- */
-Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName);
+void RequiresCollectionStage::doSaveState() {
+    // A stage may not access storage while in a saved state.
+    _collection = nullptr;
 
-/**
- * Clones the collection "shortFrom" to the capped collection "shortTo" with a size of "size".
- */
-void cloneCollectionAsCapped(OperationContext* opCtx,
-                             Database* db,
-                             const std::string& shortFrom,
-                             const std::string& shortTo,
-                             long long size,
-                             bool temp);
+    saveState(RequiresCollTag{});
+}
 
-/**
- * Converts the collection "collectionName" to a capped collection with a size of "size".
- */
-void convertToCapped(OperationContext* opCtx,
-                     const NamespaceString& collectionName,
-                     long long size);
+void RequiresCollectionStage::doRestoreState() {
+    invariant(!_collection);
+
+    const UUIDCatalog& catalog = UUIDCatalog::get(getOpCtx());
+    _collection = catalog.lookupCollectionByUUID(_collectionUUID);
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "UUID " << _collectionUUID << " no longer exists.",
+            _collection);
+
+    restoreState(RequiresCollTag{});
+}
+
 }  // namespace mongo

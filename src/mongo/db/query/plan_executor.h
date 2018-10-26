@@ -306,20 +306,18 @@ public:
     virtual void saveState() = 0;
 
     /**
-     * Restores the state saved by a saveState() call.
+     * Restores the state saved by a saveState() call. When this method returns successfully, the
+     * execution tree can once again be executed via work().
      *
-     * Returns Status::OK() if the state was successfully restored and the execution tree can be
-     * work()'d.
+     * Throws a UserException if the state cannot be successfully restored (e.g. a collection was
+     * dropped or the position of a capped cursor was lost during a yield). If restore fails, it is
+     * only safe to call dispose(), detachFromOperationContext(), or the destructor.
      *
-     * Returns ErrorCodes::QueryPlanKilled if the PlanExecutor was killed while saved.
-     *
-     * If allowed, will yield and retry if a WriteConflictException is encountered. If the time
-     * limit is exceeded during this retry process, returns ErrorCodes::MaxTimeMSExpired. If this
-     * PlanExecutor is killed during this retry process, returns ErrorCodes::QueryPlanKilled. In
-     * this scenario, locks will have been released, and will not be held when control returns to
-     * the caller.
+     * If allowed by the executor's yield policy, will yield and retry internally if a
+     * WriteConflictException is encountered. If the time limit is exceeded during this retry
+     * process, throws ErrorCodes::MaxTimeMSExpired.
      */
-    virtual Status restoreState() = 0;
+    virtual void restoreState() = 0;
 
     /**
      * Detaches from the OperationContext and releases any storage-engine state.
@@ -344,7 +342,7 @@ public:
      *
      * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
      */
-    virtual Status restoreStateWithoutRetrying() = 0;
+    virtual void restoreStateWithoutRetrying() = 0;
 
     //
     // Running Support

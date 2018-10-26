@@ -103,7 +103,6 @@ public:
         PlanExecutor::YieldPolicy yieldPolicy = PlanExecutor::YieldPolicy::YIELD_MANUAL,
         TailableModeEnum tailableMode = TailableModeEnum::kNormal) {
         CollectionScanParams csparams;
-        csparams.collection = coll;
         csparams.direction = CollectionScanParams::FORWARD;
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
@@ -118,7 +117,7 @@ public:
 
         // Make the stage.
         unique_ptr<PlanStage> root(
-            new CollectionScan(&_opCtx, csparams, ws.get(), cq.get()->root()));
+            new CollectionScan(&_opCtx, coll, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor = PlanExecutor::make(

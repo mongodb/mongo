@@ -151,12 +151,17 @@ Status PlanYieldPolicy::yield(stdx::function<void()> whileYieldingFn) {
                 QueryYield::yieldAllLocks(opCtx, whileYieldingFn, _planYielding->nss());
             }
 
-            return _planYielding->restoreStateWithoutRetrying();
+            _planYielding->restoreStateWithoutRetrying();
+            return Status::OK();
         } catch (const WriteConflictException&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             WriteConflictException::logAndBackoff(
                 attempt, "plan execution restoreState", _planYielding->nss().ns());
             // retry
+        } catch (...) {
+            // Errors other than write conflicts don't get retried, and should instead result in the
+            // PlanExecutor dying. We propagate all such errors as status codes.
+            return exceptionToStatus();
         }
     }
 }

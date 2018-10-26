@@ -368,12 +368,11 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     AutoGetCollectionForRead readLock(opCtx(), nss);
     auto workingSet = stdx::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
-    collScanParams.collection = readLock.getCollection();
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
-        opCtx(), collScanParams, workingSet.get(), matchExpression.get());
+        opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
@@ -408,11 +407,10 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     AutoGetCollectionForRead readLock(opCtx(), nss);
     auto workingSet = stdx::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
-    collScanParams.collection = readLock.getCollection();
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
-        opCtx(), collScanParams, workingSet.get(), matchExpression.get());
+        opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
@@ -453,12 +451,11 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     AutoGetCollectionForRead readLock(opCtx(), nss);
     auto workingSet = stdx::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
-    collScanParams.collection = readLock.getCollection();
     collScanParams.tailable = true;
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
-        opCtx(), collScanParams, workingSet.get(), matchExpression.get());
+        opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
@@ -492,11 +489,10 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     AutoGetCollectionForRead readLock(opCtx(), nss);
     auto workingSet = stdx::make_unique<WorkingSet>();
     CollectionScanParams collScanParams;
-    collScanParams.collection = readLock.getCollection();
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = stdx::make_unique<CollectionScan>(
-        opCtx(), collScanParams, workingSet.get(), matchExpression.get());
+        opCtx(), readLock.getCollection(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(

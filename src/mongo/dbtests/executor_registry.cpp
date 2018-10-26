@@ -72,10 +72,10 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollscan() {
         unique_ptr<WorkingSet> ws(new WorkingSet());
         CollectionScanParams params;
-        params.collection = collection();
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
+        unique_ptr<CollectionScan> scan(
+            new CollectionScan(&_opCtx, collection(), params, ws.get(), NULL));
 
         // Create a plan executor to hold it
         auto qr = stdx::make_unique<QueryRequest>(nss);
@@ -139,7 +139,7 @@ public:
         // At this point, we're done yielding.  We recover our lock.
 
         // And clean up anything that happened before.
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         // Make sure that the PlanExecutor moved forward over the deleted data.  We don't see
         // foo==10
@@ -171,7 +171,7 @@ public:
         // Drop a collection that's not ours.
         _client.dropCollection("unittests.someboguscollection");
 
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
         ASSERT_EQUALS(10, obj["foo"].numberInt());
@@ -180,7 +180,7 @@ public:
 
         _client.dropCollection(nss.ns());
 
-        ASSERT_EQUALS(ErrorCodes::QueryPlanKilled, exec->restoreState());
+        ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
     }
 };
 
@@ -201,7 +201,7 @@ public:
 
         exec->saveState();
         _client.dropIndexes(nss.ns());
-        ASSERT_EQUALS(ErrorCodes::QueryPlanKilled, exec->restoreState());
+        ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
     }
 };
 
@@ -222,7 +222,7 @@ public:
 
         exec->saveState();
         _client.dropIndex(nss.ns(), BSON("foo" << 1));
-        ASSERT_EQUALS(ErrorCodes::QueryPlanKilled, exec->restoreState());
+        ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
     }
 };
 
@@ -246,7 +246,7 @@ public:
         _ctx.reset();
         _client.dropDatabase("somesillydb");
         _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
-        ASSERT_OK(exec->restoreState());
+        exec->restoreState();
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
         ASSERT_EQUALS(10, obj["foo"].numberInt());
@@ -257,7 +257,7 @@ public:
         _ctx.reset();
         _client.dropDatabase("unittests");
         _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
-        ASSERT_EQUALS(ErrorCodes::QueryPlanKilled, exec->restoreState());
+        ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
     }
 };
 

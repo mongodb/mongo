@@ -398,7 +398,7 @@ Message getMore(OperationContext* opCtx,
 
         PlanExecutor* exec = cc->getExecutor();
         exec->reattachToOperationContext(opCtx);
-        uassertStatusOK(exec->restoreState());
+        exec->restoreState();
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
@@ -447,7 +447,7 @@ Message getMore(OperationContext* opCtx,
 
             // Reacquiring locks.
             readLock.emplace(opCtx, nss);
-            uassertStatusOK(exec->restoreState());
+            exec->restoreState();
 
             // We woke up because either the timed_wait expired, or there was more data. Either
             // way, attempt to generate another batch of results.

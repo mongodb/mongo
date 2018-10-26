@@ -57,18 +57,18 @@ using stdx::make_unique;
 const char* CollectionScan::kStageType = "COLLSCAN";
 
 CollectionScan::CollectionScan(OperationContext* opCtx,
+                               const Collection* collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : PlanStage(kStageType, opCtx),
+    : RequiresCollectionStage(kStageType, opCtx, collection),
       _workingSet(workingSet),
       _filter(filter),
-      _params(params),
-      _isDead(false) {
+      _params(params) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.maxTs = params.maxTs;
-    invariant(!_params.shouldTrackLatestOplogTimestamp || _params.collection->ns().isOplog());
+    invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
 
     if (params.maxTs) {
         _endConditionBSON = BSON("$gte" << *(params.maxTs));
@@ -78,17 +78,6 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
 }
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
-    if (_isDead) {
-        Status status(
-            ErrorCodes::CappedPositionLost,
-            str::stream()
-                << "CollectionScan died due to position in capped collection being deleted. "
-                << "Last seen record id: "
-                << _lastSeenId);
-        *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-        return PlanStage::DEAD;
-    }
-
     if (_commonStats.isEOF) {
         return PlanStage::IS_EOF;
     }
@@ -110,14 +99,13 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
                 // storage engine snapshot while waiting. Otherwise, we will end up reading from the
                 // snapshot where the oplog entries are not yet visible even after the wait.
-                invariant(!_params.tailable && _params.collection->ns().isOplog());
+                invariant(!_params.tailable && collection()->ns().isOplog());
 
                 getOpCtx()->recoveryUnit()->abandonSnapshot();
-                _params.collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
-                    getOpCtx());
+                collection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(getOpCtx());
             }
 
-            _cursor = _params.collection->getCursor(getOpCtx(), forward);
+            _cursor = collection()->getCursor(getOpCtx(), forward);
 
             if (!_lastSeenId.isNull()) {
                 invariant(_params.tailable);
@@ -128,7 +116,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // returned this one. This is only possible in the tailing case because that is the
                 // only time we'd need to create a cursor after already getting a record out of it.
                 if (!_cursor->seekExact(_lastSeenId)) {
-                    _isDead = true;
                     Status status(ErrorCodes::CappedPositionLost,
                                   str::stream() << "CollectionScan died due to failure to restore "
                                                 << "tailable cursor position. "
@@ -221,20 +208,24 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
 }
 
 bool CollectionScan::isEOF() {
-    return _commonStats.isEOF || _isDead;
+    return _commonStats.isEOF;
 }
 
-void CollectionScan::doSaveState() {
+void CollectionScan::saveState(RequiresCollTag) {
     if (_cursor) {
         _cursor->save();
     }
 }
 
-void CollectionScan::doRestoreState() {
+void CollectionScan::restoreState(RequiresCollTag) {
     if (_cursor) {
-        if (!_cursor->restore()) {
-            _isDead = true;
-        }
+        const bool couldRestore = _cursor->restore();
+        uassert(ErrorCodes::CappedPositionLost,
+                str::stream()
+                    << "CollectionScan died due to position in capped collection being deleted. "
+                    << "Last seen record id: "
+                    << _lastSeenId,
+                couldRestore);
     }
 }
 

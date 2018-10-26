@@ -411,7 +411,7 @@ public:
 
             PlanExecutor* exec = cursor->getExecutor();
             exec->reattachToOperationContext(opCtx);
-            uassertStatusOK(exec->restoreState());
+            exec->restoreState();
 
             auto planSummary = Explain::getPlanSummary(exec);
             {
