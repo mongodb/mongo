@@ -62,8 +62,6 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
     pExpCtx->checkForInterrupt();
 
-    invariant(!pExpCtx->inMongos);
-
     if (_queuedInvalidate) {
         const auto res = DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
         _queuedInvalidate.reset();
