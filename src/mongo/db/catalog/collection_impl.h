@@ -227,8 +227,6 @@ public:
 
     // -----------
 
-    StatusWith<CompactStats> compact(OperationContext* opCtx, const CompactOptions* options) final;
-
     /**
      * removes all documents as fast as possible
      * indexes before and after will be the same

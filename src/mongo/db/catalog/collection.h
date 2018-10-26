@@ -74,30 +74,6 @@ class RecordCursor;
 class UpdateDriver;
 class UpdateRequest;
 
-struct CompactOptions {
-    // padding
-    enum PaddingMode { PRESERVE, NONE, MANUAL } paddingMode = NONE;
-
-    // only used if _paddingMode == MANUAL
-    double paddingFactor = 1;  // what to multiple document size by
-    int paddingBytes = 0;      // what to add to ducment size after multiplication
-
-    // other
-    bool validateDocuments = true;
-
-    std::string toString() const;
-
-    unsigned computeRecordSize(unsigned recordSize) const {
-        recordSize = static_cast<unsigned>(paddingFactor * recordSize);
-        recordSize += paddingBytes;
-        return recordSize;
-    }
-};
-
-struct CompactStats {
-    long long corruptDocuments = 0;
-};
-
 /**
  * Holds information update an update operation.
  */
@@ -290,9 +266,6 @@ public:
             const char* damageSource,
             const mutablebson::DamageVector& damages,
             CollectionUpdateArgs* args) = 0;
-
-        virtual StatusWith<CompactStats> compact(OperationContext* opCtx,
-                                                 const CompactOptions* options) = 0;
 
         virtual Status truncate(OperationContext* opCtx) = 0;
 
@@ -573,11 +546,6 @@ public:
     }
 
     // -----------
-
-    inline StatusWith<CompactStats> compact(OperationContext* const opCtx,
-                                            const CompactOptions* const options) {
-        return this->_impl().compact(opCtx, options);
-    }
 
     /**
      * removes all documents as fast as possible

@@ -40,6 +40,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_compact.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -164,11 +165,8 @@ public:
 
         log() << "compact " << nss.ns() << " begin, options: " << compactOptions;
 
-        StatusWith<CompactStats> status = collection->compact(opCtx, &compactOptions);
+        StatusWith<CompactStats> status = compactCollection(opCtx, collection, &compactOptions);
         uassertStatusOK(status.getStatus());
-
-        if (status.getValue().corruptDocuments > 0)
-            result.append("invalidObjects", status.getValue().corruptDocuments);
 
         log() << "compact " << nss.ns() << " end";
 

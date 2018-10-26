@@ -234,7 +234,6 @@ env.Library(
     target='catalog_impl',
     source=[
         "catalog_control.cpp",
-        "collection_compact.cpp",
         "collection_impl.cpp",
         "collection_info_cache_impl.cpp",
         "database_holder_impl.cpp",
@@ -288,6 +287,7 @@ env.Library(
     source=[
         'capped_utils.cpp',
         'coll_mod.cpp',
+        "collection_compact.cpp",
         'create_collection.cpp',
         'drop_collection.cpp',
         'drop_database.cpp',
@@ -306,6 +306,7 @@ env.Library(
         'collection',
         'database',
         'index_catalog',
+        'index_key_validate',
     ],
 )
 

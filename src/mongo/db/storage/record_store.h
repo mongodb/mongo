@@ -56,6 +56,22 @@ class RecordStore;
 struct ValidateResults;
 class ValidateAdaptor;
 
+struct CompactOptions {
+    // padding
+    enum PaddingMode { PRESERVE, NONE, MANUAL } paddingMode = NONE;
+
+    // only used if _paddingMode == MANUAL
+    double paddingFactor = 1;  // what to multiple document size by
+    int paddingBytes = 0;      // what to add to ducment size after multiplication
+
+    // other
+    bool validateDocuments = true;
+
+    std::string toString() const;
+};
+
+struct CompactStats {};
+
 /**
  * Allows inserting a Record "in-place" without creating a copy ahead of time.
  */

@@ -182,9 +182,6 @@ public:
         std::abort();
     }
 
-    StatusWith<CompactStats> compact(OperationContext* opCtx, const CompactOptions* options) {
-        std::abort();
-    }
     Status truncate(OperationContext* opCtx) {
         std::abort();
     }

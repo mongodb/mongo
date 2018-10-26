@@ -30,20 +30,15 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/collection_compact.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/base/owned_pointer_map.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -77,29 +72,33 @@ private:
 }
 
 
-StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
-                                                 const CompactOptions* compactOptions) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
+                                           Collection* collection,
+                                           const CompactOptions* compactOptions) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns().toString(), MODE_X));
 
     DisableDocumentValidation validationDisabler(opCtx);
 
-    if (!_recordStore->compactSupported())
+    auto recordStore = collection->getRecordStore();
+    auto indexCatalog = collection->getIndexCatalog();
+
+    if (!recordStore->compactSupported())
         return StatusWith<CompactStats>(ErrorCodes::CommandNotSupported,
                                         str::stream()
                                             << "cannot compact collection with record store: "
-                                            << _recordStore->name());
+                                            << recordStore->name());
 
-    if (_recordStore->compactsInPlace()) {
+    if (recordStore->compactsInPlace()) {
         CompactStats stats;
-        Status status = _recordStore->compact(opCtx, NULL, compactOptions, &stats);
+        Status status = recordStore->compact(opCtx, nullptr, compactOptions, &stats);
         if (!status.isOK())
             return StatusWith<CompactStats>(status);
 
         // Compact all indexes (not including unfinished indexes)
-        IndexCatalog::IndexIterator ii(_indexCatalog->getIndexIterator(opCtx, false));
+        IndexCatalog::IndexIterator ii(indexCatalog->getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
-            IndexAccessMethod* index = _indexCatalog->getIndex(descriptor);
+            IndexAccessMethod* index = indexCatalog->getIndex(descriptor);
 
             LOG(1) << "compacting index: " << descriptor->toString();
             Status status = index->compact(opCtx);
@@ -112,13 +111,13 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
         return StatusWith<CompactStats>(stats);
     }
 
-    if (_indexCatalog->numIndexesInProgress(opCtx))
+    if (indexCatalog->numIndexesInProgress(opCtx))
         return StatusWith<CompactStats>(ErrorCodes::BadValue,
                                         "cannot compact when indexes in progress");
 
     std::vector<BSONObj> indexSpecs;
     {
-        IndexCatalog::IndexIterator ii(_indexCatalog->getIndexIterator(opCtx, false));
+        IndexCatalog::IndexIterator ii(indexCatalog->getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
 
@@ -149,13 +148,13 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
         // which is important and wanted here
         WriteUnitOfWork wunit(opCtx);
         log() << "compact dropping indexes";
-        _indexCatalog->dropAllIndexes(opCtx, true);
+        indexCatalog->dropAllIndexes(opCtx, true);
         wunit.commit();
     }
 
     CompactStats stats;
 
-    auto indexerPtr = createMultiIndexBlock(opCtx);
+    auto indexerPtr = collection->createMultiIndexBlock(opCtx);
     MultiIndexBlock& indexer(*indexerPtr);
     indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
@@ -164,9 +163,9 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
-    MyCompactAdaptor adaptor(_this, &indexer);
+    MyCompactAdaptor adaptor(collection, &indexer);
 
-    status = _recordStore->compact(opCtx, &adaptor, compactOptions, &stats);
+    status = recordStore->compact(opCtx, &adaptor, compactOptions, &stats);
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
