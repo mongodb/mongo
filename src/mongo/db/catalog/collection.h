@@ -51,6 +51,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/capped_callback.h"
@@ -166,12 +167,21 @@ public:
     enum class StoreDeletedDoc { Off, On };
 
     /**
+     * Direction of collection scan plan executor returned by makePlanExecutor().
+     */
+    enum class ScanDirection {
+        kForward = 1,
+        kBackward = -1,
+    };
+
+    /**
      * Callback function for callers of insertDocumentForBulkLoader().
      */
     using OnRecordInsertedFn = stdx::function<Status(const RecordId& loc)>;
 
     class Impl : virtual CappedCallback {
     public:
+        using ScanDirection = Collection::ScanDirection;
         using OnRecordInsertedFn = Collection::OnRecordInsertedFn;
 
         virtual ~Impl() = 0;
@@ -324,6 +334,11 @@ public:
         virtual void notifyCappedWaitersIfNeeded() = 0;
 
         virtual const CollatorInterface* getDefaultCollator() const = 0;
+
+        virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
+            OperationContext* opCtx,
+            PlanExecutor::YieldPolicy yieldPolicy,
+            ScanDirection scanDirection) = 0;
 
         virtual std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) = 0;
     };
@@ -710,6 +725,16 @@ public:
      */
     inline const CollatorInterface* getDefaultCollator() const {
         return this->_impl().getDefaultCollator();
+    }
+
+    /**
+     * Returns a plan executor for a collection scan over this collection.
+     */
+    inline std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
+        OperationContext* opCtx,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        ScanDirection scanDirection) {
+        return this->_impl().makePlanExecutor(opCtx, yieldPolicy, scanDirection);
     }
 
     /**

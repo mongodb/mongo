@@ -48,7 +48,6 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/memory.h"
@@ -357,7 +356,7 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
         yieldPolicy = PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;
     }
     auto exec =
-        InternalPlanner::collectionScan(_opCtx, _collection->ns().ns(), _collection, yieldPolicy);
+        _collection->makePlanExecutor(_opCtx, yieldPolicy, Collection::ScanDirection::kForward);
 
     Snapshotted<BSONObj> objToIndex;
     RecordId loc;

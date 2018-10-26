@@ -360,6 +360,11 @@ public:
      */
     const CollatorInterface* getDefaultCollator() const final;
 
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
+        OperationContext* opCtx,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        ScanDirection scanDirection) final;
+
     std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) final;
 
 private:

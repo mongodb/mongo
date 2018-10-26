@@ -280,6 +280,13 @@ public:
         std::abort();
     }
 
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
+        OperationContext* opCtx,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        ScanDirection scanDirection) {
+        std::abort();
+    }
+
     std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) {
         std::abort();
     }

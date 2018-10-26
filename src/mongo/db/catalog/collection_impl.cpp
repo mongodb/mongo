@@ -63,6 +63,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -1294,6 +1295,13 @@ Status CollectionImpl::touch(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExecutor(
+    OperationContext* opCtx, PlanExecutor::YieldPolicy yieldPolicy, ScanDirection scanDirection) {
+    auto isForward = scanDirection == ScanDirection::kForward;
+    auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
+    return InternalPlanner::collectionScan(opCtx, _ns.ns(), _this, yieldPolicy, direction);
 }
 
 std::unique_ptr<MultiIndexBlock> CollectionImpl::createMultiIndexBlock(OperationContext* opCtx) {
