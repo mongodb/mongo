@@ -43,35 +43,6 @@
 
 namespace mongo {
 
-namespace {
-class MyCompactAdaptor : public RecordStoreCompactAdaptor {
-public:
-    MyCompactAdaptor(Collection* collection, MultiIndexBlock* indexBlock)
-
-        : _collection(collection), _multiIndexBlock(indexBlock) {}
-
-    virtual bool isDataValid(const RecordData& recData) {
-        // Use the latest BSON validation version. We allow compaction of collections containing
-        // decimal data even if decimal is disabled.
-        return recData.toBson().valid(BSONVersion::kLatest);
-    }
-
-    virtual size_t dataSize(const RecordData& recData) {
-        return recData.toBson().objsize();
-    }
-
-    virtual void inserted(const RecordData& recData, const RecordId& newLocation) {
-        _multiIndexBlock->insert(recData.toBson(), newLocation).transitional_ignore();
-    }
-
-private:
-    Collection* _collection;
-
-    MultiIndexBlock* _multiIndexBlock;
-};
-}
-
-
 StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
                                            Collection* collection,
                                            const CompactOptions* compactOptions) {
@@ -90,7 +61,7 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
 
     if (recordStore->compactsInPlace()) {
         CompactStats stats;
-        Status status = recordStore->compact(opCtx, nullptr, compactOptions, &stats);
+        Status status = recordStore->compact(opCtx);
         if (!status.isOK())
             return StatusWith<CompactStats>(status);
 
@@ -163,9 +134,9 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
-    MyCompactAdaptor adaptor(collection, &indexer);
-
-    status = recordStore->compact(opCtx, &adaptor, compactOptions, &stats);
+    // The MMAPv1 storage engine used to add documents to indexer through the
+    // RecordStoreCompactAdaptor interface.
+    status = recordStore->compact(opCtx);
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 

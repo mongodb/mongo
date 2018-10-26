@@ -190,10 +190,7 @@ public:
 
     virtual Timestamp getPinnedOplog() const final;
 
-    virtual Status compact(OperationContext* opCtx,
-                           RecordStoreCompactAdaptor* adaptor,
-                           const CompactOptions* options,
-                           CompactStats* stats);
+    virtual Status compact(OperationContext* opCtx) final;
 
     virtual bool isInRecordIdOrder() const override {
         return true;

@@ -1491,10 +1491,7 @@ Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status WiredTigerRecordStore::compact(OperationContext* opCtx,
-                                      RecordStoreCompactAdaptor* adaptor,
-                                      const CompactOptions* options,
-                                      CompactStats* stats) {
+Status WiredTigerRecordStore::compact(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isWriteLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();

@@ -50,7 +50,6 @@ struct CompactStats;
 class MAdvise;
 class OperationContext;
 
-class RecordStoreCompactAdaptor;
 class RecordStore;
 
 struct ValidateResults;
@@ -496,12 +495,8 @@ public:
      * Attempt to reduce the storage space used by this RecordStore.
      *
      * Only called if compactSupported() returns true.
-     * No RecordStoreCompactAdaptor will be passed if compactsInPlace() returns true.
      */
-    virtual Status compact(OperationContext* opCtx,
-                           RecordStoreCompactAdaptor* adaptor,
-                           const CompactOptions* options,
-                           CompactStats* stats) {
+    virtual Status compact(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }
 
@@ -608,14 +603,6 @@ public:
 
 protected:
     std::string _ns;
-};
-
-class RecordStoreCompactAdaptor {
-public:
-    virtual ~RecordStoreCompactAdaptor() {}
-    virtual bool isDataValid(const RecordData& recData) = 0;
-    virtual size_t dataSize(const RecordData& recData) = 0;
-    virtual void inserted(const RecordData& recData, const RecordId& newLocation) = 0;
 };
 
 struct ValidateResults {
