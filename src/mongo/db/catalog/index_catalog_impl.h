@@ -294,7 +294,6 @@ public:
         std::string _indexNamespace;
 
         IndexCatalogEntry* _entry;
-        bool _inProgress;
 
         OperationContext* _opCtx;
     };
