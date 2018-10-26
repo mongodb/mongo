@@ -1641,6 +1641,17 @@ class TestBinder(testcase.IDLTestcase):
                     callback: qux
             """))
 
+        # Custom setting missing from_bson callback, okay because default impl works.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                append_bson: baz
+                from_string: qux
+            """))
+
     def test_server_parameter_negative(self):
         # type: () -> None
         """Negative server parameter test cases."""
@@ -1663,16 +1674,6 @@ class TestBinder(testcase.IDLTestcase):
                 set_at: startup
                 description: bar
                 from_bson: buzz
-                from_string: qux
-            """), idl.errors.ERROR_ID_SERVER_PARAM_MISSING_METHOD)
-
-        self.assert_bind_fail(
-            textwrap.dedent("""
-        server_parameters:
-            foo:
-                set_at: startup
-                description: bar
-                append_bson: baz
                 from_string: qux
             """), idl.errors.ERROR_ID_SERVER_PARAM_MISSING_METHOD)
 

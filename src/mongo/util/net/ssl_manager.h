@@ -61,6 +61,16 @@ namespace mongo {
  * @return the SSL version std::string prefixed with prefix and suffixed with suffix
  */
 const std::string getSSLVersion(const std::string& prefix, const std::string& suffix);
+
+/**
+ * Validation callback for setParameter 'opensslCipherConfig'.
+ */
+Status validateOpensslCipherConfig(const std::string&);
+
+/**
+ * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
+ */
+Status validateDisableNonTLSConnectionLogging(const bool&);
 }
 
 #ifdef MONGO_CONFIG_SSL

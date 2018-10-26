@@ -42,4 +42,9 @@ server_parameters:
     from_bson: "customSettingFromBSON"
     from_string: "customSettingFromString"
     deprecated_name: "customSettingTestDeprecated"
-  
+
+  customSettingWithoutFromBSON:
+    set_at: startup
+    description: "Basic test using default fromBSON callback."
+    append_bson: "customSettingAppendBSON"
+    from_string: "customSettingFromString"

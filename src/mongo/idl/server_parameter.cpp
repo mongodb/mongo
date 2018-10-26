@@ -58,12 +58,19 @@ IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData 
                       sp->allowedToChangeAtRuntime()),
       _sp(sp) {}
 
-Status IDLServerParameter::set(const BSONElement& newValueElement) {
-    invariant(_fromBSON, "set() called on IDLServerParamter with no fromBSON implementation");
-    if (!_fromBSON) {
-        return {ErrorCodes::BadValue, "Unable to set parameter with no setter callback"};
+Status IDLServerParameter::set(const BSONElement& newValueElement) try {
+    if (_fromBSON) {
+        return _fromBSON(newValueElement);
+    } else {
+        // Default fallback behavior: Cast to string and use 'from_string' method.
+        return setFromString(newValueElement.String());
     }
-    return _fromBSON(newValueElement);
+} catch (const AssertionException& ex) {
+    return {ErrorCodes::BadValue,
+            str::stream() << "Invalid value '" << newValueElement << "' for setParameter '"
+                          << name()
+                          << "': "
+                          << ex.what()};
 }
 
 Status IDLServerParameter::setFromString(const std::string& str) {

@@ -1678,6 +1678,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_server_parameter(self, params):
         # type: (List[ast.ServerParameter]) -> None
         """Generate IDLServerParameter instances."""
+        # pylint: disable=too-many-branches
 
         for param in params:
             # Optiona storage declarations.
@@ -1715,7 +1716,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             common.template_args(
                                 'auto* ret = new IDLServerParameter(${name}, ${spt});',
                                 spt=param.set_at, name=_encaps(param.name)))
-                        self._writer.write_line('ret->setFromBSON(%s);' % (param.from_bson))
+                        if param.from_bson:
+                            self._writer.write_line('ret->setFromBSON(%s);' % (param.from_bson))
                         self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
                         self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
 

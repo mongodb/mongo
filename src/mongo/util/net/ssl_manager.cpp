@@ -53,104 +53,6 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
-
-namespace {
-
-ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
-    setDiffieHellmanParameterPEMFile(ServerParameterSet::getGlobal(),
-                                     "opensslDiffieHellmanParameters",
-                                     &sslGlobalParams.sslPEMTempDHParam);
-
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
-    suppressNoTLSPeerCertificateWarning(ServerParameterSet::getGlobal(),
-                                        "suppressNoTLSPeerCertificateWarning",
-                                        &sslGlobalParams.suppressNoTLSPeerCertificateWarning);
-
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> tlsWithholdClientCertificate(
-    ServerParameterSet::getGlobal(),
-    "tlsWithholdClientCertificate",
-    &sslGlobalParams.tlsWithholdClientCertificate);
-
-// Deprecated alias for tlsWithholdClientCertificate
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> sslWithholdClientCertificate(
-    ServerParameterSet::getGlobal(),
-    "sslWithholdClientCertificate",
-    &sslGlobalParams.tlsWithholdClientCertificate);
-
-}  // namespace
-
-class OpenSSLCipherConfigParameter
-    : public ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> {
-public:
-    OpenSSLCipherConfigParameter()
-        : ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>(
-              ServerParameterSet::getGlobal(),
-              "opensslCipherConfig",
-              &sslGlobalParams.sslCipherConfig) {}
-    Status validate(const std::string& potentialNewValue) final {
-        if (!sslGlobalParams.sslCipherConfig.empty()) {
-            return Status(
-                ErrorCodes::BadValue,
-                "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig");
-        }
-        // Note that there is very little validation that we can do here.
-        // OpenSSL exposes no API to validate a cipher config string. The only way to figure out
-        // what a string maps to is to make an SSL_CTX object, set the string on it, then parse the
-        // resulting STACK_OF object. If provided an invalid entry in the string, it will silently
-        // ignore it. Because an entry in the string may map to multiple ciphers, or remove ciphers
-        // from the final set produced by the full string, we can't tell if any entry failed
-        // to parse.
-        return Status::OK();
-    }
-} openSSLCipherConfig;
-
-/**
- * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
- * if the sslMode is set to preferSSL, we will log connections that are not using SSL.
- * If true, such log messages will be suppressed.
- */
-class DisableNonSSLConnectionLoggingParameter
-    : public ExportedServerParameter<bool, ServerParameterType::kStartupOnly> {
-public:
-    DisableNonSSLConnectionLoggingParameter()
-        : ExportedServerParameter<bool, ServerParameterType::kStartupOnly>(
-              ServerParameterSet::getGlobal(),
-              "disableNonSSLConnectionLogging",
-              &sslGlobalParams.disableNonSSLConnectionLogging) {}
-    Status validate(const bool& potentialNewValue) final {
-        warning() << "Option: disableNonSSLConnectionLogging is deprecated. Please use "
-                  << "disableNonTLSConnectionLogging instead.";
-        if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
-            return Status(ErrorCodes::BadValue,
-                          "Error parsing command line: Multiple occurrences of option "
-                          "disableNonTLSConnectionLogging");
-        }
-        sslGlobalParams.disableNonSSLConnectionLoggingSet = true;
-        return Status::OK();
-    }
-} disableNonSSLConnectionLogging;
-
-class DisableNonTLSConnectionLoggingParameter
-    : public ExportedServerParameter<bool, ServerParameterType::kStartupOnly> {
-public:
-    DisableNonTLSConnectionLoggingParameter()
-        : ExportedServerParameter<bool, ServerParameterType::kStartupOnly>(
-              ServerParameterSet::getGlobal(),
-              "disableNonTLSConnectionLogging",
-              &sslGlobalParams.disableNonSSLConnectionLogging) {}
-    Status validate(const bool& potentialNewValue) final {
-        if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
-            return Status(ErrorCodes::BadValue,
-                          "Error parsing command line: Multiple occurrences of option "
-                          "disableNonTLSConnectionLogging");
-        }
-        sslGlobalParams.disableNonSSLConnectionLoggingSet = true;
-        return Status::OK();
-    }
-} disableNonTLSConnectionLogging;
-
-#ifdef MONGO_CONFIG_SSL
-
 namespace {
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 // OpenSSL has a more complete library of OID to SN mappings.
@@ -820,11 +722,8 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
     }
 }
 
-#endif
-
 }  // namespace mongo
 
-#ifdef MONGO_CONFIG_SSL
 // TODO SERVER-11601 Use NFC Unicode canonicalization
 bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
     nameToMatch = removeFQDNRoot(std::move(nameToMatch));
@@ -843,4 +742,3 @@ bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::strin
         return !strcasecmp(nameToMatch.c_str(), certHostName.c_str());
     }
 }
-#endif

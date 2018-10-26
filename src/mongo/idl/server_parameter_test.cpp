@@ -91,6 +91,19 @@ TEST(ServerParameter, setFromBSON) {
     ASSERT_NOT_OK(param.set(elem));
 }
 
+TEST(ServerParameter, setFromBSONViaString) {
+    IDLServerParameter param("setFromBSONViaString"_sd, ServerParameterType::kStartupOnly);
+    auto obj = BSON(""
+                    << "value");
+    auto elem = obj.firstElement();
+
+    param.setFromString([](StringData) { return Status::OK(); });
+    ASSERT_OK(param.set(elem));
+
+    param.setFromString([](StringData) { return Status(ErrorCodes::BadValue, "Can't set me."); });
+    ASSERT_NOT_OK(param.set(elem));
+}
+
 TEST(ServerParameter, deprecatedAlias) {
     IDLServerParameter param("basename"_sd, ServerParameterType::kStartupOnly);
     IDLServerParameterDeprecatedAlias alias("aliasname"_sd, &param);
@@ -120,6 +133,12 @@ TEST(IDLServerParameter, customSettingTest) {
     auto* cst = getServerParameter("customSettingTest");
     ASSERT_OK(cst->setFromString("New Value"));
     ASSERT_EQ(test::gCustomSetting, "New Value");
+
+    auto* cswobson = getServerParameter("customSettingWithoutFromBSON");
+    ASSERT_OK(cswobson->set(BSON(""
+                                 << "no bson")
+                                .firstElement()));
+    ASSERT_EQ(test::gCustomSetting, "no bson");
 
     auto* depr = getServerParameter("customSettingTestDeprecated");
     ASSERT_OK(depr->setFromString("Value via depr name"));

@@ -830,22 +830,27 @@ def _bind_server_parameter(ctxt, param):
     ast_param.cpp_varname = param.cpp_varname
     ast_param.deprecated_name = param.deprecated_name
 
-    custom_required_fields = ["from_string", "from_bson", "append_bson"]
+    custom_required_fields = ["from_string", "append_bson"]
     standard_optional_fields = ["default", "on_update", "validator"]
 
     if param.cpp_varname is None:
-        # Custom SCP, requires callbacks.
+        # Custom SCP, uses callbacks.
+        ast_param.append_bson = param.append_bson
+        ast_param.from_bson = param.from_bson
+        ast_param.from_string = param.from_string
+
+        # Check for required callbacks.
         for req in custom_required_fields:
             if getattr(param, req) is None:
                 ctxt.add_missing_server_parameter_method(param, req)
-            setattr(ast_param, req, getattr(param, req))
 
+        # Check for disallowed declared-storage fields.
         for conflict in standard_optional_fields:
             if getattr(param, conflict) is not None:
                 ctxt.add_server_parameter_attr_without_storage(param, conflict)
     else:
-        # Standard SCP, allows optional fields.
-        for conflict in custom_required_fields:
+        # Standard SCP, allows optional fields, but not custom callbacks.
+        for conflict in custom_required_fields + ["from_bson"]:
             if getattr(param, conflict) is not None:
                 ctxt.add_server_parameter_attr_with_storage(param, conflict)
 
