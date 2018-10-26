@@ -365,8 +365,6 @@ public:
         PlanExecutor::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) final;
 
-    std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) final;
-
 private:
     inline DatabaseCatalogEntry* dbce() const final {
         return this->_dbce;

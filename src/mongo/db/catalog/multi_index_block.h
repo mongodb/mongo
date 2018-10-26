@@ -142,7 +142,8 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    virtual Status doneInserting(std::set<RecordId>* const dupsOut = nullptr) = 0;
+    virtual Status doneInserting() = 0;
+    virtual Status doneInserting(std::set<RecordId>* const dupsOut) = 0;
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -155,7 +156,8 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    virtual void commit(stdx::function<void(const BSONObj& spec)> onCreateFn = nullptr) = 0;
+    virtual void commit() = 0;
+    virtual void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses

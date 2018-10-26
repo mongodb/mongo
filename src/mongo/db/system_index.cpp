@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -124,8 +125,7 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         log() << "No authorization index detected on " << ns
               << " collection. Attempting to recover by creating an index with spec: " << indexSpec;
 
-        auto indexerPtr = collection->createMultiIndexBlock(opCtx);
-        MultiIndexBlock& indexer(*indexerPtr);
+        MultiIndexBlockImpl indexer(opCtx, collection);
 
         writeConflictRetry(opCtx, "authorization index regeneration", ns.ns(), [&] {
             fassert(40453, indexer.init(indexSpec));

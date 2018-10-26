@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
@@ -416,8 +417,7 @@ void _createIndex(OperationContext* opCtx,
                 << "ns"
                 << nss.ns());
 
-        auto indexerPtr = collection->createMultiIndexBlock(opCtx);
-        MultiIndexBlock& indexer(*indexerPtr);
+        MultiIndexBlockImpl indexer(opCtx, collection);
         ASSERT_OK(indexer.init(indexInfoObj).getStatus());
         WriteUnitOfWork wuow(opCtx);
         indexer.commit();

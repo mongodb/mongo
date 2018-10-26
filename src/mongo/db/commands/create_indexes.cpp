@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
@@ -353,8 +354,7 @@ public:
         statsTracker.emplace(opCtx, ns, Top::LockType::WriteLocked, dbProfilingLevel);
 
 
-        auto indexerPtr = collection->createMultiIndexBlock(opCtx);
-        MultiIndexBlock& indexer(*indexerPtr);
+        MultiIndexBlockImpl indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
 

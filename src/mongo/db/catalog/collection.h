@@ -44,7 +44,6 @@
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -339,8 +338,6 @@ public:
             OperationContext* opCtx,
             PlanExecutor::YieldPolicy yieldPolicy,
             ScanDirection scanDirection) = 0;
-
-        virtual std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) = 0;
     };
 
 public:
@@ -735,13 +732,6 @@ public:
         PlanExecutor::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) {
         return this->_impl().makePlanExecutor(opCtx, yieldPolicy, scanDirection);
-    }
-
-    /**
-     * Creates an instance of MultiIndexBlock.
-     */
-    inline std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) {
-        return this->_impl().createMultiIndexBlock(opCtx);
     }
 
 private:

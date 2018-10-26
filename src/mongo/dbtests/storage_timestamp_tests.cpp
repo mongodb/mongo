@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -231,8 +232,7 @@ public:
     void createIndex(Collection* coll, std::string indexName, const BSONObj& indexKey) {
 
         // Build an index.
-        auto indexerPtr = coll->createMultiIndexBlock(_opCtx);
-        MultiIndexBlock& indexer(*indexerPtr);
+        MultiIndexBlockImpl indexer(_opCtx, coll);
         BSONObj indexInfoObj;
         {
             auto swIndexInfoObj = indexer.init({BSON(
@@ -1799,8 +1799,7 @@ public:
         std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
 
         // Build an index on `{a: 1}`. This index will be multikey.
-        auto indexerPtr = autoColl.getCollection()->createMultiIndexBlock(_opCtx);
-        MultiIndexBlock& indexer(*indexerPtr);
+        MultiIndexBlockImpl indexer(_opCtx, autoColl.getCollection());
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
         BSONObj indexInfoObj;
         {

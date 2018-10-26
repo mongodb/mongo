@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -422,8 +423,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // Copy the index descriptions from the source collection, adjusting the ns field.
     {
-        auto indexerPtr = tmpColl->createMultiIndexBlock(opCtx);
-        MultiIndexBlock& indexer(*indexerPtr);
+        MultiIndexBlockImpl indexer(opCtx, tmpColl);
         indexer.allowInterruption();
 
         std::vector<BSONObj> indexesToCopy;

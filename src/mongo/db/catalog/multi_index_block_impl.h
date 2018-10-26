@@ -155,7 +155,8 @@ public:
      *
      * Must not be called inside of a WriteUnitOfWork.
      */
-    Status doneInserting(std::set<RecordId>* dupsOut = nullptr) override;
+    Status doneInserting() override;
+    Status doneInserting(std::set<RecordId>* dupsOut) override;
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -166,6 +167,7 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
+    void commit() override;
     void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) override;
 
     /**

@@ -430,7 +430,7 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
     }
 
     if (state != PlanExecutor::IS_EOF) {
-        return WorkingSetCommon::getMemberObjectStatus(objToIndex.value());
+        return exec->getMemberObjectStatus(objToIndex.value());
     }
 
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
@@ -485,6 +485,10 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc, const RecordId& loc) {
     return Status::OK();
 }
 
+Status MultiIndexBlockImpl::doneInserting() {
+    return doneInserting(nullptr);
+}
+
 Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
@@ -508,6 +512,10 @@ Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
 void MultiIndexBlockImpl::abortWithoutCleanup() {
     _indexes.clear();
     _needToCleanup = false;
+}
+
+void MultiIndexBlockImpl::commit() {
+    commit({});
 }
 
 void MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onCreateFn) {

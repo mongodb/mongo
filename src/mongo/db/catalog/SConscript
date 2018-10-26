@@ -147,6 +147,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'database',
+        'multi_index_block',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
@@ -177,6 +178,40 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='multi_index_block',
+    source=[
+        'multi_index_block_impl.cpp',
+    ],
+    LIBDEPS=[
+        'collection',
+        'collection_info_cache',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/background',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/util/progress_meter',
+    ],
+)
+
+env.CppUnitTest(
+    target='multi_index_block_test',
+    source=[
+        'multi_index_block_test.cpp'
+    ],
+    LIBDEPS=[
+        'collection',
+        'multi_index_block',
+        '$BUILD_DIR/mongo/db/namespace_string',
     ],
 )
 
@@ -241,7 +276,6 @@ env.Library(
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "index_consistency.cpp",
-        "multi_index_block_impl.cpp",
         "private/record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[
@@ -307,6 +341,7 @@ env.Library(
         'database',
         'index_catalog',
         'index_key_validate',
+        'multi_index_block',
     ],
 )
 
@@ -352,6 +387,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
+        'multi_index_block',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',

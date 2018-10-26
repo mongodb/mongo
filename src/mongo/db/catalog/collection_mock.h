@@ -287,10 +287,6 @@ public:
         std::abort();
     }
 
-    std::unique_ptr<MultiIndexBlock> createMultiIndexBlock(OperationContext* opCtx) {
-        std::abort();
-    }
-
     OptionalCollectionUUID uuid() const {
         std::abort();
     }

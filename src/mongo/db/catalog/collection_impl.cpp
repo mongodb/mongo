@@ -49,7 +49,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
@@ -1302,10 +1301,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(opCtx, _ns.ns(), _this, yieldPolicy, direction);
-}
-
-std::unique_ptr<MultiIndexBlock> CollectionImpl::createMultiIndexBlock(OperationContext* opCtx) {
-    return std::make_unique<MultiIndexBlockImpl>(opCtx, _this);
 }
 
 void CollectionImpl::setNs(NamespaceString nss) {

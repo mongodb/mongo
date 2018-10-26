@@ -49,6 +49,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -147,7 +148,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
         const auto uuid = cce->getCollectionOptions(opCtx).uuid;
         collection.reset(new Collection(opCtx, ns, uuid, cce, dbce->getRecordStore(ns), dbce));
 
-        indexer = collection->createMultiIndexBlock(opCtx);
+        indexer = std::make_unique<MultiIndexBlockImpl>(opCtx, collection.get());
         Status status = indexer->init(indexSpecs).getStatus();
         if (!status.isOK()) {
             // The WUOW will handle cleanup, so the indexer shouldn't do its own.
