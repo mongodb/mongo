@@ -336,7 +336,7 @@ public:
             maybeDisableValidation.emplace(opCtx);
 
         const auto session = OperationContextSession::get(opCtx);
-        const auto inTransaction = session && session->inMultiDocumentTransaction();
+        const auto inTransaction = session && session->inActiveOrKilledMultiDocumentTransaction();
         uassert(50781,
                 str::stream() << "Cannot write to system collection " << nsString.ns()
                               << " within a transaction.",

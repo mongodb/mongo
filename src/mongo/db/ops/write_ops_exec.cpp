@@ -125,7 +125,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         auto session = OperationContextSession::get(opCtx);
         if (curOp->shouldDBProfile(shouldSample)) {
             boost::optional<Session::TxnResources> txnResources;
-            if (session && session->inMultiDocumentTransaction()) {
+            if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
                 // Stash the current transaction so that writes to the profile collection are not
                 // done as part of the transaction.
                 txnResources = Session::TxnResources(opCtx);
@@ -198,7 +198,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     auto session = OperationContextSession::get(opCtx);
-    auto inTransaction = session && session->inMultiDocumentTransaction();
+    auto inTransaction = session && session->inActiveOrKilledMultiDocumentTransaction();
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot create namespace " << ns.ns()
                           << " in multi-document transaction.",
@@ -345,7 +345,7 @@ void insertDocuments(OperationContext* opCtx,
     if (supportsDocLocking()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto session = OperationContextSession::get(opCtx);
-        auto inTransaction = session && session->inMultiDocumentTransaction();
+        auto inTransaction = session && session->inActiveOrKilledMultiDocumentTransaction();
 
         if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
             // Populate 'slots' with new optimes for each insert.
@@ -596,8 +596,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     auto session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with multi=true",
-            (session && session->inMultiDocumentTransaction()) || !opCtx->getTxnNumber() ||
-                !op.getMulti());
+            (session && session->inActiveOrKilledMultiDocumentTransaction()) ||
+                !opCtx->getTxnNumber() || !op.getMulti());
 
     globalOpCounters.gotUpdate();
     auto& curOp = *CurOp::get(opCtx);
@@ -757,8 +757,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     auto session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
-            (session && session->inMultiDocumentTransaction()) || !opCtx->getTxnNumber() ||
-                !op.getMulti());
+            (session && session->inActiveOrKilledMultiDocumentTransaction()) ||
+                !opCtx->getTxnNumber() || !op.getMulti());
 
     globalOpCounters.gotDelete();
     auto& curOp = *CurOp::get(opCtx);

@@ -239,7 +239,8 @@ public:
         const auto session = OperationContextSession::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "It is illegal to open a tailable cursor in a transaction",
-                session == nullptr || !(session->inMultiDocumentTransaction() && qr->isTailable()));
+                session == nullptr ||
+                    !(session->inActiveOrKilledMultiDocumentTransaction() && qr->isTailable()));
 
         // Validate term before acquiring locks, if provided.
         if (auto term = qr->getReplicationTerm()) {

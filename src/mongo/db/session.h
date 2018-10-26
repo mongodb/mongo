@@ -295,15 +295,6 @@ public:
         return _autocommit;
     }
 
-    /**
-     * Returns whether we are in a multi-document transaction, which means we have an active
-     * transaction which has autoCommit:false and has not been committed or aborted.
-     */
-    bool inMultiDocumentTransaction() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _txnState == MultiDocumentTransactionState::kInProgress;
-    };
-
     bool transactionIsCommitted() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _txnState == MultiDocumentTransactionState::kCommitted;
@@ -316,8 +307,9 @@ public:
 
     /**
      * Returns true if we are in an active multi-document transaction or if the transaction has
-     * been aborted. This is used to cover the case where a transaction has been aborted, but the
-     * OperationContext state has not been cleared yet.
+     * been aborted. This can be used to determine if the operation being executed is part of a
+     * multi-document transaction. It is necessary to check for the aborted state, since the
+     * transaction can be concurrently killed at any time without checking out the session.
      */
     bool inActiveOrKilledMultiDocumentTransaction() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

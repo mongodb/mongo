@@ -369,8 +369,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
     Session* const session = OperationContextSession::get(opCtx);
-    const bool inMultiDocumentTransaction =
-        session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction();
+    const bool inMultiDocumentTransaction = session && opCtx->writesAreReplicated() &&
+        session->inActiveOrKilledMultiDocumentTransaction();
 
     Date_t lastWriteDate;
 
@@ -456,8 +456,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     }
 
     Session* const session = OperationContextSession::get(opCtx);
-    const bool inMultiDocumentTransaction =
-        session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction();
+    const bool inMultiDocumentTransaction = session && opCtx->writesAreReplicated() &&
+        session->inActiveOrKilledMultiDocumentTransaction();
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation =
@@ -514,8 +514,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     Session* const session = OperationContextSession::get(opCtx);
     auto& documentKey = documentKeyDecoration(opCtx);
     invariant(!documentKey.isEmpty());
-    const bool inMultiDocumentTransaction =
-        session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction();
+    const bool inMultiDocumentTransaction = session && opCtx->writesAreReplicated() &&
+        session->inActiveOrKilledMultiDocumentTransaction();
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation =
@@ -945,7 +945,7 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
-    invariant(session->inMultiDocumentTransaction());
+    invariant(session->inActiveOrKilledMultiDocumentTransaction());
 
     auto opTime = repl::getNextOpTimeNoPersistForTesting(opCtx).opTime;
     opCtx->recoveryUnit()->setPrepareTimestamp(opTime.getTimestamp());

@@ -92,7 +92,8 @@ public:
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                session->inMultiDocumentTransaction());
+                session->inActiveOrKilledMultiDocumentTransaction() &&
+                    !session->transactionIsAborted());
 
         session->commitTransaction(opCtx);
 
@@ -140,7 +141,8 @@ public:
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                session->inMultiDocumentTransaction());
+                session->inActiveOrKilledMultiDocumentTransaction() &&
+                    !session->transactionIsAborted());
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
@@ -196,7 +198,8 @@ public:
         // TODO SERVER-33501 Change this when abortTransaction is retryable.
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                session->inMultiDocumentTransaction());
+                session->inActiveOrKilledMultiDocumentTransaction() &&
+                    !session->transactionIsAborted());
 
         session->abortActiveTransaction(opCtx);
         return true;

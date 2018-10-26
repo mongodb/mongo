@@ -118,7 +118,7 @@ public:
         // change for the snapshot.
         auto lockMode = LockMode::MODE_S;
         auto* session = OperationContextSession::get(opCtx);
-        if (session && session->inMultiDocumentTransaction()) {
+        if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
             // However, if we are inside a multi-statement transaction, then we only need to lock
             // the database in intent mode to ensure that none of the collections get dropped.
             lockMode = getLockModeForQuery(opCtx);
@@ -221,7 +221,7 @@ private:
 
         boost::optional<Lock::CollectionLock> collLock;
         auto* session = OperationContextSession::get(opCtx);
-        if (session && session->inMultiDocumentTransaction()) {
+        if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
             // When inside a multi-statement transaction, we are only holding the database lock in
             // intent mode. We need to also acquire the collection lock in intent mode to ensure
             // reading from the consistent snapshot doesn't overlap with any catalog operations on

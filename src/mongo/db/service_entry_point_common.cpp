@@ -513,7 +513,8 @@ bool runCommandImpl(OperationContext* opCtx,
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
         uassert(ErrorCodes::InvalidOptions,
                 "writeConcern is not allowed within a multi-statement transaction",
-                wcResult.usedDefault || !session || !session->inMultiDocumentTransaction() ||
+                wcResult.usedDefault || !session ||
+                    !session->inActiveOrKilledMultiDocumentTransaction() ||
                     invocation->definition()->getName() == "commitTransaction" ||
                     invocation->definition()->getName() == "abortTransaction" ||
                     invocation->definition()->getName() == "doTxn");
@@ -816,9 +817,9 @@ void execCommandDatabase(OperationContext* opCtx,
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         auto session = OperationContextSession::get(opCtx);
         if (!opCtx->getClient()->isInDirectClient() || !session ||
-            !session->inMultiDocumentTransaction()) {
-            const bool upconvertToSnapshot = session && session->inMultiDocumentTransaction() &&
-                sessionOptions &&
+            !session->inActiveOrKilledMultiDocumentTransaction()) {
+            const bool upconvertToSnapshot = session &&
+                session->inActiveOrKilledMultiDocumentTransaction() && sessionOptions &&
                 (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
             readConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));

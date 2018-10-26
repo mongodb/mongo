@@ -283,7 +283,7 @@ Status doTxn(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidOptions, "doTxn can only be run with a transaction ID.", txnNumber);
     auto* session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions, "doTxn must be run within a session", session);
-    invariant(session->inMultiDocumentTransaction());
+    invariant(session->inActiveOrKilledMultiDocumentTransaction());
     invariant(opCtx->getWriteUnitOfWork());
     uassert(
         ErrorCodes::InvalidOptions, "doTxn supports only CRUD opts.", _areOpsCrudOnly(doTxnCmd));

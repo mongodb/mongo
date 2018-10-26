@@ -211,7 +211,7 @@ Status waitForReadConcern(OperationContext* opCtx,
     // waiting for read concern.
     auto session = OperationContextSession::get(opCtx);
     if (opCtx->getClient()->isInDirectClient() && session &&
-        session->inMultiDocumentTransaction()) {
+        session->inActiveOrKilledMultiDocumentTransaction()) {
         return Status::OK();
     }
 

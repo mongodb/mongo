@@ -264,7 +264,7 @@ private:
 
     void _transactionChecks(OperationContext* opCtx) const {
         auto session = OperationContextSession::get(opCtx);
-        if (!session || !session->inMultiDocumentTransaction())
+        if (!session || !session->inActiveOrKilledMultiDocumentTransaction())
             return;
         uassert(50791,
                 str::stream() << "Cannot write to system collection " << ns().toString()

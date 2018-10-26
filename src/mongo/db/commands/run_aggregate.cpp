@@ -338,7 +338,7 @@ Status runAggregate(OperationContext* opCtx,
             auto session = OperationContextSession::get(opCtx);
             // If we are in a multi-document transaction, we intercept the 'readConcern'
             // assertion in order to provide a more descriptive error message and code.
-            if (session && session->inMultiDocumentTransaction()) {
+            if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
                 return {ErrorCodes::OperationNotSupportedInTransaction,
                         ex.toStatus("Operation not permitted in transaction").reason()};
             }
@@ -460,7 +460,8 @@ Status runAggregate(OperationContext* opCtx,
                                   uuid));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
         auto session = OperationContextSession::get(opCtx);
-        expCtx->inMultiDocumentTransaction = session && session->inMultiDocumentTransaction();
+        expCtx->inMultiDocumentTransaction =
+            session && session->inActiveOrKilledMultiDocumentTransaction();
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 
