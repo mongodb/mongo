@@ -33,11 +33,13 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
+
 /**
  * A simple thread-safe fail point implementation that can be activated and
  * deactivated, as well as embed temporary data into it.
@@ -260,12 +262,18 @@ private:
 
 #define MONGO_FAIL_POINT(symbol) MONGO_unlikely(symbol.shouldFail())
 
-#define MONGO_FAIL_POINT_PAUSE_WHILE_SET(symbol) \
-    do {                                         \
-        while (MONGO_FAIL_POINT(symbol)) {       \
-            sleepmillis(100);                    \
-        }                                        \
-    } while (false)
+inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET(FailPoint& failPoint) {
+    while (MONGO_FAIL_POINT(failPoint)) {
+        sleepmillis(100);
+    }
+}
+
+inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(OperationContext* opCtx,
+                                                            FailPoint& failPoint) {
+    while (MONGO_FAIL_POINT(failPoint)) {
+        opCtx->sleepFor(Milliseconds(100));
+    }
+}
 
 /**
  * Macro for creating a fail point with block context. Also use this when
@@ -286,4 +294,5 @@ private:
 #define MONGO_FAIL_POINT_BLOCK_IF(symbol, blockSymbol, ...)        \
     for (mongo::ScopedFailPoint blockSymbol(&symbol, __VA_ARGS__); \
          MONGO_unlikely(blockSymbol.isActive());)
+
 }  // namespace mongo
