@@ -854,6 +854,8 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
 
                 if (_set->setUri.isValid()) {
                     targetURI = _set->setUri.cloneURIForServer(ns.host);
+                    targetURI.setUser("");
+                    targetURI.setPassword("");
                 } else {
                     targetURI = MongoURI(ConnectionString(ns.host));
                 }

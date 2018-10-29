@@ -715,8 +715,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         host = ValueWriter(cx, args.get(0)).toString();
     }
 
-    auto statusWithHost = MongoURI::parse(host);
-    auto cs = uassertStatusOK(statusWithHost);
+    auto cs = uassertStatusOK(MongoURI::parse(host));
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
@@ -735,7 +734,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     JS_SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
 
     o.setBoolean(InternedString::slaveOk, false);
-    o.setString(InternedString::host, cs.toString());
+    o.setString(InternedString::host, cs.connectionString().toString());
     auto defaultDB = cs.getDatabase() == "" ? "test" : cs.getDatabase();
     o.setString(InternedString::defaultDB, defaultDB);
 

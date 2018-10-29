@@ -92,7 +92,9 @@ bool inMultiLine = false;
 static AtomicBool atPrompt(false);  // can eval before getting to prompt
 
 namespace {
-const auto kDefaultMongoURL = "mongodb://127.0.0.1:27017"_sd;
+const std::string kDefaultMongoHost = "127.0.0.1"s;
+const std::string kDefaultMongoPort = "27017"s;
+const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
 
 // Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a
 // featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
@@ -239,7 +241,7 @@ void setupSignals() {
 string getURIFromArgs(const std::string& arg, const std::string& host, const std::string& port) {
     if (host.empty() && arg.empty() && port.empty()) {
         // Nothing provided, just play the default.
-        return kDefaultMongoURL.toString();
+        return kDefaultMongoURL;
     }
 
     if ((str::startsWith(arg, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
@@ -247,7 +249,7 @@ string getURIFromArgs(const std::string& arg, const std::string& host, const std
         // mongo mongodb://blah
         return arg;
     }
-    if ((str::startsWith(host, "mongodb://") || str::startsWith(arg, "mongodb+srv://")) &&
+    if ((str::startsWith(host, "mongodb://") || str::startsWith(host, "mongodb+srv://")) &&
         arg.empty() && port.empty()) {
         // mongo --host mongodb://blah
         return host;
@@ -726,16 +728,17 @@ static void edit(const string& whatToEdit) {
 }
 
 namespace {
-bool mechanismRequiresPassword() {
-    using std::begin;
-    using std::end;
-    const std::string passwordlessMechanisms[] = {"GSSAPI", "MONGODB-X509"};
-    auto isInShellParameters = [](const auto& mech) {
-        return mech == shellGlobalParams.authenticationMechanism;
-    };
-
-    return std::none_of(
-        begin(passwordlessMechanisms), end(passwordlessMechanisms), isInShellParameters);
+bool mechanismRequiresPassword(const MongoURI& uri) {
+    if (const auto authMechanisms = uri.getOption("authMechanism")) {
+        constexpr std::array<StringData, 2> passwordlessMechanisms{"GSSAPI"_sd, "MONGODB-X509"_sd};
+        const std::string& authMechanism = authMechanisms.get();
+        for (const auto& mechanism : passwordlessMechanisms) {
+            if (mechanism.toString() == authMechanism) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 }  // namespace
 
@@ -780,30 +783,42 @@ int _main(int argc, char* argv[], char** envp) {
         ->attachAppender(std::make_unique<logger::ConsoleAppender<logger::MessageEventEphemeral>>(
             std::make_unique<logger::MessageEventUnadornedEncoder>()));
 
+    // Get the URL passed to the shell
     std::string& cmdlineURI = shellGlobalParams.url;
+
+    // Parse the output of getURIFromArgs which will determine if --host passed in a URI
     MongoURI parsedURI;
-    if (!cmdlineURI.empty()) {
-        parsedURI = uassertStatusOK(MongoURI::parse(stdx::as_const(cmdlineURI)));
-    }
+    parsedURI = uassertStatusOK(MongoURI::parse(getURIFromArgs(
+        cmdlineURI, escape(shellGlobalParams.dbhost), escape(shellGlobalParams.port))));
 
-    // We create an altered URI from the one passed so that we can pass that to replica set
-    // monitors.  This is to avoid making potentially breaking changes to the replica set monitor
-    // code.
-    std::string processedURI = cmdlineURI;
-    auto pos = cmdlineURI.find('@');
-    auto protocolLength = processedURI.find("://");
-    if (pos != std::string::npos && protocolLength != std::string::npos) {
-        processedURI =
-            processedURI.substr(0, protocolLength) + "://" + processedURI.substr(pos + 1);
-    }
+    // TODO: add in all of the relevant shellGlobalParams to parsedURI
+    parsedURI.setOptionIfNecessary("compressors"s, shellGlobalParams.networkMessageCompressors);
+    parsedURI.setOptionIfNecessary("authMechanism"s, shellGlobalParams.authenticationMechanism);
+    parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
+    parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
+    parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
 
+    bool usingPassword = !shellGlobalParams.password.empty();
     if (!shellGlobalParams.nodb) {  // connect to db
+        if (mechanismRequiresPassword(parsedURI) &&
+            (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
+            usingPassword = true;
+        }
+        if (usingPassword && parsedURI.getPassword().empty()) {
+            if (!shellGlobalParams.password.empty()) {
+                parsedURI.setPassword(stdx::as_const(shellGlobalParams.password));
+            } else {
+                parsedURI.setPassword(mongo::askPassword());
+            }
+        }
+        if (parsedURI.getUser().empty() && !shellGlobalParams.username.empty()) {
+            parsedURI.setUser(stdx::as_const(shellGlobalParams.username));
+        }
+
         stringstream ss;
         if (mongo::serverGlobalParams.quiet.load())
             ss << "__quiet = true;";
-        ss << "db = connect( \""
-           << getURIFromArgs(processedURI, shellGlobalParams.dbhost, shellGlobalParams.port)
-           << "\");";
+        ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString() << "\");";
 
         if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
             // If the --retryWrites cmdline argument or retryWrites URI param was specified, then
@@ -813,45 +828,7 @@ int _main(int argc, char* argv[], char** envp) {
         }
 
         mongo::shell_utils::_dbConnect = ss.str();
-
-        if (cmdlineURI.size()) {
-            const auto compressionKey = parsedURI.getOptions().find("compressors");
-            if (compressionKey != end(parsedURI.getOptions()) &&
-                shellGlobalParams.networkMessageCompressors.empty()) {
-                shellGlobalParams.networkMessageCompressors = compressionKey->second;
-            }
-            const auto mechanismKey = parsedURI.getOptions().find("authMechanism");
-            if (mechanismKey != end(parsedURI.getOptions()) &&
-                shellGlobalParams.authenticationMechanism.empty()) {
-                shellGlobalParams.authenticationMechanism = mechanismKey->second;
-            }
-
-            if (mechanismRequiresPassword() &&
-                (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
-                shellGlobalParams.usingPassword = true;
-            }
-            if (shellGlobalParams.usingPassword && shellGlobalParams.password.empty()) {
-                shellGlobalParams.password =
-                    parsedURI.getPassword().size() ? parsedURI.getPassword() : mongo::askPassword();
-            }
-            if (parsedURI.getUser().size() && shellGlobalParams.username.empty()) {
-                shellGlobalParams.username = parsedURI.getUser();
-            }
-            auto authParam = parsedURI.getOptions().find(kAuthParam);
-            if (authParam != end(parsedURI.getOptions()) &&
-                shellGlobalParams.authenticationDatabase.empty()) {
-                shellGlobalParams.authenticationDatabase = authParam->second;
-            }
-        } else if (shellGlobalParams.usingPassword && shellGlobalParams.password.empty()) {
-            shellGlobalParams.password = mongo::askPassword();
-        }
     }
-
-    // We now substitute the altered URI to permit the replica set monitors to see it without
-    // usernames.  This is to avoid making potentially breaking changes to the replica set monitor
-    // code.
-    cmdlineURI = processedURI;
-
 
     // Construct the authentication-related code to execute on shell startup.
     //
@@ -865,41 +842,39 @@ int _main(int argc, char* argv[], char** envp) {
     //  }())
     stringstream authStringStream;
     authStringStream << "(function() { " << endl;
-    if (!shellGlobalParams.authenticationMechanism.empty()) {
+
+
+    if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
         authStringStream << "DB.prototype._defaultAuthenticationMechanism = \""
-                         << escape(shellGlobalParams.authenticationMechanism) << "\";" << endl;
+                         << escape(authMechanisms.get()) << "\";" << endl;
     }
 
-    if (!shellGlobalParams.gssapiServiceName.empty()) {
+    if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
         authStringStream << "DB.prototype._defaultGssapiServiceName = \""
-                         << escape(shellGlobalParams.gssapiServiceName) << "\";" << endl;
+                         << escape(gssapiServiveName.get()) << "\";" << endl;
     }
 
-    if (!shellGlobalParams.nodb && (!shellGlobalParams.username.empty() ||
-                                    shellGlobalParams.authenticationMechanism == "MONGODB-X509")) {
-        authStringStream << "var username = \"" << escape(shellGlobalParams.username) << "\";"
-                         << endl;
-        if (shellGlobalParams.usingPassword) {
-            authStringStream << "var password = \"" << escape(shellGlobalParams.password) << "\";"
+    if (!shellGlobalParams.nodb &&
+        (!parsedURI.getUser().empty() ||
+         parsedURI.getOption("authMechanism").get_value_or("") == "MONGODB-X509")) {
+        authStringStream << "var username = \"" << escape(parsedURI.getUser()) << "\";" << endl;
+        if (usingPassword) {
+            authStringStream << "var password = \"" << escape(parsedURI.getPassword()) << "\";"
                              << endl;
         }
-        if (shellGlobalParams.authenticationDatabase.empty()) {
-            authStringStream << "var authDb = db;" << endl;
-        } else {
-            authStringStream << "var authDb = db.getSiblingDB(\""
-                             << escape(shellGlobalParams.authenticationDatabase) << "\");" << endl;
-        }
+        authStringStream << "var authDb = db.getSiblingDB(\""
+                         << escape(parsedURI.getAuthenticationDatabase()) << "\");" << endl;
 
         authStringStream << "authDb._authOrThrow({ ";
-        if (!shellGlobalParams.username.empty()) {
+        if (!parsedURI.getUser().empty()) {
             authStringStream << saslCommandUserFieldName << ": username ";
         }
-        if (shellGlobalParams.usingPassword) {
+        if (usingPassword) {
             authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
         }
-        if (!shellGlobalParams.gssapiHostName.empty()) {
+        if (const auto gssapiHostNameKey = parsedURI.getOption("gssapiHostName")) {
             authStringStream << ", " << saslCommandServiceHostnameFieldName << ": \""
-                             << escape(shellGlobalParams.gssapiHostName) << '"' << endl;
+                             << escape(gssapiHostNameKey.get()) << '"' << endl;
         }
         authStringStream << "});" << endl;
     }
