@@ -30,6 +30,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <set>
@@ -46,6 +48,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using std::string;
@@ -217,11 +220,34 @@ public:
                 return false;
             }
 
-            if (numSet == 0) {
-                foundParameter->second->append(opCtx, result, "was");
+            auto oldValueObj = ([&] {
+                BSONObjBuilder bb;
+                if (numSet == 0) {
+                    foundParameter->second->append(opCtx, bb, "was");
+                }
+                return bb.obj();
+            })();
+            auto oldValue = oldValueObj.firstElement();
+
+            if (oldValue) {
+                result.append(oldValue);
             }
 
-            uassertStatusOK(foundParameter->second->set(parameter));
+            try {
+                uassertStatusOK(foundParameter->second->set(parameter));
+            } catch (const DBException& ex) {
+                log() << "error setting parameter " << parameterName << " to "
+                      << redact(parameter.toString(false)) << " errMsg: " << redact(ex);
+                throw;
+            }
+
+            log() << "successfully set parameter " << parameterName << " to "
+                  << redact(parameter.toString(false))
+                  << (oldValue ? std::string(str::stream() << " (was "
+                                                           << redact(oldValue.toString(false))
+                                                           << ")")
+                               : "");
+
             numSet++;
         }
 
