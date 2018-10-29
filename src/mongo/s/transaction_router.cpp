@@ -345,20 +345,14 @@ BSONObj TransactionRouter::attachTxnFieldsIfNeeded(const ShardId& shardId, const
 void TransactionRouter::_verifyReadConcern() {
     invariant(!_readConcernArgs.isEmpty());
 
-    if (_readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        invariant(_atClusterTime);
+    if (_atClusterTime) {
         invariant(_atClusterTime->isSet());
     }
 }
 
 void TransactionRouter::_verifyParticipantAtClusterTime(const Participant& participant) {
-    if (_readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return;
-    }
-
     auto participantAtClusterTime = participant.getSharedOptions().atClusterTime;
     invariant(participantAtClusterTime);
-    invariant(_atClusterTime);
     invariant(*participantAtClusterTime == _atClusterTime->getTime());
 }
 
@@ -370,7 +364,9 @@ boost::optional<TransactionRouter::Participant&> TransactionRouter::getParticipa
     }
 
     _verifyReadConcern();
-    _verifyParticipantAtClusterTime(iter->second);
+    if (_atClusterTime) {
+        _verifyParticipantAtClusterTime(iter->second);
+    }
 
     return iter->second;
 }
@@ -436,7 +432,9 @@ bool TransactionRouter::_canContinueOnStaleShardOrDbError(StringData cmdName) co
 
 void TransactionRouter::onStaleShardOrDbError(StringData cmdName) {
     uassert(ErrorCodes::NoSuchTransaction,
-            "Transaction was aborted due to cluster data placement change",
+            str::stream() << "Transaction " << _txnNumber << " was aborted on statement "
+                          << _latestStmtId
+                          << " due to cluster data placement change",
             _canContinueOnStaleShardOrDbError(cmdName));
 
     // Remove participants created during the current statement so they are sent the correct options
@@ -454,13 +452,14 @@ void TransactionRouter::onViewResolutionError() {
 }
 
 bool TransactionRouter::_canContinueOnSnapshotError() const {
-    invariant(_atClusterTime);
-    return _atClusterTime->canChange(_latestStmtId);
+    return _atClusterTime && _atClusterTime->canChange(_latestStmtId);
 }
 
 void TransactionRouter::onSnapshotError() {
     uassert(ErrorCodes::NoSuchTransaction,
-            "Transaction was aborted due to snapshot error on subsequent transaction statement",
+            str::stream() << "Transaction " << _txnNumber << " was aborted on statement "
+                          << _latestStmtId
+                          << " due to a non-retryable snapshot error",
             _canContinueOnSnapshotError());
 
     // The transaction must be restarted on all participants because a new read timestamp will be
@@ -551,8 +550,9 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
         } else {
             uassert(ErrorCodes::InvalidOptions,
                     "The first command in a transaction cannot specify a readConcern level other "
-                    "than snapshot",
-                    readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+                    "than snapshot or majority",
+                    readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
+                        readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
         }
         _readConcernArgs = readConcernArgs;
     } else {
