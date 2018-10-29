@@ -311,7 +311,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
 
     if (params.count("password")) {
-        shellGlobalParams.usingPassword = true;
         shellGlobalParams.password = params["password"].as<string>();
     }
 

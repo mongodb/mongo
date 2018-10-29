@@ -54,7 +54,6 @@ struct ShellGlobalParams {
 
     std::string username;
     std::string password;
-    bool usingPassword;
     std::string authenticationMechanism;
     std::string authenticationDatabase;
     std::string gssapiServiceName;
