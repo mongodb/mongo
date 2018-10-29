@@ -29,9 +29,7 @@
     // No database versioned requests have been sent to Shard0, so it is stale.
     assert.commandWorked(sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}));
 
-    // TODO SERVER-36304: Change this to commitTransaction once multi shard transactions can be
-    // committed through mongos.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     //
     // Stale database version on second command to a shard should fail.
@@ -88,8 +86,7 @@
     assert.commandWorked(
         sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}));
 
-    // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     //
     // NoSuchTransaction should be returned if the router exhausts its retries.

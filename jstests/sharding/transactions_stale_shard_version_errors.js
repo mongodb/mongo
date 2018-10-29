@@ -74,9 +74,7 @@
     // Targets Shard1, which is stale.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    // TODO SERVER-36304: Change this to commitTransaction once multi shard transactions can be
-    // committed through mongos.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     //
     // Stale shard version on second command to a shard should fail.
@@ -128,8 +126,7 @@
     // Targets Shard0 for the other ns, which is stale.
     assert.commandWorked(sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}));
 
-    // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     //
     // Stale mongos aborts on old shard.
@@ -148,8 +145,7 @@
     // stale but should succeed.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
-    // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     // Verify there is no in-progress transaction on Shard1.
     res = assert.commandFailedWithCode(st.rs1.getPrimary().getDB(dbName).runCommand({
@@ -180,8 +176,7 @@
     // Targets all shards, two of which are stale.
     assert.commandWorked(sessionDB.runCommand({find: collName}));
 
-    // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     //
     // Can retry a stale write on the first statement.
@@ -197,8 +192,7 @@
     // Targets Shard1, which is stale.
     assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 6}]}));
 
-    // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction_forTesting();
+    session.commitTransaction();
 
     //
     // Cannot retry a stale write past the first statement.
@@ -223,8 +217,11 @@
         ErrorCodes.NoSuchTransaction);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-    // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction_forTesting();
+    // The transaction should have been implicitly aborted on all shards.
+    assertNoSuchTransactionOnAllShards(
+        st, session.getSessionId(), session.getTxnNumber_forTesting());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     //
     // NoSuchTransaction should be returned if the router exhausts its retries.
