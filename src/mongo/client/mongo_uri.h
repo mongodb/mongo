@@ -130,20 +130,62 @@ public:
         return _user;
     }
 
+    void setUser(std::string newUsername) {
+        _user = std::move(newUsername);
+    }
+
     const std::string& getPassword() const {
         return _password;
+    }
+
+    void setPassword(std::string newPassword) {
+        _password = std::move(newPassword);
     }
 
     const OptionsMap& getOptions() const {
         return _options;
     }
 
+    void addOption(std::string newKey, std::string newValue) {
+        _options[std::move(newKey)] = std::move(newValue);
+    }
+
+    void setOptionIfNecessary(std::string uriParamKey, std::string value) {
+        const auto key = _options.find(uriParamKey);
+        if (key == end(_options) && !value.empty()) {
+            addOption(uriParamKey, value);
+        }
+    }
+
+    boost::optional<std::string> getOption(const std::string& key) const {
+        const auto optIter = _options.find(key);
+        if (optIter != end(_options)) {
+            return optIter->second;
+        }
+        return boost::none;
+    }
+
     const std::string& getDatabase() const {
         return _database;
     }
 
+    std::string getAuthenticationDatabase() {
+        auto authDB = _options.find("authSource");
+        if (authDB != _options.end()) {
+            return authDB->second;
+        } else if (!_database.empty()) {
+            return _database;
+        } else {
+            return "admin";
+        }
+    }
+
     bool isValid() const {
         return _connectString.isValid();
+    }
+
+    const ConnectionString& connectionString() const {
+        return _connectString;
     }
 
     const std::string& toString() const {
@@ -160,6 +202,9 @@ public:
 
 
     const boost::optional<std::string> getAppName() const;
+
+    std::string canonicalizeURIAsString() const;
+
 
     boost::optional<bool> getRetryWrites() const {
         return _retryWrites;

@@ -318,7 +318,13 @@ connect = function(url, user, pass) {
         }
     }
 
-    chatty("connecting to: " + url);
+    var atPos = url.indexOf("@");
+    var protocolPos = url.indexOf("://");
+    var safeURL = url;
+    if (atPos != -1 && protocolPos != -1) {
+        safeURL = url.substring(0, protocolPos + 3) + url.substring(atPos + 1);
+    }
+    chatty("connecting to: " + safeURL);
     var m = new Mongo(url);
     var db = m.getDB(m.defaultDB);
 
