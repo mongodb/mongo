@@ -298,11 +298,41 @@ using SharedState = SharedStateImpl<VoidToFakeVoid<T>>;
 
 /**
  * SSB is SharedStateBase, and this is its current state.
+ *
+ * Legal transitions on future side:
+ *      kInit -> kWaiting
+ *      kInit -> kHaveContinuation
+ *      kWaiting -> kHaveContinuation
+ *
+ * Legal transitions on promise side:
+ *      kInit -> kFinished
+ *      kWaiting -> kFinished
+ *      kHaveContinuation -> kFinished
+ *
+ * Note that all and only downward transitions are legal.
+ *
+ * Each thread must change the state *after* it is set up all data that it is releasing to the other
+ * side. This must be done with an exchange() or compareExchange() so that you know what to do if
+ * the other side finished its transition before you.
  */
 enum class SSBState : uint8_t {
+    // Initial state: Promise hasn't been completed and has nothing to do when it is.
     kInit,
+
+    // Promise hasn't been completed. Someone has constructed the condvar and may be waiting on it.
+    // We do not transition back to kInit if they give up on waiting. There is also no continuation
+    // registered in this state.
     kWaiting,
-    kFinished,  // This should stay last since we have code like assert(state < kFinished).
+
+    // Promise hasn't been completed. Someone has registered a callback to be run when it is.
+    //
+    // There is no-one currently waiting on the condvar. TODO This assumption will need to change
+    // when we add continuation support to SharedSemiFuture.
+    kHaveContinuation,
+
+    // The promise has been completed with a value or error. This is the terminal state. This should
+    // stay last since we have code like assert(state < kFinished).
+    kFinished,
 };
 
 class SharedStateBase : public FutureRefCountable {
@@ -314,22 +344,30 @@ public:
 
     virtual ~SharedStateBase() = default;
 
-    // Only called by future side.
+    // Only called by future side, but may be called multiple times if waiting times out and is
+    // retried.
     void wait(Interruptible* interruptible) {
         if (state.load(std::memory_order_acquire) == SSBState::kFinished)
             return;
 
-        cv.emplace();
+        stdx::unique_lock<stdx::mutex> lk(mx);
+        if (!cv) {
+            cv.emplace();
 
-        auto oldState = SSBState::kInit;
-        if (MONGO_unlikely(!state.compare_exchange_strong(
-                oldState, SSBState::kWaiting, std::memory_order_acq_rel))) {
-            // transitionToFinished() transitioned after we did our initial check.
-            dassert(oldState == SSBState::kFinished);
-            return;
+            auto oldState = SSBState::kInit;
+            if (MONGO_unlikely(!state.compare_exchange_strong(
+                    oldState, SSBState::kWaiting, std::memory_order_acq_rel))) {
+                // transitionToFinished() transitioned after we did our initial check.
+                dassert(oldState == SSBState::kFinished);
+                return;
+            }
+        } else {
+            // Someone has already created the cv and put us in the waiting state. The promise may
+            // also have completed after we checked above, so we can't assume we aren't at
+            // kFinished.
+            dassert(state.load() != SSBState::kInit);
         }
 
-        stdx::unique_lock<stdx::mutex> lk(mx);
         interruptible->waitForConditionOrInterrupt(*cv, lk, [&] {
             // The mx locking above is insufficient to establish an acquire if state transitions to
             // kFinished before we get here, but we aquire mx before the producer does.
@@ -343,7 +381,7 @@ public:
         if (oldState == SSBState::kInit)
             return;
 
-        dassert(oldState == SSBState::kWaiting);
+        dassert(oldState == SSBState::kWaiting || oldState == SSBState::kHaveContinuation);
 
         DEV {
             // If you hit this limit one of two things has probably happened
@@ -357,7 +395,7 @@ public:
 
             size_t depth = 0;
             for (auto ssb = continuation.get(); ssb;
-                 ssb = ssb->state.load(std::memory_order_acquire) == SSBState::kWaiting
+                 ssb = ssb->state.load(std::memory_order_acquire) == SSBState::kHaveContinuation
                      ? ssb->continuation.get()
                      : nullptr) {
                 depth++;
@@ -366,11 +404,10 @@ public:
             }
         }
 
-        if (callback) {
+        if (oldState == SSBState::kHaveContinuation) {
+            invariant(callback);
             callback(this);
-        }
-
-        if (cv) {
+        } else if (cv) {
             stdx::unique_lock<stdx::mutex> lk(mx);
             // This must be done inside the lock to correctly synchronize with wait().
             cv->notify_all();
@@ -1097,7 +1134,9 @@ private:
             return success(std::move(*_immediate));
         }
 
-        if (_shared->state.load(std::memory_order_acquire) == SSBState::kFinished) {
+        auto oldState = _shared->state.load(std::memory_order_acquire);
+        dassert(oldState != SSBState::kHaveContinuation);
+        if (oldState == SSBState::kFinished) {
             if (_shared->status.isOK()) {
                 return success(std::move(*_shared->data));
             } else {
@@ -1109,9 +1148,10 @@ private:
         // support both void- and value-returning notReady implementations since we can't assign
         // void to a variable.
         ON_BLOCK_EXIT([&] {
-            auto oldState = SSBState::kInit;
+            // oldState could be either kInit or kWaiting, depending on whether we've failed a call
+            // to wait().
             if (MONGO_unlikely(!_shared->state.compare_exchange_strong(
-                    oldState, SSBState::kWaiting, std::memory_order_acq_rel))) {
+                    oldState, SSBState::kHaveContinuation, std::memory_order_acq_rel))) {
                 dassert(oldState == SSBState::kFinished);
                 _shared->callback(_shared.get());
             }

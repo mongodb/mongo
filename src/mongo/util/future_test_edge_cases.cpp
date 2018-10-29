@@ -71,6 +71,98 @@ TEST(Future_EdgeCases, looping_onError_with_then) {
     ASSERT_EQ(read().then([](int x) { return x + 0.5; }).get(), 0.5);
 }
 
+class DummyInterruptable final : public Interruptible {
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
+        stdx::condition_variable& cv,
+        stdx::unique_lock<stdx::mutex>& m,
+        Date_t deadline) noexcept override {
+        return Status(ErrorCodes::Interrupted, "");
+    }
+    Date_t getDeadline() const override {
+        MONGO_UNREACHABLE;
+    }
+    Status checkForInterruptNoAssert() noexcept override {
+        MONGO_UNREACHABLE;
+    }
+    IgnoreInterruptsState pushIgnoreInterrupts() override {
+        MONGO_UNREACHABLE;
+    }
+    void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
+        MONGO_UNREACHABLE;
+    }
+    DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
+        MONGO_UNREACHABLE;
+    }
+    void popArtificialDeadline(DeadlineState) override {
+        MONGO_UNREACHABLE;
+    }
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
+        MONGO_UNREACHABLE;
+    }
+};
+
+TEST(Future_EdgeCases, interrupted_wait_then_get) {
+    DummyInterruptable dummyInterruptable;
+
+    auto pf = makePromiseFuture<void>();
+    ASSERT_EQ(pf.future.waitNoThrow(&dummyInterruptable), ErrorCodes::Interrupted);
+    ASSERT_EQ(pf.future.getNoThrow(&dummyInterruptable), ErrorCodes::Interrupted);
+
+    pf.promise.emplaceValue();
+    pf.future.get();
+}
+
+TEST(Future_EdgeCases, interrupted_wait_then_get_with_bgthread) {
+    DummyInterruptable dummyInterruptable;
+
+    // Note, this is intentionally somewhat racy. async() is defined to sleep 100ms before running
+    // the function so it will generally test blocking in the final get(). Under TSAN the sleep is
+    // removed to allow it to find more interesting interleavings, and give it a better chance at
+    // detecting data races.
+    auto future = async([] {});
+
+    auto res = future.waitNoThrow(&dummyInterruptable);
+    if (!res.isOK())
+        ASSERT_EQ(res, ErrorCodes::Interrupted);
+
+    res = future.getNoThrow(&dummyInterruptable);
+    if (!res.isOK())
+        ASSERT_EQ(res, ErrorCodes::Interrupted);
+
+    future.get();
+}
+
+TEST(Future_EdgeCases, interrupted_wait_then_then) {
+    DummyInterruptable dummyInterruptable;
+
+    auto pf = makePromiseFuture<void>();
+    ASSERT_EQ(pf.future.waitNoThrow(&dummyInterruptable), ErrorCodes::Interrupted);
+    auto fut2 = std::move(pf.future).then([] {});
+
+    pf.promise.emplaceValue();
+    fut2.get();
+}
+
+TEST(Future_EdgeCases, interrupted_wait_then_then_with_bgthread) {
+    DummyInterruptable dummyInterruptable;
+
+    // Note, this is intentionally somewhat racy. async() is defined to sleep 100ms before running
+    // the function so it will generally test blocking in the final get(). Under TSAN the sleep is
+    // removed to allow it to find more interesting interleavings, and give it a better chance at
+    // detecting data races.
+    auto future = async([] {});
+
+    auto res = future.waitNoThrow(&dummyInterruptable);
+    if (!res.isOK())
+        ASSERT_EQ(res, ErrorCodes::Interrupted);
+
+    res = future.getNoThrow(&dummyInterruptable);
+    if (!res.isOK())
+        ASSERT_EQ(res, ErrorCodes::Interrupted);
+
+    std::move(future).then([] {}).get();
+}
+
 // Make sure we actually die if someone throws from the getAsync callback.
 //
 // With gcc 5.8 we terminate, but print "terminate() called. No exception is active". This works in
