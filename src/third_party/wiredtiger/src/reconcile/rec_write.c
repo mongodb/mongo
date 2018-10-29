@@ -1780,7 +1780,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    &ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
-			WT_PUBLISH(ref->state, WT_REF_DELETED);
+			WT_REF_SET_STATE(ref, WT_REF_DELETED);
 			goto done;
 
 		case WT_REF_LOCKED:

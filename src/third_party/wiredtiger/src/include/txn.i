@@ -550,7 +550,7 @@ __wt_txn_op_commit_page_del(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Publish to ensure we don't let the page be evicted and the updates
 	 * discarded before being written.
 	 */
-	WT_PUBLISH(ref->state, previous_state);
+	WT_REF_SET_STATE(ref, previous_state);
 }
 
 /*
@@ -1339,7 +1339,7 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	if (txn->id == WT_TXN_NONE)
+	if (txn->id == WT_TXN_NONE || F_ISSET(txn, WT_TXN_PREPARE))
 		return (false);
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);

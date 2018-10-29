@@ -76,7 +76,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	if ((previous_state == WT_REF_MEM || previous_state == WT_REF_LIMBO) &&
 	    __wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED)) {
 		if (__wt_page_is_modified(ref->page)) {
-			ref->state = previous_state;
+			WT_REF_SET_STATE(ref, previous_state);
 			return (0);
 		}
 
@@ -155,13 +155,13 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	WT_STAT_DATA_INCR(session, rec_page_delete_fast);
 
 	/* Publish the page to its new state, ensuring visibility. */
-	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	WT_REF_SET_STATE(ref, WT_REF_DELETED);
 	return (0);
 
 err:	__wt_free(session, ref->page_del);
 
 	/* Publish the page to its previous state, ensuring visibility. */
-	WT_PUBLISH(ref->state, previous_state);
+	WT_REF_SET_STATE(ref, previous_state);
 	return (ret);
 }
 
@@ -241,7 +241,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 		for (; *updp != NULL; ++updp)
 			(*updp)->txnid = WT_TXN_ABORTED;
 
-	ref->state = current_state;
+	WT_REF_SET_STATE(ref, current_state);
 
 done:	/*
 	 * Now mark the truncate aborted: this must come last because after

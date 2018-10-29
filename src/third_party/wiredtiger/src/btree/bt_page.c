@@ -482,7 +482,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			 * Re-create the state of a deleted page.
 			 */
 			ref->addr = cell;
-			ref->state = WT_REF_DELETED;
+			WT_REF_SET_STATE(ref, WT_REF_DELETED);
 			++refp;
 
 			/*

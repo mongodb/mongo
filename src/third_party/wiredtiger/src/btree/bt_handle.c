@@ -669,7 +669,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 		ref->home = root;
 		ref->page = NULL;
 		ref->addr = NULL;
-		ref->state = WT_REF_DELETED;
+		WT_REF_SET_STATE(ref, WT_REF_DELETED);
 		ref->ref_recno = 1;
 		break;
 	case BTREE_ROW:
@@ -682,7 +682,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 		ref->home = root;
 		ref->page = NULL;
 		ref->addr = NULL;
-		ref->state = WT_REF_DELETED;
+		WT_REF_SET_STATE(ref, WT_REF_DELETED);
 		WT_ERR(__wt_row_ikey_incr(session, root, 0, "", 1, ref));
 		break;
 	}
@@ -691,7 +691,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 	if (F_ISSET(btree, WT_BTREE_BULK)) {
 		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
 		ref->page = leaf;
-		ref->state = WT_REF_MEM;
+		WT_REF_SET_STATE(ref, WT_REF_MEM);
 		WT_ERR(__wt_page_modify_init(session, leaf));
 		__wt_page_only_modify_set(session, leaf);
 	}

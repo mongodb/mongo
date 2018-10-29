@@ -113,7 +113,7 @@ __las_page_instantiate_verbose(WT_SESSION_IMPL *session, uint64_t las_pageid)
  *	Instantiate lookaside update records in a recently read page.
  */
 static int
-__las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, bool *preparedp)
+__las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_CACHE *cache;
 	WT_CURSOR *cursor;
@@ -166,7 +166,6 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, bool *preparedp)
 	__wt_readlock(session, &cache->las_sweepwalk_lock);
 	WT_PUBLISH(cache->las_reader, false);
 	locked = true;
-	*preparedp = false;
 	for (ret = __wt_las_cursor_position(cursor, las_pageid);
 	    ret == 0;
 	    ret = cursor->next(cursor)) {
@@ -189,8 +188,6 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, bool *preparedp)
 		total_incr += incr;
 		upd->txnid = las_txnid;
 		upd->prepare_state = prepare_state;
-		if (prepare_state == WT_PREPARE_INPROGRESS)
-			*preparedp = true;
 #ifdef HAVE_TIMESTAMPS
 		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
 		memcpy(&upd->timestamp, las_timestamp.data, las_timestamp.size);
@@ -284,6 +281,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, bool *preparedp)
 		FLD_SET(page->modify->restore_state, WT_PAGE_RS_LOOKASIDE);
 
 		if (ref->page_las->skew_newest &&
+		    !ref->page_las->has_prepares &&
 		    !S2C(session)->txn_global.has_stable_timestamp &&
 		    __wt_txn_visible_all(session, ref->page_las->unstable_txn,
 		    WT_TIMESTAMP_NULL(&ref->page_las->unstable_timestamp))) {
@@ -378,7 +376,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
  */
 static inline int
 __page_read_lookaside(WT_SESSION_IMPL *session, WT_REF *ref,
-    uint32_t previous_state, uint32_t *final_statep, bool *preparedp)
+    uint32_t previous_state, uint32_t *final_statep)
 {
 	/*
 	 * Reading a lookaside ref for the first time, and not requiring the
@@ -403,7 +401,7 @@ __page_read_lookaside(WT_SESSION_IMPL *session, WT_REF *ref,
 			    cache_read_lookaside_delay_checkpoint);
 	}
 
-	WT_RET(__las_page_instantiate(session, ref, preparedp));
+	WT_RET(__las_page_instantiate(session, ref));
 	ref->page_las->eviction_to_lookaside = false;
 	return (0);
 }
@@ -422,7 +420,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	uint64_t time_start, time_stop;
 	uint32_t page_flags, final_state, new_state, previous_state;
 	const uint8_t *addr;
-	bool prepared, timer;
+	bool timer;
 
 	time_start = time_stop = 0;
 
@@ -520,7 +518,6 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    F_ISSET(ref->page->dsk, WT_PAGE_LAS_UPDATE));
 
 skip_read:
-	prepared = false;
 	switch (previous_state) {
 	case WT_REF_DELETED:
 		/*
@@ -530,7 +527,7 @@ skip_read:
 		 * then apply the delete.
 		 */
 		if (ref->page_las != NULL) {
-			WT_ERR(__las_page_instantiate(session, ref, &prepared));
+			WT_ERR(__las_page_instantiate(session, ref));
 			ref->page_las->eviction_to_lookaside = false;
 		}
 
@@ -540,7 +537,7 @@ skip_read:
 	case WT_REF_LIMBO:
 	case WT_REF_LOOKASIDE:
 		WT_ERR(__page_read_lookaside(
-		    session, ref, previous_state, &final_state, &prepared));
+		    session, ref, previous_state, &final_state));
 		break;
 	}
 
@@ -556,12 +553,12 @@ skip_read:
 	 *
 	 * Don't free WT_REF.page_las, there may be concurrent readers.
 	 */
-	if (final_state == WT_REF_MEM &&
-	    ref->page_las != NULL && (prepared || !ref->page_las->skew_newest))
+	if (final_state == WT_REF_MEM && ref->page_las != NULL &&
+	    (!ref->page_las->skew_newest || ref->page_las->has_prepares))
 		WT_ERR(__wt_las_remove_block(
 		    session, ref->page_las->las_pageid));
 
-	WT_PUBLISH(ref->state, final_state);
+	WT_REF_SET_STATE(ref, final_state);
 	return (ret);
 
 err:	/*
@@ -571,7 +568,7 @@ err:	/*
 	 */
 	if (ref->page != NULL && previous_state != WT_REF_LIMBO)
 		__wt_ref_out(session, ref);
-	WT_PUBLISH(ref->state, previous_state);
+	WT_REF_SET_STATE(ref, previous_state);
 
 	__wt_buf_free(session, &tmp);
 
