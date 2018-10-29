@@ -56,6 +56,7 @@ DEFAULTS = {
     "dbtest_executable": None,
     "dry_run": None,
     "exclude_with_any_tags": None,
+    "genny_executable": None,
     "include_with_any_tags": None,
     "jobs": 1,
     "mongo_executable": None,
@@ -269,6 +270,9 @@ EXCLUDED_TAG = "__TEMPORARILY_DISABLED__"
 
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
+
+# Executable file for genny, passed in as a command line arg. 
+GENNY_EXECUTABLE = None
 
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).

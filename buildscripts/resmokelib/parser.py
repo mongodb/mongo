@@ -81,6 +81,9 @@ def _make_parser():  # pylint: disable=too-many-statements
     parser.add_option("-f", "--findSuites", action="store_true", dest="find_suites",
                       help="Lists the names of the suites that will execute the specified tests.")
 
+    parser.add_option("--genny", dest="genny_executable", metavar="PATH",
+                      help="The path to the genny executable for resmoke to use.")
+
     parser.add_option("--includeWithAnyTags", action="append", dest="include_with_any_tags",
                       metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. For the jstest portion of the suite(s),"
@@ -396,6 +399,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
+    _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))

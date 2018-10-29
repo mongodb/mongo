@@ -20,8 +20,7 @@ class GennyTestCase(interface.ProcessTestCase):
         """Init the GennyTestCase with the genny workload to run."""
         interface.ProcessTestCase.__init__(self, logger, "Genny workload", genny_workload)
 
-        self.genny_executable = utils.default_if_none(genny_executable,
-                                                      config.DEFAULT_GENNY_EXECUTABLE)
+        self.genny_executable = utils.default_if_none(config.GENNY_EXECUTABLE, genny_executable)
         self.genny_options = utils.default_if_none(genny_options, {}).copy()
         self.genny_options["workload-file"] = genny_workload
 
