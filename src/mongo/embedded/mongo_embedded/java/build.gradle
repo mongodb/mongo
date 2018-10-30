@@ -20,7 +20,7 @@ buildscript {
         classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.+'
         classpath 'com.android.tools.build:gradle:3.1.2'
         classpath 'digital.wup:android-maven-publish:3.6.2'
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.+'
+        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:latest.release'
     }
 }
 
