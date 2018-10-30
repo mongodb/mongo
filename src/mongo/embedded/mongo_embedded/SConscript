@@ -158,7 +158,7 @@ mongoEmbeddedPlist = env.Substfile(
     source='../Info.plist.in',
     SUBST_DICT=[
         ('@CFBundleExecutable@', 'mongo_embedded'),
-        ('@CFBundleIdentifier@', 'org.mongodb.mongo_embedded'),
+        ('@CFBundleIdentifier@', 'org.mongodb.mongo-embedded'),
         ('@CFBundleVersion@', env['PLIST_MONGO_BUNDLE_VERSION']),
         ('@CFBundleShortVersionString@', env['PLIST_MONGO_BUNDLE_VERSION']),
         ('@MinimumOSVersion@', env['PLIST_MINIMUM_OS_VERSION'])
