@@ -196,9 +196,15 @@
     authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
         replTest.awaitReplication();
     });
+
+    // Before checking the final results, make sure that B is in secondary mode, which
+    // indicates that it has completed its rollback.
+    replTest.waitForState(replTest.nodes[1], ReplSetTest.State.SECONDARY);
+
     assert.soon(function() {
         return b.auth('spencer', 'pwd');
     });
+
     // Now both A and B should agree
     checkFinalResults(a);
     checkFinalResults(b);
