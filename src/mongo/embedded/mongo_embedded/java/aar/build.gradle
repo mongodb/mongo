@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 apply plugin: 'digital.wup.android-maven-publish'
 apply plugin: 'optional-base'
-apply plugin: 'com.jfrog.bintray'
+apply plugin: 'com.jfrog.artifactory'
 
 android {
     compileSdkVersion 28
@@ -71,29 +71,25 @@ publishing {
     }
 }
 
-bintray {
-    dryRun = true
-    //publish = false
-
-    user = System.getenv('BINTRAY_USER')
-    key = System.getenv('BINTRAY_KEY')
-
-    publications = ['mavenAar']
-
-    pkg {
-        repo = 'MongoDB'
-        name = "$group:$libraryName-android"
-        userOrg = 'mongodb'
-        licenses = [licenseShort]
-        vcsUrl = pomScmConnection
-        githubRepo = 'mongodb/mongo'
-        githubReleaseNotesFile = 'README'
-        websiteUrl = pomUrl
-        publicDownloadNumbers = true
-
-        version {
-            name = getGitVersion()
+artifactory {
+    contextUrl = "http://artifactory.corp.mongodb.com/artifactory"
+    publish {
+        repository {
+            repoKey = 'mongodb-mobile-local'
+            username = System.getenv('artifactory_mobile_user')
+            password = System.getenv('artifactory_mobile_pass')
+            maven = true
+        }
+        defaults {
+            publications ('mavenAar')
+        }
+    }
+    resolve {
+        repository {
+            repoKey = 'maven'
+            username = System.getenv('artifactory_mobile_user')
+            password = System.getenv('artifactory_mobile_pass')
+            maven = true
         }
     }
 }
-
