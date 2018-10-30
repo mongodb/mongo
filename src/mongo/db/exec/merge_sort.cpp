@@ -50,10 +50,8 @@ const char* MergeSortStage::kStageType = "SORT_MERGE";
 
 MergeSortStage::MergeSortStage(OperationContext* opCtx,
                                const MergeSortStageParams& params,
-                               WorkingSet* ws,
-                               const Collection* collection)
+                               WorkingSet* ws)
     : PlanStage(kStageType, opCtx),
-      _collection(collection),
       _ws(ws),
       _pattern(params.pattern),
       _collator(params.collator),

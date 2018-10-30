@@ -124,7 +124,6 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
             SortStageParams params;
-            params.collection = collection;
             params.pattern = sn->pattern;
             params.limit = sn->limit;
             return new SortStage(opCtx, params, ws, childStage);
@@ -183,7 +182,7 @@ PlanStage* buildStages(OperationContext* opCtx,
         }
         case STAGE_AND_HASH: {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-            auto ret = make_unique<AndHashStage>(opCtx, ws, collection);
+            auto ret = make_unique<AndHashStage>(opCtx, ws);
             for (size_t i = 0; i < ahn->children.size(); ++i) {
                 PlanStage* childStage =
                     buildStages(opCtx, collection, cq, qsol, ahn->children[i], ws);
@@ -209,7 +208,7 @@ PlanStage* buildStages(OperationContext* opCtx,
         }
         case STAGE_AND_SORTED: {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-            auto ret = make_unique<AndSortedStage>(opCtx, ws, collection);
+            auto ret = make_unique<AndSortedStage>(opCtx, ws);
             for (size_t i = 0; i < asn->children.size(); ++i) {
                 PlanStage* childStage =
                     buildStages(opCtx, collection, cq, qsol, asn->children[i], ws);
@@ -226,7 +225,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.dedup = msn->dedup;
             params.pattern = msn->sort;
             params.collator = cq.getCollator();
-            auto ret = make_unique<MergeSortStage>(opCtx, params, ws, collection);
+            auto ret = make_unique<MergeSortStage>(opCtx, params, ws);
             for (size_t i = 0; i < msn->children.size(); ++i) {
                 PlanStage* childStage =
                     buildStages(opCtx, collection, cq, qsol, msn->children[i], ws);
@@ -368,15 +367,15 @@ PlanStage* buildStages(OperationContext* opCtx,
         case STAGE_COUNT:
         case STAGE_DELETE:
         case STAGE_EOF:
-        case STAGE_GROUP:
         case STAGE_IDHACK:
         case STAGE_MULTI_ITERATOR:
         case STAGE_MULTI_PLAN:
         case STAGE_PIPELINE_PROXY:
         case STAGE_QUEUED_DATA:
+        case STAGE_RECORD_STORE_FAST_COUNT:
         case STAGE_SUBPLAN:
-        case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
+        case STAGE_TEXT_OR:
         case STAGE_UNKNOWN:
         case STAGE_UPDATE: {
             mongoutils::str::stream ss;

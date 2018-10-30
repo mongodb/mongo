@@ -58,10 +58,7 @@ class MergeSortStageParams;
  */
 class MergeSortStage final : public PlanStage {
 public:
-    MergeSortStage(OperationContext* opCtx,
-                   const MergeSortStageParams& params,
-                   WorkingSet* ws,
-                   const Collection* collection);
+    MergeSortStage(OperationContext* opCtx, const MergeSortStageParams& params, WorkingSet* ws);
 
     void addChild(PlanStage* child);
 
@@ -105,9 +102,6 @@ private:
         BSONObj _pattern;
         const CollatorInterface* _collator;
     };
-
-    // Not owned by us.
-    const Collection* _collection;
 
     // Not owned by us.
     WorkingSet* _ws;

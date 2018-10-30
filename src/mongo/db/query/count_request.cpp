@@ -72,6 +72,12 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const NamespaceString& nss,
     if (cmdObj[kLimitField].isNumber()) {
         long long limit = cmdObj[kLimitField].numberLong();
 
+        if (limit == std::numeric_limits<long long>::min()) {
+            // The absolute value of the smallest long long is too large to be represented as a long
+            // long, so we fail to parse such count commands.
+            return Status(ErrorCodes::BadValue, "limit value for count cannot be min long");
+        }
+
         // For counts, limit and -limit mean the same thing.
         if (limit < 0) {
             limit = -limit;

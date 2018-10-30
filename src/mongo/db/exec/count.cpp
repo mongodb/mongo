@@ -51,61 +51,22 @@ CountStage::CountStage(OperationContext* opCtx,
                        CountStageParams params,
                        WorkingSet* ws,
                        PlanStage* child)
-    : PlanStage(kStageType, opCtx),
-      _collection(collection),
-      _params(std::move(params)),
-      _leftToSkip(_params.skip),
-      _ws(ws) {
-    if (child)
-        _children.emplace_back(child);
+    : PlanStage(kStageType, opCtx), _params(std::move(params)), _leftToSkip(_params.skip), _ws(ws) {
+    invariant(child);
+    _children.emplace_back(child);
 }
 
 bool CountStage::isEOF() {
-    if (_specificStats.recordStoreCount) {
-        return true;
-    }
-
     if (_params.limit > 0 && _specificStats.nCounted >= _params.limit) {
         return true;
     }
 
-    return !_children.empty() && child()->isEOF();
-}
-
-void CountStage::recordStoreCount() {
-    invariant(_collection);
-    long long nCounted = _collection->numRecords(getOpCtx());
-
-    if (0 != _params.skip) {
-        nCounted -= _params.skip;
-        if (nCounted < 0) {
-            nCounted = 0;
-        }
-    }
-
-    long long limit = _params.limit;
-    if (limit < 0) {
-        limit = -limit;
-    }
-
-    if (limit < nCounted && 0 != limit) {
-        nCounted = limit;
-    }
-
-    _specificStats.nCounted = nCounted;
-    _specificStats.nSkipped = _params.skip;
-    _specificStats.recordStoreCount = true;
+    return child()->isEOF();
 }
 
 PlanStage::StageState CountStage::doWork(WorkingSetID* out) {
     // This stage never returns a working set member.
     *out = WorkingSet::INVALID_ID;
-
-    if (_params.useRecordStoreCount) {
-        invariant(_collection);
-        recordStoreCount();
-        return PlanStage::IS_EOF;
-    }
 
     if (isEOF()) {
         _commonStats.isEOF = true;

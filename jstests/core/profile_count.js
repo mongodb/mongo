@@ -32,7 +32,7 @@
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.count, coll.getName(), tojson(profileObj));
     assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "COUNT", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "RECORD_STORE_FAST_COUNT", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));

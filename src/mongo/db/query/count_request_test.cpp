@@ -172,6 +172,21 @@ TEST(CountRequest, ParseNegativeLimit) {
     ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
+TEST(CountRequest, LimitCannotBeMinLong) {
+    const auto countRequestStatus =
+        CountRequest::parseFromBSON(testns,
+                                    BSON("count"
+                                         << "TestColl"
+                                         << "query"
+                                         << BSON("a" << BSON("$gte" << 11))
+                                         << "limit"
+                                         << std::numeric_limits<long long>::min()),
+                                    false);
+
+    ASSERT_NOT_OK(countRequestStatus.getStatus());
+    ASSERT_EQ(ErrorCodes::BadValue, countRequestStatus.getStatus());
+}
+
 TEST(CountRequest, FailParseBadSkipValue) {
     const bool isExplain = false;
     const auto countRequestStatus =

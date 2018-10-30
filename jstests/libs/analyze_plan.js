@@ -298,8 +298,8 @@ function getChunkSkips(root) {
 }
 
 /**
- * Given explain output at executionStats level verbosity, confirms that the root stage is COUNT and
- * that the result of the count is equal to 'expectedCount'.
+ * Given explain output at executionStats level verbosity, confirms that the root stage is COUNT or
+ * RECORD_STORE_FAST_COUNT and that the result of the count is equal to 'expectedCount'.
  */
 function assertExplainCount({explainResults, expectedCount}) {
     const execStages = explainResults.executionStats.executionStages;
@@ -311,12 +311,14 @@ function assertExplainCount({explainResults, expectedCount}) {
         let totalCounted = 0;
         for (let shardExplain of execStages.shards) {
             const countStage = shardExplain.executionStages;
-            assert.eq(countStage.stage, "COUNT", "root stage on shard is not COUNT");
+            assert(countStage.stage === "COUNT" || countStage.stage === "RECORD_STORE_FAST_COUNT",
+                   "root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT");
             totalCounted += countStage.nCounted;
         }
         assert.eq(totalCounted, expectedCount, "wrong count result");
     } else {
-        assert.eq(execStages.stage, "COUNT", "root stage is not COUNT");
+        assert(execStages.stage === "COUNT" || execStages.stage === "RECORD_STORE_FAST_COUNT",
+               "root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT");
         assert.eq(execStages.nCounted, expectedCount, "wrong count result");
     }
 }

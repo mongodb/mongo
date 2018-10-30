@@ -204,7 +204,7 @@ struct CollectionScanStats : public SpecificStats {
 };
 
 struct CountStats : public SpecificStats {
-    CountStats() : nCounted(0), nSkipped(0), recordStoreCount(false) {}
+    CountStats() : nCounted(0), nSkipped(0) {}
 
     SpecificStats* clone() const final {
         CountStats* specific = new CountStats(*this);
@@ -216,9 +216,6 @@ struct CountStats : public SpecificStats {
 
     // The number of results we skipped over.
     long long nSkipped;
-
-    // True if we computed the count via Collection::numRecords().
-    bool recordStoreCount;
 };
 
 struct CountScanStats : public SpecificStats {
@@ -343,18 +340,6 @@ struct FetchStats : public SpecificStats {
 
     // The total number of full documents touched by the fetch stage.
     size_t docsExamined = 0u;
-};
-
-struct GroupStats : public SpecificStats {
-    GroupStats() : nGroups(0) {}
-
-    SpecificStats* clone() const final {
-        GroupStats* specific = new GroupStats(*this);
-        return specific;
-    }
-
-    // The total number of groups.
-    size_t nGroups;
 };
 
 struct IDHackStats : public SpecificStats {

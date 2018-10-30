@@ -465,11 +465,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
             }
             intervalsBob.doneFast();
         }
-    } else if (STAGE_GROUP == stats.stageType) {
-        GroupStats* spec = static_cast<GroupStats*>(stats.specific.get());
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("nGroups", spec->nGroups);
-        }
     } else if (STAGE_IDHACK == stats.stageType) {
         IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -519,6 +514,13 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_PROJECTION == stats.stageType) {
         ProjectionStats* spec = static_cast<ProjectionStats*>(stats.specific.get());
         bob->append("transformBy", spec->projObj);
+    } else if (STAGE_RECORD_STORE_FAST_COUNT == stats.stageType) {
+        CountStats* spec = static_cast<CountStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            bob->appendNumber("nCounted", spec->nCounted);
+            bob->appendNumber("nSkipped", spec->nSkipped);
+        }
     } else if (STAGE_SHARDING_FILTER == stats.stageType) {
         ShardingFilterStats* spec = static_cast<ShardingFilterStats*>(stats.specific.get());
 

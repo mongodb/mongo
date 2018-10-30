@@ -165,7 +165,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
@@ -230,7 +230,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
@@ -294,7 +294,7 @@ public:
         MergeSortStageParams msparams;
         msparams.dedup = false;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
@@ -360,7 +360,7 @@ public:
         // Sort by c:-1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << -1);
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
@@ -428,7 +428,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
@@ -478,7 +478,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         int numIndices = 20;
         for (int i = 0; i < numIndices; ++i) {
@@ -530,7 +530,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        auto ms = make_unique<MergeSortStage>(&_opCtx, msparams, &ws, coll);
+        auto ms = make_unique<MergeSortStage>(&_opCtx, msparams, &ws);
 
         // Index 'a'+i has foo equal to 'i'.
 
@@ -658,7 +658,7 @@ public:
         WorkingSetMember* member;
         MergeSortStageParams msparams;
         msparams.pattern = BSON("a" << 1);
-        auto ms = stdx::make_unique<MergeSortStage>(&_opCtx, msparams, &ws, coll);
+        auto ms = stdx::make_unique<MergeSortStage>(&_opCtx, msparams, &ws);
 
         // First child scans [5, 10].
         {
@@ -757,7 +757,7 @@ public:
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1 << "d" << 1);
         msparams.collator = nullptr;
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
@@ -825,7 +825,7 @@ public:
         msparams.pattern = BSON("c" << 1 << "d" << 1);
         CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
         msparams.collator = &collator;
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get());
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));

@@ -74,7 +74,6 @@ SortStage::SortStage(OperationContext* opCtx,
                      WorkingSet* ws,
                      PlanStage* child)
     : PlanStage(kStageType, opCtx),
-      _collection(params.collection),
       _ws(ws),
       _pattern(params.pattern),
       _limit(params.limit),

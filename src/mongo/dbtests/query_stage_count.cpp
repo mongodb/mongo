@@ -161,13 +161,11 @@ public:
             scan = createCollScan(expression.get(), ws.get());
         }
 
-        const bool useRecordStoreCount = false;
-        CountStageParams params(request, useRecordStoreCount);
+        CountStageParams params(request);
         CountStage countStage(&_opCtx, _coll, std::move(params), ws.get(), scan);
 
         const CountStats* stats = runCount(countStage);
 
-        ASSERT_FALSE(stats->recordStoreCount);
         ASSERT_EQUALS(stats->nCounted, expected_n);
         ASSERT_EQUALS(stats->nSkipped, request.getSkip());
     }

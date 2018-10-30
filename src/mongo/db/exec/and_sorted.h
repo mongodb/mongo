@@ -48,7 +48,7 @@ namespace mongo {
  */
 class AndSortedStage final : public PlanStage {
 public:
-    AndSortedStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection);
+    AndSortedStage(OperationContext* opCtx, WorkingSet* ws);
 
     void addChild(PlanStage* child);
 
@@ -72,9 +72,6 @@ private:
     // Move a child which hasn't advanced to the target node forward.
     // Returns the target node in 'out' if all children successfully advance to it.
     PlanStage::StageState moveTowardTargetRecordId(WorkingSetID* out);
-
-    // Not owned by us.
-    const Collection* _collection;
 
     // Not owned by us.
     WorkingSet* _ws;

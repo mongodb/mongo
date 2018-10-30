@@ -30,18 +30,14 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/count_request.h"
 
 namespace mongo {
 
 struct CountStageParams {
-    CountStageParams(const CountRequest& request, bool useRecordStoreCount)
-        : nss(request.getNs()),
-          limit(request.getLimit()),
-          skip(request.getSkip()),
-          useRecordStoreCount(useRecordStoreCount) {}
+    CountStageParams(const CountRequest& request)
+        : nss(request.getNs()), limit(request.getLimit()), skip(request.getSkip()) {}
 
     // Namespace to operate on (e.g. "foo.bar").
     NamespaceString nss;
@@ -51,25 +47,18 @@ struct CountStageParams {
 
     // An integer indicating to not include the first n documents in the count. 0 means no skip.
     long long skip;
-
-    // True if this count stage should just ask the record store for a count instead of computing
-    // one itself.
-    //
-    // Note: This strategy can lead to inaccurate counts on certain storage engines (including
-    // WiredTiger).
-    bool useRecordStoreCount;
 };
 
 /**
- * Stage used by the count command. This stage sits at the root of a plan tree
- * and counts the number of results returned by its child stage.
+ * Stage used by the count command. This stage sits at the root of a plan tree and counts the number
+ * of results returned by its child stage.
  *
- * This should not be confused with the CountScan stage. CountScan is a special
- * index access stage which can optimize index access for count operations in
- * some cases. On the other hand, *every* count op has a CountStage at its root.
+ * This should not be confused with the CountScan stage. CountScan is a special index access stage
+ * which can optimize index access for count operations in some cases. On the other hand, *every*
+ * count op has a CountStage at its root.
  *
- * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining
- * the specific stats.
+ * Only returns NEED_TIME until hitting EOF. The count result can be obtained by examining the
+ * specific stats.
  */
 class CountStage final : public PlanStage {
 public:
@@ -93,17 +82,6 @@ public:
     static const char* kStageType;
 
 private:
-    /**
-     * Asks the record store for the count, applying the skip and limit if necessary. The result is
-     * stored in '_specificStats'.
-     *
-     * This is only valid if the query and hint are both empty.
-     */
-    void recordStoreCount();
-
-    // The collection over which we are counting.
-    Collection* _collection;
-
     CountStageParams _params;
 
     // The number of documents that we still need to skip.

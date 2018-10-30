@@ -48,16 +48,13 @@ class BtreeKeyGenerator;
 // Parameters that must be provided to a SortStage
 class SortStageParams {
 public:
-    SortStageParams() : collection(NULL), limit(0) {}
-
-    // Used for resolving RecordIds to BSON
-    const Collection* collection;
+    SortStageParams() = default;
 
     // How we're sorting.
     BSONObj pattern;
 
     // Equal to 0 for no limit.
-    size_t limit;
+    size_t limit = 0;
 };
 
 /**
@@ -93,9 +90,6 @@ private:
     //
     // Query Stage
     //
-
-    // Not owned by us.
-    const Collection* _collection;
 
     // Not owned by us.
     WorkingSet* _ws;

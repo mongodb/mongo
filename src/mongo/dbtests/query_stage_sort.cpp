@@ -117,7 +117,6 @@ public:
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         SortStageParams params;
-        params.collection = coll;
         params.pattern = BSON("foo" << 1);
         params.limit = limit();
 
@@ -156,7 +155,6 @@ public:
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         SortStageParams params;
-        params.collection = coll;
         params.pattern = BSON("foo" << direction);
         params.limit = limit();
 
@@ -556,9 +554,7 @@ public:
         }
 
         SortStageParams params;
-        params.collection = coll;
         params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
-        params.limit = 0;
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
             &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, nullptr);

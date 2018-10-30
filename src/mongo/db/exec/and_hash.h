@@ -49,15 +49,12 @@ namespace mongo {
  */
 class AndHashStage final : public PlanStage {
 public:
-    AndHashStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection);
+    AndHashStage(OperationContext* opCtx, WorkingSet* ws);
 
     /**
      * For testing only. Allows tests to set memory usage threshold.
      */
-    AndHashStage(OperationContext* opCtx,
-                 WorkingSet* ws,
-                 const Collection* collection,
-                 size_t maxMemUsage);
+    AndHashStage(OperationContext* opCtx, WorkingSet* ws, size_t maxMemUsage);
 
     void addChild(PlanStage* child);
 
@@ -86,9 +83,6 @@ private:
     StageState readFirstChild(WorkingSetID* out);
     StageState hashOtherChildren(WorkingSetID* out);
     StageState workChild(size_t childNo, WorkingSetID* out);
-
-    // Not owned by us.
-    const Collection* _collection;
 
     // Not owned by us.
     WorkingSet* _ws;

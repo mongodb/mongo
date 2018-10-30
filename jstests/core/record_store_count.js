@@ -20,11 +20,20 @@ load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
     //
     // Logically empty predicates should use the record store's count.
     //
+    // If the collection is sharded, however, then we can't use fast count, since we need to perform
+    // shard filtering to avoid counting data that is not logically owned by the shard.
+    //
     var explain = coll.explain().count({});
     assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
+    if (!isMongos(db) || !FixtureHelpers.isSharded(coll)) {
+        assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));
+    }
 
     explain = coll.explain().count({$comment: "hi"});
     assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
+    if (!isMongos(db) || !FixtureHelpers.isSharded(coll)) {
+        assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));
+    }
 
     //
     // A non-empty query predicate should prevent the use of the record store's count.
