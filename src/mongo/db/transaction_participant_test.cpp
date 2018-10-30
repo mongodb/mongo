@@ -41,6 +41,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -882,7 +883,8 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     // Check that the oldest prepareTimestamp is the one we just set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
     ASSERT(_opObserver->transactionPrepared);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
 }
@@ -1078,7 +1080,8 @@ TEST_F(TxnParticipantTest, KillSessionsDoesNotAbortPreparedTransactions) {
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     // Check that the oldest prepareTimestamp is the one we just set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
     txnParticipant->abortArbitraryTransaction();
@@ -1104,7 +1107,8 @@ TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     // Check that the oldest prepareTimestamp is the one we just set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
     txnParticipant->abortArbitraryTransactionIfExpired();
@@ -1132,7 +1136,8 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
 
     // Check that the oldest prepareTimestamp is the one we just set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
 
     txnParticipant->stashTransactionResources(opCtx());
 
@@ -1223,7 +1228,8 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
 
     // Check that the oldest prepareTimestamp is the one we just set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
 
     auto sessionId = *opCtx()->getLogicalSessionId();
     auto txnNum = *opCtx()->getTxnNumber();
@@ -1242,7 +1248,7 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
 
     txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
     // Check that we removed the prepareTimestamp from the set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), boost::none);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
@@ -2975,23 +2981,20 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
 }
 
 TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
-    auto totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
     OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Check that there are no Timestamps in the set.
-    unsigned int zero = 0;
-    ASSERT_EQ(totalActiveTxnTS, zero);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
 
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     auto firstPrepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     // Check that we added a Timestamp to the set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS + 1);
-    // totalActiveTxnTS = 1
-    totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
     // Check that the oldest prepareTimestamp is equal to firstPrepareTimestamp because there is
     // only one prepared transaction on this Service.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), firstPrepareTimestamp);
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), firstPrepareTimestamp);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
 
     txnParticipant->stashTransactionResources(opCtx());
@@ -3023,13 +3026,10 @@ TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
         secondPrepareTimestamp = newTxnParticipant->prepareTransaction(newOpCtx.get(), {});
         ASSERT_GT(secondPrepareTimestamp, firstPrepareTimestamp);
         // Check that we added a Timestamp to the set.
-        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(),
-                  totalActiveTxnTS + 1);
-        // totalActiveTxnTS = 2
-        totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 2U);
         // The oldest prepareTimestamp should still be firstPrepareTimestamp.
-        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(),
-                  firstPrepareTimestamp);
+        prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+        ASSERT_EQ(prepareOpTime->getTimestamp(), firstPrepareTimestamp);
         ASSERT_FALSE(txnParticipant->transactionIsAborted());
     }
 
@@ -3041,25 +3041,22 @@ TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->abortActiveTransaction(opCtx());
     ASSERT(txnParticipant->transactionIsAborted());
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS - 1);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), secondPrepareTimestamp);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
+    prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), secondPrepareTimestamp);
 }
 
 TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
-    auto totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
     OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Check that there are no Timestamps in the set.
-    unsigned int zero = 0;
-    ASSERT_EQ(totalActiveTxnTS, zero);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
 
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->prepareTransaction(opCtx(), {});
     // Check that we added a Timestamp to the set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS + 1);
-    // totalActiveTxnTS = 1
-    totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
 
     txnParticipant->stashTransactionResources(opCtx());
@@ -3089,32 +3086,146 @@ TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
         // transaction was prepared after.
         newTxnParticipant->prepareTransaction(newOpCtx.get(), {});
         // Check that we added a Timestamp to the set.
-        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(),
-                  totalActiveTxnTS + 1);
-        // totalActiveTxnTS = 2
-        totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 2U);
         // The oldest prepareTimestamp should still be firstPrepareTimestamp.
         ASSERT_FALSE(txnParticipant->transactionIsAborted());
 
         // Abort this transaction and check that we have decremented the total active timestamps
         // count.
         newTxnParticipant->abortActiveTransaction(newOpCtx.get());
-        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(),
-                  totalActiveTxnTS - 1);
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
     }
 
     Client::releaseCurrent();
     Client::setCurrent(std::move(originalClient));
-    // totalActiveTxnTS = 1
-    totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
 
     // Switch clients and abort the first transaction. This means we no longer have an oldest active
     // timestamp.
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant->abortActiveTransaction(opCtx());
     ASSERT(txnParticipant->transactionIsAborted());
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS - 1);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), boost::none);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+}
+
+TEST_F(TxnParticipantTest, ProperlyMaintainOldestNonMajorityCommittedOpTimeSet) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Check that there are no Timestamps in the set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
+
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    // Check that we added a Timestamp to the set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
+
+    // Check that the oldest prepareTimestamp is equal to first prepareTimestamp because there is
+    // only one prepared transaction on this Service.
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
+
+    // Check that oldestNonMajorityCommittedOpTimes also has this prepareTimestamp and that the
+    // pair's finishOpTime is Timestamp::max() because this transaction has not been
+    // committed/aborted.
+    auto nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+    ASSERT_EQ(nonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
+    auto nonMajorityCommittedOpTimeFinishOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getFinishOpTimeOfOldestNonMajCommitted_forTest();
+    ASSERT_EQ(nonMajorityCommittedOpTimeFinishOpTime->getTimestamp(), Timestamp::max());
+
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    // Since this test uses a mock opObserver, we have to manually set the finishTimestamp on the
+    // txnParticipant.
+    auto finishOpTime = repl::OpTime({10, 10}, 0);
+    repl::ReplClientInfo::forClient(opCtx()->getClient()).setLastOp(finishOpTime);
+
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
+
+    // Make sure that we moved the OpTime from the oldestActiveOplogEntryOpTimes to
+    // oldestNonMajorityCommittedOpTimes along with the abort/commit oplog entry OpTime
+    // associated with the transaction.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+
+    nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+    nonMajorityCommittedOpTimeFinishOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getFinishOpTimeOfOldestNonMajCommitted_forTest();
+    ASSERT_FALSE(nonMajorityCommittedOpTime == boost::none);
+    ASSERT_FALSE(nonMajorityCommittedOpTimeFinishOpTime == boost::none);
+    ASSERT_EQ(nonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
+    ASSERT_EQ(nonMajorityCommittedOpTimeFinishOpTime, finishOpTime);
+
+    // If we pass in a mock commit point that is greater than the finish timestamp of the
+    // oldestNonMajorityCommittedOpTime, it should be removed from the set. This would mean that
+    // the abort/commit oplog entry is majority committed.
+    ServerTransactionsMetrics::get(opCtx())->removeOpTimesLessThanOrEqToCommittedOpTime(
+        repl::OpTime::max());
+    nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+    ASSERT_EQ(nonMajorityCommittedOpTime, boost::none);
+}
+
+TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry) {
+    const auto earlierOpTime = repl::OpTime({1, 1}, 0);
+    const auto earlierFinishOpTime = repl::OpTime({3, 2}, 0);
+
+    const auto middleOpTime = repl::OpTime({1, 2}, 0);
+    const auto middleFinishOpTime = repl::OpTime({3, 3}, 0);
+
+    const auto laterOpTime = repl::OpTime({1, 3}, 0);
+    const auto laterFinishOpTime = repl::OpTime({3, 4}, 0);
+
+    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(earlierOpTime);
+    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(earlierOpTime, earlierFinishOpTime);
+
+    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(middleOpTime);
+    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(middleOpTime, middleFinishOpTime);
+
+    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(laterOpTime);
+    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(laterOpTime, laterFinishOpTime);
+
+    auto nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+
+    ASSERT_EQ(*nonMajorityCommittedOpTime, repl::OpTime({1, 1}, 0));
+
+    // If we pass in a mock commit point that is greater than the finish timestamp of the
+    // oldestNonMajorityCommittedOpTime, it should be removed from the set. This would mean that
+    // the abort/commit oplog entry is majority committed.
+    ServerTransactionsMetrics::get(opCtx())->removeOpTimesLessThanOrEqToCommittedOpTime(
+        repl::OpTime::max());
+    nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+    ASSERT_EQ(nonMajorityCommittedOpTime, boost::none);
+
+    // Test that we can remove only a part of the set by passing in a commit point that is only
+    // greater than or equal to two of the optimes.
+    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(earlierOpTime);
+    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(earlierOpTime, earlierFinishOpTime);
+
+    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(middleOpTime);
+    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(middleOpTime, middleFinishOpTime);
+
+    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(laterOpTime);
+    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(laterOpTime, laterFinishOpTime);
+
+    nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+
+    ASSERT_EQ(*nonMajorityCommittedOpTime, earlierOpTime);
+
+    ServerTransactionsMetrics::get(opCtx())->removeOpTimesLessThanOrEqToCommittedOpTime(
+        repl::OpTime({3, 3}, 0));
+    nonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+
+    // earlierOpTime and middleOpTime must have been removed because their finishOpTime are less
+    // than or equal to the mock commit point.
+    ASSERT_EQ(nonMajorityCommittedOpTime, laterOpTime);
 }
 
 

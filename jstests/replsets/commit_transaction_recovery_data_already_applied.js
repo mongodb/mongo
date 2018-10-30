@@ -68,7 +68,8 @@
     // will error with BSONTooLarge only if recovery reapplies the operations from the transaction.
     // Note that the 'disableSnapshotting' failpoint will be unset on the node following the
     // restart.
-    replTest.restart(primary);
+    replTest.stop(primary, undefined, {skipValidation: true});
+    replTest.start(primary, {}, true);
 
     jsTestLog("Node was restarted");
 

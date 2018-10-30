@@ -823,20 +823,20 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
 
     abortGuard.Dismiss();
 
-    invariant(!_oldestOplogEntryTS,
+    invariant(!_oldestOplogEntryOpTime,
               str::stream() << "This transaction's oldest oplog entry Timestamp has already "
                             << "been set to: "
-                            << _oldestOplogEntryTS->toString());
+                            << _oldestOplogEntryOpTime->toString());
     // Keep track of the Timestamp from the first oplog entry written by this transaction.
-    _oldestOplogEntryTS = prepareOplogSlot.opTime.getTimestamp();
+    _oldestOplogEntryOpTime = prepareOplogSlot.opTime;
 
-    // Maintain the Timestamp of the oldest active oplog entry for this transaction. We currently
+    // Maintain the OpTime of the oldest active oplog entry for this transaction. We currently
     // only write an oplog entry for an in progress transaction when it is in the prepare state
     // but this will change when we allow multiple oplog entries per transaction.
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onPrepare(ServerTransactionsMetrics::get(opCtx),
-                                              *_oldestOplogEntryTS);
+                                              *_oldestOplogEntryOpTime);
     }
 
     return prepareOplogSlot.opTime.getTimestamp();
@@ -895,10 +895,10 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
             !_txnState.isPrepared(lk));
 
     // TODO SERVER-37129: Remove this invariant once we allow transactions larger than 16MB.
-    invariant(!_oldestOplogEntryTS,
+    invariant(!_oldestOplogEntryOpTime,
               str::stream() << "The oldest oplog entry Timestamp should not have been set because "
                             << "this transaction is not prepared. But, it is currently "
-                            << _oldestOplogEntryTS->toString());
+                            << _oldestOplogEntryOpTime->toString());
 
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
     // into the session.
@@ -967,6 +967,11 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
         lk.lock();
         _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
+        // If we are committing a prepared transaction, then we must have already recorded this
+        // transaction's oldest oplog entry optime.
+        invariant(_oldestOplogEntryOpTime);
+        _finishOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
         _finishCommitTransaction(lk, opCtx);
     } catch (...) {
         // It is illegal for committing a prepared transaction to fail for any reason, other than an
@@ -1015,7 +1020,8 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         _transactionMetricsObserver.onCommit(ServerTransactionsMetrics::get(opCtx),
                                              tickSource,
-                                             _oldestOplogEntryTS,
+                                             _oldestOplogEntryOpTime,
+                                             _finishOpTime,
                                              &Top::get(getGlobalServiceContext()));
         _transactionMetricsObserver.onTransactionOperation(
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
@@ -1097,10 +1103,10 @@ void TransactionParticipant::abortActiveUnpreparedOrStashPreparedTransaction(
     }
 
     // TODO SERVER-37129: Remove this invariant once we allow transactions larger than 16MB.
-    invariant(!_oldestOplogEntryTS,
+    invariant(!_oldestOplogEntryOpTime,
               str::stream() << "The oldest oplog entry Timestamp should not have been set because "
                             << "this transaction is not prepared. But, it is currently "
-                            << _oldestOplogEntryTS->toString());
+                            << _oldestOplogEntryOpTime->toString());
 
     _abortActiveTransaction(std::move(lock), opCtx, TransactionState::kInProgress);
 } catch (...) {
@@ -1149,6 +1155,12 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
     lock.lock();
     // We do not check if the active transaction number is correct here because we handle it below.
 
+    // Set the finishOpTime of this transaction if we have recorded this transaction's oldest oplog
+    // entry optime.
+    if (_oldestOplogEntryOpTime) {
+        _finishOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    }
+
     // Only abort the transaction in session if it's in expected states.
     // When the state of active transaction on session is not expected, it means another
     // thread has already aborted the transaction on session.
@@ -1185,7 +1197,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
             _transactionMetricsObserver.onAbortInactive(
                 ServerTransactionsMetrics::get(getGlobalServiceContext()),
                 tickSource,
-                _oldestOplogEntryTS,
+                _oldestOplogEntryOpTime,
                 &Top::get(getGlobalServiceContext()));
         }
         _logSlowTransaction(wl,
@@ -1198,7 +1210,8 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
         _transactionMetricsObserver.onAbortActive(
             ServerTransactionsMetrics::get(getGlobalServiceContext()),
             tickSource,
-            _oldestOplogEntryTS,
+            _oldestOplogEntryOpTime,
+            _finishOpTime,
             &Top::get(getGlobalServiceContext()));
     }
 
@@ -1206,7 +1219,8 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
     _transactionOperations.clear();
     _txnState.transitionTo(wl, TransactionState::kAborted);
     _prepareOpTime = repl::OpTime();
-    _oldestOplogEntryTS = boost::none;
+    _oldestOplogEntryOpTime = boost::none;
+    _finishOpTime = boost::none;
     _speculativeTransactionReadOpTime = repl::OpTime();
 }
 
@@ -1537,7 +1551,8 @@ void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnN
     // Reset the transactional state
     _txnState.transitionTo(wl, TransactionState::kNone);
     _prepareOpTime = repl::OpTime();
-    _oldestOplogEntryTS = boost::none;
+    _oldestOplogEntryOpTime = boost::none;
+    _finishOpTime = boost::none;
     _speculativeTransactionReadOpTime = repl::OpTime();
     _multikeyPathInfo.clear();
     _autoCommit = boost::none;

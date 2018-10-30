@@ -70,37 +70,46 @@ public:
 
     /**
      * Updates relevant metrics when a transaction commits. Also removes this transaction's oldest
-     * oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
+     * oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not boost::none.
+     * Finally, updates an entry in oldestNonMajorityCommittedOpTimes to include its commit OpTime.
      */
     void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource* tickSource,
-                  boost::optional<Timestamp> oldestOplogEntryTS,
+                  boost::optional<repl::OpTime> oldestOplogEntryOpTime,
+                  boost::optional<repl::OpTime> commitOpTime,
                   Top* top);
 
     /**
      * Updates relevant metrics when an active transaction aborts. Also removes this transaction's
-     * oldest oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
+     * oldest oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not
+     * boost::none.
+     * Finally, updates an entry in oldestNonMajorityCommittedOpTimes to include its abort OpTime.
      */
     void onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
                        TickSource* tickSource,
-                       boost::optional<Timestamp> oldestOplogEntryTS,
+                       boost::optional<repl::OpTime> oldestOplogEntryOpTime,
+                       boost::optional<repl::OpTime> abortOpTime,
                        Top* top);
 
     /**
      * Updates relevant metrics when an inactive transaction aborts. Also removes this transaction's
-     * oldest oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
+     * oldest oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not
+     * boost::none.
+     * Does not accept an optional abortOpTime parameter because we cannot abort an inactive
+     * prepared transaction. Instead, uses boost::none as the abortOpTime, which subsequently will
+     * not modify oldestNonMajorityCommittedOpTimes.
      */
     void onAbortInactive(ServerTransactionsMetrics* serverTransactionsMetrics,
                          TickSource* tickSource,
-                         boost::optional<Timestamp> oldestOplogEntryTS,
+                         boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                          Top* top);
 
     /**
-     * Adds the prepareTimestamp, which is currently the Timestamp of the first oplog entry written
-     * by an active transaction, to the oldestActiveOplogEntryTS set.
+     * Adds the prepareOpTime, which is currently the Timestamp of the first oplog entry written by
+     * an active transaction, to the oldestActiveOplogEntryTS set.
      */
     void onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
-                   Timestamp prepareTimestamp);
+                   repl::OpTime prepareOpTime);
 
     /**
      * Updates relevant metrics when an operation running on the transaction completes. An operation

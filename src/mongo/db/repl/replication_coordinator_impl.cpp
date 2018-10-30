@@ -72,6 +72,7 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -3068,7 +3069,23 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime_inloc
         maximumStableTimestamp = std::min(maximumStableTimestamp, holdStableTimestamp);
     }
 
-    const auto maximumStableOpTime = OpTime(maximumStableTimestamp, commitPoint.getTerm());
+    auto maximumStableOpTime = OpTime(maximumStableTimestamp, commitPoint.getTerm());
+
+    // When calculating the stable optime, compare it to the oldest oplog entry timestamp across
+    // transactions whose corresponding commit/abort oplog entries have not been majority committed.
+    const auto serverTxnMetrics = ServerTransactionsMetrics::get(getGlobalServiceContext());
+    const auto oldestNonMajCommittedOpTime =
+        serverTxnMetrics->getOldestNonMajorityCommittedOpTime();
+
+    if (oldestNonMajCommittedOpTime) {
+        if (oldestNonMajCommittedOpTime->getTimestamp() < maximumStableTimestamp) {
+            // If there is an oldest non-majority committed timestamp that is less than the current
+            // max stable timestamp, then update the max stable timestamp/optime accordingly.
+            maximumStableTimestamp = oldestNonMajCommittedOpTime->getTimestamp();
+            maximumStableOpTime =
+                OpTime(maximumStableTimestamp, oldestNonMajCommittedOpTime->getTerm());
+        }
+    }
 
     // Find the greatest optime candidate that is less than or equal to the commit point.
     // To do this we first find the upper bound of 'commitPoint', which points to the smallest
@@ -3126,6 +3143,16 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime_inlock() {
         invariant(snapshotOpTime <= commitPoint);
     }
 
+    // If we advanced the commit point and have prepared transactions, check if their commit or
+    // abort timestamps are <= the commit point. If so, remove them from our oldest non-majority
+    // committed optimes set because we know that the commit/abort oplog entries are majority
+    // committed.
+    // We must remove these optimes before calling _calculateStableOpTime_inlock because we want
+    // we want the stable timestamp to advance up to the commit point if all transactions are
+    // committed or aborted.
+    auto txnMetrics = ServerTransactionsMetrics::get(getGlobalServiceContext());
+    txnMetrics->removeOpTimesLessThanOrEqToCommittedOpTime(commitPoint);
+
     // Compute the current stable optime.
     auto stableOpTime = _calculateStableOpTime_inlock(_stableOpTimeCandidates, commitPoint);
     if (stableOpTime) {
@@ -3138,7 +3165,6 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime_inlock() {
 }
 
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
-
     // Get the current stable optime.
     auto stableOpTime = _getStableOpTime_inlock();
 
