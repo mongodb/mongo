@@ -234,7 +234,6 @@ env.Library(
         'auth_impl_internal',
         'authorization_manager_global',
         'saslauth',
-        'security_file',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/sasl_client',
@@ -245,13 +244,28 @@ env.Library(
     ],
 )
 
-env.Library(
+yamlEnv = env.Clone()
+yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+yamlEnv.Library(
     target='security_file',
     source=[
         'security_file.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_yaml',
+    ],
+)
+
+env.CppUnitTest(
+    target='security_file_test',
+    source=[
+        'security_file_test.cpp',
+    ],
+    LIBDEPS=[
+        'security_file',
     ],
 )
 

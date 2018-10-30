@@ -34,76 +34,88 @@
 
 #include "mongo/db/auth/security_key.h"
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 #include <sys/stat.h>
+#include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include "yaml-cpp/yaml.h"
+
 namespace mongo {
+namespace {
+std::string stripString(const std::string& filename, const std::string& str) {
+    std::string out;
+    out.reserve(str.size());
 
-using std::string;
+    std::copy_if(str.begin(), str.end(), std::back_inserter(out), [&](const char ch) {
+        // don't copy any whitespace
+        if ((ch >= '\x09' && ch <= '\x0D') || ch == ' ') {
+            return false;
+            // uassert if string contains any non-base64 characters
+        } else if ((ch < 'A' || ch > 'Z') && (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') &&
+                   ch != '+' && ch != '/' && ch != '=') {
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "invalid char in key file " << filename << ": " << str);
+        }
+        return true;
+    });
 
-StatusWith<std::string> readSecurityFile(const std::string& filename) {
+    return out;
+}
+
+}  // namespace
+
+StatusWith<std::vector<std::string>> readSecurityFile(const std::string& filename) try {
     struct stat stats;
 
     // check obvious file errors
     if (stat(filename.c_str(), &stats) == -1) {
-        return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "Error reading file " << filename << ": "
-                                                     << strerror(errno));
+        return Status(ErrorCodes::InvalidPath,
+                      str::stream() << "Error reading file " << filename << ": "
+                                    << strerror(errno));
     }
 
 #if !defined(_WIN32)
     // check permissions: must be X00, where X is >= 4
     if ((stats.st_mode & (S_IRWXG | S_IRWXO)) != 0) {
-        return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "permissions on " << filename
-                                                     << " are too open");
+        return Status(ErrorCodes::InvalidPath,
+                      str::stream() << "permissions on " << filename << " are too open");
     }
 #endif
 
-    FILE* file = fopen(filename.c_str(), "rb");
-    if (!file) {
-        return StatusWith<std::string>(ErrorCodes::InvalidPath,
-                                       str::stream() << "error opening file: " << filename << ": "
-                                                     << strerror(errno));
-    }
-
-    string str = "";
-
-    // strip key file
-    const unsigned long long fileLength = stats.st_size;
-    unsigned long long read = 0;
-    while (read < fileLength) {
-        char buf;
-        int readLength = fread(&buf, 1, 1, file);
-        if (readLength < 1) {
-            fclose(file);
-            return StatusWith<std::string>(ErrorCodes::UnsupportedFormat,
-                                           str::stream() << "error reading file: " << filename);
+    std::vector<std::string> ret;
+    const std::function<void(const YAML::Node&)> visitNode = [&](const YAML::Node& node) {
+        if (node.IsScalar()) {
+            ret.push_back(stripString(filename, node.Scalar()));
+        } else if (node.IsSequence()) {
+            for (const auto& child : node) {
+                visitNode(child);
+            }
+        } else {
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      "Only strings and sequences are supported for YAML key files");
         }
-        read++;
+    };
 
-        // check for whitespace
-        if ((buf >= '\x09' && buf <= '\x0D') || buf == ' ') {
-            continue;
-        }
+    visitNode(YAML::LoadFile(filename));
 
-        // check valid base64
-        if ((buf < 'A' || buf > 'Z') && (buf < 'a' || buf > 'z') && (buf < '0' || buf > '9') &&
-            buf != '+' && buf != '/' && buf != '=') {
-            fclose(file);
-            return StatusWith<std::string>(
-                ErrorCodes::UnsupportedFormat,
-                str::stream() << "invalid char in key file " << filename << ": " << buf);
-        }
+    uassert(50981,
+            str::stream() << "Security key file " << filename << " does not contain any valid keys",
+            !ret.empty());
 
-        str += buf;
-    }
-
-    fclose(file);
-    return StatusWith<std::string>(str);
+    return ret;
+} catch (const YAML::BadFile& e) {
+    return Status(ErrorCodes::InvalidPath,
+                  str::stream() << "error opening file: " << filename << ": " << e.what());
+} catch (const YAML::ParserException& e) {
+    return Status(ErrorCodes::UnsupportedFormat,
+                  str::stream() << "error reading file: " << filename << ": " << e.what());
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 }  // namespace mongo

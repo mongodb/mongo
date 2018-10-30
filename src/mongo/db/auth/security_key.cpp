@@ -67,23 +67,25 @@ void copyCredentials(CredsTarget&& target, const CredsSource&& source) {
     target.serverKey = source[scram::kServerKeyFieldName].String();
 }
 
+constexpr size_t kMinKeyLength = 6;
+constexpr size_t kMaxKeyLength = 1024;
+
 }  // namespace
 
 using std::string;
 
 bool setUpSecurityKey(const string& filename) {
-    StatusWith<std::string> keyString = mongo::readSecurityFile(filename);
-    if (!keyString.isOK()) {
-        log() << keyString.getStatus().reason();
+    auto keyStrings = mongo::readSecurityFile(filename);
+    if (!keyStrings.isOK()) {
+        log() << keyStrings.getStatus().reason();
         return false;
     }
 
-    const std::string password = std::move(keyString.getValue());
-    const auto keyLength = password.size();
-    if (keyLength < 6 || keyLength > 1024) {
-        log() << " security key in " << filename << " has length " << keyLength
-              << ", must be between 6 and 1024 chars";
-        return false;
+
+    const auto& password = keyStrings.getValue().front();
+    if (password.size() < kMinKeyLength || password.size() > kMaxKeyLength) {
+        error() << " security key in " << filename << " has length " << password.size()
+                << ", must be between 6 and 1024 chars";
     }
 
     auto swSaslPassword = saslPrep(password);
