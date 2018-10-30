@@ -495,7 +495,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 			root_incr += sizeof(WT_IKEY) + size;
 		} else
 			ref->ref_recno = (*root_refp)->ref_recno;
-		ref->state = WT_REF_MEM;
+		WT_REF_SET_STATE(ref, WT_REF_MEM);
 
 		/*
 		 * Initialize the child page.
@@ -784,7 +784,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		 * Set the discarded WT_REF state to split, ensuring we don't
 		 * race with any discard of the WT_REF deleted fields.
 		 */
-		WT_PUBLISH(ref->state, WT_REF_SPLIT);
+		WT_REF_SET_STATE(ref, WT_REF_SPLIT);
 
 		/*
 		 * Push out the change: not required for correctness, but stops
@@ -903,7 +903,7 @@ err:	__wt_scr_free(session, &scr);
 		for (i = 0; i < parent_entries; ++i) {
 			next_ref = pindex->index[i];
 			if (next_ref->state == WT_REF_SPLIT)
-				next_ref->state = WT_REF_DELETED;
+				WT_REF_SET_STATE(next_ref, WT_REF_DELETED);
 		}
 
 		__wt_free_ref_index(session, NULL, alloc_index, false);
@@ -1060,7 +1060,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 			parent_incr += sizeof(WT_IKEY) + size;
 		} else
 			ref->ref_recno = (*page_refp)->ref_recno;
-		ref->state = WT_REF_MEM;
+		WT_REF_SET_STATE(ref, WT_REF_MEM);
 
 		/*
 		 * Initialize the child page.
@@ -1675,7 +1675,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_memdup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
 
-		ref->state = WT_REF_DISK;
+		WT_REF_SET_STATE(ref, WT_REF_DISK);
 	}
 
 	/*
@@ -1693,7 +1693,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		*ref->page_las = multi->page_las;
 		WT_ASSERT(session, ref->page_las->max_txn != WT_TXN_NONE);
-		ref->state = WT_REF_LOOKASIDE;
+		WT_REF_SET_STATE(ref, WT_REF_LOOKASIDE);
 	}
 
 	/*
@@ -1704,7 +1704,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	 */
 	if (multi->disk_image != NULL && !closing) {
 		WT_RET(__split_multi_inmem(session, page, multi, ref));
-		ref->state = WT_REF_MEM;
+		WT_REF_SET_STATE(ref, WT_REF_MEM);
 	}
 	__wt_free(session, multi->disk_image);
 
@@ -2303,7 +2303,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	/* Swap the new page into place. */
 	ref->page = new->page;
 
-	WT_PUBLISH(ref->state, WT_REF_MEM);
+	WT_REF_SET_STATE(ref, WT_REF_MEM);
 
 	__wt_free(session, new);
 	return (0);

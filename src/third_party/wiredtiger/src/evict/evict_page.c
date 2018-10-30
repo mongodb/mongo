@@ -22,7 +22,7 @@ __evict_exclusive_clear(
 {
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED && ref->page != NULL);
 
-	ref->state = previous_state;
+	WT_REF_SET_STATE(ref, previous_state);
 }
 
 /*
@@ -77,7 +77,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 		locked = true;
 	if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
 		if (locked)
-			ref->state = previous_state;
+			WT_REF_SET_STATE(ref, previous_state);
 		return (ret == 0 ? EBUSY : ret);
 	}
 
@@ -294,7 +294,7 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		}
 	}
 
-	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	WT_REF_SET_STATE(ref, WT_REF_DELETED);
 	return (0);
 }
 
@@ -332,13 +332,13 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	    ref->page_las->eviction_to_lookaside &&
 	    __wt_page_las_active(session, ref)) {
 		ref->page_las->eviction_to_lookaside = false;
-		WT_PUBLISH(ref->state, WT_REF_LOOKASIDE);
+		WT_REF_SET_STATE(ref, WT_REF_LOOKASIDE);
 	} else if (ref->addr == NULL) {
 		WT_WITH_PAGE_INDEX(session,
 		    ret = __evict_delete_ref(session, ref, closing));
 		WT_RET_BUSY_OK(ret);
 	} else
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+		WT_REF_SET_STATE(ref, WT_REF_DISK);
 
 	return (0);
 }
@@ -428,10 +428,10 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 				*ref->page_las = mod->mod_page_las;
 				__wt_page_modify_clear(session, ref->page);
 				__wt_ref_out(session, ref);
-				WT_PUBLISH(ref->state, WT_REF_LOOKASIDE);
+				WT_REF_SET_STATE(ref, WT_REF_LOOKASIDE);
 			} else {
 				__wt_ref_out(session, ref);
-				WT_PUBLISH(ref->state, WT_REF_DISK);
+				WT_REF_SET_STATE(ref, WT_REF_DISK);
 			}
 		} else {
 			/*

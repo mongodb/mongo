@@ -17,27 +17,26 @@ if test "$#" -lt "2"; then
 	exit 1
 fi
 wttest=$1
-runmax=$2
-# Jenkins removes the quotes from the passed in arg so we may
-# have 3 or 4 args.
+shift # Consume this arg
+runmax=$1
+shift # Consume this arg
+# Jenkins removes the quotes from the passed in arg so deal with an arbitrary
+# number of arguments
 wtarg=""
-wtarg2=""
 create=1
-if test "$#" -gt "2"; then
-	wtarg=$3
-	if test "$#" -eq "4"; then
-		wtarg2=$4
-	fi
-	if test "$wtarg" == "NOCREATE"; then
+while [[ $# -gt 0 ]] ; do
+	if test "$1" == "NOCREATE"; then
 		create=0
-		wtarg=$wtarg2
+	else
+		wtarg+=" $1"
 	fi
-fi
+	shift # Consume this arg
+done
 
 home=./WT_TEST
 outfile=./wtperf.out
 rm -f $outfile
-echo "Parsed $# args: test: $wttest runmax: $runmax args: $wtarg $wtarg2" >> $outfile
+echo "Parsed $# args: test: $wttest runmax: $runmax args: $wtarg" >> $outfile
 
 # Each of these has an entry for each op in ops below.
 avg=(0 0 0 0)
@@ -95,7 +94,7 @@ while test "$run" -le "$runmax"; do
 		rm -rf $home
 		mkdir $home
 	fi
-	LD_PRELOAD=/usr/local/lib/libtcmalloc.so LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg $wtarg2
+	LD_PRELOAD=/usr/local/lib/libtcmalloc.so LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg
 	if test "$?" -ne "0"; then
 		exit 1
 	fi
