@@ -32,7 +32,7 @@
 
 #include <memory>
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
@@ -49,7 +49,7 @@ class SeekableRecordCursor;
  *
  * Preconditions: Valid RecordId.
  */
-class FetchStage : public PlanStage {
+class FetchStage : public RequiresCollectionStage {
 public:
     FetchStage(OperationContext* opCtx,
                WorkingSet* ws,
@@ -62,8 +62,6 @@ public:
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
 
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -77,6 +75,11 @@ public:
 
     static const char* kStageType;
 
+protected:
+    void saveState(RequiresCollTag) final;
+
+    void restoreState(RequiresCollTag) final;
+
 private:
     /**
      * If the member (with id memberID) passes our filter, set *out to memberID and return that
@@ -84,9 +87,6 @@ private:
      */
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
-    // Collection which is used by this stage. Used to resolve record ids retrieved by child
-    // stages. The lifetime of the collection must supersede that of the stage.
-    const Collection* _collection;
     // Used to fetch Records from _collection.
     std::unique_ptr<SeekableRecordCursor> _cursor;
 

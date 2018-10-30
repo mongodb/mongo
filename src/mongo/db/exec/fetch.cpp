@@ -55,8 +55,7 @@ FetchStage::FetchStage(OperationContext* opCtx,
                        PlanStage* child,
                        const MatchExpression* filter,
                        const Collection* collection)
-    : PlanStage(kStageType, opCtx),
-      _collection(collection),
+    : RequiresCollectionStage(kStageType, opCtx, collection),
       _ws(ws),
       _filter(filter),
       _idRetrying(WorkingSet::INVALID_ID) {
@@ -103,7 +102,7 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
 
             try {
                 if (!_cursor)
-                    _cursor = _collection->getCursor(getOpCtx());
+                    _cursor = collection()->getCursor(getOpCtx());
 
                 if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, _cursor)) {
                     _ws->free(id);
@@ -133,14 +132,17 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
     return status;
 }
 
-void FetchStage::doSaveState() {
-    if (_cursor)
+void FetchStage::saveState(RequiresCollTag) {
+    if (_cursor) {
         _cursor->saveUnpositioned();
+    }
 }
 
-void FetchStage::doRestoreState() {
-    if (_cursor)
-        _cursor->restore();
+void FetchStage::restoreState(RequiresCollTag) {
+    if (_cursor) {
+        const bool couldRestore = _cursor->restore();
+        uassert(50982, "could not restore cursor for FETCH stage", couldRestore);
+    }
 }
 
 void FetchStage::doDetachFromOperationContext() {
