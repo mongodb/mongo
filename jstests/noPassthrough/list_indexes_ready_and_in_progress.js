@@ -18,7 +18,7 @@
         }
     }
 
-    let coll = testDB.list_indexes_only_ready_indexes;
+    let coll = testDB.list_indexes_ready_and_in_progress;
     coll.drop();
     assert.commandWorked(testDB.createCollection(coll.getName()));
     assertIndexes(coll, 1, ["_id_"]);
@@ -28,7 +28,7 @@
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
     const createIdx = startParallelShell(
-        "let coll = db.getSiblingDB('test').list_indexes_only_ready_indexes;" +
+        "let coll = db.getSiblingDB('test').list_indexes_ready_and_in_progress;" +
             "assert.commandWorked(coll.createIndex({ b: 1 }, { background: true }));",
         conn.port);
     assert.soon(function() {
