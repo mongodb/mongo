@@ -74,6 +74,9 @@
 #include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
+#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
+#include <openssl/ec.h>
+#endif
 #if defined(_WIN32)
 #include <wincrypt.h>
 #elif defined(__APPLE__)
@@ -96,15 +99,6 @@ bool isUnixDomainSocket(const std::string& hostname) {
     return end(hostname) != std::find(begin(hostname), end(hostname), '/');
 }
 
-// If the underlying SSL supports auto-configuration of ECDH parameters, this function will select
-// it, otherwise this function will do nothing.
-void setECDHModeAuto(SSL_CTX* const ctx) {
-#ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
-    ::SSL_CTX_set_ecdh_auto(ctx, true);
-#endif
-    std::ignore = ctx;
-}
-
 struct DHFreer {
     void operator()(DH* const dh) noexcept {
         if (dh) {
@@ -123,6 +117,18 @@ struct BIOFree {
     }
 };
 using UniqueBIO = std::unique_ptr<BIO, BIOFree>;
+
+#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
+struct EC_KEYFree {
+    void operator()(EC_KEY* const ec_key) noexcept {
+        if (ec_key) {
+            ::EC_KEY_free(ec_key);
+        }
+    }
+};
+
+using UniqueEC_KEY = std::unique_ptr<EC_KEY, EC_KEYFree>;
+#endif
 
 UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
     UniqueBIO rv(::BIO_new_mem_buf(v.data(), v.size()));
@@ -143,6 +149,38 @@ UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
                             << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
     }
     return rv;
+}
+
+// Attempts to set a hard coded curve (prime256v1) for ECDHE if the version of OpenSSL supports it.
+bool useDefaultECKey(SSL_CTX* const ctx) {
+#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
+    UniqueEC_KEY key(EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
+
+    if (key) {
+        return ::SSL_CTX_set_tmp_ecdh(ctx, key.get()) == 1;
+    }
+#endif
+    return false;
+}
+
+// If the underlying SSL supports auto-configuration of ECDH parameters, this function will select
+// it. If not, this function will attempt to use a hard-coded but widely supported elliptic curve.
+// If that fails, ECDHE will not be enabled.
+void enableECDHE(SSL_CTX* const ctx) {
+#ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
+    ::SSL_CTX_set_ecdh_auto(ctx, true);
+#else
+    // SSL_CTRL_SET_ECDH_AUTO is defined to be 94 in OpenSSL 1.0.2. On RHEL 7, Mongo could be built
+    // against 1.0.1 but actually linked with 1.0.2 at runtime. The define may not be present, but
+    // this call could actually enable auto ecdh.
+    if (::SSL_CTX_ctrl(ctx, 94, 1, NULL) != 1) {
+        // If manually setting the configuration option failed, use a hard coded curve
+        if (!useDefaultECKey(ctx)) {
+            error() << "Failed to enable ECDHE.";
+        }
+    }
+#endif
+    std::ignore = ctx;
 }
 
 // Old copies of OpenSSL will not have constants to disable protocols they don't support.
@@ -882,7 +920,7 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     }
 
     // We always set ECDH mode anyhow, if available.
-    setECDHModeAuto(context);
+    enableECDHE(context);
 
     return Status::OK();
 }

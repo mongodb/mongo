@@ -3053,9 +3053,31 @@ def doConfigure(myenv):
             context.Result(result)
             return result
 
+        def CheckOpenSSL_EC_KEY_new(context):
+            compile_test_body = textwrap.dedent("""
+            #include <openssl/ssl.h>
+            #include <openssl/ec.h>
+
+            int main() {
+                SSL_CTX_set_tmp_ecdh(0, 0);
+                EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+                EC_KEY_free(0);
+                return 0;
+            }
+            """)
+
+            context.Message("Checking if EC_KEY_new_by_curve_name is supported... ")
+            result = context.TryCompile(compile_test_body, ".cpp")
+            context.Result(result)
+            return result
+
         conf.AddTest("CheckOpenSSL_EC_DH", CheckOpenSSL_EC_DH)
         if conf.CheckOpenSSL_EC_DH():
             conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAS_SSL_SET_ECDH_AUTO')
+
+        conf.AddTest("CheckOpenSSL_EC_KEY_new", CheckOpenSSL_EC_KEY_new)
+        if conf.CheckOpenSSL_EC_KEY_new():
+            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW')
 
     ssl_provider = get_option("ssl-provider")
     if ssl_provider == 'auto':
