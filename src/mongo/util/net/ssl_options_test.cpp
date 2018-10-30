@@ -202,33 +202,6 @@ TEST(SetupOptions, sslModeRequired) {
 }
 
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
-TEST(SetupOptions, tlsModeRequiredCertificateSelector) {
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--tlsMode");
-    argv.push_back("requireTLS");
-    argv.push_back("--tlsCertificateSelector");
-    argv.push_back("subject=Subject 1");
-    argv.push_back("--tlsClusterCertificateSelector");
-    argv.push_back("subject=Subject 2");
-    std::map<std::string, std::string> env_map;
-
-    ASSERT_OK(mongo::addSSLServerOptions(&options));
-
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    ASSERT_OK(mongo::storeSSLServerOptions(environment));
-
-    ASSERT_EQ(::mongo::sslGlobalParams.sslMode.load(), ::mongo::sslGlobalParams.SSLMode_requireSSL);
-    ASSERT_EQ(::mongo::sslGlobalParams.sslCertificateSelector.subject, "Subject 1");
-    ASSERT_EQ(::mongo::sslGlobalParams.sslClusterCertificateSelector.subject, "Subject 2");
-}
-
 TEST(SetupOptions, sslModeRequiredCertificateSelector) {
     OptionsParserTester parser;
     moe::Environment environment;
@@ -275,32 +248,11 @@ TEST(SetupOptions, disableNonSSLConnectionLoggingFalse) {
     ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, false);
 }
 
-TEST(SetupOptions, disableNonTLSConnectionLoggingFalse) {
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-
-    ::mongo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--setParameter");
-    argv.push_back("disableNonTLSConnectionLogging=false");
-    std::map<std::string, std::string> env_map;
-
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    Status storeRet = mongo::storeServerOptions(environment);
-
-    ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, false);
-}
-
 TEST(SetupOptions, disableNonSSLConnectionLoggingTrue) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
 
-    ::mongo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
@@ -315,44 +267,6 @@ TEST(SetupOptions, disableNonSSLConnectionLoggingTrue) {
     ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, true);
 }
 
-TEST(SetupOptions, disableNonTLSConnectionLoggingTrue) {
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-
-    ::mongo::sslGlobalParams.disableNonSSLConnectionLoggingSet = false;
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--setParameter");
-    argv.push_back("disableNonTLSConnectionLogging=true");
-    std::map<std::string, std::string> env_map;
-
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    Status storeRet = mongo::storeServerOptions(environment);
-
-    ASSERT_EQ(::mongo::sslGlobalParams.disableNonSSLConnectionLogging, true);
-}
-
-TEST(SetupOptions, disableNonTLSConnectionLoggingInvalid) {
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::OptionSection options;
-
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
-
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--setParameter");
-    argv.push_back("disableNonTLSConnectionLogging=false");
-    argv.push_back("--setParameter");
-    argv.push_back("disableNonSSLConnectionLogging=false");
-    std::map<std::string, std::string> env_map;
-
-    ASSERT_OK(parser.run(options, argv, env_map, &environment));
-    ASSERT_NOT_OK(mongo::storeServerOptions(environment));
-}
 #endif
 
 }  // namespace

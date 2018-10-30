@@ -133,18 +133,19 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='ssl_manager_test',
-    source=[
-        'ssl_manager_test.cpp',
-        'ssl_options_test.cpp',
-        'sock_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_options_servers',
-        '$BUILD_DIR/mongo/util/fail_point',
-        'network',
-        'socket',
-        'ssl_manager',
-    ],
-)
+if has_option('ssl'):
+    env.CppUnitTest(
+        target='ssl_manager_test',
+        source=[
+            'ssl_manager_test.cpp',
+            'ssl_options_test.cpp',
+            'sock_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/server_options_servers',
+            '$BUILD_DIR/mongo/util/fail_point',
+            'network',
+            'socket',
+            'ssl_manager',
+        ],
+    )
