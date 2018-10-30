@@ -141,7 +141,7 @@
         assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
                                      ErrorCodes.MaxTimeMSExpired);
 
-        session2.abortTransaction();
+        session2.abortTransaction_forTesting();
         session2.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: clusterTimeBeforePrepare}});
 
@@ -149,10 +149,10 @@
                   "prepareTimestamp doesn't block on a prepared transaction.");
         assert.commandWorked(read({}, successTimeout, sessionDB2, collName, 1));
 
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
         session.endSession();
 
-        session2.abortTransaction();
+        session2.abortTransaction_forTesting();
         session2.endSession();
     }
 

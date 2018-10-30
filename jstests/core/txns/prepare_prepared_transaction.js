@@ -31,7 +31,7 @@
     const secondTimestamp = PrepareHelpers.prepareTransaction(session);
     // Both prepareTimestamps should be equal.
     assert.eq(firstTimestamp, secondTimestamp);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     session.endSession();
 }());

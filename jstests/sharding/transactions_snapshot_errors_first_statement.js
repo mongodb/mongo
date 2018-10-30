@@ -67,7 +67,7 @@
             if (multipleShards) {
                 // TODO SERVER-36304: Multi-shard transactions cannot be committed through mongos
                 // until participants send their vote to the coordinator during two phase commit.
-                session.abortTransaction();
+                session.abortTransaction_forTesting();
             } else {
                 session.commitTransaction();
             }
@@ -91,7 +91,7 @@
             if (multipleShards) {
                 // TODO SERVER-36304: Multi-shard transactions cannot be committed through mongos
                 // until participants send their vote to the coordinator during two phase commit.
-                session.abortTransaction();
+                session.abortTransaction_forTesting();
             } else {
                 session.commitTransaction();
             }

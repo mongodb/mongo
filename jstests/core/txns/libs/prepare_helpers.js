@@ -42,7 +42,7 @@ const PrepareHelpers = (function() {
         if (res.ok) {
             session.commitTransaction();
         } else {
-            session.abortTransaction();
+            session.abortTransaction_forTesting();
         }
         return res;
     }

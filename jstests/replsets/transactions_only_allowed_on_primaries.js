@@ -60,7 +60,7 @@
 
             // Call abort for good measure, even though the transaction should have already been
             // aborted on the server.
-            session.abortTransaction();
+            session.abortTransaction_forTesting();
         }
     }
 

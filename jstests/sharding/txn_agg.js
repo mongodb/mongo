@@ -39,7 +39,7 @@
     let res = sessionUnsharded.aggregate([{$match: {_id: {$gte: -200}}}]).toArray();
     assert.eq(2, res.length, tojson(res));
 
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     // merge on mongos
 
@@ -52,7 +52,7 @@
     res = sessionColl.aggregate([{$match: {_id: {$gte: -200}}}], {allowDiskUse: false}).toArray();
     assert.eq(2, res.length, tojson(res));
 
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     // merge on shard
     // TODO: SERVER-33683 uncomment test after fixing deadlock.

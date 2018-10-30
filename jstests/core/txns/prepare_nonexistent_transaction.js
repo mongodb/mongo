@@ -42,11 +42,11 @@
         autocommit: false
     }),
                                  ErrorCodes.NoSuchTransaction);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc));
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
     jsTestLog("Test that if there is no transaction active on the current session, the " +
               "'txnNumber' given matches the last known transaction for this session and the " +
               "last known transaction was aborted then it errors with 'NoSuchTransaction'.");
@@ -70,7 +70,7 @@
         autocommit: false
     }),
                                  ErrorCodes.TransactionTooOld);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     jsTestLog("Test that if there is no transaction active on the current session and the " +
               "'txnNumber' given is less than the current transaction, errors with " +

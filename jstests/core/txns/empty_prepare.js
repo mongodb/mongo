@@ -28,7 +28,7 @@
     assert.commandFailedWithCode(
         sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}),
         ErrorCodes.OperationNotSupportedInTransaction);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     // ---- Test 2. Only reads before prepare ----
 
@@ -38,7 +38,7 @@
         sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}));
     // Makes sure prepareTransaction returns prepareTimestamp in its response.
     assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     // ---- Test 3. Noop writes before prepare ----
 
@@ -51,6 +51,6 @@
         sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}));
     // Makes sure prepareTransaction returns prepareTimestamp in its response.
     assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
 }());

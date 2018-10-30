@@ -28,7 +28,7 @@
     let firstTimestamp = PrepareHelpers.prepareTransaction(session);
     let secondTimestamp = PrepareHelpers.prepareTransaction(session);
     assert.eq(firstTimestamp, secondTimestamp);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     jsTestLog("Test that you can call commitTransaction on a prepared transaction.");
     session.startTransaction();
@@ -108,7 +108,7 @@
     jsTestLog("Test that you can't run update on a prepared transaction.");
     assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}),
                                  ErrorCodes.PreparedTransactionInProgress);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     jsTestLog("Test that you can't run getMore on a prepared transaction.");
     session.startTransaction();
@@ -124,7 +124,7 @@
     assert.commandFailedWithCode(
         sessionDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
         ErrorCodes.PreparedTransactionInProgress);
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     session.endSession();
 }());

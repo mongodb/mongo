@@ -86,7 +86,7 @@
                        .runCommand({find: TestData.collName, filter: {_id: TestData.txnDoc._id}});
     }, db.getMongo().port);
 
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     // The find command should be successful.
     findAwait({checkExitSuccess: true});

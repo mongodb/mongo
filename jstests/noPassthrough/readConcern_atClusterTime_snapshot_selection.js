@@ -64,7 +64,7 @@
         {readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter}});
     assert.commandFailedWithCode(primaryDB.runCommand({find: collName, maxTimeMS: 1000}),
                                  ErrorCodes.MaxTimeMSExpired);
-    primarySession.abortTransaction();
+    primarySession.abortTransaction_forTesting();
 
     // Restart replication on one of the secondaries.
     restartServerReplication(secondaryConn1);
@@ -92,7 +92,7 @@
         {readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter}});
     assert.commandFailedWithCode(secondaryDB0.runCommand({find: collName, maxTimeMS: 1000}),
                                  ErrorCodes.MaxTimeMSExpired);
-    secondarySession.abortTransaction();
+    secondarySession.abortTransaction_forTesting();
 
     // Restart replication on the lagged secondary.
     restartServerReplication(secondaryConn0);
@@ -108,7 +108,7 @@
     primarySession.startTransaction(
         {readConcern: {level: "snapshot", atClusterTime: Timestamp(1, 1)}});
     assert.commandFailedWithCode(primaryDB.runCommand({find: collName}), ErrorCodes.SnapshotTooOld);
-    primarySession.abortTransaction();
+    primarySession.abortTransaction_forTesting();
 
     rst.stopSet();
 }());

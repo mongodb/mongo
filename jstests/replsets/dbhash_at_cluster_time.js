@@ -89,7 +89,7 @@
         res = assert.commandFailedWithCode(db.runCommand({dbHash: 1, maxTimeMS: 1000}),
                                            ErrorCodes.MaxTimeMSExpired);
 
-        otherSession.abortTransaction();
+        otherSession.abortTransaction_forTesting();
         otherSession.endSession();
     }
 
@@ -103,7 +103,7 @@
         assert.commandWorked(otherDB.runCommand({create: "mycoll2"}));
         session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
         assert.commandFailedWithCode(db.runCommand({dbHash: 1}), ErrorCodes.SnapshotUnavailable);
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
 
         otherSession.endSession();
     }

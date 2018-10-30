@@ -31,7 +31,7 @@
 
     // TODO SERVER-36304: Change this to commitTransaction once multi shard transactions can be
     // committed through mongos.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // Stale database version on second command to a shard should fail.
@@ -89,7 +89,7 @@
         sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}));
 
     // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // NoSuchTransaction should be returned if the router exhausts its retries.

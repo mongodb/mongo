@@ -84,7 +84,7 @@
     assert(res instanceof WriteCommandError);
     assert(!res.hasOwnProperty("errorLabels"));
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     jsTest.log("WriteConflict returned by commitTransaction command is TransientTransactionError");
     session.startTransaction();
@@ -124,7 +124,7 @@
     assert(res instanceof WriteCommandError);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     jsTest.log(
         "ShutdownInProgress returned by commitTransaction command is not TransientTransactionError");
@@ -171,8 +171,8 @@
     assert.commandFailedWithCode(res, ErrorCodes.LockTimeout);
     assert(res instanceof WriteCommandError);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
-    sessionOther.abortTransaction();
-    session.abortTransaction();
+    sessionOther.abortTransaction_forTesting();
+    session.abortTransaction_forTesting();
     thread.join();
     assert.commandWorked(thread.returnData());
 

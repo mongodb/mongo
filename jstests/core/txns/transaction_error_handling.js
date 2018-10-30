@@ -25,7 +25,7 @@
     }
 
     try {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     } catch (e) {
         assert.eq(e.message, "There is no active transaction to abort on this session.");
     }
@@ -59,7 +59,7 @@
     jsTestLog("Test that we cannot abort a transaction that has already been committed");
     // We cannot call abortTransaction on a transaction that has already been committed.
     try {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     } catch (e) {
         assert.eq(e.message, "Cannot call abortTransaction after calling commitTransaction.");
     }
@@ -68,7 +68,7 @@
     // abortTransaction on a transaction that is in the 'aborted' state.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     jsTestLog("Test that we cannot commit a transaction that has already been aborted.");
     // We cannot call commitTransaction on a transaction that has already been aborted.
@@ -81,7 +81,7 @@
     jsTestLog("Test that we cannot abort a transaction that has already been aborted.");
     // We also cannot call abortTransaction on a transaction that has already been aborted.
     try {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     } catch (e) {
         assert.eq(e.message, "Cannot call abortTransaction twice.");
     }
@@ -105,11 +105,11 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-4"}));
     // The transaction state should be changed to 'aborted'.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
     // The transaction state should be changed to 'inactive'.
     assert.commandWorked(sessionColl.insert({_id: "normal-insert-2"}));
     try {
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     } catch (e) {
         assert.eq(e.message, "There is no active transaction to abort on this session.");
     }

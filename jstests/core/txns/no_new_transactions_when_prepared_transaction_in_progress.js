@@ -54,7 +54,7 @@
     }),
                                  ErrorCodes.NoSuchTransaction);
     */
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     session.endSession();
 }());

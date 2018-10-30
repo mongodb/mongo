@@ -76,7 +76,7 @@
 
     // TODO SERVER-36304: Change this to commitTransaction once multi shard transactions can be
     // committed through mongos.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // Stale shard version on second command to a shard should fail.
@@ -129,7 +129,7 @@
     assert.commandWorked(sessionDB.runCommand({find: otherCollName, filter: {_id: 5}}));
 
     // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // Stale mongos aborts on old shard.
@@ -149,7 +149,7 @@
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: 5}}));
 
     // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     // Verify there is no in-progress transaction on Shard1.
     res = assert.commandFailedWithCode(st.rs1.getPrimary().getDB(dbName).runCommand({
@@ -181,7 +181,7 @@
     assert.commandWorked(sessionDB.runCommand({find: collName}));
 
     // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // Can retry a stale write on the first statement.
@@ -198,7 +198,7 @@
     assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{_id: 6}]}));
 
     // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // Cannot retry a stale write past the first statement.
@@ -224,7 +224,7 @@
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     // TODO SERVER-36304: Change this to commitTransaction.
-    session.abortTransaction();
+    session.abortTransaction_forTesting();
 
     //
     // NoSuchTransaction should be returned if the router exhausts its retries.

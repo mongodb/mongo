@@ -39,7 +39,7 @@
             sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}),
             ErrorCodes.CommandNotSupported);
         // Abort the transaction in the shell.
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
 
     } finally {
         jsTestLog("Restore the original featureCompatibilityVersion.");

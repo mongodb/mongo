@@ -26,7 +26,7 @@
                   () => "Failed to find session in currentOp() output: " + tojson(db.currentOp()));
         assert.eq(ops[0].locks, {Global: "w", Database: "w", Collection: "w"});
 
-        session.abortTransaction();
+        session.abortTransaction_forTesting();
     }
 
     // We insert a document so the dbHash command has a collection to process.
