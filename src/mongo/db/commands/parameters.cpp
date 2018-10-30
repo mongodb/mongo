@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <set>
@@ -44,6 +46,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -212,19 +215,35 @@ public:
                 return false;
             }
 
-            if (numSet == 0) {
-                foundParameter->second->append(txn, result, "was");
+            auto oldValueObj = ([&] {
+                BSONObjBuilder bb;
+                if (numSet == 0) {
+                    foundParameter->second->append(txn, bb, "was");
+                }
+                return bb.obj();
+            })();
+            auto oldValue = oldValueObj.firstElement();
+
+            if (oldValue) {
+                result.append(oldValue);
             }
 
             Status status = foundParameter->second->set(parameter);
-            if (status.isOK()) {
-                numSet++;
-                continue;
+            if (!status.isOK()) {
+                errmsg = status.reason();
+                result.append("code", status.code());
+                log() << "error setting parameter " << parameterName << " to "
+                      << redact(parameter.toString(false)) << " errMsg: " << redact(status);
+                return false;
             }
 
-            errmsg = status.reason();
-            result.append("code", status.code());
-            return false;
+            log() << "successfully set parameter " << parameterName << " to "
+                  << redact(parameter.toString(false))
+                  << (oldValue ? std::string(str::stream() << " (was "
+                                                           << redact(oldValue.toString(false))
+                                                           << ")")
+                               : "");
+            numSet++;
         }
 
         if (numSet == 0 && !found) {
