@@ -60,10 +60,13 @@ namespace {
 
 /**
  * Lists the indexes for a given collection.
+ * If the optional 'includeIndexBuilds' field is set to true, returns indexes that are not
+ * ready. Defaults to false.
  *
  * Format:
  * {
- *   listIndexes: <collection name>
+ *   listIndexes: <collection name>,
+ *   includeIndexBuilds: <boolean>,
  * }
  *
  * Return format:
@@ -123,6 +126,8 @@ public:
         uassertStatusOK(
             CursorRequest::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
 
+        auto includeIndexBuilds = cmdObj["includeIndexBuilds"].trueValue();
+
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         NamespaceString cursorNss;
         BSONArrayBuilder firstBatch;
@@ -140,9 +145,13 @@ public:
             const auto nss = ctx.getNss();
 
             vector<string> indexNames;
-            writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&indexNames, &cce, &opCtx] {
+            writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
                 indexNames.clear();
-                cce->getReadyIndexes(opCtx, &indexNames);
+                if (includeIndexBuilds) {
+                    cce->getAllIndexes(opCtx, &indexNames);
+                } else {
+                    cce->getReadyIndexes(opCtx, &indexNames);
+                }
             });
 
             auto ws = make_unique<WorkingSet>();
