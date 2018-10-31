@@ -143,8 +143,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
     boost::optional<OldClientContext> ctx;
     ctx.emplace(opCtx, source.ns());
 
-    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, source);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool userInitiatedWritesAndNotPrimary =
+        opCtx->writesAreReplicated() && !replCoord->canAcceptWritesFor(opCtx, source);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
@@ -165,6 +166,14 @@ Status renameCollectionCommon(OperationContext* opCtx,
     // Make sure the source collection is not sharded.
     if (CollectionShardingState::get(opCtx, source)->getMetadata()) {
         return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    }
+
+    // Disallow renaming from a replicated to an unreplicated collection or vice versa.
+    auto sourceIsUnreplicated = replCoord->isOplogDisabledFor(opCtx, source);
+    auto targetIsUnreplicated = replCoord->isOplogDisabledFor(opCtx, target);
+    if (sourceIsUnreplicated != targetIsUnreplicated) {
+        return {ErrorCodes::IllegalOperation,
+                "Cannot rename collections between a replicated and an unreplicated database"};
     }
 
     // Ensure that collection name does not exceed maximum length.
@@ -260,7 +269,6 @@ Status renameCollectionCommon(OperationContext* opCtx,
             // If this rename collection is replicated, check for long index names in the target
             // collection that may exceed the MMAPv1 namespace limit when the target collection
             // is renamed with a drop-pending namespace.
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, target);
             auto isMasterSlave =
                 repl::ReplicationCoordinator::modeMasterSlave == replCoord->getReplicationMode();
