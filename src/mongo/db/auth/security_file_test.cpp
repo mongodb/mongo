@@ -129,11 +129,12 @@ TEST(SecurityFile, Test) {
     for (const auto& testCase : testCases) {
         TestFile file(testCase.fileContents, testCase.expectGoodPerms);
 
-        auto swKeys = readSecurityFile(file.path().native());
+        auto swKeys = readSecurityFile(file.path().string());
         if (testCase.expectGoodParse && testCase.expectGoodPerms) {
             ASSERT_OK(swKeys.getStatus());
         } else {
             ASSERT_NOT_OK(swKeys.getStatus());
+            continue;
         }
 
         auto keys = std::move(swKeys.getValue());
