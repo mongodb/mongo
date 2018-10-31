@@ -234,7 +234,9 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
         }
 
         // check that this tag is associated with a shard and if so create a chunk for the zone.
-        const auto& shardIdsForChunk = tagToShards.find(tag.getTag())->second;
+        const auto it = tagToShards.find(tag.getTag());
+        invariant(it != tagToShards.end());
+        const auto& shardIdsForChunk = it->second;
         uassert(50973,
                 str::stream()
                     << "cannot shard collection "

@@ -72,7 +72,7 @@ StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
             return status;
         }
 
-        tags._tag = tagsTag;
+        tags._tag = std::move(tagsTag);
     }
 
     {
