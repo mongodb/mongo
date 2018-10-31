@@ -183,7 +183,7 @@ if useSnappy:
 
 # Use hardware by default on all platforms if available.
 # If not available at runtime, we fall back to software in some cases.
-if (get_option("use-s390x-crc32") == "off"):
+if (get_option("use-hardware-crc32") == "off"):
     env.Append(CPPDEFINES=["HAVE_NO_CRC32_HARDWARE"])
 
 cslib = env.Library(

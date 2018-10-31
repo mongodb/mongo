@@ -505,10 +505,10 @@ add_option('runtime-hardening',
     type='choice',
 )
 
-add_option('use-s390x-crc32',
+add_option('use-hardware-crc32',
     choices=["on", "off"],
     default="on",
-    help="Enable CRC32 hardware accelaration on s390x",
+    help="Enable CRC32 hardware accelaration",
     type='choice',
 )
 
