@@ -1232,4 +1232,24 @@ TEST_F(RenameCollectionTest, UUIDCatalogMappingRemainsIntactThroughRename) {
     ASSERT_EQ(sourceColl, uuidCatalog.lookupCollectionByUUID(*sourceColl->uuid()));
 }
 
+TEST_F(RenameCollectionTest, FailRenameCollectionFromReplicatedToUnreplicatedDB) {
+    NamespaceString sourceNss("foo.isReplicated");
+    NamespaceString targetNss("local.isUnreplicated");
+
+    _createCollection(_opCtx.get(), sourceNss);
+
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation,
+                  renameCollection(_opCtx.get(), sourceNss, targetNss, {}));
+}
+
+TEST_F(RenameCollectionTest, FailRenameCollectionFromUnreplicatedToReplicatedDB) {
+    NamespaceString sourceNss("foo.system.profile");
+    NamespaceString targetNss("foo.bar");
+
+    _createCollection(_opCtx.get(), sourceNss);
+
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation,
+                  renameCollection(_opCtx.get(), sourceNss, targetNss, {}));
+}
+
 }  // namespace
