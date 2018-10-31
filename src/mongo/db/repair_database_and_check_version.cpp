@@ -415,16 +415,16 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     auto swVersion =
                         FeatureCompatibilityVersionParser::parse(featureCompatibilityVersion);
                     if (!swVersion.isOK()) {
-                        severe() << swVersion.getStatus();
                         // Note this error path captures all cases of an FCV document existing,
                         // but with any value other than "4.0" or "4.2". This includes unexpected
                         // cases with no path forward such as the FCV value not being a string.
                         return {ErrorCodes::MustDowngrade,
                                 str::stream()
-                                    << "UPGRADE PROBLEM: Unable to parse the "
-                                       "featureCompatibilityVersion document. The data files need "
-                                       "to be fully upgraded to version 4.0 before attempting an "
-                                       "upgrade to 4.2. If you are upgrading to 4.2, see "
+                                    << "UPGRADE PROBLEM: Found an invalid "
+                                       "featureCompatibilityVersion document (ERROR: "
+                                    << swVersion.getStatus()
+                                    << "). If the current featureCompatibilityVersion is below "
+                                       "4.0, see the documentation on upgrading at "
                                     << feature_compatibility_version_documentation::kUpgradeLink
                                     << "."};
                     }
