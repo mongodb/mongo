@@ -427,6 +427,14 @@ void runCommand(OperationContext* opCtx,
                         return staleInfo->getNss();
                     } else if (auto implicitCreateInfo =
                                    ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
+                        // Requests that attempt to implicitly create a collection in a transaction
+                        // should always fail with OperationNotSupportedInTransaction - this
+                        // assertion is only meant to safeguard that assumption.
+                        uassert(50983,
+                                str::stream() << "Cannot handle exception in a transaction: "
+                                              << ex.toStatus(),
+                                !TransactionRouter::get(opCtx));
+
                         return implicitCreateInfo->getNss();
                     } else {
                         throw;
