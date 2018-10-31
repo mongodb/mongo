@@ -166,7 +166,7 @@ Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus_inlock(
 }
 
 Status AbstractAsyncComponent::_scheduleWorkAndSaveHandle_inlock(
-    const executor::TaskExecutor::CallbackFn& work,
+    executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     invariant(handle);
@@ -175,7 +175,7 @@ Status AbstractAsyncComponent::_scheduleWorkAndSaveHandle_inlock(
                       str::stream() << "failed to schedule work " << name << ": " << _componentName
                                     << " is shutting down");
     }
-    auto result = _executor->scheduleWork(work);
+    auto result = _executor->scheduleWork(std::move(work));
     if (!result.isOK()) {
         return result.getStatus().withContext(str::stream() << "failed to schedule work " << name);
     }
@@ -185,7 +185,7 @@ Status AbstractAsyncComponent::_scheduleWorkAndSaveHandle_inlock(
 
 Status AbstractAsyncComponent::_scheduleWorkAtAndSaveHandle_inlock(
     Date_t when,
-    const executor::TaskExecutor::CallbackFn& work,
+    executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     invariant(handle);
@@ -196,7 +196,7 @@ Status AbstractAsyncComponent::_scheduleWorkAtAndSaveHandle_inlock(
                           << _componentName
                           << " is shutting down");
     }
-    auto result = _executor->scheduleWorkAt(when, work);
+    auto result = _executor->scheduleWorkAt(when, std::move(work));
     if (!result.isOK()) {
         return result.getStatus().withContext(
             str::stream() << "failed to schedule work " << name << " at " << when.toString());

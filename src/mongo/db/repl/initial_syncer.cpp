@@ -378,7 +378,7 @@ BSONObj InitialSyncer::_getInitialSyncProgress_inlock() const {
     return bob.obj();
 }
 
-void InitialSyncer::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
+void InitialSyncer::setScheduleDbWorkFn_forTest(const DatabaseCloner::ScheduleDbWorkFn& work) {
     LockGuard lk(_mutex);
     _scheduleDbWorkFn = work;
 }
@@ -1431,7 +1431,7 @@ Status InitialSyncer::_checkForShutdownAndConvertStatus_inlock(const Status& sta
 }
 
 Status InitialSyncer::_scheduleWorkAndSaveHandle_inlock(
-    const executor::TaskExecutor::CallbackFn& work,
+    executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     invariant(handle);
@@ -1440,7 +1440,7 @@ Status InitialSyncer::_scheduleWorkAndSaveHandle_inlock(
                       str::stream() << "failed to schedule work " << name
                                     << ": initial syncer is shutting down");
     }
-    auto result = _exec->scheduleWork(work);
+    auto result = _exec->scheduleWork(std::move(work));
     if (!result.isOK()) {
         return result.getStatus().withContext(str::stream() << "failed to schedule work " << name);
     }
@@ -1450,7 +1450,7 @@ Status InitialSyncer::_scheduleWorkAndSaveHandle_inlock(
 
 Status InitialSyncer::_scheduleWorkAtAndSaveHandle_inlock(
     Date_t when,
-    const executor::TaskExecutor::CallbackFn& work,
+    executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     invariant(handle);
@@ -1460,7 +1460,7 @@ Status InitialSyncer::_scheduleWorkAtAndSaveHandle_inlock(
                                     << when.toString()
                                     << ": initial syncer is shutting down");
     }
-    auto result = _exec->scheduleWorkAt(when, work);
+    auto result = _exec->scheduleWorkAt(when, std::move(work));
     if (!result.isOK()) {
         return result.getStatus().withContext(
             str::stream() << "failed to schedule work " << name << " at " << when.toString());

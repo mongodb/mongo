@@ -33,8 +33,8 @@
 #include <type_traits>
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -74,7 +74,7 @@ public:
      * Returns InternalError if this clock source does not implement setAlarm. May also
      * return ShutdownInProgress during shutdown. Other errors are also allowed.
      */
-    virtual Status setAlarm(Date_t when, stdx::function<void()> action) {
+    virtual Status setAlarm(Date_t when, unique_function<void()> action) {
         return {ErrorCodes::InternalError, "This clock source does not implement setAlarm."};
     }
 

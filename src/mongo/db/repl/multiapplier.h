@@ -67,7 +67,7 @@ public:
     /**
      * Callback function to report final status of applying operations.
      */
-    using CallbackFn = stdx::function<void(const Status&)>;
+    using CallbackFn = unique_function<void(const Status&)>;
 
     using MultiApplyFn =
         stdx::function<StatusWith<OpTime>(OperationContext*, MultiApplier::Operations)>;
@@ -88,7 +88,7 @@ public:
     MultiApplier(executor::TaskExecutor* executor,
                  const Operations& operations,
                  const MultiApplyFn& multiApply,
-                 const CallbackFn& onCompletion);
+                 CallbackFn onCompletion);
 
     /**
      * Blocks while applier is active.

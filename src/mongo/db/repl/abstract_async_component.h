@@ -148,11 +148,11 @@ protected:
      * Saves handle if work was successfully scheduled.
      * Returns scheduleWork status (without the handle).
      */
-    Status _scheduleWorkAndSaveHandle_inlock(const executor::TaskExecutor::CallbackFn& work,
+    Status _scheduleWorkAndSaveHandle_inlock(executor::TaskExecutor::CallbackFn work,
                                              executor::TaskExecutor::CallbackHandle* handle,
                                              const std::string& name);
     Status _scheduleWorkAtAndSaveHandle_inlock(Date_t when,
-                                               const executor::TaskExecutor::CallbackFn& work,
+                                               executor::TaskExecutor::CallbackFn work,
                                                executor::TaskExecutor::CallbackHandle* handle,
                                                const std::string& name);
 

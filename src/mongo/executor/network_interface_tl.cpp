@@ -172,7 +172,7 @@ Date_t NetworkInterfaceTL::now() {
 
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         RemoteCommandRequest& request,
-                                        const RemoteCommandCompletionFn& onFinish,
+                                        RemoteCommandCompletionFn&& onFinish,
                                         const transport::BatonHandle& baton) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
@@ -205,7 +205,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsBeforeAcquireConn)) {
         log() << "Discarding command due to failpoint before acquireConn";
-        std::move(pf.future).getAsync([onFinish](StatusWith<RemoteCommandResponse> response) {
+        std::move(pf.future).getAsync([onFinish = std::move(onFinish)](
+            StatusWith<RemoteCommandResponse> response) mutable {
             onFinish(RemoteCommandResponse(response.getStatus(), Milliseconds{0}));
         });
         return Status::OK();
@@ -237,8 +238,9 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
             });
     });
 
-    auto remainingWork = [ this, state, future = std::move(pf.future), baton, onFinish ](
-        StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
+    auto remainingWork =
+        [ this, state, future = std::move(pf.future), baton, onFinish = std::move(onFinish) ](
+            StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
         makeReadyFutureWith([&] {
             return _onAcquireConn(
                 state, std::move(future), std::move(*uassertStatusOK(swConn)), baton);
@@ -251,7 +253,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                 }
                 return error;
             })
-            .getAsync([this, state, onFinish](StatusWith<RemoteCommandResponse> response) {
+            .getAsync([ this, state, onFinish = std::move(onFinish) ](
+                StatusWith<RemoteCommandResponse> response) {
                 auto duration = now() - state->start;
                 if (!response.isOK()) {
                     onFinish(RemoteCommandResponse(response.getStatus(), duration));
@@ -430,7 +433,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
 }
 
 Status NetworkInterfaceTL::setAlarm(Date_t when,
-                                    const stdx::function<void()>& action,
+                                    unique_function<void()> action,
                                     const transport::BatonHandle& baton) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
@@ -454,37 +457,38 @@ Status NetworkInterfaceTL::setAlarm(Date_t when,
     }
 
     alarmTimer->waitUntil(when, baton)
-        .getAsync([this, weakTimer, action, when, baton](Status status) {
-            auto alarmTimer = weakTimer.lock();
-            if (!alarmTimer) {
-                return;
-            } else {
-                stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-                _inProgressAlarms.erase(alarmTimer);
-            }
-
-            auto nowVal = now();
-            if (nowVal < when) {
-                warning() << "Alarm returned early. Expected at: " << when
-                          << ", fired at: " << nowVal;
-                const auto status = setAlarm(when, std::move(action), baton);
-                if ((!status.isOK()) && (status != ErrorCodes::ShutdownInProgress)) {
-                    fassertFailedWithStatus(50785, status);
-                }
-
-                return;
-            }
-
-            if (status.isOK()) {
-                if (baton) {
-                    baton->schedule(std::move(action));
+        .getAsync(
+            [ this, weakTimer, action = std::move(action), when, baton ](Status status) mutable {
+                auto alarmTimer = weakTimer.lock();
+                if (!alarmTimer) {
+                    return;
                 } else {
-                    _reactor->schedule(transport::Reactor::kPost, std::move(action));
+                    stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+                    _inProgressAlarms.erase(alarmTimer);
                 }
-            } else if (status != ErrorCodes::CallbackCanceled) {
-                warning() << "setAlarm() received an error: " << status;
-            }
-        });
+
+                auto nowVal = now();
+                if (nowVal < when) {
+                    warning() << "Alarm returned early. Expected at: " << when
+                              << ", fired at: " << nowVal;
+                    const auto status = setAlarm(when, std::move(action), baton);
+                    if ((!status.isOK()) && (status != ErrorCodes::ShutdownInProgress)) {
+                        fassertFailedWithStatus(50785, status);
+                    }
+
+                    return;
+                }
+
+                if (status.isOK()) {
+                    if (baton) {
+                        baton->schedule(std::move(action));
+                    } else {
+                        _reactor->schedule(transport::Reactor::kPost, std::move(action));
+                    }
+                } else if (status != ErrorCodes::CallbackCanceled) {
+                    warning() << "setAlarm() received an error: " << status;
+                }
+            });
     return Status::OK();
 }
 

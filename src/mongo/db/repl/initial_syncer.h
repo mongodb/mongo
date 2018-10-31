@@ -222,7 +222,7 @@ public:
      *
      * For testing only.
      */
-    void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
+    void setScheduleDbWorkFn_forTest(const DatabaseCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
 
     /**
      * Overrides how executor starts a collection cloner.
@@ -540,11 +540,11 @@ private:
      * Saves handle if work was successfully scheduled.
      * Returns scheduleWork status (without the handle).
      */
-    Status _scheduleWorkAndSaveHandle_inlock(const executor::TaskExecutor::CallbackFn& work,
+    Status _scheduleWorkAndSaveHandle_inlock(executor::TaskExecutor::CallbackFn work,
                                              executor::TaskExecutor::CallbackHandle* handle,
                                              const std::string& name);
     Status _scheduleWorkAtAndSaveHandle_inlock(Date_t when,
-                                               const executor::TaskExecutor::CallbackFn& work,
+                                               executor::TaskExecutor::CallbackFn work,
                                                executor::TaskExecutor::CallbackHandle* handle,
                                                const std::string& name);
 
@@ -633,8 +633,8 @@ private:
     State _state = State::kPreStart;  // (M)
 
     // Passed to CollectionCloner via DatabasesCloner.
-    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
-    StartCollectionClonerFn _startCollectionClonerFn;      // (M)
+    DatabaseCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
+    StartCollectionClonerFn _startCollectionClonerFn;    // (M)
 
     // Contains stats on the current initial sync request (includes all attempts).
     // To access these stats in a user-readable format, use getInitialSyncProgress().

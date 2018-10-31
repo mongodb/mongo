@@ -66,8 +66,8 @@ Milliseconds BackgroundThreadClockSource::getPrecision() {
     return _granularity;
 }
 
-Status BackgroundThreadClockSource::setAlarm(Date_t when, stdx::function<void()> action) {
-    return _clockSource->setAlarm(when, action);
+Status BackgroundThreadClockSource::setAlarm(Date_t when, unique_function<void()> action) {
+    return _clockSource->setAlarm(when, std::move(action));
 }
 
 Date_t BackgroundThreadClockSource::now() {

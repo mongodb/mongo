@@ -110,16 +110,16 @@ TEST(Future_MoveOnly, Success_getNothrowRvalue) {
 }
 
 TEST(Future_MoveOnly, Success_getAsync) {
-    FUTURE_SUCCESS_TEST(
-        [] { return Widget(1); },
-        [](Future<Widget>&& fut) {
-            auto pf = makePromiseFuture<Widget>();
-            std::move(fut).getAsync([outside = pf.promise.share()](StatusWith<Widget> sw) mutable {
-                ASSERT_OK(sw);
-                outside.emplaceValue(std::move(sw.getValue()));
-            });
-            ASSERT_EQ(std::move(pf.future).get(), 1);
-        });
+    FUTURE_SUCCESS_TEST([] { return Widget(1); },
+                        [](Future<Widget>&& fut) {
+                            auto pf = makePromiseFuture<Widget>();
+                            std::move(fut).getAsync([outside = std::move(pf.promise)](
+                                StatusWith<Widget> sw) mutable {
+                                ASSERT_OK(sw);
+                                outside.emplaceValue(std::move(sw.getValue()));
+                            });
+                            ASSERT_EQ(std::move(pf.future).get(), 1);
+                        });
 }
 
 TEST(Future_MoveOnly, Fail_getLvalue) {
@@ -156,7 +156,7 @@ TEST(Future_MoveOnly, Fail_getNothrowRvalue) {
 TEST(Future_MoveOnly, Fail_getAsync) {
     FUTURE_FAIL_TEST<Widget>([](Future<Widget>&& fut) {
         auto pf = makePromiseFuture<Widget>();
-        std::move(fut).getAsync([outside = pf.promise.share()](StatusWith<Widget> sw) mutable {
+        std::move(fut).getAsync([outside = std::move(pf.promise)](StatusWith<Widget> sw) mutable {
             ASSERT(!sw.isOK());
             outside.setError(sw.getStatus());
         });

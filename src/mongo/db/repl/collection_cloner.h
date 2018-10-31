@@ -93,8 +93,8 @@ public:
      *
      * Used for testing only.
      */
-    using ScheduleDbWorkFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
-        const executor::TaskExecutor::CallbackFn&)>;
+    using ScheduleDbWorkFn = unique_function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+        executor::TaskExecutor::CallbackFn)>;
 
     /**
      * Type of function to create a database client
@@ -117,7 +117,7 @@ public:
                      const HostAndPort& source,
                      const NamespaceString& sourceNss,
                      const CollectionOptions& options,
-                     const CallbackFn& onCompletion,
+                     CallbackFn onCompletion,
                      StorageInterface* storageInterface,
                      const int batchSize);
 
@@ -152,7 +152,7 @@ public:
      *
      * For testing only.
      */
-    void setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& scheduleDbWorkFn);
+    void setScheduleDbWorkFn_forTest(ScheduleDbWorkFn scheduleDbWorkFn);
 
     /**
      * Allows a different client class to be injected.

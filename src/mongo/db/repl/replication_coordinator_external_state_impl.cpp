@@ -191,9 +191,9 @@ auto makeTaskExecutor(ServiceContext* service, const std::string& poolName) {
  * Schedules a task using the executor. This task is always run unless the task executor is shutting
  * down.
  */
-void scheduleWork(executor::TaskExecutor* executor,
-                  const executor::TaskExecutor::CallbackFn& work) {
-    auto cbh = executor->scheduleWork([work](const executor::TaskExecutor::CallbackArgs& args) {
+void scheduleWork(executor::TaskExecutor* executor, executor::TaskExecutor::CallbackFn work) {
+    auto cbh = executor->scheduleWork([work = std::move(work)](
+        const executor::TaskExecutor::CallbackArgs& args) {
         if (args.status == ErrorCodes::CallbackCanceled) {
             return;
         }

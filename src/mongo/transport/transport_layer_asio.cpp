@@ -120,11 +120,11 @@ private:
         cancel(baton);
 
         auto pf = makePromiseFuture<void>();
-        armTimer().getAsync([sp = pf.promise.share()](Status status) mutable {
+        armTimer().getAsync([p = std::move(pf.promise)](Status status) mutable {
             if (status.isOK()) {
-                sp.emplaceValue();
+                p.emplaceValue();
             } else {
-                sp.setError(status);
+                p.setError(status);
             }
         });
 
@@ -182,9 +182,9 @@ public:
 
     void schedule(ScheduleMode mode, Task task) override {
         if (mode == kDispatch) {
-            _ioContext.dispatch(std::move(task));
+            asio::dispatch(_ioContext, std::move(task));
         } else {
-            _ioContext.post(std::move(task));
+            asio::post(_ioContext, std::move(task));
         }
     }
 

@@ -94,7 +94,7 @@ public:
      * the callback was canceled for any reason (including shutdown).  Otherwise, it should have
      * Status::OK().
      */
-    using CallbackFn = stdx::function<void(const CallbackArgs&)>;
+    using CallbackFn = unique_function<void(const CallbackArgs&)>;
 
     /**
      * Type of a callback from a request to run a command on a remote MongoDB node.
@@ -175,8 +175,7 @@ public:
      *
      * May be called by client threads or callbacks running in the executor.
      */
-    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event,
-                                               const CallbackFn& work) = 0;
+    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) = 0;
 
     /**
      * Blocks the calling thread until "event" is signaled. Also returns if the event is never
@@ -209,7 +208,7 @@ public:
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) = 0;
+    virtual StatusWith<CallbackHandle> scheduleWork(CallbackFn work) = 0;
 
     /**
      * Schedules "work" to be run by the executor no sooner than "when".
@@ -224,7 +223,7 @@ public:
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) = 0;
+    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) = 0;
 
     /**
      * Schedules "cb" to be run by the executor with the result of executing the remote command

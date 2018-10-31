@@ -38,6 +38,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -57,7 +58,7 @@ class NetworkInterface {
 
 public:
     using Response = RemoteCommandResponse;
-    using RemoteCommandCompletionFn = stdx::function<void(const TaskExecutor::ResponseStatus&)>;
+    using RemoteCommandCompletionFn = unique_function<void(const TaskExecutor::ResponseStatus&)>;
 
     virtual ~NetworkInterface();
 
@@ -145,7 +146,7 @@ public:
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
-                                const RemoteCommandCompletionFn& onFinish,
+                                RemoteCommandCompletionFn&& onFinish,
                                 const transport::BatonHandle& baton = nullptr) = 0;
 
     Future<TaskExecutor::ResponseStatus> startCommand(
@@ -154,13 +155,13 @@ public:
         const transport::BatonHandle& baton = nullptr) {
         auto pf = makePromiseFuture<TaskExecutor::ResponseStatus>();
 
-        auto status =
-            startCommand(cbHandle,
-                         request,
-                         [sp = pf.promise.share()](const TaskExecutor::ResponseStatus& rs) mutable {
-                             sp.emplaceValue(rs);
-                         },
-                         baton);
+        auto status = startCommand(
+            cbHandle,
+            request,
+            [p = std::move(pf.promise)](const TaskExecutor::ResponseStatus& rs) mutable {
+                p.emplaceValue(rs);
+            },
+            baton);
 
         if (!status.isOK()) {
             return status;
@@ -190,7 +191,7 @@ public:
      * return true. See that method for why.
      */
     virtual Status setAlarm(Date_t when,
-                            const stdx::function<void()>& action,
+                            unique_function<void()> action,
                             const transport::BatonHandle& baton = nullptr) = 0;
 
     /**

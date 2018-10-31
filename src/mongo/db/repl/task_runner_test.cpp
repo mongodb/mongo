@@ -83,7 +83,7 @@ using OpIdVector = std::vector<unsigned int>;
 
 OpIdVector _testRunTaskTwice(TaskRunnerTest& test,
                              TaskRunner::NextAction nextAction,
-                             stdx::function<void(const Task& task)> schedule) {
+                             unique_function<void(Task task)> schedule) {
     unittest::Barrier barrier(2U);
     stdx::mutex mutex;
     std::vector<OperationContext*> txns;
@@ -121,7 +121,7 @@ OpIdVector _testRunTaskTwice(TaskRunnerTest& test,
 
 std::vector<unsigned int> _testRunTaskTwice(TaskRunnerTest& test,
                                             TaskRunner::NextAction nextAction) {
-    auto schedule = [&](const Task& task) { test.getTaskRunner().schedule(task); };
+    auto schedule = [&](Task task) { test.getTaskRunner().schedule(std::move(task)); };
     return _testRunTaskTwice(test, nextAction, schedule);
 }
 
@@ -134,9 +134,9 @@ TEST_F(TaskRunnerTest, RunTaskTwiceDisposeOperationContext) {
 // Joining thread pool before scheduling second task ensures that task runner releases
 // thread back to pool after disposing of operation context.
 TEST_F(TaskRunnerTest, RunTaskTwiceDisposeOperationContextJoinThreadPoolBeforeScheduling) {
-    auto schedule = [this](const Task& task) {
+    auto schedule = [this](Task task) {
         getThreadPool().waitForIdle();
-        getTaskRunner().schedule(task);
+        getTaskRunner().schedule(std::move(task));
     };
     auto txnId =
         _testRunTaskTwice(*this, TaskRunner::NextAction::kDisposeOperationContext, schedule);

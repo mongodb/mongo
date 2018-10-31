@@ -58,7 +58,7 @@ public:
     ~BackgroundThreadClockSource() override;
     Milliseconds getPrecision() override;
     Date_t now() override;
-    Status setAlarm(Date_t when, stdx::function<void()> action) override;
+    Status setAlarm(Date_t when, unique_function<void()> action) override;
 
     /**
      * Doesn't count as a call to now() for determining whether this ClockSource is idle.

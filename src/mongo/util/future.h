@@ -52,9 +52,6 @@
 
 namespace mongo {
 
-template <typename T>
-class SharedPromise;
-
 namespace future_details {
 template <typename T>
 class Promise;
@@ -482,10 +479,8 @@ using future_details::Future;
  * destroyed, a error will be set with ErrorCode::BrokenPromise. This should generally be considered
  * a programmer error, and should not be relied upon. We may make it debug-fatal in the future.
  *
- * Only one thread can use a given Promise at a time. It is legal to have different threads setting
- * the value/error and extracting the Future, but it is the user's responsibility to ensure that
- * those calls are strictly synchronized. This is usually easiest to achieve by calling
- * makePromiseFuture<T>() then passing a SharedPromise to the completing threads.
+ * Only one thread can use a given Promise at a time, but another thread may be using the associated
+ * Future object.
  *
  * If the result is ready when producing the Future, it is more efficient to use
  * makeReadyFutureWith() or Future<T>::makeReady() than to use a Promise<T>.
@@ -569,18 +564,6 @@ public:
         });
     }
 
-    /**
-     * Get a copyable SharedPromise that can be used to complete this Promise's Future.
-     *
-     * Callers are required to extract the Future before calling share() to prevent race conditions.
-     * Even with a SharedPromise, callers must ensure it is only completed at most once. Copyability
-     * is primarily to allow capturing lambdas to be put in std::functions which don't support
-     * move-only types.
-     *
-     * It is safe to destroy the original Promise as soon as this call returns.
-     */
-    SharedPromise<T> share() noexcept;
-
     static auto makePromiseFutureImpl() {
         struct PromiseAndFuture {
             Promise<T> promise{make_intrusive<SharedState<T>>()};
@@ -618,54 +601,6 @@ private:
     }
 
     boost::intrusive_ptr<SharedState<T>> _sharedState;
-};
-
-/**
- * A SharedPromise is a copyable object that can be used to complete a Promise.
- *
- * All copies derived from the same call to Promise::share() will complete the same shared state.
- * Callers must ensure that the shared state is only completed at most once. Copyability is
- * primarily to allow capturing lambdas to be put in std::functions which don't support move-only
- * types. If the final derived SharedPromise is destroyed without completion, the Promise will be
- * broken.
- *
- * All methods behave the same as on the underlying Promise.
- */
-template <typename T>
-class SharedPromise {
-public:
-    SharedPromise() = default;
-
-    template <typename Func>
-    void setWith(Func&& func) noexcept {
-        _promise->setWith(std::forward<Func>(func));
-    }
-
-    void setFrom(Future<T>&& future) noexcept {
-        _promise->setFrom(std::move(future));
-    }
-
-    template <typename... Args>
-    void emplaceValue(Args&&... args) noexcept {
-        _promise->emplaceValue(std::forward<Args>(args)...);
-    }
-
-    void setError(Status status) noexcept {
-        _promise->setError(std::move(status));
-    }
-
-private:
-    // Only Promise<T> needs to be a friend, but MSVC2015 doesn't respect that friendship.
-    // TODO see if this is still needed on MSVC2017+
-    template <typename T2>
-    friend class Promise;
-
-    explicit SharedPromise(std::shared_ptr<Promise<T>>&& promise) : _promise(std::move(promise)) {}
-
-    // TODO consider adding a SharedPromise refcount to SharedStateBase to avoid the extra
-    // allocation. The tricky part will be ensuring that BrokenPromise is set when the last copy is
-    // destroyed.
-    std::shared_ptr<Promise<T>> _promise;
 };
 
 /**
@@ -1428,12 +1363,6 @@ template <typename T>
 inline Future<T> Promise<T>::getFuture() noexcept {
     _sharedState->threadUnsafeIncRefCountTo(2);
     return Future<T>(boost::intrusive_ptr<SharedState<T>>(_sharedState.get(), /*add ref*/ false));
-}
-
-template <typename T>
-inline SharedPromise<T> Promise<T>::share() noexcept {
-    invariant(_sharedState);
-    return SharedPromise<T>(std::make_shared<Promise<T>>(std::move(*this)));
 }
 
 template <typename T>

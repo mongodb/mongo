@@ -59,14 +59,13 @@ public:
     virtual Date_t now() override;
     virtual StatusWith<EventHandle> makeEvent() override;
     virtual void signalEvent(const EventHandle& event) override;
-    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event,
-                                               const CallbackFn& work) override;
+    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) override;
     virtual void waitForEvent(const EventHandle& event) override;
     virtual StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
                                                      const EventHandle& event,
                                                      Date_t deadline) override;
-    virtual StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
-    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
+    virtual StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override;
+    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override;
     virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
         const executor::RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,

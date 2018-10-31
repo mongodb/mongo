@@ -77,7 +77,7 @@ template <typename Key, typename... MapArgs>
 class KeyedExecutor {
     // We hold a deque per key.  Each entry in the deque represents a task we'll eventually execute
     // and a list of callers who need to be notified after it completes.
-    using Deque = std::deque<std::vector<SharedPromise<void>>>;
+    using Deque = std::deque<std::vector<Promise<void>>>;
 
     using Map = stdx::unordered_map<Key, Deque, MapArgs...>;
 
@@ -232,7 +232,7 @@ private:
     Future<void> _onCleared(WithLock, Deque& deque) {
         invariant(deque.size());
         auto pf = makePromiseFuture<void>();
-        deque.back().push_back(pf.promise.share());
+        deque.back().push_back(std::move(pf.promise));
         return std::move(pf.future);
     }
 

@@ -130,9 +130,9 @@ public:
 
     void schedule(ScheduleMode mode, Task task) final {
         if (mode == kDispatch) {
-            _ioContext.dispatch(std::move(task));
+            asio::dispatch(_ioContext, std::move(task));
         } else {
-            _ioContext.post(std::move(task));
+            asio::post(_ioContext, std::move(task));
         }
     }
 

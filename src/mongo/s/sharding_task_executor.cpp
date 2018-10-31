@@ -89,8 +89,8 @@ void ShardingTaskExecutor::signalEvent(const EventHandle& event) {
 }
 
 StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::onEvent(const EventHandle& event,
-                                                                       const CallbackFn& work) {
-    return _executor->onEvent(event, work);
+                                                                       CallbackFn work) {
+    return _executor->onEvent(event, std::move(work));
 }
 
 void ShardingTaskExecutor::waitForEvent(const EventHandle& event) {
@@ -103,14 +103,13 @@ StatusWith<stdx::cv_status> ShardingTaskExecutor::waitForEvent(OperationContext*
     return _executor->waitForEvent(opCtx, event, deadline);
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWork(
-    const CallbackFn& work) {
-    return _executor->scheduleWork(work);
+StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWork(CallbackFn work) {
+    return _executor->scheduleWork(std::move(work));
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWorkAt(
-    Date_t when, const CallbackFn& work) {
-    return _executor->scheduleWorkAt(when, work);
+StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWorkAt(Date_t when,
+                                                                              CallbackFn work) {
+    return _executor->scheduleWorkAt(when, std::move(work));
 }
 
 StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommand(

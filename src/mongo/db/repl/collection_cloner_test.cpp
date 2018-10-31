@@ -668,12 +668,13 @@ TEST_F(CollectionClonerTest,
     // status.
     auto exec = &getExecutor();
     collectionCloner->setScheduleDbWorkFn_forTest([exec](
-        const executor::TaskExecutor::CallbackFn& workFn) {
-        auto wrappedTask = [workFn](const executor::TaskExecutor::CallbackArgs& cbd) {
+        executor::TaskExecutor::CallbackFn workFn) {
+        auto wrappedTask = [workFn = std::move(workFn)](
+            const executor::TaskExecutor::CallbackArgs& cbd) {
             workFn(executor::TaskExecutor::CallbackArgs(
                 cbd.executor, cbd.myHandle, Status(ErrorCodes::CallbackCanceled, ""), cbd.opCtx));
         };
-        return exec->scheduleWork(wrappedTask);
+        return exec->scheduleWork(std::move(wrappedTask));
     });
 
     bool collectionCreated = false;
@@ -1177,12 +1178,11 @@ TEST_F(CollectionClonerTest,
 
     // Store the scheduled CollectionCloner::_insertDocuments task but do not run it yet.
     executor::TaskExecutor::CallbackFn insertDocumentsFn;
-    collectionCloner->setScheduleDbWorkFn_forTest(
-        [&](const executor::TaskExecutor::CallbackFn& workFn) {
-            insertDocumentsFn = workFn;
-            executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
-            return StatusWith<executor::TaskExecutor::CallbackHandle>(handle);
-        });
+    collectionCloner->setScheduleDbWorkFn_forTest([&](executor::TaskExecutor::CallbackFn workFn) {
+        insertDocumentsFn = std::move(workFn);
+        executor::TaskExecutor::CallbackHandle handle(std::make_shared<MockCallbackState>());
+        return StatusWith<executor::TaskExecutor::CallbackHandle>(handle);
+    });
     ASSERT_FALSE(insertDocumentsFn);
 
     // Return first batch of collection documents from remote server for the getMore request.

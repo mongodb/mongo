@@ -57,7 +57,7 @@ void ClockSourceMock::reset(Date_t newNow) {
     _processAlarms(std::move(lk));
 }
 
-Status ClockSourceMock::setAlarm(Date_t when, stdx::function<void()> action) {
+Status ClockSourceMock::setAlarm(Date_t when, unique_function<void()> action) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (when <= _now) {
         lk.unlock();

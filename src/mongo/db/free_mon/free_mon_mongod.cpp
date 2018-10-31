@@ -180,20 +180,17 @@ private:
         auto pf = makePromiseFuture<DataBuilder>();
         std::string url(exportedExportedFreeMonEndpointURL.getLocked() + path.toString());
 
-        auto status = _executor->scheduleWork([
-            shared_promise = pf.promise.share(),
-            url = std::move(url),
-            data = std::move(data),
-            this
-        ](const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-            ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
-            try {
-                auto result = this->_client->post(url, cdr);
-                shared_promise.emplaceValue(std::move(result));
-            } catch (...) {
-                shared_promise.setError(exceptionToStatus());
-            }
-        });
+        auto status = _executor->scheduleWork(
+            [ promise = std::move(pf.promise), url = std::move(url), data = std::move(data), this ](
+                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+                ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
+                try {
+                    auto result = this->_client->post(url, cdr);
+                    promise.emplaceValue(std::move(result));
+                } catch (...) {
+                    promise.setError(exceptionToStatus());
+                }
+            });
 
         uassertStatusOK(status);
         return std::move(pf.future);

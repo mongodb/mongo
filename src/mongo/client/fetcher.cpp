@@ -172,7 +172,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const HostAndPort& source,
                  const std::string& dbname,
                  const BSONObj& findCmdObj,
-                 const CallbackFn& work,
+                 CallbackFn work,
                  const BSONObj& metadata,
                  Milliseconds findNetworkTimeout,
                  Milliseconds getMoreNetworkTimeout,
@@ -182,7 +182,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _dbname(dbname),
       _cmdObj(findCmdObj.getOwned()),
       _metadata(metadata.getOwned()),
-      _work(work),
+      _work(std::move(work)),
       _findNetworkTimeout(findNetworkTimeout),
       _getMoreNetworkTimeout(getMoreNetworkTimeout),
       _firstRemoteCommandScheduler(
@@ -190,7 +190,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
           RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout),
           [this](const auto& x) { return this->_callback(x, kFirstBatchFieldName); },
           std::move(firstCommandRetryPolicy)) {
-    uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
+    uassert(ErrorCodes::BadValue, "callback function cannot be null", _work);
 }
 
 Fetcher::~Fetcher() {

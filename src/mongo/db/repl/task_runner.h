@@ -38,6 +38,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 
@@ -60,17 +61,7 @@ public:
         kCancel = 3,
     };
 
-    using Task = stdx::function<NextAction(OperationContext*, const Status&)>;
-    using SynchronousTask = stdx::function<Status(OperationContext* opCtx)>;
-
-    /**
-     * Returns the Status from the supplied function after running it..
-     *
-     * Note: TaskRunner::NextAction controls when the operation context and thread will be released.
-     */
-    Status runSynchronousTask(
-        SynchronousTask func,
-        TaskRunner::NextAction nextAction = TaskRunner::NextAction::kKeepOperationContext);
+    using Task = unique_function<NextAction(OperationContext*, const Status&)>;
 
     /**
      * Creates a Task returning kCancel. This is useful in shutting down the task runner after
@@ -126,7 +117,7 @@ public:
      * immediately. This is usually the case when the task runner is canceled. Accessing the
      * operation context in the task will result in undefined behavior.
      */
-    void schedule(const Task& task);
+    void schedule(Task task);
 
     /**
      * If there is a task that is already running, allows the task to run to completion.

@@ -150,8 +150,8 @@ public:
         auto fd = checked_cast<ASIOSession&>(session).getSocket().native_handle();
         auto pf = makePromiseFuture<void>();
 
-        _safeExecute([ fd, type, sp = pf.promise.share(), this ] {
-            _sessions[fd] = TransportSession{type, sp};
+        _safeExecute([ fd, type, promise = std::move(pf.promise), this ]() mutable {
+            _sessions[fd] = TransportSession{type, std::move(promise)};
         });
 
         return std::move(pf.future);
@@ -159,13 +159,14 @@ public:
 
     Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) override {
         auto pf = makePromiseFuture<void>();
-        _safeExecute([ timerPtr = &timer, expiration, sp = pf.promise.share(), this ] {
-            auto pair = _timers.insert({
-                timerPtr, expiration, sp,
+        _safeExecute(
+            [ timerPtr = &timer, expiration, promise = std::move(pf.promise), this ]() mutable {
+                auto pair = _timers.insert({
+                    timerPtr, expiration, std::move(promise),
+                });
+                invariant(pair.second);
+                _timersById[pair.first->id] = pair.first;
             });
-            invariant(pair.second);
-            _timersById[pair.first->id] = pair.first;
-        });
 
         return std::move(pf.future);
     }
@@ -244,7 +245,7 @@ public:
     }
 
     void run(ClockSource* clkSource) noexcept override {
-        std::vector<SharedPromise<void>> toFulfill;
+        std::vector<Promise<void>> toFulfill;
 
         // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
         const auto guard = MakeGuard([&] {
@@ -368,7 +369,7 @@ private:
     struct Timer {
         const ReactorTimer* id;
         Date_t expiration;
-        SharedPromise<void> promise;
+        mutable Promise<void> promise;  // Needs to be mutable to move from it while in std::set.
 
         struct LessThan {
             bool operator()(const Timer& lhs, const Timer& rhs) const {
@@ -379,7 +380,7 @@ private:
 
     struct TransportSession {
         Type type;
-        SharedPromise<void> promise;
+        Promise<void> promise;
     };
 
     template <typename Callback>
@@ -394,7 +395,7 @@ private:
     template <typename Callback>
     void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Callback&& cb) {
         if (_inPoll) {
-            _scheduled.push_back([cb, this] {
+            _scheduled.push_back([ cb = std::forward<Callback>(cb), this ]() mutable {
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
                 cb();
             });

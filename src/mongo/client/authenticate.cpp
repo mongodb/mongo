@@ -137,7 +137,7 @@ Future<void> authX509(RunCommandHook runCommand, const BSONObj& params, StringDa
     // The runCommand hook checks whether the command returned { ok: 1.0 }, and we don't need to
     // extract anything from the command payload, so this is just turning a Future<BSONObj>
     // into a Future<void>
-    return runCommand(authRequest.getValue()).then([](BSONObj obj) { return Status::OK(); });
+    return runCommand(authRequest.getValue()).ignoreValue();
 }
 
 }  // namespace
@@ -149,7 +149,6 @@ Future<void> authenticateClient(const BSONObj& params,
                                 const HostAndPort& hostname,
                                 const std::string& clientName,
                                 RunCommandHook runCommand) {
-    std::string mechanism;
     auto errorHandler = [](Status status) {
         if (serverGlobalParams.transitionToAuth && !status.isA<ErrorCategory::NetworkError>()) {
             // If auth failed in transitionToAuth, just pretend it succeeded.
@@ -161,6 +160,8 @@ Future<void> authenticateClient(const BSONObj& params,
 
         return status;
     };
+
+    std::string mechanism;
     auto response = bsonExtractStringField(params, saslCommandMechanismFieldName, &mechanism);
     if (!response.isOK())
         return response;

@@ -153,7 +153,7 @@ private:
     template <typename Functor>
     static auto makeImpl(Functor&& functor) {
         struct SpecificImpl : Impl {
-            explicit SpecificImpl(Functor&& func) : f(std::move(func)) {}
+            explicit SpecificImpl(Functor&& func) : f(std::forward<Functor>(func)) {}
 
             RetType call(Args&&... args) override {
                 return callRegularVoid(std::is_void<RetType>(), f, std::forward<Args>(args)...);
@@ -162,7 +162,7 @@ private:
             std::decay_t<Functor> f;
         };
 
-        return std::make_unique<SpecificImpl>(std::move(functor));
+        return std::make_unique<SpecificImpl>(std::forward<Functor>(functor));
     }
 
     std::unique_ptr<Impl> impl;

@@ -65,7 +65,7 @@ public:
      * Publicly visible versions of _scheduleWorkAndSaveHandle_inlock() and
      * _scheduleWorkAtAndSaveHandle_inlock() for testing.
      */
-    Status scheduleWorkAndSaveHandle_forTest(const executor::TaskExecutor::CallbackFn& work,
+    Status scheduleWorkAndSaveHandle_forTest(executor::TaskExecutor::CallbackFn work,
                                              executor::TaskExecutor::CallbackHandle* handle,
                                              const std::string& name);
 
@@ -73,7 +73,7 @@ public:
      * Publicly visible version of _scheduleWorkAtAndSaveHandle_inlock() for testing.
      */
     Status scheduleWorkAtAndSaveHandle_forTest(Date_t when,
-                                               const executor::TaskExecutor::CallbackFn& work,
+                                               executor::TaskExecutor::CallbackFn work,
                                                executor::TaskExecutor::CallbackHandle* handle,
                                                const std::string& name);
 
@@ -122,20 +122,20 @@ Status MockAsyncComponent::checkForShutdownAndConvertStatus_forTest(const Status
 }
 
 Status MockAsyncComponent::scheduleWorkAndSaveHandle_forTest(
-    const executor::TaskExecutor::CallbackFn& work,
+    executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _scheduleWorkAndSaveHandle_inlock(work, handle, name);
+    return _scheduleWorkAndSaveHandle_inlock(std::move(work), handle, name);
 }
 
 Status MockAsyncComponent::scheduleWorkAtAndSaveHandle_forTest(
     Date_t when,
-    const executor::TaskExecutor::CallbackFn& work,
+    executor::TaskExecutor::CallbackFn work,
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _scheduleWorkAtAndSaveHandle_inlock(when, work, handle, name);
+    return _scheduleWorkAtAndSaveHandle_inlock(when, std::move(work), handle, name);
 }
 
 void MockAsyncComponent::cancelHandle_forTest(executor::TaskExecutor::CallbackHandle handle) {

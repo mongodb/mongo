@@ -307,13 +307,14 @@ void EventChainAndWaitingTest::onGo(const TaskExecutor::CallbackArgs& cbData) {
         return;
     }
     triggerEvent = errorOrTriggerEvent.getValue();
-    StatusWith<TaskExecutor::CallbackHandle> cbHandle = executor->onEvent(triggerEvent, triggered2);
+    StatusWith<TaskExecutor::CallbackHandle> cbHandle =
+        executor->onEvent(triggerEvent, std::move(triggered2));
     if (!cbHandle.isOK()) {
         status1 = cbHandle.getStatus();
         executor->shutdown();
         return;
     }
-    cbHandle = executor->onEvent(triggerEvent, triggered3);
+    cbHandle = executor->onEvent(triggerEvent, std::move(triggered3));
     if (!cbHandle.isOK()) {
         status1 = cbHandle.getStatus();
         executor->shutdown();

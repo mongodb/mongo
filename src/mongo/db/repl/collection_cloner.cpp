@@ -109,7 +109,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                    const HostAndPort& source,
                                    const NamespaceString& sourceNss,
                                    const CollectionOptions& options,
-                                   const CallbackFn& onCompletion,
+                                   CallbackFn onCompletion,
                                    StorageInterface* storageInterface,
                                    const int batchSize)
     : _executor(executor),
@@ -118,7 +118,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _sourceNss(sourceNss),
       _destNss(_sourceNss),
       _options(options),
-      _onCompletion(onCompletion),
+      _onCompletion(std::move(onCompletion)),
       _storageInterface(storageInterface),
       _countScheduler(_executor,
                       RemoteCommandRequest(
@@ -155,9 +155,10 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _indexSpecs(),
       _documentsToInsert(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
-      _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
-          auto task = [ this, work ](OperationContext * opCtx,
-                                     const Status& status) noexcept->TaskRunner::NextAction {
+      _scheduleDbWorkFn([this](executor::TaskExecutor::CallbackFn work) {
+          auto task = [ this, work = std::move(work) ](
+                          OperationContext * opCtx,
+                          const Status& status) mutable noexcept->TaskRunner::NextAction {
               try {
                   work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
               } catch (...) {
@@ -165,7 +166,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
               }
               return TaskRunner::NextAction::kDisposeOperationContext;
           };
-          _dbWorkTaskRunner.schedule(task);
+          _dbWorkTaskRunner.schedule(std::move(task));
           return executor::TaskExecutor::CallbackHandle();
       }),
       _createClientFn([] { return stdx::make_unique<DBClientConnection>(); }),
@@ -184,7 +185,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
     uassert(50953,
             "Missing collection UUID in CollectionCloner, collection name: " + sourceNss.ns(),
             _options.uuid);
-    uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
+    uassert(ErrorCodes::BadValue, "callback function cannot be null", _onCompletion);
     uassert(ErrorCodes::BadValue, "storage interface cannot be null", storageInterface);
     uassert(
         50954, "collectionClonerBatchSize must be non-negative.", _collectionClonerBatchSize >= 0);
@@ -292,9 +293,9 @@ void CollectionCloner::waitForDbWorker() {
     _dbWorkTaskRunner.join();
 }
 
-void CollectionCloner::setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& scheduleDbWorkFn) {
+void CollectionCloner::setScheduleDbWorkFn_forTest(ScheduleDbWorkFn scheduleDbWorkFn) {
     LockGuard lk(_mutex);
-    _scheduleDbWorkFn = scheduleDbWorkFn;
+    _scheduleDbWorkFn = std::move(scheduleDbWorkFn);
 }
 
 void CollectionCloner::setCreateClientFn_forTest(const CreateClientFn& createClientFn) {

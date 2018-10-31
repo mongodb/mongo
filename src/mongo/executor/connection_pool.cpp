@@ -179,7 +179,7 @@ private:
     using OwnedConnection = std::shared_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
     using LRUOwnershipPool = LRUCache<OwnershipPool::key_type, OwnershipPool::mapped_type>;
-    using Request = std::pair<Date_t, SharedPromise<ConnectionHandle>>;
+    using Request = std::pair<Date_t, Promise<ConnectionHandle>>;
     struct RequestComparator {
         bool operator()(const Request& a, const Request& b) {
             return a.first > b.first;
@@ -461,7 +461,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     const auto expiration = _parent->_factory->now() + timeout;
     auto pf = makePromiseFuture<ConnectionHandle>();
 
-    _requests.push_back(make_pair(expiration, pf.promise.share()));
+    _requests.push_back(make_pair(expiration, std::move(pf.promise)));
     std::push_heap(begin(_requests), end(_requests), RequestComparator{});
 
     updateStateInLock();

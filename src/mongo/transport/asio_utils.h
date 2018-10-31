@@ -350,7 +350,7 @@ struct AsyncHandlerHelper {
 template <>
 struct AsyncHandlerHelper<> {
     using Result = void;
-    static void complete(SharedPromise<Result>* promise) {
+    static void complete(Promise<Result>* promise) {
         promise->emplaceValue();
     }
 };
@@ -358,7 +358,7 @@ struct AsyncHandlerHelper<> {
 template <typename Arg>
 struct AsyncHandlerHelper<Arg> {
     using Result = Arg;
-    static void complete(SharedPromise<Result>* promise, Arg arg) {
+    static void complete(Promise<Result>* promise, Arg arg) {
         promise->emplaceValue(arg);
     }
 };
@@ -369,7 +369,7 @@ struct AsyncHandlerHelper<std::error_code, Args...> {
     using Result = typename Helper::Result;
 
     template <typename... Args2>
-    static void complete(SharedPromise<Result>* promise, std::error_code ec, Args2&&... args) {
+    static void complete(Promise<Result>* promise, std::error_code ec, Args2&&... args) {
         if (ec) {
             promise->setError(errorCodeToStatus(ec));
         } else {
@@ -381,7 +381,7 @@ struct AsyncHandlerHelper<std::error_code, Args...> {
 template <>
 struct AsyncHandlerHelper<std::error_code> {
     using Result = void;
-    static void complete(SharedPromise<Result>* promise, std::error_code ec) {
+    static void complete(Promise<Result>* promise, std::error_code ec) {
         if (ec) {
             promise->setError(errorCodeToStatus(ec));
         } else {
@@ -402,7 +402,7 @@ struct AsyncHandler {
         Helper::complete(&promise, std::forward<Args2>(args)...);
     }
 
-    SharedPromise<Result> promise;
+    Promise<Result> promise;
 };
 
 template <typename... Args>
@@ -414,7 +414,7 @@ struct AsyncResult {
     explicit AsyncResult(completion_handler_type& handler) {
         auto pf = makePromiseFuture<RealResult>();
         fut = std::move(pf.future);
-        handler.promise = pf.promise.share();
+        handler.promise = std::move(pf.promise);
     }
 
     auto get() {

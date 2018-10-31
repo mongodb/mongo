@@ -227,7 +227,7 @@ Status DatabasesCloner::startup() noexcept {
     return Status::OK();
 }
 
-void DatabasesCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
+void DatabasesCloner::setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& work) {
     LockGuard lk(_mutex);
     _scheduleDbWorkFn = work;
 }

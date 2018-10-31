@@ -67,13 +67,13 @@ public:
     Date_t now() override;
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                         RemoteCommandRequest& request,
-                        const RemoteCommandCompletionFn& onFinish,
+                        RemoteCommandCompletionFn&& onFinish,
                         const transport::BatonHandle& baton) override;
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const transport::BatonHandle& baton) override;
     Status setAlarm(Date_t when,
-                    const stdx::function<void()>& action,
+                    unique_function<void()> action,
                     const transport::BatonHandle& baton) override;
 
     bool onNetworkThread() override;

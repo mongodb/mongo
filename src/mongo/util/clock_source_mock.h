@@ -54,7 +54,7 @@ public:
 
     Milliseconds getPrecision() override;
     Date_t now() override;
-    Status setAlarm(Date_t when, stdx::function<void()> action) override;
+    Status setAlarm(Date_t when, unique_function<void()> action) override;
 
     /**
      * Advances the current time by the given value.
@@ -67,7 +67,7 @@ public:
     void reset(Date_t newNow);
 
 private:
-    using Alarm = std::pair<Date_t, stdx::function<void()>>;
+    using Alarm = std::pair<Date_t, unique_function<void()>>;
     void _processAlarms(stdx::unique_lock<stdx::mutex> lk);
 
     stdx::mutex _mutex;
@@ -106,7 +106,7 @@ public:
         return _source->now();
     }
 
-    Status setAlarm(Date_t when, stdx::function<void()> action) override {
+    Status setAlarm(Date_t when, unique_function<void()> action) override {
         return _source->setAlarm(when, std::move(action));
     }
 

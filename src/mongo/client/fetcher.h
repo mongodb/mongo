@@ -127,7 +127,7 @@ public:
             const HostAndPort& source,
             const std::string& dbname,
             const BSONObj& cmdObj,
-            const CallbackFn& work,
+            CallbackFn work,
             const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
             Milliseconds findNetworkTimeout = RemoteCommandRequest::kNoTimeout,
             Milliseconds getMoreNetworkTimeout = RemoteCommandRequest::kNoTimeout,

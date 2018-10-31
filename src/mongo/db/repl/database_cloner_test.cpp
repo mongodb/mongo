@@ -104,10 +104,9 @@ void DatabaseClonerTest::setUp() {
                                           storageInterface.get(),
                                           makeCollectionWorkClosure(),
                                           makeSetStatusClosure());
-    _databaseCloner->setScheduleDbWorkFn_forTest(
-        [this](const executor::TaskExecutor::CallbackFn& work) {
-            return getExecutor().scheduleWork(work);
-        });
+    _databaseCloner->setScheduleDbWorkFn_forTest([this](executor::TaskExecutor::CallbackFn work) {
+        return getExecutor().scheduleWork(std::move(work));
+    });
 
     _mockServer = stdx::make_unique<MockRemoteDBServer>(target.toString());
     _mockServer->assignCollectionUuid("db.a", *_options1.uuid);

@@ -116,7 +116,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                                const ListCollectionsPredicateFn& listCollectionsPred,
                                StorageInterface* si,
                                const CollectionCallbackFn& collWork,
-                               const CallbackFn& onCompletion)
+                               CallbackFn onCompletion)
     : _executor(executor),
       _dbWorkThreadPool(dbWorkThreadPool),
       _source(source),
@@ -128,7 +128,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
       _listCollectionsPredicate(listCollectionsPred ? listCollectionsPred : acceptAllPred),
       _storageInterface(si),
       _collectionWork(collWork),
-      _onCompletion(onCompletion),
+      _onCompletion(std::move(onCompletion)),
       _listCollectionsFetcher(_executor,
                               _source,
                               _dbname,
@@ -152,7 +152,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
     uassert(ErrorCodes::BadValue, "empty database name", !dbname.empty());
     uassert(ErrorCodes::BadValue, "storage interface cannot be null", si);
     uassert(ErrorCodes::BadValue, "collection callback function cannot be null", collWork);
-    uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
+    uassert(ErrorCodes::BadValue, "callback function cannot be null", _onCompletion);
 
     _stats.dbname = _dbname;
 }
@@ -259,7 +259,7 @@ void DatabaseCloner::join() {
     _condition.wait(lk, [this]() { return !_isActive_inlock(); });
 }
 
-void DatabaseCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
+void DatabaseCloner::setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& work) {
     LockGuard lk(_mutex);
 
     _scheduleDbWorkFn = work;

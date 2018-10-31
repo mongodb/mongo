@@ -75,8 +75,8 @@ public:
     Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
         auto pf = makePromiseFuture<FutureContinuationResult<Callback>>();
 
-        schedule([ cb = std::forward<Callback>(cb), sp = pf.promise.share() ]() mutable {
-            sp.setWith(std::move(cb));
+        schedule([ cb = std::forward<Callback>(cb), p = std::move(pf.promise) ]() mutable {
+            p.setWith(std::move(cb));
         });
 
         return std::move(pf.future);

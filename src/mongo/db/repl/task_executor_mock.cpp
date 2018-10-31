@@ -38,25 +38,24 @@ namespace repl {
 TaskExecutorMock::TaskExecutorMock(executor::TaskExecutor* executor)
     : unittest::TaskExecutorProxy(executor) {}
 
-StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWork(
-    const CallbackFn& work) {
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWork(CallbackFn work) {
     if (shouldFailScheduleWorkRequest()) {
         return Status(ErrorCodes::OperationFailed, "failed to schedule work");
     }
     if (shouldDeferScheduleWorkRequestByOneSecond()) {
         auto when = now() + Seconds(1);
-        return getExecutor()->scheduleWorkAt(when, work);
+        return getExecutor()->scheduleWorkAt(when, std::move(work));
     }
-    return getExecutor()->scheduleWork(work);
+    return getExecutor()->scheduleWork(std::move(work));
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWorkAt(
-    Date_t when, const CallbackFn& work) {
+    Date_t when, CallbackFn work) {
     if (shouldFailScheduleWorkAtRequest()) {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "failed to schedule work at " << when.toString());
     }
-    return getExecutor()->scheduleWorkAt(when, work);
+    return getExecutor()->scheduleWorkAt(when, std::move(work));
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRemoteCommand(

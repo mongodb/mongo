@@ -1034,7 +1034,7 @@ private:
      * All other non-shutdown scheduling failures will abort the process.
      * Does not run 'work' if callback is canceled.
      */
-    CallbackHandle _scheduleWorkAt(Date_t when, const CallbackFn& work);
+    CallbackHandle _scheduleWorkAt(Date_t when, CallbackFn work);
 
     /**
      * Creates an event.

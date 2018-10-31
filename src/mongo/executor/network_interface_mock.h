@@ -113,7 +113,7 @@ public:
     virtual std::string getHostName();
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
-                                const RemoteCommandCompletionFn& onFinish,
+                                RemoteCommandCompletionFn&& onFinish,
                                 const transport::BatonHandle& baton = nullptr);
 
     /**
@@ -129,7 +129,7 @@ public:
      * Not implemented.
      */
     virtual Status setAlarm(Date_t when,
-                            const stdx::function<void()>& action,
+                            unique_function<void()> action,
                             const transport::BatonHandle& baton = nullptr);
 
     virtual bool onNetworkThread();
@@ -284,7 +284,7 @@ private:
      * Information describing a scheduled alarm.
      */
     struct AlarmInfo {
-        using AlarmAction = stdx::function<void()>;
+        using AlarmAction = unique_function<void()>;
         AlarmInfo(Date_t inWhen, AlarmAction inAction)
             : when(inWhen), action(std::move(inAction)) {}
         bool operator>(const AlarmInfo& rhs) const {
@@ -292,7 +292,7 @@ private:
         }
 
         Date_t when;
-        AlarmAction action;
+        mutable AlarmAction action;
     };
 
     /**
@@ -435,8 +435,7 @@ public:
     NetworkOperation(const TaskExecutor::CallbackHandle& cbHandle,
                      const RemoteCommandRequest& theRequest,
                      Date_t theRequestDate,
-                     const RemoteCommandCompletionFn& onFinish);
-    ~NetworkOperation();
+                     RemoteCommandCompletionFn onFinish);
 
     /**
      * Adjusts the stored virtual time at which this entry will be subject to consideration
@@ -556,8 +555,8 @@ public:
     Date_t now() override {
         return _net->now();
     }
-    Status setAlarm(Date_t when, stdx::function<void()> action) override {
-        return _net->setAlarm(when, action);
+    Status setAlarm(Date_t when, unique_function<void()> action) override {
+        return _net->setAlarm(when, std::move(action));
     }
 
 private:

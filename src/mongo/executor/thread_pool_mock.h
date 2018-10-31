@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/platform/random.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"

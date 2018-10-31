@@ -45,15 +45,15 @@ namespace repl {
 MultiApplier::MultiApplier(executor::TaskExecutor* executor,
                            const Operations& operations,
                            const MultiApplyFn& multiApply,
-                           const CallbackFn& onCompletion)
+                           CallbackFn onCompletion)
     : _executor(executor),
       _operations(operations),
       _multiApply(multiApply),
-      _onCompletion(onCompletion) {
+      _onCompletion(std::move(onCompletion)) {
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
     uassert(ErrorCodes::BadValue, "empty list of operations", !operations.empty());
     uassert(ErrorCodes::BadValue, "multi apply function cannot be null", multiApply);
-    uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
+    uassert(ErrorCodes::BadValue, "callback function cannot be null", _onCompletion);
 }
 
 MultiApplier::~MultiApplier() {

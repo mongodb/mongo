@@ -102,12 +102,12 @@ bool TaskRunner::isActive() const {
     return _active;
 }
 
-void TaskRunner::schedule(const Task& task) {
+void TaskRunner::schedule(Task task) {
     invariant(task);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    _tasks.push_back(task);
+    _tasks.push_back(std::move(task));
     _condition.notify_all();
 
     if (_active) {
@@ -174,8 +174,8 @@ void TaskRunner::_runTasks() {
         tasks.swap(_tasks);
         lk.unlock();
         // Cancel remaining tasks with a CallbackCanceled status.
-        for (auto task : tasks) {
-            runSingleTask(task,
+        for (auto&& task : tasks) {
+            runSingleTask(std::move(task),
                           nullptr,
                           Status(ErrorCodes::CallbackCanceled,
                                  "this task has been canceled by a previously invoked task"));
@@ -207,46 +207,10 @@ TaskRunner::Task TaskRunner::_waitForNextTask() {
         return Task();
     }
 
-    Task task = _tasks.front();
+    Task task = std::move(_tasks.front());
     _tasks.pop_front();
     return task;
 }
 
-Status TaskRunner::runSynchronousTask(SynchronousTask func, TaskRunner::NextAction nextAction) {
-    // Setup cond_var for signaling when done.
-    bool done = false;
-    stdx::mutex mutex;
-    stdx::condition_variable waitTillDoneCond;
-
-    Status returnStatus{Status::OK()};
-    this->schedule([&](OperationContext* opCtx, const Status taskStatus) {
-        if (!taskStatus.isOK()) {
-            returnStatus = taskStatus;
-        } else {
-            // Run supplied function.
-            try {
-                returnStatus = func(opCtx);
-            } catch (...) {
-                returnStatus = exceptionToStatus();
-                error() << "Exception thrown in runSynchronousTask: " << redact(returnStatus);
-            }
-        }
-
-        // Signal done.
-        LockGuard lk2{mutex};
-        done = true;
-        waitTillDoneCond.notify_all();
-
-        // return nextAction based on status from supplied function.
-        if (returnStatus.isOK()) {
-            return nextAction;
-        }
-        return TaskRunner::NextAction::kCancel;
-    });
-
-    UniqueLock lk{mutex};
-    waitTillDoneCond.wait(lk, [&done] { return done; });
-    return returnStatus;
-}
 }  // namespace repl
 }  // namespace mongo

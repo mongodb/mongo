@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 
@@ -158,7 +159,7 @@ public:
     virtual void stop() = 0;
     virtual void drain() = 0;
 
-    using Task = stdx::function<void()>;
+    using Task = unique_function<void()>;
 
     enum ScheduleMode { kDispatch, kPost };
     virtual void schedule(ScheduleMode mode, Task task) = 0;
@@ -166,8 +167,8 @@ public:
     template <typename Callback>
     Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
         auto pf = makePromiseFuture<FutureContinuationResult<Callback>>();
-        schedule(kPost, [ cb = std::forward<Callback>(cb), sp = pf.promise.share() ]() mutable {
-            sp.setWith(cb);
+        schedule(kPost, [ cb = std::forward<Callback>(cb), p = std::move(pf.promise) ]() mutable {
+            p.setWith(cb);
         });
 
         return std::move(pf.future);

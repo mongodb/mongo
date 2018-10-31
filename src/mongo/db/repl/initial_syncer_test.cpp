@@ -215,7 +215,7 @@ public:
         getNet()->runReadyNetworkOperations();
         if (getNet()->hasReadyRequests()) {
             log() << "The network has unexpected requests to process, next req:";
-            NetworkInterfaceMock::NetworkOperation req = *getNet()->getNextReadyRequest();
+            const NetworkInterfaceMock::NetworkOperation& req = *getNet()->getNextReadyRequest();
             log() << req.getDiagnosticString();
         }
         ASSERT_FALSE(getNet()->hasReadyRequests());
@@ -404,8 +404,8 @@ protected:
                     _onCompletion(lastApplied);
                 });
             _initialSyncer->setScheduleDbWorkFn_forTest(
-                [this](const executor::TaskExecutor::CallbackFn& work) {
-                    return getExecutor().scheduleWork(work);
+                [this](executor::TaskExecutor::CallbackFn work) {
+                    return getExecutor().scheduleWork(std::move(work));
                 });
             _initialSyncer->setStartCollectionClonerFn([this](CollectionCloner& cloner) {
                 cloner.setCreateClientFn_forTest([&cloner, this]() {
