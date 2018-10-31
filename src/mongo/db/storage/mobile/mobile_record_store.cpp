@@ -259,13 +259,6 @@ long long MobileRecordStore::numRecords(OperationContext* opCtx) const {
     return _numRecs;
 }
 
-RecordData MobileRecordStore::dataFor(OperationContext* opCtx, const RecordId& recId) const {
-    RecordData recData;
-    bool recFound = findRecord(opCtx, recId, &recData);
-    invariant(recFound);
-    return recData;
-}
-
 bool MobileRecordStore::findRecord(OperationContext* opCtx,
                                    const RecordId& recId,
                                    RecordData* rd) const {
@@ -305,25 +298,31 @@ void MobileRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& re
     deleteStmt.step(SQLITE_DONE);
 }
 
-StatusWith<RecordId> MobileRecordStore::insertRecord(OperationContext* opCtx,
-                                                     const char* data,
-                                                     int len,
-                                                     Timestamp) {
+Status MobileRecordStore::insertRecords(OperationContext* opCtx,
+                                        std::vector<Record>* inOutRecords,
+                                        const std::vector<Timestamp>& timestamps) {
     // Inserts record into SQLite table (or replaces if duplicate record id).
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
-    _changeNumRecs(opCtx, 1);
-    _changeDataSize(opCtx, len);
+    for (auto& record : *inOutRecords) {
+        const auto data = record.data.data();
+        const auto len = record.data.size();
 
-    std::string insertQuery =
-        "INSERT OR REPLACE INTO \"" + _ident + "\"(rec_id, data) VALUES(?, ?);";
-    SqliteStatement insertStmt(*session, insertQuery);
-    RecordId recId = _nextId();
-    insertStmt.bindInt(0, recId.repr());
-    insertStmt.bindBlob(1, data, len);
-    insertStmt.step(SQLITE_DONE);
+        _changeNumRecs(opCtx, 1);
+        _changeDataSize(opCtx, len);
 
-    return StatusWith<RecordId>(recId);
+        std::string insertQuery =
+            "INSERT OR REPLACE INTO \"" + _ident + "\"(rec_id, data) VALUES(?, ?);";
+        SqliteStatement insertStmt(*session, insertQuery);
+        RecordId recId = _nextId();
+        insertStmt.bindInt(0, recId.repr());
+        insertStmt.bindBlob(1, data, len);
+        insertStmt.step(SQLITE_DONE);
+
+        record.id = recId;
+    }
+
+    return Status::OK();
 }
 
 Status MobileRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,

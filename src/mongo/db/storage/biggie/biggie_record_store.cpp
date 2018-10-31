@@ -136,12 +136,6 @@ int64_t RecordStore::storageSize(OperationContext* opCtx,
     return dataSize(opCtx);
 }
 
-RecordData RecordStore::dataFor(OperationContext* opCtx, const RecordId& loc) const {
-    RecordData rd;
-    invariant(findRecord(opCtx, loc, &rd));
-    return rd;
-}
-
 bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
     const StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     auto it = workingCopy->find(createKey(_ident, loc.repr()));
@@ -159,16 +153,18 @@ void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
     dirtyRecoveryUnit(opCtx);
 }
 
-StatusWith<RecordId> RecordStore::insertRecord(OperationContext* opCtx,
-                                               const char* data,
-                                               int len,
-                                               Timestamp) {
-    int64_t thisRecordId = nextRecordId();
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    workingCopy->insert(
-        StringStore::value_type{createKey(_ident, thisRecordId), std::string(data, len)});
-    dirtyRecoveryUnit(opCtx);
-    return StatusWith<RecordId>(RecordId(thisRecordId));
+Status RecordStore::insertRecords(OperationContext* opCtx,
+                                  std::vector<Record>* inOutRecords,
+                                  const std::vector<Timestamp>& timestamps) {
+    for (auto& record : *inOutRecords) {
+        int64_t thisRecordId = nextRecordId();
+        StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+        workingCopy->insert(StringStore::value_type{
+            createKey(_ident, thisRecordId), std::string(record.data.data(), record.data.size())});
+        record.id = RecordId(thisRecordId);
+        dirtyRecoveryUnit(opCtx);
+    }
+    return Status::OK();
 }
 
 Status RecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,

@@ -84,7 +84,6 @@ public:
 
     void initCollection(OperationContext* opCtx, const std::string& ns, bool forRepair);
 
-    void initCollectionBeforeRepair(OperationContext* opCtx, const std::string& ns);
     void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
 
 protected:

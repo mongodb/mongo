@@ -137,20 +137,13 @@ public:
 
     // CRUD related
 
-    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& id) const;
-
     virtual bool findRecord(OperationContext* opCtx, const RecordId& id, RecordData* out) const;
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& id);
 
     virtual Status insertRecords(OperationContext* opCtx,
                                  std::vector<Record>* records,
-                                 std::vector<Timestamp>* timestamps);
-
-    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                              const char* data,
-                                              int len,
-                                              Timestamp timestamp);
+                                 const std::vector<Timestamp>& timestamps);
 
     virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,

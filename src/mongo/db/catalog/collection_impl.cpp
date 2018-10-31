@@ -496,12 +496,10 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     timestamps.reserve(count);
 
     for (auto it = begin; it != end; it++) {
-        Record record = {RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())};
-        records.push_back(record);
-        Timestamp timestamp = Timestamp(it->oplogSlot.opTime.getTimestamp());
-        timestamps.push_back(timestamp);
+        records.emplace_back(Record{RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())});
+        timestamps.emplace_back(it->oplogSlot.opTime.getTimestamp());
     }
-    Status status = _recordStore->insertRecords(opCtx, &records, &timestamps);
+    Status status = _recordStore->insertRecords(opCtx, &records, timestamps);
     if (!status.isOK())
         return status;
 

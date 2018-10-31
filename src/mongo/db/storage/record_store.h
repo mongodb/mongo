@@ -1,5 +1,3 @@
-// record_store.h
-
 
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
@@ -261,7 +259,7 @@ public:
     // name of the RecordStore implementation
     virtual const char* name() const = 0;
 
-    virtual const std::string& ns() const {
+    const std::string& ns() const {
         return _ns;
     }
 
@@ -303,13 +301,15 @@ public:
     /**
      * Get the RecordData at loc, which must exist.
      *
-     * If unowned data is returned, it is valid until the next modification of this Record or
-     * the lock on this collection is released.
+     * If unowned data is returned, it is only valid until either of these happens:
+     *  - The record is modified
+     *  - The snapshot from which it was obtained is abandoned
+     *  - The lock on the collection is released
      *
-     * In general, prefer findRecord or RecordCursor::seekExact since they can tell you if a
-     * record has been removed.
+     * In general, prefer findRecord or RecordCursor::seekExact since they can tell you if a record
+     * has been removed.
      */
-    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const {
+    RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const {
         RecordData data;
         invariant(findRecord(opCtx, loc, &data));
         return data;
@@ -342,24 +342,26 @@ public:
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                              const char* data,
-                                              int len,
-                                              Timestamp timestamp) = 0;
-
+    /**
+     * Inserts the specified records into this RecordStore by copying the passed-in record data and
+     * updates 'inOutRecords' to contain the ids of the inserted records.
+     */
     virtual Status insertRecords(OperationContext* opCtx,
-                                 std::vector<Record>* records,
-                                 std::vector<Timestamp>* timestamps) {
-        int index = 0;
-        for (auto& record : *records) {
-            StatusWith<RecordId> res =
-                insertRecord(opCtx, record.data.data(), record.data.size(), (*timestamps)[index++]);
-            if (!res.isOK())
-                return res.getStatus();
+                                 std::vector<Record>* inOutRecords,
+                                 const std::vector<Timestamp>& timestamps) = 0;
 
-            record.id = res.getValue();
-        }
-        return Status::OK();
+    /**
+     * A thin wrapper around insertRecords() to simplify handling of single document inserts.
+     */
+    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
+                                      const char* data,
+                                      int len,
+                                      Timestamp timestamp) {
+        std::vector<Record> inOutRecords{Record{RecordId(), RecordData(data, len)}};
+        Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
+        if (!status.isOK())
+            return status;
+        return inOutRecords.front().id;
     }
 
     /**

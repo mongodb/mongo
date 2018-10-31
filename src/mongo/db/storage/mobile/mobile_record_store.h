@@ -56,16 +56,13 @@ public:
 
     const std::string& getIdent() const override;
 
-    RecordData dataFor(OperationContext* opCtx, const RecordId& recId) const override;
-
     bool findRecord(OperationContext* opCtx, const RecordId& recId, RecordData* rd) const override;
 
     void deleteRecord(OperationContext* opCtx, const RecordId& dl) override;
 
-    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                      const char* data,
-                                      int len,
-                                      Timestamp timestamp) override;
+    Status insertRecords(OperationContext* opCtx,
+                         std::vector<Record>* inOutRecords,
+                         const std::vector<Timestamp>& timestamps) override;
 
     Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                       const DocWriter* const* docs,

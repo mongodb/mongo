@@ -93,22 +93,20 @@ public:
         return 0;
     }
 
-    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const {
-        return RecordData(_dummy.objdata(), _dummy.objsize());
-    }
-
     virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
         return false;
     }
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) {}
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
-                                              const char* data,
-                                              int len,
-                                              Timestamp) {
-        _numInserts++;
-        return StatusWith<RecordId>(RecordId(6, 4));
+    virtual Status insertRecords(OperationContext* opCtx,
+                                 std::vector<Record>* inOutRecords,
+                                 const std::vector<Timestamp>& timestamps) {
+        _numInserts += inOutRecords->size();
+        for (auto& record : *inOutRecords) {
+            record.id = RecordId(6, 4);
+        }
+        return Status::OK();
     }
 
     virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,

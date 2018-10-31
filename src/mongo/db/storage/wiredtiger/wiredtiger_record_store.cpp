@@ -821,20 +821,6 @@ RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
-RecordData WiredTigerRecordStore::dataFor(OperationContext* opCtx, const RecordId& id) const {
-    dassert(opCtx->lockState()->isReadLocked());
-
-    // ownership passes to the shared_array created below
-    WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
-    WT_CURSOR* c = curwrap.get();
-    invariant(c);
-    setKey(c, id);
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
-    massert(28556, "Didn't find RecordId in WiredTigerRecordStore", ret != WT_NOTFOUND);
-    invariantWTOK(ret);
-    return _getData(curwrap);
-}
-
 bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
                                        const RecordId& id,
                                        RecordData* out) const {
@@ -1229,8 +1215,8 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
 
 Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,
                                             std::vector<Record>* records,
-                                            std::vector<Timestamp>* timestamps) {
-    return _insertRecords(opCtx, records->data(), timestamps->data(), records->size());
+                                            const std::vector<Timestamp>& timestamps) {
+    return _insertRecords(opCtx, records->data(), timestamps.data(), records->size());
 }
 
 Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
@@ -1311,17 +1297,6 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     }
 
     return Status::OK();
-}
-
-StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* opCtx,
-                                                         const char* data,
-                                                         int len,
-                                                         Timestamp timestamp) {
-    Record record = {RecordId(), RecordData(data, len)};
-    Status status = _insertRecords(opCtx, &record, &timestamp, 1);
-    if (!status.isOK())
-        return StatusWith<RecordId>(status);
-    return StatusWith<RecordId>(record.id);
 }
 
 bool WiredTigerRecordStore::isOpHidden_forTest(const RecordId& id) const {

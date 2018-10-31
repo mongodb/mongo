@@ -398,37 +398,50 @@ StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(con
     return status;
 }
 
-StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext* opCtx,
-                                                               const char* data,
-                                                               int len,
-                                                               Timestamp) {
-    if (_isCapped && len > _cappedMaxSize) {
-        // We use dataSize for capped rollover and we don't want to delete everything if we know
-        // this won't fit.
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
+Status EphemeralForTestRecordStore::insertRecords(OperationContext* opCtx,
+                                                  std::vector<Record>* inOutRecords,
+                                                  const std::vector<Timestamp>& timestamps) {
+
+    for (auto& record : *inOutRecords) {
+        if (_isCapped && record.data.size() > _cappedMaxSize) {
+            // We use dataSize for capped rollover and we don't want to delete everything if we know
+            // this won't fit.
+            return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
+        }
     }
+    const auto insertSingleFn = [this, opCtx](Record* record) {
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+        EphemeralForTestRecord rec(record->data.size());
+        memcpy(rec.data.get(), record->data.data(), record->data.size());
 
-    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-    EphemeralForTestRecord rec(len);
-    memcpy(rec.data.get(), data, len);
+        RecordId loc;
+        if (_data->isOplog) {
+            StatusWith<RecordId> status =
+                extractAndCheckLocForOplog(record->data.data(), record->data.size());
+            if (!status.isOK())
+                return status.getStatus();
+            loc = status.getValue();
+        } else {
+            loc = allocateLoc();
+        }
 
-    RecordId loc;
-    if (_data->isOplog) {
-        StatusWith<RecordId> status = extractAndCheckLocForOplog(data, len);
+        _data->dataSize += record->data.size();
+        _data->records[loc] = rec;
+        record->id = loc;
+
+        opCtx->recoveryUnit()->registerChange(new InsertChange(opCtx, _data, loc));
+        cappedDeleteAsNeeded_inlock(opCtx);
+
+        return Status::OK();
+    };
+
+    for (auto& record : *inOutRecords) {
+        auto status = insertSingleFn(&record);
         if (!status.isOK())
             return status;
-        loc = status.getValue();
-    } else {
-        loc = allocateLoc();
     }
 
-    opCtx->recoveryUnit()->registerChange(new InsertChange(opCtx, _data, loc));
-    _data->dataSize += len;
-    _data->records[loc] = rec;
-
-    cappedDeleteAsNeeded_inlock(opCtx);
-
-    return StatusWith<RecordId>(loc);
+    return Status::OK();
 }
 
 Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,

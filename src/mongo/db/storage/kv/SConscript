@@ -93,7 +93,7 @@ env.Library(
     source=[
         'kv_catalog_feature_tracker_test.cpp',
         'kv_engine_test_harness.cpp',
-        'kv_engine_test_timestamps.cpp',
+        'kv_engine_timestamps_test.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
