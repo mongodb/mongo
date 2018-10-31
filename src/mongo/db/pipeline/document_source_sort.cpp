@@ -215,7 +215,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
             container->erase(sortItr);
             sortItr = std::next(itr);
             skipSum = 0;
-        } else if (!nextStage->constraints().canSwapWithLimit) {
+        } else if (!nextStage->constraints().canSwapWithLimitAndSample) {
             return std::next(itr);
         } else {
             ++sortItr;

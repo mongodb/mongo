@@ -327,6 +327,22 @@ public:
     // stages.
     //
 
+private:
+    /**
+     * Attempt to push a match stage from directly ahead of the current stage given by itr to before
+     * the current stage. Returns whether the optimization was performed.
+     */
+    bool pushMatchBefore(Pipeline::SourceContainer::iterator itr,
+                         Pipeline::SourceContainer* container);
+
+    /**
+     * Attempt to push a sample stage from directly ahead of the current stage given by itr to before
+     * the current stage. Returns whether the optimization was performed.
+     */
+    bool pushSampleBefore(Pipeline::SourceContainer::iterator itr,
+                          Pipeline::SourceContainer* container);
+
+public:
     /**
      * The non-virtual public interface for optimization. Attempts to do some generic optimizations
      * such as pushing $matches as early in the pipeline as possible, then calls out to

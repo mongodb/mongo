@@ -284,8 +284,11 @@ struct StageConstraints {
     // $match predicates be swapped before itself.
     bool canSwapWithMatch = false;
 
-    // True if a subsequent $limit stage can be moved before this stage in the pipeline. This is
-    // true if this stage does not add or remove documents from the pipeline.
-    bool canSwapWithLimit = false;
+    // Neither a $sample nor a $limit can be moved before any stage which will possibly change the
+    // number of documents in the stream. Further, no stage which will change the order of documents
+    // can be swapped with a $limit or $sample, and no stage which will change behavior based on the
+    // order of documents can be swapped with a $sample because our implementation of sample will do
+    // a random sort which shuffles the order.
+    bool canSwapWithLimitAndSample = false;
 };
 }  // namespace mongo

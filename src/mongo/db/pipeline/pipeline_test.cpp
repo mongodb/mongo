@@ -132,6 +132,41 @@ TEST(PipelineOptimizationTest, LimitDoesNotMoveBeforeProject) {
                               "[{$project: {_id: true, a : true}}, {$limit : 5}]");
 }
 
+TEST(PipelineOptimizationTest, SampleLegallyPushedBefore) {
+    string inputPipe =
+        "[{$replaceRoot: { newRoot: \"$a\" }}, "
+        "{$project: { b: 1 }}, "
+        "{$addFields: { c: 1 }}, "
+        "{$sample: { size: 4 }}]";
+
+    string outputPipe =
+        "[{$sample: {size: 4}}, "
+        "{$replaceRoot: {newRoot: \"$a\"}}, "
+        "{$project: {_id: true, b : true}}, "
+        "{$addFields: {c : {$const : 1}}}]";
+
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, SampleNotIllegallyPushedBefore) {
+    string inputPipe =
+        "[{$project: { a : 1 }}, "
+        "{$match: { a: 1 }}, "
+        "{$sample: { size: 4 }}]";
+
+    string outputPipe =
+        "[{$match: {a: {$eq: 1}}}, "
+        "{$sample : {size: 4}}, "
+        "{$project: {_id: true, a : true}}]";
+
+    string serializedPipe =
+        "[{$match: {a: 1}}, "
+        "{$sample : {size: 4}}, "
+        "{$project: {_id: true, a : true}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated) {
     string inputPipe = "[{$addFields : {a : 1}}, {$match : {b : 1}}]";
 

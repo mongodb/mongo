@@ -34,6 +34,7 @@
 
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -210,17 +211,8 @@ StringMap<std::string> computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(
 
 }  // namespace
 
-Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    invariant(*itr == this);
-
-    // If we are at the end of the pipeline, only optimize in the special case of a cache stage.
-    if (std::next(itr) == container->end()) {
-        return dynamic_cast<DocumentSourceSequentialDocumentCache*>(this)
-            ? doOptimizeAt(itr, container)
-            : container->end();
-    }
-
+bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
+                                     Pipeline::SourceContainer* container) {
     auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
     if (constraints().canSwapWithMatch && nextMatch && !nextMatch->isTextQuery()) {
         // We're allowed to swap with a $match and the stage after us is a $match. Furthermore, the
@@ -241,12 +233,43 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
                 container->insert(std::next(itr), std::move(splitMatch.second));
             }
 
-            // The stage before the new $match may be able to optimize further, if there is such a
-            // stage.
-            return std::prev(itr) == container->begin() ? std::prev(itr)
-                                                        : std::prev(std::prev(itr));
+            return true;
         }
     }
+    return false;
+}
+
+bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
+                                      Pipeline::SourceContainer* container) {
+    auto nextSample = dynamic_cast<DocumentSourceSample*>((*std::next(itr)).get());
+    if (constraints().canSwapWithLimitAndSample && nextSample) {
+
+        container->insert(itr, std::move(nextSample));
+        container->erase(std::next(itr));
+
+        return true;
+    }
+    return false;
+}
+
+Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    // If we are at the end of the pipeline, only optimize in the special case of a cache stage.
+    if (std::next(itr) == container->end()) {
+        return dynamic_cast<DocumentSourceSequentialDocumentCache*>(this)
+            ? doOptimizeAt(itr, container)
+            : container->end();
+    }
+
+    // Attempt to swap 'itr' with a subsequent $match or subsequent $sample.
+    if (pushMatchBefore(itr, container) || pushSampleBefore(itr, container)) {
+        // The stage before the pushed before stage may be able to optimize further, if there is
+        // such a stage.
+        return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));
+    }
+
     return doOptimizeAt(itr, container);
 }
 
