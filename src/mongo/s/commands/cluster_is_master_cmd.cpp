@@ -32,6 +32,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -118,7 +119,8 @@ public:
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
         if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36 &&
+            LogicalSessionCache::get(opCtx)->hasSessionsCollection()) {
             result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
         }
 

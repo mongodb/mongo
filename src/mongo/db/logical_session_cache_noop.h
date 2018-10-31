@@ -98,6 +98,10 @@ public:
     };
 
     void endSessions(const LogicalSessionIdSet& lsids) override {}
+
+    bool hasSessionsCollection() const override {
+        return true;
+    }
 };
 
 }  // namespace mongo

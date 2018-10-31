@@ -301,6 +301,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     auto setupStatus = _sessionsColl->setupSessionsCollection(opCtx);
 
+    _hasSessionsColl.store(setupStatus.isOK());
     if (!setupStatus.isOK()) {
         log() << "Sessions collection is not set up; "
               << "waiting until next sessions refresh interval: " << setupStatus.reason();
@@ -467,4 +468,9 @@ boost::optional<LogicalSessionRecord> LogicalSessionCacheImpl::peekCached(
     }
     return it->second;
 }
+
+bool LogicalSessionCacheImpl::hasSessionsCollection() const {
+    return _hasSessionsColl.load();
+}
+
 }  // namespace mongo

@@ -91,6 +91,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // Initially featureCompatibilityVersion is 3.6.
     checkFCV(adminDB, "3.6");
+    assert(checkIsMasterHasFields(adminDB, ['logicalSessionTimeoutMinutes']));
 
     jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value.");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
@@ -125,6 +126,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion can be set to 3.4.");
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     checkFCV(adminDB, "3.4");
+    assert(!checkIsMasterHasFields(adminDB, ['logicalSessionTimeoutMinutes']));
 
     assert.commandWorked(adminDB.runCommand({
         configureFailPoint: "failCollectionUpdates",
@@ -144,6 +146,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // featureCompatibilityVersion can be set to 3.6.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
     checkFCV(adminDB, "3.6");
+    assert(checkIsMasterHasFields(adminDB, ['logicalSessionTimeoutMinutes']));
 
     MongoRunner.stopMongod(conn);
 
@@ -154,6 +157,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     adminDB = conn.getDB("admin");
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     checkFCV(adminDB, "3.4");
+    assert(!checkIsMasterHasFields(adminDB, ['logicalSessionTimeoutMinutes']));
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
@@ -173,6 +177,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.writeOK(conn.getDB("test").coll.insert({a: 5}));
     adminDB = conn.getDB("admin");
     checkFCV34(adminDB, "3.4");
+    assert(!checkIsMasterHasFields(adminDB, ['logicalSessionTimeoutMinutes']));
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
@@ -182,6 +187,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                    " and featureCompatibilityVersion=3.4");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, "3.4");
+    assert(!checkIsMasterHasFields(adminDB, ['logicalSessionTimeoutMinutes']));
     MongoRunner.stopMongod(conn);
 
     // A 3.6 mongod started with --shardsvr and clean data files gets featureCompatibilityVersion

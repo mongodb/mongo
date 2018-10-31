@@ -93,6 +93,11 @@ public:
      */
     virtual void endSessions(const LogicalSessionIdSet& lsids) = 0;
 
+    /*
+     * Returns true if sessions collection setup was run and returned OK status.
+     */
+    virtual bool hasSessionsCollection() const = 0;
+
     /**
      * Refreshes the cache synchronously. This flushes all pending refreshes and
      * inserts to the sessions collection.

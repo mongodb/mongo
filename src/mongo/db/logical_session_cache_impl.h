@@ -129,6 +129,8 @@ public:
 
     LogicalSessionCacheStats getStats() override;
 
+    bool hasSessionsCollection() const override;
+
 private:
     /**
      * Internal methods to handle scheduling and perform refreshes for active
@@ -170,6 +172,7 @@ private:
     LogicalSessionIdSet _endingSessions;
 
     Date_t lastRefreshTime;
+    AtomicBool _hasSessionsColl{false};
 };
 
 }  // namespace mongo

@@ -58,3 +58,18 @@ function removeFCVDocument(adminDB) {
     assert.commandWorked(res, "failed to list collections");
     assert.eq(newUUID, res.cursor.firstBatch[0].info.uuid);
 }
+
+/**
+* Returns true if isMaster responce has at least one specified in the arguments fields.
+*/
+function checkIsMasterHasFields(db, fieldsToCheck) {
+    let res = db.runCommand({isMaster: 1});
+    assert.commandWorked(res);
+    for (let i = 0; i < fieldsToCheck.length; i++) {
+        let field = fieldsToCheck[i];
+        if (res.hasOwnProperty(field)) {
+            return true;
+        }
+    }
+    return false;
+}
