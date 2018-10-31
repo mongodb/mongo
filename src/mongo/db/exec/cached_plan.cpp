@@ -63,13 +63,11 @@ CachedPlanStage::CachedPlanStage(OperationContext* opCtx,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  PlanStage* root)
-    : PlanStage(kStageType, opCtx),
-      _collection(collection),
+    : RequiresCollectionStage(kStageType, opCtx, collection),
       _ws(ws),
       _canonicalQuery(cq),
       _plannerParams(params),
       _decisionWorks(decisionWorks) {
-    invariant(_collection);
     _children.emplace_back(root);
 }
 
@@ -197,7 +195,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        PlanCache* cache = _collection->infoCache()->getPlanCache();
+        PlanCache* cache = collection()->infoCache()->getPlanCache();
         cache->deactivate(*_canonicalQuery);
     }
 
@@ -224,7 +222,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         PlanStage* newRoot;
         // Only one possible plan. Build the stages from the solution.
         verify(StageBuilder::build(
-            getOpCtx(), _collection, *_canonicalQuery, *solutions[0], _ws, &newRoot));
+            getOpCtx(), collection(), *_canonicalQuery, *solutions[0], _ws, &newRoot));
         _children.emplace_back(newRoot);
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
@@ -242,7 +240,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     auto cachingMode = shouldCache ? MultiPlanStage::CachingMode::AlwaysCache
                                    : MultiPlanStage::CachingMode::NeverCache;
     _children.emplace_back(
-        new MultiPlanStage(getOpCtx(), _collection, _canonicalQuery, cachingMode));
+        new MultiPlanStage(getOpCtx(), collection(), _canonicalQuery, cachingMode));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {
@@ -252,7 +250,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
         PlanStage* nextPlanRoot;
         verify(StageBuilder::build(
-            getOpCtx(), _collection, *_canonicalQuery, *solutions[ix], _ws, &nextPlanRoot));
+            getOpCtx(), collection(), *_canonicalQuery, *solutions[ix], _ws, &nextPlanRoot));
 
         // Takes ownership of 'nextPlanRoot'.
         multiPlanStage->addPlan(std::move(solutions[ix]), nextPlanRoot, _ws);
@@ -308,7 +306,7 @@ const SpecificStats* CachedPlanStage::getSpecificStats() const {
 void CachedPlanStage::updatePlanCache() {
     const double score = PlanRanker::scoreTree(getStats()->children[0].get());
 
-    PlanCache* cache = _collection->infoCache()->getPlanCache();
+    PlanCache* cache = collection()->infoCache()->getPlanCache();
     Status fbs = cache->feedback(*_canonicalQuery, score);
     if (!fbs.isOK()) {
         LOG(5) << _canonicalQuery->ns() << ": Failed to update cache with feedback: " << redact(fbs)

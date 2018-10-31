@@ -40,6 +40,8 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -54,10 +56,18 @@ using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
+const std::string kTestNamespace = "test.coll";
+
 class QueryStageNearTest : public unittest::Test {
+public:
+    void setUp() override {
+        directClient.createCollection(kTestNamespace);
+    }
+
 protected:
     const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
     OperationContext* const _opCtx = _uniqOpCtx.get();
+    DBDirectClient directClient{_opCtx};
 };
 
 /**
@@ -75,8 +85,8 @@ public:
         double max;
     };
 
-    MockNearStage(OperationContext* opCtx, WorkingSet* workingSet)
-        : NearStage(opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, NULL),
+    MockNearStage(OperationContext* opCtx, WorkingSet* workingSet, const Collection* coll)
+        : NearStage(opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, coll),
           _pos(0) {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
@@ -85,7 +95,7 @@ public:
 
     virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                                       WorkingSet* workingSet,
-                                                      Collection* collection) {
+                                                      const Collection* collection) {
         if (_pos == static_cast<int>(_intervals.size()))
             return StatusWith<CoveredInterval*>(NULL);
 
@@ -116,7 +126,6 @@ public:
 
     virtual StageState initialize(OperationContext* opCtx,
                                   WorkingSet* workingSet,
-                                  Collection* collection,
                                   WorkingSetID* out) {
         return IS_EOF;
     }
@@ -156,7 +165,11 @@ TEST_F(QueryStageNearTest, Basic) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_opCtx, &workingSet);
+    AutoGetCollectionForRead autoColl(_opCtx, NamespaceString{kTestNamespace});
+    auto* coll = autoColl.getCollection();
+    ASSERT(coll);
+
+    MockNearStage nearStage(_opCtx, &workingSet, coll);
 
     // First set of results
     mockData.clear();
@@ -191,7 +204,11 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_opCtx, &workingSet);
+    AutoGetCollectionForRead autoColl(_opCtx, NamespaceString{kTestNamespace});
+    auto* coll = autoColl.getCollection();
+    ASSERT(coll);
+
+    MockNearStage nearStage(_opCtx, &workingSet, coll);
 
     // Empty set of results
     mockData.clear();

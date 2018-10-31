@@ -66,17 +66,14 @@ MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
                                const Collection* collection,
                                CanonicalQuery* cq,
                                CachingMode cachingMode)
-    : PlanStage(kStageType, opCtx),
-      _collection(collection),
+    : RequiresCollectionStage(kStageType, opCtx, collection),
       _cachingMode(cachingMode),
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
       _backupPlanIdx(kNoSuchPlan),
       _failure(false),
       _failureCount(0),
-      _statusMemberId(WorkingSet::INVALID_ID) {
-    invariant(_collection);
-}
+      _statusMemberId(WorkingSet::INVALID_ID) {}
 
 void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
                              PlanStage* root,
@@ -130,7 +127,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
         // if the best solution fails. Alternatively we could try to
         // defer cache insertion to be after the first produced result.
 
-        _collection->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
+        collection()->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;
@@ -204,7 +201,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // make sense.
     ScopedTimer timer(getClock(), &_commonStats.executionTimeMillis);
 
-    size_t numWorks = getTrialPeriodWorks(getOpCtx(), _collection);
+    size_t numWorks = getTrialPeriodWorks(getOpCtx(), collection());
     size_t numResults = getTrialPeriodNumToReturn(*_query);
 
     // Work the plans, stopping when a plan hits EOF or returns some
@@ -273,7 +270,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             size_t runnerUpIdx = ranking->candidateOrder[1];
 
             LOG(1) << "Winning plan tied with runner-up. Not caching."
-                   << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
+                   << " ns: " << collection()->ns() << " " << redact(_query->toStringShort())
                    << " winner score: " << ranking->scores[0]
                    << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root)
                    << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
@@ -287,7 +284,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             size_t winnerIdx = ranking->candidateOrder[0];
             LOG(1) << "Winning plan had zero results. Not caching."
-                   << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
+                   << " ns: " << collection()->ns() << " " << redact(_query->toStringShort())
                    << " winner score: " << ranking->scores[0]
                    << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root);
         }
@@ -321,7 +318,8 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
 
         if (validSolutions) {
-            _collection->infoCache()
+            collection()
+                ->infoCache()
                 ->getPlanCache()
                 ->set(*_query,
                       solutions,

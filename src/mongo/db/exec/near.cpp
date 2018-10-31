@@ -47,10 +47,9 @@ NearStage::NearStage(OperationContext* opCtx,
                      const char* typeName,
                      StageType type,
                      WorkingSet* workingSet,
-                     Collection* collection)
-    : PlanStage(typeName, opCtx),
+                     const Collection* collection)
+    : RequiresCollectionStage(typeName, opCtx, collection),
       _workingSet(workingSet),
-      _collection(collection),
       _searchState(SearchState_Initializing),
       _nextIntervalStats(nullptr),
       _stageType(type),
@@ -69,7 +68,7 @@ NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
 
 
 PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
-    PlanStage::StageState state = initialize(getOpCtx(), _workingSet, _collection, out);
+    PlanStage::StageState state = initialize(getOpCtx(), _workingSet, out);
     if (state == PlanStage::IS_EOF) {
         _searchState = SearchState_Buffering;
         return PlanStage::NEED_TIME;
@@ -141,7 +140,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
 
     if (!_nextInterval) {
         StatusWith<CoveredInterval*> intervalStatus =
-            nextInterval(getOpCtx(), _workingSet, _collection);
+            nextInterval(getOpCtx(), _workingSet, collection());
         if (!intervalStatus.isOK()) {
             _searchState = SearchState_Finished;
             *error = intervalStatus.getStatus();

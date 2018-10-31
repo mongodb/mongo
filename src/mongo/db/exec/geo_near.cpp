@@ -295,12 +295,11 @@ public:
 
     PlanStage::StageState work(OperationContext* opCtx,
                                WorkingSet* workingSet,
-                               Collection* collection,
                                WorkingSetID* out,
                                double* estimatedDistance);
 
 private:
-    void buildIndexScan(OperationContext* opCtx, WorkingSet* workingSet, Collection* collection);
+    void buildIndexScan(OperationContext* opCtx, WorkingSet* workingSet);
 
     PlanStage::Children* _children;     // Points to PlanStage::_children in the NearStage.
     const IndexDescriptor* _twoDIndex;  // Not owned here.
@@ -314,8 +313,7 @@ private:
 
 // Initialize the internal states
 void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
-                                                      WorkingSet* workingSet,
-                                                      Collection* collection) {
+                                                      WorkingSet* workingSet) {
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
     IndexScanParams scanParams(opCtx, *_twoDIndex);
@@ -357,12 +355,11 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
 // from the nearest document.
 PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* opCtx,
                                                              WorkingSet* workingSet,
-                                                             Collection* collection,
                                                              WorkingSetID* out,
                                                              double* estimatedDistance) {
     if (!_indexScan) {
         // Setup index scan stage for current level.
-        buildIndexScan(opCtx, workingSet, collection);
+        buildIndexScan(opCtx, workingSet);
     }
 
     WorkingSetID workingSetID;
@@ -432,7 +429,6 @@ PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* o
 
 PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
                                                  WorkingSet* workingSet,
-                                                 Collection* collection,
                                                  WorkingSetID* out) {
     if (!_densityEstimator) {
         _densityEstimator.reset(
@@ -441,7 +437,7 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
 
     double estimatedDistance;
     PlanStage::StageState state =
-        _densityEstimator->work(opCtx, workingSet, collection, out, &estimatedDistance);
+        _densityEstimator->work(opCtx, workingSet, out, &estimatedDistance);
 
     if (state == PlanStage::IS_EOF) {
         // 2d index only works with legacy points as centroid. $nearSphere will project
@@ -479,7 +475,7 @@ static const string kTwoDIndexNearStage("GEO_NEAR_2D");
 GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                                OperationContext* opCtx,
                                WorkingSet* workingSet,
-                               Collection* collection,
+                               const Collection* collection,
                                IndexDescriptor* twoDIndex)
     : NearStage(opCtx, kTwoDIndexNearStage.c_str(), STAGE_GEO_NEAR_2D, workingSet, collection),
       _nearParams(nearParams),
@@ -596,7 +592,7 @@ static R2Annulus projectBoundsToTwoDDegrees(R2Annulus sphereBounds) {
 StatusWith<NearStage::CoveredInterval*>  //
     GeoNear2DStage::nextInterval(OperationContext* opCtx,
                                  WorkingSet* workingSet,
-                                 Collection* collection) {
+                                 const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
         return StatusWith<CoveredInterval*>(NULL);
@@ -773,7 +769,7 @@ static const string kS2IndexNearStage("GEO_NEAR_2DSPHERE");
 GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
                                            OperationContext* opCtx,
                                            WorkingSet* workingSet,
-                                           Collection* collection,
+                                           const Collection* collection,
                                            IndexDescriptor* s2Index)
     : NearStage(opCtx, kS2IndexNearStage.c_str(), STAGE_GEO_NEAR_2DSPHERE, workingSet, collection),
       _nearParams(nearParams),
@@ -860,12 +856,11 @@ public:
     // Return IS_EOF is such document exists and set the estimated distance to the nearest doc.
     PlanStage::StageState work(OperationContext* opCtx,
                                WorkingSet* workingSet,
-                               Collection* collection,
                                WorkingSetID* out,
                                double* estimatedDistance);
 
 private:
-    void buildIndexScan(OperationContext* opCtx, WorkingSet* workingSet, Collection* collection);
+    void buildIndexScan(OperationContext* opCtx, WorkingSet* workingSet);
 
     PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
     const IndexDescriptor* _s2Index;   // Not owned here.
@@ -878,8 +873,7 @@ private:
 
 // Setup the index scan stage for neighbors at this level.
 void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
-                                                            WorkingSet* workingSet,
-                                                            Collection* collection) {
+                                                            WorkingSet* workingSet) {
     IndexScanParams scanParams(opCtx, *_s2Index);
     scanParams.bounds = _nearParams->baseBounds;
 
@@ -909,12 +903,11 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* op
 
 PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationContext* opCtx,
                                                                    WorkingSet* workingSet,
-                                                                   Collection* collection,
                                                                    WorkingSetID* out,
                                                                    double* estimatedDistance) {
     if (!_indexScan) {
         // Setup index scan stage for current level.
-        buildIndexScan(opCtx, workingSet, collection);
+        buildIndexScan(opCtx, workingSet);
     }
 
     WorkingSetID workingSetID;
@@ -987,7 +980,6 @@ PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationCont
 
 PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
                                                        WorkingSet* workingSet,
-                                                       Collection* collection,
                                                        WorkingSetID* out) {
     if (!_densityEstimator) {
         _densityEstimator.reset(
@@ -996,7 +988,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
 
     double estimatedDistance;
     PlanStage::StageState state =
-        _densityEstimator->work(opCtx, workingSet, collection, out, &estimatedDistance);
+        _densityEstimator->work(opCtx, workingSet, out, &estimatedDistance);
 
     if (state == IS_EOF) {
         // We find a document in 4 neighbors at current level, but didn't at previous level.
@@ -1019,7 +1011,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
 StatusWith<NearStage::CoveredInterval*>  //
     GeoNear2DSphereStage::nextInterval(OperationContext* opCtx,
                                        WorkingSet* workingSet,
-                                       Collection* collection) {
+                                       const Collection* collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
         return StatusWith<CoveredInterval*>(NULL);

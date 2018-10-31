@@ -49,7 +49,9 @@ public:
     RequiresCollectionStage(const char* stageType, OperationContext* opCtx, const Collection* coll)
         : PlanStage(stageType, opCtx),
           _collection(coll),
-          _collectionUUID(_collection->uuid().get()) {}
+          _collectionUUID(_collection->uuid().get()) {
+        invariant(_collection);
+    }
 
     virtual ~RequiresCollectionStage() = default;
 

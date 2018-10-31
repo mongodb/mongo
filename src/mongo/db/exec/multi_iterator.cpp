@@ -47,19 +47,13 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 MultiIteratorStage::MultiIteratorStage(OperationContext* opCtx,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : PlanStage(kStageType, opCtx), _collection(collection), _ws(ws) {}
+    : RequiresCollectionStage(kStageType, opCtx, collection), _ws(ws) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
 }
 
 PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
-    if (_collection == NULL) {
-        Status status(ErrorCodes::InternalError, "MultiIteratorStage died on null collection");
-        *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-        return PlanStage::DEAD;
-    }
-
     boost::optional<Record> record;
     try {
         while (!_iterators.empty()) {
@@ -87,25 +81,19 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
 }
 
 bool MultiIteratorStage::isEOF() {
-    return _collection == NULL || _iterators.empty();
+    return _iterators.empty();
 }
 
-void MultiIteratorStage::kill() {
-    _collection = NULL;
-    _iterators.clear();
-}
-
-void MultiIteratorStage::doSaveState() {
+void MultiIteratorStage::saveState(RequiresCollTag) {
     for (auto&& iterator : _iterators) {
         iterator->save();
     }
 }
 
-void MultiIteratorStage::doRestoreState() {
+void MultiIteratorStage::restoreState(RequiresCollTag) {
     for (auto&& iterator : _iterators) {
-        if (!iterator->restore()) {
-            kill();
-        }
+        const bool couldRestore = iterator->restore();
+        uassert(50991, "could not restore cursor for MULTI_ITERATOR stage", couldRestore);
     }
 }
 

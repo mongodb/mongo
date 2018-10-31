@@ -37,7 +37,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -69,10 +69,10 @@ class OperationContext;
  *
  *   --Plans for entire rooted $or queries are neither written to nor read from the plan cache.
  */
-class SubplanStage final : public PlanStage {
+class SubplanStage final : public RequiresCollectionStage {
 public:
     SubplanStage(OperationContext* opCtx,
-                 Collection* collection,
+                 const Collection* collection,
                  WorkingSet* ws,
                  const QueryPlannerParams& params,
                  CanonicalQuery* cq);
@@ -127,6 +127,11 @@ public:
         return _compositeSolution.get();
     }
 
+protected:
+    void saveState(RequiresCollTag) final {}
+
+    void restoreState(RequiresCollTag) final {}
+
 private:
     /**
      * A class used internally in order to keep track of the results of planning
@@ -173,9 +178,6 @@ private:
      * Used as a fallback if subplanning fails. Helper for pickBestPlan().
      */
     Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
-
-    // Not owned here. Must be non-null.
-    Collection* _collection;
 
     // Not owned here.
     WorkingSet* _ws;

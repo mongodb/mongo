@@ -37,8 +37,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
@@ -88,7 +88,7 @@ namespace mongo {
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
  */
-class NearStage : public PlanStage {
+class NearStage : public RequiresCollectionStage {
 public:
     struct CoveredInterval;
 
@@ -109,7 +109,7 @@ protected:
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,
-              Collection* collection);
+              const Collection* collection);
 
     //
     // Methods implemented for specific search functionality
@@ -124,7 +124,7 @@ protected:
      */
     virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                                       WorkingSet* workingSet,
-                                                      Collection* collection) = 0;
+                                                      const Collection* collection) = 0;
 
     /**
      * Computes the distance value for the given member data, or -1 if the member should not be
@@ -143,8 +143,11 @@ protected:
      */
     virtual StageState initialize(OperationContext* opCtx,
                                   WorkingSet* workingSet,
-                                  Collection* collection,
                                   WorkingSetID* out) = 0;
+
+    void saveState(RequiresCollTag) final {}
+
+    void restoreState(RequiresCollTag) final {}
 
     // Filled in by subclasses.
     NearStats _specificStats;
@@ -163,7 +166,6 @@ private:
     //
 
     WorkingSet* const _workingSet;
-    Collection* const _collection;
 
     // A progressive search works in stages of buffering and then advancing
     enum SearchState {

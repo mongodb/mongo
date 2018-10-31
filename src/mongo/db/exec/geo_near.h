@@ -70,19 +70,18 @@ public:
     GeoNear2DStage(const GeoNearParams& nearParams,
                    OperationContext* opCtx,
                    WorkingSet* workingSet,
-                   Collection* collection,
+                   const Collection* collection,
                    IndexDescriptor* twoDIndex);
 
 protected:
     StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                               WorkingSet* workingSet,
-                                              Collection* collection) final;
+                                              const Collection* collection) final;
 
     StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
     PlanStage::StageState initialize(OperationContext* opCtx,
                                      WorkingSet* workingSet,
-                                     Collection* collection,
                                      WorkingSetID* out) final;
 
 private:
@@ -116,7 +115,7 @@ public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
                          OperationContext* opCtx,
                          WorkingSet* workingSet,
-                         Collection* collection,
+                         const Collection* collection,
                          IndexDescriptor* s2Index);
 
     ~GeoNear2DSphereStage();
@@ -124,13 +123,12 @@ public:
 protected:
     StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                               WorkingSet* workingSet,
-                                              Collection* collection) final;
+                                              const Collection* collection) final;
 
     StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
     PlanStage::StageState initialize(OperationContext* opCtx,
                                      WorkingSet* workingSet,
-                                     Collection* collection,
                                      WorkingSetID* out) final;
 
 private:

@@ -68,7 +68,7 @@ using std::unique_ptr;
 using stdx::make_unique;
 
 PlanStage* buildStages(OperationContext* opCtx,
-                       Collection* collection,
+                       const Collection* collection,
                        const CanonicalQuery& cq,
                        const QuerySolution& qsol,
                        const QuerySolutionNode* root,
@@ -277,7 +277,7 @@ PlanStage* buildStages(OperationContext* opCtx,
                 opCtx, node->index.identifier.catalogName);
             invariant(desc);
             const FTSAccessMethod* fam =
-                static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
+                static_cast<const FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
             invariant(fam);
 
             TextStageParams params(fam->getSpec());
@@ -389,7 +389,7 @@ PlanStage* buildStages(OperationContext* opCtx,
 
 // static (this one is used for Cached and MultiPlanStage)
 bool StageBuilder::build(OperationContext* opCtx,
-                         Collection* collection,
+                         const Collection* collection,
                          const CanonicalQuery& cq,
                          const QuerySolution& solution,
                          WorkingSet* wsIn,

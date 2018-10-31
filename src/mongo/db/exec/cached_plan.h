@@ -33,7 +33,7 @@
 #include <memory>
 #include <queue>
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
@@ -52,7 +52,7 @@ class PlanYieldPolicy;
  * Preconditions: Valid RecordId.
  *
  */
-class CachedPlanStage final : public PlanStage {
+class CachedPlanStage final : public RequiresCollectionStage {
 public:
     CachedPlanStage(OperationContext* opCtx,
                     Collection* collection,
@@ -86,6 +86,11 @@ public:
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
+protected:
+    void saveState(RequiresCollTag) final {}
+
+    void restoreState(RequiresCollTag) final {}
+
 private:
     /**
      * Passes stats from the trial period run of the cached plan to the plan cache.
@@ -114,9 +119,6 @@ private:
      * ErrorCodes::MaxTimeMSExpired if the operation exceeded its time limit.
      */
     Status tryYield(PlanYieldPolicy* yieldPolicy);
-
-    // Not owned. Must be non-null.
-    Collection* _collection;
 
     // Not owned.
     WorkingSet* _ws;

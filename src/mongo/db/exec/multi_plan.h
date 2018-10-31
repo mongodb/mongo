@@ -32,7 +32,7 @@
 
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
@@ -51,7 +51,7 @@ namespace mongo {
  *
  * Owns the query solutions and PlanStage roots for all candidate plans.
  */
-class MultiPlanStage final : public PlanStage {
+class MultiPlanStage final : public RequiresCollectionStage {
 public:
     /**
      * Callers use this to specify how the MultiPlanStage should interact with the plan cache.
@@ -153,6 +153,11 @@ public:
 
     static const char* kStageType;
 
+protected:
+    void saveState(RequiresCollTag) final {}
+
+    void restoreState(RequiresCollTag) final {}
+
 private:
     //
     // Have all our candidate plans do something.
@@ -177,9 +182,6 @@ private:
     Status tryYield(PlanYieldPolicy* yieldPolicy);
 
     static const int kNoSuchPlan = -1;
-
-    // Not owned here. Must be non-null.
-    const Collection* _collection;
 
     // Describes the cases in which we should write an entry for the winning plan to the plan cache.
     const CachingMode _cachingMode;
