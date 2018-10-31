@@ -204,9 +204,9 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     User::CredentialData credentials = userObj->getCredentials();
     UserName userName = userObj->getName();
 
-    _scramCredentials = credentials.scram<HashBlock>();
+    auto scramCredentials = credentials.scram<HashBlock>();
 
-    if (!_scramCredentials.isValid()) {
+    if (!scramCredentials.isValid()) {
         // Check for authentication attempts of the __system user on
         // systems started without a keyfile.
         if (userName == internalSecurity.user->getName()) {
@@ -220,9 +220,16 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         }
     }
 
-    _secrets = scram::Secrets<HashBlock>("",
-                                         base64::decode(_scramCredentials.storedKey),
-                                         base64::decode(_scramCredentials.serverKey));
+    _secrets.push_back(scram::Secrets<HashBlock>("",
+                                                 base64::decode(scramCredentials.storedKey),
+                                                 base64::decode(scramCredentials.serverKey)));
+
+    if (userName == internalSecurity.user->getName() && internalSecurity.alternateCredentials) {
+        auto altCredentials = internalSecurity.alternateCredentials->scram<HashBlock>();
+        _secrets.push_back(scram::Secrets<HashBlock>("",
+                                                     base64::decode(altCredentials.storedKey),
+                                                     base64::decode(altCredentials.serverKey)));
+    }
 
     // Generate server-first-message
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
@@ -238,8 +245,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     _nonce =
         clientNonce + base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
     StringBuilder sb;
-    sb << "r=" << _nonce << ",s=" << _scramCredentials.salt
-       << ",i=" << _scramCredentials.iterationCount;
+    sb << "r=" << _nonce << ",s=" << scramCredentials.salt
+       << ",i=" << scramCredentials.iterationCount;
     std::string outputData = sb.str();
 
     // add client-first-message-bare and server-first-message to _authMessage
@@ -327,14 +334,25 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
 
-    if (!_secrets.verifyClientProof(_authMessage, base64::decode(proof.toString()))) {
+    const auto decodedProof = base64::decode(proof.toString());
+    std::string serverSignature;
+    const auto checkSecret = [&](const scram::Secrets<HashBlock>& secret) {
+        if (!secret.verifyClientProof(_authMessage, decodedProof))
+            return false;
+
+        serverSignature = secret.generateServerSignature(_authMessage);
+        return true;
+    };
+
+    if (!std::any_of(_secrets.begin(), _secrets.end(), checkSecret)) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "SCRAM authentication failed, storedKey mismatch");
     }
 
+    invariant(!serverSignature.empty());
     StringBuilder sb;
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    sb << "v=" << _secrets.generateServerSignature(_authMessage);
+    sb << "v=" << serverSignature;
 
     return std::make_tuple(false, sb.str());
 }

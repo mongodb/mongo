@@ -34,12 +34,11 @@
 
 #include "mongo/db/auth/internal_user_auth.h"
 
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace mmb = mongo::mutablebson;
+namespace {
 
 // not guarded by the authParams mutex never changed in
 // multi-threaded operation
@@ -47,30 +46,50 @@ static bool authParamsSet = false;
 
 // Store default authentication parameters for internal authentication to cluster members,
 // guarded by the authParams mutex
-static BSONObj authParams;
+static std::vector<BSONObj> authParams;
 
 static stdx::mutex authParamMutex;
+
+template <typename Container>
+void setInternalUserAuthParamsFromContainer(Container&& params) {
+    if (!isInternalAuthSet()) {
+        authParamsSet = true;
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(authParamMutex);
+    authParams.clear();
+    std::transform(params.begin(),
+                   params.end(),
+                   std::back_inserter(authParams),
+                   [](const BSONObj& obj) { return obj.getOwned(); });
+}
+
+}  // namespace
 
 bool isInternalAuthSet() {
     return authParamsSet;
 }
 
-void setInternalUserAuthParams(const BSONObj& authParamsIn) {
-    if (!isInternalAuthSet()) {
-        authParamsSet = true;
-    }
-    stdx::lock_guard<stdx::mutex> lk(authParamMutex);
-
-    authParams = authParamsIn.copy();
+void setInternalUserAuthParams(BSONObj authParamsIn) {
+    setInternalUserAuthParamsFromContainer(std::initializer_list<BSONObj>{authParamsIn});
 }
 
-BSONObj getInternalUserAuthParams() {
+void setInternalUserAuthParams(const std::vector<BSONObj>& keys) {
+    setInternalUserAuthParamsFromContainer(keys);
+}
+
+size_t getInternalUserAuthParamsCount() {
+    stdx::lock_guard<stdx::mutex> lk(authParamMutex);
+    return authParams.size();
+}
+
+BSONObj getInternalUserAuthParams(size_t idx) {
     if (!authParamsSet) {
         return BSONObj();
     }
 
     stdx::lock_guard<stdx::mutex> lk(authParamMutex);
-    return authParams.copy();
+    return (idx < authParams.size()) ? authParams.at(idx) : BSONObj();
 }
 
 }  // namespace mongo

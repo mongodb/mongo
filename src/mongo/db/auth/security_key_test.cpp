@@ -29,11 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/security_file.h"
-
 #include "boost/filesystem.hpp"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/security_file.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -68,21 +69,26 @@ private:
 };
 
 struct TestCase {
-    enum class FailureMode { Success, Permissions, Parsing };
+    enum class FailureMode { Success, Permissions, Parsing, SecurityKeyConstraint };
 
     TestCase(StringData contents_,
              std::initializer_list<std::string> expected_,
-             FailureMode mode = FailureMode::Success)
-        : fileContents(contents_.toString()),
-          expected(expected_),
-          expectGoodParse(mode == FailureMode::Success),
-          expectGoodPerms(mode == FailureMode::Success || mode == FailureMode::Parsing) {}
+             FailureMode mode_ = FailureMode::Success)
+        : fileContents(contents_.toString()), expected(expected_), mode(mode_) {}
 
     std::string fileContents;
     std::vector<std::string> expected;
-    bool expectGoodParse = true;
-    bool expectGoodPerms = true;
+    FailureMode mode = FailureMode::Success;
 };
+
+StringData longKeyMaker() {
+    static const auto longKey = [] {
+        std::array<char, 1026> ret;
+        ret.fill('a');
+        return ret;
+    }();
+    return StringData(longKey.data(), longKey.size());
+}
 
 std::initializer_list<TestCase> testCases = {
     // Our good ole insecure key
@@ -107,7 +113,7 @@ std::initializer_list<TestCase> testCases = {
      {"foopdedoop", "G92sqe/Y9Nn92fU1M8Q=cIKI"}},
 
     // An array of keys with the JSON-like YAML array format
-    {"[ \"foop de doop\", \"key 2\" ]", {"foopdedoop", "key2"}},
+    {"[ \"foop de doop\", \"other key\" ]", {"foopdedoop", "otherkey"}},
 
     // An empty file doesn't parse correctly
     {"", {}, TestCase::FailureMode::Parsing},
@@ -123,14 +129,19 @@ std::initializer_list<TestCase> testCases = {
 
     // A file with bad permissions doesn't parse correctly
     {"", {}, TestCase::FailureMode::Permissions},
-};
+
+    // These two keys should pass the security file parsing, but fail loading them as
+    // security keys because they are too short or two long
+    {"abc", {"abc"}, TestCase::FailureMode::SecurityKeyConstraint},
+    {longKeyMaker(), {longKeyMaker().toString()}, TestCase::FailureMode::SecurityKeyConstraint}};
 
 TEST(SecurityFile, Test) {
     for (const auto& testCase : testCases) {
-        TestFile file(testCase.fileContents, testCase.expectGoodPerms);
+        TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);
 
         auto swKeys = readSecurityFile(file.path().string());
-        if (testCase.expectGoodParse && testCase.expectGoodPerms) {
+        if (testCase.mode == TestCase::FailureMode::Success ||
+            testCase.mode == TestCase::FailureMode::SecurityKeyConstraint) {
             ASSERT_OK(swKeys.getStatus());
         } else {
             ASSERT_NOT_OK(swKeys.getStatus());
@@ -139,12 +150,22 @@ TEST(SecurityFile, Test) {
 
         auto keys = std::move(swKeys.getValue());
         ASSERT_EQ(keys.size(), testCase.expected.size());
-        if (testCase.expected.size() == 1) {
-            ASSERT_EQ(keys.front(), testCase.expected.front());
+        for (size_t i = 0; i < keys.size(); i++) {
+            ASSERT_EQ(keys.at(i), testCase.expected.at(i));
+        }
+    }
+}
+
+TEST(SecurityKey, Test) {
+    internalSecurity.user = std::make_shared<User>(UserName("__system", "local"));
+
+    for (const auto& testCase : testCases) {
+        TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);
+
+        if (testCase.mode == TestCase::FailureMode::Success) {
+            ASSERT_TRUE(setUpSecurityKey(file.path().string()));
         } else {
-            for (size_t i = 0; i < keys.size(); i++) {
-                ASSERT_EQ(keys.at(i), testCase.expected.at(i));
-            }
+            ASSERT_FALSE(setUpSecurityKey(file.path().string()));
         }
     }
 }

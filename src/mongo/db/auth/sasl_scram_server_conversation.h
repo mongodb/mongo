@@ -82,8 +82,10 @@ private:
 
     int _step{0};
     std::string _authMessage;
-    User::SCRAMCredentials<HashBlock> _scramCredentials;
-    scram::Secrets<HashBlock> _secrets;
+
+    // The secrets to check the client proof against during the second step
+    // Usually only contains one element, except during key rollover.
+    std::vector<scram::Secrets<HashBlock>> _secrets;
 
     // client and server nonce concatenated
     std::string _nonce;

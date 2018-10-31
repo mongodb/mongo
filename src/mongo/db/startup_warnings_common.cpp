@@ -38,6 +38,7 @@
 #include <fstream>
 
 #include "mongo/config.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
@@ -136,6 +137,15 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         warned = true;
     }
 
+    if (!getInternalUserAuthParams(1).isEmpty()) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: Multiple keys specified in security key file. If cluster key file"
+              << startupWarningsLog;
+        log() << "            rollover is not in progress, only one key should be specified in"
+              << startupWarningsLog;
+        log() << "            the key file" << startupWarningsLog;
+        warned = true;
+    }
 
     if (warned) {
         log() << startupWarningsLog;

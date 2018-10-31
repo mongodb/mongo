@@ -185,8 +185,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
     ],
 )
 
@@ -219,6 +217,19 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/md5',
+    ],
+)
+
+env.CppUnitTest(
+    target='security_key_test',
+    source=[
+        'security_key_test.cpp',
+    ],
+    LIBDEPS=[
+        'auth',
+        'security_file',
+        'security_key',
+        'user',
     ],
 )
 
@@ -256,16 +267,6 @@ yamlEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_yaml',
-    ],
-)
-
-env.CppUnitTest(
-    target='security_file_test',
-    source=[
-        'security_file_test.cpp',
-    ],
-    LIBDEPS=[
-        'security_file',
     ],
 )
 

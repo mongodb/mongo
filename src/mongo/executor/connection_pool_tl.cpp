@@ -188,7 +188,21 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
             _client = std::move(client);
             return _client->initWireVersion("NetworkInterfaceTL", _onConnectHook);
         })
-        .then([this] { return _client->authenticate(getInternalUserAuthParams()); })
+        .then([this] {
+            // Try to authenticate with the default system credentials
+            return _client->authenticate(getInternalUserAuthParams())
+                .onError([this](Status status) -> Future<void> {
+                    // If we're in the middle of a keyfile rollover, there may be alternate
+                    // credentials to try.
+                    const auto altParams = getInternalUserAuthParams(1);
+                    if (!altParams.isEmpty() && status == ErrorCodes::AuthenticationFailed) {
+                        return _client->authenticate(altParams);
+                    } else {
+                        // If there weren't alternate credentials, the original error stands.
+                        return status;
+                    }
+                });
+        })
         .then([this] {
             if (!_onConnectHook) {
                 return Future<void>::makeReady();

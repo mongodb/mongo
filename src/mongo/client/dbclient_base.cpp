@@ -492,16 +492,39 @@ bool DBClientBase::authenticateInternalUser() {
         return false;
     }
 
-    try {
-        auth(getInternalUserAuthParams());
-        return true;
-    } catch (const AssertionException& ex) {
-        if (!serverGlobalParams.quiet.load()) {
-            log() << "can't authenticate to " << toString()
-                  << " as internal user, error: " << ex.what();
+    Status authStatus(ErrorCodes::InternalError, "Status was not set after authentication");
+    auto attemptAuth = [&](const BSONObj& params) {
+        if (params.isEmpty()) {
+            return;
         }
-        return false;
+
+        try {
+            auth(params);
+            authStatus = Status::OK();
+        } catch (const AssertionException& ex) {
+            authStatus = ex.toStatus();
+        }
+    };
+
+    // First we attempt to authenticate with the default authentication parameters.
+    attemptAuth(getInternalUserAuthParams());
+
+    // If we're in the middle of keyfile rollover, we try to authenticate again with the alternate
+    // credentials in the keyfile.
+    if (authStatus == ErrorCodes::AuthenticationFailed) {
+        attemptAuth(getInternalUserAuthParams(1));
     }
+
+    if (authStatus.isOK()) {
+        return true;
+    }
+
+    if (serverGlobalParams.quiet.load()) {
+        log() << "can't authenticate to " << toString()
+              << " as internal user, error: " << authStatus.reason();
+    }
+
+    return false;
 }
 
 void DBClientBase::auth(const BSONObj& params) {

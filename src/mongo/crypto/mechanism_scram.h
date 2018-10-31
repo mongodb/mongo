@@ -249,8 +249,15 @@ public:
 
     static BSONObj generateCredentials(std::string password, int iterationCount) {
         auto salt = Presecrets<HashBlock>::generateSecureRandomSalt();
+        return generateCredentials(salt, password, iterationCount);
+    }
+
+    static BSONObj generateCredentials(const std::vector<uint8_t>& salt,
+                                       const std::string& password,
+                                       int iterationCount) {
         Secrets<HashBlock> secrets(Presecrets<HashBlock>(password, salt, iterationCount));
-        const auto encodedSalt = base64::encode(reinterpret_cast<char*>(salt.data()), salt.size());
+        const auto encodedSalt =
+            base64::encode(reinterpret_cast<const char*>(salt.data()), salt.size());
         return BSON(kIterationCountFieldName << iterationCount << kSaltFieldName << encodedSalt
                                              << kStoredKeyFieldName
                                              << secrets.storedKey().toString()

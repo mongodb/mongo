@@ -1886,7 +1886,7 @@ if env['TARGET_ARCH'] == 'i386':
 
 # Needed for auth tests since key files are stored in git with mode 644.
 if not env.TargetOSIs('windows'):
-    for keysuffix in [ "1" , "2" ]:
+    for keysuffix in [ "1" , "2", "ForRollover" ]:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 

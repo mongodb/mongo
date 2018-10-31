@@ -33,6 +33,8 @@
 #include <memory>
 #include <string>
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/shim.h"
@@ -67,6 +69,9 @@ class UserDocumentParser;
  */
 struct AuthInfo {
     UserHandle user;
+
+    // Used during keyfile rollover to store the alternate key used to authenticate
+    boost::optional<User::CredentialData> alternateCredentials;
 };
 extern AuthInfo internalSecurity;  // set at startup and not changed after initialization.
 

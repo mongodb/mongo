@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 namespace mongo {
 class BSONObj;
 
@@ -41,19 +44,29 @@ class BSONObj;
 bool isInternalAuthSet();
 
 /**
+ * This method initializes the authParams from a list of keys. It defaults to generating
+ * SCRAM-SHA-1 credentials only.
+ */
+void setInternalUserAuthParams(const std::vector<BSONObj>& keys);
+
+/**
  * This method initializes the authParams object with authentication
  * credentials to be used by authenticateInternalUser.
  */
-void setInternalUserAuthParams(const BSONObj& authParamsIn);
+void setInternalUserAuthParams(BSONObj obj);
 
 /**
- * Returns a copy of the authParams object to be used by authenticateInternalUser
+ * Returns a BSON object containing user info to be used by authenticateInternalUser
  *
  * The format of the return object is { authparams, fallbackParams:params}
  *
  * If SCRAM-SHA-1 is the internal auth mechanism the fallbackParams sub document is
  * for MONGODB-CR auth is included. For MONGODB-XC509 no fallbackParams document is
  * returned.
+ *
+ * If no internal auth information has been set then this returns an empty BSONObj.
  **/
-BSONObj getInternalUserAuthParams();
+
+BSONObj getInternalUserAuthParams(size_t idx = 0);
+
 }  // namespace mongo
