@@ -37,9 +37,12 @@
         }
         withPinnedCursor({
             conn: conn,
+            sessionId: null,
+            db: conn.getDB("test"),
             assertFunction: assertFunction,
             runGetMoreFunc: runGetMoreFunc,
-            failPointName: failPointName
+            failPointName: failPointName,
+            assertEndCounts: true
         });
     }
 
