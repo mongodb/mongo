@@ -3814,6 +3814,11 @@ tasks:
             done
 
             ./gradlew clean :aar:build :aar:publishMavenAarPublicationToLocalRepository
+            # Is this a release?
+            echo "${version|-g}" | grep -q -- "-g"
+            if [ $? -eq 1 ]; then
+                ./gradlew --info :aar:artifactoryPublish
+            fi
 
             mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
             cp -r aar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/android
@@ -3916,6 +3921,11 @@ tasks:
             rm -rf ./mongo-embedded-sdk-${version}
 
             ./gradlew clean :jar:build :jar:publishMavenPublicationToLocalRepository
+            # Is this a release?
+            echo "${version|-g}" | grep -q -- "-g"
+            if [ $? -eq 1 ]; then
+                ./gradlew --info :jar:artifactoryPublish
+            fi
 
             mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/java
             cp -r jar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/java
@@ -10570,7 +10580,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 10.10
+    cdriver_cmake_osx_deployment_target: "10.10"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
@@ -10600,7 +10610,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 11.0
+    cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
@@ -10632,7 +10642,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 11.0
+    cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphonesimulator --show-sdk-path)"
@@ -10667,7 +10677,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 10.2
+    cdriver_cmake_osx_deployment_target: "10.2"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvos --show-sdk-path)"
@@ -10699,7 +10709,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 10.2
+    cdriver_cmake_osx_deployment_target: "10.2"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvsimulator --show-sdk-path)"
@@ -10734,7 +10744,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_watchos.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 4.2
+    cdriver_cmake_osx_deployment_target: "4.2"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk watchos --show-sdk-path)"
@@ -10766,7 +10776,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_watchos_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: 4.2
+    cdriver_cmake_osx_deployment_target: "4.2"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk watchsimulator --show-sdk-path)"
