@@ -5,6 +5,9 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
     "use strict";
 
+    // Amazon linux does not currently support ECDHE
+    const EXCLUDED_BUILDS = ['amazon', 'amzn64'];
+
     const suites = [
         "SSLV2 Cipher Suites",
         "SSLV3 Cipher Suites",
@@ -77,7 +80,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
         });
 
         // All platforms except Amazon Linux 1 should support ECDHE
-        if (buildInfo().buildEnvironment.distmod !== 'amazon') {
+        if (!EXCLUDED_BUILDS.includes(buildInfo().buildEnvironment.distmod)) {
             assert(hasECDHE, 'Supports at least one ECDHE cipher suite');
         }
     }
