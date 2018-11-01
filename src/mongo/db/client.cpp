@@ -88,11 +88,6 @@ void Client::initThread(StringData desc,
     currentClient = service->makeClient(fullDesc, std::move(session));
 }
 
-void Client::destroy() {
-    invariant(haveClient());
-    currentClient.reset(nullptr);
-}
-
 namespace {
 int64_t generateSeed(const std::string& desc) {
     size_t seed = 0;
@@ -167,6 +162,21 @@ ServiceContext::UniqueClient Client::releaseCurrent() {
 void Client::setCurrent(ServiceContext::UniqueClient client) {
     invariant(!haveClient());
     currentClient = std::move(client);
+}
+
+ThreadClient::ThreadClient(ServiceContext* serviceContext)
+    : ThreadClient(getThreadName(), serviceContext, nullptr) {}
+
+ThreadClient::ThreadClient(StringData desc,
+                           ServiceContext* serviceContext,
+                           transport::SessionHandle session) {
+    invariant(!currentClient);
+    Client::initThread(desc, serviceContext, std::move(session));
+}
+
+ThreadClient::~ThreadClient() {
+    invariant(currentClient);
+    currentClient.reset(nullptr);
 }
 
 }  // namespace mongo

@@ -66,7 +66,8 @@ public:
 
 protected:
     ServiceContextTest();
-    virtual ~ServiceContextTest();
+    virtual ~ServiceContextTest() = default;
+    ThreadClient _threadClient;
 };
 
 }  // namespace mongo

@@ -123,8 +123,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, GetOrCreateSessionAfterCheckOutSessio
     ocs.emplace(_opCtx, true);
 
     stdx::async(stdx::launch::async, [&] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready();
+        ThreadClient tc(getGlobalServiceContext());
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         auto scopedSession =
             SessionCatalog::get(sideOpCtx.get())->getOrCreateSession(sideOpCtx.get(), lsid);
@@ -136,8 +135,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, GetOrCreateSessionAfterCheckOutSessio
     ocs.reset();
 
     stdx::async(stdx::launch::async, [&] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready();
+        ThreadClient tc(getGlobalServiceContext());
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         auto scopedSession =
             SessionCatalog::get(sideOpCtx.get())->getOrCreateSession(sideOpCtx.get(), lsid);
@@ -234,8 +232,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
     // Schedule a separate "regular operation" thread, which will block on checking-out the session,
     // which we will use to confirm that session kill completion actually unblocks check-out
     auto future = stdx::async(stdx::launch::async, [lsid] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready();
+        ThreadClient tc(getGlobalServiceContext());
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         sideOpCtx->setLogicalSessionId(lsid);
 
@@ -279,8 +276,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
         // Make sure that the checkOutForKill call will wait for the owning operation context to
         // check the session back in
         auto future = stdx::async(stdx::launch::async, [lsid] {
-            ON_BLOCK_EXIT([&] { Client::destroy(); });
-            Client::initThreadIfNotAlready();
+            ThreadClient tc(getGlobalServiceContext());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);
             sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
@@ -306,8 +302,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
     // Schedule a separate "regular operation" thread, which will block on checking-out the session,
     // which we will use to confirm that session kill completion actually unblocks check-out
     auto future = stdx::async(stdx::launch::async, [lsid] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready();
+        ThreadClient tc(getGlobalServiceContext());
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         sideOpCtx->setLogicalSessionId(lsid);
 
@@ -387,8 +382,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     for (const auto& lsid : lsids) {
         futures.emplace_back(
             stdx::async(stdx::launch::async, [lsid, &firstUseOfTheSessionReachedBarrier] {
-                ON_BLOCK_EXIT([&] { Client::destroy(); });
-                Client::initThreadIfNotAlready();
+                ThreadClient tc(getGlobalServiceContext());
 
                 {
                     auto sideOpCtx = Client::getCurrent()->makeOperationContext();

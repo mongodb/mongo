@@ -55,6 +55,7 @@ namespace mongo {
 
 class Collection;
 class OperationContext;
+class ThreadClient;
 
 typedef long long ConnectionId;
 
@@ -78,8 +79,8 @@ public:
 
     /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent
-     * and cc() will return client.get(). The client will be destroyed with the thread exits
-     * or Client::destroy() is called.
+     * and cc() will return client.get(). The client will be destroyed when the thread exits
+     * or the ThreadClient RAII helper exits its scope.
      */
     static void setCurrent(ServiceContext::UniqueClient client);
 
@@ -138,15 +139,6 @@ public:
      * Inits a thread if that thread has not already been init'd, using the existing thread name
      */
     static void initThreadIfNotAlready();
-
-    /**
-     * Destroys the Client object stored in TLS for the current thread. The current thread must have
-     * a Client.
-     *
-     * If destroy() is not called explicitly, then the Client stored in TLS will be destroyed upon
-     * exit of the current thread.
-     */
-    static void destroy();
 
     std::string clientAddress(bool includePort = false) const;
     const std::string& desc() const {
@@ -219,6 +211,7 @@ public:
 
 private:
     friend class ServiceContext;
+    friend class ThreadClient;
     explicit Client(std::string desc,
                     ServiceContext* serviceContext,
                     transport::SessionHandle session);
@@ -242,6 +235,29 @@ private:
     OperationContext* _opCtx = nullptr;
 
     PseudoRandom _prng;
+};
+
+/**
+ * RAII-style Client helper to manage its lifecycle.
+ * Instantiates a client on the current thread, which remains bound to this thread so long as the
+ * instance of ThreadClient is in scope.
+ *
+ * Swapping the managed Client by ThreadClient with AlternativeClientRegion is permitted so long as
+ * the AlternativeClientRegion is not used beyond the scope of ThreadClient.
+ *
+ * Calling Client::releaseCurrent() is not permitted on a Client managed by the ThreadClient and
+ * will invariant once ThreadClient goes out of scope.
+ */
+class ThreadClient {
+public:
+    explicit ThreadClient(ServiceContext* serviceContext);
+    explicit ThreadClient(StringData desc,
+                          ServiceContext* serviceContext,
+                          transport::SessionHandle session = nullptr);
+    ~ThreadClient();
+    ThreadClient(const ThreadClient&) = delete;
+    ThreadClient(ThreadClient&&) = delete;
+    void operator=(const ThreadClient&) = delete;
 };
 
 /**

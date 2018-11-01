@@ -100,8 +100,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
     // Now actually start the createDatabase work.
 
     auto future = launchAsync([this, dbname] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname);
     });

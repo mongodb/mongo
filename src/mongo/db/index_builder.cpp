@@ -120,8 +120,7 @@ std::string IndexBuilder::name() const {
 }
 
 void IndexBuilder::run() {
-    Client::initThread(name().c_str());
-    ON_BLOCK_EXIT([] { Client::destroy(); });
+    ThreadClient tc(name(), getGlobalServiceContext());
     LOG(2) << "IndexBuilder building index " << _index;
 
     auto opCtx = cc().makeOperationContext();

@@ -50,8 +50,7 @@ std::string ClusterCursorCleanupJob::name() const {
 }
 
 void ClusterCursorCleanupJob::run() {
-    Client::initThread(name().c_str());
-    ON_BLOCK_EXIT([] { Client::destroy(); });
+    ThreadClient tc(name(), getGlobalServiceContext());
 
     auto* const client = Client::getCurrent();
     auto* const manager = Grid::get(client->getServiceContext())->getCursorManager();

@@ -525,6 +525,20 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target= 'thread_client_test',
+    source= 'thread_client_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+    LIBDEPS_PRIVATE=[
+        'service_context_test_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
 env.Library(
     target='lasterror',
     source=[

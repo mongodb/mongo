@@ -79,8 +79,7 @@ TEST_F(EnableShardingTest, noDBExists) {
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
     auto future = launchAsync([&] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(opCtx.get())->enableSharding(opCtx.get(), "db1");
     });

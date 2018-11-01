@@ -286,8 +286,7 @@ public:
     }
 
     void run() {
-        Client::initThread("clientcursormon");
-        ON_BLOCK_EXIT([] { Client::destroy(); });
+        ThreadClient tc("clientcursormon", getGlobalServiceContext());
         while (!globalInShutdownDeprecated()) {
             {
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();

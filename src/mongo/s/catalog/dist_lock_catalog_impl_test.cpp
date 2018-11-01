@@ -92,8 +92,7 @@ protected:
     auto launchOnSeparateThread(std::function<void(OperationContext*)> func) {
         auto const serviceContext = getServiceContext();
         return launchAsync([serviceContext, func] {
-            ON_BLOCK_EXIT([&] { Client::destroy(); });
-            Client::initThreadIfNotAlready("Test");
+            ThreadClient tc("Test", getGlobalServiceContext());
             auto opCtx = Client::getCurrent()->makeOperationContext();
             func(opCtx.get());
         });

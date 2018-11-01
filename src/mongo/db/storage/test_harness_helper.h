@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -53,10 +54,9 @@ namespace mongo {
  * HarnessHelper implementation. The newRecoveryUnit() implementation dictates what RecoveryUnit
  * implementation the OperationContext has.
  */
-class HarnessHelper {
+class HarnessHelper : public ScopedGlobalServiceContextForTest {
 public:
-    virtual ~HarnessHelper();
-
+    virtual ~HarnessHelper() = default;
     explicit HarnessHelper();
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
@@ -83,6 +83,9 @@ public:
     }
 
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
+
+protected:
+    ThreadClient _threadClient;
 };
 
 namespace harness_helper_detail {

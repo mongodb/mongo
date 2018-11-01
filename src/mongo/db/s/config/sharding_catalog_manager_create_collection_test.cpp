@@ -167,9 +167,7 @@ TEST_F(CreateCollectionTest, BaseCase) {
     requestOptions.cappedSize = 256;
 
     auto future = launchAsync([this, &testNS, &requestOptions] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-
-        Client::initThreadIfNotAlready("BaseCaseTest");
+        ThreadClient tc("BaseCaseTest", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(opCtx.get())
             ->createCollection(opCtx.get(), testNS, requestOptions);

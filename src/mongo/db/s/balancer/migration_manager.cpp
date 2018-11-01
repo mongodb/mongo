@@ -521,8 +521,7 @@ void MigrationManager::_schedule(WithLock lock,
         executor->scheduleRemoteCommand(
             remoteRequest,
             [this, itMigration](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-                Client::initThread(getThreadName());
-                ON_BLOCK_EXIT([&] { Client::destroy(); });
+                ThreadClient tc(getThreadName(), getGlobalServiceContext());
                 auto opCtx = cc().makeOperationContext();
 
                 stdx::lock_guard<stdx::mutex> lock(_mutex);

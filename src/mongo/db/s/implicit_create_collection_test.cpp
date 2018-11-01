@@ -70,8 +70,7 @@ public:
 TEST_F(ImplicitCreateTest, NormalCreate) {
     const NamespaceString kNs("test.user");
     auto future = launchAsync([this, &kNs] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ASSERT_OK(onCannotImplicitlyCreateCollection(opCtx.get(), kNs));
     });
@@ -84,8 +83,7 @@ TEST_F(ImplicitCreateTest, NormalCreate) {
 TEST_F(ImplicitCreateTest, CanCallOnCannotImplicitAgainAfterError) {
     const NamespaceString kNs("test.user");
     auto future = launchAsync([this, &kNs] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         auto status = onCannotImplicitlyCreateCollection(opCtx.get(), kNs);
         ASSERT_EQ(ErrorCodes::FailPointEnabled, status);
@@ -100,8 +98,7 @@ TEST_F(ImplicitCreateTest, CanCallOnCannotImplicitAgainAfterError) {
     // Retry, but this time config server will return success
 
     future = launchAsync([this, &kNs] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ASSERT_OK(onCannotImplicitlyCreateCollection(opCtx.get(), kNs));
     });
@@ -114,8 +111,7 @@ TEST_F(ImplicitCreateTest, CanCallOnCannotImplicitAgainAfterError) {
 TEST_F(ImplicitCreateTest, ShouldNotCallConfigCreateIfCollectionExists) {
     const NamespaceString kNs("test.user");
     auto future = launchAsync([this, &kNs] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         auto status = onCannotImplicitlyCreateCollection(opCtx.get(), kNs);
         ASSERT_EQ(ErrorCodes::FailPointEnabled, status);
@@ -135,8 +131,7 @@ TEST_F(ImplicitCreateTest, ShouldNotCallConfigCreateIfCollectionExists) {
     // Retry, but this time config server will return success
 
     future = launchAsync([this, &kNs] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ASSERT_OK(onCannotImplicitlyCreateCollection(opCtx.get(), kNs));
     });

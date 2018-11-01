@@ -40,16 +40,7 @@ namespace {
 stdx::function<std::unique_ptr<HarnessHelper>()> basicHarnessFactory;
 }  // namespace
 
-
-HarnessHelper::HarnessHelper() {
-    setGlobalServiceContext(ServiceContext::make());
-    Client::initThread(getThreadName());
-}
-
-HarnessHelper::~HarnessHelper() {
-    Client::destroy();
-    setGlobalServiceContext({});
-}
+HarnessHelper::HarnessHelper() : _threadClient(getGlobalServiceContext()) {}
 
 void registerHarnessHelperFactory(stdx::function<std::unique_ptr<HarnessHelper>()> factory) {
     basicHarnessFactory = std::move(factory);

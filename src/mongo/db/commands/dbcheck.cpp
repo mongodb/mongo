@@ -193,8 +193,7 @@ protected:
 
     virtual void run() override {
         // Every dbCheck runs in its own client.
-        Client::initThread(name());
-        ON_BLOCK_EXIT([] { Client::destroy(); });
+        ThreadClient tc(name(), getGlobalServiceContext());
 
         for (const auto& coll : *_run) {
             try {

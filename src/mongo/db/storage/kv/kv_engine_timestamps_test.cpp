@@ -48,7 +48,7 @@
 namespace mongo {
 namespace {
 
-class SnapshotManagerTests : public ServiceContextTest {
+class SnapshotManagerTests : public unittest::Test, public ScopedGlobalServiceContextForTest {
 public:
     /**
      * Usable as an OperationContext* but owns both the Client and the OperationContext.

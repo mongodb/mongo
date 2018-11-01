@@ -165,8 +165,7 @@ public:
     }
 
     Status doDrop() {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         return ShardingCatalogManager::get(opCtx.get())->dropCollection(opCtx.get(), dropNS());
     }

@@ -120,7 +120,7 @@ class InitialSyncerTest : public executor::ThreadPoolExecutorTest,
                           public SyncSourceSelector,
                           public ScopedGlobalServiceContextForTest {
 public:
-    InitialSyncerTest() {}
+    InitialSyncerTest() : _threadClient(getGlobalServiceContext()) {}
 
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
 
@@ -331,7 +331,6 @@ protected:
         _mockServer = stdx::make_unique<MockRemoteDBServer>(_target.toString());
         _options1.uuid = UUID::gen();
 
-        Client::initThreadIfNotAlready();
         reset();
 
         launchExecutorThread();
@@ -435,7 +434,6 @@ protected:
         _dbWorkThreadPool.reset();
         _replicationProcess.reset();
         _storageInterface.reset();
-        Client::destroy();
     }
 
     /**
@@ -481,6 +479,7 @@ protected:
 private:
     DataReplicatorExternalStateMock* _externalState;
     std::unique_ptr<InitialSyncer> _initialSyncer;
+    ThreadClient _threadClient;
     bool _executorThreadShutdownComplete = false;
 };
 

@@ -172,8 +172,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(operationContext())
             ->shardCollection(opCtx.get(),
@@ -295,8 +294,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         // TODO: can we mock the ShardRegistry to return these?
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
 
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(operationContext())
             ->shardCollection(opCtx.get(),
@@ -391,8 +389,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        ON_BLOCK_EXIT([&] { Client::destroy(); });
-        Client::initThreadIfNotAlready("Test");
+        ThreadClient tc("Test", getGlobalServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(operationContext())
             ->shardCollection(opCtx.get(),

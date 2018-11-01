@@ -91,8 +91,7 @@ public:
     static std::string secondsExpireField;
 
     virtual void run() {
-        Client::initThread(name().c_str());
-        ON_BLOCK_EXIT([] { Client::destroy(); });
+        ThreadClient tc(name(), getGlobalServiceContext());
         AuthorizationSession::get(cc())->grantInternalAuthorization();
 
         while (!globalInShutdownDeprecated()) {

@@ -139,41 +139,37 @@ using std::endl;
 
 void shutdown(ServiceContext* srvContext) {
 
-    Client::initThreadIfNotAlready();
-    auto const client = Client::getCurrent();
-    auto const serviceContext = client->getServiceContext();
-    invariant(srvContext == serviceContext);
-
-    serviceContext->setKillAllOperations();
-
-    // We should always be able to acquire the global lock at shutdown.
-    // Close all open databases, shutdown storage engine and run all deinitializers.
-    auto shutdownOpCtx = serviceContext->makeOperationContext(client);
     {
-        UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());
-        Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
-        DatabaseHolder::getDatabaseHolder().closeAll(shutdownOpCtx.get(), "shutdown");
+        ThreadClient tc(srvContext);
+        auto const client = Client::getCurrent();
+        auto const serviceContext = client->getServiceContext();
 
-        LogicalSessionCache::set(serviceContext, nullptr);
+        serviceContext->setKillAllOperations();
 
-        // Shut down the background periodic task runner
-        if (auto runner = serviceContext->getPeriodicRunner()) {
-            runner->shutdown();
+        // We should always be able to acquire the global lock at shutdown.
+        // Close all open databases, shutdown storage engine and run all deinitializers.
+        auto shutdownOpCtx = serviceContext->makeOperationContext(client);
+        {
+            UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());
+            Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
+            DatabaseHolder::getDatabaseHolder().closeAll(shutdownOpCtx.get(), "shutdown");
+
+            LogicalSessionCache::set(serviceContext, nullptr);
+
+            // Shut down the background periodic task runner
+            if (auto runner = serviceContext->getPeriodicRunner()) {
+                runner->shutdown();
+            }
+
+            // Global storage engine may not be started in all cases before we exit
+            if (serviceContext->getStorageEngine()) {
+                shutdownGlobalStorageEngineCleanly(serviceContext);
+            }
+
+            Status status = mongo::runGlobalDeinitializers();
+            uassertStatusOKWithContext(status, "Global deinitilization failed");
         }
-
-        // Global storage engine may not be started in all cases before we exit
-        if (serviceContext->getStorageEngine()) {
-            shutdownGlobalStorageEngineCleanly(serviceContext);
-        }
-
-        Status status = mongo::runGlobalDeinitializers();
-        uassertStatusOKWithContext(status, "Global deinitilization failed");
     }
-    shutdownOpCtx.reset();
-
-    if (Client::getCurrent())
-        Client::destroy();
-
     setGlobalServiceContext(nullptr);
 
     log(LogComponent::kControl) << "now exiting";

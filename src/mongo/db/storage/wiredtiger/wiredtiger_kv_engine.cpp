@@ -179,9 +179,7 @@ public:
     }
 
     virtual void run() {
-        Client::initThread(name().c_str());
-        ON_BLOCK_EXIT([] { Client::destroy(); });
-
+        ThreadClient tc(name(), getGlobalServiceContext());
         LOG(1) << "starting " << name() << " thread";
 
         while (!_shuttingDown.load()) {
@@ -227,9 +225,7 @@ public:
     }
 
     virtual void run() {
-        Client::initThread(name().c_str());
-        ON_BLOCK_EXIT([] { Client::destroy(); });
-
+        ThreadClient tc(name(), getGlobalServiceContext());
         LOG(1) << "starting " << name() << " thread";
 
         while (!_shuttingDown.load()) {
