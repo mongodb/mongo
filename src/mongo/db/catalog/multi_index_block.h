@@ -214,4 +214,5 @@ public:
 
     virtual bool getBuildInBackground() const = 0;
 };
+
 }  // namespace mongo

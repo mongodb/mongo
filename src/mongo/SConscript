@@ -341,6 +341,7 @@ mongod = env.Program(
         'db/ftdc/ftdc_mongod',
         'db/fts/ftsmongod',
         'db/index/index_access_method',
+        'db/index_builds_coordinator',
         'db/index/index_descriptor',
         'db/index_d',
         'db/initialize_snmp',

@@ -72,6 +72,7 @@
 #include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -907,6 +908,11 @@ void shutdownTask() {
         // Destroy all stashed transaction resources, in order to release locks.
         killSessionsLocalShutdownAllTransactions(opCtx);
     }
+
+    // Interrupts all index builds, leaving the state intact to be recovered when the server
+    // restarts. This should be done after replication oplog application finishes, so foreground
+    // index builds begun by replication on secondaries do not invariant.
+    IndexBuildsCoordinator::get(serviceContext)->shutdown();
 
     serviceContext->setKillAllOperations();
 

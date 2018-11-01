@@ -892,6 +892,32 @@ env.Library(
 )
 
 env.Library(
+    target="index_builds_coordinator",
+    source=[
+        "collection_index_builds_tracker.cpp",
+        "database_index_builds_tracker.cpp",
+        "index_builds_coordinator.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        "$BUILD_DIR/mongo/db/catalog/index_builds_manager",
+        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
+    ],
+)
+
+env.CppUnitTest(
+    target="index_builds_coordinator_test",
+    source=[
+        "index_builds_coordinator_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "index_builds_coordinator",
+    ]
+)
+
+env.Library(
     target="cloner",
     source=[
         "cloner.cpp",

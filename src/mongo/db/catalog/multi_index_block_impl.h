@@ -56,9 +56,6 @@ class MultiIndexBlockImpl : public MultiIndexBlock {
     MONGO_DISALLOW_COPYING(MultiIndexBlockImpl);
 
 public:
-    /**
-     * Neither pointer is owned.
-     */
     MultiIndexBlockImpl(OperationContext* opCtx, Collection* collection);
     ~MultiIndexBlockImpl() override;
 
