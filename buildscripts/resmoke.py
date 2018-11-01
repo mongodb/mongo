@@ -4,9 +4,21 @@
 from __future__ import absolute_import
 
 import os.path
+import platform
 import random
+import subprocess
 import sys
+import tarfile
 import time
+
+import pkg_resources
+import requests
+
+try:
+    import grpc_tools.protoc
+    import grpc
+except ImportError:
+    pass
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -23,8 +35,11 @@ from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib import testing
 from buildscripts.resmokelib import utils
 
+from buildscripts.resmokelib.core import process
+from buildscripts.resmokelib.core import jasper_process
 
-class Resmoke(object):
+
+class Resmoke(object):  # pylint: disable=too-many-instance-attributes
     """The main class to run tests with resmoke."""
 
     def __init__(self):
@@ -34,6 +49,7 @@ class Resmoke(object):
         self._exec_logger = None
         self._resmoke_logger = None
         self._archive = None
+        self._jasper_server = None
         self._interrupted = False
         self._exit_code = 0
 
@@ -132,8 +148,9 @@ class Resmoke(object):
         suites = None
         try:
             suites = self._get_suites()
-
             self._setup_archival()
+            if config.SPAWN_USING == "jasper":
+                self._setup_jasper()
             self._setup_signal_handler(suites)
 
             for suite in suites:
@@ -148,6 +165,8 @@ class Resmoke(object):
             exit_code = max(suite.return_code for suite in suites)
             self.exit(exit_code)
         finally:
+            if config.SPAWN_USING == "jasper":
+                self._exit_jasper()
             self._exit_archival()
             if suites:
                 reportfile.write(suites)
@@ -250,6 +269,97 @@ class Resmoke(object):
         """Finish up archival tasks before exit if enabled in the cli options."""
         if self._archive and not self._interrupted:
             self._archive.exit()
+
+    # pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
+    def _setup_jasper(self):
+        """Start up the jasper process manager."""
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
+        try:
+            well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
+        except ImportError:
+            raise ImportError("You must run: sys.executable + '-m pip install grpcio grpcio-tools "
+                              "googleapis-common-protos' to use --spawnUsing=jasper.")
+
+        # We use the build/ directory as the output directory because the generated files aren't
+        # meant to because tracked by git or linted.
+        proto_out = os.path.join(root_dir, "build", "jasper")
+
+        utils.rmtree(proto_out, ignore_errors=True)
+        os.makedirs(proto_out)
+
+        # We make 'proto_out' into a Python package so we can add it to 'sys.path' and import the
+        # *pb2*.py modules from it.
+        with open(os.path.join(proto_out, "__init__.py"), "w"):
+            pass
+
+        ret = grpc_tools.protoc.main([
+            grpc_tools.protoc.__file__,
+            "--grpc_python_out",
+            proto_out,
+            "--python_out",
+            proto_out,
+            "--proto_path",
+            os.path.dirname(proto_file),
+            "--proto_path",
+            well_known_protos_include,
+            os.path.basename(proto_file),
+        ])
+
+        if ret != 0:
+            raise RuntimeError("Failed to generated gRPC files from the jasper.proto file")
+
+        sys.path.append(os.path.dirname(proto_out))
+
+        from jasper import jasper_pb2
+        from jasper import jasper_pb2_grpc
+
+        jasper_process.Process.jasper_pb2 = jasper_pb2
+        jasper_process.Process.jasper_pb2_grpc = jasper_pb2_grpc
+
+        curator_path = "build/curator"
+        git_hash = "1b8c7344aa1daed0846e32204dffb21cfdda208c"
+        curator_exists = os.path.isfile(curator_path)
+        curator_same_version = False
+        if curator_exists:
+            curator_version = subprocess.check_output([curator_path, "--version"]).split()
+            curator_same_version = git_hash in curator_version
+
+        if curator_exists and not curator_same_version:
+            os.remove(curator_path)
+            self._resmoke_logger.info(
+                "Found a different version of curator. Downloading version %s of curator to enable"
+                "process management using jasper.", git_hash)
+
+        if not curator_exists or not curator_same_version:
+            if sys.platform == "darwin":
+                os_platform = "macos"
+            elif sys.platform == "win32":
+                os_platform = "windows-64"
+            elif sys.platform.startswith("linux"):
+                os_platform = "ubuntu1604"
+            else:
+                raise OSError("Unrecognized platform. "
+                              "This program is meant to be run on MacOS, Windows, or Linux.")
+            url = ("https://s3.amazonaws.com/boxes.10gen.com/build/curator/"
+                   "curator-dist-%s-%s.tar.gz") % (os_platform, git_hash)
+            response = requests.get(url, stream=True)
+            with tarfile.open(mode="r|gz", fileobj=response.raw) as tf:
+                tf.extractall(path="./build/")
+
+        jasper_port = config.BASE_PORT - 1
+        jasper_conn_str = "localhost:%d" % jasper_port
+        jasper_process.Process.connection_str = jasper_conn_str
+        jasper_command = [curator_path, "jasper", "grpc", "--port", str(jasper_port)]
+        self._jasper_server = process.Process(self._resmoke_logger, jasper_command)
+        self._jasper_server.start()
+
+        channel = grpc.insecure_channel(jasper_conn_str)
+        grpc.channel_ready_future(channel).result()
+
+    def _exit_jasper(self):
+        if self._jasper_server:
+            self._jasper_server.stop()
 
     def exit(self, exit_code):
         """Exit with the provided exit code."""

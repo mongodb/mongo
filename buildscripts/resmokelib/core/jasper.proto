@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package jasper;
+option go_package = "internal";
+
+import "google/protobuf/empty.proto";
+
+message Logger {
+    LogType log_type = 1;
+    LogOptions log_options = 2;
+}
+
+message OutputOptions {
+  repeated Logger loggers = 1;
+  bool suppress_output = 2;
+  bool suppress_error = 3;
+  bool redirect_output_to_error = 4;
+  bool redirect_error_to_output = 5;
+}
+
+enum LogType {
+    LOGUNKNOWN = 0;
+    LOGBUILDLOGGERV2 = 1;
+    LOGBUILDLOGGERV3 = 2;
+    LOGDEFAULT = 3;
+    LOGFILE = 4;
+    LOGINHERIT = 5;
+    LOGSPLUNK = 6;
+    LOGSUMOLOGIC = 7;
+    LOGINMEMORY = 8;
+}
+
+enum LogFormat {
+    LOGFORMATUNKNOWN = 0;
+    LOGFORMATDEFAULT = 1;
+    LOGFORMATJSON = 2;
+    LOGFORMATPLAIN = 3;
+}
+
+message LogOptions {
+    BufferOptions buffer_options = 1;
+    BuildloggerOptions buildlogger_options = 2;
+    string default_prefix = 3;
+    string file_name = 4;
+    LogFormat format = 5;
+    int64 in_memory_cap = 6;
+    SplunkOptions splunk_options = 7;
+    string sumo_endpoint = 8;
+}
+
+message BufferOptions {
+    bool buffered = 1;
+    int64 duration = 2;
+    int64 max_size = 3;
+}
+
+message BuildloggerOptions {
+    bool create_test = 1;
+    string url = 2;
+    int64 number = 3;
+    string phase = 4;
+    string builder = 5;
+    string test = 6;
+    string command = 7;
+}
+
+message SplunkOptions {
+    string url = 1;
+    string token = 2;
+    string channel = 3;
+}
+
+message CreateOptions {
+  repeated string args = 1;
+  string working_directory = 2;
+  map<string, string> environment = 3;
+  bool override_environ = 4;
+  int64 timeout_seconds = 5;
+  repeated string tags = 6;
+  repeated CreateOptions on_success = 7;
+  repeated CreateOptions on_failure = 8;
+  repeated CreateOptions on_timeout = 9;
+  OutputOptions output = 10;
+}
+
+message ProcessInfo {
+  string id = 1;
+  int64 pid = 2;
+  string host_id = 3;
+  bool running = 4;
+  bool successful = 5;
+  bool complete = 6;
+  bool timedout = 7;
+  CreateOptions options = 8;
+  int32 exit_code = 9;
+}
+
+message StatusResponse {
+  string host_id = 1;
+  bool active = 2;
+}
+
+message Filter {
+  FilterSpecifications name = 1;
+}
+
+enum  FilterSpecifications {
+  ALL = 0;
+  RUNNING = 1;
+  TERMINATED = 2;
+  FAILED = 3;
+  SUCCESSFUL = 4;
+}
+
+message SignalProcess {
+  JasperProcessID ProcessID = 1;
+  Signals signal = 2;
+}
+
+enum Signals {
+  UNKNOWN = 0;
+  TERMINATE = 1;
+  KILL = 2;
+  HANGUP = 3;
+  INIT = 4;
+  USER1 = 5;
+  USER2 = 6;
+}
+
+
+message TagName {
+  string value = 1;
+}
+
+message ProcessTags {
+  string processID = 1;
+  repeated string tags = 2;
+}
+
+message JasperProcessID {
+  string value = 1;
+
+}
+
+message OperationOutcome {
+  bool success = 1;
+  string text = 2;
+  int32 exit_code = 3;
+}
+
+message BuildOptions {
+    string target = 1;
+    string arch = 2;
+    string edition = 3;
+    bool debug = 4;
+}
+
+message MongoDBDownloadOptions {
+    BuildOptions build_options = 1;
+    string path = 2;
+    repeated string releases = 3;
+}
+
+message CacheOptions {
+    bool disabled = 1;
+    int64 prune_delay = 2;
+    int64 max_size = 3;
+}
+
+enum ArchiveFormat {
+    ARCHIVEUNKNOWN = 0;
+    ARCHIVEAUTO = 1;
+    ARCHIVETARGZ = 2;
+    ARCHIVEZIP = 3;
+}
+
+message ArchiveOptions {
+    bool should_extract = 1;
+    ArchiveFormat format = 2;
+    string target_path = 3;
+}
+
+message DownloadInfo {
+  string url = 1;
+  string path = 2;
+  ArchiveOptions archive_opts = 3;
+}
+
+message BuildloggerURLs {
+    repeated string urls = 1;
+}
+
+service JasperProcessManager {
+  rpc Status(google.protobuf.Empty) returns  (StatusResponse);
+  rpc Create(CreateOptions) returns (ProcessInfo);
+  rpc List(Filter) returns (stream ProcessInfo);
+  rpc Group(TagName) returns (stream ProcessInfo);
+  rpc Get(JasperProcessID) returns (ProcessInfo);
+  rpc Wait(JasperProcessID) returns (OperationOutcome);
+  rpc Signal(SignalProcess) returns (OperationOutcome);
+  rpc Close(google.protobuf.Empty) returns (OperationOutcome);
+  rpc TagProcess(ProcessTags) returns (OperationOutcome);
+  rpc ResetTags(JasperProcessID) returns (OperationOutcome);
+  rpc GetTags(JasperProcessID) returns (ProcessTags);
+  rpc DownloadFile(DownloadInfo) returns (OperationOutcome);
+  rpc DownloadMongoDB(MongoDBDownloadOptions) returns (OperationOutcome);
+  rpc ConfigureCache(CacheOptions) returns (OperationOutcome);
+  rpc GetBuildloggerURLs(JasperProcessID) returns (BuildloggerURLs);
+}

@@ -84,6 +84,11 @@ def _make_parser():  # pylint: disable=too-many-statements
     parser.add_option("--genny", dest="genny_executable", metavar="PATH",
                       help="The path to the genny executable for resmoke to use.")
 
+    parser.add_option("--spawnUsing", type="choice", dest="spawn_using", choices=("python",
+                                                                                  "jasper"),
+                      help=("Allows you to spawn resmoke processes using python or Jasper."
+                            "Defaults to python. Options are 'python' or 'jasper'."))
+
     parser.add_option("--includeWithAnyTags", action="append", dest="include_with_any_tags",
                       metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. For the jstest portion of the suite(s),"
@@ -419,6 +424,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.SERVICE_EXECUTOR = config.pop("service_executor")
     _config.SHELL_READ_MODE = config.pop("shell_read_mode")
     _config.SHELL_WRITE_MODE = config.pop("shell_write_mode")
+    _config.SPAWN_USING = config.pop("spawn_using")
     _config.STAGGER_JOBS = config.pop("stagger_jobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storage_engine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storage_engine_cache_size_gb")

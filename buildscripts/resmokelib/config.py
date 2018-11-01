@@ -79,6 +79,7 @@ DEFAULTS = {
     "shell_read_mode": None,
     "shell_write_mode": None,
     "shuffle": None,
+    "spawn_using": None,
     "stagger_jobs": None,
     "majority_read_concern": None,  # Default is set on the commandline.
     "storage_engine": None,
@@ -341,6 +342,10 @@ SHELL_WRITE_MODE = None
 # If true, then the order the tests run in is randomized. Otherwise the tests will run in
 # alphabetical (case-insensitive) order.
 SHUFFLE = None
+
+# Possible values are python and jasper. If python, resmoke uses the python built-in subprocess
+# or subprocess32 module to spawn threads. If jasper, resmoke uses the jasper module.
+SPAWN_USING = None
 
 # If true, the launching of jobs is staggered in resmoke.py.
 STAGGER_JOBS = None

@@ -21,4 +21,5 @@ class CPPUnitTestCase(interface.ProcessTestCase):
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
     def _make_process(self):
-        return core.process.Process(self.logger, [self.program_executable], **self.program_options)
+        return core.programs.make_process(self.logger, [self.program_executable],
+                                          **self.program_options)

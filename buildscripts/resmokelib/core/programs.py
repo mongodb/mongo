@@ -10,7 +10,8 @@ import os
 import os.path
 import stat
 
-from . import process as _process
+from . import jasper_process
+from . import process
 from .. import config
 from .. import utils
 
@@ -30,6 +31,14 @@ DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
     "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
     "storage": {"recovery": 2}, "transaction": 4
 }
+
+
+def make_process(*args, **kwargs):
+    """Choose whether to use python built in process or jasper."""
+    process_cls = process.Process
+    if config.SPAWN_USING == "jasper":
+        process_cls = jasper_process.Process
+    return process_cls(*args, **kwargs)
 
 
 def default_mongod_log_component_verbosity():
@@ -140,7 +149,7 @@ def mongod_program(  # pylint: disable=too-many-branches
     _set_keyfile_permissions(kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
-    return _process.Process(logger, args, **process_kwargs)
+    return make_process(logger, args, **process_kwargs)
 
 
 def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
@@ -164,7 +173,7 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     _set_keyfile_permissions(kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
-    return _process.Process(logger, args, **process_kwargs)
+    return make_process(logger, args, **process_kwargs)
 
 
 def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
@@ -297,7 +306,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     _set_keyfile_permissions(test_data)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
-    return _process.Process(logger, args, **process_kwargs)
+    return make_process(logger, args, **process_kwargs)
 
 
 def _format_shell_vars(sb, path, value):
@@ -357,7 +366,7 @@ def generic_program(logger, args, process_kwargs=None, **kwargs):
     _apply_kwargs(args, kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
-    return _process.Process(logger, args, **process_kwargs)
+    return make_process(logger, args, **process_kwargs)
 
 
 def _apply_set_parameters(args, set_parameter):
