@@ -47,8 +47,20 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 }  // namespace
 
 Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opCtx) {
+    auto existsStatus = checkSessionsCollectionExists(opCtx);
+    if (existsStatus.isOK()) {
+        return Status::OK();
+    }
+
     DBDirectClient client(opCtx);
-    auto cmd = generateCreateIndexesCmd();
+    BSONObj cmd;
+
+    if (existsStatus.code() == ErrorCodes::IndexOptionsConflict) {
+        cmd = generateCollModCmd();
+    } else {
+        cmd = generateCreateIndexesCmd();
+    }
+
     BSONObj info;
     if (!client.runCommand(NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
         return getStatusFromCommandResult(info);
@@ -66,14 +78,21 @@ Status SessionsCollectionStandalone::checkSessionsCollectionExists(OperationCont
         return Status{ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist"};
     }
 
-    auto indexExists = std::find_if(indexes.begin(), indexes.end(), [](const BSONObj& index) {
+    auto index = std::find_if(indexes.begin(), indexes.end(), [](const BSONObj& index) {
         return index.getField("name").String() == kSessionsTTLIndex;
     });
 
-    if (indexExists == indexes.end()) {
+    if (index == indexes.end()) {
         return Status{ErrorCodes::IndexNotFound,
                       "config.system.sessions does not have the required TTL index"};
     };
+
+    if (!index->hasField("expireAfterSeconds") ||
+        index->getField("expireAfterSeconds").Int() != (localLogicalSessionTimeoutMinutes * 60)) {
+        return Status{
+            ErrorCodes::IndexOptionsConflict,
+            "config.system.sessions currently has the incorrect timeout for the TTL index"};
+    }
 
     return Status::OK();
 }

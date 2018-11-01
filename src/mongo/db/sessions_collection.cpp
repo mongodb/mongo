@@ -315,4 +315,20 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
 
     return createIndexes.toBSON();
 }
+
+BSONObj SessionsCollection::generateCollModCmd() {
+    BSONObjBuilder collModCmdBuilder;
+
+    collModCmdBuilder << "collMod" << NamespaceString::kLogicalSessionsNamespace.coll();
+
+    BSONObjBuilder indexBuilder(collModCmdBuilder.subobjStart("index"));
+    indexBuilder << "name" << kSessionsTTLIndex;
+    indexBuilder << "expireAfterSeconds" << localLogicalSessionTimeoutMinutes * 60;
+
+    indexBuilder.done();
+    collModCmdBuilder.done();
+
+    return collModCmdBuilder.obj();
+}
+
 }  // namespace mongo
