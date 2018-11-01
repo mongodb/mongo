@@ -373,8 +373,7 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 			 * on some gcc compilers because they don't understand
 			 * FALLTHROUGH as part of a macro.
 			 */
-			return (
-			    __wt_illegal_value(session, "checkpoint array"));
+			return (__wt_illegal_value(session, ckpt->flags));
 		}
 	return (0);
 }

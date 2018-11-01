@@ -51,16 +51,16 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	 * A simple search only makes sense if the key format is a string or a
 	 * record number, and the value format is a single string.
 	 */
-	if (strcmp(cursor->key_format, "r") != 0 &&
-	    strcmp(cursor->key_format, "S") != 0) {
+	if (!WT_STREQ(cursor->key_format, "r") &&
+	    !WT_STREQ(cursor->key_format, "S")) {
 		fprintf(stderr,
 		    "%s: read command only possible when the key format is "
 		    "a record number or string\n",
 		    progname);
 		return (1);
 	}
-	rkey = strcmp(cursor->key_format, "r") == 0;
-	if (strcmp(cursor->value_format, "S") != 0) {
+	rkey = WT_STREQ(cursor->key_format, "r");
+	if (!WT_STREQ(cursor->value_format, "S")) {
 		fprintf(stderr,
 		    "%s: read command only possible when the value format is "
 		    "a string\n",

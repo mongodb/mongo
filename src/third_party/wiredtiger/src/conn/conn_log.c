@@ -277,6 +277,15 @@ __logmgr_config(
 	if (!reconfig) {
 		WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 		conn->log_file_max = (wt_off_t)cval.val;
+		/*
+		 * With the default log file extend configuration or if the log
+		 * file extension size is larger than the configured maximum log
+		 * file size, set the log file extension size to the configured
+		 * maximum log file size.
+		 */
+		if (conn->log_extend_len == WT_CONFIG_UNSET ||
+		    conn->log_extend_len > conn->log_file_max)
+			conn->log_extend_len = conn->log_file_max;
 		WT_STAT_CONN_SET(session, log_max_filesize, conn->log_file_max);
 	}
 
@@ -883,7 +892,6 @@ __log_wrlsn_server(void *arg)
 	__wt_log_wrlsn(session, NULL);
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "log wrlsn server error");
-
 	}
 	return (WT_THREAD_RET_VALUE);
 }
@@ -1171,12 +1179,12 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 	if (conn->log_tid_set) {
 		__wt_cond_signal(session, conn->log_cond);
-		WT_TRET(__wt_thread_join(session, conn->log_tid));
+		WT_TRET(__wt_thread_join(session, &conn->log_tid));
 		conn->log_tid_set = false;
 	}
 	if (conn->log_file_tid_set) {
 		__wt_cond_signal(session, conn->log_file_cond);
-		WT_TRET(__wt_thread_join(session, conn->log_file_tid));
+		WT_TRET(__wt_thread_join(session, &conn->log_file_tid));
 		conn->log_file_tid_set = false;
 	}
 	if (conn->log_file_session != NULL) {
@@ -1186,7 +1194,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 	if (conn->log_wrlsn_tid_set) {
 		__wt_cond_signal(session, conn->log_wrlsn_cond);
-		WT_TRET(__wt_thread_join(session, conn->log_wrlsn_tid));
+		WT_TRET(__wt_thread_join(session, &conn->log_wrlsn_tid));
 		conn->log_wrlsn_tid_set = false;
 	}
 	if (conn->log_wrlsn_session != NULL) {

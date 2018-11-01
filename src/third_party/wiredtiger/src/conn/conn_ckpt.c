@@ -219,7 +219,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 	F_CLR(conn, WT_CONN_SERVER_CHECKPOINT);
 	if (conn->ckpt_tid_set) {
 		__wt_cond_signal(session, conn->ckpt_cond);
-		WT_TRET(__wt_thread_join(session, conn->ckpt_tid));
+		WT_TRET(__wt_thread_join(session, &conn->ckpt_tid));
 		conn->ckpt_tid_set = false;
 	}
 	__wt_cond_destroy(session, &conn->ckpt_cond);

@@ -219,7 +219,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_REF *current, *descent;
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
-	uint32_t base, indx, limit;
+	uint32_t base, indx, limit, read_flags;
 	int cmp, depth;
 	bool append_check, descend_right, done;
 
@@ -431,7 +431,10 @@ append:			if (__wt_split_descent_race(
 				goto restart;
 		}
 
-descend:	/*
+descend:	/* Encourage races. */
+		WT_DIAGNOSTIC_YIELD;
+
+		/*
 		 * Swap the current page for the child page. If the page splits
 		 * while we're retrieving it, restart the search at the root.
 		 * We cannot restart in the "current" page; for example, if a
@@ -443,8 +446,11 @@ descend:	/*
 		 * On other error, simply return, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
+		read_flags = WT_READ_RESTART_OK;
+		if (F_ISSET(cbt, WT_CBT_READ_ONCE))
+			FLD_SET(read_flags, WT_READ_WONT_NEED);
 		if ((ret = __wt_page_swap(session,
-		    current, descent, false, WT_READ_RESTART_OK)) == 0) {
+		    current, descent, read_flags)) == 0) {
 			current = descent;
 			continue;
 		}

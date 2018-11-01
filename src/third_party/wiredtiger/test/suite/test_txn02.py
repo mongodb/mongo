@@ -93,6 +93,12 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     checklog_calls = 100 if wttest.islongtest() else 2
     checklog_mod = (len(scenarios) / checklog_calls + 1)
 
+    _debug = False
+    def debug(self, msg):
+        if not self._debug:
+            return
+        print(msg)
+
     def conn_config(self):
         # Cycle through the different transaction_sync values in a
         # deterministic manner.
@@ -201,7 +207,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     def test_ops(self):
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
         self.session2 = self.conn.open_session()
-        # print "Creating %s with config '%s'" % (self.uri, self.create_params)
+        self.debug("Creating %s with config '%s'" % (self.uri, self.create_params))
         self.session.create(self.uri, self.create_params)
         # Set up the table with entries for 1, 2, 10 and 11.
         # We use the overwrite config so insert can update as needed.
@@ -214,11 +220,10 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             self.scenario_number % len(self.conn_list)]
         ops = (self.op1, self.op2, self.op3, self.op4)
         txns = (self.txn1, self.txn2, self.txn3, self.txn4)
-        # for ok, txn in zip(ops, txns):
-        # print ', '.join('%s(%d)[%s]' % (ok[0], ok[1], txn)
         for i, ot in enumerate(zip(ops, txns)):
             ok, txn = ot
             op, k = ok
+            self.debug('{}({})[{}]'.format(ok[0], ok[1], txn))
 
             # Close and reopen the connection and cursor.
             if reopen == 'reopen':
@@ -231,7 +236,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             # Test multiple operations per transaction by always
             # doing the same operation on key k + 1.
             k1 = k + 1
-            # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
+            self.debug('Operation. Num: %d: %s(%d)[%s]' % (i, ok[0], ok[1], txn))
             if op == 'insert' or op == 'update':
                 c[k] = c[k1] = i + 2
                 current[k] = current[k1] = i + 2
@@ -245,7 +250,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                 if k1 in current:
                     del current[k1]
 
-            # print current
+            self.debug(str(current))
             # Check the state after each operation.
             self.check_all(current, committed)
 

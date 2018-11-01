@@ -63,7 +63,7 @@ __im_handle_remove(WT_SESSION_IMPL *session,
 	if (im_fh->ref != 0) {
 		__wt_err(session, EBUSY, "%s: file-remove", im_fh->iface.name);
 		if (!force)
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 	}
 
 	bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
@@ -272,7 +272,7 @@ __im_fs_size(WT_FILE_SYSTEM *file_system,
 
 	/* Search for the handle, then get its size. */
 	if ((im_fh = __im_handle_search(file_system, name)) == NULL)
-		ret = ENOENT;
+		ret = __wt_set_return(session, ENOENT);
 	else
 		*sizep = (wt_off_t)im_fh->buf.size;
 
@@ -349,6 +349,7 @@ __im_file_read(WT_FILE_HANDLE *file_handle,
 	__wt_spin_unlock(session, &im_fs->lock);
 	if (ret == 0)
 		return (0);
+	F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 	WT_RET_MSG(session, WT_ERROR,
 	    "%s: handle-read: failed to read %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,

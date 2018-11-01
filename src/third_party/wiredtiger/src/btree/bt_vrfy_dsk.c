@@ -34,6 +34,7 @@ static int __verify_dsk_row(
 #define	WT_RET_VRFY(session, ...) do {					\
 	if (!(F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)))		\
 		__wt_errx(session, __VA_ARGS__);			\
+	F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);			\
 	return (WT_ERROR);						\
 } while (0)
 
@@ -166,7 +167,7 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 		return (__verify_dsk_chunk(session, tag, dsk, dsk->u.datalen));
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, dsk->type);
 	}
 	/* NOTREACHED */
 }
@@ -699,6 +700,7 @@ static int
 __err_cell_corrupt(
     WT_SESSION_IMPL *session, uint32_t entry_num, const char *tag)
 {
+	F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 	WT_RET_VRFY(session,
 	    "item %" PRIu32 " on page at %s is a corrupted cell",
 	    entry_num, tag);

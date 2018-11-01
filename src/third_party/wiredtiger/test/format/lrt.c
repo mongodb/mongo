@@ -110,8 +110,15 @@ lrt(void *arg)
 			 */
 			testutil_check(session->snapshot(session, "name=test"));
 			__wt_sleep(1, 0);
-			testutil_check(session->begin_transaction(
-			    session, "snapshot=test"));
+			/*
+			 * Keep trying to start a new transaction if it's
+			 * timing out - we know there aren't any resources
+			 * pinned so it should succeed eventually.
+			 */
+			while ((ret = session->begin_transaction(
+			    session, "snapshot=test")) == WT_CACHE_FULL)
+				;
+			testutil_check(ret);
 			testutil_check(session->snapshot(
 			    session, "drop=(all)"));
 			testutil_check(session->commit_transaction(
@@ -123,8 +130,10 @@ lrt(void *arg)
 			 * positioned. As soon as the cursor loses its position
 			 * a new snapshot will be allocated.
 			 */
-			testutil_check(session->begin_transaction(
-			    session, "isolation=snapshot"));
+			while ((ret = session->begin_transaction(
+			    session, "snapshot=snapshot")) == WT_CACHE_FULL)
+				;
+			testutil_check(ret);
 
 			/* Read a record at the end of the table. */
 			do {

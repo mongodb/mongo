@@ -104,6 +104,7 @@ _wiredtiger.pyd
 **/test/checkpoint/t
 **/test/csuite/test_random_abort
 **/test/csuite/test_rwlock
+**/test/csuite/test_schema_abort
 **/test/csuite/test_scope
 **/test/csuite/test_timestamp_abort
 **/test/csuite/test_truncated_log
@@ -126,6 +127,9 @@ _wiredtiger.pyd
 **/test/csuite/test_wt3338_partial_update
 **/test/csuite/test_wt3363_checkpoint_op_races
 **/test/csuite/test_wt3874_pad_byte_collator
+**/test/csuite/test_wt4105_large_doc_small_upd
+**/test/csuite/test_wt4117_checksum
+**/test/csuite/test_wt4156_metadata_salvage
 **/test/cursor_order/cursor_order
 **/test/fops/t
 **/test/format/s_dumpcmp

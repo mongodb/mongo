@@ -25,7 +25,7 @@ struct __wt_data_handle_cache {
 struct __wt_hazard {
 	WT_REF *ref;			/* Page reference */
 #ifdef HAVE_DIAGNOSTIC
-	const char *file;		/* File/line where hazard acquired */
+	const char *func;		/* Function/line hazard acquired */
 	int	    line;
 #endif
 };
@@ -120,7 +120,7 @@ struct __wt_session_impl {
 	 * to applications, create a parallel structure instead.
 	 */
 	struct __wt_scratch_track {
-		const char *file;	/* Allocating file, line */
+		const char *func;	/* Allocating function, line */
 		int line;
 	} *scratch_track;
 #endif
@@ -140,6 +140,8 @@ struct __wt_session_impl {
 	WT_DATA_HANDLE **ckpt_handle;	/* Handle list */
 	u_int   ckpt_handle_next;	/* Next empty slot */
 	size_t  ckpt_handle_allocated;	/* Bytes allocated */
+
+	uint64_t cache_wait_us; /* Wait time for cache for current operation */
 
 	/*
 	 * Operations acting on handles.

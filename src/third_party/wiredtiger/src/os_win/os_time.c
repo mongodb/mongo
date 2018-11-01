@@ -29,19 +29,16 @@ __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
 }
 
 /*
- * localtime_r --
- *	Return the current local time.
+ * __wt_localtime --
+ *	Return the current local broken-down time.
  */
-struct tm *
-localtime_r(const time_t *timer, struct tm *result)
+int
+__wt_localtime(WT_SESSION_IMPL *session, const time_t *timep, struct tm *result)
 {
 	errno_t err;
 
-	err = localtime_s(result, timer);
-	if (err != 0) {
-		__wt_err(NULL, err, "localtime_s");
-		return (NULL);
-	}
+	if ((err = localtime_s(result, timep)) == 0)
+		return (0);
 
-	return (result);
+	WT_RET_MSG(session, err, "localtime_s");
 }

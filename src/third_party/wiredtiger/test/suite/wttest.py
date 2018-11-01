@@ -101,7 +101,7 @@ class CapturedFd(object):
                                      ' unexpected ' + self.desc +
                                      ', contains:\n"' + contents + '"')
             testcase.fail('unexpected ' + self.desc + ', contains: "' +
-                      shortenWithEllipsis(contents,100) + '"')
+                      contents + '"')
         self.expectpos = filesize
 
     def checkAdditional(self, testcase, expect):
@@ -180,7 +180,7 @@ class WiredTigerTestCase(unittest.TestCase):
 
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
-                    gdbSub = False, verbose = 1, builddir = None, dirarg = None,
+                    gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
                     longtest = False):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
@@ -194,6 +194,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._origcwd = os.getcwd()
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
+        WiredTigerTestCase._lldbSubprocess = lldbSub
         WiredTigerTestCase._longtest = longtest
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
@@ -339,20 +340,25 @@ class WiredTigerTestCase(unittest.TestCase):
             self.conn.close(config)
             self.conn = None
 
-    def open_conn(self, directory="."):
+    def open_conn(self, directory=".", config=None):
         """
         Open the connection if already closed.
         """
         if self.conn == None:
+            if config != None:
+                self._old_config = self.conn_config
+                self.conn_config = config
             self.conn = self.setUpConnectionOpen(directory)
+            if config != None:
+                self.conn_config = self._old_config
             self.session = self.setUpSessionOpen(self.conn)
 
-    def reopen_conn(self, directory="."):
+    def reopen_conn(self, directory=".", config=None):
         """
         Reopen the connection.
         """
         self.close_conn()
-        self.open_conn(directory)
+        self.open_conn(directory, config)
 
     def setUp(self):
         if not hasattr(self.__class__, 'wt_ntests'):

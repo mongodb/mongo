@@ -331,7 +331,7 @@ for optype in log_data.optypes:
 })
 
 tfile.write('''
-\tWT_ILLEGAL_VALUE(session);
+\tWT_ILLEGAL_VALUE(session, optype);
 \t}
 
 \treturn (0);

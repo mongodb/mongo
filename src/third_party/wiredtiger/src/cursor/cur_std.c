@@ -708,6 +708,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
+	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	uint64_t bucket, hash_value;
 	uint32_t overwrite_flag;
@@ -722,7 +723,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 
 	/* Fast path overwrite configuration */
 	if (have_config && cfg[2] == NULL &&
-	    WT_STREQ(cfg[1], "overwrite=false")) {
+	    strcmp(cfg[1], "overwrite=false") == 0) {
 		have_config = false;
 		overwrite_flag = 0;
 	} else
@@ -780,7 +781,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 	bucket = hash_value % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(cursor, &session->cursor_cache[bucket], q) {
 		if (cursor->uri_hash == hash_value &&
-		    WT_STREQ(cursor->uri, uri)) {
+		    strcmp(cursor->uri, uri) == 0) {
 			if ((ret = cursor->reopen(cursor, false)) != 0) {
 				F_CLR(cursor, WT_CURSTD_CACHEABLE);
 				session->dhandle = NULL;
@@ -797,6 +798,15 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 			F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_RAW |
 			    WT_CURSTD_OVERWRITE);
 			F_SET(cursor, overwrite_flag);
+			/*
+			 * If this is a btree cursor, clear its read_once flag.
+			 */
+			if (WT_PREFIX_MATCH(cursor->internal_uri, "file:")) {
+				cbt = (WT_CURSOR_BTREE *)cursor;
+				F_CLR(cbt, WT_CBT_READ_ONCE);
+			} else {
+				cbt = NULL;
+			}
 
 			if (have_config) {
 				/*
@@ -819,6 +829,15 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 				    session, cfg, "raw", 0, &cval));
 				if (cval.val != 0)
 					F_SET(cursor, WT_CURSTD_RAW);
+
+				if (cbt) {
+					WT_RET(__wt_config_gets_def(
+					    session,
+					    cfg, "read_once", 0, &cval));
+					if (cval.val != 0)
+						F_SET(cbt, WT_CBT_READ_ONCE);
+				}
+
 			}
 
 			WT_STAT_CONN_INCR(session, cursor_reopen);
@@ -835,7 +854,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
-int
+void
 __wt_cursor_close(WT_CURSOR *cursor)
 {
 	WT_SESSION_IMPL *session;
@@ -854,7 +873,6 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
-	return (0);
 }
 
 /*

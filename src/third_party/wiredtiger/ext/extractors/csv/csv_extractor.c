@@ -147,7 +147,6 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	long field_num;
 	int ret;
 
-	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
 
 	orig = (const CSV_EXTRACTOR *)extractor;
@@ -155,34 +154,61 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	if ((ret = wt_api->config_parser_open(wt_api, session, appcfg->str,
 	    appcfg->len, &parser)) != 0)
 		return (ret);
-	if ((ret = parser->get(parser, "field", &field)) != 0 ||
-	    (ret = parser->get(parser, "format", &format)) != 0) {
-		if (ret == WT_NOTFOUND) {
+	if ((ret = parser->get(parser, "field", &field)) != 0) {
+		if (ret == WT_NOTFOUND)
 			(void)wt_api->err_printf(
-			    wt_api, session, "field or format not found");
-			return (WT_NOTFOUND);
-		}
-		return (ret);
+			    wt_api, session, "field not found");
+		else
+			(void)wt_api->err_printf(
+			    wt_api, session, "WT_CONFIG_PARSER.get: field: %s",
+			    wt_api->strerror(wt_api, session, ret));
+		goto err;
 	}
+	if ((ret = parser->get(parser, "format", &format)) != 0) {
+		if (ret == WT_NOTFOUND)
+			(void)wt_api->err_printf(
+			    wt_api, session, "format not found");
+		else
+			(void)wt_api->err_printf(
+			    wt_api, session, "WT_CONFIG_PARSER.get: format: %s",
+			    wt_api->strerror(wt_api, session, ret));
+		goto err;
+	}
+	ret = parser->close(parser);
+	parser = NULL;
+	if (ret != 0) {
+		(void)wt_api->err_printf(
+		    wt_api, session, "WT_CONFIG_PARSER.close: %s",
+		    wt_api->strerror(wt_api, session, ret));
+	}
+
 	field_num = strtol(field.str, NULL, 10);
 	if (field_num < 0 || field_num > INT_MAX) {
 		(void)wt_api->err_printf(
 		    wt_api, session, "field: invalid format");
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
 	if (format.len != 1 || (format.str[0] != 'S' && format.str[0] != 'i')) {
 		(void)wt_api->err_printf(
 		    wt_api, session, "format: invalid format");
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
-	if ((csv_extractor = calloc(1, sizeof(CSV_EXTRACTOR))) == NULL)
-		return (errno);
+	if ((csv_extractor = calloc(1, sizeof(CSV_EXTRACTOR))) == NULL) {
+		ret = errno;
+		goto err;
+	}
 
 	*csv_extractor = *orig;
 	csv_extractor->field = (int)field_num;
 	csv_extractor->format_isnum = (format.str[0] == 'i');
 	*customp = (WT_EXTRACTOR *)csv_extractor;
 	return (0);
+
+err:	if (parser != NULL)
+		(void)parser->close(parser);
+	return (ret);
 }
 
 /*
@@ -207,6 +233,7 @@ int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	CSV_EXTRACTOR *csv_extractor;
+	int ret;
 
 	(void)config;				/* Unused parameters */
 
@@ -218,6 +245,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	csv_extractor->extractor.terminate = csv_terminate;
 	csv_extractor->wt_api = connection->get_extension_api(connection);
 
-	return (connection->add_extractor(
-	    connection, "csv", (WT_EXTRACTOR *)csv_extractor, NULL));
+	if ((ret = connection->add_extractor(
+	    connection, "csv", (WT_EXTRACTOR *)csv_extractor, NULL)) == 0)
+		return (0);
+
+	free(csv_extractor);
+	return (ret);
 }

@@ -35,6 +35,7 @@ namespace workgen {
 struct ContextInternal;
 struct OperationInternal;
 struct TableInternal;
+struct ThreadRunner;
 struct Thread;
 struct Transaction;
 
@@ -171,6 +172,7 @@ struct Context {
 struct TableOptions {
     int key_size;
     int value_size;
+    uint64_t value_compressibility;
     bool random_value;
     int range;
 
@@ -308,8 +310,8 @@ struct Operation {
     void create_all();
     void get_static_counts(Stats &stats, int multiplier);
     void kv_compute_max(bool iskey, bool has_random);
-    void kv_gen(bool iskey, uint32_t randomizer, uint64_t n,
-      char *result) const;
+    void kv_gen(ThreadRunner *runner, bool iskey, uint64_t compressibility,
+       uint64_t n, char *result) const;
     void kv_size_buffer(bool iskey, size_t &size) const;
     void size_check() const;
 #endif

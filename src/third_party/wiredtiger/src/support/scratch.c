@@ -71,30 +71,9 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	WT_DECL_RET;
-	size_t len;
-	va_list ap;
+	WT_VA_ARGS_BUF_FORMAT(session, buf, fmt, false);
 
-	for (;;) {
-		va_start(ap, fmt);
-		ret = __wt_vsnprintf_len_set(
-		    buf->mem, buf->memsize, &len, fmt, ap);
-		va_end(ap);
-		WT_RET(ret);
-
-		/* Check if there was enough space. */
-		if (len < buf->memsize) {
-			buf->data = buf->mem;
-			buf->size = len;
-			return (0);
-		}
-
-		/*
-		 * If not, double the size of the buffer: we're dealing with
-		 * strings, and we don't expect these numbers to get huge.
-		 */
-		WT_RET(__wt_buf_extend(session, buf, len + 1));
-	}
+	return (0);
 }
 
 /*
@@ -106,11 +85,6 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	WT_DECL_RET;
-	size_t len, space;
-	char *p;
-	va_list ap;
-
 	/*
 	 * If we're appending data to an existing buffer, any data field should
 	 * point into the allocated memory.  (It wouldn't be insane to copy any
@@ -119,27 +93,9 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 	 */
 	WT_ASSERT(session, buf->data == NULL || WT_DATA_IN_ITEM(buf));
 
-	for (;;) {
-		va_start(ap, fmt);
-		p = (char *)((uint8_t *)buf->mem + buf->size);
-		WT_ASSERT(session, buf->memsize >= buf->size);
-		space = buf->memsize - buf->size;
-		ret = __wt_vsnprintf_len_set(p, space, &len, fmt, ap);
-		va_end(ap);
-		WT_RET(ret);
+	WT_VA_ARGS_BUF_FORMAT(session, buf, fmt, true);
 
-		/* Check if there was enough space. */
-		if (len < space) {
-			buf->size += len;
-			return (0);
-		}
-
-		/*
-		 * If not, double the size of the buffer: we're dealing with
-		 * strings, and we don't expect these numbers to get huge.
-		 */
-		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
-	}
+	return (0);
 }
 
 /*
@@ -223,7 +179,7 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session,
 			    session, buf, "%s%" PRIu64, sep, pv.u.u));
 			sep = ",";
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, pv.type);
 		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);
@@ -233,7 +189,7 @@ err:	__wt_scr_free(session, &tmp);
 		return ((const char *)buf->data);
 
 	retp = "failed to create printable output";
-	__wt_err(session, ret, "%s: %s", __func__, retp);
+	__wt_err(session, ret, "%s", retp);
 	return (retp);
 }
 
@@ -286,7 +242,7 @@ __wt_buf_set_size(
 int
 __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
+    , const char *func, int line
 #endif
     )
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
@@ -374,15 +330,14 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 	F_SET(*best, WT_ITEM_INUSE);
 
 #ifdef HAVE_DIAGNOSTIC
-	session->scratch_track[best - session->scratch].file = file;
+	session->scratch_track[best - session->scratch].func = func;
 	session->scratch_track[best - session->scratch].line = line;
 #endif
 
 	*scratchp = *best;
 	return (0);
 
-err:	WT_RET_MSG(session, ret,
-	    "session unable to allocate a scratch buffer");
+err:	WT_RET_MSG(session, ret, "session unable to allocate a scratch buffer");
 }
 
 /*
@@ -400,16 +355,19 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 		if (*bufp == NULL)
 			continue;
 		if (F_ISSET(*bufp, WT_ITEM_INUSE))
+#ifdef HAVE_DIAGNOSTIC
 			__wt_errx(session,
 			    "scratch buffer allocated and never discarded"
-#ifdef HAVE_DIAGNOSTIC
 			    ": %s: %d",
 			    session->
-			    scratch_track[bufp - session->scratch].file,
+			    scratch_track[bufp - session->scratch].func,
 			    session->
 			    scratch_track[bufp - session->scratch].line
-#endif
 			    );
+#else
+			__wt_errx(session,
+			    "scratch buffer allocated and never discarded");
+#endif
 
 		__wt_buf_free(session, *bufp);
 		__wt_free(session, *bufp);

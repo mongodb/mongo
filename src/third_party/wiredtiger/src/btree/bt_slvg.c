@@ -259,7 +259,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * fixed-length format ranges to overlap during salvage, and I don't
 	 * want to have to retrofit the code later.
 	 */
-	qsort(ss->pages,
+	__wt_qsort(ss->pages,
 	    (size_t)ss->pages_next, sizeof(WT_TRACK *), __slvg_trk_compare_key);
 	if (ss->page_type == WT_PAGE_ROW_LEAF)
 		WT_ERR(__slvg_row_range(session, ss));
@@ -328,7 +328,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 */
 	if (ss->root_ref.page != NULL) {
 		btree->ckpt = ckptbase;
-		ret = __wt_evict(session, &ss->root_ref, true);
+		ret = __wt_evict(session, &ss->root_ref, true, WT_REF_MEM);
 		ss->root_ref.page = NULL;
 		btree->ckpt = NULL;
 	}
@@ -1093,7 +1093,7 @@ __slvg_col_trk_update_start(uint32_t slot, WT_STUFF *ss)
 	}
 	i -= slot;
 	if (i > 1)
-		qsort(ss->pages + slot, (size_t)i,
+		__wt_qsort(ss->pages + slot, (size_t)i,
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 }
 
@@ -1300,7 +1300,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_evict(session, ref, true);
+		ret = __wt_evict(session, ref, true, WT_REF_MEM);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));
@@ -1770,7 +1770,8 @@ __slvg_row_trk_update_start(
 	 * would have discarded it, we wouldn't be here.  Therefore, this test
 	 * is safe.  (But, it never hurts to check.)
 	 */
-	WT_ERR_TEST(!found, WT_ERROR);
+	if (!found)
+		WT_ERR_MSG(session, WT_ERROR, "expected on-page key not found");
 	WT_ERR(__slvg_key_copy(session, &trk->row_start, key));
 
 	/*
@@ -1789,7 +1790,7 @@ __slvg_row_trk_update_start(
 	}
 	i -= slot;
 	if (i > 1)
-		qsort(ss->pages + slot, (size_t)i,
+		__wt_qsort(ss->pages + slot, (size_t)i,
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
 err:	if (page != NULL)
@@ -2018,7 +2019,7 @@ __slvg_row_build_leaf(
 	 */
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_evict(session, ref, true);
+		ret = __wt_evict(session, ref, true, WT_REF_MEM);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));
@@ -2159,13 +2160,12 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	 * If an overflow page is referenced more than once, discard leaf pages
 	 * with the lowest LSNs until overflow pages are only referenced once.
 	 *
-	 * This requires sorting the page list by LSN, and the overflow array
-
-	 * by address cookie.
+	 * This requires sorting the page list by LSN, and the overflow array by
+	 * address cookie.
 	 */
-	qsort(ss->pages,
+	__wt_qsort(ss->pages,
 	    (size_t)ss->pages_next, sizeof(WT_TRACK *), __slvg_trk_compare_gen);
-	qsort(ss->ovfl,
+	__wt_qsort(ss->ovfl,
 	    (size_t)ss->ovfl_next, sizeof(WT_TRACK *), __slvg_trk_compare_addr);
 
 	/*
@@ -2350,7 +2350,7 @@ __slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk, bool multi_panic)
 {
 	if (F_ISSET(trk, WT_TRACK_OVFL_REFD)) {
 		if (!multi_panic)
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 		WT_PANIC_RET(session, EINVAL,
 		    "overflow record unexpectedly referenced multiple times "
 		    "during leaf page merge");

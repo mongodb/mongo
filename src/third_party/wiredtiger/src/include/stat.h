@@ -354,6 +354,12 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_other;
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
+	int64_t cache_lookaside_cursor_wait_application;
+	int64_t cache_lookaside_cursor_wait_internal;
+	int64_t cache_lookaside_score;
+	int64_t cache_lookaside_entries;
+	int64_t cache_lookaside_insert;
+	int64_t cache_lookaside_remove;
 	int64_t cache_eviction_checkpoint;
 	int64_t cache_eviction_get_ref;
 	int64_t cache_eviction_get_ref_empty;
@@ -398,14 +404,11 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_internal;
 	int64_t cache_eviction_split_internal;
 	int64_t cache_eviction_split_leaf;
-	int64_t cache_lookaside_score;
-	int64_t cache_lookaside_entries;
-	int64_t cache_lookaside_insert;
-	int64_t cache_lookaside_remove;
 	int64_t cache_bytes_max;
 	int64_t cache_eviction_maximum_page_size;
 	int64_t cache_eviction_dirty;
 	int64_t cache_eviction_app_dirty;
+	int64_t cache_timed_out_ops;
 	int64_t cache_read_overflow;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
@@ -455,11 +458,11 @@ struct __wt_connection_stats {
 	int64_t cursor_insert;
 	int64_t cursor_modify;
 	int64_t cursor_next;
+	int64_t cursor_restart;
 	int64_t cursor_prev;
 	int64_t cursor_remove;
 	int64_t cursor_reserve;
 	int64_t cursor_reset;
-	int64_t cursor_restart;
 	int64_t cursor_search;
 	int64_t cursor_search_near;
 	int64_t cursor_sweep_buckets;
@@ -583,6 +586,7 @@ struct __wt_connection_stats {
 	int64_t rec_split_stashed_objects;
 	int64_t session_cursor_open;
 	int64_t session_open;
+	int64_t session_query_ts;
 	int64_t session_table_alter_fail;
 	int64_t session_table_alter_success;
 	int64_t session_table_alter_skip;
@@ -620,8 +624,9 @@ struct __wt_connection_stats {
 	int64_t page_sleep;
 	int64_t page_del_rollback_blocked;
 	int64_t child_modify_blocked_page;
+	int64_t txn_commit_queue_walked;
 	int64_t txn_commit_queue_empty;
-	int64_t txn_commit_queue_tail;
+	int64_t txn_commit_queue_head;
 	int64_t txn_commit_queue_inserts;
 	int64_t txn_commit_queue_len;
 	int64_t txn_snapshots_created;
@@ -631,6 +636,7 @@ struct __wt_connection_stats {
 	int64_t txn_prepare_active;
 	int64_t txn_prepare_rollback;
 	int64_t txn_query_ts;
+	int64_t txn_read_queue_walked;
 	int64_t txn_read_queue_empty;
 	int64_t txn_read_queue_head;
 	int64_t txn_read_queue_inserts;
@@ -663,6 +669,7 @@ struct __wt_connection_stats {
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
 	int64_t txn_pinned_timestamp;
+	int64_t txn_pinned_timestamp_checkpoint;
 	int64_t txn_pinned_timestamp_oldest;
 	int64_t txn_sync;
 	int64_t txn_commit;
@@ -783,6 +790,7 @@ struct __wt_dsrc_stats {
 	int64_t compress_raw_ok;
 	int64_t cursor_insert_bulk;
 	int64_t cursor_create;
+	int64_t cursor_restart;
 	int64_t cursor_insert_bytes;
 	int64_t cursor_remove_bytes;
 	int64_t cursor_update_bytes;
@@ -795,7 +803,6 @@ struct __wt_dsrc_stats {
 	int64_t cursor_remove;
 	int64_t cursor_reserve;
 	int64_t cursor_reset;
-	int64_t cursor_restart;
 	int64_t cursor_search;
 	int64_t cursor_search_near;
 	int64_t cursor_truncate;

@@ -19,9 +19,11 @@ __curconfig_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
-	WT_TRET(__wt_cursor_close(cursor));
+err:
 
-err:	API_END_RET(session, ret);
+	__wt_cursor_close(cursor);
+
+	API_END_RET(session, ret);
 }
 
 /*
@@ -60,10 +62,9 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
 
 	WT_RET(__wt_calloc_one(session, &cconfig));
-
-	cursor = &cconfig->iface;
+	cursor = (WT_CURSOR *)cconfig;
 	*cursor = iface;
-	cursor->session = &session->iface;
+	cursor->session = (WT_SESSION *)session;
 	cursor->key_format = cursor->value_format = "S";
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));

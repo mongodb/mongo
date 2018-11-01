@@ -82,7 +82,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 			break;
 		WT_ERR(__wt_getline(session, fs, value));
 		if (value->size == 0)
-			WT_ERR(__wt_illegal_value(session, WT_METADATA_BACKUP));
+			WT_PANIC_ERR(session, EINVAL,
+			    "%s: zero-length value", WT_METADATA_BACKUP);
 		WT_ERR(__wt_metadata_update(session, key->data, value->data));
 	}
 
@@ -329,8 +330,10 @@ err:	WT_TRET(__wt_fclose(session, &fs));
 	 * something has gone horribly wrong, except for the compatibility
 	 * setting which is optional.
 	 */
-	return (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 ? ret :
-	    __wt_illegal_value(session, WT_METADATA_TURTLE));
+	if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0)
+		return (ret);
+	WT_PANIC_RET(session, ret,
+	    "%s: fatal turtle file read error", WT_METADATA_TURTLE);
 }
 
 /*
@@ -388,5 +391,8 @@ err:	WT_TRET(__wt_fclose(session, &fs));
 	 * An error updating the turtle file means something has gone horribly
 	 * wrong -- we're done.
 	 */
-	return (ret == 0 ? 0 : __wt_illegal_value(session, WT_METADATA_TURTLE));
+	if (ret == 0)
+		return (ret);
+	WT_PANIC_RET(session, ret,
+	    "%s: fatal turtle file update error", WT_METADATA_TURTLE);
 }

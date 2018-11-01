@@ -117,7 +117,7 @@ __wt_global_once(void)
 		return;
 	}
 
-	__wt_checksum_init();
+	__wt_process.checksum = wiredtiger_crc32c_func();
 	__global_calibrate_ticks();
 
 	TAILQ_INIT(&__wt_process.connqh);

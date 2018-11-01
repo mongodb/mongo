@@ -1,4 +1,12 @@
 /*
+ * The checksum code doesn't include WiredTiger configuration or include files.
+ * This means the HAVE_NO_CRC32_HARDWARE #define isn't configurable as part of
+ * standalone WiredTiger configuration, there's no way to turn off the checksum
+ * hardware.
+ */
+#if !defined(HAVE_NO_CRC32_HARDWARE)
+
+/*
  * Hardware-accelerated CRC-32 variants for Linux on z Systems
  *
  * Use the z/Architecture Vector Extension Facility to accelerate the
@@ -271,10 +279,13 @@ crc32_le_vgfm_generic:
 	VLM     %v8,%v15,0,%r15
 	lmg     %r14,%r15,240(%r15)
 	br	%r14
+#endif
 
-/*
- * Make sure the stack isn't executable with GCC (regardless of platform).
- */
-#ifndef __clang__
+/* Make sure the stack isn't executable with GCC (regardless of platform). */
+#ifdef __ELF__
 .section	.note.GNU-stack,"",@progbits
 #endif
+/*
+ * DO NOT add an #endif after this line, this section must always be output
+ * and can never be #ifdef'd out as part of conditional compilation.
+ */

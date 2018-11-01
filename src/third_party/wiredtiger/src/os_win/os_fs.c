@@ -279,6 +279,8 @@ __win_file_read(WT_FILE_HANDLE *file_handle,
 		    win_fh->filehandle, addr, chunk, &nr, &overlapped)) {
 			windows_error = __wt_getlasterror();
 			ret = __wt_map_windows_error(windows_error);
+			if (ret == WT_ERROR)
+				F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 			__wt_err(session, ret,
 			    "%s: handle-read: ReadFile: failed to read %lu "
 			    "bytes at offset %" PRIuMAX ": %s",
@@ -393,7 +395,7 @@ __win_file_set_end(
 
 	if (SetEndOfFile(win_fh->filehandle_secondary) == FALSE) {
 		if (GetLastError() == ERROR_USER_MAPPED_FILE)
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 		windows_error = __wt_getlasterror();
 		ret = __wt_map_windows_error(windows_error);
 		__wt_err(session, ret,

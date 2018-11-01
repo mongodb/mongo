@@ -111,8 +111,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		case WT_SYNC_CLOSE:
 			/*
 			 * Evict the page.
+			 *
+			 * Ensure the ref state is restored to the previous
+			 * value if eviction fails.
 			 */
-			WT_ERR(__wt_evict(session, ref, true));
+			WT_ERR(__wt_evict(session, ref, true, ref->state));
 			break;
 		case WT_SYNC_DISCARD:
 			/*
@@ -126,7 +129,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			break;
 		case WT_SYNC_CHECKPOINT:
 		case WT_SYNC_WRITE_LEAVES:
-			WT_ERR(__wt_illegal_value(session, NULL));
+			WT_ERR(__wt_illegal_value(session, syncop));
 			break;
 		}
 	}

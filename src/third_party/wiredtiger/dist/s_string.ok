@@ -24,6 +24,7 @@ Async
 AsyncOp
 Athanassoulis
 Athlon
+Axxx
 BBBBB
 BBBBBB
 BBBBBBBBBB
@@ -46,6 +47,7 @@ Brueckner
 Bsearch
 Btree
 Buf
+Bxxx
 Bzip
 CAS
 CCCCCCCCCCCCCCCCCC
@@ -75,6 +77,7 @@ Checksum
 Checksums
 CityHash
 CloseHandle
+Cmvxz
 Cmvz
 Collet
 Comparator
@@ -207,8 +210,8 @@ LLLLLLL
 LOGREC
 LOGSCAN
 LOOKASIDE
+LRSVv
 LRU
-LRVv
 LSB
 LSM
 LSN
@@ -222,6 +225,7 @@ LevelDB
 Levyx
 Llqr
 Llqrt
+LmT
 LoadLoad
 LockFile
 Lookaside
@@ -443,6 +447,7 @@ Zlib's
 Zstandard
 Zstd
 Zstd's
+aaa
 abcdef
 abcdefghijklmnopqrstuvwxyz
 addl
@@ -478,6 +483,7 @@ backoff
 bal
 basecfg
 basho
+bbb
 bcr
 bdb
 beginthreadex
@@ -496,6 +502,7 @@ bool
 boolean
 br
 breakpoint
+bs
 bswap
 bt
 btcur
@@ -525,6 +532,7 @@ calloc
 cas
 catfmt
 cb
+ccc
 ccr
 cd
 centric
@@ -622,6 +630,7 @@ datastore
 dbc
 dbs
 dcalloc
+ddd
 decile
 deciles
 decl
@@ -652,6 +661,7 @@ dhandle
 dhandles
 difftime
 dir
+directio
 dirlist
 disjunction
 disjunctions
@@ -677,6 +687,7 @@ dsync
 dumpcmp
 dumpfile
 dup
+eee
 eg
 egrep
 emp
@@ -718,6 +729,7 @@ fdatasync
 fdopen
 fextend
 ffc
+fff
 fflush
 ffs
 fgetc
@@ -746,9 +758,11 @@ fopen
 formatmessage
 fp
 fprintf
+fread
 free'd
 fs
 fscanf
+fseek
 fstat
 fstream
 fsync
@@ -758,6 +772,7 @@ ftruncate
 func
 funcid
 fvisibility
+fwrite
 gcc
 gdb
 ge
@@ -772,6 +787,7 @@ getraw
 gettime
 gettimeofday
 getv
+ggg
 github
 gitignore
 gobare
@@ -785,6 +801,7 @@ handlep
 hashval
 havesize
 hdr
+hhh
 highjack
 hilq
 hotbackup
@@ -801,6 +818,7 @@ idlems
 idx
 ifdef
 ifdef's
+iflag
 iiSii
 iiiS
 iiii
@@ -859,6 +877,7 @@ iszero
 iter
 iteratively
 iters
+jjj
 jnr
 jrx
 json
@@ -1030,6 +1049,7 @@ other's
 ovfl
 ownp
 pR
+pS
 packv
 pagesize
 parens
@@ -1137,6 +1157,7 @@ rwlock
 sH
 sHQ
 sT
+sanitizers
 scalability
 sched
 scr
@@ -1318,6 +1339,7 @@ vtype
 vunpack
 vw
 vxr
+vxz
 vz
 waitpid
 waker
@@ -1361,3 +1383,4 @@ zstd
 zstd's
 zu
 zyxwvutsrqponmlkjihgfedcba
+zzz

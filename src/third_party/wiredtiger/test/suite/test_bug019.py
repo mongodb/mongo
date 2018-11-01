@@ -35,7 +35,7 @@ from wtdataset import SimpleDataSet
 class test_bug019(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled,file_max=100K)'
     uri = "table:bug019"
-    entries = 100000
+    entries = 5000
 
     # Modify rows so we write log records. We're writing a lot more than a
     # single log file, so we know the underlying library will churn through
@@ -43,7 +43,9 @@ class test_bug019(wttest.WiredTigerTestCase):
     def populate(self, nentries):
         c = self.session.open_cursor(self.uri, None, None)
         for i in range(0, nentries):
-            c[i] = i
+            # Make the values about 200 bytes. That's about 1MB of data for
+            # 5000 records, generating 10 log files used plus more for overhead.
+            c[i] = "abcde" * 40
         c.close()
 
     # Wait for a log file to be pre-allocated. Avoid timing problems, but
@@ -60,7 +62,7 @@ class test_bug019(wttest.WiredTigerTestCase):
     # Windows systems due to an issue with the directory list code.
     def test_bug019(self):
         # Create a table just to write something into the log.
-        self.session.create(self.uri, 'key_format=i,value_format=i')
+        self.session.create(self.uri, 'key_format=i,value_format=S')
         self.populate(self.entries)
         self.session.checkpoint()
 

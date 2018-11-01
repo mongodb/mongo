@@ -39,7 +39,7 @@ __wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
 	}
 	for (i = 0; backup_list[i] != NULL; ++i) {
 		if (strcmp(backup_list[i], name) == 0) {
-			ret = EBUSY;
+			ret = __wt_set_return(session, EBUSY);
 			break;
 		}
 	}

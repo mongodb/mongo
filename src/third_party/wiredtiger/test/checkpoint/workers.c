@@ -103,7 +103,7 @@ start_workers(table_type type)
 
 	/* Wait for the threads. */
 	for (i = 0; i < g.nworkers; ++i)
-		testutil_check(__wt_thread_join(NULL, tids[i]));
+		testutil_check(__wt_thread_join(NULL, &tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +

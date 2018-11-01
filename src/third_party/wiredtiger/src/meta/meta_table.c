@@ -331,3 +331,27 @@ err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 		__wt_free(session, *valuep);
 	return (ret);
 }
+
+/*
+ * __wt_metadata_salvage --
+ *	Salvage the metadata file. This is a destructive operation.
+ *	Save a copy of the original metadata.
+ */
+int
+__wt_metadata_salvage(WT_SESSION_IMPL *session)
+{
+	WT_SESSION *wt_session;
+
+	wt_session = &session->iface;
+	/*
+	 * Copy the original metadata.
+	 */
+	WT_RET(__wt_copy_and_sync(wt_session, WT_METAFILE, WT_METAFILE_SLVG));
+
+	/*
+	 * Now salvage the metadata. We know we're in wiredtiger_open and
+	 * single threaded.
+	 */
+	WT_RET(wt_session->salvage(wt_session, WT_METAFILE_URI, NULL));
+	return (0);
+}

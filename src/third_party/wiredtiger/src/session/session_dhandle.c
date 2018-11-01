@@ -140,7 +140,7 @@ __wt_session_lock_dhandle(
 		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
 		    (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    (btree != NULL && F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))))
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 		++dhandle->excl_ref;
 		return (0);
 	}
@@ -167,7 +167,7 @@ __wt_session_lock_dhandle(
 		 * give up.
 		 */
 		if (btree != NULL && F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 
 		/*
 		 * If the handle is open, get a read lock and recheck.

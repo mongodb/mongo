@@ -25,9 +25,6 @@
 /* Define to 1 if you have the `clock_gettime' function. */
 /* #undef HAVE_CLOCK_GETTIME */
 
-/* Define to 1 to enable CRC32 hardware support. */
-/* #undef HAVE_CRC32_HARDWARE */
-
 /* Define to 1 for diagnostic tests. */
 /* #undef HAVE_DIAGNOSTIC */
 

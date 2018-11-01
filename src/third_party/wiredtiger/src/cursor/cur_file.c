@@ -469,15 +469,18 @@ __curfile_close(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, cbt->btree);
-	released = false;
+err:
 
-	/*
-	 * If releasing the cursor fails in any way, it will be left
-	 * in a state that allows it to be normally closed.
-	 */
-	WT_TRET(__wt_cursor_cache_release(session, cursor, &released));
-	if (released)
-		goto done;
+	/* Only try to cache the cursor if there's no error. */
+	if (ret == 0) {
+		/*
+		 * If releasing the cursor fails in any way, it will be left in
+		 * a state that allows it to be normally closed.
+		 */
+		ret = __wt_cursor_cache_release(session, cursor, &released);
+		if (released)
+			goto done;
+	}
 
 	dead = F_ISSET(cursor, WT_CURSTD_DEAD);
 	if (F_ISSET(cursor, WT_CURSTD_BULK)) {
@@ -494,7 +497,7 @@ __curfile_close(WT_CURSOR *cursor)
 	WT_ASSERT(session, session->dhandle == NULL ||
 	    session->dhandle->session_inuse > 0);
 
-	WT_TRET(__wt_cursor_close(cursor));
+	__wt_cursor_close(cursor);
 
 	/*
 	 * Note: release the data handle last so that cursor statistics are
@@ -513,8 +516,7 @@ __curfile_close(WT_CURSOR *cursor)
 			WT_TRET(__wt_session_release_dhandle(session));
 	}
 
-done:
-err:	API_END_RET(session, ret);
+done:	API_END_RET(session, ret);
 }
 
 /*
@@ -632,18 +634,16 @@ __curfile_create(WT_SESSION_IMPL *session,
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 
-	cbt = NULL;
-	cacheable = F_ISSET(session, WT_SESSION_CACHE_CURSORS) && !bulk;
-
 	btree = S2BT(session);
 	WT_ASSERT(session, btree != NULL);
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
-	WT_RET(__wt_calloc(session, 1, csize, &cbt));
+	cacheable = F_ISSET(session, WT_SESSION_CACHE_CURSORS) && !bulk;
 
-	cursor = &cbt->iface;
+	WT_RET(__wt_calloc(session, 1, csize, &cbt));
+	cursor = (WT_CURSOR *)cbt;
 	*cursor = iface;
-	cursor->session = &session->iface;
+	cursor->session = (WT_SESSION *)session;
 	cursor->internal_uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
@@ -693,6 +693,10 @@ __curfile_create(WT_SESSION_IMPL *session,
 		cacheable = false;
 	}
 
+	WT_ERR(__wt_config_gets_def(session, cfg, "read_once", 0, &cval));
+	if (cval.val != 0)
+		F_SET(cbt, WT_CBT_READ_ONCE);
+
 	/* Underlying btree initialization. */
 	__wt_btcur_open(cbt);
 
@@ -710,7 +714,7 @@ __curfile_create(WT_SESSION_IMPL *session,
 	 * WiredTiger.wt should not be cached, doing so interferes
 	 * with named checkpoints.
 	 */
-	if (cacheable && !WT_STREQ(WT_METAFILE_URI, cursor->internal_uri))
+	if (cacheable && strcmp(WT_METAFILE_URI, cursor->internal_uri) != 0)
 		F_SET(cursor, WT_CURSTD_CACHEABLE);
 
 	WT_ERR(__wt_cursor_init(
@@ -724,8 +728,7 @@ err:		/*
 		 * Our caller expects to release the data handle if we fail.
 		 * Disconnect it from the cursor before closing.
 		 */
-		if (session->dhandle != NULL)
-			__wt_cursor_dhandle_decr_use(session);
+		__wt_cursor_dhandle_decr_use(session);
 		cbt->btree = NULL;
 		WT_TRET(__curfile_close(cursor));
 		*cursorp = NULL;

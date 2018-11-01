@@ -187,6 +187,15 @@
 } while (0)
 
 /*
+ * Some C compiler address sanitizers complain if qsort is passed a NULL base
+ * reference, even if there are no elements to compare (note zero elements is
+ * allowed by the IEEE Std 1003.1-2017 standard). Avoid the complaint.
+ */
+#define	__wt_qsort(base, nmemb, size, compar)				\
+	if ((nmemb) != 0)						\
+		qsort(base, nmemb, size, compar)
+
+/*
  * Binary search for an integer key.
  */
 #define	WT_BINARY_SEARCH(key, arrayp, n, found) do {			\
@@ -227,9 +236,12 @@
 } while (0)
 
 /*
- * Check if a variable string equals a constant string.  Inline the common
- * case for WiredTiger of a single byte string.  This is required because not
- * all compilers optimize this case in strcmp (e.g., clang).
+ * Check if a variable string equals a constant string. Inline the common case
+ * for WiredTiger of a single byte string. This is required because not all
+ * compilers optimize this case in strcmp (e.g., clang). While this macro works
+ * in the case of comparing two pointers (a sizeof operator on a pointer won't
+ * equal 2 and the extra code will be discarded at compile time), that's not its
+ * purpose.
  */
 #define	WT_STREQ(s, cs)							\
 	(sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
@@ -294,21 +306,16 @@ typedef void wt_timestamp_t;
 	__wt_scr_alloc_func(session, size, scratchp, __func__, __LINE__)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags, __func__, __LINE__)
-#define	__wt_page_swap(session, held, want, prev_race, flags)		\
-	__wt_page_swap_func(						\
-	    session, held, want, prev_race, flags, __func__, __LINE__)
+#define	__wt_page_swap(session, held, want, flags)			\
+	__wt_page_swap_func(session, held, want, flags, __func__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags)
-#define	__wt_page_swap(session, held, want, prev_race, flags)		\
-	__wt_page_swap_func(session, held, want, prev_race, flags)
+#define	__wt_page_swap(session, held, want, flags)			\
+	__wt_page_swap_func(session, held, want, flags)
 #endif
-
-/* Called on unexpected code path: locate the failure. */
-#define	__wt_illegal_value(session, msg)				\
-	__wt_illegal_value_func(session, msg, __func__, __LINE__)
 
 /* Random number generator state. */
 union __wt_rand_state {
@@ -337,5 +344,56 @@ union __wt_rand_state {
 		}
 #define	WT_TAILQ_SAFE_REMOVE_END }
 
-/* Sleep time to uncover race conditions during timing stress test. */
-#define	TIMING_STRESS_TEST_SLEEP	(100 * WT_THOUSAND)
+/*
+ * WT_VA_ARGS_BUF_FORMAT --
+ *	Format into a scratch buffer, extending it as necessary. This is a
+ * macro because we need to repeatedly call va_start/va_end and there's no
+ * way to do that inside a function call.
+ */
+#define	WT_VA_ARGS_BUF_FORMAT(session, buf, fmt, concatenate) do {	\
+	size_t __len, __space;						\
+	va_list __ap;							\
+	int __ret_xx;		/* __ret already used by WT_RET */	\
+	char *__p;							\
+									\
+	/*								\
+	 * This macro is used to both initialize and concatenate into a	\
+	 * buffer. If not concatenating, clear the size so we don't use	\
+	 * any existing contents.					\
+	 */								\
+	if (!(concatenate))						\
+		(buf)->size = 0;					\
+	for (;;) {							\
+		WT_ASSERT(session, (buf)->memsize >= (buf)->size);	\
+		__p = (char *)((uint8_t *)(buf)->mem + (buf)->size);	\
+		__space = (buf)->memsize - (buf)->size;			\
+									\
+		/* Format into the buffer. */				\
+		va_start(__ap, fmt);					\
+		__ret_xx = __wt_vsnprintf_len_set(			\
+		    __p, __space, &__len, fmt, __ap);			\
+		va_end(__ap);						\
+		WT_RET(__ret_xx);					\
+									\
+		/* Check if there was enough space. */			\
+		if (__len < __space) {					\
+			(buf)->data = (buf)->mem;			\
+			(buf)->size += __len;				\
+			break;						\
+		}							\
+									\
+		/*							\
+		 * If not, double the size of the buffer: we're dealing	\
+		 * with strings, we don't expect the size to get huge.	\
+		 */							\
+		WT_RET(__wt_buf_extend(					\
+		    session, buf, (buf)->size + __len + 1));		\
+	}								\
+} while (0)
+
+/*
+ * HAVE_LONG_RUNNING_PREPARE
+ * 	To enable functionality of evicting prepared transactions using
+ * cache overflow mechanism.
+ */
+#undef	HAVE_LONG_RUNNING_PREPARE

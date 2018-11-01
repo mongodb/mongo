@@ -87,6 +87,12 @@ union __wt_lsn {
 #define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(III)
 #define	WT_LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
+/*
+ * Size range for the log files.
+ */
+#define	WT_LOG_FILE_MAX ((int64_t)2 * WT_GIGABYTE)
+#define	WT_LOG_FILE_MIN (100 * WT_KILOBYTE)
+
 #define	WT_LOG_SKIP_HEADER(data)					\
     ((const uint8_t *)(data) + offsetof(WT_LOG_RECORD, record))
 #define	WT_LOG_REC_SIZE(size)						\
@@ -317,9 +323,15 @@ struct __wt_log_record {
 	/*
 	 * No automatic generation: flag values cannot change, they're written
 	 * to disk.
+	 *
+	 * Unused bits in the flags, as well as the 'unused' padding,
+	 * are expected to be zeroed; we check that to help detect file
+	 * corruption.
 	 */
 #define	WT_LOG_RECORD_COMPRESSED	0x01u	/* Compressed except hdr */
 #define	WT_LOG_RECORD_ENCRYPTED		0x02u	/* Encrypted except hdr */
+#define	WT_LOG_RECORD_ALL_FLAGS					\
+	(WT_LOG_RECORD_COMPRESSED | WT_LOG_RECORD_ENCRYPTED)
 	uint16_t	flags;		/* 08-09: Flags */
 	uint8_t		unused[2];	/* 10-11: Padding */
 	uint32_t	mem_len;	/* 12-15: Uncompressed len if needed */

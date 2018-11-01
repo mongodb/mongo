@@ -569,7 +569,7 @@ __wt_cell_unpack_safe(
 	if (start != NULL &&						\
 	    ((uint8_t *)(t) < (uint8_t *)start ||			\
 	    (((uint8_t *)(t)) + (len)) > (uint8_t *)end))		\
-		return (WT_ERROR);					\
+		return (WT_ERROR);	        			\
 } while (0)
 
 restart:
@@ -692,7 +692,7 @@ restart:
 		unpack->__len = WT_PTRDIFF32(p, cell);
 		break;
 	default:
-		return (WT_ERROR);			/* Unknown cell type. */
+		return (WT_ERROR);		/* Unknown cell type. */
 	}
 
 	/*
@@ -778,7 +778,7 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 			return (0);
 		huffman = btree->huffman_value;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, unpack->type);
 	}
 
 	return (huffman == NULL || store->size == 0 ? 0 :

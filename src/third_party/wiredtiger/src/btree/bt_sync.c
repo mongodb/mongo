@@ -118,6 +118,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
 	WT_REF *prev, *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
@@ -239,9 +240,13 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * Set the checkpointing flag to block such actions and wait for
 		 * any problematic eviction or page splits to complete.
 		 */
-		btree->checkpointing = WT_CKPT_PREPARE;
+		WT_ASSERT(session, btree->syncing == WT_BTREE_SYNC_OFF &&
+		    btree->sync_session == NULL);
+
+		btree->sync_session = session;
+		btree->syncing = WT_BTREE_SYNC_WAIT;
 		(void)__wt_gen_next_drain(session, WT_GEN_EVICT);
-		btree->checkpointing = WT_CKPT_RUNNING;
+		btree->syncing = WT_BTREE_SYNC_RUNNING;
 
 		/* Write all dirty in-cache pages. */
 		LF_SET(WT_READ_NO_EVICT);
@@ -256,9 +261,24 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			if (walk == NULL)
 				break;
 
-			/* Skip clean pages. */
-			if (!__wt_page_is_modified(walk->page))
+			/*
+			 * Skip clean pages, but need to make sure maximum
+			 * transaction ID is always updated.
+			 */
+			if (!__wt_page_is_modified(walk->page)) {
+				if (((mod = walk->page->modify) != NULL) &&
+				    mod->rec_max_txn > btree->rec_max_txn)
+					btree->rec_max_txn = mod->rec_max_txn;
+#ifdef HAVE_TIMESTAMPS
+				if (mod != NULL && __wt_timestamp_cmp(
+				    &btree->rec_max_timestamp,
+				    &mod->rec_max_timestamp) < 0)
+					__wt_timestamp_set(
+					    &btree->rec_max_timestamp,
+					    &mod->rec_max_timestamp);
+#endif
 				continue;
+			}
 
 			/*
 			 * Take a local reference to the page modify structure
@@ -338,7 +358,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		break;
 	case WT_SYNC_CLOSE:
 	case WT_SYNC_DISCARD:
-		WT_ERR(__wt_illegal_value(session, NULL));
+		WT_ERR(__wt_illegal_value(session, syncop));
 		break;
 	}
 
@@ -367,7 +387,8 @@ err:	/* On error, clear any left-over tree walk. */
 		__wt_txn_release_snapshot(session);
 
 	/* Clear the checkpoint flag. */
-	btree->checkpointing = WT_CKPT_OFF;
+	btree->syncing = WT_BTREE_SYNC_OFF;
+	btree->sync_session = NULL;
 
 	__wt_spin_unlock(session, &btree->flush_lock);
 
