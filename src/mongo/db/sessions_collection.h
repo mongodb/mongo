@@ -97,6 +97,11 @@ public:
      */
     static BSONObj generateCreateIndexesCmd();
 
+    /*
+     * Generates a collMod command for the sessions collection TTL index.
+     */
+    static BSONObj generateCollModCmd();
+
 protected:
     /**
      * Makes a send function for the given client.
