@@ -227,6 +227,12 @@ void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTrans
 void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
                                            repl::OpTime prepareOpTime,
                                            TickSource::Tick curTick) {
+
+    //
+    // Per transaction metrics.
+    //
+    _singleTransactionStats.setPreparedStartTime(curTick);
+
     // Since we currently only write an oplog entry for an in progress transaction when it is in
     // the prepare state, the prepareOpTime is currently the oldest OpTime written to the
     // oplog for this transaction.

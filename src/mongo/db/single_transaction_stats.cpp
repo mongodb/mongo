@@ -52,6 +52,24 @@ Microseconds SingleTransactionStats::getDuration(TickSource* tickSource,
     return tickSource->ticksTo<Microseconds>(_endTime - _startTime);
 }
 
+Microseconds SingleTransactionStats::getPreparedDuration(TickSource* tickSource,
+                                                         TickSource::Tick curTick) const {
+    invariant(_startTime > 0);
+    invariant(_preparedStartTime > 0);
+
+    // If the transaction hasn't ended yet, we return how long it has currently been running for.
+    if (_endTime == 0) {
+        return tickSource->ticksTo<Microseconds>(curTick - _preparedStartTime);
+    }
+    return tickSource->ticksTo<Microseconds>(_endTime - _preparedStartTime);
+}
+
+void SingleTransactionStats::setPreparedStartTime(TickSource::Tick time) {
+    invariant(_startTime > 0);
+
+    _preparedStartTime = time;
+}
+
 void SingleTransactionStats::setEndTime(TickSource::Tick time) {
     invariant(_startTime > 0);
 
@@ -121,6 +139,11 @@ void SingleTransactionStats::report(BSONObjBuilder* builder,
 
     builder->append("timeActiveMicros", timeActive);
     builder->append("timeInactiveMicros", timeInactive);
+
+    if (_preparedStartTime > 0) {
+        auto timePrepared = durationCount<Microseconds>(getPreparedDuration(tickSource, curTick));
+        builder->append("timePreparedMicros", timePrepared);
+    }
 
     if (_expireDate != Date_t::max()) {
         builder->append("expiryTime", dateToISOStringLocal(_expireDate));

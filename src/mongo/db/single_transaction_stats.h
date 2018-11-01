@@ -94,6 +94,26 @@ public:
     Microseconds getDuration(TickSource* tickSource, TickSource::Tick curTick) const;
 
     /**
+     * If the transaction is currently in progress, this method returns the duration
+     * the transaction has been in the prepared state for in microseconds, given the
+     * current time value.
+     *
+     * For a completed transaction, this method returns the total duration the transaction
+     * has been in the prepared state in microseconds.
+     *
+     * This method cannot be called until setStartTime() and setPreparedStartTime() have been
+     * called.
+     */
+    Microseconds getPreparedDuration(TickSource* tickSource, TickSource::Tick curTick) const;
+
+    /**
+     * Sets the time at which a transaction enters the prepared state.
+     *
+     * This method cannot be called until setStartTime() has been called.
+     */
+    void setPreparedStartTime(TickSource::Tick time);
+
+    /**
      * Sets the transaction's end time, only if the start time has already been set.
      *
      * This method cannot be called until setStartTime() has been called.
@@ -238,6 +258,9 @@ private:
 
     // Holds information about the last client to run a transaction operation.
     LastClientInfo _lastClientInfo;
+
+    // The time at which a transaction enters the prepared state.
+    TickSource::Tick _preparedStartTime{0};
 };
 
 }  // namespace mongo

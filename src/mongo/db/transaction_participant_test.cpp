@@ -2001,6 +2001,28 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCom
         Microseconds(100));
 }
 
+TEST_F(TransactionsMetricsTest, SingleTranasactionStatsPreparedDurationShouldBeSetUponCommit) {
+    auto tickSource = initMockTickSource();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+
+    // Advance the clock.
+    tickSource->advance(Microseconds(10));
+
+    // Prepare the transaction and extend the duration in the prepared state.
+    const auto preparedTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    tickSource->advance(Microseconds(100));
+
+    txnParticipant->commitPreparedTransaction(opCtx(), preparedTimestamp);
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(100));
+}
+
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbort) {
     auto tickSource = initMockTickSource();
 
@@ -2015,6 +2037,26 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbo
     ASSERT_EQ(
         txnParticipant->getSingleTransactionStats().getDuration(tickSource, tickSource->getTicks()),
         Microseconds(100));
+}
+
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSetUponAbort) {
+    auto tickSource = initMockTickSource();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+
+    // Advance the clock.
+    tickSource->advance(Microseconds(10));
+
+    // Prepare the transaction and extend the duration in the prepared state.
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    tickSource->advance(Microseconds(100));
+
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(100));
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilCommit) {
@@ -2048,6 +2090,41 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
         Microseconds(200));
 }
 
+TEST_F(TransactionsMetricsTest,
+       SingleTransactionStatsPreparedDurationShouldKeepIncreasingUntilCommit) {
+    auto tickSource = initMockTickSource();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+
+    // Prepare the transaction and extend the duration in the prepared state.
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    tickSource->advance(Microseconds(100));
+
+    // The prepared transaction's duration should have increased.
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(100));
+
+    tickSource->advance(Microseconds(100));
+
+    // Commit the prepared transaction and check the prepared duration.
+    txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(200));
+
+    // The prepared transaction committed, so the prepared duration shouldn't have increased even if
+    // more time passed.
+    tickSource->advance(Microseconds(100));
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(200));
+}
+
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilAbort) {
     auto tickSource = initMockTickSource();
 
@@ -2077,6 +2154,41 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
     ASSERT_EQ(
         txnParticipant->getSingleTransactionStats().getDuration(tickSource, tickSource->getTicks()),
         Microseconds(200));
+}
+
+TEST_F(TransactionsMetricsTest,
+       SingleTransactionStatsPreparedDurationShouldKeepIncreasingUntilAbort) {
+    auto tickSource = initMockTickSource();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+
+    // Prepare the transaction and extend the duration in the prepared state.
+    txnParticipant->prepareTransaction(opCtx(), {});
+    tickSource->advance(Microseconds(100));
+
+    // The prepared transaction's duration should have increased.
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(100));
+
+    tickSource->advance(Microseconds(100));
+
+    // Abort the prepared transaction and check the prepared duration.
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(200));
+
+    // The prepared transaction aborted, so the prepared duration shouldn't have increased even if
+    // more time passed.
+    tickSource->advance(Microseconds(100));
+    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getPreparedDuration(
+                  tickSource, tickSource->getTicks()),
+              Microseconds(200));
 }
 
 TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) {
@@ -2499,6 +2611,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
 
 
 TEST_F(TransactionsMetricsTest, ReportStashedResources) {
+    auto tickSource = initMockTickSource();
     auto clockSource = initMockPreciseClockSource();
     auto startTime = Date_t::now();
     clockSource->reset(startTime);
@@ -2540,6 +2653,11 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
     ASSERT(opCtx()->lockState()->isLocked());
 
+    // Prepare the transaction and extend the duration in the prepared state.
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    const long preparedDuration = 10;
+    tickSource->advance(Microseconds(preparedDuration));
+
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     txnParticipant->stashTransactionResources(opCtx());
     ASSERT(!opCtx()->getWriteUnitOfWork());
@@ -2565,6 +2683,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
         startTime + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()});
+    ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), preparedDuration);
 
     ASSERT_EQ(stashedState.getField("client").valueStringData().toString(), "");
     ASSERT_EQ(stashedState.getField("connectionId").numberLong(), 0);
@@ -2592,10 +2711,11 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     ASSERT(txnParticipant->reportStashedState().isEmpty());
 
     // Commit the transaction. This allows us to release locks.
-    txnParticipant->commitUnpreparedTransaction(opCtx());
+    txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
 }
 
 TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
+    auto tickSource = initMockTickSource();
     auto clockSource = initMockPreciseClockSource();
     auto startTime = Date_t::now();
     clockSource->reset(startTime);
@@ -2620,6 +2740,11 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
     ASSERT(opCtx()->lockState()->isLocked());
 
+    // Prepare transaction and extend duration in the prepared state.
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    const long prepareDuration = 10;
+    tickSource->advance(Microseconds(prepareDuration));
+
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
     txnParticipant->reportUnstashedState(repl::ReadConcernArgs::get(opCtx()),
@@ -2640,6 +2765,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
         startTime + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()});
+    ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), prepareDuration);
 
     // For the following time metrics, we are only verifying that the transaction sub-document is
     // being constructed correctly with proper types because we have other tests to verify that
