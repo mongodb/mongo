@@ -163,10 +163,10 @@
     assert.commandWorked(
         st.configRS.getPrimary().getDB('admin').runCommand({refreshLogicalSessionCacheNow: 1}));
     // system.sessions collection can never be on config server.
-    validateSessionsCollection(st.configRS.getPrimary(), false, false, true);
+    validateSessionsCollection(st.configRS.getPrimary(), false, false, null, true);
     // The system sessions collection should have been created on some shard.
-    assert(validateSessionsCollection(st.rs0.getPrimary(), true, true, false) ||
-           validateSessionsCollection(st.rs1.getPrimary(), true, true, false));
+    assert(validateSessionsCollection(st.rs0.getPrimary(), true, true, null, false) ||
+           validateSessionsCollection(st.rs1.getPrimary(), true, true, null, false));
 
     st.stop();
 })();

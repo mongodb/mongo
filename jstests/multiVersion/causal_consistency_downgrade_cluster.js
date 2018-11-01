@@ -55,10 +55,10 @@
     // force config server to create sessions collection
     assert.commandWorked(
         st.configRS.getPrimary().getDB('admin').runCommand({refreshLogicalSessionCacheNow: 1}));
-    validateSessionsCollection(st.configRS.getPrimary(), false, false, true);
+    validateSessionsCollection(st.configRS.getPrimary(), false, false, null, true);
     // initially system.sessions collection has just one chunk.
-    assert(validateSessionsCollection(st.rs0.getPrimary(), true, false, false) ||
-           validateSessionsCollection(st.rs1.getPrimary(), true, false, false));
+    assert(validateSessionsCollection(st.rs0.getPrimary(), true, false, null, false) ||
+           validateSessionsCollection(st.rs1.getPrimary(), true, false, null, false));
 
     // Change featureCompatibilityVersion to 3.4.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
@@ -89,8 +89,8 @@
     });
 
     // Confirm that the system.sessions was dropped on the downgrade.
-    validateSessionsCollection(st.rs0.getPrimary(), false, false, true);
-    validateSessionsCollection(st.rs1.getPrimary(), false, false, true);
+    validateSessionsCollection(st.rs0.getPrimary(), false, false, null, true);
+    validateSessionsCollection(st.rs1.getPrimary(), false, false, null, true);
 
     // Downgrade mongos first.
     jsTest.log("Downgrading mongos servers.");
