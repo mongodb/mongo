@@ -53,6 +53,9 @@
 namespace mongo {
 
 using std::string;
+const char* kWTRepairMsg =
+    "This version of MongoDB is unable to repair this kind of corruption, but version 4.0.3+ may "
+    "be able to repair it. See http://dochub.mongodb.org/core/repair for more information.";
 
 Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == 0)
@@ -60,6 +63,12 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
 
     if (retCode == WT_ROLLBACK) {
         throw WriteConflictException();
+    }
+
+    if (retCode == WT_TRY_SALVAGE) {
+        severe() << "WiredTiger metadata corruption detected";
+        severe() << kWTRepairMsg;
+        fassertFailedNoTrace(50944);
     }
 
     fassert(28559, retCode != WT_PANIC);
