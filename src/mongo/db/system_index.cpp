@@ -48,6 +48,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_rebuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
@@ -149,6 +150,36 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
     }
 }
 
+Status createOrRebuildIndex(OperationContext* opCtx,
+                            Collection* collection,
+                            const BSONObj& indexPattern,
+                            const IndexSpec& indexSpec) {
+    IndexCatalog* indexCatalog = collection->getIndexCatalog();
+    invariant(indexCatalog);
+
+    if (!indexCatalog->checkUnfinished().isOK()) {
+        try {
+            forceRestartInProgressIndexesOnCollection(opCtx, collection->ns());
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }
+
+    std::vector<IndexDescriptor*> indexes;
+    indexCatalog->findIndexesByKeyPattern(opCtx, indexPattern, false, &indexes);
+
+    if (indexes.empty()) {
+        try {
+            generateSystemIndexForExistingCollection(
+                opCtx, collection, collection->ns(), indexSpec);
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 Status verifySystemIndexes(OperationContext* opCtx) {
@@ -180,32 +211,20 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             }
 
             // Ensure that system indexes exist for the user collection
-            indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemUsersKeyPattern, false, &indexes);
-            if (indexes.empty()) {
-                try {
-                    generateSystemIndexForExistingCollection(
-                        opCtx, collection, systemUsers, v3SystemUsersIndexSpec);
-                } catch (...) {
-                    return exceptionToStatus();
-                }
+            Status createRebuildStatus = createOrRebuildIndex(
+                opCtx, collection, v3SystemUsersKeyPattern, v3SystemUsersIndexSpec);
+            if (!createRebuildStatus.isOK()) {
+                return createRebuildStatus;
             }
         }
 
         // Ensure that system indexes exist for the roles collection, if it exists.
         collection = autoDb.getDb()->getCollection(opCtx, systemRoles);
         if (collection) {
-            IndexCatalog* indexCatalog = collection->getIndexCatalog();
-            invariant(indexCatalog);
-
-            std::vector<IndexDescriptor*> indexes;
-            indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemRolesKeyPattern, false, &indexes);
-            if (indexes.empty()) {
-                try {
-                    generateSystemIndexForExistingCollection(
-                        opCtx, collection, systemRoles, v3SystemRolesIndexSpec);
-                } catch (...) {
-                    return exceptionToStatus();
-                }
+            Status createRebuildStatus = createOrRebuildIndex(
+                opCtx, collection, v3SystemRolesKeyPattern, v3SystemRolesIndexSpec);
+            if (!createRebuildStatus.isOK()) {
+                return createRebuildStatus;
             }
         }
     }

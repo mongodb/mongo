@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
+
 namespace mongo {
 
 class OperationContext;
@@ -39,4 +41,11 @@ class OperationContext;
  * Only call this at startup before taking requests.
  */
 void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx);
+
+/**
+ * Restarts building indexes that were in progress during shutdown on a single collection.
+ * Only call this at startup before taking requests.
+ * NOTE: This function ignores the --noIndexBuildRetry option
+ */
+void forceRestartInProgressIndexesOnCollection(OperationContext* opCtx, const NamespaceString& ns);
 }
