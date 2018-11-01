@@ -2050,7 +2050,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSe
     tickSource->advance(Microseconds(10));
 
     // Prepare the transaction and extend the duration in the prepared state.
-    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    txnParticipant->prepareTransaction(opCtx(), {});
     tickSource->advance(Microseconds(100));
 
     txnParticipant->abortActiveTransaction(opCtx());
@@ -2741,7 +2741,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     ASSERT(opCtx()->lockState()->isLocked());
 
     // Prepare transaction and extend duration in the prepared state.
-    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    txnParticipant->prepareTransaction(opCtx(), {});
     const long prepareDuration = 10;
     tickSource->advance(Microseconds(prepareDuration));
 
