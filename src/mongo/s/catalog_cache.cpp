@@ -43,6 +43,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -365,6 +366,37 @@ void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInval
         // longer valid, so trigger a refresh.
         itColl->second->needsRefresh = true;
     }
+}
+
+void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
+                                     ChunkVersion targetCollectionVersion) const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    const auto itDb = _collectionsByDb.find(nss.db());
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
+            str::stream() << "could not act as router for " << nss.ns()
+                          << ", no entry for database "
+                          << nss.db(),
+            itDb != _collectionsByDb.end());
+
+    auto itColl = itDb->second.find(nss.ns());
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
+            str::stream() << "could not act as router for " << nss.ns()
+                          << ", no entry for collection.",
+            itColl != itDb->second.end());
+
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none),
+            str::stream() << "could not act as router for " << nss.ns() << ", wanted "
+                          << targetCollectionVersion.toString()
+                          << ", but found the collection was unsharded",
+            itColl->second->routingInfo);
+
+    auto foundVersion = itColl->second->routingInfo->getVersion();
+    uassert(StaleConfigInfo(nss, targetCollectionVersion, foundVersion),
+            str::stream() << "could not act as router for " << nss.ns() << ", wanted "
+                          << targetCollectionVersion.toString()
+                          << ", but found "
+                          << foundVersion.toString(),
+            foundVersion.epoch() == targetCollectionVersion.epoch());
 }
 
 void CatalogCache::invalidateDatabaseEntry(const StringData dbName) {

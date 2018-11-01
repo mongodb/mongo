@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/storage/backup_cursor_state.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -299,9 +300,18 @@ public:
      * request to be sent to the config servers. If another thread has already requested a refresh,
      * it will instead wait for that response.
      */
-    virtual boost::optional<OID> refreshAndGetEpoch(
+    virtual boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const = 0;
+
+    /**
+     * Consults the CatalogCache to determine if this node has routing information for the
+     * collection given by 'nss' which reports the same epoch as given by 'targetCollectionVersion'.
+     * Major and minor versions in 'targetCollectionVersion' are ignored.
+     */
+    virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const NamespaceString& nss,
+                                              ChunkVersion targetCollectionVersion) const = 0;
 };
 
 }  // namespace mongo

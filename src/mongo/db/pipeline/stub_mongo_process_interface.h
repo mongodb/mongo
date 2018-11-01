@@ -191,9 +191,16 @@ public:
         return true;
     }
 
-    boost::optional<OID> refreshAndGetEpoch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            const NamespaceString& nss) const override {
+    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss) const override {
         return boost::none;
+    }
+
+    void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const NamespaceString&,
+                                      ChunkVersion) const override {
+        uasserted(51019, "Unexpected check of routing table");
     }
 };
 }  // namespace mongo

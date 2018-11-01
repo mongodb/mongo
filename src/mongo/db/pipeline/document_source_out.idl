@@ -30,6 +30,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/chunk_version.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -42,6 +44,14 @@ enums:
             kModeReplaceCollection: "replaceCollection"
             kModeInsertDocuments: "insertDocuments"
             kModeReplaceDocuments: "replaceDocuments"
+
+types:
+    ChunkVersion:
+        bson_serialization_type: object
+        description: An object representing a chunk version for a collection.
+        cpp_type: ChunkVersion
+        serializer: ChunkVersion::toBSON
+        deserializer: ChunkVersion::fromBSONThrowing
 
 structs:
     DocumentSourceOutSpec:
@@ -71,12 +81,11 @@ structs:
                 optional: true
                 description: Document of fields representing the unique key.
 
-            epoch:
-                cpp_name: targetEpoch
-                type: objectid
+            targetCollectionVersion:
+                type: ChunkVersion
                 optional: true
-                description: If set, the epoch found when parsed on mongos. Can be used to check if
-                             a collection has since been dropped and re-created, in which case the
-                             shard key may have changed. As of this writing, this also can be used
-                             to detect if the collection has gone from unsharded to sharded, and
-                             thus now has a shard key.
+                description: If set, the collection's ChunkVersion found when parsed on mongos. Can
+                             be used to check if a collection has since been dropped and re-created,
+                             in which case the shard key may have changed. As of this writing, this
+                             also can be used to detect if the collection has gone from unsharded to
+                             sharded, and thus now has a shard key.

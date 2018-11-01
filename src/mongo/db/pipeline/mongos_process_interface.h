@@ -173,6 +173,12 @@ public:
                                      const NamespaceString&,
                                      const std::set<FieldPath>& uniqueKeyPaths) const final;
 
+    void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>&,
+                                      const NamespaceString&,
+                                      ChunkVersion) const final {
+        MONGO_UNREACHABLE;
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

@@ -73,6 +73,14 @@ void attachWriteConcern(BatchedCommandRequest* request, const WriteConcernOption
 
 }  // namespace
 
+void MongoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    ChunkVersion targetCollectionVersion) const {
+    auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+    return catalogCache->checkEpochOrThrow(nss, targetCollectionVersion);
+}
+
 std::pair<std::vector<FieldPath>, bool>
 MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
                                                                        const NamespaceString& nss,

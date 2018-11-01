@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -94,11 +95,17 @@ public:
         bool _allowShardedOutNss;
     };
 
+    /**
+     * Builds a new $out stage which will spill all documents into 'outputNs' as inserts. If
+     * 'targetCollectionVersion' is provided then processing will stop with an error if the
+     * collection's epoch changes during the course of execution. This is used as a mechanism to
+     * prevent the shard key from changing.
+     */
     DocumentSourceOut(NamespaceString outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       WriteModeEnum mode,
                       std::set<FieldPath> uniqueKey,
-                      boost::optional<OID> targetEpoch);
+                      boost::optional<ChunkVersion> targetCollectionVersion);
 
     virtual ~DocumentSourceOut() = default;
 
@@ -195,7 +202,7 @@ public:
         LocalReadConcernBlock readLocal(pExpCtx->opCtx);
 
         pExpCtx->mongoProcessInterface->insert(
-            pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch);
+            pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch());
     };
 
     /**
@@ -211,7 +218,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WriteModeEnum,
         std::set<FieldPath> uniqueKey = std::set<FieldPath>{"_id"},
-        boost::optional<OID> targetEpoch = boost::none);
+        boost::optional<ChunkVersion> targetCollectionVersion = boost::none);
 
     /**
      * Parses a $out stage from the user-supplied BSON.
@@ -228,9 +235,37 @@ protected:
     WriteConcernOptions _writeConcern;
 
     const NamespaceString _outputNs;
-    boost::optional<OID> _targetEpoch;
+    boost::optional<ChunkVersion> _targetCollectionVersion;
+
+    boost::optional<OID> _targetEpoch() {
+        return _targetCollectionVersion ? boost::optional<OID>(_targetCollectionVersion->epoch())
+                                        : boost::none;
+    }
 
 private:
+    /**
+     * If 'spec' does not specify a uniqueKey, uses the sharding catalog to pick a default key of
+     * the shard key + _id. Returns a pair of the uniqueKey (either from the spec or generated), and
+     * an optional ChunkVersion, populated with the version stored in the sharding catalog when we
+     * asked for the shard key.
+     */
+    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMongoS(
+        const boost::intrusive_ptr<ExpressionContext>&,
+        const DocumentSourceOutSpec& spec,
+        const NamespaceString& outputNs);
+
+    /**
+     * Ensures that 'spec' contains a uniqueKey which has a supporting index - either because the
+     * uniqueKey was sent from mongos or because there is a corresponding unique index. Returns the
+     * target ChunkVersion already attached to 'spec', but verifies that this node's cached routing
+     * table agrees on the epoch for that version before returning. Throws a StaleConfigException if
+     * not.
+     */
+    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMongoD(
+        const boost::intrusive_ptr<ExpressionContext>&,
+        const DocumentSourceOutSpec& spec,
+        const NamespaceString& outputNs);
+
     bool _initialized = false;
     bool _done = false;
 

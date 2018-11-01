@@ -149,7 +149,7 @@ bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-boost::optional<OID> MongoProcessCommon::refreshAndGetEpoch(
+boost::optional<ChunkVersion> MongoProcessCommon::refreshAndGetCollectionVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
     const bool forceRefreshFromThisThread = false;
     auto routingInfo = uassertStatusOK(
@@ -157,7 +157,7 @@ boost::optional<OID> MongoProcessCommon::refreshAndGetEpoch(
             ->catalogCache()
             ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss, forceRefreshFromThisThread));
     if (auto chunkManager = routingInfo.cm()) {
-        return chunkManager->getVersion().epoch();
+        return chunkManager->getVersion();
     }
     return boost::none;
 }
@@ -175,4 +175,5 @@ std::vector<FieldPath> MongoProcessCommon::_shardKeyToDocumentKeyFields(
     }
     return result;
 }
+
 }  // namespace mongo

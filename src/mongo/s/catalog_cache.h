@@ -207,6 +207,15 @@ public:
     void onStaleShardVersion(CachedCollectionRoutingInfo&&);
 
     /**
+     * Throws a StaleConfigException if this catalog cache does not have an entry for the given
+     * namespace, or if the entry for the given namespace does not have the same epoch as
+     * 'targetCollectionVersion'. Does not perform any refresh logic. Ignores everything except the
+     * epoch of 'targetCollectionVersion' when performing the check, but needs the entire target
+     * version to throw a StaleConfigException.
+     */
+    void checkEpochOrThrow(const NamespaceString& nss, ChunkVersion targetCollectionVersion) const;
+
+    /**
      * Non-blocking method, which indiscriminately causes the database entry for the specified
      * database to be refreshed the next time getDatabase is called.
      */

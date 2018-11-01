@@ -120,6 +120,12 @@ public:
                                      const NamespaceString& nss,
                                      const std::set<FieldPath>& uniqueKeyPaths) const final;
 
+    virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const NamespaceString& nss,
+                                              ChunkVersion targetCollectionVersion) const override {
+        uasserted(51020, "unexpected request to consult sharding catalog on non-shardsvr");
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

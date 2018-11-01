@@ -78,7 +78,7 @@ public:
                                                    _writeConcern,
                                                    upsert,
                                                    multi,
-                                                   _targetEpoch);
+                                                   _targetEpoch());
         } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
             uassertStatusOKWithContext(ex.toStatus(),
                                        "$out failed to update the matching document, did you "

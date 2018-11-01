@@ -43,6 +43,10 @@ class MongoInterfaceShardServer final : public MongoInterfaceStandalone {
 public:
     using MongoInterfaceStandalone::MongoInterfaceStandalone;
 
+    void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const NamespaceString& nss,
+                                      ChunkVersion targetCollectionVersion) const final;
+
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext* opCtx, const NamespaceString&, UUID) const final;
 
