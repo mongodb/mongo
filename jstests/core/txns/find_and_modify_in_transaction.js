@@ -1,5 +1,5 @@
 // Test transactions including find-and-modify
-// @tags: [uses_transactions]
+// @tags: [assumes_unsharded_collection, uses_transactions]
 (function() {
     "use strict";
 

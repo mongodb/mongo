@@ -1,7 +1,7 @@
 /**
  * Verify that transactions correctly abort on unique index write conflicts.
  *
- *  @tags: [uses_transactions]
+ *  @tags: [cannot_create_unique_index_when_using_hashed_shard_key, uses_transactions]
  */
 
 (function() {

@@ -1,5 +1,5 @@
 // Tests that multikey updates made inside a transaction are visible to that transaction's reads.
-// @tags: [uses_transactions]
+// @tags: [assumes_unsharded_collection, uses_transactions]
 (function() {
     "use strict";
 
