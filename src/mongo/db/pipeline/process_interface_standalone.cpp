@@ -468,7 +468,7 @@ BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
 
     if (clientOpCtx) {
         if (auto txnParticipant = TransactionParticipant::get(clientOpCtx)) {
-            txnParticipant->reportUnstashedState(repl::ReadConcernArgs::get(clientOpCtx), &builder);
+            txnParticipant->reportUnstashedState(clientOpCtx, &builder);
         }
 
         // Append lock stats before returning.

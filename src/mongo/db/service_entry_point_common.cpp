@@ -655,8 +655,14 @@ void execCommandDatabase(OperationContext* opCtx,
             const bool upconvertToSnapshot = txnParticipant &&
                 txnParticipant->inMultiDocumentTransaction() &&
                 sessionOptions.getStartTransaction();
-            readConcernArgs = uassertStatusOK(
+            auto newReadConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
+            {
+                // We must obtain the client lock to set the ReadConcernArgs on the operation
+                // context as it may be concurrently read by CurrentOp.
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                readConcernArgs = newReadConcernArgs;
+            }
         }
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
@@ -764,6 +770,9 @@ void execCommandDatabase(OperationContext* opCtx,
         if (readConcernArgs.isEmpty()) {
             auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body, false);
             if (readConcernArgsStatus.isOK()) {
+                // We must obtain the client lock to set the ReadConcernArgs on the operation
+                // context as it may be concurrently read by CurrentOp.
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
                 readConcernArgs = readConcernArgsStatus.getValue();
             }
         }

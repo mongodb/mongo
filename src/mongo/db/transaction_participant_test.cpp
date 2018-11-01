@@ -2778,8 +2778,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
 
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
-    txnParticipant->reportUnstashedState(repl::ReadConcernArgs::get(opCtx()),
-                                         &unstashedStateBuilder);
+    txnParticipant->reportUnstashedState(opCtx(), &unstashedStateBuilder);
     auto unstashedState = unstashedStateBuilder.obj();
     auto transactionDocument = unstashedState.getObjectField("transaction");
     auto parametersDocument = transactionDocument.getObjectField("parameters");
@@ -2811,7 +2810,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
 
     // With the resources stashed, verify that the Session reports an empty unstashed state.
     BSONObjBuilder builder;
-    txnParticipant->reportUnstashedState(repl::ReadConcernArgs::get(opCtx()), &builder);
+    txnParticipant->reportUnstashedState(opCtx(), &builder);
     ASSERT(builder.obj().isEmpty());
 }
 
@@ -2834,8 +2833,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
 
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
-    txnParticipant->reportUnstashedState(repl::ReadConcernArgs::get(opCtx()),
-                                         &unstashedStateBuilder);
+    txnParticipant->reportUnstashedState(opCtx(), &unstashedStateBuilder);
     ASSERT_BSONOBJ_EQ(unstashedStateBuilder.obj(), reportBuilder.obj());
 }
 

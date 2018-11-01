@@ -298,8 +298,10 @@ public:
      * If this session is not holding stashed locks in _txnResourceStash (transaction is active),
      * reports the current state of the session using the provided builder. Locks the session
      * object's mutex while running.
+     * If this is called from a thread other than the owner of the opCtx, that thread must be
+     * holding the client lock.
      */
-    void reportUnstashedState(repl::ReadConcernArgs readConcernArgs, BSONObjBuilder* builder) const;
+    void reportUnstashedState(OperationContext* opCtx, BSONObjBuilder* builder) const;
 
     /**
      * Convenience method which creates and populates a BSONObj containing the stashed state.

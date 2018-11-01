@@ -1285,7 +1285,7 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
     }
 }
 
-void TransactionParticipant::reportUnstashedState(repl::ReadConcernArgs readConcernArgs,
+void TransactionParticipant::reportUnstashedState(OperationContext* opCtx,
                                                   BSONObjBuilder* builder) const {
     stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
 
@@ -1298,7 +1298,7 @@ void TransactionParticipant::reportUnstashedState(repl::ReadConcernArgs readConc
     if (!singleTransactionStats.isForMultiDocumentTransaction() ||
         singleTransactionStats.isActive() || singleTransactionStats.isEnded()) {
         BSONObjBuilder transactionBuilder;
-        _reportTransactionStats(lm, &transactionBuilder, readConcernArgs);
+        _reportTransactionStats(lm, &transactionBuilder, repl::ReadConcernArgs::get(opCtx));
         builder->append("transaction", transactionBuilder.obj());
     }
 }

@@ -381,12 +381,17 @@ Status runAggregate(OperationContext* opCtx,
         if (liteParsedPipeline.hasChangeStream()) {
             nss = NamespaceString::kRsOplogNamespace;
 
-            // If the read concern is not specified, upgrade to 'majority' and wait to make sure we
-            // have a snapshot available.
+            // If the read concern is not specified, upgrade to 'majority' and wait to make sure
+            // we have a snapshot available.
             auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             if (!readConcernArgs.hasLevel()) {
-                readConcernArgs =
-                    repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+                {
+                    // We must obtain the client lock to set the ReadConcernArgs on the operation
+                    // context as it may be concurrently read by CurrentOp.
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    readConcernArgs =
+                        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+                }
                 uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, true));
             }
 

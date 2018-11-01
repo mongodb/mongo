@@ -381,7 +381,12 @@ void runCommand(OperationContext* opCtx,
     validateSessionOptions(osi, command->getName(), nss.db());
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto readConcernParseStatus = readConcernArgs.initialize(request.body);
+    auto readConcernParseStatus = [&]() {
+        // We must obtain the client lock to set the ReadConcernArgs on the operation
+        // context as it may be concurrently read by CurrentOp.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        return readConcernArgs.initialize(request.body);
+    }();
     if (!readConcernParseStatus.isOK()) {
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
