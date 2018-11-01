@@ -835,8 +835,10 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
     // but this will change when we allow multiple oplog entries per transaction.
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        const auto tickSource = getGlobalServiceContext()->getTickSource();
         _transactionMetricsObserver.onPrepare(ServerTransactionsMetrics::get(opCtx),
-                                              *_oldestOplogEntryOpTime);
+                                              *_oldestOplogEntryOpTime,
+                                              tickSource->getTicks());
     }
 
     return prepareOplogSlot.opTime.getTimestamp();
@@ -1012,7 +1014,7 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
     if (_speculativeTransactionReadOpTime > clientInfo.getLastOp()) {
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
-
+    const bool isCommittingWithPrepare = _txnState.isCommittingWithPrepare(lk);
     _txnState.transitionTo(lk, TransactionState::kCommitted);
 
     {
@@ -1022,7 +1024,8 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
                                              tickSource,
                                              _oldestOplogEntryOpTime,
                                              _finishOpTime,
-                                             &Top::get(getGlobalServiceContext()));
+                                             &Top::get(getGlobalServiceContext()),
+                                             isCommittingWithPrepare);
         _transactionMetricsObserver.onTransactionOperation(
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
     }
@@ -1194,7 +1197,8 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
             tickSource,
             _oldestOplogEntryOpTime,
             _finishOpTime,
-            &Top::get(getGlobalServiceContext()));
+            &Top::get(getGlobalServiceContext()),
+            _txnState.isPrepared(lm));
     }
 
     _transactionOperationBytes = 0;

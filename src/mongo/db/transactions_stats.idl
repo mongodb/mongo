@@ -70,3 +70,14 @@ structs:
       totalStarted:
         type: long
         default: 0
+      totalPrepared:
+        type: long
+        default: 0
+      totalPreparedThenCommitted:
+        type: long
+        default: 0
+      totalPreparedThenAborted:
+        type: long
+        default: 0
+      oldestActiveOplogEntryTimestamp:
+        type: timestamp

@@ -1682,6 +1682,17 @@ TEST_F(TransactionsMetricsTest, IncrementTotalStartedUponStartTransaction) {
               beforeTransactionStart + 1U);
 }
 
+TEST_F(TransactionsMetricsTest, IncrementPreparedTransaction) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    unsigned long long beforePrepareCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPrepared();
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant->prepareTransaction(opCtx(), {});
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPrepared(), beforePrepareCount + 1U);
+}
+
 TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -1696,6 +1707,23 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommitted(), beforeCommitCount + 1U);
 }
 
+TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenCommitted) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+
+    unsigned long long beforePreparedThenCommittedCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted();
+
+    txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
+
+    ASSERT_TRUE(txnParticipant->transactionIsCommitted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
+              beforePreparedThenCommittedCount + 1U);
+}
+
+
 TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -1709,6 +1737,22 @@ TEST_F(TransactionsMetricsTest, IncrementTotalAbortedUponAbort) {
     // Assert that the aborted counter is incremented by 1.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
 }
+
+TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenAborted) {
+    unsigned long long beforePreparedThenAbortedCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant->prepareTransaction(opCtx(), {});
+
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted(),
+              beforePreparedThenAbortedCount + 1U);
+}
+
 
 TEST_F(TransactionsMetricsTest, TrackTotalOpenTransactionsWithAbort) {
     unsigned long long beforeTransactionStart =
@@ -1852,6 +1896,91 @@ TEST_F(TransactionsMetricsTest, TrackTotalActiveAndInactiveTransactionsWithUnsta
     txnParticipant->abortArbitraryTransaction();
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+}
+
+TEST_F(TransactionsMetricsTest, TrackCurrentActiveAndInactivePreparedTransactionsOnCommit) {
+    unsigned long long beforeActivePreparedCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentActive();
+    unsigned long long beforeInactivePreparedCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    unsigned long long beforePrepareCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPrepared();
+    unsigned long long beforePreparedThenCommittedCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted();
+
+    // Tests that unstashing a transaction puts it into an active state.
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPrepared(), beforePrepareCount + 1U);
+
+    // Tests that the first stash decrements the active counter and increments the inactive counter.
+    txnParticipant->stashTransactionResources(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter + 1U);
+
+    // Tests that unstashing increments the active counter and decrements the inactive counter.
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter);
+
+    // Tests that committing decrements the active counter only.
+    txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
+              beforePreparedThenCommittedCount + 1U);
+}
+
+TEST_F(TransactionsMetricsTest,
+       TrackCurrentActiveAndInactivePreparedTransactionsWithUnstashedAbort) {
+    unsigned long long beforeActivePreparedCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentActive();
+    unsigned long long beforeInactivePreparedCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Tests that unstashing a transaction increments the active counter only.
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant->prepareTransaction(opCtx(), {});
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter);
+
+    // Tests that stashing a prepared transaction decrements the active counter and increments the
+    // inactive counter.
+    txnParticipant->stashTransactionResources(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter + 1U);
+
+    // Tests that aborting a stashed prepared transaction decrements the inactive counter only.
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter);
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActivePreparedCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactivePreparedCounter);
 }
 
 TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCommit) {

@@ -77,7 +77,8 @@ public:
                   TickSource* tickSource,
                   boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                   boost::optional<repl::OpTime> commitOpTime,
-                  Top* top);
+                  Top* top,
+                  bool wasPrepared);
 
     /**
      * Updates relevant metrics when an active transaction aborts. Also removes this transaction's
@@ -89,7 +90,8 @@ public:
                        TickSource* tickSource,
                        boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                        boost::optional<repl::OpTime> abortOpTime,
-                       Top* top);
+                       Top* top,
+                       bool wasPrepared);
 
     /**
      * Updates relevant metrics when an inactive transaction aborts. Also removes this transaction's
@@ -109,7 +111,8 @@ public:
      * an active transaction, to the oldestActiveOplogEntryTS set.
      */
     void onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
-                   repl::OpTime prepareOpTime);
+                   repl::OpTime prepareOpTime,
+                   TickSource::Tick curTick);
 
     /**
      * Updates relevant metrics when an operation running on the transaction completes. An operation

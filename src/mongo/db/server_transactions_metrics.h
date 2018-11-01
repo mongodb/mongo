@@ -72,6 +72,15 @@ public:
     unsigned long long getTotalCommitted() const;
     void incrementTotalCommitted();
 
+    unsigned long long getTotalPrepared() const;
+    void incrementTotalPrepared();
+
+    unsigned long long getTotalPreparedThenCommitted() const;
+    void incrementTotalPreparedThenCommitted();
+
+    unsigned long long getTotalPreparedThenAborted() const;
+    void incrementTotalPreparedThenAborted();
+
     /**
      * Returns the OpTime of the oldest oplog entry written across all open transactions.
      * Returns boost::none if there are no transaction oplog entry OpTimes stored.
@@ -130,6 +139,12 @@ public:
     void updateStats(TransactionsStats* stats);
 
 private:
+    /**
+     * Returns the first and oldest optime in the ordered set of active oplog entry optimes.
+     * Returns boost::none if there are no transaction oplog entry optimes stored.
+     */
+    boost::optional<repl::OpTime> _calculateOldestActiveOpTime() const;
+
     // The number of multi-document transactions currently active.
     AtomicUInt64 _currentActive{0};
 
@@ -147,6 +162,18 @@ private:
 
     // The total number of multi-document transaction commits.
     AtomicUInt64 _totalCommitted{0};
+
+    // The total number of prepared transactions since the last server startup.
+    AtomicUInt64 _totalPrepared{0};
+
+    // The total number of prepared transaction commits.
+    AtomicUInt64 _totalPreparedThenCommitted{0};
+
+    // The total number of prepared transaction aborts.
+    AtomicUInt64 _totalPreparedThenAborted{0};
+
+    // The optime of the oldest oplog entry for any active transaction.
+    boost::optional<repl::OpTime> _oldestActiveOplogEntryOpTime;
 
     // Maintain the oldest oplog entry OpTime across all active transactions. Currently, we only
     // write an oplog entry for an ongoing transaction if it is in the `prepare` state. By

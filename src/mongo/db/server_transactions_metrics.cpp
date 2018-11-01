@@ -113,7 +113,31 @@ void ServerTransactionsMetrics::incrementTotalCommitted() {
     _totalCommitted.fetchAndAdd(1);
 }
 
-boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestActiveOpTime() const {
+unsigned long long ServerTransactionsMetrics::getTotalPrepared() const {
+    return _totalPrepared.load();
+}
+
+void ServerTransactionsMetrics::incrementTotalPrepared() {
+    _totalPrepared.fetchAndAdd(1);
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalPreparedThenCommitted() const {
+    return _totalPreparedThenCommitted.load();
+}
+
+void ServerTransactionsMetrics::incrementTotalPreparedThenCommitted() {
+    _totalPreparedThenCommitted.fetchAndAdd(1);
+}
+
+unsigned long long ServerTransactionsMetrics::getTotalPreparedThenAborted() const {
+    return _totalPreparedThenAborted.load();
+}
+
+void ServerTransactionsMetrics::incrementTotalPreparedThenAborted() {
+    _totalPreparedThenAborted.fetchAndAdd(1);
+}
+
+boost::optional<repl::OpTime> ServerTransactionsMetrics::_calculateOldestActiveOpTime() const {
     if (_oldestActiveOplogEntryOpTimes.empty()) {
         return boost::none;
     }
@@ -140,6 +164,7 @@ void ServerTransactionsMetrics::addActiveOpTime(repl::OpTime oldestOplogEntryOpT
                             << "oldestNonMajorityCommittedOpTimes."
                             << "oldestOplogEntryOpTime: "
                             << oldestOplogEntryOpTime.toString());
+    _oldestActiveOplogEntryOpTime = _calculateOldestActiveOpTime();
 }
 
 void ServerTransactionsMetrics::removeActiveOpTime(repl::OpTime oldestOplogEntryOpTime,
@@ -183,6 +208,7 @@ void ServerTransactionsMetrics::removeActiveOpTime(repl::OpTime oldestOplogEntry
                             << oldestOplogEntryOpTime.toString()
                             << "finishOpTime: "
                             << finishOpTime->toString());
+    _oldestActiveOplogEntryOpTime = _calculateOldestActiveOpTime();
 }
 
 boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestNonMajorityCommittedOpTime()
@@ -219,6 +245,10 @@ ServerTransactionsMetrics::getFinishOpTimeOfOldestNonMajCommitted_forTest() cons
     return oldestNonMajorityCommittedOpTime;
 }
 
+boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestActiveOpTime() const {
+    return _oldestActiveOplogEntryOpTime;
+}
+
 unsigned int ServerTransactionsMetrics::getTotalActiveOpTimes() const {
     return _oldestActiveOplogEntryOpTimes.size();
 }
@@ -230,6 +260,15 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalAborted(_totalAborted.load());
     stats->setTotalCommitted(_totalCommitted.load());
     stats->setTotalStarted(_totalStarted.load());
+    stats->setTotalPrepared(_totalPrepared.load());
+    stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
+    stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
+    // To avoid compression loss, we have Timestamp(0, 0) be the default value if no oldest active
+    // transaction optime is stored.
+    Timestamp oldestActiveOplogEntryTimestamp = (_oldestActiveOplogEntryOpTime != boost::none)
+        ? _oldestActiveOplogEntryOpTime->getTimestamp()
+        : Timestamp();
+    stats->setOldestActiveOplogEntryTimestamp(oldestActiveOplogEntryTimestamp);
 }
 
 class TransactionsSSS : public ServerStatusSection {
