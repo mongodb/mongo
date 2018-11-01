@@ -578,6 +578,17 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         myIndex = StatusWith<int>(-1);
     }
 
+    if (serverGlobalParams.enableMajorityReadConcern && localConfig.containsArbiter()) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This replica set uses arbiters, but readConcern:majority is enabled "
+              << startupWarningsLog;
+        log() << "**          for this node. This is not a recommended configuration. Please see "
+              << startupWarningsLog;
+        log() << "**          https://dochub.mongodb.org/core/psa-disable-rc-majority"
+              << startupWarningsLog;
+        log() << startupWarningsLog;
+    }
+
     // Do not check optime, if this node is an arbiter.
     bool isArbiter =
         myIndex.getValue() != -1 && localConfig.getMemberAt(myIndex.getValue()).isArbiter();
