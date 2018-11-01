@@ -637,6 +637,7 @@ public:
         // Check if this collection is currently being sharded and if so, join it
         if (!scopedShardCollection.mustExecute()) {
             status = scopedShardCollection.waitForCompletion(opCtx);
+            result << "collectionsharded" << nss.ns();
         } else {
             try {
                 // Take the collection critical section so that no writes can happen.
