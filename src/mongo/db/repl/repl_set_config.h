@@ -358,6 +358,11 @@ public:
      */
     int calculatePriorityRank(double priority) const;
 
+    /**
+     * Returns true if this replica set has at least one arbiter.
+     */
+    bool containsArbiter() const;
+
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.

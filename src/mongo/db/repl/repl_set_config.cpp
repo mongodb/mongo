@@ -869,5 +869,14 @@ int ReplSetConfig::calculatePriorityRank(double priority) const {
     return count;
 }
 
+bool ReplSetConfig::containsArbiter() const {
+    for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
+        if (mem->isArbiter()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace repl
 }  // namespace mongo
