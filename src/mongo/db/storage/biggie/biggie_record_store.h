@@ -1,5 +1,3 @@
-// biggie_record_store.h
-
 
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
@@ -48,17 +46,6 @@ namespace biggie {
  * A RecordStore that stores all data in-memory.
  */
 class RecordStore : public ::mongo::RecordStore {
-    const bool _isCapped;
-    const int64_t _cappedMaxSize;
-    const int64_t _cappedMaxDocs;
-    std::string _identStr;
-    StringData _ident;
-    std::string _prefix;
-    std::string _postfix;
-    CappedCallback* _cappedCallback;
-    mutable stdx::mutex _cappedCallbackMutex;  // Guards _cappedCallback
-    mutable stdx::mutex _cappedDeleterMutex;
-
 public:
     explicit RecordStore(StringData ns,
                          StringData ident,
@@ -130,8 +117,24 @@ public:
                                         long long dataSize);
 
 private:
+    const bool _isCapped;
+    const int64_t _cappedMaxSize;
+    const int64_t _cappedMaxDocs;
+
+    std::string _identStr;
+    StringData _ident;
+
+    std::string _prefix;
+    std::string _postfix;
+
+    mutable stdx::mutex _cappedCallbackMutex;  // Guards _cappedCallback
+    CappedCallback* _cappedCallback;
+
+    mutable stdx::mutex _cappedDeleterMutex;
+
     AtomicInt64 _highest_record_id{1};
     std::string generateKey(const uint8_t* key, size_t key_len) const;
+
     /*
      * This gets the next (guaranteed) unique record id.
      */
@@ -166,6 +169,7 @@ private:
     private:
         bool inPrefix(const std::string& key_string);
     };
+
     class ReverseCursor final : public SeekableRecordCursor {
         OperationContext* opCtx;
         StringData _ident;

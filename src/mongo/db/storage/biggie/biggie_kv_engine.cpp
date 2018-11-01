@@ -80,19 +80,14 @@ std::unique_ptr<::mongo::RecordStore> KVEngine::getRecordStore(OperationContext*
     return recordStore;
 }
 
-std::shared_ptr<StringStore> KVEngine::getMaster() const {
+bool KVEngine::trySwapMaster(StringStore& newMaster, uint64_t version) {
     stdx::lock_guard<stdx::mutex> lock(_masterLock);
-    return _master;
-}
-
-bool KVEngine::compareAndSwapMaster(std::shared_ptr<StringStore> compareAgainst,
-                                    std::unique_ptr<StringStore>& newMaster) {
-    stdx::lock_guard<stdx::mutex> lock(_masterLock);
-    if (compareAgainst->sameRoot(*_master)) {
-        _master.reset(newMaster.release());
-        return true;
-    }
-    return false;
+    invariant(!newMaster.hasBranch() && !_master.hasBranch());
+    if (_masterVersion != version)
+        return false;
+    _master = newMaster;
+    _masterVersion++;
+    return true;
 }
 
 

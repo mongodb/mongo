@@ -56,20 +56,6 @@ namespace {
 
 const Ordering allAscending = Ordering::make(BSONObj());
 
-// This function is the same as the one in record store--basically, using the git analogy, create
-// a working branch if one does not exist.
-StringStore* getRecoveryUnitBranch_forking(OperationContext* opCtx) {
-    biggie::RecoveryUnit* biggieRCU = checked_cast<biggie::RecoveryUnit*>(opCtx->recoveryUnit());
-    invariant(biggieRCU);
-    biggieRCU->forkIfNeeded();
-    return biggieRCU->getWorkingCopy();
-}
-
-void dirtyRecoveryUnit(OperationContext* opCtx) {
-    biggie::RecoveryUnit* biggieRCU = checked_cast<biggie::RecoveryUnit*>(opCtx->recoveryUnit());
-    biggieRCU->makeDirty();
-}
-
 // This just checks to see if the field names are empty or not.
 bool hasFieldNames(const BSONObj& obj) {
     BSONForEach(e, obj) {
@@ -195,14 +181,13 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
 
 SpecialFormatInserted SortedDataBuilderInterface::commit(bool mayInterrupt) {
     biggie::RecoveryUnit* ru = checked_cast<biggie::RecoveryUnit*>(_opCtx->recoveryUnit());
-    ru->forkIfNeeded();
     ru->commitUnitOfWork();
     return SpecialFormatInserted::NoSpecialFormatInserted;
 }
 
 StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONObj& key,
                                                                      const RecordId& loc) {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(_opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
 
     invariant(loc.isNormal());
     invariant(!hasFieldNames(key));
@@ -243,7 +228,7 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
     _lastKeyToString = newKSToString;
     _lastRID = loc.repr();
 
-    dirtyRecoveryUnit(_opCtx);
+    RecoveryUnit::get(_opCtx)->makeDirty();
     return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
 }
 
@@ -285,7 +270,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
     // The KeyString representation of the key.
     std::unique_ptr<KeyString> workingCopyInternalKs = keyToKeyString(key, _order);
 
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string insertKeyString = createKeyString(key, loc, _prefix, _order, _isUnique);
 
     // For unique indexes, if duplicate keys are allowed then we do the following:
@@ -346,7 +331,8 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
     std::memcpy(&data[0] + sizeof(int64_t), internalTbString.data(), internalTbString.length());
 
     workingCopy->insert(StringStore::value_type(insertKeyString, data));
-    dirtyRecoveryUnit(opCtx);
+    RecoveryUnit::get(opCtx)->makeDirty();
+
     return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
 }
 
@@ -354,7 +340,7 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
                                   const BSONObj& key,
                                   const RecordId& loc,
                                   bool dupsAllowed) {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string removeKeyString;
     if (_isUnique) {
         // For unique indexes, to unindex them we do the following:
@@ -385,24 +371,25 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
         removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
         workingCopy->erase(removeKeyString);
     }
-    dirtyRecoveryUnit(opCtx);
+
+    RecoveryUnit::get(opCtx)->makeDirty();
 }
 
 // This function is, as of now, not in the interface, but there exists a server ticket to add
 // truncate to the list of commands able to be used.
 Status SortedDataInterface::truncate(OperationContext* opCtx) {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::vector<std::string> toDelete;
     auto end = workingCopy->upper_bound(_KSForIdentEnd);
     for (auto it = workingCopy->lower_bound(_KSForIdentStart); it != end; ++it) {
         toDelete.push_back(it->first);
     }
     if (!toDelete.empty()) {
-        ON_BLOCK_EXIT([opCtx]() { dirtyRecoveryUnit(opCtx); });
         for (const auto& key : toDelete) {
             workingCopy->erase(key);
         }
     }
+    RecoveryUnit::get(opCtx)->makeDirty();
     return Status::OK();
 }
 
@@ -410,7 +397,7 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
                                         const BSONObj& key,
                                         const RecordId& loc) {
     std::string workingCopyCheckKey = createKeyString(key, loc, _prefix, _order, _isUnique);
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
 
     // We effectively do the same check as in insert. However, we also check to make sure that
     // the iterator returned to us by lower_bound also happens to be inside out ident.
@@ -447,7 +434,7 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
 void SortedDataInterface::fullValidate(OperationContext* opCtx,
                                        long long* numKeysOut,
                                        ValidateResults* fullResults) const {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     long long numKeys = 0;
     auto it = workingCopy->lower_bound(_KSForIdentStart);
     while (it != workingCopy->end() && it->first.compare(_KSForIdentEnd) < 0) {
@@ -464,11 +451,11 @@ bool SortedDataInterface::appendCustomStats(OperationContext* opCtx,
 }
 
 long long SortedDataInterface::getSpaceUsedBytes(OperationContext* opCtx) const {
-    StringStore* str = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     size_t totalSize = 0;
-    StringStore::const_iterator it = str->lower_bound(_KSForIdentStart);
-    StringStore::const_iterator end = str->upper_bound(_KSForIdentEnd);
-    int64_t numElements = str->distance(it, end);
+    StringStore::const_iterator it = workingCopy->lower_bound(_KSForIdentStart);
+    StringStore::const_iterator end = workingCopy->upper_bound(_KSForIdentEnd);
+    int64_t numElements = workingCopy->distance(it, end);
     for (int i = 0; i < numElements; i++) {
         totalSize += it->first.length();
         ++it;
@@ -477,14 +464,14 @@ long long SortedDataInterface::getSpaceUsedBytes(OperationContext* opCtx) const 
 }
 
 bool SortedDataInterface::isEmpty(OperationContext* opCtx) {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     return workingCopy->distance(workingCopy->lower_bound(_KSForIdentStart),
                                  workingCopy->upper_bound(_KSForIdentEnd)) == 0;
 }
 
 std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterface::newCursor(
     OperationContext* opCtx, bool isForward) const {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
 
     return std::make_unique<SortedDataInterface::Cursor>(opCtx,
                                                          isForward,
@@ -594,7 +581,7 @@ bool SortedDataInterface::Cursor::checkCursorValid() {
 
 void SortedDataInterface::Cursor::setEndPosition(const BSONObj& key, bool inclusive) {
     auto finalKey = stripFieldNames(key);
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(_opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
     if (finalKey.isEmpty()) {
         _endPos = boost::none;
         _endPosReverse = boost::none;
@@ -756,7 +743,7 @@ void SortedDataInterface::Cursor::save() {
 }
 
 void SortedDataInterface::Cursor::restore() {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(_opCtx);
+    StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
 
     this->_workingCopy = workingCopy;
 

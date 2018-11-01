@@ -59,6 +59,7 @@ class merge_conflict_exception : std::exception {
 template <class Key, class T>
 class RadixStore {
     class Node;
+    class Head;
 
 public:
     using mapped_type = T;
@@ -80,7 +81,7 @@ public:
         using pointer = pointer_type;
         using reference = reference_type;
 
-        radix_iterator() : _workingRootReference(nullptr), _root(nullptr), _current(nullptr) {}
+        radix_iterator() : _root(nullptr), _current(nullptr) {}
 
         ~radix_iterator() = default;
 
@@ -118,40 +119,32 @@ public:
         }
 
     private:
-        radix_iterator(const std::shared_ptr<Node>& root)
-            : _workingRootReference(&root), _root(root), _current(nullptr) {}
+        radix_iterator(const std::shared_ptr<Head>& root) : _root(root), _current(nullptr) {}
 
-        radix_iterator(const std::shared_ptr<Node>& root, Node* current)
-            : _workingRootReference(&root), _root(root), _current(current) {}
+        radix_iterator(const std::shared_ptr<Head>& root, Node* current)
+            : _root(root), _current(current) {}
 
         /**
          * Tries to restore the iterator if the working tree experienced a change, if it isn't
          * possible to restore the iterator, it invalidates it instead.
          */
         void _restoreIfChanged() {
-            if (_workingRootReference->get() != _root.get()) {
-                boost::optional<value_type> currentKey = _current->data;
+            if (!_root->_nextVersion)
+                return;
 
-                // Update the iterator to point to the updated working tree
-                _root = *_workingRootReference;
+            invariant(_current->data);
 
-                // Try to find the _current node in the new root
-                if (!currentKey) {
-                    if (_root.get() == _current) {
-                        _current = _workingRootReference->get();
-                    } else {
-                        _current = nullptr;
-                    }
-                    return;
-                }
+            // Copy the key from _current before we move our _root reference.
+            auto key = _current->data->first;
 
-                RadixStore store;
-                store._root = *_workingRootReference;
+            do {
+                _root = _root->_nextVersion;
+            } while (_root->_nextVersion);
 
-                // lower_bound() tries to find the node belonging to 'key', if it can't it finds the
-                // next closest item.
-                _current = store.lower_bound(currentKey->first)._current;
-            }
+            RadixStore store(*_root);
+
+            // Find the same or next node in the updated tree.
+            _current = store.lower_bound(key)._current;
         }
 
         /**
@@ -230,15 +223,8 @@ public:
             } while (!_current->data);
         }
 
-        // "_workingRootReference" is a pointer to the original root node in the working copy when
-        // the iterator was created. It is used to check for any modifications to the tree.
-        const std::shared_ptr<Node>* _workingRootReference;
-
-        // "_root" is a pointer to the root of the tree over which this is iterating. This has to be
-        // a shared pointer otherwise if _workingRootReference was operating on an already copied
-        // tree, further changes to its unique nodes won't be reflected towards the iterator as they
-        // are made.
-        std::shared_ptr<Node> _root;
+        // "_root" is a pointer to the root of the tree over which this is iterating.
+        std::shared_ptr<Head> _root;
 
         // "_current" is the node that the iterator is currently on. _current->data will never be
         // boost::none (unless it is within the process of tree traversal), and _current will be
@@ -260,13 +246,9 @@ public:
         using pointer = pointer_type;
         using reference = reference_type;
 
-        reverse_radix_iterator()
-            : _workingRootReference(nullptr), _root(nullptr), _current(nullptr) {}
+        reverse_radix_iterator() : _root(nullptr), _current(nullptr) {}
 
-        reverse_radix_iterator(const const_iterator& it)
-            : _workingRootReference(it._workingRootReference),
-              _root(it._root),
-              _current(it._current) {
+        reverse_radix_iterator(const const_iterator& it) : _root(it._root), _current(it._current) {
             // If the iterator passed in is at the end(), then set _current to root which is
             // equivalent to rbegin(). Otherwise, move the iterator back one node, due to the fact
             // that the relationship &*r == &*(i-1) must be maintained for any reverse iterator 'r'
@@ -283,10 +265,7 @@ public:
             }
         }
 
-        reverse_radix_iterator(const iterator& it)
-            : _workingRootReference(it._workingRootReference),
-              _root(it._root),
-              _current(it._current) {
+        reverse_radix_iterator(const iterator& it) : _root(it._root), _current(it._current) {
             if (_current == nullptr) {
                 _current = _root;
                 _traverseRightSubtree();
@@ -332,52 +311,45 @@ public:
 
 
     private:
-        reverse_radix_iterator(const std::shared_ptr<Node>& root)
-            : _workingRootReference(&root), _root(root), _current(nullptr) {}
+        reverse_radix_iterator(const std::shared_ptr<Head>& root)
+            : _root(root), _current(nullptr) {}
 
-        reverse_radix_iterator(const std::shared_ptr<Node>& root, Node* current)
-            : _workingRootReference(&root), _root(root), _current(current) {}
+        reverse_radix_iterator(const std::shared_ptr<Head>& root, Node* current)
+            : _root(root), _current(current) {}
 
         /**
          * Tries to restore the iterator if the working tree experienced a change, if it isn't
          * possible to restore the iterator, it invalidates it instead.
          */
         void _restoreIfChanged() {
-            if (_workingRootReference->get() != _root.get()) {
-                auto currentKey = _current->data;
+            if (!_root->_nextVersion)
+                return;
 
-                // Update the iterator to point to the updated working tree.
-                _root = *_workingRootReference;
+            invariant(_current->data);
 
-                // Try to find the _current node in the new root.
-                if (!currentKey) {
-                    if (_root.get() == _current) {
-                        _current = _workingRootReference->get();
-                    } else {
-                        _current = nullptr;
-                    }
-                    return;
-                }
+            // Copy the key from _current before we move our _root reference.
+            auto key = _current->data->first;
 
-                RadixStore store;
-                store._root = *_workingRootReference;
+            do {
+                _root = _root->_nextVersion;
+            } while (_root->_nextVersion);
 
-                // lower_bound() tries to find the node belonging to 'key', if it can't it finds the
-                // next closest item.
-                const_iterator it = store.lower_bound(currentKey->first);
+            RadixStore store(*_root);
 
-                // Couldn't find any nodes with key greater than currentKey in lower_bound().
-                // So make _current point to the beginning, since rbegin() will point to the
-                // previous node before currentKey.
-                if (!it._current)
-                    _current = store.rbegin()._current;
-                else {
-                    _current = it._current;
-                    // lower_bound(), moved us one up in a forwards direction since the currentKey
-                    // didn't exist anymore, move one back.
-                    if (_current->data->first > currentKey->first)
-                        _findNextReverse();
-                }
+            // Find the same or next node in the updated tree.
+            const_iterator it = store.lower_bound(key);
+
+            // Couldn't find any nodes with key greater than currentKey in lower_bound().
+            // So make _current point to the beginning, since rbegin() will point to the
+            // previous node before key.
+            if (!it._current)
+                _current = store.rbegin()._current;
+            else {
+                _current = it._current;
+                // lower_bound(), moved us one up in a forwards direction since the currentKey
+                // didn't exist anymore, move one back.
+                if (_current->data->first > key)
+                    _findNextReverse();
             }
         }
 
@@ -440,13 +412,8 @@ public:
             } while (!_current->isLeaf());
         }
 
-
-        // "_workingRootReference" is a pointer to the original root node in the working copy when
-        // the iterator was created. It is used to check for any modifications to the tree.
-        const std::shared_ptr<Node>* _workingRootReference;
-
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        std::shared_ptr<Node> _root;
+        std::shared_ptr<Head> _root;
 
         // "_current" is a the node that the iterator is currently on. _current->data will never be
         // boost::none, and _current will be become a nullptr once there are no more nodes left to
@@ -458,15 +425,28 @@ public:
     using const_reverse_iterator = reverse_radix_iterator<const_pointer, const value_type&>;
 
     // Constructor
-    RadixStore(const RadixStore& other) {
-        _root = other._root;
+    RadixStore() {
+        _root = std::make_shared<Head>();
     }
 
-    RadixStore() {
-        _root = std::make_shared<Node>();
+    RadixStore(const RadixStore& other) {
+        _root = std::make_shared<Head>(*(other._root));
+        _root->_nextVersion = nullptr;
+    }
+
+    RadixStore(const Head& other) {
+        _root = std::make_shared<Head>(other);
+        _root->_nextVersion = nullptr;
     }
 
     ~RadixStore() = default;
+
+    // Assignment Operator.
+    RadixStore& operator=(const RadixStore& other) {
+        _root = std::make_shared<Head>(*(other._root));
+        _root->_nextVersion = nullptr;
+        return *this;
+    }
 
     // Equality
     bool operator==(const RadixStore& other) const {
@@ -483,10 +463,6 @@ public:
         }
 
         return other_iter == other.end();
-    }
-
-    bool sameRoot(const RadixStore& other) const {
-        return this->_root.get() == other._root.get();
     }
 
     // Capacity
@@ -516,9 +492,13 @@ public:
         return 0;
     }
 
+    bool hasBranch() const {
+        return _root->_nextVersion ? true : false;
+    }
+
     // Modifiers
     void clear() noexcept {
-        _root = std::make_shared<Node>();
+        _root = std::make_shared<Head>();
     }
 
     std::pair<const_iterator, bool> insert(value_type&& value) {
@@ -589,7 +569,9 @@ public:
         isUniquelyOwned = context.at(0).second;
 
         if (!isUniquelyOwned) {
-            _root = std::make_shared<Node>(*parent);
+            invariant(!_root->_nextVersion);
+            _root->_nextVersion = std::make_shared<Head>(*_root);
+            _root = _root->_nextVersion;
             parent = _root.get();
         }
 
@@ -645,7 +627,7 @@ public:
         if (this->empty())
             return RadixStore::rend();
 
-        auto node = _root;
+        std::shared_ptr<Node> node = _root;
         while (!node->isLeaf()) {
             for (auto iter = node->children.rbegin(); iter != node->children.rend(); ++iter) {
                 if (*iter != nullptr) {
@@ -824,6 +806,16 @@ private:
             _sizeSubtreeElems = 0;
         }
 
+        Node(const Node& other) {
+            trieKey = other.trieKey;
+            depth = other.depth;
+            if (other.data)
+                data.emplace(other.data->first, other.data->second);
+            children = other.children;
+            _numSubtreeElems = other._numSubtreeElems;
+            _sizeSubtreeElems = other._sizeSubtreeElems;
+        }
+
         bool isLeaf() const {
             for (auto child : children) {
                 if (child != nullptr)
@@ -837,9 +829,38 @@ private:
         boost::optional<value_type> data;
         std::array<std::shared_ptr<Node>, 256> children;
 
-    private:
+    protected:
         size_type _numSubtreeElems;
         size_type _sizeSubtreeElems;
+    };
+
+    /**
+     * Head is the root node of every RadixStore, it contains extra information used by cursors to
+     * be able to see when the tree is modified and to respond to these changes by ensuring they are
+     * not iterating over stale trees.
+     */
+    class Head : public Node {
+        friend class RadixStore;
+
+    public:
+        Head() : Node() {
+            _nextVersion = nullptr;
+        }
+
+        Head(std::vector<uint8_t> key) : Node(key) {
+            _nextVersion = nullptr;
+        }
+
+        Head(const Head& other) : Node(other) {
+            _nextVersion = other._nextVersion;
+        }
+
+        Head(const Node& other) : Node(other) {
+            _nextVersion = nullptr;
+        }
+
+    protected:
+        std::shared_ptr<Head> _nextVersion;
     };
 
     /**
@@ -959,8 +980,13 @@ private:
         uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
 
         if (_root.use_count() > 1) {
-            // Copy node on a modifying operation when the root isn't unique.
-            _root = std::make_shared<Node>(*_root.get());
+            // Copy the node on a modifying operation when the root isn't unique.
+
+            // There should not be any _nextVersion set in the _root otherwise our tree would have
+            // multiple HEADs.
+            invariant(!_root->_nextVersion);
+            _root->_nextVersion = std::make_shared<Head>(*_root);
+            _root = _root->_nextVersion;
         }
 
         _root->_numSubtreeElems += elemNum;
@@ -1185,8 +1211,11 @@ private:
             return nullptr;
 
         // The first node should always be the root node.
-        if (_root.use_count() > 1)
-            _root = std::make_shared<Node>(*_root);
+        if (_root.use_count() > 1) {
+            invariant(!_root->_nextVersion);
+            _root->_nextVersion = std::make_shared<Head>(*_root);
+            _root = _root->_nextVersion;
+        }
         context[0] = _root.get();
 
         // If the context only contains the root, and it was copied, return the new root.
@@ -1222,9 +1251,9 @@ private:
         // Merges all differences between this and other, using base to determine whether operations
         // are allowed or should throw a merge conflict.
         RadixStore base, other, node;
-        node._root = std::make_shared<Node>(*current);
-        base._root = std::make_shared<Node>(*baseNode);
-        other._root = std::make_shared<Node>(*otherNode);
+        node._root = std::make_shared<Head>(*current);
+        base._root = std::make_shared<Head>(*baseNode);
+        other._root = std::make_shared<Head>(*otherNode);
 
         // Merges insertions and updates from the master tree into the working tree, if possible.
         for (const value_type otherVal : other) {
@@ -1290,8 +1319,8 @@ private:
     void _mergeTwoBranches(const Node* current, const Node* otherNode) {
 
         RadixStore other, node;
-        node._root = std::make_shared<Node>(*current);
-        other._root = std::make_shared<Node>(*otherNode);
+        node._root = std::make_shared<Head>(*current);
+        other._root = std::make_shared<Head>(*otherNode);
 
         for (const value_type otherVal : other) {
             RadixStore::const_iterator thisIter = node.find(otherVal.first);
@@ -1444,7 +1473,7 @@ private:
         return node;
     }
 
-    std::shared_ptr<Node> _root = nullptr;
+    std::shared_ptr<Head> _root = nullptr;
 };
 
 using StringStore = RadixStore<std::string, std::string>;
