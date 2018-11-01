@@ -333,3 +333,5 @@ error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
 error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", "NetworkInterfaceExceededTimeLimit"])
 
 error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory", "MigrationConflict"])
+
+error_class("VoteAbortError", ["NoSuchTransaction", "TransactionTooOld"])

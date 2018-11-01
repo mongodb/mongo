@@ -51,7 +51,6 @@ executor:
         numInitialSyncAttempts: 1
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
-        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     num_nodes: 2
     start_initial_sync_node: True
     replset_config_options:

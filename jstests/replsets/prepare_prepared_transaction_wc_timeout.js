@@ -44,7 +44,6 @@
                                     secConn,
                                     {
                                       prepareTransaction: 1,
-                                      coordinatorId: "dummy",
                                       lsid: {id: lsid},
                                       txnNumber: NumberLong(39),
                                       autocommit: false,

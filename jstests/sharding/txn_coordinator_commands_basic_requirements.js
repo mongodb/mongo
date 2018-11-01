@@ -15,28 +15,7 @@
     const checkCoordinatorCommandsRejected = function(conn, expectedErrorCode) {
         assert.commandFailedWithCode(conn.adminCommand({
             coordinateCommitTransaction: 1,
-            participants: [{shardId: "voteCommitDummy"}, {shardId: "voteAbortDummy"}],
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(1),
-            autocommit: false
-        }),
-                                     expectedErrorCode);
-
-        assert.commandFailedWithCode(conn.adminCommand({
-            voteCommitTransaction: 1,
-            shardId: "voteCommitDummy",
-            prepareTimestamp: Timestamp(0, 0),
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(1),
-            autocommit: false
-        }),
-                                     expectedErrorCode);
-
-        assert.commandFailedWithCode(conn.adminCommand({
-            voteAbortTransaction: 1,
-            shardId: "voteAbortDummy",
+            participants: [{shardId: "dummy1"}, {shardId: "dummy2"}],
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             stmtId: NumberInt(1),
@@ -47,31 +26,9 @@
 
     const checkCoordinatorCommandsAgainstNonAdminDbRejected = function(conn) {
         const testDB = conn.getDB(dbName);
-
         assert.commandFailedWithCode(testDB.runCommand({
             coordinateCommitTransaction: 1,
-            participants: [{shardId: "voteCommitDummy"}, {shardId: "voteAbortDummy"}],
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false
-        }),
-                                     ErrorCodes.Unauthorized);
-
-        assert.commandFailedWithCode(testDB.runCommand({
-            voteCommitTransaction: 1,
-            shardId: "voteCommitDummy",
-            prepareTimestamp: Timestamp(0, 0),
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false
-        }),
-                                     ErrorCodes.Unauthorized);
-
-        assert.commandFailedWithCode(testDB.runCommand({
-            voteAbortTransaction: 1,
-            shardId: "voteAbortDummy",
+            participants: [{shardId: "dummy1"}, {shardId: "dummy2"}],
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             stmtId: NumberInt(0),

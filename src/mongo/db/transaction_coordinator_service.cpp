@@ -38,41 +38,48 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_commands_impl.h"
-#include "mongo/executor/task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
 const auto transactionCoordinatorServiceDecoration =
     ServiceContext::declareDecoration<TransactionCoordinatorService>();
 
-void doCoordinatorAction(OperationContext* opCtx,
-                         std::shared_ptr<TransactionCoordinator> coordinator,
-                         TransactionCoordinator::StateMachine::Action action) {
-    switch (action) {
-        case TransactionCoordinator::StateMachine::Action::kSendCommit: {
-            txn::sendCommit(opCtx,
-                            coordinator,
-                            coordinator->getNonAckedCommitParticipants(),
-                            coordinator->getCommitTimestamp());
-            break;
-        }
-        case TransactionCoordinator::StateMachine::Action::kSendAbort: {
-            txn::sendAbort(opCtx, coordinator->getNonVotedAbortParticipants());
-            break;
-        }
-        case TransactionCoordinator::StateMachine::Action::kNone:
-            break;
-    }
+using Action = TransactionCoordinator::StateMachine::Action;
+using State = TransactionCoordinator::StateMachine::State;
+
+/**
+ * Constructs the default options for the thread pool used to run commit.
+ */
+ThreadPool::Options makeDefaultThreadPoolOptions() {
+    ThreadPool::Options options;
+    options.poolName = "TransactionCoordinatorService";
+    options.minThreads = 0;
+    options.maxThreads = 20;
+
+    // Ensure all threads have a client
+    options.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    return options;
 }
-}
+
+}  // namespace
 
 TransactionCoordinatorService::TransactionCoordinatorService()
-    : _coordinatorCatalog(std::make_shared<TransactionCoordinatorCatalog>()) {}
+    : _coordinatorCatalog(std::make_shared<TransactionCoordinatorCatalog>()),
+      _threadPool(makeDefaultThreadPoolOptions()) {
+    _threadPool.startup();
+}
 
-TransactionCoordinatorService::~TransactionCoordinatorService() = default;
+void TransactionCoordinatorService::shutdown() {
+    _threadPool.shutdown();
+}
 
 TransactionCoordinatorService* TransactionCoordinatorService::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
@@ -100,72 +107,42 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
                     "Cannot start a new transaction with the same session ID and transaction "
                     "number as a transaction that has already begun two-phase commit.",
                     latestCoordinator->state() ==
-                        TransactionCoordinator::StateMachine::State::kWaitingForParticipantList);
+                        TransactionCoordinator::StateMachine::State::kUninitialized);
 
             return;
         }
         // Call tryAbort on previous coordinator.
-        auto actionToTake = latestCoordinator.get()->recvTryAbort();
-        doCoordinatorAction(opCtx, latestCoordinator, actionToTake);
+        latestCoordinator.get()->recvTryAbort();
     }
 
     _coordinatorCatalog->create(lsid, txnNumber);
 
     // TODO (SERVER-37024): Schedule abort task on executor to execute at commitDeadline.
-    // TODO (SERVER-37025): Schedule poke task on executor.
 }
 
-Future<TransactionCoordinatorService::CommitDecision>
-TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
-                                                LogicalSessionId lsid,
-                                                TxnNumber txnNumber,
-                                                const std::set<ShardId>& participantList) {
+Future<TransactionCoordinator::CommitDecision> TransactionCoordinatorService::coordinateCommit(
+    OperationContext* opCtx,
+    LogicalSessionId lsid,
+    TxnNumber txnNumber,
+    const std::set<ShardId>& participantList) {
 
     auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
     if (!coordinator) {
-        return TransactionCoordinatorService::CommitDecision::kAbort;
+        // TODO (SERVER-37440): Return decision "kForgotten", which indicates that a decision was
+        // already made and forgotten. The caller can recover the decision from the local
+        // participant if a higher transaction has not been started on the session and the session
+        // has not been reaped.
+        // Currently is MONGO_UNREACHABLE because no tests should cause the router to re-send
+        // coordinateCommitTransaction.
+        MONGO_UNREACHABLE;
     }
 
-    auto actionToTake = coordinator.get()->recvCoordinateCommit(participantList);
-    doCoordinatorAction(opCtx, coordinator.get(), actionToTake);
-
-    return coordinator.get()->waitForCompletion().then([](auto finalState) {
-        switch (finalState) {
-            case TransactionCoordinator::StateMachine::State::kAborted:
-                return TransactionCoordinatorService::CommitDecision::kAbort;
-            case TransactionCoordinator::StateMachine::State::kCommitted:
-                return TransactionCoordinatorService::CommitDecision::kCommit;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    });
-}
-
-void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,
-                                               LogicalSessionId lsid,
-                                               TxnNumber txnNumber,
-                                               const ShardId& shardId,
-                                               Timestamp prepareTimestamp) {
-    auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
-    if (!coordinator) {
-        txn::sendAbort(opCtx, {shardId});
-        return;
+    Action initialAction = coordinator->recvCoordinateCommit(participantList);
+    if (initialAction != Action::kNone) {
+        txn::launchCoordinateCommitTask(_threadPool, coordinator, lsid, txnNumber, initialAction);
     }
 
-    auto actionToTake = coordinator.get()->recvVoteCommit(shardId, prepareTimestamp);
-    doCoordinatorAction(opCtx, coordinator.get(), actionToTake);
-}
-
-void TransactionCoordinatorService::voteAbort(OperationContext* opCtx,
-                                              LogicalSessionId lsid,
-                                              TxnNumber txnNumber,
-                                              const ShardId& shardId) {
-    auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
-
-    if (coordinator) {
-        auto actionToTake = coordinator.get()->recvVoteAbort(shardId);
-        doCoordinatorAction(opCtx, coordinator.get(), actionToTake);
-    }
+    return coordinator.get()->waitForDecision();
 }
 
 }  // namespace mongo

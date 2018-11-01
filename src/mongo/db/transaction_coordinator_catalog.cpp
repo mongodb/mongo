@@ -78,22 +78,22 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::create(Lo
     return newCoordinator;
 }
 
-boost::optional<std::shared_ptr<TransactionCoordinator>> TransactionCoordinatorCatalog::get(
-    LogicalSessionId lsid, TxnNumber txnNumber) {
+std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(LogicalSessionId lsid,
+                                                                           TxnNumber txnNumber) {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
     if (coordinatorsForSessionIter == _coordinatorsBySession.end()) {
-        return boost::none;
+        return nullptr;
     }
 
     const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
     const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
 
     if (coordinatorForTxnIter == coordinatorsForSession.end()) {
-        return boost::none;
+        return nullptr;
     }
 
     return coordinatorForTxnIter->second;

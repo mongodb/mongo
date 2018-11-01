@@ -28,32 +28,25 @@
 
     // Call prepare on committed transaction.
     jsTestLog("Test that calling prepare on a committed transaction fails.");
-    assert.commandFailedWithCode(sessionDB.adminCommand({
-        prepareTransaction: 1,
-        coordinatorId: "dummy",
-        txnNumber: txnNumber,
-        autocommit: false
-    }),
-                                 ErrorCodes.TransactionCommitted);
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber, autocommit: false}),
+        ErrorCodes.TransactionCommitted);
 
     jsTestLog("Test the error precedence when calling prepare on a committed transaction but not " +
               "providing txnNumber to prepareTransaction.");
-    assert.commandFailedWithCode(
-        sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy", autocommit: false}),
-        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, autocommit: false}),
+                                 ErrorCodes.InvalidOptions);
 
     jsTestLog("Test the error precedence when calling prepare on a committed transaction but not " +
               "providing autocommit to prepareTransaction.");
     assert.commandFailedWithCode(
-        sessionDB.adminCommand(
-            {prepareTransaction: 1, coordinatorId: "dummy", txnNumber: txnNumber}),
+        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber}),
         ErrorCodes.InvalidOptions);
 
     jsTestLog("Test the error precedence when calling prepare on a committed transaction and " +
               "providing startTransaction to prepareTransaction.");
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: txnNumber,
         autocommit: false,
         startTransaction: true

@@ -70,5 +70,4 @@ executor:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
         disableLogicalSessionCacheRefresh: false
-        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     num_nodes: 3

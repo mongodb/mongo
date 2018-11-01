@@ -80,6 +80,5 @@ executor:
         numInitialSyncAttempts: 10
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
-        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     num_nodes: 2
     start_initial_sync_node: True

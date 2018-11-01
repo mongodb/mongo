@@ -34,135 +34,107 @@
 
 #include <future>
 
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
+namespace {
+
 using State = TransactionCoordinator::StateMachine::State;
+using Coordinator = ServiceContextMongoDTest;
 
 const Timestamp dummyTimestamp = Timestamp::min();
 
-TEST(Coordinator, SomeParticipantVotesAbortLeadsToAbort) {
+void doCommit(TransactionCoordinator& coordinator) {
+    coordinator.recvCoordinateCommit({ShardId("shard0000")});
+    coordinator.madeParticipantListDurable();
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    coordinator.madeCommitDecisionDurable();
+    coordinator.recvCommitAck(ShardId("shard0000"));
+}
+
+void doAbort(TransactionCoordinator& coordinator) {
+    coordinator.recvCoordinateCommit({ShardId("shard0000")});
+    coordinator.madeParticipantListDurable();
+    coordinator.recvVoteAbort(ShardId("shard0000"));
+    coordinator.madeAbortDecisionDurable();
+    coordinator.recvAbortAck(ShardId("shard0000"));
+}
+}
+
+TEST_F(Coordinator, SomeParticipantVotesAbortLeadsToAbort) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.madeParticipantListDurable();
     coordinator.recvVoteAbort(ShardId("shard0000"));
     coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
+    coordinator.madeAbortDecisionDurable();
+    coordinator.recvAbortAck(ShardId("shard0001"));
     ASSERT_EQ(State::kAborted, coordinator.state());
 }
 
-TEST(Coordinator, SomeParticipantsVoteAbortBeforeCoordinatorReceivesParticipantListLeadsToAbort) {
-    TransactionCoordinator coordinator;
-    coordinator.recvVoteAbort(ShardId("shard0000"));
-    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
-    ASSERT_EQ(State::kAborted, coordinator.state());
-}
-
-TEST(Coordinator, AllParticipantsVoteCommitLeadsToCommit) {
+TEST_F(Coordinator, AllParticipantsVoteCommitLeadsToCommit) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.madeParticipantListDurable();
     coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
+    coordinator.madeCommitDecisionDurable();
     coordinator.recvCommitAck(ShardId("shard0000"));
     coordinator.recvCommitAck(ShardId("shard0001"));
     ASSERT_EQ(State::kCommitted, coordinator.state());
 }
 
-TEST(
-    Coordinator,
-    AllParticipantsVoteCommitSomeParticipantsVoteBeforeCoordinatorReceivesParticipantListLeadsToCommit) {
-    TransactionCoordinator coordinator;
-    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
-    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
-    coordinator.recvCommitAck(ShardId("shard0000"));
-    coordinator.recvCommitAck(ShardId("shard0001"));
-    ASSERT_EQ(State::kCommitted, coordinator.state());
-}
-
-TEST(Coordinator, NotHearingSomeParticipantsVoteOtherParticipantsVotedCommitLeadsToStillWaiting) {
+TEST_F(Coordinator, NotHearingSomeParticipantsVoteOtherParticipantsVotedCommitLeadsToStillWaiting) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.madeParticipantListDurable();
     coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     ASSERT_EQ(State::kWaitingForVotes, coordinator.state());
 }
 
-TEST(Coordinator, NotHearingSomeParticipantsVoteAnotherParticipantVotedAbortLeadsToAbort) {
+TEST_F(Coordinator, NotHearingSomeParticipantsVoteAnotherParticipantVotedAbortLeadsToAbort) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.madeParticipantListDurable();
     coordinator.recvVoteAbort(ShardId("shard0000"));
-    ASSERT_EQ(State::kAborted, coordinator.state());
+    ASSERT_EQ(State::kMakingAbortDecisionDurable, coordinator.state());
 }
 
-TEST(Coordinator, NotHearingSomeParticipantsCommitAckLeadsToStillWaiting) {
+TEST_F(Coordinator, NotHearingSomeParticipantsCommitAckLeadsToStillWaiting) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.madeParticipantListDurable();
     coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
+    coordinator.madeCommitDecisionDurable();
     coordinator.recvCommitAck(ShardId("shard0000"));
     ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
 }
 
-TEST(Coordinator, TryAbortWhileWaitingForParticipantListSuccessfullyAborts) {
-    TransactionCoordinator coordinator;
-    coordinator.recvTryAbort();
-    ASSERT_EQ(State::kAborted, coordinator.state());
-}
-
-TEST(Coordinator, TryAbortWhileWaitingForVotesSuccessfullyAborts) {
-    TransactionCoordinator coordinator;
-    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
-    coordinator.recvTryAbort();
-    ASSERT_EQ(State::kAborted, coordinator.state());
-}
-
-TEST(Coordinator, TryAbortWhileWaitingForCommitAcksDoesNotCancelCommit) {
-    TransactionCoordinator coordinator;
-    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
-    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
-    ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
-    coordinator.recvTryAbort();
-    ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
-    coordinator.recvCommitAck(ShardId("shard0000"));
-    coordinator.recvCommitAck(ShardId("shard0001"));
-    ASSERT_EQ(State::kCommitted, coordinator.state());
-}
-
-TEST(Coordinator, VoteCommitToAbortedCoordinatorRespondsWithAbort) {
-    TransactionCoordinator coordinator;
-    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteAbort(ShardId("shard0000"));
-    ASSERT_EQ(State::kAborted, coordinator.state());
-    auto action = coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
-    ASSERT_EQ(TransactionCoordinator::StateMachine::Action::kSendAbort, action);
-}
-
-TEST(Coordinator, WaitForCompletionReturnsOnChangeToCommitted) {
+TEST_F(Coordinator, WaitForCompletionReturnsOnChangeToCommitted) {
     TransactionCoordinator coordinator;
     auto future = coordinator.waitForCompletion();
-    coordinator.recvCoordinateCommit({ShardId("shard0000")});
-    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
-    coordinator.recvCommitAck(ShardId("shard0000"));
+    doCommit(coordinator);
     auto finalState = future.get();
     ASSERT_EQ(finalState, TransactionCoordinator::StateMachine::State::kCommitted);
 }
 
-TEST(Coordinator, WaitForCompletionReturnsOnChangeToAborted) {
+TEST_F(Coordinator, WaitForCompletionReturnsOnChangeToAborted) {
     TransactionCoordinator coordinator;
     auto future = coordinator.waitForCompletion();
-    coordinator.recvVoteAbort(ShardId("shard0000"));
+    doAbort(coordinator);
     auto finalState = future.get();
     ASSERT_EQ(finalState, TransactionCoordinator::StateMachine::State::kAborted);
 }
 
-TEST(Coordinator, RepeatedCallsToWaitForCompletionAllReturn) {
+TEST_F(Coordinator, RepeatedCallsToWaitForCompletionAllReturn) {
     TransactionCoordinator coordinator;
     auto futures = {coordinator.waitForCompletion(),
                     coordinator.waitForCompletion(),
                     coordinator.waitForCompletion()};
-    coordinator.recvVoteAbort(ShardId("shard0000"));
+    doAbort(coordinator);
 
     for (auto& future : futures) {
         auto finalState = future.get();
@@ -170,9 +142,9 @@ TEST(Coordinator, RepeatedCallsToWaitForCompletionAllReturn) {
     }
 }
 
-TEST(Coordinator, CallingWaitForCompletionAfterAlreadyCompleteReturns) {
+TEST_F(Coordinator, CallingWaitForCompletionAfterAlreadyCompleteReturns) {
     TransactionCoordinator coordinator;
-    coordinator.recvVoteAbort(ShardId("shard0000"));
+    doAbort(coordinator);
 
     auto future = coordinator.waitForCompletion();
     auto finalState = future.get();

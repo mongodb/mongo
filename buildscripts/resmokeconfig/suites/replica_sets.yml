@@ -8,7 +8,4 @@ executor:
   config:
     shell_options:
       nodb: ''
-      global_vars:
-        TestData:
-          setSkipShardingPartsOfPrepareTransactionFailpoint: true
       readMode: commands

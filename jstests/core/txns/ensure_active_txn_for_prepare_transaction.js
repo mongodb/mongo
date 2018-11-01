@@ -24,7 +24,6 @@
               "the session");
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: NumberLong(0),
         stmtId: NumberInt(1),
         autocommit: false
@@ -39,7 +38,6 @@
 
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: NumberLong(0),
         stmtId: NumberInt(1),
         autocommit: false
@@ -54,7 +52,6 @@
 
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: NumberLong(1),
         stmtId: NumberInt(1),
         autocommit: false

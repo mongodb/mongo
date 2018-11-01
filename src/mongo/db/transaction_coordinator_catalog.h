@@ -68,10 +68,9 @@ public:
 
     /**
      * Returns the coordinator with the given session id and transaction number, if it exists. If it
-     * does not exist, return boost::none.
+     * does not exist, return nullptr.
      */
-    boost::optional<std::shared_ptr<TransactionCoordinator>> get(LogicalSessionId lsid,
-                                                                 TxnNumber txnNumber);
+    std::shared_ptr<TransactionCoordinator> get(LogicalSessionId lsid, TxnNumber txnNumber);
 
     /**
      * Returns the coordinator with the highest transaction number with the given session id, if it

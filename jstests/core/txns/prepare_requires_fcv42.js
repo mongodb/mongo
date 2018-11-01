@@ -35,9 +35,8 @@
         jsTestLog("Transaction fails to prepare in last stable FCV.");
         session.startTransaction();
         assert.commandWorked(sessionDB[collName].insert({_id: "b"}));
-        assert.commandFailedWithCode(
-            sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}),
-            ErrorCodes.CommandNotSupported);
+        assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
+                                     ErrorCodes.CommandNotSupported);
         // Abort the transaction in the shell.
         session.abortTransaction_forTesting();
 

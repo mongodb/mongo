@@ -657,7 +657,7 @@ TEST_F(TransactionRouterTest, SendCommitDirectlyForSingleParticipants) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(TransactionRouterTest, SendPrepareAndCoordinateCommitForMultipleParticipants) {
+TEST_F(TransactionRouterTest, SendCoordinateCommitForMultipleParticipants) {
     LogicalSessionId lsid(makeLogicalSessionIdForTest());
     TxnNumber txnNum{3};
 
@@ -674,21 +674,6 @@ TEST_F(TransactionRouterTest, SendPrepareAndCoordinateCommitForMultipleParticipa
     txnRouter->attachTxnFieldsIfNeeded(shard2, {});
 
     auto future = launchAsync([&] { txnRouter->commitTransaction(operationContext()); });
-
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(hostAndPort2, request.target);
-        ASSERT_EQ("admin", request.dbname);
-
-        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
-        ASSERT_EQ(cmdName, "prepareTransaction");
-
-        auto coordinator = request.cmdObj["coordinatorId"].str();
-        ASSERT_EQ(shard1.toString(), coordinator);
-
-        checkSessionDetails(request.cmdObj, lsid, txnNum, boost::none);
-
-        return BSON("ok" << 1);
-    });
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);

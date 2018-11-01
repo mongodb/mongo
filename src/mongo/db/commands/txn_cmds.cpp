@@ -46,6 +46,9 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic);
+MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic);
+
 class CmdCommitTxn : public BasicCommand {
 public:
     CmdCommitTxn() : BasicCommand("commitTransaction") {}
@@ -94,6 +97,11 @@ public:
             // commit oplog entry.
             auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClient.setLastOpToSystemLastOpTime(opCtx);
+            if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
+                uasserted(ErrorCodes::SocketException,
+                          "returning network error because failpoint is on");
+            }
+
             return true;
         }
 
@@ -108,6 +116,10 @@ public:
         } else {
             // commitUnpreparedTransaction will throw if the transaction is prepared.
             txnParticipant->commitUnpreparedTransaction(opCtx);
+        }
+        if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
+            uasserted(ErrorCodes::SocketException,
+                      "returning network error because failpoint is on");
         }
 
         return true;
@@ -172,6 +184,11 @@ public:
                                     << exceptionToStatus());
             throw;
         }
+        if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
+            uasserted(ErrorCodes::SocketException,
+                      "returning network error because failpoint is on");
+        }
+
         return true;
     }
 

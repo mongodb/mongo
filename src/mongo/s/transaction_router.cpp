@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
 
 #include "mongo/platform/basic.h"
 
@@ -614,46 +614,22 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
 
 Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
     invariant(_coordinatorId);
-
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-    PrepareTransaction prepareCmd;
-    prepareCmd.setDbName("admin");
-    prepareCmd.setCoordinatorId(*_coordinatorId);
-
-    auto prepareCmdObj = prepareCmd.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    auto coordinatorIter = _participants.find(*_coordinatorId);
+    invariant(coordinatorIter != _participants.end());
 
     std::vector<CommitParticipant> participantList;
     for (const auto& participantEntry : _participants) {
-        ShardId shardId(participantEntry.first);
-
         CommitParticipant commitParticipant;
-        commitParticipant.setShardId(shardId);
+        commitParticipant.setShardId(participantEntry.first);
         participantList.push_back(std::move(commitParticipant));
-
-        if (participantEntry.second.isCoordinator()) {
-            // coordinateCommit is sent to participant that is also a coordinator.
-            invariant(shardId == *_coordinatorId);
-            continue;
-        }
-
-        const auto& participant = participantEntry.second;
-        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        shard->runFireAndForgetCommand(opCtx,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       "admin",
-                                       participant.attachTxnFieldsIfNeeded(prepareCmdObj, false));
     }
 
-    auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, *_coordinatorId));
+    auto coordinatorShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *_coordinatorId));
 
     CoordinateCommitTransaction coordinateCommitCmd;
     coordinateCommitCmd.setDbName("admin");
     coordinateCommitCmd.setParticipants(participantList);
-
-    auto coordinatorIter = _participants.find(*_coordinatorId);
-    invariant(coordinatorIter != _participants.end());
 
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
         opCtx,

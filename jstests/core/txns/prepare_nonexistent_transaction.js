@@ -22,13 +22,10 @@
 
     jsTestLog("Test that if there is no transaction active on the current session, errors with " +
               "'NoSuchTransaction'.");
-    assert.commandFailedWithCode(sessionDB.adminCommand({
-        prepareTransaction: 1,
-        coordinatorId: "dummy",
-        txnNumber: NumberLong(0),
-        autocommit: false
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand(
+            {prepareTransaction: 1, txnNumber: NumberLong(0), autocommit: false}),
+        ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Test that if there is a transaction running on the current session and the " +
               "'txnNumber' given is greater than the current transaction, errors with " +
@@ -37,7 +34,6 @@
     assert.commandWorked(sessionColl.insert(doc));
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
         autocommit: false
     }),
@@ -52,7 +48,6 @@
               "last known transaction was aborted then it errors with 'NoSuchTransaction'.");
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: NumberLong(session.getTxnNumber_forTesting()),
         autocommit: false
     }),
@@ -63,31 +58,24 @@
               "'TransactionTooOld'.");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert(doc));
-    assert.commandFailedWithCode(sessionDB.adminCommand({
-        prepareTransaction: 1,
-        coordinatorId: "dummy",
-        txnNumber: NumberLong(0),
-        autocommit: false
-    }),
-                                 ErrorCodes.TransactionTooOld);
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand(
+            {prepareTransaction: 1, txnNumber: NumberLong(0), autocommit: false}),
+        ErrorCodes.TransactionTooOld);
     session.abortTransaction_forTesting();
 
     jsTestLog("Test that if there is no transaction active on the current session and the " +
               "'txnNumber' given is less than the current transaction, errors with " +
               "'TransactionTooOld'.");
-    assert.commandFailedWithCode(sessionDB.adminCommand({
-        prepareTransaction: 1,
-        coordinatorId: "dummy",
-        txnNumber: NumberLong(0),
-        autocommit: false
-    }),
-                                 ErrorCodes.TransactionTooOld);
+    assert.commandFailedWithCode(
+        sessionDB.adminCommand(
+            {prepareTransaction: 1, txnNumber: NumberLong(0), autocommit: false}),
+        ErrorCodes.TransactionTooOld);
 
     jsTestLog("Test the error precedence when calling prepare on a nonexistent transaction but " +
               "not providing txnNumber to prepareTransaction.");
-    assert.commandFailedWithCode(
-        sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy", autocommit: false}),
-        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, autocommit: false}),
+                                 ErrorCodes.InvalidOptions);
 
     // It isn't ideal that NoSuchTransaction is thrown instead of InvalidOptions here, but it's okay
     // to leave as is for now since this case fails in some way.
@@ -95,7 +83,6 @@
               "not providing autocommit to prepareTransaction.");
     assert.commandFailedWithCode(sessionDB.adminCommand({
         prepareTransaction: 1,
-        coordinatorId: "dummy",
         txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
     }),
                                  ErrorCodes.NoSuchTransaction);
@@ -106,7 +93,6 @@
         prepareTransaction: 1,
         // The last txnNumber we used was saved on the server's session, so we use a txnNumber that
         // is greater than that to make sure it has never been seen before.
-        coordinatorId: "dummy",
         txnNumber: NumberLong(session.getTxnNumber_forTesting() + 2),
         autocommit: false,
         startTransaction: true

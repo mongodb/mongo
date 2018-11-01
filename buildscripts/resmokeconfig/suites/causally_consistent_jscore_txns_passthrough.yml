@@ -35,6 +35,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
-        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     # Use a 1-node replica set.
     num_nodes: 1

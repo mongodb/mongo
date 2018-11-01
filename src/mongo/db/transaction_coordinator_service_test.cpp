@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -34,8 +33,10 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_coordinator_commands_impl.h"
 #include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -55,7 +56,9 @@ const std::set<ShardId> kThreeShardIdSet{{"s1"}, {"s2"}, {"s3"}};
 const Timestamp kDummyTimestamp = Timestamp::min();
 const Date_t kCommitDeadline = Date_t::max();
 const StatusWith<BSONObj> kRetryableError = {ErrorCodes::HostUnreachable, ""};
+const StatusWith<BSONObj> kNoSuchTransaction = {ErrorCodes::NoSuchTransaction, ""};
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
+const StatusWith<BSONObj> kPrepareOk = BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1));
 
 HostAndPort makeHostAndPort(const ShardId& shardId) {
     return HostAndPort(str::stream() << shardId << ":123");
@@ -65,9 +68,6 @@ class TransactionCoordinatorServiceTest : public ShardServerTestFixture {
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();
-
-        operationContext()->setLogicalSessionId(_lsid);
-        operationContext()->setTxnNumber(_txnNumber);
 
         for (const auto& shardId : kThreeShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -87,6 +87,14 @@ public:
             ASSERT_EQ(commandName, request.cmdObj.firstElement().fieldNameStringData());
             return response;
         });
+    }
+
+    void assertPrepareSentAndRespondWithSuccess() {
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName, kPrepareOk);
+    }
+
+    void assertPrepareSentAndRespondWithNoSuchTransaction() {
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName, kNoSuchTransaction);
     }
 
     void assertAbortSentAndRespondWithSuccess() {
@@ -125,9 +133,8 @@ public:
         auto commitDecisionFuture = coordinatorService.coordinateCommit(
             operationContext(), lsid, txnNumber, transactionParticipantShards);
 
-        for (const auto& shardId : transactionParticipantShards) {
-            coordinatorService.voteCommit(
-                operationContext(), lsid, txnNumber, shardId, kDummyTimestamp);
+        for (size_t i = 0; i < transactionParticipantShards.size(); ++i) {
+            assertPrepareSentAndRespondWithSuccess();
         }
 
         for (size_t i = 0; i < transactionParticipantShards.size(); ++i) {
@@ -150,7 +157,13 @@ public:
         auto commitDecisionFuture =
             coordinatorService.coordinateCommit(operationContext(), lsid, txnNumber, shardIdSet);
 
-        coordinatorService.voteAbort(operationContext(), lsid, txnNumber, abortingShard);
+        for (size_t i = 0; i < shardIdSet.size(); ++i) {
+            assertPrepareSentAndRespondWithNoSuchTransaction();
+        }
+
+        // Abort gets sent to the second participant as soon as the first participant
+        // receives a not-okay response to prepare.
+        assertAbortSentAndRespondWithSuccess();
 
         // Wait for abort to complete.
         commitDecisionFuture.get();
@@ -218,7 +231,6 @@ private:
     std::unique_ptr<TransactionCoordinatorService> _coordinatorService;
 };
 
-
 }  // namespace
 
 TEST_F(TransactionCoordinatorServiceTest, CreateCoordinatorOnNewSessionSucceeds) {
@@ -253,31 +265,6 @@ TEST_F(TransactionCoordinatorServiceTest,
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
-       CreateCoordinatorWithHigherTxnNumberThanOngoingUncommittedTxnAbortsPreviousTxnAndSucceeds) {
-
-    TransactionCoordinatorService coordinatorService;
-    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
-
-    // This is currently the only way we have to get the commit decision.
-    auto oldTxnCommitDecisionFuture = coordinatorService.coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-
-    // Create a coordinator for a higher transaction number in the same session.
-    coordinatorService.createCoordinator(
-        operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
-
-    assertAbortSentAndRespondWithSuccess();
-    assertAbortSentAndRespondWithSuccess();
-
-    // We should have aborted the previous transaction.
-    ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
-              static_cast<int>(TransactionCoordinatorService::CommitDecision::kAbort));
-
-    // Make sure the newly created one works fine.
-    commitTransaction(coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
-}
-
-TEST_F(TransactionCoordinatorServiceTest,
        CreateCoordinatorWithHigherTxnNumberThanOngoingCommittingTxnCommitsPreviousTxnAndSucceeds) {
 
     TransactionCoordinatorService coordinatorService;
@@ -287,16 +274,18 @@ TEST_F(TransactionCoordinatorServiceTest,
     // commit acks.
     auto oldTxnCommitDecisionFuture = coordinatorService.coordinateCommit(
         operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-    coordinatorService.voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-    coordinatorService.voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[1], kDummyTimestamp);
+
+    // Simulate all participants acking prepare/voting to commit.
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
 
     // Create a coordinator for a higher transaction number in the same session. This should
     // "tryAbort" on the old coordinator which should NOT abort it since it's already waiting for
     // commit acks.
     coordinatorService.createCoordinator(
         operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
+    auto newTxnCommitDecisionFuture = coordinatorService.coordinateCommit(
+        operationContext(), lsid(), txnNumber() + 1, kTwoShardIdSet);
 
     // Finish committing the old transaction by sending it commit acks from both participants.
     assertCommitSentAndRespondWithSuccess();
@@ -304,10 +293,32 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // The old transaction should now be committed.
     ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
-              static_cast<int>(TransactionCoordinatorService::CommitDecision::kCommit));
+              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
 
     // Make sure the newly created one works fine too.
-    commitTransaction(coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+    // commitTransaction(coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
+}
+
+TEST_F(TransactionCoordinatorServiceTestSingleTxn,
+       CoordinateCommitReturnsCorrectCommitDecisionOnAbort) {
+
+    auto commitDecisionFuture = coordinatorService()->coordinateCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+
+    // Simulate a participant voting to abort.
+    assertPrepareSentAndRespondWithNoSuchTransaction();
+    assertPrepareSentAndRespondWithSuccess();
+
+    // Only send abort to the node that voted to commit.
+    assertAbortSentAndRespondWithSuccess();
+
+    auto commitDecision = commitDecisionFuture.get();
+    ASSERT_EQ(static_cast<int>(commitDecision),
+              static_cast<int>(TransactionCoordinator::CommitDecision::kAbort));
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
@@ -323,49 +334,19 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       CoordinateCommitReturnsCorrectCommitDecisionOnAbort) {
-
-    auto commitDecisionFuture = coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-
-    coordinatorService()->voteAbort(operationContext(), lsid(), txnNumber(), kTwoShardIdList[0]);
-
-    auto commitDecision = commitDecisionFuture.get();
-    ASSERT_EQ(static_cast<int>(commitDecision),
-              static_cast<int>(TransactionCoordinatorService::CommitDecision::kAbort));
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        CoordinateCommitReturnsCorrectCommitDecisionOnCommit) {
 
     auto commitDecisionFuture = coordinatorService()->coordinateCommit(
         operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
 
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[1], kDummyTimestamp);
-
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 
     auto commitDecision = commitDecisionFuture.get();
     ASSERT_EQ(static_cast<int>(commitDecision),
-              static_cast<int>(TransactionCoordinatorService::CommitDecision::kCommit));
-}
-
-TEST_F(TransactionCoordinatorServiceTest,
-       CoordinateCommitReturnsAbortDecisionWhenCoordinatorDoesNotExist) {
-
-    TransactionCoordinatorService coordinatorService;
-    auto commitDecisionFuture = coordinatorService.coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-    ASSERT_TRUE(commitDecisionFuture.isReady());
-
-    auto commitDecision = commitDecisionFuture.get();
-    ASSERT_EQ(static_cast<int>(commitDecision),
-              static_cast<int>(TransactionCoordinatorService::CommitDecision::kAbort));
+              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
@@ -407,154 +388,6 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
 
     ASSERT_EQ(static_cast<int>(commitDecisionFuture1.get()),
               static_cast<int>(commitDecisionFuture2.get()));
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       VoteCommitDoesNotSendCommitIfParticipantListNotYetReceived) {
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    assertNoMessageSent();
-    // To prevent invariant failure in TransactionCoordinator that all futures have been completed.
-    abortTransaction(
-        *coordinatorService(), lsid(), txnNumber(), kTwoShardIdSet, kTwoShardIdList[1]);
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       ResentVoteCommitDoesNotSendCommitIfParticipantListNotYetReceived) {
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    assertNoMessageSent();
-
-    // To prevent invariant failure in TransactionCoordinator that all futures have been completed.
-    abortTransaction(
-        *coordinatorService(), lsid(), txnNumber(), kTwoShardIdSet, kTwoShardIdList[1]);
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       ResentVoteCommitDoesNotSendCommitIfParticipantListHasBeenReceived) {
-
-    auto commitDecisionFuture = coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    assertNoMessageSent();
-
-    // To prevent invariant failure in TransactionCoordinator that all futures have been completed.
-    abortTransaction(
-        *coordinatorService(), lsid(), txnNumber(), kTwoShardIdSet, kTwoShardIdList[1]);
-    commitDecisionFuture.get();
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn, FinalVoteCommitSendsCommit) {
-    auto commitDecisionFuture = coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[1], kDummyTimestamp);
-
-    assertCommitSentAndRespondWithSuccess();
-    assertCommitSentAndRespondWithSuccess();
-}
-
-// This logic is obviously correct for a transaction which has been aborted prior to receiving
-// coordinateCommit, when the coordinator does not yet know all participants and so cannot send
-// abortTransaction to all participants. In this case, it can potentially receive voteCommit
-// messages from some participants even after the local TransactionCoordinator object has
-// transitioned to the aborted state and then removed from the service. We then must tell
-// the participant that sent the voteCommit message that it should abort.
-//
-// More subtly, it also works for voteCommit retries for transactions that have already committed,
-// because we'll send abort to the participant, and the abort command will just receive
-// NoSuchTransaction or TransactionTooOld (because the participant must have already committed if
-// the transaction coordinator finished committing).
-TEST_F(TransactionCoordinatorServiceTest,
-       VoteCommitForCoordinatorThatDoesNotExistSendsVoteAbortToCallingParticipant) {
-
-    TransactionCoordinatorService coordinatorService;
-    coordinatorService.voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    assertAbortSentAndRespondWithSuccess();
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       ResentFinalVoteCommitOnlySendsCommitToNonAckedParticipants) {
-
-    auto commitDecisionFuture = coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[1], kDummyTimestamp);
-
-    assertCommitSentAndRespondWithSuccess();
-    assertCommitSentAndRespondWithRetryableError();
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[1], kDummyTimestamp);
-
-    assertCommitSentAndRespondWithSuccess();
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       VoteAbortDoesNotSendAbortIfIsOnlyVoteReceivedSoFar) {
-
-    coordinatorService()->voteAbort(operationContext(), lsid(), txnNumber(), kTwoShardIdList[0]);
-
-    assertNoMessageSent();
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       VoteAbortForCoordinatorThatDoesNotExistDoesNotSendAbort) {
-
-    coordinatorService()->voteAbort(operationContext(), lsid(), txnNumber(), kTwoShardIdList[0]);
-    // Coordinator no longer exists.
-    coordinatorService()->voteAbort(operationContext(), lsid(), txnNumber(), kTwoShardIdList[0]);
-
-    assertNoMessageSent();
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       VoteAbortSendsAbortIfSomeParticipantsHaveVotedCommit) {
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdList[0], kDummyTimestamp);
-
-    coordinatorService()->voteAbort(operationContext(), lsid(), txnNumber(), kTwoShardIdList[1]);
-
-    // This should be sent to the shard that voted commit (s1).
-    assertAbortSentAndRespondWithSuccess();
-}
-
-TEST_F(TransactionCoordinatorServiceTestSingleTxn,
-       VoteAbortAfterReceivingParticipantListSendsAbortToAllParticipantsWhoHaventVotedAbort) {
-
-    auto commitDecisionFuture = coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kThreeShardIdSet);
-
-    coordinatorService()->voteCommit(
-        operationContext(), lsid(), txnNumber(), kThreeShardIdList[0], kDummyTimestamp);
-
-    coordinatorService()->voteAbort(operationContext(), lsid(), txnNumber(), kThreeShardIdList[1]);
-
-    // Should send abort to shards s1 and s3 (the ones that did not vote abort).
-    assertAbortSentAndRespondWithSuccess();
-    assertAbortSentAndRespondWithSuccess();
 }
 
 }  // namespace mongo

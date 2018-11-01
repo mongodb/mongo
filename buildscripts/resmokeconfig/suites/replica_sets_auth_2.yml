@@ -48,6 +48,5 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
-          setSkipShardingPartsOfPrepareTransactionFailpoint: true
       nodb: ''
       readMode: commands

@@ -71,5 +71,4 @@ executor:
         numInitialSyncAttempts: 1
         disableLogicalSessionCacheRefresh: false
         logicalSessionRefreshMillis: 1000
-        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     num_nodes: 3

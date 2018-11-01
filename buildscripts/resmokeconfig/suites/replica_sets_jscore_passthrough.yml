@@ -62,5 +62,4 @@ executor:
         #
         # TODO SERVER-35156: Remove the following line to disable the periodic no-op writer.
         writePeriodicNoops: 1
-        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     num_nodes: 2

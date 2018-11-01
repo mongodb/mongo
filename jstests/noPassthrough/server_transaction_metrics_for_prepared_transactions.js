@@ -41,8 +41,6 @@
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
-    assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: "skipShardingPartsOfPrepareTransaction", mode: "alwaysOn"}));
 
     // Set up the test database.
     const dbName = "test";

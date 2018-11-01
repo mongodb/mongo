@@ -34,7 +34,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_catalog.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -47,13 +49,13 @@ class TransactionCoordinatorService final {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorService);
 
 public:
-    enum class CommitDecision {
-        kCommit,
-        kAbort,
-    };
-
     TransactionCoordinatorService();
-    ~TransactionCoordinatorService();
+    ~TransactionCoordinatorService() = default;
+
+    /**
+     * Shuts down the thread pool used for executing commits.
+     */
+    void shutdown();
 
     /**
      * Retrieves the TransactionCoordinatorService associated with the service or operation context.
@@ -75,37 +77,17 @@ public:
      * Delivers coordinateCommit to the TransactionCoordinator, asynchronously sends commit or
      * abort to participants if necessary, and returns a Future that will contain the commit
      * decision when the transaction finishes committing or aborting.
-     *
-     * TODO (SERVER-37364): On the commit path, this Future should instead be signaled as soon as
-     * the coordinator is finished persisting the commit decision, rather than waiting until the
-     * commit process has been completed entirely.
      */
-    Future<CommitDecision> coordinateCommit(OperationContext* opCtx,
-                                            LogicalSessionId lsid,
-                                            TxnNumber txnNumber,
-                                            const std::set<ShardId>& participantList);
-
-    /**
-     * Delivers voteCommit to the TransactionCoordinator and asynchronously sends commit or abort to
-     * participants if necessary.
-     */
-    void voteCommit(OperationContext* opCtx,
-                    LogicalSessionId lsid,
-                    TxnNumber txnNumber,
-                    const ShardId& shardId,
-                    Timestamp prepareTimestamp);
-
-    /**
-     * Delivers voteAbort on the TransactionCoordinator and asynchronously sends commit or abort to
-     * participants if necessary.
-     */
-    void voteAbort(OperationContext* opCtx,
-                   LogicalSessionId lsid,
-                   TxnNumber txnNumber,
-                   const ShardId& shardId);
+    Future<TransactionCoordinator::CommitDecision> coordinateCommit(
+        OperationContext* opCtx,
+        LogicalSessionId lsid,
+        TxnNumber txnNumber,
+        const std::set<ShardId>& participantList);
 
 private:
     std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
+
+    ThreadPool _threadPool;
 };
 
 }  // namespace mongo

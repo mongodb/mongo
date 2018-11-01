@@ -70,15 +70,49 @@ void expectScheduleThrows(Schedule schedule) {
     ASSERT_EQ(State::kBroken, coordinator.state());
 }
 
+
+void doCommit(StateMachine& coordinator) {
+    runSchedule(coordinator,
+                {Event::kRecvParticipantList,
+                 Event::kMadeParticipantListDurable,
+                 Event::kRecvFinalVoteCommit,
+                 Event::kMadeCommitDecisionDurable,
+                 Event::kRecvFinalCommitAck});
+}
+
+void doAbort(StateMachine& coordinator) {
+    runSchedule(coordinator,
+                {Event::kRecvParticipantList,
+                 Event::kMadeParticipantListDurable,
+                 Event::kRecvVoteAbort,
+                 Event::kMadeAbortDecisionDurable,
+                 Event::kRecvFinalAbortAck});
+}
+
 TEST(CoordinatorStateMachine, AbortSucceeds) {
-    expectScheduleSucceeds({Event::kRecvVoteAbort}, State::kAborted);
-    expectScheduleSucceeds({Event::kRecvVoteAbort, Event::kRecvVoteAbort}, State::kAborted);
+    expectScheduleSucceeds({Event::kRecvParticipantList,
+                            Event::kMadeParticipantListDurable,
+                            Event::kRecvVoteAbort,
+                            Event::kMadeAbortDecisionDurable,
+                            Event::kRecvFinalAbortAck},
+                           State::kAborted);
+    // Check that it's okay to receive two vote aborts.
+    expectScheduleSucceeds({Event::kRecvParticipantList,
+                            Event::kMadeParticipantListDurable,
+                            Event::kRecvVoteAbort,
+                            Event::kRecvVoteAbort,
+                            Event::kMadeAbortDecisionDurable,
+                            Event::kRecvFinalAbortAck},
+                           State::kAborted);
 }
 
 TEST(CoordinatorStateMachine, CommitSucceeds) {
-    expectScheduleSucceeds(
-        {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit, Event::kRecvFinalCommitAck},
-        State::kCommitted);
+    expectScheduleSucceeds({Event::kRecvParticipantList,
+                            Event::kMadeParticipantListDurable,
+                            Event::kRecvFinalVoteCommit,
+                            Event::kMadeCommitDecisionDurable,
+                            Event::kRecvFinalCommitAck},
+                           State::kCommitted);
 }
 
 TEST(CoordinatorStateMachine, RecvFinalVoteCommitAndRecvVoteAbortThrows) {
@@ -90,7 +124,7 @@ TEST(CoordinatorStateMachine, RecvFinalVoteCommitAndRecvVoteAbortThrows) {
 TEST(CoordinatorStateMachine, WaitForTransitionToOnlyTerminalStatesReturnsCorrectStateOnAbort) {
     StateMachine coordinator;
     auto future = coordinator.waitForTransitionTo({State::kCommitted, State::kAborted});
-    runSchedule(coordinator, {Event::kRecvVoteAbort});
+    doAbort(coordinator);
     ASSERT_EQ(future.get(), State::kAborted);
 }
 
@@ -100,15 +134,13 @@ TEST(CoordinatorStateMachine, WaitForTransitionToStatesThatHaventBeenReachedRetu
     ASSERT_FALSE(future.isReady());
     // We need to abort here because we require that all promises are triggered prior to coordinator
     // destruction.
-    runSchedule(coordinator, {Event::kRecvVoteAbort});
+    doAbort(coordinator);
 }
 
 TEST(CoordinatorStateMachine, WaitForTransitionToOnlyTerminalStatesReturnsCorrectStateOnCommit) {
     StateMachine coordinator;
     auto future = coordinator.waitForTransitionTo({State::kCommitted, State::kAborted});
-    runSchedule(
-        coordinator,
-        {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit, Event::kRecvFinalCommitAck});
+    doCommit(coordinator);
     ASSERT_EQ(future.get(), State::kCommitted);
 }
 
@@ -117,8 +149,9 @@ TEST(CoordinatorStateMachine,
     StateMachine coordinator;
     runSchedule(coordinator, {Event::kRecvParticipantList});
     auto future = coordinator.waitForTransitionTo(
-        {State::kWaitingForVotes, State::kCommitted, State::kAborted});
-    ASSERT_EQ(future.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
+        {State::kMakingParticipantListDurable, State::kCommitted, State::kAborted});
+    ASSERT_EQ(future.get(),
+              TransactionCoordinator::StateMachine::State::kMakingParticipantListDurable);
 }
 
 TEST(CoordinatorStateMachine, WaitForTransitionToMultipleStatesReturnsFirstStateToBeHit) {
@@ -128,7 +161,7 @@ TEST(CoordinatorStateMachine, WaitForTransitionToMultipleStatesReturnsFirstState
                                                    State::kCommitted,
                                                    State::kAborted});
 
-    runSchedule(coordinator, {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit});
+    doCommit(coordinator);
 
     ASSERT_EQ(future.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
 }
@@ -140,7 +173,7 @@ TEST(CoordinatorStateMachine,
         {State::kWaitingForVotes, State::kCommitted, State::kAborted});
     auto future2 = coordinator.waitForTransitionTo(
         {State::kWaitingForCommitAcks, State::kCommitted, State::kAborted});
-    runSchedule(coordinator, {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit});
+    doCommit(coordinator);
 
     ASSERT_EQ(future1.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
     ASSERT_EQ(future2.get(), TransactionCoordinator::StateMachine::State::kWaitingForCommitAcks);
@@ -163,7 +196,7 @@ TEST(CoordinatorStateMachine,
                      coordinator.waitForTransitionTo(
                          {State::kWaitingForCommitAcks, State::kCommitted, State::kAborted})};
 
-    runSchedule(coordinator, {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit});
+    doCommit(coordinator);
 
     for (auto& future1 : futures1) {
         ASSERT_EQ(future1.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);

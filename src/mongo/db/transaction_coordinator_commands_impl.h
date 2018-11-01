@@ -31,25 +31,54 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_commit_decision_gen.h"
 #include "mongo/db/transaction_coordinator.h"
 
 namespace mongo {
 
+class ThreadPool;
+
 namespace txn {
 
-/**
- * Asynchronously sends commit to all participants provided and calls recvCommitAck on the
- * coordinator if the commit command succeeds.
- */
-void sendCommit(OperationContext* opCtx,
-                std::shared_ptr<TransactionCoordinator> coordinator,
-                const std::set<ShardId>& nonAckedParticipants,
-                Timestamp commitTimestamp);
+void launchCoordinateCommitTask(ThreadPool& threadPool,
+                                std::shared_ptr<TransactionCoordinator> coordinator,
+                                const LogicalSessionId& lsid,
+                                const TxnNumber& txnNumber,
+                                TransactionCoordinator::StateMachine::Action initialAction);
 
 /**
- * Asynchronously sends abort to all participants provided.
+ * Schedules prepare to be sent asynchronously to all participants and blocks on being signaled that
+ * a voteAbort or the final voteCommit has been received.
  */
-void sendAbort(OperationContext* opCtx, const std::set<ShardId>& nonVotedAbortParticipants);
+TransactionCoordinator::StateMachine::Action sendPrepare(
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    const TxnNumber& txnNumber,
+    std::shared_ptr<TransactionCoordinator> coordinator,
+    const std::set<ShardId>& participants);
+
+/**
+ * Schedules commit to be sent asynchronously to all participants and blocks on being signaled that
+ * the final commit ack has been received.
+ */
+TransactionCoordinator::StateMachine::Action sendCommit(
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    const TxnNumber& txnNumber,
+    std::shared_ptr<TransactionCoordinator> coordinator,
+    const std::set<ShardId>& nonAckedParticipants,
+    Timestamp commitTimestamp);
+
+/**
+ * Schedules abort to be sent asynchronously to all participants and blocks on being signaled that
+ * the final abort ack has been received.
+ */
+TransactionCoordinator::StateMachine::Action sendAbort(
+    OperationContext* opCtx,
+    const LogicalSessionId& lsid,
+    const TxnNumber& txnNumber,
+    std::shared_ptr<TransactionCoordinator> coordinator,
+    const std::set<ShardId>& nonVotedAbortParticipants);
 
 }  // namespace txn
 }  // namespace mongo

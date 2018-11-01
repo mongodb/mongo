@@ -25,17 +25,15 @@
 
     session.startTransaction();
     // TODO SERVER-35787: make this fail with NoSuchTransaction.
-    assert.commandFailedWithCode(
-        sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}),
-        ErrorCodes.OperationNotSupportedInTransaction);
+    assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
     session.abortTransaction_forTesting();
 
     // ---- Test 2. Only reads before prepare ----
 
     session.startTransaction();
     assert.eq(doc, sessionColl.findOne({a: 1}));
-    let res = assert.commandWorked(
-        sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}));
+    let res = assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
     // Makes sure prepareTransaction returns prepareTimestamp in its response.
     assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
     session.abortTransaction_forTesting();
@@ -47,8 +45,7 @@
     assert.eq(res.nMatched, 1, tojson(res));
     assert.eq(res.nModified, 0, tojson(res));
     assert.eq(res.nUpserted, 0, tojson(res));
-    res = assert.commandWorked(
-        sessionDB.adminCommand({prepareTransaction: 1, coordinatorId: "dummy"}));
+    res = assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
     // Makes sure prepareTransaction returns prepareTimestamp in its response.
     assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
     session.abortTransaction_forTesting();
