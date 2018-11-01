@@ -53,7 +53,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -94,12 +93,6 @@ const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::Prim
                                                             TagSet{});
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
-
-const std::string kActionLogCollectionName("actionlog");
-const int kActionLogCollectionSizeMB = 20 * 1024 * 1024;
-
-const std::string kChangeLogCollectionName("changelog");
-const int kChangeLogCollectionSizeMB = 200 * 1024 * 1024;
 
 const NamespaceString kSettingsNamespace("config", "settings");
 
@@ -151,87 +144,6 @@ Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
                                         upsert,
                                         ShardingCatalogClient::kMajorityWriteConcern);
     return status.getStatus().withContext(str::stream() << "Collection metadata write failed");
-}
-
-Status ShardingCatalogClientImpl::logAction(OperationContext* opCtx,
-                                            const std::string& what,
-                                            const std::string& ns,
-                                            const BSONObj& detail) {
-    if (_actionLogCollectionCreated.load() == 0) {
-        Status result = _createCappedConfigCollection(opCtx,
-                                                      kActionLogCollectionName,
-                                                      kActionLogCollectionSizeMB,
-                                                      ShardingCatalogClient::kMajorityWriteConcern);
-        if (result.isOK()) {
-            _actionLogCollectionCreated.store(1);
-        } else {
-            log() << "couldn't create config.actionlog collection:" << causedBy(result);
-            return result;
-        }
-    }
-
-    return _log(opCtx,
-                kActionLogCollectionName,
-                what,
-                ns,
-                detail,
-                ShardingCatalogClient::kMajorityWriteConcern);
-}
-
-Status ShardingCatalogClientImpl::logChangeChecked(OperationContext* opCtx,
-                                                   const std::string& what,
-                                                   const std::string& ns,
-                                                   const BSONObj& detail,
-                                                   const WriteConcernOptions& writeConcern) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-              writeConcern.wMode == WriteConcernOptions::kMajority);
-    if (_changeLogCollectionCreated.load() == 0) {
-        Status result = _createCappedConfigCollection(
-            opCtx, kChangeLogCollectionName, kChangeLogCollectionSizeMB, writeConcern);
-        if (result.isOK()) {
-            _changeLogCollectionCreated.store(1);
-        } else {
-            log() << "couldn't create config.changelog collection:" << causedBy(result);
-            return result;
-        }
-    }
-
-    return _log(opCtx, kChangeLogCollectionName, what, ns, detail, writeConcern);
-}
-
-Status ShardingCatalogClientImpl::_log(OperationContext* opCtx,
-                                       const StringData& logCollName,
-                                       const std::string& what,
-                                       const std::string& operationNS,
-                                       const BSONObj& detail,
-                                       const WriteConcernOptions& writeConcern) {
-    Date_t now = Grid::get(opCtx)->getNetwork()->now();
-    const std::string serverName = str::stream() << Grid::get(opCtx)->getNetwork()->getHostName()
-                                                 << ":" << serverGlobalParams.port;
-    const std::string changeId = str::stream() << serverName << "-" << now.toString() << "-"
-                                               << OID::gen();
-
-    ChangeLogType changeLog;
-    changeLog.setChangeId(changeId);
-    changeLog.setServer(serverName);
-    changeLog.setClientAddr(opCtx->getClient()->clientAddress(true));
-    changeLog.setTime(now);
-    changeLog.setNS(operationNS);
-    changeLog.setWhat(what);
-    changeLog.setDetails(detail);
-
-    BSONObj changeLogBSON = changeLog.toBSON();
-    log() << "about to log metadata event into " << logCollName << ": " << redact(changeLogBSON);
-
-    const NamespaceString nss("config", logCollName);
-    Status result = insertConfigDocument(opCtx, nss, changeLogBSON, writeConcern);
-
-    if (!result.isOK()) {
-        warning() << "Error encountered while logging config change with ID [" << changeId
-                  << "] into collection " << logCollName << ": " << redact(result);
-    }
-
-    return result;
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabase(
@@ -975,43 +887,6 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     auto response = configShard->runBatchWriteCommand(
         opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
     return response.toStatus();
-}
-
-Status ShardingCatalogClientImpl::_createCappedConfigCollection(
-    OperationContext* opCtx,
-    StringData collName,
-    int cappedSize,
-    const WriteConcernOptions& writeConcern) {
-    BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize
-                                      << WriteConcernOptions::kWriteConcernField
-                                      << writeConcern.toBSON());
-
-    auto result =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "config",
-            createCmd,
-            Shard::kDefaultConfigCommandTimeout,
-            Shard::RetryPolicy::kIdempotent);
-
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    if (!result.getValue().commandStatus.isOK()) {
-        if (result.getValue().commandStatus == ErrorCodes::NamespaceExists) {
-            if (result.getValue().writeConcernStatus.isOK()) {
-                return Status::OK();
-            } else {
-                return result.getValue().writeConcernStatus;
-            }
-        } else {
-            return result.getValue().commandStatus;
-        }
-    }
-
-    return result.getValue().writeConcernStatus;
 }
 
 StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaustiveFindOnConfig(

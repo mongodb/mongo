@@ -270,33 +270,6 @@ public:
                                            repl::ReadConcernLevel readConcern) = 0;
 
     /**
-     * Writes a diagnostic event to the action log.
-     */
-    virtual Status logAction(OperationContext* opCtx,
-                             const std::string& what,
-                             const std::string& ns,
-                             const BSONObj& detail) = 0;
-
-    /**
-     * Writes a diagnostic event to the change log.
-     */
-    virtual Status logChangeChecked(OperationContext* opCtx,
-                                    const std::string& what,
-                                    const std::string& ns,
-                                    const BSONObj& detail,
-                                    const WriteConcernOptions& writeConcern) = 0;
-
-    void logChange(OperationContext* const opCtx,
-                   const std::string& what,
-                   const std::string& ns,
-                   const BSONObj& detail,
-                   const WriteConcernOptions& writeConcern) {
-        // It is safe to ignore the results of `logChangeChecked` in many cases, as the
-        // failure to log a change is often of no consequence.
-        logChangeChecked(opCtx, what, ns, detail, writeConcern).ignore();
-    }
-
-    /**
      * Reads global sharding settings from the confing.settings collection. The key parameter is
      * used as the _id of the respective setting document.
      *

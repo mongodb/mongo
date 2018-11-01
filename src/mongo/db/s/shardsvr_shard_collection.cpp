@@ -49,6 +49,7 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
@@ -408,7 +409,6 @@ void shardCollection(OperationContext* opCtx,
                      const bool fromMapReduce,
                      const ShardId& dbPrimaryShardId,
                      const int numContiguousChunksPerShard) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
@@ -428,12 +428,12 @@ void shardCollection(OperationContext* opCtx,
         }
         collectionDetail.append("primary", primaryShard->toString());
         collectionDetail.append("numChunks", static_cast<int>(splitPoints.size() + 1));
-        uassertStatusOK(
-            catalogClient->logChangeChecked(opCtx,
-                                            "shardCollection.start",
-                                            nss.ns(),
-                                            collectionDetail.obj(),
-                                            ShardingCatalogClient::kMajorityWriteConcern));
+        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
+            opCtx,
+            "shardCollection.start",
+            nss.ns(),
+            collectionDetail.obj(),
+            ShardingCatalogClient::kMajorityWriteConcern));
     }
 
     // Construct the collection default collator.
@@ -538,11 +538,12 @@ void shardCollection(OperationContext* opCtx,
         shardsRefreshed.emplace_back(chunk.getShard());
     }
 
-    catalogClient->logChange(opCtx,
-                             "shardCollection.end",
-                             nss.ns(),
-                             BSON("version" << initialChunks.collVersion().toString()),
-                             ShardingCatalogClient::kMajorityWriteConcern);
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        "shardCollection.end",
+        nss.ns(),
+        BSON("version" << initialChunks.collVersion().toString()),
+        ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 /**

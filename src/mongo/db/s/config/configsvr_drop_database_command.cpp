@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -137,12 +138,12 @@ public:
         // error.
         auto dbType = uassertStatusOK(dbInfo).value;
 
-        uassertStatusOK(
-            catalogClient->logChangeChecked(opCtx,
-                                            "dropDatabase.start",
-                                            dbname,
-                                            BSONObj(),
-                                            ShardingCatalogClient::kMajorityWriteConcern));
+        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
+            opCtx,
+            "dropDatabase.start",
+            dbname,
+            BSONObj(),
+            ShardingCatalogClient::kMajorityWriteConcern));
 
         // Drop the database's collections.
         for (const auto& nss : catalogClient->getAllShardedCollectionsForDb(
@@ -174,7 +175,7 @@ public:
         uassertStatusOKWithContext(
             status, str::stream() << "Could not remove database '" << dbname << "' from metadata");
 
-        catalogClient->logChange(
+        ShardingLogging::get(opCtx)->logChange(
             opCtx, "dropDatabase", dbname, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
 
         result.append("dropped", dbname);

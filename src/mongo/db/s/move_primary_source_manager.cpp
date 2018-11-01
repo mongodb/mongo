@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/shard_metadata_util.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -77,7 +78,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     log() << "Moving " << _dbname << " primary from: " << _fromShard << " to: " << _toShard;
 
     // Record start in changelog
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->logChangeChecked(
+    uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "movePrimary.start",
         _dbname.toString(),
@@ -225,7 +226,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
                  "against the config server to obtain its latest optime"
               << causedBy(redact(commitStatus));
 
-        Status validateStatus = Grid::get(opCtx)->catalogClient()->logChangeChecked(
+        Status validateStatus = ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "movePrimary.validating",
             getNss().ns(),
@@ -287,7 +288,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 
     _cleanup(opCtx);
 
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->logChangeChecked(
+    uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "movePrimary.commit",
         _dbname.toString(),
@@ -327,7 +328,7 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
     }
 
     try {
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->logChangeChecked(
+        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "movePrimary.error",
             _dbname.toString(),

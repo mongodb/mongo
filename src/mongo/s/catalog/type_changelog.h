@@ -48,6 +48,7 @@ public:
     // Field names and types in the changelog collection type.
     static const BSONField<std::string> changeId;
     static const BSONField<std::string> server;
+    static const BSONField<std::string> shard;
     static const BSONField<std::string> clientAddr;
     static const BSONField<Date_t> time;
     static const BSONField<std::string> what;
@@ -86,6 +87,11 @@ public:
     }
     void setServer(const std::string& server);
 
+    const std::string& getShard() const {
+        return _shard.get();
+    }
+    void setShard(const std::string& shard);
+
     const std::string& getClientAddr() const {
         return _clientAddr.get();
     }
@@ -116,8 +122,10 @@ private:
 
     // (M)  id for this change "<hostname>-<current_time>-<increment>"
     boost::optional<std::string> _changeId;
-    // (M)  hostname of server that we are making the change on.  Does not include port.
+    // (M)  hostname of server that we are making the change on.
     boost::optional<std::string> _server;
+    // (O) id of shard making the change, or "config" for configSvrs
+    boost::optional<std::string> _shard;
     // (M)  hostname:port of the client that made this change
     boost::optional<std::string> _clientAddr;
     // (M)  time this change was made

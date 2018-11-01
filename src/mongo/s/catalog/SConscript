@@ -138,7 +138,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_catalog_client_test',
     source=[
-        'sharding_catalog_log_change_test.cpp',
         'sharding_catalog_test.cpp',
         'sharding_catalog_write_retry_test.cpp',
     ],

@@ -103,17 +103,6 @@ public:
                                    const WriteConcernOptions& writeConcern,
                                    repl::ReadConcernLevel readConcern) override;
 
-    Status logAction(OperationContext* opCtx,
-                     const std::string& what,
-                     const std::string& ns,
-                     const BSONObj& detail) override;
-
-    Status logChangeChecked(OperationContext* opCtx,
-                            const std::string& what,
-                            const std::string& ns,
-                            const BSONObj& detail,
-                            const WriteConcernOptions& writeConcern) override;
-
     StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) override;
 
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,

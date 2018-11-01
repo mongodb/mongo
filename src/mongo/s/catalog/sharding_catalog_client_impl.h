@@ -73,17 +73,6 @@ public:
 
     void shutDown(OperationContext* opCtx) override;
 
-    Status logAction(OperationContext* opCtx,
-                     const std::string& what,
-                     const std::string& ns,
-                     const BSONObj& detail) override;
-
-    Status logChangeChecked(OperationContext* opCtx,
-                            const std::string& what,
-                            const std::string& ns,
-                            const BSONObj& detail,
-                            const WriteConcernOptions& writeConcern) override;
-
     StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
         OperationContext* opCtx,
         const std::string& dbName,
@@ -195,14 +184,6 @@ private:
                                                   bool upsert,
                                                   const WriteConcernOptions& writeConcern);
 
-    /**
-     * Creates the specified collection name in the config database.
-     */
-    Status _createCappedConfigCollection(OperationContext* opCtx,
-                                         StringData collName,
-                                         int cappedSize,
-                                         const WriteConcernOptions& writeConcern);
-
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
@@ -222,32 +203,12 @@ private:
         const ReadPreferenceSetting& readPref,
         repl::ReadConcernLevel readConcernLevel);
 
-    /**
-     * Best effort method, which logs diagnostic events on the config server. If the config server
-     * write fails for any reason a warning will be written to the local service log and the method
-     * will return a failed status.
-     *
-     * @param opCtx Operation context in which the call is running
-     * @param logCollName Which config collection to write to (excluding the database name)
-     * @param what E.g. "split", "migrate" (not interpreted)
-     * @param operationNS To which collection the metadata change is being applied (not interpreted)
-     * @param detail Additional info about the metadata change (not interpreted)
-     * @param writeConcern Write concern options to use for logging
-     */
-    Status _log(OperationContext* opCtx,
-                const StringData& logCollName,
-                const std::string& what,
-                const std::string& operationNSS,
-                const BSONObj& detail,
-                const WriteConcernOptions& writeConcern);
-
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
     // (M) Must hold _mutex for access.
     // (R) Read only, can only be written during initialization.
-    // (S) Self-synchronizing; access in any way from any context.
     //
 
     stdx::mutex _mutex;
@@ -260,12 +221,6 @@ private:
 
     // True if startup() has been called.
     bool _started = false;  // (M)
-
-    // Whether the logAction call should attempt to create the actionlog collection
-    AtomicInt32 _actionLogCollectionCreated{0};  // (S)
-
-    // Whether the logChange call should attempt to create the changelog collection
-    AtomicInt32 _changeLogCollectionCreated{0};  // (S)
 };
 
 }  // namespace mongo

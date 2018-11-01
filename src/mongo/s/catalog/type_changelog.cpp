@@ -43,6 +43,7 @@ namespace mongo {
 
 const BSONField<std::string> ChangeLogType::changeId("_id");
 const BSONField<std::string> ChangeLogType::server("server");
+const BSONField<std::string> ChangeLogType::shard("shard");
 const BSONField<std::string> ChangeLogType::clientAddr("clientAddr");
 const BSONField<Date_t> ChangeLogType::time("time");
 const BSONField<std::string> ChangeLogType::what("what");
@@ -66,6 +67,15 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
         if (!status.isOK())
             return status;
         changeLog._server = changeLogServer;
+    }
+
+    {
+        std::string changeLogShard;
+        Status status =
+            bsonExtractStringFieldWithDefault(source, shard.name(), "", &changeLogShard);
+        if (!status.isOK())
+            return status;
+        changeLog._shard = changeLogShard;
     }
 
     {
@@ -142,6 +152,8 @@ BSONObj ChangeLogType::toBSON() const {
         builder.append(changeId.name(), getChangeId());
     if (_server)
         builder.append(server.name(), getServer());
+    if (_shard)
+        builder.append(shard.name(), getShard());
     if (_clientAddr)
         builder.append(clientAddr.name(), getClientAddr());
     if (_time)
@@ -162,6 +174,10 @@ void ChangeLogType::setChangeId(const std::string& changeId) {
 
 void ChangeLogType::setServer(const std::string& server) {
     _server = server;
+}
+
+void ChangeLogType::setShard(const std::string& shard) {
+    _shard = shard;
 }
 
 void ChangeLogType::setClientAddr(const std::string& clientAddr) {

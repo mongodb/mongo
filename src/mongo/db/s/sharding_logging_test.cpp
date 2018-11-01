@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -36,6 +35,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -180,10 +180,15 @@ protected:
 
     Status log(const std::string& what, const std::string& ns, const BSONObj& detail) {
         if (_configCollType == ChangeLog) {
-            return catalogClient()->logChangeChecked(
-                operationContext(), what, ns, detail, ShardingCatalogClient::kMajorityWriteConcern);
+            return ShardingLogging::get(operationContext())
+                ->logChangeChecked(operationContext(),
+                                   what,
+                                   ns,
+                                   detail,
+                                   ShardingCatalogClient::kMajorityWriteConcern);
         } else {
-            return catalogClient()->logAction(operationContext(), what, ns, detail);
+            return ShardingLogging::get(operationContext())
+                ->logAction(operationContext(), what, ns, detail);
         }
     }
 

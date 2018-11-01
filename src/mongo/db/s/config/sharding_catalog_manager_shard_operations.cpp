@@ -57,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -759,7 +760,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    Grid::get(opCtx)->catalogClient()->logChange(
+    ShardingLogging::get(opCtx)->logChange(
         opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // Ensure the added shard is visible to this process.
@@ -812,7 +813,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
         log() << "going to start draining shard: " << name;
 
         // Record start in changelog
-        const Status logStatus = Grid::get(opCtx)->catalogClient()->logChangeChecked(
+        const Status logStatus = ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "removeShard.start",
             "",
@@ -884,7 +885,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     shardRegistry->reload(opCtx);
 
     // Record finish in changelog
-    Grid::get(opCtx)->catalogClient()->logChange(
+    ShardingLogging::get(opCtx)->logChange(
         opCtx, "removeShard", "", BSON("shard" << name), ShardingCatalogClient::kLocalWriteConcern);
 
     return ShardDrainingStatus::COMPLETED;

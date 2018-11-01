@@ -82,6 +82,7 @@ env.Library(
         'migration_types',
         'sharding_api_d',
         'sharding_catalog_manager',
+        'sharding_logging',
     ],
 )
 
@@ -189,6 +190,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
+        'sharding_logging',
     ],
 )
 
@@ -424,5 +426,29 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/util/version_impl',
+    ]
+)
+
+env.Library(
+    target='sharding_logging',
+    source=[
+        'sharding_logging.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_api_d',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+    ],
+)
+
+env.CppUnitTest(
+    target='sharding_logging_test',
+    source=[
+        'sharding_logging_test.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_runtime_d',
+        'sharding_logging',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
     ]
 )

@@ -143,21 +143,6 @@ Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* opCt
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::logAction(OperationContext* opCtx,
-                                            const std::string& what,
-                                            const std::string& ns,
-                                            const BSONObj& detail) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
-Status ShardingCatalogClientMock::logChangeChecked(OperationContext* opCtx,
-                                                   const std::string& what,
-                                                   const std::string& ns,
-                                                   const BSONObj& detail,
-                                                   const WriteConcernOptions& writeConcern) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* opCtx,
                                                                  StringData key) {
     return {ErrorCodes::InternalError, "Method not implemented"};

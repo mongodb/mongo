@@ -45,6 +45,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -225,7 +226,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
-    const Status logStatus = Grid::get(opCtx)->catalogClient()->logChangeChecked(
+    const Status logStatus = ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "moveChunk.start",
         getNss().ns(),
@@ -446,7 +447,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                  "against the config server to obtain its latest optime"
               << causedBy(redact(migrationCommitStatus));
 
-        Status status = Grid::get(opCtx)->catalogClient()->logChangeChecked(
+        Status status = ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "moveChunk.validating",
             getNss().ns(),
@@ -574,7 +575,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // scheduling orphan cleanup.
     _cleanup(opCtx);
 
-    Grid::get(opCtx)->catalogClient()->logChange(
+    ShardingLogging::get(opCtx)->logChange(
         opCtx,
         "moveChunk.commit",
         getNss().ns(),
@@ -637,7 +638,7 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
         return;
     }
 
-    Grid::get(opCtx)->catalogClient()->logChange(
+    ShardingLogging::get(opCtx)->logChange(
         opCtx,
         "moveChunk.error",
         getNss().ns(),
