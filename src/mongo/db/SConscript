@@ -707,6 +707,9 @@ env.Library(
         'catalog/index_key_validate',
         'concurrency/write_conflict_exception',
     ],
+    LIBDEPS_PRIVATE=[
+        'index_d',
+    ]
 )
 
 env.Library(
