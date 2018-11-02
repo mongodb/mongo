@@ -8511,8 +8511,6 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: aggregation_multiversion_fuzzer
-  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -8528,6 +8526,7 @@ buildvariants:
   - name: aggregation_multiversion_fuzzer_7
   - name: aggregation_multiversion_fuzzer_8
   - name: aggregation_multiversion_fuzzer_9
+  - name: aggregation_wildcard_fuzzer
   - name: jstestfuzz_sharded
   - name: mongosTest
   - name: multiversion_auth
@@ -10073,7 +10072,6 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: aggregation_expression_multiversion_fuzzer
-  - name: aggregation_wildcard_fuzzer
   - name: auth
   - name: causally_consistent_jscore_passthrough
   - name: causally_consistent_jscore_passthrough_auth
@@ -12656,8 +12654,6 @@ buildvariants:
   - name: aggregation_ese
   - name: aggregation_auth
   - name: aggregation_mongos_passthrough
-  - name: aggregation_multiversion_fuzzer
-  - name: aggregation_wildcard_fuzzer
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
