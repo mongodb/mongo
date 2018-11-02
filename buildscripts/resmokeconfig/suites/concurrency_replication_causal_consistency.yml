@@ -23,6 +23,10 @@ selector:
   - requires_dbstats
   - requires_datasize
   - requires_sharding
+  # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
+  # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
+  # from.
+  - uses_curop_agg_stage
 
 executor:
   archive:
