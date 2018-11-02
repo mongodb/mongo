@@ -9,11 +9,17 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-    load("jstests/libs/analyze_plan.js");         // For getPlanStages.
-    load("jstests/libs/fixture_helpers.js");      // For isMongos and numberOfShardsForCollection.
+    load("jstests/libs/analyze_plan.js");     // For getPlanStages.
+    load("jstests/libs/fixture_helpers.js");  // For isMongos and numberOfShardsForCollection.
 
-    const assertArrayEq = (l, r) => assert(arrayEq(l, r));
+    // Asserts that the given cursors produce identical result sets.
+    function assertResultsEq(cursor1, cursor2) {
+        while (cursor1.hasNext()) {
+            assert(cursor2.hasNext());
+            assert.eq(cursor1.next()._id, cursor2.next()._id);
+        }
+        assert(!cursor2.hasNext());
+    }
 
     const coll = db.wildcard_index_bounds;
     coll.drop();
@@ -25,7 +31,7 @@
     // Insert a set of documents into the collection, based on the template document and populated
     // with an increasing sequence of values. This is to ensure that the range of values present for
     // each field in the dataset is not entirely homogeneous.
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 10; i++) {
         (function populateDoc(doc, value) {
             for (let key in doc) {
                 if (typeof doc[key] === 'object')
@@ -39,19 +45,22 @@
         assert.commandWorked(coll.insert(templateDoc));
     }
 
+    // For sharded passthroughs, we need to know the number of shards occupied by the collection.
+    const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
+
     // Set of operations which will be applied to each field in the index in turn. If the 'bounds'
     // property is null, this indicates that the operation is not supported by $** indexes. The
     // 'subpathBounds' property indicates whether the bounds for '$_path' are supposed to contain
     // all subpaths rather than a single point-interval, i.e. ["path.to.field.", "path.to.field/").
     const operationList = [
-        {expression: {$gte: 50}, bounds: ['[50.0, inf.0]']},
-        {expression: {$gt: 50}, bounds: ['(50.0, inf.0]']},
-        {expression: {$lt: 150}, bounds: ['[-inf.0, 150.0)']},
-        {expression: {$lte: 150}, bounds: ['[-inf.0, 150.0]']},
-        {expression: {$eq: 75}, bounds: ['[75.0, 75.0]']},
+        {expression: {$gte: 3}, bounds: ['[3.0, inf.0]']},
+        {expression: {$gt: 3}, bounds: ['(3.0, inf.0]']},
+        {expression: {$lt: 7}, bounds: ['[-inf.0, 7.0)']},
+        {expression: {$lte: 7}, bounds: ['[-inf.0, 7.0]']},
+        {expression: {$eq: 5}, bounds: ['[5.0, 5.0]']},
         {
-          expression: {$in: [25, 75, 125, 175]},
-          bounds: ['[25.0, 25.0]', '[75.0, 75.0]', '[125.0, 125.0]', '[175.0, 175.0]']
+          expression: {$in: [3, 5, 7, 9]},
+          bounds: ['[3.0, 3.0]', '[5.0, 5.0]', '[7.0, 7.0]', '[9.0, 9.0]']
         },
         {expression: {$exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
         {
@@ -129,8 +138,10 @@
                 assert.docEq(ixScans[0].indexBounds, expectedBounds);
 
                 // Verify that the results obtained from the $** index are identical to a COLLSCAN.
-                assertArrayEq(coll.find(query).toArray(),
-                              coll.find(query).hint({$natural: 1}).toArray());
+                // We must explicitly hint the wildcard index, because we also sort on {_id: 1} to
+                // ensure that both result sets are in the same order.
+                assertResultsEq(coll.find(query).sort({_id: 1}).hint(keyPattern),
+                                coll.find(query).sort({_id: 1}).hint({$natural: 1}));
 
                 // Push the query into the $or and $and predicate arrays.
                 orQueryBounds.push(expectedBounds);
@@ -144,34 +155,35 @@
 
             // Perform a rooted $or for this operation across all indexed fields; for instance:
             // {$or: [{a: {$eq: 25}}, {'b.c': {$eq: 25}}, {'b.d.e': {$eq: 25}}]}.
-            const ixScans = getPlanStages(
-                coll.find({$or: multiFieldPreds}).explain().queryPlanner.winningPlan, "IXSCAN");
+            const explainedOr = assert.commandWorked(coll.find({$or: multiFieldPreds}).explain());
 
-            // We should find that each branch of the $or has used a separate $** sub-index.
-            const ixScanBounds = [];
-            ixScans.forEach((ixScan) => ixScanBounds.push(ixScan.indexBounds));
-            // In the sharded passthroughs, we expect to have 'orQueryBounds' on each shard.
-            const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
-            let orQueryBoundsShards = [];
-            for (let i = 0; i < numShards; ++i) {
-                orQueryBoundsShards = orQueryBoundsShards.concat(orQueryBounds);
+            // Obtain the list of index bounds from each individual IXSCAN stage across all shards.
+            const ixScanBounds = getPlanStages(explainedOr.queryPlanner.winningPlan, "IXSCAN")
+                                     .map(elem => elem.indexBounds);
+
+            // We should find that each branch of the $or has used a separate $** sub-index. In the
+            // sharded passthroughs, we expect to have 'orQueryBounds' on each shard.
+            assert.eq(ixScanBounds.length, orQueryBounds.length * numShards);
+            for (let offset = 0; offset < ixScanBounds.length; offset += orQueryBounds.length) {
+                const ixBounds = ixScanBounds.slice(offset, offset + orQueryBounds.length);
+                orQueryBounds.forEach(
+                    exBound => assert(ixBounds.some(ixBound => !bsonWoCompare(ixBound, exBound))));
             }
-            assertArrayEq(ixScanBounds, orQueryBoundsShards);
 
             // Verify that the results obtained from the $** index are identical to a COLLSCAN.
-            assertArrayEq(coll.find({$or: multiFieldPreds}).toArray(),
-                          coll.find({$or: multiFieldPreds}).hint({$natural: 1}).toArray());
+            assertResultsEq(coll.find({$or: multiFieldPreds}).sort({_id: 1}).hint(keyPattern),
+                            coll.find({$or: multiFieldPreds}).sort({_id: 1}).hint({$natural: 1}));
 
             // Perform an $and for this operation across all indexed fields; for instance:
             // {$and: [{a: {$gte: 50}}, {'b.c': {$gte: 50}}, {'b.d.e': {$gte: 50}}]}.
-            const explainOutput = coll.find({$and: multiFieldPreds}).explain();
-            const winningIxScan = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
+            const explainedAnd = coll.find({$and: multiFieldPreds}).explain();
+            const winningIxScan = getPlanStages(explainedAnd.queryPlanner.winningPlan, "IXSCAN");
 
             // Extract information about the rejected plans. We should have one IXSCAN for each $**
             // candidate that wasn't the winner. Before SERVER-36521 banned them for $** indexes, a
             // number of AND_SORTED plans would also be generated here; we search for these in order
             // to verify that no such plans now exist.
-            const rejectedPlans = getRejectedPlans(explainOutput);
+            const rejectedPlans = getRejectedPlans(explainedAnd);
             let rejectedIxScans = [], rejectedAndSorted = [];
             for (let rejectedPlan of rejectedPlans) {
                 rejectedAndSorted =
@@ -196,8 +208,8 @@
             }
 
             // Verify that the results obtained from the $** index are identical to a COLLSCAN.
-            assertArrayEq(coll.find({$and: multiFieldPreds}).toArray(),
-                          coll.find({$and: multiFieldPreds}).hint({$natural: 1}).toArray());
+            assertResultsEq(coll.find({$and: multiFieldPreds}).sort({_id: 1}).hint(keyPattern),
+                            coll.find({$and: multiFieldPreds}).sort({_id: 1}).hint({$natural: 1}));
         }
     }
 
