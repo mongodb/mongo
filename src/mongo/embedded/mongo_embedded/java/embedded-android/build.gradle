@@ -1,0 +1,89 @@
+apply plugin: 'com.android.library'
+apply plugin: 'optional-base'
+apply plugin: 'maven'
+apply plugin: 'signing'
+
+android {
+    compileSdkVersion 28
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 28
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDir '../src'
+            jniLibs.srcDirs '../jniLibs'
+        }
+    }
+}
+
+task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    classifier = 'sources'
+}
+
+dependencies {
+    api "net.java.dev.jna:jna:$jnaVersion@aar"
+    api 'org.slf4j:slf4j-api:1.7.6', optional
+}
+
+artifacts {
+    archives sourcesJar
+}
+
+signing {
+    sign configurations.archives
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                name "${libraryName}-android"
+                packaging 'aar'
+                description "${pomDescription} - Android"
+                url pomUrl
+
+                scm {
+                    connection "scm:${pomScmConnection}"
+                    developerConnection "scm:${pomScmConnection}"
+                    url pomScmUrl
+                }
+
+                licenses {
+                    license {
+                        name pomLicenseName
+                        url pomLicenseUrl
+                    }
+                }
+
+                developers {
+                    developer {
+                        id 'mongodb'
+                        name 'MongoDB Inc.'
+                        email 'build@mongodb.com'
+                    }
+                }
+            }
+        }
+    }
+}

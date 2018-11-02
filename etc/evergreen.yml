@@ -1094,6 +1094,35 @@ functions:
         done
         fi
 
+  "setup gradle signing keys":
+    command: shell.exec
+    params:
+      silent: true
+      script: |
+        cd src/src/mongo/embedded/mongo_embedded/java
+
+        echo -n "${mongodb_mobile_release_signing_secret_key}" > mobile-release-signing-key.secret
+        echo -n "${mongodb_mobile_release_signing_public_key}" > mobile-release-signing-key.public
+
+        gpg --homedir ${workingdir}/.gnupg --allow-secret-key-import --import mobile-release-signing-key.secret
+        gpg --homedir ${workingdir}/.gnupg --import mobile-release-signing-key.public
+        # Required for gradle to pick up the keys
+        gpg --homedir ${workingdir}/.gnupg --keyring secring.gpg --export-secret-keys secring.gpg
+
+        echo -n <<EOF
+        signing.keyId=${mongodb_mobile_release_signing_keyid}
+        signing.password=${mongodb_mobile_release_signing_password}
+        signing.secretKeyRingFile=${mongodb_mobile_release_signing_secretkeyringfile}
+
+        ossrhUsername=${mongodb_mobile_ossrh_username}
+        ossrhPassword=${mongodb_mobile_ossrh_password}
+        EOF > local.properties
+
+        echo <<EOF
+        export artifactory_mobile_user=${artifactory_mobile_user}
+        export artifactory_mobile_pass=${artifactory_mobile_pass}
+        EOF > artifactory_mobile_creds.sh
+
   "setup android toolchain" :
     command: shell.exec
     params:
@@ -1103,6 +1132,67 @@ functions:
         if [ "${setup_android_toolchain|}" = "true" ]; then
             ${activate_virtualenv}
             PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh ${android_toolchain_target_arch} ${android_toolchain_api_version}
+        fi
+
+  "build java embedded sdk":
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # If the android toolchain has not been setup the android sdk will not
+        # be available and we should not build the android version of mongodb
+        # embedded.
+        if [ "${setup_android_toolchain|}" = "true" ]; then
+            export ANDROID_HOME=$(pwd)/android_sdk
+
+            cd src/src/mongo/embedded/mongo_embedded/java
+
+            # TODO: Clean this up later where we can remove duplication
+            if [ ${package_type|embedded-android} = "embedded-jar" ]; then
+                tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
+                mkdir -p jniLibs/linux-x86-64
+                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/linux-x86-64
+                rm -rf ./mongo-embedded-sdk-${version}
+
+                tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
+                mkdir -p jniLibs/darwin
+                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.dylib jniLibs/darwin
+                rm -rf ./mongo-embedded-sdk-${version}
+
+                ./gradlew clean :embedded-jar:build :embedded-jar:publishMavenPublicationToLocalRepository
+
+                # Is this a release?
+                echo "${version|-g}" | grep -q -- "-g"
+                if [ $? -eq 1 ]; then
+                    echo "Releases disabled on master."
+                    #source ./artifactory_mobile_creds.sh
+                    #./gradlew --info :embedded-jar:artifactoryPublish
+                fi
+
+
+                mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/java
+                cp -r embedded-jar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/java
+            else
+                for arch in arm64-v8a armeabi-v7a x86_64 ; do
+                    tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
+                    mkdir -p jniLibs/$arch
+                    cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/$arch
+                    rm -rf ./mongo-embedded-sdk-${version}
+                done
+
+                ./gradlew clean :embedded-android:build
+                # Is this a release?
+                echo "${version|-g}" | grep -q -- "-g"
+                if [ $? -eq 1 ]; then
+                    echo "Releases disabled on master."
+                    #./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
+                fi
+
+                mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
+                cp -r embedded-android/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/android
+            fi
         fi
 
   "shared scons cache pruning" :
@@ -3961,37 +4051,8 @@ tasks:
         remote_file: ${project}/embedded-sdk/embedded-sdk-android-x86_64/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-android-x86_64.tgz"
-    - command: shell.exec
-      params:
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "${setup_android_toolchain|}" = "true" ]; then
-            export ANDROID_HOME=$(pwd)/android_sdk
-
-            cd src/src/mongo/embedded/mongo_embedded/java
-
-            chmod +x gradlew
-
-            for arch in arm64-v8a armeabi-v7a x86_64 ; do
-                tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
-                mkdir -p jniLibs/$arch
-                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/$arch
-                rm -rf ./mongo-embedded-sdk-${version}
-            done
-
-            ./gradlew clean :aar:build :aar:publishMavenAarPublicationToLocalRepository
-            # Is this a release?
-            echo "${version|-g}" | grep -q -- "-g"
-            if [ $? -eq 1 ]; then
-                echo "Mobile publishing disable in master for now"
-                #./gradlew --info :aar:artifactoryPublish
-            fi
-
-            mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
-            cp -r aar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/android
-          fi
+    - func: "setup gradle signing keys"
+    - func: "build java embedded sdk"
     - command: shell.exec
       params:
         script: |
@@ -4066,40 +4127,10 @@ tasks:
         remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.10/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-java-darwin.tgz"
-    - command: shell.exec
-      params:
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "${setup_android_toolchain|}" = "true" ]; then
-            export ANDROID_HOME=$(pwd)/android_sdk
-
-            cd src/src/mongo/embedded/mongo_embedded/java
-
-            chmod +x gradlew
-
-            tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
-            mkdir -p jniLibs/linux-x86-64
-            cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/linux-x86-64
-            rm -rf ./mongo-embedded-sdk-${version}
-
-            tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
-            mkdir -p jniLibs/darwin
-            cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.dylib jniLibs/darwin
-            rm -rf ./mongo-embedded-sdk-${version}
-
-            ./gradlew clean :jar:build :jar:publishMavenPublicationToLocalRepository
-            # Is this a release?
-            echo "${version|-g}" | grep -q -- "-g"
-            if [ $? -eq 1 ]; then
-                echo "Mobile publishing disable in master for now"
-                #./gradlew --info :jar:artifactoryPublish
-            fi
-
-            mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/java
-            cp -r jar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/java
-          fi
+    - func: "setup gradle signing keys"
+    - func: "build java embedded sdk"
+      vars:
+        package_type: embedded-jar
     - command: shell.exec
       params:
         script: |
