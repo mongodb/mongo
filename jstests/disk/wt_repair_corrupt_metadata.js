@@ -65,13 +65,41 @@
         mongod = startMongodOnExistingPath(dbpath, mongodOptions);
         testColl = mongod.getDB(baseName)[collName];
 
-        // The collection exists depite using an older turtle file because salvage is able to find
+        // The collection exists despite using an older turtle file because salvage is able to find
         // the table in the WiredTiger.wt file.
         assert(testColl.exists());
         // We can assert that the data exists because the salvage only took place on the metadata,
         // not the data.
         assert.eq(testColl.find({}).itcount(), 1);
         MongoRunner.stopMongod(mongod);
+
+        // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
+        // invalid.
+        if (mongodOptions.hasOwnProperty('journal')) {
+            jsTestLog("Corrupting log file metadata");
+
+            let data = cat(turtleFile);
+            let re = /checkpoint_lsn=\(([0-9,]+)\)/g;
+            let newData = data.replace(re, "checkpoint_lsn=(1,2)");
+
+            print('writing data to new turtle file: \n' + newData);
+            removeFile(turtleFile);
+            writeFile(turtleFile, newData);
+
+            assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
+
+            mongod = startMongodOnExistingPath(dbpath, mongodOptions);
+            testColl = mongod.getDB(baseName)[collName];
+
+            // The collection exists despite using a salvaged turtle file because salvage is able to
+            // find the table in the WiredTiger.wt file.
+            assert(testColl.exists());
+
+            // We can assert that the data exists because the salvage only took place on the
+            // metadata, not the data.
+            assert.eq(testColl.find({}).itcount(), 1);
+            MongoRunner.stopMongod(mongod);
+        }
     };
 
     // Repair may behave differently with journaling enabled or disabled, but the end result should

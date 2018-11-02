@@ -648,22 +648,26 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
             severe() << kWTRepairMsg;
             fassertFailedNoTrace(50944);
         }
-
-        warning() << "Attempting to salvage WiredTiger metadata";
-        configStr = wtOpenConfig + ",salvage=true";
-        ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
-        if (!ret) {
-            StorageRepairObserver::get(getGlobalServiceContext())
-                ->onModification("WiredTiger metadata salvaged");
-            return;
-        }
-
-        severe() << "Failed to salvage WiredTiger metadata: " + wtRCToStatus(ret).reason();
-        fassertFailedNoTrace(50947);
     }
 
     severe() << "Reason: " << wtRCToStatus(ret).reason();
-    fassertFailedNoTrace(28595);
+    if (!_inRepairMode) {
+        fassertFailedNoTrace(28595);
+    }
+
+    // Always attempt to salvage metadata regardless of error code when in repair mode.
+
+    warning() << "Attempting to salvage WiredTiger metadata";
+    configStr = wtOpenConfig + ",salvage=true";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        StorageRepairObserver::get(getGlobalServiceContext())
+            ->onModification("WiredTiger metadata salvaged");
+        return;
+    }
+
+    severe() << "Failed to salvage WiredTiger metadata: " + wtRCToStatus(ret).reason();
+    fassertFailedNoTrace(50947);
 }
 
 void WiredTigerKVEngine::cleanShutdown() {
