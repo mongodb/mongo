@@ -569,7 +569,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     WiredTigerSession session(_conn);
     if (!_readOnly && repair && _hasUri(session.getSession(), _sizeStorerUri)) {
         log() << "Repairing size cache";
-        fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
+
+        auto status = _salvageIfNeeded(_sizeStorerUri.c_str());
+        if (status.code() != ErrorCodes::DataModifiedByRepair)
+            fassertNoTrace(28577, status);
     }
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
