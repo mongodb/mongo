@@ -296,7 +296,10 @@ private:
         kFinished
     } _queryState = QueryState::kNotStarted;
 
-    // (M) Client connection used for query.
+    // (M) Client connection used for query. The '_clientConnection' is owned by the '_runQuery'
+    // thread and may only be set by that thread, and only when holding '_mutex'. The '_runQuery'
+    // thread may read this pointer without holding '_mutex'. It is exposed to other threads to
+    // allow cancellation, and those other threads may access it only when holding '_mutex'.
     std::unique_ptr<DBClientConnection> _clientConnection;
 
     // State transitions:

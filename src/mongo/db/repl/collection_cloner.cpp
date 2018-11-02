@@ -514,6 +514,7 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         queryStateOK = _queryState == QueryState::kNotStarted;
         if (queryStateOK) {
             _queryState = QueryState::kRunning;
+            _clientConnection = _createClientFn();
         }
     }
     if (!queryStateOK) {
@@ -534,7 +535,6 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         }
     }
 
-    _clientConnection = _createClientFn();
     Status clientConnectionStatus = _clientConnection->connect(_source, StringData());
     if (!clientConnectionStatus.isOK()) {
         _finishCallback(clientConnectionStatus);
