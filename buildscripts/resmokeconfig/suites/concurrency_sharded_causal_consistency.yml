@@ -110,6 +110,10 @@ selector:
   exclude_with_any_tags:
   - uses_transactions
   - requires_replication
+  # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
+  # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
+  # from.
+  - uses_curop_agg_stage
 
 executor:
   archive:

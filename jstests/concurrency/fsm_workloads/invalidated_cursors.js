@@ -6,6 +6,8 @@
  * This workload was designed to stress creating, pinning, and invalidating cursors through the
  * cursor manager. Threads perform find, getMore and explain commands while the database,
  * collection, or an index is dropped.
+ *
+ * @tags: [uses_curop_agg_stage]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
