@@ -5072,6 +5072,16 @@ tasks:
       run_multiple_jobs: false
 
 - <<: *task_template
+  name: watchdog_inmemory
+  commands:
+  - func: "do setup"
+  - func: "do watchdog setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=watchdog --storageEngine=inMemory
+      run_multiple_jobs: false
+
+- <<: *task_template
   name: jsonSchema
   commands:
   - func: "do setup"
@@ -8816,6 +8826,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: watchdog
+  - name: watchdog_inmemory
   - name: watchdog_WT
   - name: package
     distros:
