@@ -40,7 +40,8 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
     const cursor = parseCursor(res);
 
     if (!cursor) {
-        abortTransaction(data.sessionDb, data.txnNumber, [ErrorCodes.NoSuchTransaction]);
+        abortTransaction(
+            data.sessionDb, data.txnNumber, [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
         data.cursorId = NumberLong(0);
     } else {
         assert(cursor.hasOwnProperty("firstBatch"), tojson(res));
