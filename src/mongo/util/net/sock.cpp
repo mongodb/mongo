@@ -412,7 +412,7 @@ SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
     }
     _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
     return _sslManager->parseAndValidatePeerCertificateDeprecated(
-        _sslConnection.get(), "", HostAndPort());
+        _sslConnection.get(), "", HostAndPort(_remote.getAddr(), _remote.getPort()));
 }
 
 std::string Socket::getSNIServerName() const {
