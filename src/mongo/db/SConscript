@@ -691,6 +691,7 @@ env.Library(
         'views/views',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'commands/server_status',
         'update/update_driver',
     ]

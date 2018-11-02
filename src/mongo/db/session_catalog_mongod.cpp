@@ -42,8 +42,39 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
+namespace {
+
+struct SessionTasksExecutor {
+    SessionTasksExecutor()
+        : threadPool([] {
+              ThreadPool::Options options;
+              options.threadNamePrefix = "MongoDSessionCatalog";
+              options.minThreads = 0;
+              options.maxThreads = 1;
+              return options;
+          }()) {}
+
+    ThreadPool threadPool;
+};
+
+const auto sessionTasksExecutor = ServiceContext::declareDecoration<SessionTasksExecutor>();
+const ServiceContext::ConstructorActionRegisterer sessionTasksExecutorRegisterer{
+    "SessionCatalogD",
+    [](ServiceContext* service) { sessionTasksExecutor(service).threadPool.startup(); },
+    [](ServiceContext* service) {
+        auto& pool = sessionTasksExecutor(service).threadPool;
+        pool.shutdown();
+        pool.join();
+    }};
+
+auto getThreadPool(OperationContext* opCtx) {
+    return &sessionTasksExecutor(opCtx->getServiceContext()).threadPool;
+}
+
+}  // namespace
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     invalidateSessions(opCtx, boost::none);
@@ -102,40 +133,42 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
 
     const auto catalog = SessionCatalog::get(opCtx);
 
-    std::vector<Session::KillToken> sessionKillTokens;
+    // The use of shared_ptr here is in order to work around the limition of stdx::function that the
+    // functor must be copyable
+    auto sessionKillTokens = std::make_shared<std::vector<Session::KillToken>>();
 
     if (singleSessionDoc) {
-        sessionKillTokens.emplace_back(catalog->killSession(LogicalSessionId::parse(
+        sessionKillTokens->emplace_back(catalog->killSession(LogicalSessionId::parse(
             IDLParserErrorContext("lsid"), singleSessionDoc->getField("_id").Obj())));
     } else {
         SessionKiller::Matcher matcher(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        catalog->scanSessions(matcher,
-                              [&sessionKillTokens](WithLock sessionCatalogLock, Session* session) {
-                                  sessionKillTokens.emplace_back(session->kill(sessionCatalogLock));
-                              });
+        catalog->scanSessions(
+            matcher, [&sessionKillTokens](WithLock sessionCatalogLock, Session* session) {
+                sessionKillTokens->emplace_back(session->kill(sessionCatalogLock));
+            });
     }
 
-    if (sessionKillTokens.empty())
+    if (sessionKillTokens->empty())
         return;
 
-    stdx::thread([
+    uassertStatusOK(getThreadPool(opCtx)->schedule([
         service = opCtx->getServiceContext(),
         sessionKillTokens = std::move(sessionKillTokens)
     ]() mutable {
-        auto uniqueClient = service->makeClient("Session catalog kill");
+        auto uniqueClient = service->makeClient("Kill-Session");
         auto uniqueOpCtx = uniqueClient->makeOperationContext();
         const auto opCtx = uniqueOpCtx.get();
         const auto catalog = SessionCatalog::get(opCtx);
 
-        for (auto& sessionKillToken : sessionKillTokens) {
+        for (auto& sessionKillToken : *sessionKillTokens) {
             auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
 
             auto const txnParticipant =
                 TransactionParticipant::getFromNonCheckedOutSession(session.get());
             txnParticipant->invalidate();
         }
-    }).detach();
+    }));
 }
 
 }  // namespace mongo
