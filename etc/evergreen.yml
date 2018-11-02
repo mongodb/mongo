@@ -7408,6 +7408,17 @@ tasks:
       resmoke_args: --suites=watchdog --storageEngine=wiredTiger
       run_multiple_jobs: false
 
+# This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
+- <<: *task_template
+  name: watchdog_inmemory
+  commands:
+  - func: "do setup"
+  - func: "do watchdog setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=watchdog --storageEngine=inMemory
+      run_multiple_jobs: false
+
 - <<: *task_template
   name: free_monitoring
   commands:
@@ -8843,6 +8854,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: watchdog_mmapv1
+  - name: watchdog_inmemory
   - name: watchdog_wiredtiger
   - name: package
     distros:
@@ -13093,6 +13105,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: watchdog_mmapv1
+  - name: watchdog_inmemory
   - name: watchdog_wiredtiger
   - name: package
     distros:
