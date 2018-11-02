@@ -566,8 +566,8 @@ void
 copy(u_int gen, u_int recno)
 {
 	FILE *ifp, *ofp;
-	WT_PAGE_HEADER *dsk;
 	WT_BLOCK_HEADER *blk;
+	WT_PAGE_HEADER *dsk;
 	char buf[PSIZE];
 
 	CHECK((ifp = fopen(LOAD, "r")) != NULL);
@@ -615,9 +615,9 @@ process(void)
 	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
-	const char *key, *value;
 	WT_SESSION *session;
 	char config[100];
+	const char *key, *value;
 
 	/* Salvage. */
 	config[0] = '\0';

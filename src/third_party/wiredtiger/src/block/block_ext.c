@@ -272,8 +272,9 @@ __block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
  *	Complain if a block appears on the available or discard lists.
  */
 int
-__wt_block_misplaced(WT_SESSION_IMPL *session,
-   WT_BLOCK *block, const char *tag, wt_off_t offset, uint32_t size, bool live)
+__wt_block_misplaced(
+   WT_SESSION_IMPL *session, WT_BLOCK *block, const char *list,
+   wt_off_t offset, uint32_t size, bool live, const char *func, int line)
 {
 	const char *name;
 
@@ -308,8 +309,9 @@ __wt_block_misplaced(WT_SESSION_IMPL *session,
 	__wt_spin_unlock(session, &block->live_lock);
 	if (name != NULL) {
 		__wt_errx(session,
-		    "%s failed: %" PRIuMAX "/%" PRIu32 " is on the %s list",
-		    tag, (uintmax_t)offset, size, name);
+		    "%s failed: %" PRIuMAX "/%" PRIu32 " is on the %s list "
+		    "(%s, %d)",
+		    list, (uintmax_t)offset, size, name, func, line);
 		return (__wt_panic(session));
 	}
 	return (0);
@@ -604,8 +606,8 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size);
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(
-	    __wt_block_misplaced(session, block, "free", offset, size, true));
+	WT_RET(__wt_block_misplaced(
+	    session, block, "free", offset, size, true, __func__, __LINE__));
 #endif
 	WT_RET(__wt_block_ext_prealloc(session, 5));
 	__wt_spin_lock(session, &block->live_lock);

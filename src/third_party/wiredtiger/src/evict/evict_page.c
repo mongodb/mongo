@@ -231,8 +231,7 @@ __wt_evict(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (!closing)
-			__evict_exclusive_clear(
-			    session, ref, previous_state);
+			__evict_exclusive_clear(session, ref, previous_state);
 
 		WT_STAT_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_DATA_INCR(session, cache_eviction_fail);

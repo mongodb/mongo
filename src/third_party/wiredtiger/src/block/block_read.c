@@ -94,8 +94,8 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	 * In diagnostic mode, verify the block we're about to read isn't on
 	 * the available list, or for live systems, the discard list.
 	 */
-	WT_RET(__wt_block_misplaced(
-	    session, block, "read", offset, size, bm->is_live));
+	WT_RET(__wt_block_misplaced(session,
+	    block, "read", offset, size, bm->is_live, __func__, __LINE__));
 #endif
 	/* Read the block. */
 	WT_RET(
@@ -298,6 +298,5 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 	if (block->verify || F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 		return (WT_ERROR);
-	WT_PANIC_RET(
-	    session, WT_ERROR, "%s: fatal read error", block->name);
+	WT_PANIC_RET(session, WT_ERROR, "%s: fatal read error", block->name);
 }

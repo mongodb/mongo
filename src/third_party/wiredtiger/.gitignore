@@ -103,6 +103,7 @@ _wiredtiger.pyd
 **/test/bloom/t
 **/test/checkpoint/t
 **/test/csuite/test_random_abort
+**/test/csuite/test_random_directio
 **/test/csuite/test_rwlock
 **/test/csuite/test_schema_abort
 **/test/csuite/test_scope
@@ -130,6 +131,7 @@ _wiredtiger.pyd
 **/test/csuite/test_wt4105_large_doc_small_upd
 **/test/csuite/test_wt4117_checksum
 **/test/csuite/test_wt4156_metadata_salvage
+**/test/csuite/test_wt4333_handle_locks
 **/test/cursor_order/cursor_order
 **/test/fops/t
 **/test/format/s_dumpcmp

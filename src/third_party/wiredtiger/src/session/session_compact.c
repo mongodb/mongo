@@ -405,10 +405,15 @@ __wt_session_compact(
 	session->compact->max_time = (uint64_t)cval.val;
 	__wt_epoch(session, &session->compact->begin);
 
-	/* Find the types of data sources being compacted. */
+	/*
+	 * Find the types of data sources being compacted.  This could involve
+	 * opening indexes for a table, so acquire the table lock in write
+	 * mode.
+	 */
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-	    __compact_handle_append, __compact_uri_analyze, cfg, 0));
+	    WT_WITH_TABLE_WRITE_LOCK(session,
+		ret = __wt_schema_worker(session, uri,
+		__compact_handle_append, __compact_uri_analyze, cfg, 0)));
 	WT_ERR(ret);
 
 	if (session->compact->lsm_count != 0)

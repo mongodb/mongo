@@ -395,8 +395,9 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 
-	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
-	    ret = __schema_open_index(session, table, idxname, len, indexp));
+	WT_WITH_TABLE_WRITE_LOCK(session,
+	    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret =
+		__schema_open_index(session, table, idxname, len, indexp)));
 	return (ret);
 }
 

@@ -77,14 +77,15 @@ class Translator:
         raise TranslateException(errtype)
 
     supported_opt_list = [ 'checkpoint_interval', 'checkpoint_threads',
-                           'close_conn', 'compact', 'compression',
-                           'conn_config', 'create', 'icount',
+                           'close_conn', 'compact', 'compressibility',
+                           'compression', 'conn_config', 'create', 'icount',
                            'key_sz', 'log_like_table', 'pareto',
                            'populate_ops_per_txn', 'populate_threads',
                            'random_range', 'random_value', 'range_partition',
                            'readonly', 'reopen_connection', 'run_ops',
-                           'sess_config', 'table_config', 'table_count',
-                           'threads', 'transaction_config', 'value_sz' ]
+                           'sample_interval', 'sess_config', 'table_config',
+                           'table_count', 'threads', 'transaction_config',
+                           'value_sz' ]
 
     def set_opt(self, optname, val):
         if optname not in self.supported_opt_list:
@@ -122,6 +123,17 @@ class Translator:
 
     def get_int_opt(self, optname, dfault):
         v = self._get_opt(optname, dfault) + 0
+        setattr(self.options, optname, v)
+        return v
+
+    # Convert a time value, by default a number of seconds, that can be
+    # modified to microseconds using 'ms' as a suffix.
+    def get_intms_opt(self, optname, wtperf_optname, dfault):
+        s = self._get_opt(wtperf_optname, str(dfault))
+        if s.endswith('ms'):
+            v = int(s[:-2])
+        else:
+            v = 1000 * int(s)
         setattr(self.options, optname, v)
         return v
 
@@ -230,10 +242,19 @@ class Translator:
         checkpoint_interval = self.get_int_opt('checkpoint_interval', 120)
         run_ops = self.get_int_opt('run_ops', -1)
         if log_like_table:
+            tdecls += '# Log like file, requires that logging be enabled ' + \
+                      'in the connection config.\n'
             tdecls += 'log_name = "table:log"\n'
-            tdecls += 's.create(log_name, "key_format=S,value_format=S," +' + \
-                      ' compress_table_config)\n'
-            tdecls += 'log_table = Table(log_name)\n\n'
+            tdecls += 's.create(log_name, wtperf_table_config +' \
+                      ' "key_format=S,value_format=S," +' + \
+                      ' compress_table_config + table_config +' \
+                      ' ",log=(enabled=true)")\n'
+            tdecls += 'log_table = Table(log_name)\n'
+            if opts.compressibility != 100:
+                tdecls += 'log_table.options.value_compressibility = ' + \
+                str(opts.compressibility) + '\n'
+            tdecls += '\n'
+
         thread_count = 0
         tnames = ''
         multi = (table_count > 1)
@@ -331,6 +352,15 @@ class Translator:
                 tnames += str(checkpoint_threads) + ' * '
             tnames += thread_name + ' + '
 
+        if log_like_table:
+            thread_name = 'logging_thread'
+
+            tdecls += 'ops = Operation(Operation.OP_SLEEP, "0.1") + \\\n' + \
+                '      Operation(Operation.OP_LOG_FLUSH, "")\n'
+            tdecls += thread_name + ' = Thread(ops)\n'
+            tdecls += '\n'
+            tnames += thread_name + ' + '
+
         tnames = tnames.rstrip(' +')
         return (tdecls, tnames)
 
@@ -365,11 +395,11 @@ class Translator:
         s += 'tables = []\n'
         s += 'table_count = ' + str(opts.table_count) + '\n'
         if opts.table_count == 1:
-            s += 'tname = "table:test.wt"\n'
+            s += 'tname = "table:test"\n'
             indent = ''
         else:
             s += 'for i in range(0, table_count):\n'
-            s += '    tname = "table:test" + str(i) + ".wt"\n'
+            s += '    tname = "table:test" + str(i)\n'
             indent = '    '
 
         s += indent + 'table = Table(tname)\n'
@@ -383,6 +413,9 @@ class Translator:
             # In wtperf, the icount plus random_range is the key range
             table_range = (opts.random_range + opts.icount) / opts.table_count
             s += indent + 'table.options.range = ' + str(table_range) + '\n'
+        if opts.compressibility != 100:
+            s += indent + 'table.options.value_compressibility = ' + \
+                str(opts.compressibility) + '\n'
         s += indent + 'tables.append(table)\n'
         return s
 
@@ -482,7 +515,7 @@ class Translator:
                     continue
                 (key, val) = self.split_assign(line)
                 if key in [ 'max_latency', 'report_file', 'report_interval',
-                            'run_time', 'sample_interval', 'sample_rate',
+                            'run_time', 'sample_rate',
                             'warmup' ]:
                     workloadopts += 'workload.options.' + key + '=' + val + '\n'
                 else:
@@ -495,6 +528,8 @@ class Translator:
         readonly = self.get_boolean_opt('readonly', False)
         close_conn = self.get_boolean_opt('close_conn', True)
         compression = self.get_string_opt('compression', '')
+        self.get_intms_opt('sample_interval_ms', 'sample_interval', 0)
+        self.get_int_opt('compressibility', 100)
         self.get_int_opt('table_count', 1)
         self.get_string_opt('table_config', '')
         self.get_int_opt('key_sz', 20)
@@ -516,6 +551,11 @@ class Translator:
            opts.table_count != 1:
             self.fatal_error('random_range and multiple tables without ' + \
                              'range_partition is not supported')
+
+        if self.options.sample_interval_ms != 0:
+            workloadopts += 'workload.options.sample_interval_ms = ' + \
+                str(self.options.sample_interval_ms) + '\n'
+            print('X: ' + workloadopts)
 
         s = '#/usr/bin/env python\n'
         s += '# generated from ' + self.filename + '\n'
@@ -581,6 +621,7 @@ class Translator:
                 s += '\n'
             s += 'workload = Workload(context, ' + t_var + ')\n'
             s += workloadopts
+
             if self.verbose > 0:
                 s += 'print("workload:")\n'
             s += 'workload.run(conn)\n\n'

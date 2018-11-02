@@ -271,6 +271,8 @@ struct __wt_process;
     typedef struct __wt_process WT_PROCESS;
 struct __wt_ref;
     typedef struct __wt_ref WT_REF;
+struct __wt_ref_hist;
+    typedef struct __wt_ref_hist WT_REF_HIST;
 struct __wt_row;
     typedef struct __wt_row WT_ROW;
 struct __wt_rwlock;

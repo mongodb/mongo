@@ -53,10 +53,10 @@ salvage(void)
 static int
 corrupt(void)
 {
-	FILE *fp;
 	struct stat sb;
-	size_t len, nw;
+	FILE *fp;
 	wt_off_t offset;
+	size_t len, nw;
 	int fd, ret;
 	char buf[8 * 1024], copycmd[2 * 1024];
 

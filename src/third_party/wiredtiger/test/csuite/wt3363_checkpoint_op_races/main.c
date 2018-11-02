@@ -133,9 +133,9 @@ static WT_THREAD_RET
 do_checkpoints(void *_opts)
 {
 	TEST_OPTS *opts;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	time_t now, start;
-	int ret;
 
 	opts = (TEST_OPTS *)_opts;
 	(void)time(&start);

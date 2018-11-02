@@ -86,6 +86,7 @@ struct Track {
 
     uint64_t ops_in_progress;           // Total operations not completed */
     uint64_t ops;                       // Total operations completed */
+    uint64_t rollbacks;                 // Total operations rolled back */
     uint64_t latency_ops;               // Total ops sampled for latency
     uint64_t latency;                   // Total latency */
     uint64_t bucket_ops;                // Computed for percentile_latency
@@ -282,8 +283,8 @@ struct Value {
 
 struct Operation {
     enum OpType {
-	OP_CHECKPOINT, OP_INSERT, OP_NONE, OP_NOOP, OP_REMOVE, OP_SEARCH,
-	OP_SLEEP, OP_UPDATE };
+	OP_CHECKPOINT, OP_INSERT, OP_LOG_FLUSH, OP_NONE, OP_NOOP,
+	OP_REMOVE, OP_SEARCH, OP_SLEEP, OP_UPDATE };
     OpType _optype;
     OperationInternal *_internal;
 
@@ -401,7 +402,7 @@ struct WorkloadOptions {
     std::string report_file;
     int report_interval;
     int run_time;
-    int sample_interval;
+    int sample_interval_ms;
     int sample_rate;
     std::string sample_file;
     int warmup;

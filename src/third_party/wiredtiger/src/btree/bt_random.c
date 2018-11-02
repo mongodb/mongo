@@ -427,10 +427,9 @@ random_page_entry:
 	 */
 	WT_ERR(__wt_row_random_leaf(session, cbt));
 	WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
-	if (valid) {
-		WT_ERR(__wt_key_return(session, cbt));
-		WT_ERR(__wt_value_return(session, cbt, upd));
-	} else {
+	if (valid)
+		WT_ERR(__cursor_kv_return(session, cbt, upd));
+	else {
 		if ((ret = __wt_btcur_next(cbt, false)) == WT_NOTFOUND)
 			ret = __wt_btcur_prev(cbt, false);
 		WT_ERR(ret);

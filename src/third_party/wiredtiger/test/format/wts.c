@@ -579,15 +579,15 @@ wts_verify(const char *tag)
 void
 wts_stats(void)
 {
+	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION *session;
-	FILE *fp;
 	size_t len;
-	char *stat_name;
-	const char *desc, *pval;
 	uint64_t v;
+	const char *desc, *pval;
+	char *stat_name;
 
 	/* Ignore statistics if they're not configured. */
 	if (g.c_statistics == 0)

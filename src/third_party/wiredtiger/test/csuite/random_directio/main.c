@@ -70,7 +70,6 @@
 #include "test_util.h"
 #include "util.h"
 
-#include <fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
 
@@ -331,7 +330,7 @@ gen_kv(char *buf, size_t buf_size, uint64_t id, uint32_t threadid,
 	if (!forward)
 		reverse(keyid);
 	testutil_assert(keyid_size + 4 <= buf_size);
-	large_size = buf_size - 4 - keyid_size;
+	large_size = (buf_size - 4) - keyid_size;
 	testutil_check(__wt_snprintf(buf, buf_size,
 	    "%s" KEY_SEP "%1.1x" KEY_SEP "%.*s",
 	    keyid, threadid, (int)large_size, large));
@@ -369,7 +368,7 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id,
     uint32_t op, uint32_t flags)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 	const char *retry_opname;
 	char uri1[50], uri2[50];
 
@@ -377,7 +376,6 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id,
 		return (0);
 
 	id -= op;
-	ret = 0;
 	retry_opname = NULL;
 
 	switch (op) {
@@ -401,7 +399,7 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id,
 		cursor->set_key(cursor, uri1);
 		cursor->set_value(cursor, uri1);
 		testutil_check(cursor->insert(cursor));
-		cursor->close(cursor);
+		testutil_check(cursor->close(cursor));
 		break;
 	case 2:
 		/* Rename the table. */
@@ -428,7 +426,7 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id,
 		fprintf(stderr, "UPDATE: %s\n", uri2);
 		*/
 		testutil_check(cursor->update(cursor));
-		cursor->close(cursor);
+		testutil_check(cursor->close(cursor));
 		break;
 	case 4:
 		/* Drop the table. */
@@ -470,13 +468,13 @@ static WT_THREAD_RET
 thread_run(void *arg)
 {
 	WT_CURSOR *cursor, *rev;
+	WT_DECL_RET;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	WT_THREAD_DATA *td;
 	size_t lsize;
 	uint64_t i;
 	uint32_t kvsize, op;
-	int ret;
 	char *buf1, *buf2;
 	char large[LARGE_WRITE_SIZE];
 
@@ -509,8 +507,9 @@ thread_run(void *arg)
 again:
 		/*
 		if (i > 0 && i % 10000 == 0)
-			printf("Thread %d completed %d entries\n",
-			    (int)td->id, (int)i);
+			printf("Thread %" PRIu32
+			    " completed %" PRIu64 " entries\n",
+			    td->id, i);
 		*/
 
 		gen_kv(buf1, kvsize, i, td->id, large, true);
@@ -680,7 +679,7 @@ fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
 static void
 check_kv(WT_CURSOR *cursor, const char *key, const char *value, bool exists)
 {
-	int ret;
+	WT_DECL_RET;
 	char *got;
 
 	cursor->set_key(cursor, key);
@@ -696,7 +695,7 @@ check_kv(WT_CURSOR *cursor, const char *key, const char *value, bool exists)
 			printf("FAIL: unexpected key in rev file: %s\n", key);
 			testutil_assert(exists);
 		}
-		cursor->get_value(cursor, &got);
+		testutil_check(cursor->get_value(cursor, &got));
 		TEST_STREQ(value, got, "value");
 	}
 }
@@ -709,7 +708,7 @@ static void
 check_dropped(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
 	testutil_assert(ret == WT_NOTFOUND);
@@ -723,7 +722,7 @@ static void
 check_empty(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 
 	testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 	ret = cursor->next(cursor);
@@ -740,13 +739,13 @@ check_one_entry(WT_SESSION *session, const char *uri, const char *key,
     const char *value)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 	char *gotkey, *gotvalue;
 
 	testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 	testutil_check(cursor->next(cursor));
-	cursor->get_key(cursor, &gotkey);
-	cursor->get_value(cursor, &gotvalue);
+	testutil_check(cursor->get_key(cursor, &gotkey));
+	testutil_check(cursor->get_value(cursor, &gotvalue));
 	testutil_assert(WT_STREQ(key, gotkey));
 	testutil_assert(WT_STREQ(value, gotvalue));
 	ret = cursor->next(cursor);
@@ -769,8 +768,9 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid,
 		return;
 
 	if (LF_ISSET(SCHEMA_VERBOSE))
-		fprintf(stderr, "check_schema(%d, thread=%d)\n",
-	    (int)lastid, (int)threadid);
+		fprintf(stderr,
+		    "check_schema(%" PRIu64 ", thread=%" PRIu32 ")\n",
+		    lastid, threadid);
 	if (has_schema_operation(lastid, 0)) {
 		/* Create table operation. */
 		gen_table_name(uri, sizeof(uri), lastid, threadid);
@@ -828,11 +828,11 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *meta, *rev;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t gotid, id;
 	uint64_t *lastid;
 	uint32_t gotth, kvsize, th, threadmap;
-	int ret;
 	char checkdir[4096], savedir[4096];
 	char *gotkey, *gotvalue, *keybuf, *p;
 	char **large_arr;
@@ -912,7 +912,7 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 	for (ret = 0; ret != WT_NOTFOUND && threadmap != 0;
 	     ret = cursor->next(cursor)) {
 		testutil_check(ret);
-		cursor->get_key(cursor, &gotkey);
+		testutil_check(cursor->get_key(cursor, &gotkey));
 		gotid = (uint64_t)strtol(gotkey, &p, 10);
 		testutil_assert(*p == KEY_SEP[0]);
 		p++;
@@ -920,9 +920,9 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 		if (isdigit(*p))
 			gotth = (uint32_t)(*p - '0');
 		else if (*p >= 'a' && *p <= 'f')
-			gotth = (uint32_t)(*p - 'a' + 10);
+			gotth = (uint32_t)((*p - 'a') + 10);
 		else
-			gotth = (uint32_t)(*p - 'A' + 10);
+			gotth = (uint32_t)((*p - 'A') + 10);
 		p++;
 		testutil_assert(*p == KEY_SEP[0]);
 		p++;
@@ -956,7 +956,7 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 		 */
 		gen_kv(keybuf, kvsize, id, th, large_arr[th], true);
 		gen_kv(&keybuf[kvsize], kvsize, id, th, large_arr[th], false);
-		cursor->get_value(cursor, &gotvalue);
+		testutil_check(cursor->get_value(cursor, &gotvalue));
 		TEST_STREQ(keybuf, gotkey, "main table key");
 
 		/*
@@ -992,7 +992,7 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 		    NULL, &meta));
 		while ((ret = meta->next(meta)) != WT_NOTFOUND) {
 			testutil_check(ret);
-			meta->get_key(meta, &gotkey);
+			testutil_check(meta->get_key(meta, &gotkey));
 			/*
 			 * Names involved in schema testing are of the form:
 			 *   table:Axxx-t
@@ -1054,10 +1054,12 @@ handler(int sig)
 		if (termsig == SIGCONT || termsig == SIGSTOP)
 			return;
 		printf("Child got signal %d (status = %d, 0x%x)\n",
-		    termsig, status, (unsigned int)status);
+		    termsig, status, (u_int)status);
 #ifdef WCOREDUMP
 		if (WCOREDUMP(status))
-			printf("Child process id=%d created core file\n", pid);
+			printf(
+			    "Child process id=%" PRIuMAX " created core file\n",
+			    (uintmax_t)pid);
 #endif
 	}
 
@@ -1065,8 +1067,8 @@ handler(int sig)
 	 * The core file will indicate why the child exited. Choose EINVAL here.
 	 */
 	testutil_die(EINVAL,
-	    "Child process %" PRIu64 " abnormally exited, status=%d (0x%x)",
-	    (uint64_t)pid, status, status);
+	    "Child process %" PRIuMAX " abnormally exited, status=%d (0x%x)",
+	    (uintmax_t)pid, status, (u_int)status);
 }
 
 /*
@@ -1096,9 +1098,9 @@ main(int argc, char *argv[])
 	size_t size;
 	uint32_t datasize, flags, i, interval, ncycles, nth, timeout;
 	int ch, status;
-	const char *method, *working_dir;
 	char *arg, *p;
 	char args[1024], buf[1024];
+	const char *method, *working_dir;
 	bool populate_only, rand_th, rand_time, verify_only;
 
 	(void)testutil_set_progname(argv);
@@ -1114,7 +1116,7 @@ main(int argc, char *argv[])
 	working_dir = "WT_TEST.random-directio";
 	method = "none";
 	pid = 0;
-	WT_CLEAR(args);
+	memset(args, 0, sizeof(args));
 
 	if (!has_direct_io()) {
 		fprintf(stderr, "**** test_random_directio: this system does "
@@ -1123,8 +1125,7 @@ main(int argc, char *argv[])
 	}
 	for (i = 0, p = args; i < (uint32_t)argc; i++) {
 		testutil_check(__wt_snprintf_len_set(p,
-		    sizeof(args) - (size_t)(p - args), &size, " %s",
-		    argv[i]));
+		    sizeof(args) - (size_t)(p - args), &size, " %s", argv[i]));
 		p += size;
 	}
 	while ((ch = __wt_getopt(progname, argc, argv,

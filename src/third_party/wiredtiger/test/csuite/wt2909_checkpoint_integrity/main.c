@@ -237,7 +237,7 @@ create_big_string(char **bigp)
 static void
 cursor_count_items(WT_CURSOR *cursor, uint64_t *countp)
 {
-	int ret;
+	WT_DECL_RET;
 
 	*countp = 0;
 

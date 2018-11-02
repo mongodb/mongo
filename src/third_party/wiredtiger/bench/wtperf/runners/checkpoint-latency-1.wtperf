@@ -1,0 +1,38 @@
+# A stress configuration to create checkpoints while doing a mix of inserts
+# and reads.
+conn_config="cache_size=2GB,eviction=(threads_max=8),log=(enabled=true),session_max=250,statistics=(fast),statistics_log=(wait=1,json)"
+# Logging is off for regular tables. The log_like file has logging enabled.
+table_config="memory_page_max=10m,leaf_value_max=64MB,checksum=on,split_pct=90,type=file,log=(enabled=false)"
+checkpoint_interval=60
+checkpoint_threads=1
+# Compressibility is an option that requires workgen
+compressibility=50
+compression="snappy"
+create=true
+close_conn=false
+# 4m records sized 5k = 20G or 10x cache size.
+icount=4000000
+log_like_table=true
+populate_threads=4
+report_interval=1
+# Run for a longer duration to ensure checkpoints are completing.
+run_time=1200
+sample_interval=500ms
+sample_rate=1
+# MongoDB always has multiple tables, and checkpoints behave differently when
+# there is more than a single table.
+table_count=100
+# We are using a mix of 4:1 read vs write operations, and trying to reach
+# a total throughput of about 2.5 Gigabytes a sec.
+# Updates have a write amplification of 3x, reads have no amplification.
+# Write records/sec = 700[throttle] * 100[thread count] * 3[amp] = 210,000
+# Read records/sec = 2800[throttle] * 100[thread count] * 1[amp] = 280,000
+# 490,000 * 5000[bytes/record] = 2.45 Gigabytes a sec.
+threads=((count=100,updates=1,throttle=700),(count=100,reads=1,throttle=2800))
+# We've done all our calculations based on a 5K record size.  But we have
+# compression on, and there is also the factor of any additional btree
+# overhead. Experimently, we've observed that workgen records sized as below
+# end up with a disk footprint close to 5K, at least in btree data files.
+value_sz=7000
+# Wait for the throughput to stabilize
+warmup=120

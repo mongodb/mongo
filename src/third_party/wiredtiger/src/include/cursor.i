@@ -417,8 +417,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 * Unpack the cell and deal with overflow and prefix-compressed keys.
 	 * Inline building simple prefix-compressed keys from a previous key,
 	 * otherwise build from scratch.
+	 *
+	 * Clear the key cell structure. It shouldn't be necessary (as far as I
+	 * can tell, and we don't do it in lots of other places), but disabling
+	 * shared builds (--disable-shared) results in the compiler complaining
+	 * about uninitialized field use.
 	 */
 	kpack = &_kpack;
+	memset(kpack, 0, sizeof(*kpack));
 	__wt_cell_unpack(cell, kpack);
 	if (kpack->type == WT_CELL_KEY &&
 	    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {

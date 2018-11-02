@@ -46,15 +46,15 @@
 void
 copy_directory(const char *fromdir, const char *todir, bool directio)
 {
-	DIR *dirp;
 	struct dirent *dp;
 	struct stat sb;
-	ssize_t ioret;
+	DIR *dirp;
 	size_t blksize, bufsize, readbytes, n, remaining;
-	int openflags, rfd, wfd;
-	char fromfile[4096], tofile[4096];
-	unsigned char *buf, *orig_buf;
+	ssize_t ioret;
 	uintptr_t bufptr;
+	int openflags, rfd, wfd;
+	u_char *buf, *orig_buf;
+	char fromfile[4096], tofile[4096];
 
 #ifdef O_DIRECT
 	openflags = directio ? O_DIRECT : 0;
@@ -62,7 +62,7 @@ copy_directory(const char *fromdir, const char *todir, bool directio)
 	testutil_assert(!directio);
 	openflags = 0;
 #endif
-	orig_buf = dcalloc(COPY_BUF_SIZE, sizeof(unsigned char));
+	orig_buf = dcalloc(COPY_BUF_SIZE, sizeof(u_char));
 	buf = NULL;
 	blksize = bufsize = 0;
 
@@ -119,8 +119,7 @@ copy_directory(const char *fromdir, const char *todir, bool directio)
 				bufsize = COPY_BUF_SIZE - blksize;
 				bufptr = (uintptr_t)orig_buf;
 				/* Align pointer up to next block boundary */
-				buf = (unsigned char *)
-				    ALIGN_UP(bufptr, blksize);
+				buf = (u_char *)ALIGN_UP(bufptr, blksize);
 				/* Align size down to block boundary */
 				testutil_assert(bufsize >= blksize);
 				bufsize = ALIGN_DOWN(bufsize, blksize);
