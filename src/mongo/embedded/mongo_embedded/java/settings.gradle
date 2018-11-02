@@ -1,2 +1,2 @@
-include ':aar'
-include ':jar'
+include ':embedded-android'
+include ':embedded-jar'
