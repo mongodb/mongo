@@ -1977,6 +1977,7 @@ env.CppUnitTest(
         'session_catalog_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/concurrency',
         'auth/authmocks',
         'service_context_d_test_fixture',
         'session_catalog',

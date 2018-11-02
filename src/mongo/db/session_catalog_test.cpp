@@ -34,6 +34,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -381,33 +382,37 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
                                               makeLogicalSessionIdForTest()};
 
     std::vector<stdx::future<void>> futures;
+    unittest::Barrier firstUseOfTheSessionReachedBarrier(lsids.size() + 1);
 
     for (const auto& lsid : lsids) {
-        futures.emplace_back(stdx::async(stdx::launch::async, [lsid] {
-            ON_BLOCK_EXIT([&] { Client::destroy(); });
-            Client::initThreadIfNotAlready();
+        futures.emplace_back(
+            stdx::async(stdx::launch::async, [lsid, &firstUseOfTheSessionReachedBarrier] {
+                ON_BLOCK_EXIT([&] { Client::destroy(); });
+                Client::initThreadIfNotAlready();
 
-            {
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(lsid);
+                {
+                    auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+                    sideOpCtx->setLogicalSessionId(lsid);
 
-                OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
-                ASSERT_THROWS_CODE(sideOpCtx->sleepFor(Hours{6}),
-                                   AssertionException,
-                                   ErrorCodes::ExceededTimeLimit);
-            }
+                    OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+                    firstUseOfTheSessionReachedBarrier.countDownAndWait();
 
-            {
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(lsid);
+                    ASSERT_THROWS_CODE(sideOpCtx->sleepFor(Hours{6}),
+                                       AssertionException,
+                                       ErrorCodes::ExceededTimeLimit);
+                }
 
-                OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
-            }
-        }));
+                {
+                    auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+                    sideOpCtx->setLogicalSessionId(lsid);
 
-        ASSERT(stdx::future_status::ready !=
-               futures.back().wait_for(Milliseconds(10).toSystemDuration()));
+                    OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+                }
+            }));
     }
+
+    // Make sure all spawned threads have created the session
+    firstUseOfTheSessionReachedBarrier.countDownAndWait();
 
     // Kill the first and the third sessions
     {
