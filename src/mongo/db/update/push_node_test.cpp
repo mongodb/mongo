@@ -289,6 +289,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArray) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToEmptyDocument) {
@@ -306,6 +307,7 @@ TEST_F(PushNodeTest, ApplyToEmptyDocument) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToArrayWithOneElement) {
@@ -323,6 +325,7 @@ TEST_F(PushNodeTest, ApplyToArrayWithOneElement) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.1': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToDottedPathElement) {
@@ -351,6 +354,7 @@ TEST_F(PushNodeTest, ApplyToDottedPathElement) {
                   doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'choices.first.votes': [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{choices.first.votes}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplySimpleEachToEmptyArray) {
@@ -368,6 +372,7 @@ TEST_F(PushNodeTest, ApplySimpleEachToEmptyArray) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplySimpleEachToEmptyDocument) {
@@ -385,6 +390,7 @@ TEST_F(PushNodeTest, ApplySimpleEachToEmptyDocument) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyMultipleEachToEmptyDocument) {
@@ -402,6 +408,7 @@ TEST_F(PushNodeTest, ApplyMultipleEachToEmptyDocument) {
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1, 2]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplySimpleEachToArrayWithOneElement) {
@@ -419,6 +426,7 @@ TEST_F(PushNodeTest, ApplySimpleEachToArrayWithOneElement) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.1': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyMultipleEachToArrayWithOneElement) {
@@ -436,6 +444,7 @@ TEST_F(PushNodeTest, ApplyMultipleEachToArrayWithOneElement) {
     ASSERT_EQUALS(fromjson("{a: [0, 1, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.1': 1, 'a.2': 2}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyEmptyEachToEmptyArray) {
@@ -453,6 +462,7 @@ TEST_F(PushNodeTest, ApplyEmptyEachToEmptyArray) {
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyEmptyEachToEmptyDocument) {
@@ -470,6 +480,7 @@ TEST_F(PushNodeTest, ApplyEmptyEachToEmptyDocument) {
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyEmptyEachToArrayWithOneElement) {
@@ -487,6 +498,7 @@ TEST_F(PushNodeTest, ApplyEmptyEachToArrayWithOneElement) {
     ASSERT_EQUALS(fromjson("{a: [0]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToArrayWithSlice) {
@@ -504,6 +516,7 @@ TEST_F(PushNodeTest, ApplyToArrayWithSlice) {
     ASSERT_EQUALS(fromjson("{a: [3]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [3]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyWithNumericSort) {
@@ -521,6 +534,7 @@ TEST_F(PushNodeTest, ApplyWithNumericSort) {
     ASSERT_EQUALS(fromjson("{a: [-1, 2, 3]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [-1, 2, 3]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyWithReverseNumericSort) {
@@ -538,6 +552,7 @@ TEST_F(PushNodeTest, ApplyWithReverseNumericSort) {
     ASSERT_EQUALS(fromjson("{a: [4, 3, -1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [4, 3, -1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyWithMixedSort) {
@@ -555,6 +570,7 @@ TEST_F(PushNodeTest, ApplyWithMixedSort) {
     ASSERT_EQUALS(fromjson("{a: [-1, 3, 4, 't', {a: 1}, {b: 1}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [-1, 3, 4, 't', {a: 1}, {b: 1}]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyWithReverseMixedSort) {
@@ -572,6 +588,7 @@ TEST_F(PushNodeTest, ApplyWithReverseMixedSort) {
     ASSERT_EQUALS(fromjson("{a: [{b: 1}, {a: 1}, 't', 4, 3, -1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [{b: 1}, {a: 1}, 't', 4, 3, -1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyWithEmbeddedFieldSort) {
@@ -589,6 +606,7 @@ TEST_F(PushNodeTest, ApplyWithEmbeddedFieldSort) {
     ASSERT_EQUALS(fromjson("{a: [3, 't', {b: 1}, 4, -1, {a: 1}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [3, 't', {b: 1}, 4, -1, {a: 1}]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplySortWithCollator) {
@@ -608,6 +626,7 @@ TEST_F(PushNodeTest, ApplySortWithCollator) {
     ASSERT_EQUALS(fromjson("{a: ['ha', 'gb', 'fc', 'dd']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: ['ha', 'gb', 'fc', 'dd']}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
@@ -623,8 +642,12 @@ TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: ['dd', 'fc', 'gb', 'ha']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 
     // Now with a collator.
+    resetApplyParams();
+    setPathTaken("a");
+    setLogBuilderToNull();
     CollatorInterfaceMock mockCollator(CollatorInterfaceMock::MockType::kReverseString);
     node.setCollator(&mockCollator);
     mutablebson::Document doc2(fromjson("{a: ['dd', 'fc', 'gb']}"));
@@ -632,6 +655,7 @@ TEST_F(PushNodeTest, ApplySortAfterSetCollator) {
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: ['ha', 'gb', 'fc', 'dd']}"), doc2);
     ASSERT_FALSE(doc2.isInPlaceModeEnabled());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 // Some of the below tests apply multiple different update modifiers. This special check function
@@ -678,6 +702,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithSliceValues) {
         ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
         mutablebson::Document doc(fromjson("{a: []}"));
+        resetApplyParams();
         setPathTaken("a");
         setLogBuilderToNull();
         auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -710,6 +735,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSliceValues) {
         ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
         mutablebson::Document doc(fromjson("{a: [2, 3]}"));
+        resetApplyParams();
         setPathTaken("a");
         setLogBuilderToNull();
         auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -811,6 +837,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithSortAndSliceValues) {
         ASSERT_OK(node.init(update["$push"]["a"], expCtx));
 
         mutablebson::Document doc(fromjson("{a: [{a: 2, b: 3}, {a: 3, b: 1}]}"));
+        resetApplyParams();
         setPathTaken("a");
         setLogBuilderToNull();
         auto result = node.apply(getApplyParams(doc.root()["a"]));
@@ -833,6 +860,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionZero) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionOne) {
@@ -850,6 +878,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithPositionOne) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithLargePosition) {
@@ -867,6 +896,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithLargePosition) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToSingletonArrayWithPositionZero) {
@@ -884,6 +914,7 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithPositionZero) {
     ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1, 0]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToSingletonArrayWithLargePosition) {
@@ -901,6 +932,7 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithLargePosition) {
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.1': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToEmptyArrayWithNegativePosition) {
@@ -918,6 +950,7 @@ TEST_F(PushNodeTest, ApplyToEmptyArrayWithNegativePosition) {
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToSingletonArrayWithNegativePosition) {
@@ -935,6 +968,7 @@ TEST_F(PushNodeTest, ApplyToSingletonArrayWithNegativePosition) {
     ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1, 0]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToPopulatedArrayWithNegativePosition) {
@@ -952,6 +986,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithNegativePosition) {
     ASSERT_EQUALS(fromjson("{a: [0, 1, 2, 5, 3, 4]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [0, 1, 2, 5, 3, 4]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyToPopulatedArrayWithOutOfBoundsNegativePosition) {
@@ -969,6 +1004,7 @@ TEST_F(PushNodeTest, ApplyToPopulatedArrayWithOutOfBoundsNegativePosition) {
     ASSERT_EQUALS(fromjson("{a: [5, 0, 1, 2, 3, 4]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [5, 0, 1, 2, 3, 4]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(PushNodeTest, ApplyMultipleElementsPushWithNegativePosition) {
@@ -986,6 +1022,7 @@ TEST_F(PushNodeTest, ApplyMultipleElementsPushWithNegativePosition) {
     ASSERT_EQUALS(fromjson("{a: [0, 1, 2, 5, 6, 7, 3, 4]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [0, 1, 2, 5, 6, 7, 3, 4]}}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 }  // namespace

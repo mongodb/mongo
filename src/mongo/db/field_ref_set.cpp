@@ -145,16 +145,16 @@ bool FieldRefSet::insert(const FieldRef* toInsert, const FieldRef** conflict) {
 }
 
 const std::string FieldRefSet::toString() const {
-    str::stream res;
-    res << "Fields:[ ";
-    FieldRefSet::const_iterator where = _fieldSet.begin();
-    const FieldRefSet::const_iterator end = _fieldSet.end();
-    for (; where != end; ++where) {
-        const FieldRef& current = **where;
-        res << current.dottedField() << ",";
+    str::stream ss;
+    ss << "{";
+    const auto last = _fieldSet.rbegin();
+    for (auto path : _fieldSet) {
+        ss << path->dottedField();
+        if (path != *last)
+            ss << ", ";
     }
-    res << "]";
-    return res;
+    ss << "}";
+    return ss;
 }
 
 }  // namespace mongo

@@ -60,8 +60,8 @@ class FieldRefSet {
     typedef std::set<const FieldRef*, FieldRefPtrLessThan> FieldSet;
 
 public:
-    typedef FieldSet::iterator iterator;
-    typedef FieldSet::const_iterator const_iterator;
+    using iterator = FieldSet::iterator;
+    using const_iterator = FieldSet::const_iterator;
 
     FieldRefSet();
 
@@ -108,7 +108,7 @@ public:
     void fillFrom(const std::vector<FieldRef*>& fields);
 
     /**
-     * Replace any existing conflicting FieldRef with the shortest (closest to root) one
+     * Replace any existing conflicting FieldRef with the shortest (closest to root) one.
      */
     void keepShortest(const FieldRef* toInsert);
 
@@ -124,6 +124,10 @@ public:
         _fieldSet.clear();
     }
 
+    void erase(const FieldRef* item) {
+        _fieldSet.erase(item);
+    }
+
     /**
      * A debug/log-able string
      */
@@ -132,6 +136,42 @@ public:
 private:
     // A set of field_ref pointers, none of which is owned here.
     FieldSet _fieldSet;
+};
+
+/**
+ * A wrapper class for FieldRefSet which owns the storage of the underlying FieldRef objects.
+ */
+class FieldRefSetWithStorage {
+public:
+    /**
+     * Inserts the given FieldRef into the set. In the case of a conflict with an existing element,
+     * only the shortest path is kept in the set.
+     */
+    void keepShortest(const FieldRef& toInsert) {
+        const FieldRef* inserted = &(*_ownedFieldRefs.insert(toInsert).first);
+        _fieldRefSet.keepShortest(inserted);
+    }
+
+    bool empty() const {
+        return _fieldRefSet.empty();
+    }
+
+    void clear() {
+        _ownedFieldRefs.clear();
+        _fieldRefSet.clear();
+    }
+
+    std::string toString() const {
+        return _fieldRefSet.toString();
+    }
+
+private:
+    // Holds the storage for FieldRef's inserted into the set. This may become out of sync with
+    // '_fieldRefSet' since we don't attempt to remove conflicts from the backing set, which can
+    // leave '_ownedFieldRefs' holding storage for a superset of the field refs that are actually
+    // contained in '_fieldRefSet'.
+    std::set<FieldRef> _ownedFieldRefs;
+    FieldRefSet _fieldRefSet;
 };
 
 }  // namespace mongo

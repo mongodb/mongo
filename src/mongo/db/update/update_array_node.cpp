@@ -155,6 +155,11 @@ UpdateNode::ApplyResult UpdateArrayNode::apply(ApplyParams applyParams) const {
         ++i;
     }
 
+    // If no elements match the array filter, report the path to the array itself as modified.
+    if (applyParams.modifiedPaths && matchingElements.size() == 0) {
+        applyParams.modifiedPaths->keepShortest(*applyParams.pathTaken);
+    }
+
     // If the child updates have not been logged, log the updated array elements.
     if (!childrenShouldLogThemselves && applyParams.logBuilder) {
         if (nModified > 1) {

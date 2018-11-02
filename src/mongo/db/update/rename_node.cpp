@@ -169,7 +169,11 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
         }
 
         // The element we want to rename does not exist. When that happens, we treat the operation
-        // as a no-op.
+        // as a no-op. The attempted from/to paths are still considered modified.
+        if (applyParams.modifiedPaths) {
+            applyParams.modifiedPaths->keepShortest(*fromFieldRef);
+            applyParams.modifiedPaths->keepShortest(toFieldRef);
+        }
         return ApplyResult::noopResult();
     }
 

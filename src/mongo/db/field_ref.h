@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -273,6 +272,14 @@ inline bool operator>(const FieldRef& lhs, const FieldRef& rhs) {
 
 inline bool operator>=(const FieldRef& lhs, const FieldRef& rhs) {
     return lhs.compare(rhs) >= 0;
+}
+
+inline FieldRef operator+(const FieldRef& lhs, const FieldRef& rhs) {
+    FieldRef result = lhs;
+    for (size_t i = 0; i < rhs.numParts(); ++i) {
+        result.appendPart(rhs.getPart(i));
+    }
+    return result;
 }
 
 std::ostream& operator<<(std::ostream& stream, const FieldRef& value);

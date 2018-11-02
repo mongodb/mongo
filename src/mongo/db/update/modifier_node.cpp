@@ -277,6 +277,11 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
         } else {
             fullPath = FieldRef(str::stream() << applyParams.pathTaken->dottedField() << "."
                                               << applyParams.pathToCreate->dottedField());
+
+            // If adding an element to an array, only mark the path to the array itself as modified.
+            if (applyParams.modifiedPaths && applyParams.element.getType() == BSONType::Array) {
+                applyParams.modifiedPaths->keepShortest(*applyParams.pathTaken);
+            }
         }
 
         ApplyResult applyResult;
@@ -315,13 +320,20 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
 }
 
 UpdateNode::ApplyResult ModifierNode::apply(ApplyParams applyParams) const {
+    ApplyResult result;
     if (context == Context::kInsertOnly && !applyParams.insert) {
-        return ApplyResult::noopResult();
+        result = ApplyResult::noopResult();
     } else if (!applyParams.pathToCreate->empty()) {
-        return applyToNonexistentElement(applyParams);
+        result = applyToNonexistentElement(applyParams);
     } else {
-        return applyToExistingElement(applyParams);
+        result = applyToExistingElement(applyParams);
     }
+
+    if (applyParams.modifiedPaths) {
+        applyParams.modifiedPaths->keepShortest(*applyParams.pathTaken + *applyParams.pathToCreate);
+    }
+
+    return result;
 }
 
 void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,

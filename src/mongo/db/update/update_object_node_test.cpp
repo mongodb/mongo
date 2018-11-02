@@ -1776,6 +1776,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
     ASSERT_EQUALS(fromjson("{a: 5, b: 6}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {b: 6}}"), getLogDoc());
+    ASSERT_EQUALS(getModifiedPaths(), "{b}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
@@ -1799,6 +1800,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
     ASSERT_EQUALS(fromjson("{a: 6}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: 6}}"), getLogDoc());
+    ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
@@ -1840,6 +1842,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, c: 7, b: 6, d: 8}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a, b, c, d}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
@@ -1882,6 +1885,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
                       getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.b, a.c, b.d, b.e}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
@@ -1924,6 +1928,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
                       getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.b, a.c, b.d, b.e}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
@@ -1960,6 +1965,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}"),
                       getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.b.c.d, a.b.c.e, a.f}");
 }
 
 TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
@@ -2007,6 +2013,7 @@ TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     ASSERT_BSONOBJ_EQ(fromjson("{z: 9, a: 5, b: 8, c: 7, d: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {a: 5, b: 8, c: 7, d: 6, z: 9}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a, b, c, d, z}");
 }
 
 TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
@@ -2075,6 +2082,7 @@ TEST_F(UpdateObjectNodeTest, ApplyNoop) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a, b, c}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
@@ -2112,6 +2120,7 @@ TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {b: 6}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a, b, c}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
@@ -2129,6 +2138,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
 
     mutablebson::Document doc(fromjson("{a: 0}"));
     addIndexedPath("a");
+    ASSERT_EQUALS(getModifiedPaths(), "{}");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::PathNotViable,
@@ -2180,6 +2190,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
 
     mutablebson::Document doc(fromjson("{}"));
     addIndexedPath("a");
+    ASSERT_EQUALS(getModifiedPaths(), "{}");
     ASSERT_THROWS_CODE_AND_WHAT(
         root.apply(getApplyParams(doc.root())),
         AssertionException,
@@ -2215,6 +2226,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
@@ -2258,6 +2270,7 @@ TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 7, 'a.1.b': 6, 'a.1.c': 8, 'a.2': 5}}"),
                       getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0, a.1.b, a.1.c, a.2}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
@@ -2282,6 +2295,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     mutablebson::Document doc(fromjson("{}"));
     setMatchedField("0");
     addIndexedPath("a");
+    ASSERT_EQUALS(getModifiedPaths(), "{}");
     ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::ConflictingUpdateOperators,
@@ -2322,6 +2336,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 5, '1': 7, '2': 6}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 5, 'a.1': 7, 'a.2': 6}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0, a.1, a.2}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
@@ -2358,6 +2373,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 6, '1': 7, '2': 5}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 6, 'a.1': 7, 'a.2': 5}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0, a.1, a.2}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
@@ -2388,6 +2404,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c}");
 
     mutablebson::Document doc2(fromjson("{a: [{b: 0, c: 0}]}"));
     resetApplyParams();
@@ -2399,6 +2416,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc2.getObject());
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
@@ -2436,6 +2454,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6, 'a.1.d': 7}}"),
                       getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c, a.1.d}");
 
     mutablebson::Document doc2(fromjson("{a: [{b: 0, c: 0}, {c: 0, d: 0}]}"));
     resetApplyParams();
@@ -2448,6 +2467,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.1.c': 6, 'a.1.d': 7}}"),
                       getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.1.c, a.1.d}");
 }
 
 /**
@@ -2476,6 +2496,7 @@ TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: [0, 0, 2, 0, 0]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.02': 2}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.02}");
 }
 
 /**
@@ -2542,6 +2563,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: [null, null, {b: 1, c: 1}]}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.2.b': 1, 'a.2.c': 1}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
@@ -2591,6 +2613,7 @@ TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 5, c: [2, 3, 4]}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 5, 'a.c': [2, 3, 4]}}"), getLogDoc().getObject());
+    ASSERT_EQUALS(getModifiedPaths(), "{a.b, a.c}");
 }
 
 TEST(ParseRenameTest, RenameToStringWithEmbeddedNullFails) {

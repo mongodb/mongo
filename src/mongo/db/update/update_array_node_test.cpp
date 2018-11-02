@@ -122,6 +122,7 @@ TEST_F(UpdateArrayNodeTest, UpdateIsAppliedToAllMatchingElements) {
     ASSERT_EQUALS(fromjson("{a: [2, 1, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [2, 1, 2]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0, a.2}", getModifiedPaths());
 }
 
 DEATH_TEST_F(UpdateArrayNodeTest,
@@ -170,6 +171,7 @@ TEST_F(UpdateArrayNodeTest, UpdateForEmptyIdentifierIsAppliedToAllArrayElements)
     ASSERT_EQUALS(fromjson("{a: [1, 1, 1]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [1, 1, 1]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0, a.1, a.2}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElement) {
@@ -217,6 +219,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElement) {
     ASSERT_EQUALS(fromjson("{a: [{b: 1, c: 1, d: 1}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.0.b': 1, 'a.0.c': 1, 'a.0.d': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b, a.0.c, a.0.d}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsUsingMergedChildrenCache) {
@@ -255,6 +258,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsUsingMergedChildr
     ASSERT_EQUALS(fromjson("{a: [{b: 1, c: 1}, {b: 1, c: 1}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [{b: 1, c: 1}, {b: 1, c: 1}]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b, a.0.c, a.1.b, a.1.c}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsWithoutMergedChildrenCache) {
@@ -302,6 +306,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementsWithoutMergedChil
     ASSERT_EQUALS(fromjson("{a: [{b: 2, c: 2, d: 1}, {b: 1, c: 2, d: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [{b: 2, c: 2, d: 1}, {b: 1, c: 2, d: 2}]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b, a.0.c, a.1.c, a.1.d}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementWithEmptyIdentifiers) {
@@ -331,6 +336,7 @@ TEST_F(UpdateArrayNodeTest, ApplyMultipleUpdatesToArrayElementWithEmptyIdentifie
     ASSERT_EQUALS(fromjson("{a: [{b: 1, c: 1}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.0.b': 1, 'a.0.c': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b, a.0.c}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
@@ -342,18 +348,10 @@ TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx
-
-                                                                ));
-    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx
-
-                                                                ));
-    auto parsedFilterK = assertGet(MatchExpressionParser::parse(arrayFilterK, expCtx
-
-                                                                ));
-    auto parsedFilterL = assertGet(MatchExpressionParser::parse(arrayFilterL, expCtx
-
-                                                                ));
+    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
+    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
+    auto parsedFilterK = assertGet(MatchExpressionParser::parse(arrayFilterK, expCtx));
+    auto parsedFilterL = assertGet(MatchExpressionParser::parse(arrayFilterL, expCtx));
 
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterI)));
     arrayFilters["j"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterJ)));
@@ -383,6 +381,7 @@ TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdates) {
     ASSERT_EQUALS(fromjson("{a: [{x: 0, b: [{c: 1, d: 1}]}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.0.b.0.c': 1, 'a.0.b.0.d': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b.0.c, a.0.b.0.d}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
@@ -392,12 +391,8 @@ TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithMergeConflictToArrayElementFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx
-
-                                                                ));
-    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx
-
-                                                                ));
+    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
+    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
 
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterI)));
     arrayFilters["j"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterJ)));
@@ -432,12 +427,8 @@ TEST_F(UpdateArrayNodeTest, ApplyUpdatesWithEmptyIdentifiersWithMergeConflictToA
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx
-
-                                                                ));
-    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx
-
-                                                                ));
+    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
+    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
 
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterI)));
     arrayFilters["j"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterJ)));
@@ -474,18 +465,10 @@ TEST_F(UpdateArrayNodeTest, ApplyNestedArrayUpdatesWithMergeConflictFails) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx
-
-                                                                ));
-    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx
-
-                                                                ));
-    auto parsedFilterK = assertGet(MatchExpressionParser::parse(arrayFilterK, expCtx
-
-                                                                ));
-    auto parsedFilterL = assertGet(MatchExpressionParser::parse(arrayFilterL, expCtx
-
-                                                                ));
+    auto parsedFilterI = assertGet(MatchExpressionParser::parse(arrayFilterI, expCtx));
+    auto parsedFilterJ = assertGet(MatchExpressionParser::parse(arrayFilterJ, expCtx));
+    auto parsedFilterK = assertGet(MatchExpressionParser::parse(arrayFilterK, expCtx));
+    auto parsedFilterL = assertGet(MatchExpressionParser::parse(arrayFilterL, expCtx));
 
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterI)));
     arrayFilters["j"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilterJ)));
@@ -520,9 +503,7 @@ TEST_F(UpdateArrayNodeTest, NoArrayElementsMatch) {
     auto arrayFilter = fromjson("{'i': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -541,16 +522,15 @@ TEST_F(UpdateArrayNodeTest, NoArrayElementsMatch) {
     ASSERT_EQUALS(fromjson("{a: [2, 2, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, UpdatesToAllArrayElementsAreNoops) {
     auto update = fromjson("{$set: {'a.$[i]': 1}}");
-    auto arrayFilter = fromjson("{'i': 0}");
+    auto arrayFilter = fromjson("{'i': 1}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -569,6 +549,7 @@ TEST_F(UpdateArrayNodeTest, UpdatesToAllArrayElementsAreNoops) {
     ASSERT_EQUALS(fromjson("{a: [1, 1, 1]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.0, a.1, a.2}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
@@ -576,9 +557,7 @@ TEST_F(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -597,6 +576,7 @@ TEST_F(UpdateArrayNodeTest, NoArrayElementAffectsIndexes) {
     ASSERT_EQUALS(fromjson("{a: [{c: 0, b: 0}, {c: 0, b: 0}, {c: 0, b: 0}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {a: [{c: 0, b: 0}, {c: 0, b: 0}, {c: 0, b: 0}]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b, a.1.b, a.2.b}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
@@ -604,9 +584,7 @@ TEST_F(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -625,6 +603,7 @@ TEST_F(UpdateArrayNodeTest, WhenOneElementIsMatchedLogElementUpdateDirectly) {
     ASSERT_EQUALS(fromjson("{a: [{c: 1}, {c: 0, b: 0}, {c: 1}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.1.b': 0}}"), getLogDoc());
+    ASSERT_EQUALS("{a.1.b}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
@@ -632,9 +611,7 @@ TEST_F(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -653,6 +630,7 @@ TEST_F(UpdateArrayNodeTest, WhenOneElementIsModifiedLogElement) {
     ASSERT_EQUALS(fromjson("{a: [{c: 0, b: 0}, {c: 0, b: 0}, {c: 1}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.1': {c: 0, b: 0}}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b, a.1.b}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ArrayUpdateOnEmptyArrayIsANoop) {
@@ -676,6 +654,7 @@ TEST_F(UpdateArrayNodeTest, ArrayUpdateOnEmptyArrayIsANoop) {
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
@@ -683,9 +662,7 @@ TEST_F(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
     auto arrayFilter = fromjson("{'i.c': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -705,6 +682,7 @@ TEST_F(UpdateArrayNodeTest, ApplyPositionalInsideArrayUpdate) {
     ASSERT_EQUALS(fromjson("{a: [{b: [0, 1], c: 0}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{$set: {'a.0.b.1': 1}}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b.1}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
@@ -712,9 +690,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
     auto arrayFilter = fromjson("{'i': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -734,6 +710,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateFromReplication) {
     ASSERT_EQUALS(fromjson("{a: [0]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.0.b}", getModifiedPaths());
 }
 
 TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
@@ -741,9 +718,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateNotFromReplication) {
     auto arrayFilter = fromjson("{'i': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -767,9 +742,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateWithoutLogBuilderOrIndexData) {
     auto arrayFilter = fromjson("{'i': 0}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx
-
-                                                               ));
+    auto parsedFilter = assertGet(MatchExpressionParser::parse(arrayFilter, expCtx));
     arrayFilters["i"] = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     std::set<std::string> foundIdentifiers;
     UpdateObjectNode root;
@@ -787,6 +760,7 @@ TEST_F(UpdateArrayNodeTest, ApplyArrayUpdateWithoutLogBuilderOrIndexData) {
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS("{a.0}", getModifiedPaths());
 }
 
 }  // namespace

@@ -64,6 +64,7 @@ protected:
         _indexData.reset();
         _logDoc.reset();
         _logBuilder = stdx::make_unique<LogBuilder>(_logDoc.root());
+        _modifiedPaths.clear();
     }
 
     UpdateNode::ApplyParams getApplyParams(mutablebson::Element element) {
@@ -76,6 +77,7 @@ protected:
         applyParams.validateForStorage = _validateForStorage;
         applyParams.indexData = _indexData.get();
         applyParams.logBuilder = _logBuilder.get();
+        applyParams.modifiedPaths = &_modifiedPaths;
         return applyParams;
     }
 
@@ -126,6 +128,10 @@ protected:
         return _logDoc;
     }
 
+    std::string getModifiedPaths() {
+        return _modifiedPaths.toString();
+    }
+
 private:
     std::vector<std::unique_ptr<FieldRef>> _immutablePathsVector;
     FieldRefSet _immutablePaths;
@@ -138,6 +144,7 @@ private:
     std::unique_ptr<UpdateIndexData> _indexData;
     mutablebson::Document _logDoc;
     std::unique_ptr<LogBuilder> _logBuilder;
+    FieldRefSetWithStorage _modifiedPaths;
 };
 
 }  // namespace mongo

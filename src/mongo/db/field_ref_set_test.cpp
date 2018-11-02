@@ -28,15 +28,16 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/field_ref_set.h"
 
 #include "mongo/db/field_ref.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
-using mongo::FieldRef;
-using mongo::FieldRefSet;
+namespace {
 
 TEST(EmptySet, Normal) {
     // insert "b"
@@ -143,4 +144,47 @@ TEST(NotEmpty, Conflict) {
     ASSERT_EQUALS(bDotE, *conflict);
 }
 
-}  // unnamed namespace
+TEST(FieldRefSetWithStorageTest, ManagesFieldRefLifetime) {
+    FieldRefSetWithStorage fieldRefSet;
+    FieldRef ref("a.b");
+
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a.b}", fieldRefSet.toString());
+
+    // Re-use 'ref', and verify that the set still contains the previous FieldRef.
+    ref.parse("b.c"_sd);
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a.b, b.c}", fieldRefSet.toString());
+}
+
+TEST(FieldRefSetWithStorageTest, InsertRemovesConflictsByKeepingShortest) {
+    FieldRefSetWithStorage fieldRefSet;
+    FieldRef ref("a.b");
+
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a.b}", fieldRefSet.toString());
+
+    ref.parse("a"_sd);
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a}", fieldRefSet.toString());
+}
+
+TEST(FieldRefSetWithStorageTest, InsertRemovesMultipleConflicts) {
+    FieldRefSetWithStorage fieldRefSet;
+    FieldRef ref("a.b");
+
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a.b}", fieldRefSet.toString());
+
+    ref.parse("a.c"_sd);
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a.b, a.c}", fieldRefSet.toString());
+
+    // Inserting 'a' should remove both conflicts with longer paths.
+    ref.parse("a"_sd);
+    fieldRefSet.keepShortest(ref);
+    ASSERT_EQUALS("{a}", fieldRefSet.toString());
+}
+
+}  // namespace
+}  // namespace mongo

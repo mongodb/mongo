@@ -117,6 +117,7 @@ TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: [1, 2, 3]}"), doc);
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
@@ -134,6 +135,7 @@ TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.b.c}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
@@ -151,6 +153,7 @@ TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.0}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsBlockedByAScalar) {
@@ -213,6 +216,7 @@ TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
@@ -230,6 +234,7 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
     ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
@@ -247,6 +252,7 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
     ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
@@ -264,6 +270,7 @@ TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
     ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
@@ -281,6 +288,7 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
     ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) {
@@ -298,6 +306,7 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) 
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
     ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
@@ -314,6 +323,7 @@ TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
     ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
@@ -331,6 +341,7 @@ TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 TEST_F(PopNodeTest, ThrowsWhenPathIsImmutable) {
@@ -404,6 +415,7 @@ TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
     ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
 }  // namespace

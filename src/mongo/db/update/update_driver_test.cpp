@@ -60,6 +60,7 @@ namespace mongo {
 namespace {
 
 using mongoutils::str::stream;
+using unittest::assertGet;
 
 TEST(Parse, Normal) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -526,6 +527,99 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
     immutablePaths.fillFrom(immutablePathsVector.vector());
     ASSERT_NOT_OK(
         driverRepl().populateDocumentWithQueryFields(opCtx(), query, immutablePaths, doc()));
+}
+
+using mutablebson::Document;
+
+class ModifiedPathsTestFixture : public mongo::unittest::Test {
+public:
+    std::string getModifiedPaths(Document* doc,
+                                 BSONObj updateSpec,
+                                 StringData matchedField = StringData(),
+                                 std::vector<BSONObj> arrayFilterSpec = {}) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        UpdateDriver driver(expCtx);
+        std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+        for (const auto& filter : arrayFilterSpec) {
+            auto parsedFilter = assertGet(MatchExpressionParser::parse(filter, expCtx));
+            auto expr = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
+            ASSERT(expr->getPlaceholder());
+            arrayFilters[expr->getPlaceholder().get()] = std::move(expr);
+        }
+        driver.parse(updateSpec, arrayFilters);
+
+        const bool validateForStorage = true;
+        const FieldRefSet emptyImmutablePaths;
+        FieldRefSetWithStorage modifiedPaths;
+        ASSERT_OK(driver.update(matchedField,
+                                doc,
+                                validateForStorage,
+                                emptyImmutablePaths,
+                                nullptr,
+                                nullptr,
+                                &modifiedPaths));
+
+        return modifiedPaths.toString();
+    }
+};
+
+TEST_F(ModifiedPathsTestFixture, SetFieldInRoot) {
+    BSONObj spec = fromjson("{$set: {a: 1}}");
+    Document doc(fromjson("{a: 0}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+}
+
+TEST_F(ModifiedPathsTestFixture, IncFieldInRoot) {
+    BSONObj spec = fromjson("{$inc: {a: 1}}");
+    Document doc(fromjson("{a: 0}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+}
+
+TEST_F(ModifiedPathsTestFixture, UnsetFieldInRoot) {
+    BSONObj spec = fromjson("{$unset: {a: ''}}");
+    Document doc(fromjson("{a: 0}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+}
+
+TEST_F(ModifiedPathsTestFixture, UpdateArrayElement) {
+    BSONObj spec = fromjson("{$set: {'a.0.b': 1}}");
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a.0.b}");
+}
+
+TEST_F(ModifiedPathsTestFixture, SetBeyondTheEndOfArrayShouldReturnPathToArray) {
+    BSONObj spec = fromjson("{$set: {'a.1.b': 1}}");
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+}
+
+TEST_F(ModifiedPathsTestFixture, InsertingAndUpdatingArrayShouldReturnPathToArray) {
+    BSONObj spec = fromjson("{$set: {'a.0.b': 1, 'a.1.c': 2}}");
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+
+    spec = fromjson("{$set: {'a.10.b': 1, 'a.1.c': 2}}");
+    Document doc2(fromjson("{a: [{b: 0}, {b: 0}]}"));
+    ASSERT_EQ(getModifiedPaths(&doc2, spec), "{a}");
+}
+
+TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperator) {
+    BSONObj spec = fromjson("{$set: {'a.$': 1}}");
+    Document doc(fromjson("{a: [0, 1, 2]}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec, "0"_sd), "{a.0}");
+}
+
+TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperatorToNestedField) {
+    BSONObj spec = fromjson("{$set: {'a.$.b': 1}}");
+    Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec, "1"_sd), "{a.1.b}");
+}
+
+TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
+    BSONObj spec = fromjson("{$set: {'a.$[i]': 1}}");
+    BSONObj arrayFilter = fromjson("{i: 0}");
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec, ""_sd, {arrayFilter}), "{a}");
 }
 
 }  // namespace

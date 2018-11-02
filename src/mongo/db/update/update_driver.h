@@ -95,13 +95,22 @@ public:
      * If 'validateForStorage' is true, ensures that modified elements do not violate depth or DBRef
      * constraints. Ensures that no paths in 'immutablePaths' are modified (though they may be
      * created, if they do not yet exist).
+     *
+     * If 'modifiedPaths' is not null, this method will populate it with the set of paths that were
+     * either modified at runtime or present statically in the update modifiers. For arrays, the
+     * set will include only the path to the array if the length has changed. All paths encode array
+     * indexes explicitly.
+     *
+     * The caller must either provide a null pointer, or a non-null pointer to an empty field ref
+     * set.
      */
     Status update(StringData matchedField,
                   mutablebson::Document* doc,
                   bool validateForStorage,
                   const FieldRefSet& immutablePaths,
                   BSONObj* logOpRec = nullptr,
-                  bool* docWasModified = nullptr);
+                  bool* docWasModified = nullptr,
+                  FieldRefSetWithStorage* modifiedPaths = nullptr);
 
     //
     // Accessors
