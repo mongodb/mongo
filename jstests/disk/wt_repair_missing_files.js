@@ -76,7 +76,24 @@
     MongoRunner.stopMongod(mongod);
 
     /**
-     * Test 3. Delete the _mdb_catalog. Verify that repair suceeds in creating an empty catalog and
+     * Test 3. Delete the sizeStorer. Verify that repair suceeds in recreating it.
+     */
+
+    let sizeStorerFile = dbpath + "sizeStorer.wt";
+    jsTestLog("deleting size storer file: " + sizeStorerFile);
+    removeFile(sizeStorerFile);
+
+    assertRepairSucceeds(dbpath, mongod.port);
+
+    mongod = startMongodOnExistingPath(dbpath);
+    testColl = mongod.getDB(baseName)[collName];
+
+    assert.eq(testColl.find(doc).itcount(), 1);
+    assert.eq(testColl.count(), 1);
+    MongoRunner.stopMongod(mongod);
+
+    /**
+     * Test 4. Delete the _mdb_catalog. Verify that repair suceeds in creating an empty catalog and
      * MongoDB starts up normally with no data.
      */
 
@@ -94,7 +111,7 @@
     assert.eq(testColl.count(), 0);
 
     /**
-     * Test 4. Verify that using repair with --directoryperdb creates a missing directory and its
+     * Test 5. Verify that using repair with --directoryperdb creates a missing directory and its
      * files, allowing MongoDB to start up normally.
      */
 
