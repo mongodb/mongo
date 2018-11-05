@@ -258,6 +258,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
         invariant(nullptr == std::exchange(msmForCsr(css), this));
+        _state = kCloning;
     }
 
     Status startCloneStatus = _cloneDriver->startClone(opCtx);
@@ -265,7 +266,6 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         return startCloneStatus;
     }
 
-    _state = kCloning;
     scopedGuard.Dismiss();
     return Status::OK();
 }
@@ -701,7 +701,17 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         auto* const css = CollectionShardingRuntime::get(opCtx, getNss());
 
-        invariant(this == std::exchange(msmForCsr(css), nullptr));
+        // In the kCreated state there should be no state to clean up, but we can verify this
+        // just to be safe.
+        if (_state == kCreated) {
+            // Verify that we did not set the MSM on the CSR.
+            invariant(!msmForCsr(css));
+            // Verify that the clone driver was not initialized.
+            invariant(!_cloneDriver);
+        } else {
+            auto oldMsmOnCsr = std::exchange(msmForCsr(css), nullptr);
+            invariant(this == oldMsmOnCsr);
+        }
         _critSec.reset();
         return std::move(_cloneDriver);
     }();
