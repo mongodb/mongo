@@ -569,7 +569,12 @@ void AsyncResultsMerger::_cleanUpFailedBatch(WithLock lk, Status status, size_t 
     remote.status = std::move(status);
     // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We
     // remove the unreachable host entirely from consideration by marking it as exhausted.
-    if (_params.getAllowPartialResults()) {
+    //
+    // The ExchangePassthrough error code is an internal-only error code used specifically to
+    // communicate that an error has occurred, but some other thread is responsible for returning
+    // the error to the user. In order to avoid polluting the user's error message, we ingore such
+    // errors with the expectation that all outstanding cursors will be closed promptly.
+    if (_params.getAllowPartialResults() || remote.status == ErrorCodes::ExchangePassthrough) {
         remote.status = Status::OK();
 
         // Clear the results buffer and cursor id.

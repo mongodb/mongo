@@ -235,8 +235,10 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx, size_t 
 
     for (;;) {
         // Execute only in case we have not encountered an error.
-        uassertStatusOKWithContext(_errorInLoadNextBatch,
-                                   "Exchange failed due to an error on different thread.");
+        if (!_errorInLoadNextBatch.isOK()) {
+            uasserted(ErrorCodes::ExchangePassthrough,
+                      "Exchange failed due to an error on different thread.");
+        }
 
         // Check if we have a document.
         if (!_consumers[consumerId]->isEmpty()) {

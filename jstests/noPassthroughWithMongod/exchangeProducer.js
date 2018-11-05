@@ -282,12 +282,15 @@ TestData.disableImplicitSessions = true;
             assert.eq(numConsumers, res.cursors.length);
 
             let parallelShells = [];
+            failingConsumer(res.cursors[0], ErrorCodes.FailPointEnabled)();
 
-            // All consumers will see the exchange fail error.
-            for (let i = 0; i < numConsumers; ++i) {
-                parallelShells.push(failingConsumer(res.cursors[i], ErrorCodes.FailPointEnabled));
+            // After the first consumer sees an error, each subsequent consumer should see an
+            // 'ExchangePassthrough' error.
+            for (let i = 0; i < numConsumers - 1; ++i) {
+                parallelShells.push(
+                    failingConsumer(res.cursors[i + 1], ErrorCodes.ExchangePassthrough));
             }
-            for (let i = 0; i < numConsumers; ++i) {
+            for (let i = 0; i < numConsumers - 1; ++i) {
                 parallelShells[i]();
             }
         } finally {
