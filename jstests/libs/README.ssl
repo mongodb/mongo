@@ -20,7 +20,7 @@ rm ca.srl client-multivalue-rdn.key client-multivalue-rdn.rsa client-multivalue-
 ecdsa-*.pem are ECDSA signed certificates:
 
 generate an ec-key (from a well known curve)
-opensl ecparam -name prime256v1 -genkey -out mykey.key
+openssl ecparam -name prime256v1 -genkey -out mykey.key
 
 create certificate request
 openssl req -new -key mykey.key -out mycsr.csr
