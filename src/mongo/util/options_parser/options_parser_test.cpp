@@ -277,6 +277,40 @@ TEST(Registration, StringFormatConstraint) {
     }
 }
 
+TEST(Registration, NestedSubSections) {
+    moe::OptionSection root;
+    moe::OptionSection childSection;
+    moe::OptionSection grandchildSection;
+
+    ASSERT_OK(childSection.addSection(grandchildSection));
+    ASSERT_NOT_OK(root.addSection(childSection));
+}
+
+TEST(Registration, MergeSubSections) {
+    moe::OptionSection root;
+    ASSERT_EQ(root.countSubSections(), 0UL);
+
+    {
+        moe::OptionSection opts("Options");
+        opts.addOptionChaining("option1", "option1", moe::String, "A string option");
+        ASSERT_OK(root.addSection(opts));
+        ASSERT_EQ(root.countSubSections(), 1UL);
+    }
+
+    {
+        moe::OptionSection moreOpts("Options");
+        moreOpts.addOptionChaining("option2", "option2", moe::Int, "An integer option");
+        ASSERT_OK(root.addSection(moreOpts));
+        ASSERT_EQ(root.countSubSections(), 1UL);
+    }
+
+    std::vector<moe::OptionDescription> options;
+    ASSERT_OK(root.getAllOptions(&options));
+    ASSERT_EQ(options.size(), 2UL);
+    ASSERT_EQ(options[0]._dottedName, "option1");
+    ASSERT_EQ(options[1]._dottedName, "option2");
+}
+
 TEST(Parsing, Good) {
     moe::OptionsParser parser;
     moe::Environment environment;
@@ -309,7 +343,7 @@ TEST(Parsing, SubSection) {
     moe::OptionSection subSection("Section Name");
 
     subSection.addOptionChaining("port", "port", moe::Int, "Port");
-    testOpts.addSection(subSection).transitional_ignore();
+    ASSERT_OK(testOpts.addSection(subSection));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -4167,7 +4201,7 @@ TEST(OptionCount, Basic) {
     moe::OptionSection subSection("Section Name");
     subSection.addOptionChaining("port", "port", moe::Int, "Port")
         .setSources(moe::SourceYAMLConfig);
-    testOpts.addSection(subSection).transitional_ignore();
+    ASSERT_OK(testOpts.addSection(subSection));
 
     int numOptions;
     ASSERT_OK(testOpts.countOptions(&numOptions, true /*visibleOnly*/, moe::SourceCommandLine));

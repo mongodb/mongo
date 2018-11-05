@@ -86,9 +86,14 @@ public:
 
     /**
      * Add a sub section to this section.  Used mainly to keep track of section headers for when
-     * we need generate the help std::string for the command line
+     * we need generate the help std::string for the command line.
+     *
+     * Note that while the structure of this class allows for a nested hierarchy of sections,
+     * our actual use-case enforces a maximum depth of 2.
+     * The base node plus one level of subsections.
+     * This means that subsections being added must not contain subsections of their own.
      */
-    Status addSection(const OptionSection& subSection);
+    Status addSection(const OptionSection& newSection);
 
     /**
      * Add an option to this section, and returns a reference to an OptionDescription to allow
@@ -137,6 +142,11 @@ public:
 
     // Count the number of options in this section and all subsections
     Status countOptions(int* numOptions, bool visibleOnly, OptionSources sources) const;
+
+    /**
+     * Returns the number of subsections which have been added to this OptionSection.
+     */
+    size_t countSubSections() const;
 
     /**
      * Populates the given map with all the default values for any options in this option

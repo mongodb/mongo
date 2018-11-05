@@ -46,17 +46,31 @@ using std::shared_ptr;
 // Registration interface
 
 // TODO: Make sure the section we are adding does not have duplicate options
-Status OptionSection::addSection(const OptionSection& subSection) {
-    std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = subSection._options.begin(); oditerator != subSection._options.end();
-         oditerator++) {
-        if (oditerator->_positionalStart != -1) {
-            StringBuilder sb;
-            sb << "Attempted to add subsection with positional option: " << oditerator->_dottedName;
-            return Status(ErrorCodes::InternalError, sb.str());
+Status OptionSection::addSection(const OptionSection& newSection) {
+    if (newSection._subSections.size()) {
+        return {ErrorCodes::InternalError, "Option subsections may not contain nested subsections"};
+    }
+
+    for (const auto& opt : newSection._options) {
+        if (opt._positionalStart != -1) {
+            return {ErrorCodes::InternalError,
+                    str::stream() << "Attempted to add subsection with positional option: "
+                                  << opt._dottedName};
         }
     }
-    _subSections.push_back(subSection);
+
+    for (auto& oldSection : _subSections) {
+        if (newSection._name == oldSection._name) {
+            // Matches existing section name, merge options.
+            std::copy(newSection._options.cbegin(),
+                      newSection._options.cend(),
+                      std::back_inserter(oldSection._options));
+            return Status::OK();
+        }
+    }
+
+    // New section name, just adopt it.
+    _subSections.push_back(newSection);
     return Status::OK();
 }
 
@@ -583,6 +597,10 @@ Status OptionSection::countOptions(int* numOptions, bool visibleOnly, OptionSour
     }
 
     return Status::OK();
+}
+
+size_t OptionSection::countSubSections() const {
+    return _subSections.size();
 }
 
 Status OptionSection::getConstraints(std::vector<std::shared_ptr<Constraint>>* constraints) const {
