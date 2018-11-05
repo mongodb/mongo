@@ -29,6 +29,7 @@
  */
 
 #include "mongo/platform/basic.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
 #include "mongo/db/pipeline/document_source_out_replace_coll.h"
 
@@ -72,7 +73,7 @@ void DocumentSourceOutReplaceColl::initializeWriteNs() {
         uassert(16994,
                 str::stream() << "failed to create temporary $out collection '" << _tempNs.ns()
                               << "': "
-                              << info.toString(),
+                              << getStatusFromCommandResult(info).reason(),
                 conn->runCommand(outputNs.db().toString(), cmd.done(), info));
     }
 
