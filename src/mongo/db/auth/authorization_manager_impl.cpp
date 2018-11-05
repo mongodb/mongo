@@ -539,14 +539,6 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     // thread is fetching into the cache
     CacheGuard guard(opCtx, this);
 
-    auto pinnedIt =
-        std::find_if(_pinnedUsers.begin(), _pinnedUsers.end(), [&](const auto& userHandle) {
-            return (userHandle->getName() == userName);
-        });
-    if (pinnedIt != _pinnedUsers.end()) {
-        return *pinnedIt;
-    }
-
     while ((boost::none == (cachedUser = _userCache.get(userName))) &&
            guard.otherUpdateInFetchPhase()) {
         guard.wait();
