@@ -18,8 +18,24 @@
     }
     assert.writeOK(bulk.execute());
 
+    const configPrimary = st.configRS.getPrimary();
+    const admin = configPrimary.getDB("admin");
+
+    // Set the priority and votes to 0 for secondary config servers so that in the case
+    // of an election, they cannot step up. If a different node were to step up, the
+    // config server would no longer be blackholed from mongos.
+    let conf = admin.runCommand({replSetGetConfig: 1}).config;
+    for (let i = 0; i < conf.members.length; i++) {
+        if (conf.members[i].host !== configPrimary.host) {
+            conf.members[i].votes = 0;
+            conf.members[i].priority = 0;
+        }
+    }
+    conf.version++;
+    const response = admin.runCommand({replSetReconfig: conf});
+    assert.commandWorked(response);
+
     jsTest.log('Partitioning the config server primary from the mongos');
-    var configPrimary = st.configRS.getPrimary();
     configPrimary.discardMessagesFrom(st.s, 1.0);
     st.s.discardMessagesFrom(configPrimary, 1.0);
 
