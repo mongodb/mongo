@@ -58,6 +58,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/net/dh_openssl.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_options.h"
@@ -70,6 +71,7 @@
 #endif
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
+#include <openssl/dh.h>
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
@@ -87,6 +89,36 @@ namespace mongo {
 
 namespace {
 
+// Modulus for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919
+constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58, 0xA2, 0xBB, 0x4A, 0x9A,
+    0xAF, 0xDC, 0x56, 0x20, 0x27, 0x3D, 0x3C, 0xF1, 0xD8, 0xB9, 0xC5, 0x83, 0xCE, 0x2D, 0x36, 0x95,
+    0xA9, 0xE1, 0x36, 0x41, 0x14, 0x64, 0x33, 0xFB, 0xCC, 0x93, 0x9D, 0xCE, 0x24, 0x9B, 0x3E, 0xF9,
+    0x7D, 0x2F, 0xE3, 0x63, 0x63, 0x0C, 0x75, 0xD8, 0xF6, 0x81, 0xB2, 0x02, 0xAE, 0xC4, 0x61, 0x7A,
+    0xD3, 0xDF, 0x1E, 0xD5, 0xD5, 0xFD, 0x65, 0x61, 0x24, 0x33, 0xF5, 0x1F, 0x5F, 0x06, 0x6E, 0xD0,
+    0x85, 0x63, 0x65, 0x55, 0x3D, 0xED, 0x1A, 0xF3, 0xB5, 0x57, 0x13, 0x5E, 0x7F, 0x57, 0xC9, 0x35,
+    0x98, 0x4F, 0x0C, 0x70, 0xE0, 0xE6, 0x8B, 0x77, 0xE2, 0xA6, 0x89, 0xDA, 0xF3, 0xEF, 0xE8, 0x72,
+    0x1D, 0xF1, 0x58, 0xA1, 0x36, 0xAD, 0xE7, 0x35, 0x30, 0xAC, 0xCA, 0x4F, 0x48, 0x3A, 0x79, 0x7A,
+    0xBC, 0x0A, 0xB1, 0x82, 0xB3, 0x24, 0xFB, 0x61, 0xD1, 0x08, 0xA9, 0x4B, 0xB2, 0xC8, 0xE3, 0xFB,
+    0xB9, 0x6A, 0xDA, 0xB7, 0x60, 0xD7, 0xF4, 0x68, 0x1D, 0x4F, 0x42, 0xA3, 0xDE, 0x39, 0x4D, 0xF4,
+    0xAE, 0x56, 0xED, 0xE7, 0x63, 0x72, 0xBB, 0x19, 0x0B, 0x07, 0xA7, 0xC8, 0xEE, 0x0A, 0x6D, 0x70,
+    0x9E, 0x02, 0xFC, 0xE1, 0xCD, 0xF7, 0xE2, 0xEC, 0xC0, 0x34, 0x04, 0xCD, 0x28, 0x34, 0x2F, 0x61,
+    0x91, 0x72, 0xFE, 0x9C, 0xE9, 0x85, 0x83, 0xFF, 0x8E, 0x4F, 0x12, 0x32, 0xEE, 0xF2, 0x81, 0x83,
+    0xC3, 0xFE, 0x3B, 0x1B, 0x4C, 0x6F, 0xAD, 0x73, 0x3B, 0xB5, 0xFC, 0xBC, 0x2E, 0xC2, 0x20, 0x05,
+    0xC5, 0x8E, 0xF1, 0x83, 0x7D, 0x16, 0x83, 0xB2, 0xC6, 0xF3, 0x4A, 0x26, 0xC1, 0xB2, 0xEF, 0xFA,
+    0x88, 0x6B, 0x42, 0x38, 0x61, 0x1F, 0xCF, 0xDC, 0xDE, 0x35, 0x5B, 0x3B, 0x65, 0x19, 0x03, 0x5B,
+    0xBC, 0x34, 0xF4, 0xDE, 0xF9, 0x9C, 0x02, 0x38, 0x61, 0xB4, 0x6F, 0xC9, 0xD6, 0xE6, 0xC9, 0x07,
+    0x7A, 0xD9, 0x1D, 0x26, 0x91, 0xF7, 0xF7, 0xEE, 0x59, 0x8C, 0xB0, 0xFA, 0xC1, 0x86, 0xD9, 0x1C,
+    0xAE, 0xFE, 0x13, 0x09, 0x85, 0x13, 0x92, 0x70, 0xB4, 0x13, 0x0C, 0x93, 0xBC, 0x43, 0x79, 0x44,
+    0xF4, 0xFD, 0x44, 0x52, 0xE2, 0xD7, 0x4D, 0xD3, 0x64, 0xF2, 0xE2, 0x1E, 0x71, 0xF5, 0x4B, 0xFF,
+    0x5C, 0xAE, 0x82, 0xAB, 0x9C, 0x9D, 0xF6, 0x9E, 0xE8, 0x6D, 0x2B, 0xC5, 0x22, 0x36, 0x3A, 0x0D,
+    0xAB, 0xC5, 0x21, 0x97, 0x9B, 0x0D, 0xEA, 0xDA, 0x1D, 0xBF, 0x9A, 0x42, 0xD5, 0xC4, 0x48, 0x4E,
+    0x0A, 0xBC, 0xD0, 0x6B, 0xFA, 0x53, 0xDD, 0xEF, 0x3C, 0x1B, 0x20, 0xEE, 0x3F, 0xD5, 0x9D, 0x7C,
+    0x25, 0xE4, 0x1D, 0x2B, 0x66, 0xC6, 0x2E, 0x37, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+// Generator for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919 (2)
+constexpr std::uint8_t ffdhe3072_g = 0x02;
+
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
 // `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
@@ -98,15 +130,6 @@ namespace {
 bool isUnixDomainSocket(const std::string& hostname) {
     return end(hostname) != std::find(begin(hostname), end(hostname), '/');
 }
-
-struct DHFreer {
-    void operator()(DH* const dh) noexcept {
-        if (dh) {
-            ::DH_free(dh);
-        }
-    }
-};
-using UniqueDHParams = std::unique_ptr<DH, DHFreer>;
 
 struct BIOFree {
     void operator()(BIO* const p) noexcept {
@@ -129,6 +152,16 @@ struct EC_KEYFree {
 
 using UniqueEC_KEY = std::unique_ptr<EC_KEY, EC_KEYFree>;
 #endif
+
+struct BIGNUMFree {
+    void operator()(BIGNUM* const bn) noexcept {
+        if (bn) {
+            ::BN_free(bn);
+        }
+    }
+};
+
+using UniqueBIGNUM = std::unique_ptr<BIGNUM, BIGNUMFree>;
 
 UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
     UniqueBIO rv(::BIO_new_mem_buf(v.data(), v.size()));
@@ -166,7 +199,7 @@ bool useDefaultECKey(SSL_CTX* const ctx) {
 // If the underlying SSL supports auto-configuration of ECDH parameters, this function will select
 // it. If not, this function will attempt to use a hard-coded but widely supported elliptic curve.
 // If that fails, ECDHE will not be enabled.
-void enableECDHE(SSL_CTX* const ctx) {
+bool enableECDHE(SSL_CTX* const ctx) {
 #ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
     SSL_CTX_set_ecdh_auto(ctx, true);
 #elif OPENSSL_VERSION_NUMBER < 0x10100000L || \
@@ -180,11 +213,14 @@ void enableECDHE(SSL_CTX* const ctx) {
         // If manually setting the configuration option failed, use a hard coded curve
         if (!useDefaultECKey(ctx)) {
             error() << "Failed to enable ECDHE.";
+            return false;
         }
     }
 #endif
     std::ignore = ctx;
+    return true;
 }
+
 
 // Old copies of OpenSSL will not have constants to disable protocols they don't support.
 // Define them to values we can OR together safely to generically disable these protocols across
@@ -224,13 +260,30 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || \
     (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)
 // Copies of OpenSSL after 1.1.0 define new functions for interaction with
-// X509 structure. We must polyfill used definitions to interact with older
-// OpenSSL versions.
+// X509 and DH structures. We must polyfill used definitions to interact with older OpenSSL
+// versions.
 const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
     return peerCert->cert_info->extensions;
 }
 inline int X509_NAME_ENTRY_set(const X509_NAME_ENTRY* ne) {
     return ne->set;
+}
+
+int DH_set0_pqg(DH* dh, BIGNUM* p, BIGNUM* q, BIGNUM* g) {
+    dh->p = p;
+    dh->g = g;
+
+    return 1;
+}
+
+void DH_get0_pqg(const DH* dh, const BIGNUM** p, const BIGNUM** q, const BIGNUM** g) {
+    if (p) {
+        *p = dh->p;
+    }
+
+    if (g) {
+        *g = dh->g;
+    }
 }
 #endif
 
@@ -667,6 +720,58 @@ SSLX509Name getCertificateSubjectX509Name(X509* cert) {
     return SSLX509Name(std::move(entries));
 }
 
+int verifyDHParameters(const UniqueDHParams& dhparams) {
+    int codes = 0;
+
+    ::DH_check(dhparams.get(), &codes);
+
+    const BIGNUM* p = nullptr;
+    const BIGNUM* g = nullptr;
+
+    DH_get0_pqg(dhparams.get(), &p, nullptr, &g);
+
+    // Many RFC's define DH parameters where 2 is listed as the generator for the group. If p = 11
+    // mod 24, then 2 generates the entire group. However, it becomes trivial for an attacker to
+    // determine the lsb of any shared secret. Instead of leaking this bit, the RFC designers chose
+    // primes which halve the number of possible shared secrets. Since 2 does not generate the
+    // entire group associated with such primes, OpenSSL fails the DH_check with
+    // DH_NOT_SUITABLE_GENERATOR. Since leaking a single bit and halving the number of possible
+    // shared secrets is essentially the same thing, we manually check for it here (p = 23 mod 24)
+    // and strip out the errors as necessary. See Appendix E of RFC 2412.
+    if (BN_is_word(g, DH_GENERATOR_2)) {
+        long residue = BN_mod_word(p, 24);
+        if (residue == 11 || residue == 23) {
+            codes &= ~DH_NOT_SUITABLE_GENERATOR;
+        }
+    }
+    return codes;
+}
+
+UniqueDHParams makeDefaultDHParameters() {
+    UniqueDHParams dhparams(::DH_new());
+
+    if (!dhparams) {
+        return nullptr;
+    }
+
+    UniqueBIGNUM p(::BN_bin2bn(ffdhe3072_p.data(), ffdhe3072_p.size(), nullptr));
+    UniqueBIGNUM g(::BN_bin2bn(&ffdhe3072_g, sizeof(ffdhe3072_g), nullptr));
+
+    if (!p || !g) {
+        return nullptr;
+    }
+
+    if (DH_set0_pqg(dhparams.get(), p.get(), nullptr, g.get()) != 1) {
+        return nullptr;
+    }
+
+    // DH takes over memory management responsibilities after successfully setting these
+    p.release();
+    g.release();
+
+    return dhparams;
+}
+
 SSLConnectionOpenSSL::SSLConnectionOpenSSL(SSL_CTX* context,
                                            Socket* sock,
                                            const char* initialBytes,
@@ -923,7 +1028,21 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     }
 
     // We always set ECDH mode anyhow, if available.
-    enableECDHE(context);
+    if (enableECDHE(context)) {
+        // If we enable ECDHE successfully, we can also enable DHE without breaking compatibility
+        // with Java 7. Java 7 clients are unable to use DHE with strong parameters, but they will
+        // ignore that we advertise it if we advertise ECDHE first, which it does support.
+
+        // If opensslDiffieHellmanParameters has been specified, we set it above (even if ECDHE is
+        // not enabled). Otherwise, we use a default, (currently) strong DHE parameter.
+        if (params.sslPEMTempDHParam.empty()) {
+            UniqueDHParams dhparams = makeDefaultDHParameters();
+
+            if (!dhparams || SSL_CTX_set_tmp_dh(context, dhparams.get()) != 1) {
+                error() << "Failed to enable DHE";
+            }
+        }
+    }
 
     return Status::OK();
 }

@@ -1,4 +1,4 @@
-// Test that the server supports at least one ECDHE tls cipher suite.
+// Test that the server supports ECDHE and DHE tls cipher suites.
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
@@ -34,10 +34,16 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
     const mongod = MongoRunner.runMongod(x509_options);
 
+    // Use new toolchain python, if it exists
+    let python_binary = '/opt/mongodbtoolchain/v3/bin/python3';
+    if (runProgram('/bin/sh', '-c', 'ls ' + python_binary) !== 0) {
+        python_binary = '/opt/mongodbtoolchain/v2/bin/python3';
+    }
+
     // Run the tls cipher suite enumerator
-    let python = "/usr/bin/env /opt/mongodbtoolchain/v2/bin/python3";
-    let enumerator = " jstests/ssl/tls_enumerator.py ";
-    const python_command = python + enumerator + "--port=" + mongod.port + " --cafile=" + CA_CERT +
+    const python = '/usr/bin/env ' + python_binary;
+    const enumerator = " jstests/ssl/tls_enumerator.py ";
+    const python_command = python + enumerator + '--port=' + mongod.port + ' --cafile=' + CA_CERT +
         ' --cert=' + CLIENT_CERT + ' --outfile=' + OUTFILE;
     assert.eq(runProgram('/bin/sh', '-c', python_command), 0);
 
@@ -57,20 +63,38 @@ load('jstests/ssl/libs/ssl_helpers.js');
     suites.slice(0, suites.indexOf('tls1'))
         .forEach(tlsVersion => assert(cipherDict[tlsVersion].length === 0));
 
-    // Printing TLS 1.1 and 1.2 suites that are accepted
     let hasECDHE = false;
+    let hasDHE = false;
+
+    // Printing TLS 1.1 and 1.2 suites that are accepted
     suites.slice(suites.indexOf('tls1_1')).forEach(tlsVersion => {
         print('*************************\n' + tlsVersion + ": ");
         cipherDict[tlsVersion].forEach(cipher => {
             print(cipher);
-            if (cipher.includes('ECDHE'))
+
+            if (cipher.startsWith('ECDHE')) {
                 hasECDHE = true;
+            }
+
+            if (cipher.startsWith('DHE')) {
+                hasDHE = true;
+            }
         });
     });
 
-    // All platforms except Amazon Linux 1 should support ECDHE
+    // All platforms except Amazon Linux 1 should support ECDHE and DHE
     if (!EXCLUDED_BUILDS.includes(buildInfo().buildEnvironment.distmod)) {
         assert(hasECDHE, 'Supports at least one ECDHE cipher suite');
+
+        // Secure Transport disallows DHE, so we don't require it on those platforms
+        if (determineSSLProvider() !== 'apple') {
+            assert(hasDHE, 'Supports at least one DHE cipher suite');
+        }
+    }
+
+    // If ECDHE is enabled, DHE should be too (for Java 7 compat)
+    if (determineSSLProvider() !== 'apple') {
+        assert(hasDHE === hasECDHE, 'Supports both ECDHE and DHE or neither');
     }
 
     MongoRunner.stopMongod(mongod);

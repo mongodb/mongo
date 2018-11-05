@@ -38,6 +38,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#include "mongo/util/net/dh_openssl.h"
+#endif
+
 
 namespace mongo {
 namespace {
@@ -261,6 +265,13 @@ TEST(SSLManager, EscapeRFC2253) {
     ASSERT_EQ(escapeRfc2253("a;c"), "a\\;c");
     ASSERT_EQ(escapeRfc2253("abc "), "abc\\ ");
 }
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+TEST(SSLManager, DHCheckRFC7919) {
+    auto dhparams = makeDefaultDHParameters();
+    ASSERT_EQ(verifyDHParameters(dhparams), 0);
+}
+#endif
 
 #endif
 
