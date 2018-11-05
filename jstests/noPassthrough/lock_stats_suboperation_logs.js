@@ -77,6 +77,10 @@
     for (let line of lines) {
         if ((match = lockWaitTimeRegex.exec(line)) !== null) {
             let lockWaitTime = match[1];
+            // Ignoring 'noise' lock stats from other operations such as locks taken during
+            // validation stage.
+            if (lockWaitTime < blockedMillis * 1000)
+                continue;
             if (supposedLockWaitTime === undefined)
                 supposedLockWaitTime = lockWaitTime;
             else
