@@ -31,8 +31,8 @@
 
     print("1: initial insert");
 
-    coll.save({_id: -1, a: "a", date: new Date()});
-    coll.save({_id: 1, b: "b", date: new Date()});
+    assert.writeOK(coll.save({_id: -1, a: "a", date: new Date()}));
+    assert.writeOK(coll.save({_id: 1, b: "b", date: new Date()}));
 
     print("2: shard collection");
 
