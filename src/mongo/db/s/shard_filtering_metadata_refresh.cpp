@@ -88,6 +88,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
         currentShardVersion.majorVersion() >= shardVersionReceived.majorVersion()) {
         // Don't need to remotely reload if we're in the same epoch and the requested version is
         // smaller than the one we know about. This means that the remote side is behind.
+        return;
     }
 
     if (MONGO_FAIL_POINT(skipShardFilteringMetadataRefresh)) {
