@@ -72,36 +72,27 @@ StringMap<std::vector<ShardId>> getTagToShardIds(OperationContext* opCtx,
         return tagToShardIds;
     }
 
-    // get all docs in config.shards
-    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto findShardsStatus =
+    // Get all docs in config.shards through a query instead of going through the shard registry
+    // because we need the zones as well
+    const auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto shardDocs = uassertStatusOK(
         configServer->exhaustiveFindOnConfig(opCtx,
                                              ReadPreferenceSetting(ReadPreference::Nearest),
                                              repl::ReadConcernLevel::kMajorityReadConcern,
                                              ShardType::ConfigNS,
                                              BSONObj(),
                                              BSONObj(),
-                                             0);
-    uassertStatusOK(findShardsStatus);
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "cannot find any shard documents",
-            !findShardsStatus.getValue().docs.empty());
+                                             0));
+    uassert(50986, str::stream() << "Could not find any shard documents", !shardDocs.docs.empty());
 
     for (const auto& tag : tags) {
         tagToShardIds[tag.getTag()] = {};
     }
 
-    const auto& shardDocList = findShardsStatus.getValue().docs;
-
-    for (const auto& shardDoc : shardDocList) {
-        auto shardParseStatus = ShardType::fromBSON(shardDoc);
-        uassertStatusOK(shardParseStatus);
-        auto parsedShard = shardParseStatus.getValue();
+    for (const auto& shardDoc : shardDocs.docs) {
+        auto parsedShard = uassertStatusOK(ShardType::fromBSON(shardDoc));
         for (const auto& tag : parsedShard.getTags()) {
-            auto it = tagToShardIds.find(tag);
-            if (it != tagToShardIds.end()) {
-                it->second.push_back(parsedShard.getName());
-            }
+            tagToShardIds[tag].push_back(parsedShard.getName());
         }
     }
 
@@ -214,10 +205,7 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
     const StringMap<std::vector<ShardId>>& tagToShards,
     const std::vector<ShardId>& allShardIds) {
     invariant(!allShardIds.empty());
-
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "cannot find zone split points because no zone docs were found",
-            !tags.empty());
+    invariant(!tags.empty());
 
     ChunkVersion version(1, 0, OID::gen());
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
@@ -240,7 +228,7 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
         uassert(50973,
                 str::stream()
                     << "cannot shard collection "
-                    << tag.getNS().ns()
+                    << nss.ns()
                     << " because it is associated with zone: "
                     << tag.getTag()
                     << " which is not associated with a shard. please add this zone to a shard.",
@@ -255,6 +243,7 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
                     &chunks);
         lastChunkMax = tag.getMaxKey();
     }
+
     if (lastChunkMax.woCompare(keyPattern.globalMax()) < 0) {
         // existing zones do not span to $maxKey so create a chunk for that
         const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
@@ -340,12 +329,11 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
         }
     }
 
-    const auto tagToShards = getTagToShardIds(opCtx, tags);
-    const Timestamp& validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-
-    uassert(ErrorCodes::InternalError,
+    uassert(ErrorCodes::InvalidOptions,
             str::stream() << "cannot generate initial chunks based on both split points and tags",
             tags.empty() || finalSplitPoints.empty());
+
+    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
 
     auto initialChunks = tags.empty()
         ? InitialSplitPolicy::generateShardCollectionInitialChunks(nss,
@@ -356,7 +344,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
                                                                    shardIds,
                                                                    numContiguousChunksPerShard)
         : InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
-              nss, shardKeyPattern, validAfter, tags, tagToShards, shardIds);
+              nss, shardKeyPattern, validAfter, tags, getTagToShardIds(opCtx, tags), shardIds);
 
     return initialChunks;
 }

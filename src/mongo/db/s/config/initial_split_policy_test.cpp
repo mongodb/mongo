@@ -420,16 +420,6 @@ TEST_F(GenerateShardCollectionInitialZonedChunksTest, NumRemainingChunksGreaterT
     checkGeneratedInitialZoneChunks(tags, 2, expectedChunkRanges, expectedShardIds);
 }
 
-TEST_F(GenerateShardCollectionInitialZonedChunksTest, EmptyTagsShouldFail) {
-    const std::vector<ChunkRange> expectedChunkRanges;
-    const std::vector<TagsType> tags;
-    const std::vector<ShardId> expectedShardIds;
-    ASSERT_THROWS_CODE(
-        checkGeneratedInitialZoneChunks(tags, 1, expectedChunkRanges, expectedShardIds),
-        AssertionException,
-        ErrorCodes::InvalidOptions);
-}
-
 TEST_F(GenerateShardCollectionInitialZonedChunksTest, ZoneNotAssociatedWithAnyShardShouldFail) {
     const auto zone1 = zoneName("0");
     const auto zone2 = zoneName("1");

@@ -545,43 +545,6 @@ void shardCollection(OperationContext* opCtx,
                              ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-std::vector<TagsType> getExistingTags(OperationContext* opCtx, const NamespaceString& nss) {
-    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto tagStatus =
-        configServer->exhaustiveFindOnConfig(opCtx,
-                                             kConfigReadSelector,
-                                             repl::ReadConcernLevel::kMajorityReadConcern,
-                                             TagsType::ConfigNS,
-                                             BSON(TagsType::ns(nss.ns())),
-                                             BSONObj(),
-                                             0);
-    uassertStatusOK(tagStatus);
-
-    const auto& tagDocList = tagStatus.getValue().docs;
-    std::vector<TagsType> tags;
-    for (const auto& tagDoc : tagDocList) {
-        auto tagParseStatus = TagsType::fromBSON(tagDoc);
-        uassertStatusOK(tagParseStatus);
-        const auto& parsedTag = tagParseStatus.getValue();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "the min and max of the existing zone " << parsedTag.getMinKey()
-                              << " -->> "
-                              << parsedTag.getMaxKey()
-                              << " have non-matching number of keys",
-                parsedTag.getMinKey().nFields() == parsedTag.getMaxKey().nFields());
-
-        const auto& rangeMin = parsedTag.getMinKey();
-        const auto& rangeMax = parsedTag.getMaxKey();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "zone " << rangeMin << " -->> " << rangeMax
-                              << " has min greater than max",
-                rangeMin.woCompare(rangeMax) < 0);
-
-        tags.push_back(parsedTag);
-    }
-    return tags;
-}
-
 /**
  * Internal sharding command run on primary shard server to shard a collection.
  */
@@ -623,6 +586,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        auto const grid = Grid::get(opCtx);
         auto const shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
@@ -650,7 +614,8 @@ public:
                     opCtx, nss, proposedKey, shardKeyPattern, request);
 
                 // Read zone info
-                auto tags = getExistingTags(opCtx, nss);
+                const auto catalogClient = grid->catalogClient();
+                auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
 
                 if (!tags.empty()) {
                     validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tags);
@@ -663,7 +628,7 @@ public:
                     uuid = UUID::gen();
                 }
 
-                auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+                const auto shardRegistry = grid->shardRegistry();
                 shardRegistry->reload(opCtx);
 
                 DBDirectClient localClient(opCtx);

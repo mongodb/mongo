@@ -586,6 +586,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
     const auto& tagDocsOpTimePair = findStatus.getValue();
 
     std::vector<TagsType> tags;
+
     for (const BSONObj& obj : tagDocsOpTimePair.value) {
         auto tagRes = TagsType::fromBSON(obj);
         if (!tagRes.isOK()) {
