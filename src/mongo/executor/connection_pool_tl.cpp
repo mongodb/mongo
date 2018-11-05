@@ -34,7 +34,8 @@
 
 #include "mongo/executor/connection_pool_tl.h"
 
-#include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/client/authenticate.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -157,6 +158,67 @@ void TLConnection::cancelTimeout() {
     _timer->cancelTimeout();
 }
 
+class TLConnectionSetupHook : public executor::NetworkConnectionHook {
+public:
+    explicit TLConnectionSetupHook(executor::NetworkConnectionHook* hookToWrap)
+        : _wrappedHook(hookToWrap) {}
+
+    BSONObj augmentIsMasterRequest(BSONObj cmdObj) override {
+        BSONObjBuilder bob(std::move(cmdObj));
+        bob.append("hangUpOnStepDown", false);
+        if (internalSecurity.user) {
+            bob.append("saslSupportedMechs", internalSecurity.user->getName().getUnambiguousName());
+        }
+
+        return bob.obj();
+    }
+
+    Status validateHost(const HostAndPort& remoteHost,
+                        const BSONObj& isMasterRequest,
+                        const RemoteCommandResponse& isMasterReply) override try {
+        const auto saslMechsElem = isMasterReply.data.getField("saslSupportedMechs");
+        if (saslMechsElem.type() == Array) {
+            auto array = saslMechsElem.Array();
+            for (const auto& elem : array) {
+                _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
+            }
+        }
+
+        if (!_wrappedHook) {
+            return Status::OK();
+        } else {
+            return _wrappedHook->validateHost(remoteHost, isMasterRequest, isMasterReply);
+        }
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+    StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(
+        const HostAndPort& remoteHost) final {
+        if (_wrappedHook) {
+            return _wrappedHook->makeRequest(remoteHost);
+        } else {
+            return boost::none;
+        }
+    }
+
+    Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) final {
+        if (_wrappedHook) {
+            return _wrappedHook->handleReply(remoteHost, std::move(response));
+        } else {
+            return Status::OK();
+        }
+    }
+
+    const std::vector<std::string>& saslMechsForInternalAuth() const {
+        return _saslMechsForInternalAuth;
+    }
+
+private:
+    std::vector<std::string> _saslMechsForInternalAuth;
+    executor::NetworkConnectionHook* const _wrappedHook = nullptr;
+};
+
 void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     auto anchor = shared_from_this();
 
@@ -180,28 +242,21 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
         }
     });
 
+    auto isMasterHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook);
+
     AsyncDBClient::connect(_peer, transport::kGlobalSSLMode, _serviceContext, _reactor, timeout)
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
         })
-        .then([this](AsyncDBClient::Handle client) {
+        .then([this, isMasterHook](AsyncDBClient::Handle client) {
             _client = std::move(client);
-            return _client->initWireVersion("NetworkInterfaceTL", _onConnectHook);
+            return _client->initWireVersion("NetworkInterfaceTL", isMasterHook.get());
         })
-        .then([this] {
-            // Try to authenticate with the default system credentials
-            return _client->authenticate(getInternalUserAuthParams())
-                .onError([this](Status status) -> Future<void> {
-                    // If we're in the middle of a keyfile rollover, there may be alternate
-                    // credentials to try.
-                    const auto altParams = getInternalUserAuthParams(1);
-                    if (!altParams.isEmpty() && status == ErrorCodes::AuthenticationFailed) {
-                        return _client->authenticate(altParams);
-                    } else {
-                        // If there weren't alternate credentials, the original error stands.
-                        return status;
-                    }
-                });
+        .then([this, isMasterHook] {
+            boost::optional<std::string> mechanism;
+            if (!isMasterHook->saslMechsForInternalAuth().empty())
+                mechanism = isMasterHook->saslMechsForInternalAuth().front();
+            return _client->authenticateInternal(std::move(mechanism));
         })
         .then([this] {
             if (!_onConnectHook) {

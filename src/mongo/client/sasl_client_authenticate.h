@@ -70,10 +70,9 @@ class BSONObj;
  * rejected.  Other failures, all of which are tantamount to authentication failure, may also be
  * returned.
  */
-extern void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
-                                      const HostAndPort& hostname,
-                                      const BSONObj& saslParameters,
-                                      auth::AuthCompletionHandler handler);
+extern Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
+                                              const HostAndPort& hostname,
+                                              const BSONObj& saslParameters);
 
 /**
  * Extracts the payload field from "cmdObj", and store it into "*payload".

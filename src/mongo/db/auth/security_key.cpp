@@ -39,13 +39,13 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -69,8 +69,7 @@ public:
           _salt256(scram::Presecrets<SHA256Block>::generateSecureRandomSalt()),
           _filename(filename) {}
 
-    boost::optional<std::pair<User::CredentialData, BSONObj>> generate(
-        const std::string& password) {
+    boost::optional<User::CredentialData> generate(const std::string& password) {
         if (password.size() < kMinKeyLength || password.size() > kMaxKeyLength) {
             error() << " security key in " << _filename << " has length " << password.size()
                     << ", must be between 6 and 1024 chars";
@@ -100,17 +99,7 @@ public:
                                   saslGlobalParams.scramSHA256IterationCount.load())))
             return boost::none;
 
-        auto internalAuthParams =
-            BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" << saslCommandUserDBFieldName
-                                               << internalSecurity.user->getName().getDB()
-                                               << saslCommandUserFieldName
-                                               << internalSecurity.user->getName().getUser()
-                                               << saslCommandPasswordFieldName
-                                               << passwordDigest
-                                               << saslCommandDigestPasswordFieldName
-                                               << false);
-
-        return std::make_pair(std::move(credentials), std::move(internalAuthParams));
+        return credentials;
     }
 
 private:
@@ -152,15 +141,13 @@ bool setUpSecurityKey(const string& filename) {
         return false;
     }
 
-    std::vector<BSONObj> internalAuthParams;
     CredentialsGenerator generator(filename);
     auto credentials = generator.generate(keyStrings.front());
     if (!credentials) {
         return false;
     }
 
-    internalSecurity.user->setCredentials(std::move(credentials->first));
-    internalAuthParams.push_back(std::move(credentials->second));
+    internalSecurity.user->setCredentials(std::move(*credentials));
 
     if (keyStrings.size() == 2) {
         credentials = generator.generate(keyStrings[1]);
@@ -168,14 +155,13 @@ bool setUpSecurityKey(const string& filename) {
             return false;
         }
 
-        internalSecurity.alternateCredentials = std::move(credentials->first);
-        internalAuthParams.push_back(std::move(credentials->second));
+        internalSecurity.alternateCredentials = std::move(*credentials);
     }
 
     int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
     if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile ||
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
-        setInternalUserAuthParams(internalAuthParams);
+        auth::setInternalAuthKeys(keyStrings);
     }
 
     return true;

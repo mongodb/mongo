@@ -37,7 +37,7 @@
 #include <string>
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/db/client.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/version_manager.h"
@@ -58,14 +58,12 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
 
     // Authenticate as the first thing we do
     // NOTE: Replica set authentication allows authentication against *any* online host
-    if (isInternalAuthSet()) {
+    if (auth::isInternalAuthSet()) {
         LOG(2) << "calling onCreate auth for " << conn->toString();
 
-        bool result = conn->authenticateInternalUser();
-
-        uassert(15847,
-                str::stream() << "can't authenticate to server " << conn->getServerAddress(),
-                result);
+        uassertStatusOKWithContext(conn->authenticateInternalUser(),
+                                   str::stream() << "can't authenticate to server "
+                                                 << conn->getServerAddress());
     }
 
     // Delegate the metadata hook logic to the egress hook; use lambdas to pass the arguments in

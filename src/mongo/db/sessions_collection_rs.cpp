@@ -35,11 +35,11 @@
 #include <boost/optional.hpp>
 #include <utility>
 
+#include "mongo/client/authenticate.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
@@ -75,8 +75,8 @@ Status makePrimaryConnection(OperationContext* opCtx, boost::optional<ScopedDbCo
     // Make a connection to the primary, auth, then send
     try {
         conn->emplace(hostname);
-        if (isInternalAuthSet()) {
-            (*conn)->get()->auth(getInternalUserAuthParams());
+        if (auth::isInternalAuthSet()) {
+            uassertStatusOK((*conn)->get()->authenticateInternalUser());
         }
         return Status::OK();
     } catch (...) {

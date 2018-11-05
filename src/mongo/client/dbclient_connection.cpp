@@ -48,7 +48,6 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -174,6 +173,14 @@ void DBClientConnection::_auth(const BSONObj& params) {
     }
 
     DBClientBase::_auth(params);
+}
+
+Status DBClientConnection::authenticateInternalUser() {
+    if (autoReconnect) {
+        _internalAuthOnReconnect = true;
+    }
+
+    return DBClientBase::authenticateInternalUser();
 }
 
 bool DBClientConnection::connect(const HostAndPort& server,
@@ -341,6 +348,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
 
 void DBClientConnection::logout(const string& dbname, BSONObj& info) {
     authCache.erase(dbname);
+    _internalAuthOnReconnect = false;
     runCommand(dbname, BSON("logout" << 1), info);
 }
 
@@ -470,16 +478,18 @@ void DBClientConnection::_checkConnection() {
     }
 
     LOG(_logLevel) << "reconnect " << toString() << " ok" << endl;
-    for (map<string, BSONObj>::const_iterator i = authCache.begin(); i != authCache.end(); i++) {
-        try {
-            DBClientConnection::_auth(i->second);
-        } catch (AssertionException& ex) {
-            if (ex.code() != ErrorCodes::AuthenticationFailed)
-                throw;
-            LOG(_logLevel) << "reconnect: auth failed "
-                           << i->second[auth::getSaslCommandUserDBFieldName()]
-                           << i->second[auth::getSaslCommandUserFieldName()] << ' ' << ex.what()
-                           << std::endl;
+    if (_internalAuthOnReconnect) {
+        uassertStatusOK(authenticateInternalUser());
+    } else {
+        for (const auto& kv : authCache) {
+            try {
+                DBClientConnection::_auth(kv.second);
+            } catch (ExceptionFor<ErrorCodes::AuthenticationFailed>& ex) {
+                LOG(_logLevel) << "reconnect: auth failed "
+                               << kv.second[auth::getSaslCommandUserDBFieldName()]
+                               << kv.second[auth::getSaslCommandUserFieldName()] << ' ' << ex.what()
+                               << std::endl;
+            }
         }
     }
 }

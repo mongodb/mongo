@@ -33,6 +33,7 @@
 #include <cstdint>
 
 #include "mongo/base/string_data.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/index_spec.h"
@@ -293,10 +294,9 @@ public:
 
     /**
     * Authenticates to another cluster member using appropriate authentication data.
-    * Uses getInternalUserAuthParams() to retrive authentication parameters.
-    * @return true if the authentication was succesful
+    * @return true if the authentication was successful
     */
-    bool authenticateInternalUser();
+    virtual Status authenticateInternalUser();
 
     /**
      * Authenticate a user.
@@ -714,6 +714,8 @@ protected:
     long long _connectionId;  // unique connection id for this connection
 
 private:
+    auth::RunCommandHook _makeAuthRunCommandHook();
+
     /**
      * The rpc protocols this client supports.
      *

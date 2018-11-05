@@ -38,9 +38,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/util/password_digest.h"
-
-using mongo::executor::RemoteCommandRequest;
 
 namespace mongo {
 namespace auth {
@@ -64,20 +65,16 @@ StatusWith<std::string> extractDBField(const BSONObj& params) {
     return std::move(db);
 }
 
-StatusWith<RemoteCommandRequest> createMongoCRGetNonceCmd(const BSONObj& params) {
+StatusWith<OpMsgRequest> createMongoCRGetNonceCmd(const BSONObj& params) {
     auto db = extractDBField(params);
     if (!db.isOK()) {
         return std::move(db.getStatus());
     }
 
-    auto request = RemoteCommandRequest();
-    request.cmdObj = kGetNonceCmd;
-    request.dbname = db.getValue();
-
-    return std::move(request);
+    return OpMsgRequest::fromDBAndBody(db.getValue(), kGetNonceCmd);
 }
 
-RemoteCommandRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonce) {
+OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonce) {
     std::string username;
     uassertStatusOK(bsonExtractStringField(params, saslCommandUserFieldName, &username));
 
@@ -93,9 +90,6 @@ RemoteCommandRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringD
         digested = createPasswordDigest(username, password);
     }
 
-    auto request = RemoteCommandRequest();
-    request.dbname = uassertStatusOK(extractDBField(params));
-
     BSONObjBuilder b;
     {
         b << "authenticate" << 1 << "nonce" << nonce << "user" << username;
@@ -109,41 +103,38 @@ RemoteCommandRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringD
             md5_finish(&st, d);
         }
         b << "key" << digestToString(d);
-        request.cmdObj = b.obj();
     }
-    return request;
+
+    return OpMsgRequest::fromDBAndBody(uassertStatusOK(extractDBField(params)), b.obj());
 }
 
-void authMongoCRImpl(RunCommandHook runCommand,
-                     const BSONObj& params,
-                     AuthCompletionHandler handler) {
+Future<void> authMongoCRImpl(RunCommandHook runCommand, const BSONObj& params) {
     invariant(runCommand);
-    invariant(handler);
 
     // Step 1: send getnonce command, receive nonce
     auto nonceRequest = createMongoCRGetNonceCmd(params);
-    if (!nonceRequest.isOK())
-        return handler(std::move(nonceRequest.getStatus()));
+    if (!nonceRequest.isOK()) {
+        return nonceRequest.getStatus();
+    }
 
-    runCommand(nonceRequest.getValue(), [runCommand, params, handler](AuthResponse response) {
-        if (!response.isOK())
-            return handler(std::move(response));
+    return runCommand(nonceRequest.getValue())
+        .then([runCommand, params](BSONObj nonceResponse) -> Future<void> {
+            auto status = getStatusFromCommandResult(nonceResponse);
+            if (!status.isOK()) {
+                return status;
+            }
 
-        try {
             // Ensure response was valid
             std::string nonce;
-            BSONObj nonceResponse = response.data;
             auto valid = bsonExtractStringField(nonceResponse, "nonce", &nonce);
             if (!valid.isOK())
-                return handler({ErrorCodes::AuthenticationFailed,
-                                "Invalid nonce response: " + nonceResponse.toString()});
+                return Status(ErrorCodes::AuthenticationFailed,
+                              "Invalid nonce response: " + nonceResponse.toString());
 
-            // Step 2: send authenticate command, receive response
-            runCommand(createMongoCRAuthenticateCmd(params, nonce), handler);
-        } catch (const DBException& e) {
-            return handler(e.toStatus());
-        }
-    });
+            return runCommand(createMongoCRAuthenticateCmd(params, nonce)).then([](BSONObj reply) {
+                return getStatusFromCommandResult(reply);
+            });
+        });
 }
 
 MONGO_INITIALIZER(RegisterAuthMongoCR)(InitializerContext* context) {

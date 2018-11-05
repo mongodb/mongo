@@ -106,7 +106,6 @@ env.Library(
         'sharding_legacy_api',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         'coreshard',
         'sharding_task_executor',

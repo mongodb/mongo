@@ -180,16 +180,17 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     }
     const auto clientNonce = input[1].substr(2);
 
-
-    // SERVER-16534, SCRAM-SHA-1 must be enabled for authenticating the internal user, so that
-    // cluster members may communicate with each other. Hence ignore disabled auth mechanism
-    // for the internal user.
     UserName user(ServerMechanismBase::ServerMechanismBase::_principalName,
                   ServerMechanismBase::getAuthenticationDatabase());
-    if (Policy::getName() == "SCRAM-SHA-1"_sd &&
-        !sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
+
+    // SERVER-16534, some mechanisms must be enabled for authenticating the internal user, so that
+    // cluster members may communicate with each other. Hence ignore disabled auth mechanism
+    // for the internal user.
+    if (Policy::isInternalAuthMech() &&
+        !sequenceContains(saslGlobalParams.authenticationMechanisms, Policy::getName()) &&
         user != internalSecurity.user->getName()) {
-        return Status(ErrorCodes::BadValue, "SCRAM-SHA-1 authentication is disabled");
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << Policy::getName() << " authentication is disabled");
     }
 
     // The authentication database is also the source database for the user.

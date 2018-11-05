@@ -43,6 +43,12 @@ struct PLAINPolicy {
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{};
     }
+    static int securityLevel() {
+        return 0;
+    }
+    static constexpr bool isInternalAuthMech() {
+        return false;
+    }
 };
 
 struct SCRAMSHA1Policy {
@@ -53,6 +59,12 @@ struct SCRAMSHA1Policy {
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
+    }
+    static int securityLevel() {
+        return 1;
+    }
+    static constexpr bool isInternalAuthMech() {
+        return true;
     }
 };
 
@@ -65,6 +77,12 @@ struct SCRAMSHA256Policy {
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
     }
+    static int securityLevel() {
+        return true;
+    }
+    static constexpr bool isInternalAuthMech() {
+        return true;
+    }
 };
 
 struct GSSAPIPolicy {
@@ -73,6 +91,12 @@ struct GSSAPIPolicy {
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
+    }
+    static int securityLevel() {
+        return 3;
+    }
+    static constexpr bool isInternalAuthMech() {
+        return false;
     }
 };
 

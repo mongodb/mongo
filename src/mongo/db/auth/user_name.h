@@ -88,6 +88,13 @@ public:
     }
 
     /**
+     * Gets the full unambiguous unique name of a user as a string, formatted as "db.user"
+     */
+    std::string getUnambiguousName() const {
+        return str::stream() << getDB() << "." << getUser();
+    }
+
+    /**
      * Stringifies the object, for logging/debugging.
      */
     std::string toString() const {

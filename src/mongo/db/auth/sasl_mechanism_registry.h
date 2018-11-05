@@ -102,6 +102,24 @@ public:
     virtual ~SaslServerCommonBase() = default;
     virtual StringData mechanismName() const = 0;
     virtual SecurityPropertySet properties() const = 0;
+
+    /**
+     * This returns a number that represents the "amount" of security provided by this mechanism
+     * to determine the order in which it is offered to clients in the isMaster
+     * saslSupportedMechs response.
+     *
+     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a
+     * higher value than the less secure mechanisms.
+     *
+     * For example, SCRAM-SHA-256 > SCRAM-SHA-1 > PLAIN
+     */
+    virtual int securityLevel() const = 0;
+
+    /**
+     * Returns true if the mechanism can be used for internal cluster authentication.
+     * Currently only SCRAM-SHA-1/SCRAM-SHA-256 return true here.
+     */
+    virtual bool isInternalAuthMech() const = 0;
 };
 
 /**
@@ -229,6 +247,14 @@ public:
     SecurityPropertySet properties() const final {
         return policy_type::getProperties();
     }
+
+    int securityLevel() const final {
+        return policy_type::securityLevel();
+    }
+
+    bool isInternalAuthMech() const final {
+        return policy_type::isInternalAuthMech();
+    }
 };
 
 /** Instantiates a class which provides runtime access to Policy properties. */
@@ -254,6 +280,14 @@ public:
     SecurityPropertySet properties() const final {
         return policy_type::getProperties();
     }
+
+    int securityLevel() const final {
+        return policy_type::securityLevel();
+    }
+
+    bool isInternalAuthMech() const final {
+        return policy_type::isInternalAuthMech();
+    }
 };
 
 /**
@@ -266,6 +300,16 @@ class SASLServerMechanismRegistry {
 public:
     static SASLServerMechanismRegistry& get(ServiceContext* serviceContext);
     static void set(ServiceContext* service, std::unique_ptr<SASLServerMechanismRegistry> registry);
+
+    /**
+     * Intialize the registry with a list of enabled mechanisms.
+     */
+    explicit SASLServerMechanismRegistry(std::vector<std::string> enabledMechanisms);
+
+    /**
+     * Sets a new list of enabled mechanisms - used in testing.
+     */
+    void setEnabledMechanisms(std::vector<std::string> enabledMechanisms);
 
     /**
      * Produces a list of SASL mechanisms which can be used to authenticate as a user.
@@ -302,38 +346,42 @@ public:
         using policy_type = typename T::policy_type;
         auto mechName = policy_type::getName();
 
-        // Always allow SCRAM-SHA-1 to pass to the first sasl step since we need to
-        // handle internal user authentication, SERVER-16534
         if (validateGlobalConfig &&
-            (mechName != "SCRAM-SHA-1" && !_mechanismSupportedByConfig(mechName))) {
+            (!policy_type::isInternalAuthMech() && !_mechanismSupportedByConfig(mechName))) {
             return false;
         }
 
-        invariant(
-            _getMapRef(T::isInternal).emplace(mechName.toString(), std::make_unique<T>()).second);
+        auto& list = _getMapRef(T::isInternal);
+        list.emplace_back(std::make_unique<T>());
+        std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) {
+            return (a->securityLevel() >= b->securityLevel());
+        });
+
         return true;
     }
 
 private:
-    stdx::unordered_map<std::string, std::unique_ptr<ServerFactoryBase>>& _getMapRef(
-        StringData dbName) {
+    using MechList = std::vector<std::unique_ptr<ServerFactoryBase>>;
+
+    MechList& _getMapRef(StringData dbName) {
         return _getMapRef(dbName != "$external"_sd);
     }
 
-    stdx::unordered_map<std::string, std::unique_ptr<ServerFactoryBase>>& _getMapRef(
-        bool internal) {
+    MechList& _getMapRef(bool internal) {
         if (internal) {
-            return _internalMap;
+            return _internalMechs;
         }
-        return _externalMap;
+        return _externalMechs;
     }
 
-    bool _mechanismSupportedByConfig(StringData mechName);
+    bool _mechanismSupportedByConfig(StringData mechName) const;
 
     // Stores factories which make mechanisms for all databases other than $external
-    stdx::unordered_map<std::string, std::unique_ptr<ServerFactoryBase>> _internalMap;
+    MechList _internalMechs;
     // Stores factories which make mechanisms exclusively for $external
-    stdx::unordered_map<std::string, std::unique_ptr<ServerFactoryBase>> _externalMap;
+    MechList _externalMechs;
+
+    std::vector<std::string> _enabledMechanisms;
 };
 
 template <typename Factory>

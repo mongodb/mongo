@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/authenticate.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/net/ssl_options.h"
@@ -204,9 +204,9 @@ mongo::Status mongo::setClusterAuthModeFromString(StringData strMode) {
         }
         serverGlobalParams.clusterAuthMode.store(mode);
 #ifdef MONGO_CONFIG_SSL
-        setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-X509"
-                                                                     << saslCommandUserDBFieldName
-                                                                     << "$external"));
+        auth::setInternalUserAuthParams(
+            BSON(saslCommandMechanismFieldName << "MONGODB-X509" << saslCommandUserDBFieldName
+                                               << "$external"));
 #endif
     } else if ((mode == ServerGlobalParams::ClusterAuthMode_x509) &&
                (oldMode == ServerGlobalParams::ClusterAuthMode_sendX509)) {

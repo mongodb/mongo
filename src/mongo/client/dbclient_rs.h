@@ -74,6 +74,8 @@ public:
      */
     bool connect();
 
+    Status authenticateInternalUser() override;
+
     /**
      * Logs out the connection for the given database.
      *
@@ -256,6 +258,9 @@ private:
 
     DBClientConnection* checkMaster();
 
+    template <typename Authenticate>
+    Status _runAuthLoop(Authenticate authCb);
+
     /**
      * Helper method for selecting a node based on the read preference. Will advance
      * the tag tags object if it cannot find a node that matches the current tag.
@@ -328,6 +333,7 @@ private:
     // we can re-auth
     // this could be a security issue, as the password is stored in memory
     // not sure if/how we should handle
+    bool _internalAuthRequested = false;
     std::map<std::string, BSONObj> _auths;  // dbName -> auth parameters
 
     MongoURI _uri;

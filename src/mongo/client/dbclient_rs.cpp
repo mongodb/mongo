@@ -361,6 +361,14 @@ bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
 }
 
 void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
+    if (_internalAuthRequested) {
+        auto status = conn->authenticateInternalUser();
+        if (!status.isOK()) {
+            warning() << "cached auth failed for set " << _setName << ": " << status;
+        }
+        return;
+    }
+
     for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
         try {
             conn->auth(i->second);
@@ -373,6 +381,7 @@ void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
 }
 
 void DBClientReplicaSet::logoutAll(DBClientConnection* conn) {
+    _internalAuthRequested = false;
     for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
         BSONObj response;
         try {
@@ -406,33 +415,26 @@ bool DBClientReplicaSet::connect() {
     return _getMonitor()->getHostOrRefresh(anyUpHost).getNoThrow().isOK();
 }
 
-static bool isAuthenticationException(const DBException& ex) {
-    return ex.code() == ErrorCodes::AuthenticationFailed;
-}
-
-void DBClientReplicaSet::_auth(const BSONObj& params) {
+template <typename Authenticate>
+Status DBClientReplicaSet::_runAuthLoop(Authenticate authCb) {
     // We prefer to authenticate against a primary, but otherwise a secondary is ok too
     // Empty tag matches every secondary
-    shared_ptr<ReadPreferenceSetting> readPref(
-        new ReadPreferenceSetting(ReadPreference::PrimaryPreferred, TagSet()));
+    const auto readPref =
+        std::make_shared<ReadPreferenceSetting>(ReadPreference::PrimaryPreferred, TagSet());
 
-    LOG(3) << "dbclient_rs authentication of " << _getMonitor()->getName() << endl;
+    LOG(3) << "dbclient_rs authentication of " << _getMonitor()->getName();
 
     // NOTE that we retry MAX_RETRY + 1 times, since we're always primary preferred we don't
     // fallback to the primary.
     Status lastNodeStatus = Status::OK();
     for (size_t retry = 0; retry < MAX_RETRY + 1; retry++) {
         try {
-            DBClientConnection* conn = selectNodeUsingTags(readPref);
-
-            if (conn == NULL) {
+            auto conn = selectNodeUsingTags(readPref);
+            if (conn == nullptr) {
                 break;
             }
 
-            conn->auth(params);
-
-            // Cache the new auth information since we now validated it's good
-            _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
+            authCb(conn);
 
             // Ensure the only child connection open is the one we authenticated against - other
             // child connections may not have full authentication information.
@@ -445,27 +447,46 @@ void DBClientReplicaSet::_auth(const BSONObj& params) {
                 resetMaster();
             }
 
-            return;
-        } catch (const DBException& ex) {
-            // We care if we can't authenticate (i.e. bad password) in credential params.
-            if (isAuthenticationException(ex)) {
-                throw;
+            return Status::OK();
+        } catch (const DBException& e) {
+            auto status = e.toStatus();
+            if (status == ErrorCodes::AuthenticationFailed) {
+                return status;
             }
 
             lastNodeStatus =
-                ex.toStatus(str::stream() << "can't authenticate against replica set node "
-                                          << _lastSlaveOkHost);
+                status.withContext(str::stream() << "can't authenticate against replica set node "
+                                                 << _lastSlaveOkHost);
             _invalidateLastSlaveOkCache(lastNodeStatus);
         }
     }
 
     if (lastNodeStatus.isOK()) {
-        StringBuilder assertMsgB;
-        assertMsgB << "Failed to authenticate, no good nodes in " << _getMonitor()->getName();
-        uasserted(ErrorCodes::HostNotFound, assertMsgB.str());
+        return Status(ErrorCodes::HostNotFound,
+                      str::stream() << "Failed to authenticate, no good nodes in "
+                                    << _getMonitor()->getName());
     } else {
-        uassertStatusOK(lastNodeStatus);
+        return lastNodeStatus;
     }
+}
+
+Status DBClientReplicaSet::authenticateInternalUser() {
+    if (!auth::isInternalAuthSet()) {
+        return {ErrorCodes::AuthenticationFailed,
+                "No authentication parameters set for internal user"};
+    }
+
+    _internalAuthRequested = true;
+    return _runAuthLoop(
+        [&](DBClientConnection* conn) { uassertStatusOK(conn->authenticateInternalUser()); });
+}
+
+void DBClientReplicaSet::_auth(const BSONObj& params) {
+    uassertStatusOK(_runAuthLoop([&](DBClientConnection* conn) {
+        conn->auth(params);
+        // Cache the new auth information since we now validated it's good
+        _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
+    }));
 }
 
 void DBClientReplicaSet::logout(const string& dbname, BSONObj& info) {

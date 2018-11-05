@@ -95,6 +95,7 @@ SaslConversation::SaslConversation(std::string mech)
           std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState),
           AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{})),
       authSession(authManager->makeAuthorizationSession()),
+      registry({"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
       mechanism(mech) {
 
     AuthorizationManager::set(getServiceContext(),
@@ -271,12 +272,6 @@ TEST_F(SaslIllegalConversation, IllegalClientMechanism) {
     std::string clientMessage;
     std::string serverMessage;
     ASSERT(!client->initialize().isOK() || !client->step(serverMessage, &clientMessage).isOK());
-}
-
-TEST_F(SaslIllegalConversation, IllegalServerMechanism) {
-    SASLServerMechanismRegistry registry;
-    auto swServer = registry.getServerMechanism("FAKE", "test");
-    ASSERT_NOT_OK(swServer.getStatus());
 }
 
 }  // namespace

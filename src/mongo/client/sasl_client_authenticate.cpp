@@ -42,10 +42,9 @@ namespace mongo {
 
 using namespace mongoutils;
 
-void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
-                               const HostAndPort& hostname,
-                               const BSONObj& saslParameters,
-                               auth::AuthCompletionHandler handler) = nullptr;
+Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
+                                       const HostAndPort& hostname,
+                                       const BSONObj& saslParameters) = nullptr;
 
 Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type) {
     BSONElement payloadElement;

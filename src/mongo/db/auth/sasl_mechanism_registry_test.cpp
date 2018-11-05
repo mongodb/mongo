@@ -64,10 +64,40 @@ TEST(SecurityProperty, mutualAndPlainHasAllSubsets) {
         SecurityPropertySet{SecurityProperty::kMutualAuth, SecurityProperty::kNoPlainText}));
 }
 
+template <typename Policy>
+class BaseMockMechanism : public MakeServerMechanism<Policy> {
+public:
+    explicit BaseMockMechanism(std::string authenticationDatabase)
+        : MakeServerMechanism<Policy>(std::move(authenticationDatabase)) {}
+
+protected:
+    StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
+                                                       StringData input) final {
+        return std::make_tuple(true, std::string());
+    }
+};
+
+template <typename Policy, bool argIsInternal>
+class BaseMockMechanismFactory : public MakeServerFactory<Policy> {
+public:
+    static constexpr bool isInternal = argIsInternal;
+    bool canMakeMechanismForUser(const User* user) const final {
+        return true;
+    }
+};
+
 // Policy for a hypothetical "FOO" SASL mechanism.
 struct FooPolicy {
     static constexpr StringData getName() {
         return "FOO"_sd;
+    }
+
+    static constexpr int securityLevel() {
+        return 0;
+    }
+
+    static constexpr bool isInternalAuthMech() {
+        return false;
     }
 
     // This mech is kind of dangerous, it sends plaintext passwords across the wire.
@@ -76,26 +106,13 @@ struct FooPolicy {
     }
 };
 
-class FooMechanism : public MakeServerMechanism<FooPolicy> {
+class FooMechanism : public BaseMockMechanism<FooPolicy> {
 public:
-    explicit FooMechanism(std::string authenticationDatabase)
-        : MakeServerMechanism<FooPolicy>(std::move(authenticationDatabase)) {}
-
-protected:
-    StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData input) final {
-        return std::make_tuple(true, std::string());
-    }
+    using BaseMockMechanism<FooPolicy>::BaseMockMechanism;
 };
 
 template <bool argIsInternal>
-class FooMechanismFactory : public MakeServerFactory<FooMechanism> {
-public:
-    static constexpr bool isInternal = argIsInternal;
-    bool canMakeMechanismForUser(const User* user) const final {
-        return true;
-    }
-};
+class FooMechanismFactory : public BaseMockMechanismFactory<FooMechanism, argIsInternal> {};
 
 // Policy for a hypothetical "BAR" SASL mechanism.
 struct BarPolicy {
@@ -103,32 +120,53 @@ struct BarPolicy {
         return "BAR"_sd;
     }
 
+    static constexpr int securityLevel() {
+        return 1;
+    }
+
+    static constexpr bool isInternalAuthMech() {
+        return false;
+    }
+
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kMutualAuth, SecurityProperty::kNoPlainText};
     }
 };
 
-class BarMechanism : public MakeServerMechanism<BarPolicy> {
+class BarMechanism : public BaseMockMechanism<BarPolicy> {
 public:
-    explicit BarMechanism(std::string authenticationDatabase)
-        : MakeServerMechanism<BarPolicy>(std::move(authenticationDatabase)) {}
-
-protected:
-    StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData input) final {
-        return std::make_tuple(true, std::string());
-    }
+    using BaseMockMechanism<BarPolicy>::BaseMockMechanism;
 };
 
 template <bool argIsInternal>
-class BarMechanismFactory : public MakeServerFactory<BarMechanism> {
-public:
-    static constexpr bool isInternal = argIsInternal;
-    bool canMakeMechanismForUser(const User* user) const final {
+class BarMechanismFactory : public BaseMockMechanismFactory<BarMechanism, argIsInternal> {};
+
+// Policy for a hypothetical "InternalAuth" SASL mechanism.
+struct InternalAuthPolicy {
+    static constexpr StringData getName() {
+        return "InternalAuth"_sd;
+    }
+
+    static constexpr int securityLevel() {
+        return 2;
+    }
+
+    static constexpr bool isInternalAuthMech() {
         return true;
+    }
+
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{SecurityProperty::kMutualAuth, SecurityProperty::kNoPlainText};
     }
 };
 
+class InternalAuthMechanism : public BaseMockMechanism<InternalAuthPolicy> {
+public:
+    using BaseMockMechanism<InternalAuthPolicy>::BaseMockMechanism;
+};
+
+class InternalAuthMechanismFactory : public BaseMockMechanismFactory<InternalAuthMechanism, true> {
+};
 
 class MechanismRegistryTest : public ServiceContextTest {
 public:
@@ -137,7 +175,9 @@ public:
           authManagerExternalState(new AuthzManagerExternalStateMock()),
           authManager(new AuthorizationManagerImpl(
               std::unique_ptr<AuthzManagerExternalStateMock>(authManagerExternalState),
-              AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{})) {
+              AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{})),
+          // By default the registry is initialized with all mechanisms enabled.
+          registry({"FOO", "BAR", "InternalAuth"}) {
         AuthorizationManager::set(getServiceContext(),
                                   std::unique_ptr<AuthorizationManager>(authManager));
 
@@ -180,6 +220,17 @@ public:
                                                         << "roles"
                                                         << BSONArray()),
                                                    BSONObj()));
+
+        internalSecurity.user = std::make_shared<User>(UserName("__system", "local"));
+    }
+
+    BSONObj getMechsFor(const UserName user) {
+        BSONObjBuilder builder;
+        registry.advertiseMechanismNamesForUser(
+            opCtx.get(),
+            BSON("isMaster" << 1 << "saslSupportedMechs" << user.getUnambiguousName()),
+            &builder);
+        return builder.obj();
     }
 
     ServiceContext::UniqueOperationContext opCtx;
@@ -187,6 +238,9 @@ public:
     AuthorizationManager* authManager;
 
     SASLServerMechanismRegistry registry;
+
+    const UserName internalSajack = {"sajack"_sd, "test"_sd};
+    const UserName externalSajack = {"sajack"_sd, "$external"_sd};
 };
 
 TEST_F(MechanismRegistryTest, acquireInternalMechanism) {
@@ -226,14 +280,7 @@ TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
     registry.registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    BSONObjBuilder builder;
-
-    registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                            BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                            << "test.noSuchUser"),
-                                            &builder);
-
-    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
+    ASSERT_BSONOBJ_EQ(BSONObj(), getMechsFor(UserName("noSuchUser"_sd, "test"_sd)));
 }
 
 TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {
@@ -242,56 +289,42 @@ TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {
     registry.registerFactory<BarMechanismFactory<false>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    BSONObjBuilder builder;
-    registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                            BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                            << "test.sajack"),
-                                            &builder);
-
-    BSONObj obj = builder.done();
-    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), obj);
-
-    BSONObjBuilder builderExternal;
-    registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                            BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                            << "$external.sajack"),
-                                            &builderExternal);
-
-    BSONObj objExternal = builderExternal.done();
-    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), objExternal);
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(internalSajack));
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(externalSajack));
 }
 
 TEST_F(MechanismRegistryTest, weakMechCannotAdvertiseOnInternal) {
     registry.registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    BSONObjBuilder builder;
-    registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                            BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                            << "test.sajack"),
-                                            &builder);
-
-
-    BSONObj obj = builder.done();
-
-    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSONArray()), obj);
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSONArray()), getMechsFor(internalSajack));
 }
 
 TEST_F(MechanismRegistryTest, weakMechCanAdvertiseOnExternal) {
     registry.registerFactory<FooMechanismFactory<false>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    BSONObjBuilder builder;
-    registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                            BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                            << "$external.sajack"),
-                                            &builder);
-
-    BSONObj obj = builder.done();
-
-    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("FOO")), obj);
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("FOO")), getMechsFor(externalSajack));
 }
 
+TEST_F(MechanismRegistryTest, internalAuth) {
+    registry.setEnabledMechanisms({"BAR"});
+
+    registry.registerFactory<BarMechanismFactory<true>>(
+        SASLServerMechanismRegistry::kValidateGlobalMechanisms);
+    registry.registerFactory<InternalAuthMechanismFactory>(
+        SASLServerMechanismRegistry::kValidateGlobalMechanisms);
+
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(internalSajack));
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth"
+                                                              << "BAR")),
+                      getMechsFor(internalSecurity.user->getName()));
+
+    registry.setEnabledMechanisms({"BAR", "InternalAuth"});
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth"
+                                                              << "BAR")),
+                      getMechsFor(internalSajack));
+}
 
 }  // namespace
 }  // namespace mongo

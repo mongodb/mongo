@@ -36,9 +36,9 @@
 
 #include <string>
 
+#include "mongo/client/authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/log.h"
 
@@ -58,8 +58,8 @@ AuthorizationManager* getGlobalAuthorizationManager() {
 }  // namespace
 
 bool replAuthenticate(DBClientBase* conn) {
-    if (isInternalAuthSet())
-        return conn->authenticateInternalUser();
+    if (auth::isInternalAuthSet())
+        return conn->authenticateInternalUser().isOK();
     if (getGlobalAuthorizationManager()->isAuthEnabled())
         return false;
     return true;

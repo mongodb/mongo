@@ -47,7 +47,7 @@
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -449,6 +449,21 @@ private:
 };
 }  // namespace
 
+auth::RunCommandHook DBClientBase::_makeAuthRunCommandHook() {
+    return [this](OpMsgRequest request) -> Future<BSONObj> {
+        try {
+            auto ret = runCommand(std::move(request));
+            auto status = getStatusFromCommandResult(ret->getCommandReply());
+            if (!status.isOK()) {
+                return status;
+            }
+            return Future<BSONObj>::makeReady(std::move(ret->getCommandReply()));
+        } catch (const DBException& e) {
+            return Future<BSONObj>::makeReady(e.toStatus());
+        }
+    };
+}
+
 void DBClientBase::_auth(const BSONObj& params) {
     ScopedMetadataWriterRemover remover{this};
 
@@ -460,71 +475,46 @@ void DBClientBase::_auth(const BSONObj& params) {
     }
 #endif
 
-    auth::authenticateClient(
-        params,
-        HostAndPort(getServerAddress()),
-        clientName,
-        [this](RemoteCommandRequest request, auth::AuthCompletionHandler handler) {
-            BSONObj info;
-            auto start = Date_t::now();
-
-            try {
-                auto reply = runCommand(
-                    OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj, request.metadata));
-
-                BSONObj data = reply->getCommandReply().getOwned();
-                Milliseconds millis(Date_t::now() - start);
-
-                // Hand control back to authenticateClient()
-                handler({data, millis});
-
-            } catch (...) {
-                handler(exceptionToStatus());
-            }
-        });
+    HostAndPort remote(getServerAddress());
+    auth::authenticateClient(params, remote, clientName, _makeAuthRunCommandHook())
+        .onError([](Status status) {
+            // for some reason, DBClient transformed all errors into AuthenticationFailed errors
+            return Status(ErrorCodes::AuthenticationFailed, status.reason());
+        })
+        .get();
 }
 
-bool DBClientBase::authenticateInternalUser() {
-    if (!isInternalAuthSet()) {
+Status DBClientBase::authenticateInternalUser() {
+    ScopedMetadataWriterRemover remover{this};
+    if (!auth::isInternalAuthSet()) {
         if (!serverGlobalParams.quiet.load()) {
             log() << "ERROR: No authentication parameters set for internal user";
         }
-        return false;
+        return {ErrorCodes::AuthenticationFailed,
+                "No authentication parameters set for internal user"};
     }
 
-    Status authStatus(ErrorCodes::InternalError, "Status was not set after authentication");
-    auto attemptAuth = [&](const BSONObj& params) {
-        if (params.isEmpty()) {
-            return;
-        }
-
-        try {
-            auth(params);
-            authStatus = Status::OK();
-        } catch (const AssertionException& ex) {
-            authStatus = ex.toStatus();
-        }
-    };
-
-    // First we attempt to authenticate with the default authentication parameters.
-    attemptAuth(getInternalUserAuthParams());
-
-    // If we're in the middle of keyfile rollover, we try to authenticate again with the alternate
-    // credentials in the keyfile.
-    if (authStatus == ErrorCodes::AuthenticationFailed) {
-        attemptAuth(getInternalUserAuthParams(1));
+    // We will only have a client name if SSL is enabled
+    std::string clientName = "";
+#ifdef MONGO_CONFIG_SSL
+    if (sslManager() != nullptr) {
+        clientName = sslManager()->getSSLConfiguration().clientSubjectName.toString();
     }
+#endif
 
-    if (authStatus.isOK()) {
-        return true;
+    auto status =
+        auth::authenticateInternalClient(clientName, boost::none, _makeAuthRunCommandHook())
+            .getNoThrow();
+    if (status.isOK()) {
+        return status;
     }
 
     if (serverGlobalParams.quiet.load()) {
         log() << "can't authenticate to " << toString()
-              << " as internal user, error: " << authStatus.reason();
+              << " as internal user, error: " << status.reason();
     }
 
-    return false;
+    return status;
 }
 
 void DBClientBase::auth(const BSONObj& params) {

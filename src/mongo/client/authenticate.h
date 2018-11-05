@@ -34,10 +34,14 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/executor/remote_command_request.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/future.h"
 #include "mongo/util/md5.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -45,25 +49,23 @@ class BSONObj;
 
 namespace auth {
 
-using AuthResponse = executor::RemoteCommandResponse;
-using AuthCompletionHandler = stdx::function<void(AuthResponse)>;
-using RunCommandResultHandler = AuthCompletionHandler;
-using RunCommandHook =
-    stdx::function<void(executor::RemoteCommandRequest, RunCommandResultHandler)>;
+using RunCommandHook = stdx::function<Future<BSONObj>(OpMsgRequest request)>;
 
 /* Hook for legacy MONGODB-CR support provided by shell client only */
-using AuthMongoCRHandler =
-    stdx::function<void(RunCommandHook, const BSONObj&, AuthCompletionHandler)>;
+using AuthMongoCRHandler = stdx::function<Future<void>(RunCommandHook, const BSONObj&)>;
 extern AuthMongoCRHandler authMongoCR;
 
 /**
  * Names for supported authentication mechanisms.
  */
 
-extern const char* const kMechanismMongoX509;
-extern const char* const kMechanismSaslPlain;
-extern const char* const kMechanismGSSAPI;
-extern const char* const kMechanismScramSha1;
+constexpr auto kMechanismMongoCR = "MONGODB-CR"_sd;
+constexpr auto kMechanismMongoX509 = "MONGODB-X509"_sd;
+constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
+constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;
+constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
+constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
+constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
 /**
  * Authenticate a user.
@@ -89,19 +91,51 @@ extern const char* const kMechanismScramSha1;
  * Other fields in "params" are silently ignored. A "params" object can be constructed
  * using the buildAuthParams() method.
  *
- * If a "handler" is provided, this call will execute asynchronously and "handler" will be
- * invoked when authentication has completed.  If no handler is provided, authenticateClient
- * will run synchronously.
- *
- * Returns normally on success, and throws on error.  Throws a DBException with getCode() ==
- * ErrorCodes::AuthenticationFailed if authentication is rejected.  All other exceptions are
- * tantamount to authentication failure, but may also indicate more serious problems.
+ * This function will return a future that will be filled with the final result of the
+ * authentication command on success or a Status on error.
  */
-void authenticateClient(const BSONObj& params,
-                        const HostAndPort& hostname,
-                        StringData clientSubjectName,
-                        RunCommandHook runCommand,
-                        AuthCompletionHandler handler = AuthCompletionHandler());
+Future<void> authenticateClient(const BSONObj& params,
+                                const HostAndPort& hostname,
+                                const std::string& clientSubjectName,
+                                RunCommandHook runCommand);
+
+/**
+ * Authenticate as the __system user. All parameters are the same as authenticateClient above,
+ * but the __system user's credentials will be filled in automatically.
+ *
+ * The "mechanismHint" parameter will force authentication with a specific mechanism
+ * (e.g. SCRAM-SHA-256). If it is boost::none, then an isMaster will be called to negotiate
+ * a SASL mechanism with the server.
+ *
+ * Because this may retry during cluster keyfile rollover, this may call the RunCommandHook more
+ * than once, but will only call the AuthCompletionHandler once.
+ */
+Future<void> authenticateInternalClient(const std::string& clientSubjectName,
+                                        boost::optional<std::string> mechanismHint,
+                                        RunCommandHook runCommand);
+
+/**
+ * Sets the keys used by authenticateInternalClient - these should be a vector of raw passwords,
+ * they will be digested and prepped appropriately by authenticateInternalClient depending
+ * on what mechanism is used.
+ */
+void setInternalAuthKeys(const std::vector<std::string>& keys);
+
+/**
+ * Sets the parameters for non-password based internal authentication.
+ */
+void setInternalUserAuthParams(BSONObj obj);
+
+/**
+ * Returns whether there are multiple keys that will be tried while authenticating an internal
+ * client (used for logging a startup warning).
+ */
+bool hasMultipleInternalAuthKeys();
+
+/**
+ * Returns whether there are any internal auth data set.
+ */
+bool isInternalAuthSet();
 
 /**
  * Build a BSONObject representing parameters to be passed to authenticateClient(). Takes
@@ -116,6 +150,13 @@ BSONObj buildAuthParams(StringData dbname,
                         StringData username,
                         StringData passwordText,
                         bool digestPassword);
+
+/**
+ * Run an isMaster exchange to negotiate a SASL mechanism for authentication.
+ */
+Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
+                                           const UserName& username,
+                                           boost::optional<std::string> mechanismHint);
 
 /**
  * Return the field name for the database containing credential information.

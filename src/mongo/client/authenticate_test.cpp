@@ -45,10 +45,6 @@
 namespace {
 
 using namespace mongo;
-using executor::RemoteCommandRequest;
-using executor::RemoteCommandResponse;
-
-using auth::RunCommandResultHandler;
 
 /**
  * Utility class to support tests in this file.  Allows caller to load
@@ -65,9 +61,8 @@ public:
           _nonce("7ca422a24f326f2a"),
           _requests(),
           _responses() {
-        _runCommandCallback = [this](RemoteCommandRequest request,
-                                     RunCommandResultHandler handler) {
-            runCommand(std::move(request), handler);
+        _runCommandCallback = [this](OpMsgRequest request) {
+            return runCommand(std::move(request));
         };
 
         // create our digest
@@ -84,18 +79,19 @@ public:
     }
 
     // protected:
-    void runCommand(RemoteCommandRequest request, RunCommandResultHandler handler) {
+    Future<BSONObj> runCommand(OpMsgRequest request) {
         // Validate the received request
         ASSERT(!_requests.empty());
-        RemoteCommandRequest expected = _requests.front();
-        ASSERT(expected.dbname == request.dbname);
-        ASSERT_BSONOBJ_EQ(expected.cmdObj, request.cmdObj);
+        auto& expected = _requests.front();
+        ASSERT_EQ(expected.getDatabase(), request.getDatabase());
+        ASSERT_BSONOBJ_EQ(expected.body, request.body);
         _requests.pop();
 
         // Then pop a response and call the handler
         ASSERT(!_responses.empty());
-        handler(_responses.front());
+        auto ret = _responses.front();
         _responses.pop();
+        return ret;
     }
 
     void reset() {
@@ -105,11 +101,11 @@ public:
     }
 
     void pushResponse(const BSONObj& cmd) {
-        _responses.emplace(cmd, _millis);
+        _responses.emplace(cmd);
     }
 
     void pushRequest(StringData dbname, const BSONObj& cmd) {
-        _requests.emplace(_mockHost, dbname.toString(), cmd, nullptr);
+        _requests.emplace(OpMsgRequest::fromDBAndBody(dbname, cmd));
     }
 
     BSONObj loadMongoCRConversation() {
@@ -175,8 +171,8 @@ public:
     std::string _digest;
     std::string _nonce;
 
-    std::queue<RemoteCommandRequest> _requests;
-    std::queue<RemoteCommandResponse> _responses;
+    std::queue<OpMsgRequest> _requests;
+    std::queue<BSONObj> _responses;
 };
 
 TEST_F(AuthClientTest, MongoCR) {
@@ -185,7 +181,7 @@ TEST_F(AuthClientTest, MongoCR) {
     // jstests exist to ensure MONGODB-CR continues to work from the client.
     auto params = loadMongoCRConversation();
     ASSERT_THROWS(
-        auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback),
+        auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback).get(),
         DBException);
 }
 
@@ -193,26 +189,23 @@ TEST_F(AuthClientTest, asyncMongoCR) {
     // As with the sync version above, we expect authentication to fail
     // since this test was built without MONGODB-CR support.
     auto params = loadMongoCRConversation();
-    auth::authenticateClient(std::move(params),
-                             HostAndPort(),
-                             "",
-                             _runCommandCallback,
-                             [this](auth::AuthResponse response) { ASSERT(!response.isOK()); });
+    ASSERT_NOT_OK(
+        auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback)
+            .getNoThrow());
 }
 
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthClientTest, X509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback);
+    auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback)
+        .get();
 }
 
 TEST_F(AuthClientTest, asyncX509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(std::move(params),
-                             HostAndPort(),
-                             _username,
-                             _runCommandCallback,
-                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
+    ASSERT_OK(
+        auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback)
+            .getNoThrow());
 }
 #endif
 

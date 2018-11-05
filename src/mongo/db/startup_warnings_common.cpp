@@ -37,8 +37,8 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/client/authenticate.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
@@ -137,7 +137,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         warned = true;
     }
 
-    if (!getInternalUserAuthParams(1).isEmpty()) {
+    if (auth::hasMultipleInternalAuthKeys()) {
         log() << startupWarningsLog;
         log() << "** WARNING: Multiple keys specified in security key file. If cluster key file"
               << startupWarningsLog;

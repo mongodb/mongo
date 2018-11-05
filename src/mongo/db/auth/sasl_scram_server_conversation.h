@@ -38,7 +38,7 @@
 namespace mongo {
 
 /**
- *  Server side authentication session for SASL SCRAM-SHA-1.
+ *  Server side authentication session for SASL SCRAM-SHA-1/256.
  */
 template <typename Policy>
 class SaslSCRAMServerMechanism : public MakeServerMechanism<Policy> {

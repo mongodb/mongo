@@ -170,7 +170,6 @@ clientDriverEnv.Library(
         'connection_string',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
     ],
 )
@@ -243,7 +242,6 @@ env.Library(
         'authentication',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
         '$BUILD_DIR/mongo/transport/message_compressor',
@@ -258,9 +256,6 @@ env.Library(
     ],
     LIBDEPS=[
         'clientdriver_network',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
     ],
 )
 

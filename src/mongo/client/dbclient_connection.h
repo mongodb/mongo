@@ -280,6 +280,8 @@ public:
         return _isMongos;
     }
 
+    Status authenticateInternalUser() override;
+
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
@@ -310,6 +312,7 @@ protected:
 
     void _checkConnection();
 
+    bool _internalAuthOnReconnect = false;
     std::map<std::string, BSONObj> authCache;
 
     static AtomicInt32 _numConnections;

@@ -38,10 +38,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
@@ -202,7 +202,7 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
             return false;
         }
 
-        if (isInternalAuthSet() && !conn.authenticateInternalUser()) {
+        if (auth::isInternalAuthSet() && !conn.authenticateInternalUser().isOK()) {
             return false;
         }
         BSONObj out;

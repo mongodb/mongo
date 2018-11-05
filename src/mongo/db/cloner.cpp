@@ -38,7 +38,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -705,9 +705,11 @@ Status Cloner::copyDb(OperationContext* opCtx,
                 return Status(ErrorCodes::HostUnreachable, errmsg);
             }
 
-            if (isInternalAuthSet() && !con->authenticateInternalUser()) {
-                return Status(ErrorCodes::AuthenticationFailed,
-                              "Unable to authenticate as internal user");
+            if (auth::isInternalAuthSet()) {
+                auto authStatus = con->authenticateInternalUser();
+                if (!authStatus.isOK()) {
+                    return authStatus;
+                }
             }
 
             _conn = std::move(con);

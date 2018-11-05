@@ -55,6 +55,15 @@ public:
     virtual ~NetworkConnectionHook() = default;
 
     /**
+     * Optionally augments the isMaster request sent while initializing the wire protocol.
+     *
+     * By default this will just return the cmdObj passed in unaltered.
+     */
+    virtual BSONObj augmentIsMasterRequest(BSONObj cmdObj) {
+        return cmdObj;
+    }
+
+    /**
      * Runs optional validation logic on an isMaster reply from a remote host. If a non-OK
      * Status is returned, it will be propagated up to the completion handler for the command
      * that initiated the request that caused this connection to be created. This will

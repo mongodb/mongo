@@ -32,6 +32,7 @@
 
 #include <memory>
 
+#include "mongo/client/authenticate.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
@@ -67,6 +68,8 @@ public:
 
     Future<void> authenticate(const BSONObj& params);
 
+    Future<void> authenticateInternal(boost::optional<std::string> mechanismHint);
+
     Future<void> initWireVersion(const std::string& appName,
                                  executor::NetworkConnectionHook* const hook);
 
@@ -81,9 +84,11 @@ public:
 
 private:
     Future<Message> _call(Message request, const transport::BatonHandle& baton = nullptr);
-    BSONObj _buildIsMasterRequest(const std::string& appName);
+    BSONObj _buildIsMasterRequest(const std::string& appName,
+                                  executor::NetworkConnectionHook* hook);
     void _parseIsMasterResponse(BSONObj request,
                                 const std::unique_ptr<rpc::ReplyInterface>& response);
+    auth::RunCommandHook _makeAuthRunCommandHook();
 
     const HostAndPort _peer;
     transport::SessionHandle _session;

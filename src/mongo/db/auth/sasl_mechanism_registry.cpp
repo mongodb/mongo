@@ -60,13 +60,22 @@ void SASLServerMechanismRegistry::set(ServiceContext* service,
     getSASLServerMechanismRegistry(service) = std::move(registry);
 }
 
+SASLServerMechanismRegistry::SASLServerMechanismRegistry(std::vector<std::string> enabledMechanisms)
+    : _enabledMechanisms(std::move(enabledMechanisms)) {}
+
+void SASLServerMechanismRegistry::setEnabledMechanisms(std::vector<std::string> enabledMechanisms) {
+    _enabledMechanisms = std::move(enabledMechanisms);
+}
+
 StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::getServerMechanism(
     StringData mechanismName, std::string authenticationDatabase) {
-    auto& map = _getMapRef(authenticationDatabase);
+    auto& mechList = _getMapRef(authenticationDatabase);
 
-    auto it = map.find(mechanismName.toString());
-    if (it != map.end()) {
-        return it->second->create(std::move(authenticationDatabase));
+    auto it = std::find_if(mechList.begin(), mechList.end(), [&](const auto& mech) {
+        return (mech->mechanismName() == mechanismName);
+    });
+    if (it != mechList.end()) {
+        return (*it)->create(std::move(authenticationDatabase));
     }
 
     return Status(ErrorCodes::BadValue,
@@ -100,18 +109,23 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
 
         user = std::move(swUser.getValue());
         BSONArrayBuilder mechanismsBuilder;
-        auto& map = _getMapRef(userName.getDB());
+        const auto& mechList = _getMapRef(userName.getDB());
 
-        for (const auto& factoryIt : map) {
-            SecurityPropertySet properties = factoryIt.second->properties();
+        for (const auto& factoryIt : mechList) {
+            SecurityPropertySet properties = factoryIt->properties();
             if (!properties.hasAllProperties(SecurityPropertySet{SecurityProperty::kNoPlainText,
                                                                  SecurityProperty::kMutualAuth}) &&
                 userName.getDB() != "$external") {
                 continue;
             }
 
-            if (factoryIt.second->canMakeMechanismForUser(user.get())) {
-                mechanismsBuilder << factoryIt.first;
+            auto mechanismEnabled = _mechanismSupportedByConfig(factoryIt->mechanismName());
+            if (!mechanismEnabled && userName == internalSecurity.user->getName()) {
+                mechanismEnabled = factoryIt->isInternalAuthMech();
+            }
+
+            if (mechanismEnabled && factoryIt->canMakeMechanismForUser(user.get())) {
+                mechanismsBuilder << factoryIt->mechanismName();
             }
         }
 
@@ -119,8 +133,8 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     }
 }
 
-bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechName) {
-    return sequenceContains(saslGlobalParams.authenticationMechanisms, mechName);
+bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechName) const {
+    return sequenceContains(_enabledMechanisms, mechName);
 }
 
 namespace {
@@ -128,7 +142,9 @@ ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializ
     "CreateSASLServerMechanismRegistry",
     {"EndStartupOptionStorage"},
     [](ServiceContext* service) {
-        SASLServerMechanismRegistry::set(service, std::make_unique<SASLServerMechanismRegistry>());
+        SASLServerMechanismRegistry::set(service,
+                                         std::make_unique<SASLServerMechanismRegistry>(
+                                             saslGlobalParams.authenticationMechanisms));
     }};
 }  // namespace
 

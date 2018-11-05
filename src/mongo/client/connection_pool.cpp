@@ -32,9 +32,9 @@
 
 #include "mongo/client/connection_pool.h"
 
+#include "mongo/client/authenticate.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -192,8 +192,8 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     uassertStatusOK(conn->connect(target, StringData()));
     conn->setTags(_messagingPortTags);
 
-    if (isInternalAuthSet()) {
-        conn->auth(getInternalUserAuthParams());
+    if (auth::isInternalAuthSet()) {
+        uassertStatusOK(conn->authenticateInternalUser());
     }
 
     if (_hook) {

@@ -47,9 +47,9 @@
 #endif
 
 #include "mongo/base/init.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/server_options.h"
@@ -407,7 +407,7 @@ bool initializeServerGlobalState(ServiceContext* service) {
 #ifdef MONGO_CONFIG_SSL
     if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
-        setInternalUserAuthParams(
+        auth::setInternalUserAuthParams(
             BSON(saslCommandMechanismFieldName
                  << "MONGODB-X509"
                  << saslCommandUserDBFieldName
