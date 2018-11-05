@@ -1125,9 +1125,8 @@ functions:
                 # Is this a release?
                 echo "${version|-g}" | grep -q -- "-g"
                 if [ $? -eq 1 ]; then
-                    echo "Releases disabled on master."
-                    #source ./artifactory_mobile_creds.sh
-                    #./gradlew --info :embedded-jar:artifactoryPublish
+                    source ./artifactory_mobile_creds.sh
+                    ./gradlew --info :embedded-jar:artifactoryPublish
                 fi
 
 
@@ -1145,8 +1144,7 @@ functions:
                 # Is this a release?
                 echo "${version|-g}" | grep -q -- "-g"
                 if [ $? -eq 1 ]; then
-                    echo "Releases disabled on master."
-                    #./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
+                    ./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
                 fi
 
                 mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
