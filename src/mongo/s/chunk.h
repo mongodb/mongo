@@ -46,6 +46,10 @@ class ChunkInfo {
 public:
     explicit ChunkInfo(const ChunkType& from);
 
+    const auto& getRange() const {
+        return _range;
+    }
+
     const BSONObj& getMin() const {
         return _range.getMin();
     }

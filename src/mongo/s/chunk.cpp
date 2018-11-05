@@ -47,10 +47,7 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
       _history(from.getHistory()),
       _jumbo(from.getJumbo()),
       _writesTracker(std::make_shared<ChunkWritesTracker>()) {
-    invariant(from.validate());
-    if (!_history.empty()) {
-        invariant(_shardId == _history.front().getShard());
-    }
+    uassertStatusOK(from.validate());
 }
 
 const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {

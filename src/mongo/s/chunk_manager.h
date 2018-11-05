@@ -152,13 +152,6 @@ public:
 
 
 private:
-    /**
-     * Does a single pass over the chunkMap and constructs the ShardVersionMap object.
-     */
-    static ShardVersionMap _constructShardVersionMap(const OID& epoch,
-                                                     const ChunkInfoMap& chunkMap,
-                                                     Ordering shardKeyOrdering);
-
     RoutingTableHistory(NamespaceString nss,
                         boost::optional<UUID> uuid,
                         KeyPattern shardKeyPattern,
@@ -166,6 +159,11 @@ private:
                         bool unique,
                         ChunkInfoMap chunkMap,
                         ChunkVersion collectionVersion);
+
+    /**
+     * Does a single pass over the chunkMap and constructs the ShardVersionMap object.
+     */
+    ShardVersionMap _constructShardVersionMap() const;
 
     std::string _extractKeyString(const BSONObj& shardKeyValue) const;
 
@@ -194,12 +192,12 @@ private:
     // ranges must cover the complete space from [MinKey, MaxKey).
     const ChunkInfoMap _chunkMap;
 
+    // Max version across all chunks
+    const ChunkVersion _collectionVersion;
+
     // Map from shard id to the maximum chunk version for that shard. If a shard contains no
     // chunks, it won't be present in this map.
     const ShardVersionMap _shardVersions;
-
-    // Max version across all chunks
-    const ChunkVersion _collectionVersion;
 
     friend class ChunkManager;
 };

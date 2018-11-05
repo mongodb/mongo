@@ -472,6 +472,14 @@ Status ChunkType::validate() const {
                 str::stream() << "max is not greater than min: " << *_min << ", " << *_max};
     }
 
+    if (!_history.empty()) {
+        if (_history.front().getShard() != *_shard) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "History contains an invalid shard "
+                                  << _history.front().getShard()};
+        }
+    }
+
     return Status::OK();
 }
 
