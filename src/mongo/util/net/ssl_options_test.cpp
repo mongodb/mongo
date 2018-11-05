@@ -347,6 +347,7 @@ TEST(SetupOptions, sslModeRequiredCertificateSelector) {
     ASSERT_EQ(::mongo::sslGlobalParams.sslCertificateSelector.subject, "Subject 1");
     ASSERT_EQ(::mongo::sslGlobalParams.sslClusterCertificateSelector.subject, "Subject 2");
 }
+#endif
 
 TEST(SetupOptions, disableNonSSLConnectionLoggingFalse) {
     OptionsParserTester parser;
@@ -445,7 +446,6 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingInvalid) {
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
     ASSERT_NOT_OK(mongo::storeServerOptions(environment));
 }
-#endif
 
 }  // namespace
 }  // namespace mongo
