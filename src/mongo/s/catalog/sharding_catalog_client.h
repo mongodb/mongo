@@ -204,7 +204,8 @@ public:
                                                          repl::ReadConcernLevel readConcern) = 0;
 
     /**
-     * Retrieves all tags for the specified collection.
+     * Retrieves all zones defined for the specified collection. The returned vector is sorted based
+     * on the min key of the zones.
      *
      * Returns a !OK status if an error occurs.
      */
