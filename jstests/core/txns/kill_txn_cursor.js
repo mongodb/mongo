@@ -49,14 +49,15 @@
         assert.commandWorked(sessionDb.runCommand({getMore: cursorId2, collection: collName}));
     assert(cursorRes2.hasOwnProperty("cursor"));
     assert(cursorRes2.cursor.hasOwnProperty("nextBatch"));
-    assert.docEq(cursorRes2.cursor.nextBatch, [{_id: 2}, {_id: 3}]);
+    assert.sameMembers(cursorRes2.cursor.nextBatch, [{_id: 2}, {_id: 3}]);
 
     jsTest.log("Can still write in the transaction");
     assert.commandWorked(sessionColl.insert({_id: 4}));
 
     jsTest.log("Commit transaction.");
     session.commitTransaction();
-    assert.docEq([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}], sessionColl.find().toArray());
+    assert.sameMembers([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
+                       sessionColl.find().toArray());
 
     session.endSession();
 }());

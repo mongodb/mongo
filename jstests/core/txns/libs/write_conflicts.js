@@ -123,7 +123,7 @@ var WriteConflictHelpers = (function() {
         writeConflictTestCase(coll, session1, session2, txn1Op, txn2Op, initOp);
 
         // Check the final state of the collection.
-        assert.docEq(expectedDocs, coll.find().toArray());
+        assert.sameMembers(expectedDocs, coll.find().toArray());
 
         // Clean up the collection.
         assert.commandWorked(coll.remove({}, {writeConcern: {w: "majority"}}));

@@ -38,7 +38,7 @@
 
     // Read with aggregation also returns the document.
     let docs = sessionColl.aggregate([{$match: {_id: "insert-1"}}]).toArray();
-    assert.docEq([{_id: "insert-1"}], docs);
+    assert.sameMembers([{_id: "insert-1"}], docs);
 
     // Insert a doc within a transaction.
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
@@ -110,7 +110,7 @@
 
     // But read in the same transaction returns the docs.
     docs = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}]}).toArray();
-    assert.docEq([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], docs);
+    assert.sameMembers([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], docs);
 
     // Commit the transaction.
     session.commitTransaction();
@@ -145,7 +145,7 @@
 
     // But read in the same transaction sees the docs get deleted.
     docs = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}, {_id: "doc-3"}]}).toArray();
-    assert.docEq([], docs);
+    assert.sameMembers([], docs);
 
     // Commit the transaction.
     session.commitTransaction();

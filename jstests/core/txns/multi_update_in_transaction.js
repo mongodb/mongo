@@ -29,7 +29,7 @@
     let res = sessionColl.update({a: 99}, {$set: {b: 1}}, {multi: true});
     assert.eq(0, res.nModified);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
+    assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
     session.commitTransaction();
 
@@ -40,7 +40,7 @@
     res = sessionColl.update({a: 1}, {$set: {b: 1}}, {multi: true});
     assert.eq(1, res.nModified);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1, b: 1}]);
+    assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1, b: 1}]);
 
     session.commitTransaction();
 
@@ -51,7 +51,8 @@
     res = sessionColl.update({a: 0}, {$set: {b: 2}}, {multi: true});
     assert.eq(2, res.nModified);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), [{_id: 0, a: 0, b: 2}, {_id: 1, a: 0, b: 2}, {_id: 2, a: 1, b: 1}]);
+    assert.sameMembers(res.toArray(),
+                       [{_id: 0, a: 0, b: 2}, {_id: 1, a: 0, b: 2}, {_id: 2, a: 1, b: 1}]);
 
     session.commitTransaction();
 
@@ -66,7 +67,7 @@
     assert.eq(3, res.nModified);
 
     res = sessionColl.find({});
-    assert.docEq(
+    assert.sameMembers(
         res.toArray(),
         [{_id: 0, a: 0, b: 2, c: 1}, {_id: 1, a: 0, b: 2, c: 1}, {_id: 2, a: 1, b: 1, c: 2}]);
 
@@ -79,7 +80,7 @@
     res = sessionColl.update({_id: 3}, {$set: {d: 1}}, {multi: true, upsert: true});
     assert.eq(1, res.nUpserted);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), [
+    assert.sameMembers(res.toArray(), [
         {_id: 0, a: 0, b: 2, c: 1},
         {_id: 1, a: 0, b: 2, c: 1},
         {_id: 2, a: 1, b: 1, c: 2},

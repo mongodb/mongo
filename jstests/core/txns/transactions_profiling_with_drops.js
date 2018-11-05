@@ -26,7 +26,7 @@
     session.startTransaction();
 
     jsTest.log("Run a slow read. Profiling in the transaction should succeed.");
-    assert.docEq(
+    assert.sameMembers(
         [{_id: "doc"}],
         sessionColl.find({$where: "sleep(1000); return true;"}).comment("read success").toArray());
     profilerHasSingleMatchingEntryOrThrow(
@@ -53,7 +53,7 @@
         });
 
     jsTest.log("Run a slow read. Profiling in the transaction should fail.");
-    assert.docEq(
+    assert.sameMembers(
         [{_id: "doc"}],
         sessionColl.find({$where: "sleep(1000); return true;"}).comment("read failure").toArray());
     session.commitTransaction();

@@ -88,7 +88,7 @@
     assert.commandFailedWithCode(thread.returnData(), ErrorCodes.DuplicateKey);
 
     // Check the final documents.
-    assert.docEq([txnDoc], testColl.find().toArray());
+    assert.sameMembers([txnDoc], testColl.find().toArray());
 
     // Clean up the test collection.
     assert.commandWorked(testColl.remove({}));
@@ -118,7 +118,7 @@
     assert.commandWorked(thread.returnData());
 
     // Check the final documents.
-    assert.docEq([nonTxnDoc], testColl.find().toArray());
+    assert.sameMembers([nonTxnDoc], testColl.find().toArray());
 
     // Clean up the test collection.
     assert.commandWorked(testColl.remove({}));
@@ -141,6 +141,6 @@
                                  ErrorCodes.NoSuchTransaction);
 
     // Check the final documents.
-    assert.docEq([nonTxnDoc], testColl.find().toArray());
+    assert.sameMembers([nonTxnDoc], testColl.find().toArray());
 
 }());

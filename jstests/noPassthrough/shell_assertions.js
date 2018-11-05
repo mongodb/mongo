@@ -591,6 +591,105 @@
         });
     });
 
+    /* assert.sameMembers tests */
+
+    tests.push(function sameMembersFailsWithInvalidArguments() {
+        assert.throws(() => assert.sameMembers());
+        assert.throws(() => assert.sameMembers([]));
+        assert.throws(() => assert.sameMembers({}, {}));
+        assert.throws(() => assert.sameMembers(1, 1));
+    });
+
+    tests.push(function sameMembersFailsWhenLengthsDifferent() {
+        assert.throws(() => assert.sameMembers([], [1]));
+        assert.throws(() => assert.sameMembers([], [1]));
+        assert.throws(() => assert.sameMembers([1, 2], [1]));
+        assert.throws(() => assert.sameMembers([1], [1, 2]));
+    });
+
+    tests.push(function sameMembersFailsWhenCountsOfDuplicatesDifferent() {
+        assert.throws(() => assert.sameMembers([1, 1], [1, 2]));
+        assert.throws(() => assert.sameMembers([1, 2], [1, 1]));
+    });
+
+    tests.push(function sameMembersFailsWithDifferentObjects() {
+        assert.throws(() => assert.sameMembers([{_id: 0, a: 0}], [{_id: 0, a: 1}]));
+        assert.throws(() => assert.sameMembers([{_id: 1, a: 0}], [{_id: 0, a: 0}]));
+        assert.throws(() => {
+            assert.sameMembers([{a: [{b: 0, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}]}]);
+        });
+    });
+
+    tests.push(function sameMembersFailsWithDifferentBSONTypes() {
+        assert.throws(() => {
+            assert.sameMembers([new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
+                               [new BinData(0, "xxxgqwetkqwklEWRbWERKKJREtbq")]);
+        });
+        assert.throws(() => assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 2)]));
+    });
+
+    tests.push(function sameMembersDoesNotSortNestedArrays() {
+        assert.throws(() => assert.sameMembers([[1, 2]], [[2, 1]]));
+        assert.throws(() => {
+            assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}],
+                               [{_id: 0, a: [{c: 0, b: 1}, {b: 0}]}]);
+        });
+    });
+
+    tests.push(function sameMembersPassesWithEmptyArrays() {
+        assert.sameMembers([], []);
+    });
+
+    tests.push(function sameMembersPassesSingleElement() {
+        assert.sameMembers([1], [1]);
+    });
+
+    tests.push(function sameMembersPassesWithSameOrder() {
+        assert.sameMembers([1, 2], [1, 2]);
+        assert.sameMembers([1, 2, 3], [1, 2, 3]);
+    });
+
+    tests.push(function sameMembersPassesWithDifferentOrder() {
+        assert.sameMembers([2, 1], [1, 2]);
+        assert.sameMembers([1, 2, 3], [3, 1, 2]);
+    });
+
+    tests.push(function sameMembersPassesWithDuplicates() {
+        assert.sameMembers([1, 1, 2], [1, 1, 2]);
+        assert.sameMembers([1, 1, 2], [1, 2, 1]);
+        assert.sameMembers([2, 1, 1], [1, 1, 2]);
+    });
+
+    tests.push(function sameMembersPassesWithSortedNestedArrays() {
+        assert.sameMembers([[1, 2]], [[1, 2]]);
+        assert.sameMembers([{a: [{b: 0}, {b: 1, c: 0}], _id: 0}],
+                           [{_id: 0, a: [{b: 0}, {c: 0, b: 1}]}]);
+    });
+
+    tests.push(function sameMembersPassesWithObjects() {
+        assert.sameMembers([{_id: 0, a: 0}], [{_id: 0, a: 0}]);
+        assert.sameMembers([{_id: 0, a: 0}, {_id: 1}], [{_id: 0, a: 0}, {_id: 1}]);
+        assert.sameMembers([{_id: 0, a: 0}, {_id: 1}], [{_id: 1}, {_id: 0, a: 0}]);
+    });
+
+    tests.push(function sameMembersPassesWithUnsortedObjects() {
+        assert.sameMembers([{a: 0, _id: 1}], [{_id: 1, a: 0}]);
+        assert.sameMembers([{a: [{b: 1, c: 0}], _id: 0}], [{_id: 0, a: [{c: 0, b: 1}]}]);
+    });
+
+    tests.push(function sameMembersPassesWithBSONTypes() {
+        assert.sameMembers([new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")],
+                           [new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")]);
+        assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 1)]);
+    });
+
+    tests.push(function sameMembersPassesWithOtherTypes() {
+        assert.sameMembers([null], [null]);
+        assert.sameMembers([undefined], [undefined]);
+        assert.sameMembers(["a"], ["a"]);
+        assert.sameMembers([null, undefined, "a"], [undefined, "a", null]);
+    });
+
     /* main */
 
     tests.forEach((test) => {

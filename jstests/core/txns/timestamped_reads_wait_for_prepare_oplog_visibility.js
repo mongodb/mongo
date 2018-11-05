@@ -126,7 +126,7 @@
                 filter: TestData.otherDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
-            assert.docEq(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
+            assert.sameMembers(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
         };
 
         return {oplogVisibility: oplogVisibility, prepareConflict: prepareConflict};
@@ -180,7 +180,7 @@
                 readConcern: {afterClusterTime: clusterTime},
                 maxTimeMS: TestData.successTimeout
             }));
-            assert.docEq(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
+            assert.sameMembers(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
         };
 
         return {oplogVisibility: oplogVisibility, prepareConflict: prepareConflict};
@@ -196,13 +196,13 @@
                 filter: TestData.txnDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
-            assert.docEq(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
+            assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
             cursor = assert.commandWorked(_db.runCommand({
                 find: _collName,
                 filter: TestData.otherDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
-            assert.docEq(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
+            assert.sameMembers(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
         };
 
         const prepareConflict = function() {
@@ -212,13 +212,13 @@
                 filter: TestData.txnDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
-            assert.docEq(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
+            assert.sameMembers(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
             cursor = assert.commandWorked(_db.runCommand({
                 find: _collName,
                 filter: TestData.otherDocFilter,
                 maxTimeMS: TestData.successTimeout
             }));
-            assert.docEq(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
+            assert.sameMembers(cursor.cursor.firstBatch, [TestData.otherDoc], tojson(cursor));
         };
 
         return {oplogVisibility: oplogVisibility, prepareConflict: prepareConflict};

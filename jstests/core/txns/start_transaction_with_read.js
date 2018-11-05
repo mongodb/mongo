@@ -27,7 +27,7 @@
     session.startTransaction();
 
     let docs = sessionColl.find({}).toArray();
-    assert.eq(docs, [initialDoc]);
+    assert.sameMembers(docs, [initialDoc]);
 
     jsTest.log("Insert two documents in a transaction");
 
@@ -36,7 +36,7 @@
 
     // Read in the same transaction returns the doc.
     docs = sessionColl.find({_id: "insert-1"}).toArray();
-    assert.docEq(docs, [{_id: "insert-1"}]);
+    assert.sameMembers(docs, [{_id: "insert-1"}]);
 
     // Insert a doc within a transaction.
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));

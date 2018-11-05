@@ -35,7 +35,7 @@
     jsTestLog("Start a read-only transaction on the first session.");
     session.startTransaction({writeConcern: {w: "majority"}});
 
-    assert.docEq(expectedDocs, sessionColl.find().toArray());
+    assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
     jsTestLog("Start a transaction on the second session that modifies the same collection.");
     session2.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
@@ -47,7 +47,7 @@
     jsTestLog(
         "Continue reading in the first transaction. Changes from the second transaction should not be visible.");
 
-    assert.docEq(expectedDocs, sessionColl.find().toArray());
+    assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
     jsTestLog("Committing the second transaction.");
     session2.commitTransaction();
@@ -55,20 +55,21 @@
     jsTestLog(
         "Committed changes from the second transaction should still not be visible to the first.");
 
-    assert.docEq(expectedDocs, sessionColl.find().toArray());
+    assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
     jsTestLog(
         "Writes that occur outside of a transaction should not be visible to a read only transaction.");
 
     assert.writeOK(testColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
 
-    assert.docEq(expectedDocs, sessionColl.find().toArray());
+    assert.sameMembers(expectedDocs, sessionColl.find().toArray());
 
     jsTestLog("Committing first transaction.");
     session.commitTransaction();
 
     // Make sure the correct documents exist after committing the second transaction.
-    assert.docEq([{_id: 0}, {_id: 1, a: 1}, {_id: 3}, {_id: 4}], sessionColl.find().toArray());
+    assert.sameMembers([{_id: 0}, {_id: 1, a: 1}, {_id: 3}, {_id: 4}],
+                       sessionColl.find().toArray());
 
     session.endSession();
     session2.endSession();

@@ -29,7 +29,7 @@
     let res = sessionColl.remove({a: 99}, {justOne: false});
     assert.eq(0, res.nRemoved);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
+    assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
     session.commitTransaction();
 
@@ -40,7 +40,7 @@
     res = sessionColl.remove({a: 1}, {justOne: false});
     assert.eq(1, res.nRemoved);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}]);
+    assert.sameMembers(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}]);
 
     session.commitTransaction();
 
@@ -51,7 +51,7 @@
     res = sessionColl.remove({a: 0}, {justOne: false});
     assert.eq(2, res.nRemoved);
     res = sessionColl.find({});
-    assert.docEq(res.toArray(), []);
+    assert.sameMembers(res.toArray(), []);
 
     session.commitTransaction();
 

@@ -67,17 +67,17 @@
 
     session.startTransaction({readConcern: {level: "snapshot"}});
 
-    assert.docEq([{_id: 0}], sessionColl.find().toArray());
+    assert.sameMembers([{_id: 0}], sessionColl.find().toArray());
 
-    assert.docEq([{_id: "a"}], sessionColl2.find().toArray());
+    assert.sameMembers([{_id: "a"}], sessionColl2.find().toArray());
 
     jsTestLog("Start a majority-read transaction.");
 
     session2.startTransaction({readConcern: {level: "majority"}});
 
-    assert.docEq([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
+    assert.sameMembers([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
 
-    assert.docEq([{_id: "a"}], session2Coll2.find().toArray());
+    assert.sameMembers([{_id: "a"}], session2Coll2.find().toArray());
 
     jsTestLog("Allow the uncommitted write to finish.");
     assert.commandWorked(db.adminCommand({
@@ -88,25 +88,25 @@
     joinHungWrite();
 
     jsTestLog("Double-checking that writes not committed at start of snapshot cannot appear.");
-    assert.docEq([{_id: 0}], sessionColl.find().toArray());
+    assert.sameMembers([{_id: 0}], sessionColl.find().toArray());
 
-    assert.docEq([{_id: "a"}], sessionColl2.find().toArray());
+    assert.sameMembers([{_id: "a"}], sessionColl2.find().toArray());
 
-    assert.docEq([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
+    assert.sameMembers([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
 
-    assert.docEq([{_id: "a"}], session2Coll2.find().toArray());
+    assert.sameMembers([{_id: "a"}], session2Coll2.find().toArray());
 
     jsTestLog("Committing transactions.");
     session.commitTransaction();
     session2.commitTransaction();
 
-    assert.docEq([{_id: 0}, {_id: 1}], sessionColl.find().toArray());
+    assert.sameMembers([{_id: 0}, {_id: 1}], sessionColl.find().toArray());
 
-    assert.docEq([{_id: "a"}, {_id: "b"}], sessionColl2.find().toArray());
+    assert.sameMembers([{_id: "a"}, {_id: "b"}], sessionColl2.find().toArray());
 
-    assert.docEq([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
+    assert.sameMembers([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
 
-    assert.docEq([{_id: "a"}, {_id: "b"}], session2Coll2.find().toArray());
+    assert.sameMembers([{_id: "a"}, {_id: "b"}], session2Coll2.find().toArray());
 
     session.endSession();
 }());

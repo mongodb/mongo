@@ -76,7 +76,7 @@
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId++)
     }));
-    assert.docEq(testColl.find().toArray(), [{_id: 0}]);
+    assert.sameMembers(testColl.find().toArray(), [{_id: 0}]);
 
     // Drop and re-create collection to keep parts of test isolated from one another.
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -156,6 +156,6 @@
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId++)
     }));
-    assert.docEq(testColl.find().toArray(), [{_id: 6}]);
+    assert.sameMembers(testColl.find().toArray(), [{_id: 6}]);
     session.endSession();
 }());

@@ -181,17 +181,25 @@ assert = (function() {
             msg, "[" + tojson(a) + "] != [" + tojson(b) + "] are not equal"));
     };
 
-    assert.docEq = function(a, b, msg) {
-        _validateAssertionMessage(msg);
-
+    function _isDocEq(a, b) {
         if (a == b) {
-            return;
+            return true;
         }
 
         var aSorted = sortDoc(a);
         var bSorted = sortDoc(b);
 
         if ((aSorted != null && bSorted != null) && friendlyEqual(aSorted, bSorted)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    assert.docEq = function(a, b, msg) {
+        _validateAssertionMessage(msg);
+
+        if (_isDocEq(a, b)) {
             return;
         }
 
@@ -208,6 +216,40 @@ assert = (function() {
         }
         for (let a of aSet) {
             if (!bSet.has(a)) {
+                failAssertion();
+            }
+        }
+    };
+
+    /**
+     * Throws if the two arrays do not have the same members, in any order. Nested arrays must have
+     * the same order to be considered equal.
+     */
+    assert.sameMembers = function(aArr, bArr, msg) {
+        _validateAssertionMessage(msg);
+
+        const failAssertion = function() {
+            doassert(_buildAssertionMessage(msg, tojson(aArr) + " != " + tojson(bArr)));
+        };
+
+        if (aArr.length !== bArr.length) {
+            failAssertion();
+        }
+
+        // Keep a set of which indices we've already used to avoid double counting values.
+        const matchedIndicesInRight = new Set();
+        for (let a of aArr) {
+            let foundMatch = false;
+            for (let i = 0; i < bArr.length; ++i) {
+                // Sort both inputs in case either is a document. Note: this does not sort any
+                // nested arrays.
+                if (!matchedIndicesInRight.has(i) && _isDocEq(a, bArr[i])) {
+                    matchedIndicesInRight.add(i);
+                    foundMatch = true;
+                    break;
+                }
+            }
+            if (!foundMatch) {
                 failAssertion();
             }
         }
