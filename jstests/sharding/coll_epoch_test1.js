@@ -79,42 +79,5 @@
     assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount());
     assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
 
-    assert(coll.drop());
-    st.configRS.awaitLastOpCommitted();
-
-    //
-    // Test that inserts and queries go to correct shard even when the collection has been unsharded
-    // and resharded from another mongos on a different primary
-    //
-    // TODO: SERVER-32607 uncomment after the proper database version checks are in place.
-    /*
-        jsTest.log("Re-creating sharded collection with different primary...");
-
-        var getOtherShard = function(shardId) {
-            for (var i = 0; i < shards.length; ++i) {
-                if (shards[i].shardName != shardId)
-                    return shards[i].shardName;
-            }
-        };
-
-        assert.commandWorked(admin.runCommand({
-            movePrimary: coll.getDB() + "",
-            to: getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary)
-        }));
-        assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
-
-        bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
-        for (var i = 0; i < 100; i++) {
-            bulk.insert({test: "d"});
-        }
-        assert.writeOK(bulk.execute());
-
-        assert.eq(100, staleMongos.getCollection(coll + "").find({test: "d"}).itcount());
-        assert.eq(0,
-                  staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b",
-       "c"]}}).itcount());
-
-        assert(coll.drop());
-    */
     st.stop();
 })();
