@@ -38,6 +38,7 @@
     assert.eq(100, staleMongos.getCollection(coll + "").find({test: "a"}).itcount());
 
     assert(coll.drop());
+    st.configRS.awaitLastOpCommitted();
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
@@ -49,6 +50,7 @@
     st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
     assert.commandWorked(coll.ensureIndex({notId: 1}));
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {notId: 1}}));
+    st.configRS.awaitLastOpCommitted();
 
     bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
@@ -59,6 +61,7 @@
     assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
 
     assert(coll.drop());
+    st.configRS.awaitLastOpCommitted();
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
@@ -77,6 +80,7 @@
     assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
 
     assert(coll.drop());
+    st.configRS.awaitLastOpCommitted();
 
     //
     // Test that inserts and queries go to correct shard even when the collection has been unsharded
