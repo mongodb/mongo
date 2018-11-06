@@ -121,6 +121,26 @@ TEST(Registration, DuplicateSingleName) {
     }
 }
 
+TEST(Registration, DuplicateSeingleNameAcrossSections) {
+    moe::OptionSection group1;
+    group1.addOptionChaining("one", "", moe::Switch, "Uno");
+
+    moe::OptionSection group2;
+    group2.addOptionChaining("one", "", moe::Switch, "Dos");
+
+    moe::OptionSection root;
+    ASSERT_OK(root.addSection(group1));
+    ASSERT_NOT_OK(root.addSection(group2));
+
+    ASSERT_THROWS(root.addOptionChaining("one", "", moe::Switch, "Tres"),
+                  mongo::AssertionException);
+    root.addOptionChaining("two", "", moe::Switch, "Quatro");
+
+    moe::OptionSection group3;
+    group3.addOptionChaining("two", "", moe::Switch, "Cinco");
+    ASSERT_NOT_OK(root.addSection(group3));
+}
+
 TEST(Registration, DuplicateDottedName) {
     moe::OptionSection testOpts;
     try {

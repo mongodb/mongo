@@ -170,6 +170,17 @@ private:
     std::string _name;
     std::list<OptionSection> _subSections;
     std::list<OptionDescription> _options;
+
+    /**
+     * Internal accumulator of all dotted names (incl. deprecated) in _options and all _subSections.
+     * Used for ensuring duplicate entries don't find their way into different parts of the tree.
+     */
+    std::set<std::string> _allDottedNames;
+
+    /**
+     * Internal accumulator for all single names. See _allDottedNames for further info.
+     */
+    std::set<std::string> _allSingleNames;
 };
 
 }  // namespace optionenvironment
