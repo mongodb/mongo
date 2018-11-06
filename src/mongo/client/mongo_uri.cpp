@@ -114,7 +114,7 @@ namespace {
 
 /**
  * Helper Method for MongoURI::parse() to split a string into exactly 2 pieces by a char
- * delimeter.
+ * delimiter.
  */
 std::pair<StringData, StringData> partitionForward(StringData str, const char c) {
     const auto delim = str.find(c);
@@ -276,12 +276,12 @@ URIParts::URIParts(StringData uri) {
     const auto userAndHostInfo = userAndDb.first;
 
     // 2.b Make sure that there are no question marks in the left side of the /
-    //     as any options after the ? must still have the / delimeter
+    //     as any options after the ? must still have the / delimiter
     if (userAndDb.second.empty() && userAndHostInfo.find('?') != std::string::npos) {
         uasserted(
             ErrorCodes::FailedToParse,
             str::stream()
-                << "URI must contain slash delimeter between hosts and options for mongodb:// URL: "
+                << "URI must contain slash delimiter between hosts and options for mongodb:// URL: "
                 << uri);
     }
 
