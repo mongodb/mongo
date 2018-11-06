@@ -45,17 +45,18 @@ std::string CurOpFailpointHelpers::updateCurOpMsg(OperationContext* opCtx,
     return oldMsg;
 }
 
-void CurOpFailpointHelpers::waitWhileFailPointEnabled(
-    FailPoint* failPoint,
-    OperationContext* opCtx,
-    const std::string& curOpMsg,
-    const std::function<void(void)>& whileWaiting) {
+void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
+                                                      OperationContext* opCtx,
+                                                      const std::string& curOpMsg,
+                                                      const std::function<void(void)>& whileWaiting,
+                                                      bool checkForInterrupt) {
     invariant(failPoint);
     auto origCurOpMsg = updateCurOpMsg(opCtx, curOpMsg);
 
     MONGO_FAIL_POINT_BLOCK((*failPoint), options) {
         const BSONObj& data = options.getData();
-        const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
+        const bool shouldCheckForInterrupt =
+            checkForInterrupt || data["shouldCheckForInterrupt"].booleanSafe();
         while (MONGO_FAIL_POINT((*failPoint))) {
             sleepFor(Milliseconds(10));
             if (whileWaiting) {

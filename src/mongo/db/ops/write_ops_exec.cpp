@@ -349,11 +349,16 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     auto acquireCollection = [&] {
         while (true) {
-            if (MONGO_FAIL_POINT(hangDuringBatchInsert)) {
-                log() << "batch insert - hangDuringBatchInsert fail point enabled. Blocking until "
-                         "fail point is disabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangDuringBatchInsert);
-            }
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangDuringBatchInsert,
+                opCtx,
+                "hangDuringBatchInsert",
+                []() {
+                    log() << "batch insert - hangDuringBatchInsert fail point enabled. Blocking "
+                             "until fail point is disabled.";
+                },
+                true  // Check for interrupt periodically.
+                );
 
             if (MONGO_FAIL_POINT(failAllInserts)) {
                 uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
@@ -594,11 +599,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     boost::optional<AutoGetCollection> collection;
     while (true) {
-        if (MONGO_FAIL_POINT(hangDuringBatchUpdate)) {
-            log() << "batch update - hangDuringBatchUpdate fail point enabled. Blocking until "
-                     "fail point is disabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringBatchUpdate);
-        }
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangDuringBatchUpdate, opCtx, "hangDuringBatchUpdate", [opCtx]() {
+                log() << "batch update - hangDuringBatchUpdate fail point enabled. Blocking until "
+                         "fail point is disabled.";
+            });
 
         if (MONGO_FAIL_POINT(failAllUpdates)) {
             uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");

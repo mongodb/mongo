@@ -54,6 +54,7 @@ public:
     static void waitWhileFailPointEnabled(FailPoint* failPoint,
                                           OperationContext* opCtx,
                                           const std::string& curOpMsg,
-                                          const std::function<void(void)>& whileWaiting = nullptr);
+                                          const std::function<void(void)>& whileWaiting = nullptr,
+                                          bool checkForInterrupt = false);
 };
 }

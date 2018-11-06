@@ -28,16 +28,23 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_out_in_place.h"
 #include "mongo/db/pipeline/document_source_out_replace_coll.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 
 using boost::intrusive_ptr;
 using std::vector;
@@ -189,6 +196,17 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
 
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+        // clang-format off
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangWhileBuildingDocumentSourceOutBatch,
+            pExpCtx->opCtx,
+            "hangWhileBuildingDocumentSourceOutBatch",
+            []() {
+                log() << "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' "
+                      << "failpoint";
+            });
+        // clang-format on
+
         auto doc = nextInput.releaseDocument();
 
         // Generate an _id if the uniqueKey includes _id but the document doesn't have one.
