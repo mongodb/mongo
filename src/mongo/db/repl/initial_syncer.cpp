@@ -620,6 +620,11 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
     auto filterBob = BSONObjBuilder(queryBob.subobjStart("filter"));
     filterBob.append("_id", FeatureCompatibilityVersion::kParameterName);
     filterBob.done();
+    // As part of reading the FCV, we ensure the source node "all committed" timestamp has advanced
+    // to at least the timestamp of the last optime that we found in the lastOplogEntryFetcher.
+    // When document locking is used, there could be oplog "holes" which would result in
+    // inconsistent initial sync data if we didn't do this.
+    queryBob.append("readConcern", BSON("afterOpTime" << lastOpTimeWithHash.opTime));
 
     _fCVFetcher = stdx::make_unique<Fetcher>(
         _exec,
