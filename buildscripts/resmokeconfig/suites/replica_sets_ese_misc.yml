@@ -185,8 +185,8 @@ selector:
   - jstests/replsets/id_index_replication.js
   - jstests/replsets/server_status_metrics.js
   - jstests/replsets/shutdown.js
-  - jstests/replsets/initial_sync_visibility.js
   - jstests/replsets/initial_sync_invalid_views.js
+  - jstests/replsets/initial_sync_oplog_hole.js
   - jstests/replsets/initial_sync_views.js
   - jstests/replsets/reconfig_tags.js
   - jstests/replsets/oplog_replay_on_startup_with_bad_op.js

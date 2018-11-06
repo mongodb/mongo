@@ -110,7 +110,12 @@ MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 
 // Used to pause after inserting collection data and calling the opObservers.  Inserts to
 // replicated collections that are not part of a multi-statement transaction will have generated
-// their OpTime and oplog entry.
+// their OpTime and oplog entry. Supports parameters to limit pause by namespace and by _id
+// of first data item in an insert (must be of type string):
+//  data: {
+//      collectionNS: <fully-qualified collection namespace>,
+//      first_id: <string>
+//  }
 MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
 
 /**
@@ -395,11 +400,16 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     MONGO_FAIL_POINT_BLOCK(hangAfterCollectionInserts, extraData) {
         const BSONObj& data = extraData.getData();
         const auto collElem = data["collectionNS"];
+        const auto firstIdElem = data["first_id"];
         // If the failpoint specifies no collection or matches the existing one, hang.
-        if (!collElem || _ns.ns() == collElem.str()) {
+        if ((!collElem || _ns.ns() == collElem.str()) &&
+            (!firstIdElem || (begin != end && firstIdElem.type() == mongo::String &&
+                              begin->doc["_id"].str() == firstIdElem.str()))) {
+            string whenFirst =
+                firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
             while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
                 log() << "hangAfterCollectionInserts fail point enabled for " << _ns.toString()
-                      << ". Blocking until fail point is disabled.";
+                      << whenFirst << ". Blocking until fail point is disabled.";
                 mongo::sleepsecs(1);
                 opCtx->checkForInterrupt();
             }

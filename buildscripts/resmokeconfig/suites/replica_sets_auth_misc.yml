@@ -181,7 +181,7 @@ selector:
   - jstests/replsets/apply_batches_totalMillis.js
   - jstests/replsets/id_index_replication.js
   - jstests/replsets/server_status_metrics.js
-  - jstests/replsets/initial_sync_visibility.js
+  - jstests/replsets/initial_sync_oplog_hole.js
   - jstests/replsets/plan_cache_slaveok.js
   - jstests/replsets/dbhash_system_collections.js
   - jstests/replsets/capped_insert_order.js
