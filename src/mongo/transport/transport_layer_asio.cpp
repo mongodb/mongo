@@ -261,8 +261,20 @@ public:
         return &_endpoint;
     }
 
+    const Endpoint* operator->() const noexcept {
+        return &_endpoint;
+    }
+
     Endpoint& operator*() noexcept {
         return _endpoint;
+    }
+
+    const Endpoint& operator*() const noexcept {
+        return _endpoint;
+    }
+
+    bool operator<(const WrappedEndpoint& rhs) const noexcept {
+        return _endpoint < rhs._endpoint;
     }
 
     const std::string& toString() const {
@@ -642,8 +654,9 @@ Status TransportLayerASIO::setup() {
     _listenerPort = _listenerOptions.port;
     WrappedResolver resolver(*_acceptorReactor);
 
+    // Self-deduplicating list of unique endpoint addresses.
+    std::set<WrappedEndpoint> endpoints;
     for (auto& ip : listenAddrs) {
-        std::error_code ec;
         if (ip.empty()) {
             warning() << "Skipping empty bind address";
             continue;
@@ -656,68 +669,68 @@ Status TransportLayerASIO::setup() {
             continue;
         }
         auto& addrs = swAddrs.getValue();
+        endpoints.insert(addrs.begin(), addrs.end());
+    }
 
-        for (auto& addr : addrs) {
+    for (auto& addr : endpoints) {
 #ifndef _WIN32
-            if (addr.family() == AF_UNIX) {
-                if (::unlink(addr.toString().c_str()) == -1 && errno != ENOENT) {
-                    error() << "Failed to unlink socket file " << addr.toString().c_str() << " "
-                            << errnoWithDescription(errno);
-                    fassertFailedNoTrace(40486);
-                }
+        if (addr.family() == AF_UNIX) {
+            if (::unlink(addr.toString().c_str()) == -1 && errno != ENOENT) {
+                error() << "Failed to unlink socket file " << addr.toString().c_str() << " "
+                        << errnoWithDescription(errno);
+                fassertFailedNoTrace(40486);
             }
-#endif
-            if (addr.family() == AF_INET6 && !_listenerOptions.enableIPv6) {
-                error() << "Specified ipv6 bind address, but ipv6 is disabled";
-                fassertFailedNoTrace(40488);
-            }
-
-            GenericAcceptor acceptor(*_acceptorReactor);
-            acceptor.open(addr->protocol());
-            acceptor.set_option(GenericAcceptor::reuse_address(true));
-            if (addr.family() == AF_INET6) {
-                acceptor.set_option(asio::ip::v6_only(true));
-            }
-
-            acceptor.non_blocking(true, ec);
-            if (ec) {
-                return errorCodeToStatus(ec);
-            }
-
-            acceptor.bind(*addr, ec);
-            if (ec) {
-                return errorCodeToStatus(ec);
-            }
-
-#ifndef _WIN32
-            if (addr.family() == AF_UNIX) {
-                if (::chmod(addr.toString().c_str(), serverGlobalParams.unixSocketPermissions) ==
-                    -1) {
-                    error() << "Failed to chmod socket file " << addr.toString().c_str() << " "
-                            << errnoWithDescription(errno);
-                    fassertFailedNoTrace(40487);
-                }
-            }
-#endif
-            if (_listenerOptions.port == 0 &&
-                (addr.family() == AF_INET || addr.family() == AF_INET6)) {
-                if (_listenerPort != _listenerOptions.port) {
-                    return Status(ErrorCodes::BadValue,
-                                  "Port 0 (ephemeral port) is not allowed when"
-                                  " listening on multiple IP interfaces");
-                }
-                std::error_code ec;
-                auto endpoint = acceptor.local_endpoint(ec);
-                if (ec) {
-                    return errorCodeToStatus(ec);
-                }
-                _listenerPort = endpointToHostAndPort(endpoint).port();
-            }
-
-            sockaddr_storage sa;
-            memcpy(&sa, addr->data(), addr->size());
-            _acceptors.emplace_back(SockAddr(sa, addr->size()), std::move(acceptor));
         }
+#endif
+        if (addr.family() == AF_INET6 && !_listenerOptions.enableIPv6) {
+            error() << "Specified ipv6 bind address, but ipv6 is disabled";
+            fassertFailedNoTrace(40488);
+        }
+
+        GenericAcceptor acceptor(*_acceptorReactor);
+        acceptor.open(addr->protocol());
+        acceptor.set_option(GenericAcceptor::reuse_address(true));
+        if (addr.family() == AF_INET6) {
+            acceptor.set_option(asio::ip::v6_only(true));
+        }
+
+        std::error_code ec;
+        acceptor.non_blocking(true, ec);
+        if (ec) {
+            return errorCodeToStatus(ec);
+        }
+
+        acceptor.bind(*addr, ec);
+        if (ec) {
+            return errorCodeToStatus(ec);
+        }
+
+#ifndef _WIN32
+        if (addr.family() == AF_UNIX) {
+            if (::chmod(addr.toString().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
+                error() << "Failed to chmod socket file " << addr.toString().c_str() << " "
+                        << errnoWithDescription(errno);
+                fassertFailedNoTrace(40487);
+            }
+        }
+#endif
+        if (_listenerOptions.port == 0 && (addr.family() == AF_INET || addr.family() == AF_INET6)) {
+            if (_listenerPort != _listenerOptions.port) {
+                return Status(ErrorCodes::BadValue,
+                              "Port 0 (ephemeral port) is not allowed when"
+                              " listening on multiple IP interfaces");
+            }
+            std::error_code ec;
+            auto endpoint = acceptor.local_endpoint(ec);
+            if (ec) {
+                return errorCodeToStatus(ec);
+            }
+            _listenerPort = endpointToHostAndPort(endpoint).port();
+        }
+
+        sockaddr_storage sa;
+        memcpy(&sa, addr->data(), addr->size());
+        _acceptors.emplace_back(SockAddr(sa, addr->size()), std::move(acceptor));
     }
 
     if (_acceptors.empty() && _listenerOptions.isIngress()) {
