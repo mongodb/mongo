@@ -34,7 +34,7 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: 2}));
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     jsTestLog("Test that you can call abortTransaction on a prepared transaction.");
     session.startTransaction();

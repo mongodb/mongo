@@ -33,7 +33,7 @@
     assert.eq(doc1, sessionColl.findOne(doc1));
 
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     // After commit the insert persists.
     assert.eq(doc1, testColl.findOne(doc1));
@@ -52,7 +52,7 @@
     assert.eq(doc2, sessionColl.findOne(doc2));
 
     prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     // After commit the update persists.
     assert.eq(doc2, testColl.findOne({_id: 1}));
@@ -69,7 +69,7 @@
     assert.eq(null, sessionColl.findOne(doc2));
 
     prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     // After commit the delete persists.
     assert.eq(null, testColl.findOne(doc2));
