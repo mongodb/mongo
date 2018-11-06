@@ -190,6 +190,7 @@ _ERROR_CATEGORIES = [
   'build/printf_format',
   'build/storage_class',
   'legal/copyright',
+  'legal/license',
   'mongo/polyfill',
   'readability/alt_tokens',
   'readability/braces',
@@ -1682,12 +1683,83 @@ def CheckForCopyright(filename, lines, error):
   # We'll say it should occur by line 10. Don't forget there's a
   # dummy line at the front.
   for line in xrange(1, min(len(lines), 11)):
-    if re.search(r'Copyright', lines[line], re.I): break
+    if re.search(r'Copyright', lines[line], re.I):
+      CheckForServerSidePublicLicense(line, filename, lines, error)
+      break
   else:                       # means no copyright line was found
     error(filename, 0, 'legal/copyright', 5,
           'No copyright message found.  '
           'You should have a line: "Copyright [year] <Copyright Owner>"')
 
+def CheckForServerSidePublicLicense(copyright_offset, filename, lines, error):
+  license_header = '''\
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */'''.splitlines()
+
+  # The following files are in the src/mongo/ directory but technically belong
+  # in src/third_party/ because their copyright does not belong to MongoDB. Note
+  # that we do not need to use os.path.normpath() to match these pathnames on
+  # Windows because FileInfo.RepositoryName() normalizes the path separator for
+  # us already.
+  files_to_ignore = set([
+    'src/mongo/shell/linenoise.cpp',
+    'src/mongo/shell/linenoise.h',
+    'src/mongo/shell/mk_wcwidth.cpp',
+    'src/mongo/shell/mk_wcwidth.h',
+    'src/mongo/util/md5.cpp',
+    'src/mongo/util/md5.h',
+    'src/mongo/util/md5main.cpp',
+    'src/mongo/util/net/ssl_stream.cpp',
+    'src/mongo/util/scopeguard.h',
+  ])
+
+  if FileInfo(filename).RepositoryName() in files_to_ignore:
+    return
+
+  # We expect the first line of the license header to follow shortly after the
+  # "Copyright" message.
+  for line in xrange(copyright_offset, min(len(lines), copyright_offset + 3)):
+    if re.search(r'This program is free software', lines[line]):
+      license_header_start_line = line
+      for i in xrange(len(license_header)):
+        line = i + license_header_start_line
+        if line >= len(lines) or lines[line] != license_header[i]:
+          error(filename, 0, 'legal/license', 5,
+                'Incorrect license header found.  '
+                'Expected "' + license_header[i] + '".  '
+                'See https://github.com/mongodb/mongo/wiki/Server-Code-Style')
+          # We break here to stop reporting legal/license errors for this file.
+          break
+
+      # We break here to indicate that we found some license header.
+      break
+  else:
+    error(filename, 0, 'legal/license', 5,
+          'No license header found.  '
+          'See https://github.com/mongodb/mongo/wiki/Server-Code-Style')
 
 def GetIndentLevel(line):
   """Return the number of leading spaces in line.
