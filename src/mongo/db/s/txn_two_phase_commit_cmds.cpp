@@ -95,6 +95,12 @@ public:
                     "Transaction isn't in progress",
                     txnParticipant->inMultiDocumentTransaction());
 
+            // We automatically fail 'prepareTransaction' against a primary that has
+            // 'enableMajorityReadConcern' set to 'false'.
+            uassert(50993,
+                    "'prepareTransaction' is not supported with 'enableMajorityReadConcern=false'",
+                    serverGlobalParams.enableMajorityReadConcern);
+
             if (txnParticipant->transactionIsPrepared()) {
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
                 auto prepareOpTime = txnParticipant->getPrepareOpTime();
