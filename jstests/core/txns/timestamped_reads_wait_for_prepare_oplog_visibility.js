@@ -83,7 +83,7 @@
         db.setLogLevel(0);
         joinReadThread({checkExitSuccess: true});
 
-        PrepareHelpers.commitTransaction(session, prepareTimestamp);
+        PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
     }
 
     const snapshotRead = function(_collName) {
