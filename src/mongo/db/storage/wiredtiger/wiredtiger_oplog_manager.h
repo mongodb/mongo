@@ -99,13 +99,9 @@ private:
     mutable stdx::condition_variable
         _opsBecameVisibleCV;  // Signaled when a journal flush is complete.
 
-    bool _isRunning = false;     // Guarded by the oplogVisibilityStateMutex.
-    bool _shuttingDown = false;  // Guarded by oplogVisibilityStateMutex.
-
-    // This is the RecordId of the newest oplog document in the oplog on startup.  It is used as a
-    // floor in waitForAllEarlierOplogWritesToBeVisible().
-    RecordId _oplogMaxAtStartup = RecordId(0);  // Guarded by oplogVisibilityStateMutex.
-    bool _opsWaitingForJournal = false;         // Guarded by oplogVisibilityStateMutex.
+    bool _isRunning = false;             // Guarded by oplogVisibilityStateMutex.
+    bool _shuttingDown = false;          // Guarded by oplogVisibilityStateMutex.
+    bool _opsWaitingForJournal = false;  // Guarded by oplogVisibilityStateMutex.
 
     // When greater than 0, indicates that there are operations waiting for oplog visibility, and
     // journal flushing should not be delayed.

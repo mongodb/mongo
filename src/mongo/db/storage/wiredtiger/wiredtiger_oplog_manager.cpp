@@ -61,17 +61,14 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         oplogRecordStore->getCursor(opCtx, false /* false = reverse cursor */);
     auto lastRecord = reverseOplogCursor->next();
     if (lastRecord) {
-        _oplogMaxAtStartup = lastRecord->id;
-
         // Although the oplog may have holes, using the top of the oplog should be safe. In the
         // event of a secondary crashing, replication recovery will truncate the oplog, resetting
         // visibility to the truncate point. In the event of a primary crashing, it will perform
         // rollback before servicing oplog reads.
-        auto oplogVisibility = Timestamp(_oplogMaxAtStartup.repr());
+        auto oplogVisibility = Timestamp(lastRecord->id.repr());
         setOplogReadTimestamp(oplogVisibility);
         LOG(1) << "Setting oplog visibility at startup. Val: " << oplogVisibility;
     } else {
-        _oplogMaxAtStartup = RecordId();
         // Avoid setting oplog visibility to 0. That means "everything is visible".
         setOplogReadTimestamp(Timestamp(kMinimumTimestamp));
     }
@@ -141,16 +138,10 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
             return true;
         }
         currentLatestVisibleTimestamp = newLatestVisibleTimestamp;
-
-        // currentLatestVisibleTimestamp might be Timestamp "1" if there are no oplog documents
-        // inserted since the last mongod restart.  In this case, we need to simulate what timestamp
-        // the last oplog document had when it was written, which is the _oplogMaxAtStartup value.
-        RecordId latestVisible =
-            std::max(RecordId(currentLatestVisibleTimestamp), _oplogMaxAtStartup);
+        RecordId latestVisible = RecordId(currentLatestVisibleTimestamp);
         if (latestVisible < waitingFor) {
             LOG(2) << "Operation is waiting for " << waitingFor << "; latestVisible is "
-                   << currentLatestVisibleTimestamp << " oplogMaxAtStartup is "
-                   << _oplogMaxAtStartup;
+                   << currentLatestVisibleTimestamp;
         }
         return latestVisible >= waitingFor;
     });
