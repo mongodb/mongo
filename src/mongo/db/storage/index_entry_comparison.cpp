@@ -29,10 +29,12 @@
  */
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/index_entry_comparison.h"
+
 #include <ostream>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 
 namespace mongo {
 
@@ -193,7 +195,7 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
     }
 
     sb << builder.obj();
-    return Status(ErrorCodes::DuplicateKey, sb.str());
+    return Status(DuplicateKeyErrorInfo(keyPattern), sb.str());
 }
 
 }  // namespace mongo

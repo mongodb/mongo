@@ -77,6 +77,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -127,6 +128,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
@@ -142,6 +144,7 @@ env.CppUnitTest(
         'sharding_catalog_write_retry_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
     ]
 )

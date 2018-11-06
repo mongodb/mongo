@@ -79,7 +79,7 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
                 << " all map to this node in new configuration version "
                 << newConfig.getConfigVersion() << " for replica set "
                 << newConfig.getReplSetName();
-        return StatusWith<int>(ErrorCodes::DuplicateKey, message);
+        return StatusWith<int>(ErrorCodes::InvalidReplicaSetConfig, message);
     }
 
     int myIndex = std::distance(newConfig.membersBegin(), meConfigs.front());

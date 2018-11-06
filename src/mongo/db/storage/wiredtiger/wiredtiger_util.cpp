@@ -188,7 +188,7 @@ Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
     while ((ret = parser.next(&keyItem, &valueItem)) == 0) {
         const StringData key(keyItem.str, keyItem.len);
         if (keysSeen.count(key)) {
-            return Status(ErrorCodes::DuplicateKey,
+            return Status(ErrorCodes::Error(50998),
                           str::stream() << "app_metadata must not contain duplicate keys. "
                                         << "Found multiple instances of key '"
                                         << key

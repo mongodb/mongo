@@ -43,8 +43,8 @@ namespace mongo {
  * Confirms that obj only contains field names where allowed(name) returns true,
  * and that no field name occurs multiple times.
  *
- * On failure, returns BadValue and a message naming the unexpected field or DuplicateKey and a
- * message naming the repeated field.  "objectName" is included in the message, for reporting
+ * On failure, returns BadValue and a message naming the unexpected field or error code 51000 with
+ * a message naming a repeated field.  "objectName" is included in the message, for reporting
  * purposes.
  */
 template <typename Condition>
@@ -65,7 +65,7 @@ Status bsonCheckOnlyHasFieldsImpl(StringData objectName,
         if (!seenBefore) {
             seenBefore = true;
         } else {
-            return Status(ErrorCodes::DuplicateKey,
+            return Status(ErrorCodes::Error(51000),
                           str::stream() << "Field " << name << " appears multiple times in "
                                         << objectName);
         }

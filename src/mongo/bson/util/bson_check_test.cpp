@@ -77,9 +77,10 @@ TEST(BsonCheck, CheckHasOnlyLegalFields) {
 }
 
 TEST(BsonCheck, CheckNoDuplicates) {
-    ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+    ASSERT_EQUALS(51000,
                   bsonCheckOnlyHasFields(
-                      "", BSON("aField" << 1 << "anotherField" << 2 << "aField" << 3), legals));
+                      "", BSON("aField" << 1 << "anotherField" << 2 << "aField" << 3), legals)
+                      .code());
 }
 
 }  // namespace

@@ -186,7 +186,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataDuplicateKeys) {
     StatusWith<BSONObj> result =
         WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::DuplicateKey, result.getStatus().code());
+    ASSERT_EQUALS(50998, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {

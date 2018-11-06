@@ -90,7 +90,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
         validateConfigForInitiate(&notPresentExternalState, config, getGlobalServiceContext())
             .getStatus());
     ASSERT_EQUALS(
-        ErrorCodes::DuplicateKey,
+        ErrorCodes::InvalidReplicaSetConfig,
         validateConfigForInitiate(&presentTwiceExternalState, config, getGlobalServiceContext())
             .getStatus());
     ASSERT_EQUALS(1,
@@ -703,7 +703,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_MustFindSelf) {
             &notPresentExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
             .getStatus());
     ASSERT_EQUALS(
-        ErrorCodes::DuplicateKey,
+        ErrorCodes::InvalidReplicaSetConfig,
         validateConfigForReconfig(
             &presentThriceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
             .getStatus());
@@ -718,7 +718,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_MustFindSelf) {
             &notPresentExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
             .getStatus());
     ASSERT_EQUALS(
-        ErrorCodes::DuplicateKey,
+        ErrorCodes::InvalidReplicaSetConfig,
         validateConfigForReconfig(
             &presentThriceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
             .getStatus());

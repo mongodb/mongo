@@ -75,8 +75,8 @@ TEST(InitializerDependencyGraphTest, InsertSameNameTwiceFails) {
     InitializerDependencyGraph graph;
     ASSERT_ADD_INITIALIZER(graph, "A", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS);
     ASSERT_EQUALS(
-        ErrorCodes::DuplicateKey,
-        ADD_INITIALIZER(graph, "A", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS));
+        50999,
+        ADD_INITIALIZER(graph, "A", doNothing, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS).code());
 }
 
 TEST(InitializerDependencyGraphTest, TopSortEmptyGraph) {

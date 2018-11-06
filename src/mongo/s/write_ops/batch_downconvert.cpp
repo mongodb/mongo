@@ -33,6 +33,7 @@
 #include "mongo/s/write_ops/batch_downconvert.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 
 namespace mongo {
 
@@ -100,16 +101,6 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
         // Write error
         errors->writeError.reset(new WriteErrorDetail);
         int writeErrorCode = code == 0 ? ErrorCodes::UnknownError : code;
-
-        // COMPATIBILITY
-        // Certain clients expect write commands to always report 11000 for duplicate key
-        // errors, while legacy GLE can return additional codes.
-        if (writeErrorCode == 11001 /* dup key in update */
-            ||
-            writeErrorCode == 12582 /* dup key capped */) {
-            writeErrorCode = ErrorCodes::DuplicateKey;
-        }
-
         errors->writeError->setStatus({ErrorCodes::Error(writeErrorCode), err});
     } else if (!jNote.empty()) {
         // Know this is legacy gle and the journaling not enforced - write concern error in 2.4

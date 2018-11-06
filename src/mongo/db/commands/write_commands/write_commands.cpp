@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
@@ -150,7 +151,11 @@ void serializeReply(OperationContext* opCtx,
             }
         } else {
             error.append("code", int(status.code()));
+            if (auto const extraInfo = status.extraInfo()) {
+                extraInfo->serialize(&error);
+            }
         }
+
         error.append("errmsg", errorMessage(status.reason()));
         errors.push_back(error.obj());
     }

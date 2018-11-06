@@ -594,7 +594,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
                 log() << "Cannot find self in new replica set configuration; I must be removed; "
                       << myIndex.getStatus();
                 break;
-            case ErrorCodes::DuplicateKey:
+            case ErrorCodes::InvalidReplicaSetConfig:
                 error() << "Several entries in new config represent this node; "
                            "Removing self until an acceptable configuration arrives; "
                         << myIndex.getStatus();

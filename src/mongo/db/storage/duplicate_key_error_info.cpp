@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -28,46 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/util/fail_point_registry.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/util/fail_point_server_parameter.h"
-#include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 
-using mongoutils::str::stream;
+#include "mongo/base/init.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
 
-using std::string;
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 
-FailPointRegistry::FailPointRegistry() : _frozen(false) {}
+}  // namespace
 
-Status FailPointRegistry::addFailPoint(const string& name, FailPoint* failPoint) {
-    if (_frozen) {
-        return Status(ErrorCodes::CannotMutateObject, "Registry is already frozen");
-    }
-
-    if (_fpMap.count(name) > 0) {
-        return Status(ErrorCodes::Error(51006),
-                      stream() << "Fail point already registered: " << name);
-    }
-
-    _fpMap.insert(make_pair(name, failPoint));
-    return Status::OK();
+void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
+    bob->append("keyPattern", _keyPattern);
 }
 
-FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
-    return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(nullptr));
+std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj& obj) {
+    return std::make_shared<DuplicateKeyErrorInfo>(obj["keyPattern"].Obj());
 }
 
-void FailPointRegistry::freeze() {
-    _frozen = true;
-}
-
-void FailPointRegistry::registerAllFailPointsAsServerParameters() {
-    for (auto it = _fpMap.begin(); it != _fpMap.end(); ++it) {
-        // Intentionally leaked.
-        new FailPointServerParameter(it->first, it->second);
-    }
-}
-}
+}  // namespace mongo

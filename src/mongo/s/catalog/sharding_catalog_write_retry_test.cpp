@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -77,6 +78,10 @@ using UpdateRetryTest = ShardingTestFixture;
 const NamespaceString kTestNamespace("config.TestColl");
 const HostAndPort kTestHosts[] = {
     HostAndPort("TestHost1:12345"), HostAndPort("TestHost2:12345"), HostAndPort("TestHost3:12345")};
+
+Status getMockDuplicateKeyError() {
+    return {DuplicateKeyErrorInfo(BSON("mock" << 1)), "Mock duplicate key error"};
+}
 
 TEST_F(InsertRetryTest, RetryOnInterruptedAndNetworkErrorSuccess) {
     configTargeter()->setFindHostReturnValue({kTestHosts[0]});
@@ -168,7 +173,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
-        return Status(ErrorCodes::DuplicateKey, "Duplicate key");
+        return getMockDuplicateKeyError();
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
@@ -206,7 +211,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
-        return Status(ErrorCodes::DuplicateKey, "Duplicate key");
+        return getMockDuplicateKeyError();
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
@@ -244,7 +249,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
-        return Status(ErrorCodes::DuplicateKey, "Duplicate key");
+        return getMockDuplicateKeyError();
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
@@ -300,7 +305,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[0]);
-        return Status(ErrorCodes::DuplicateKey, "Duplicate key");
+        return getMockDuplicateKeyError();
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {

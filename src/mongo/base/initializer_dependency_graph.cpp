@@ -49,7 +49,7 @@ Status InitializerDependencyGraph::addInitializer(std::string name,
 
     InitializerDependencyNode& newNode = _nodes[name];
     if (newNode.initFn) {
-        return Status(ErrorCodes::DuplicateKey, name);
+        return Status(ErrorCodes::Error(50999), name);
     }
 
     newNode.initFn = std::move(initFn);

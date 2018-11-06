@@ -556,7 +556,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         validateConfigForStartUp(_externalState.get(), localConfig, getServiceContext());
     if (!myIndex.isOK()) {
         if (myIndex.getStatus() == ErrorCodes::NodeNotFound ||
-            myIndex.getStatus() == ErrorCodes::DuplicateKey) {
+            myIndex.getStatus() == ErrorCodes::InvalidReplicaSetConfig) {
             warning() << "Locally stored replica set configuration does not have a valid entry "
                          "for the current node; waiting for reconfig or remote heartbeat; Got \""
                       << myIndex.getStatus() << "\" while validating " << localConfig.toBSON();

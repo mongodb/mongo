@@ -541,7 +541,7 @@ TEST_F(DatabaseClonerTest, CollectionInfoNameDuplicate) {
                                                              << _options2.toBSON()))));
     }
 
-    ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatus().code());
+    ASSERT_EQUALS(51005, getStatus().code());
     ASSERT_STRING_CONTAINS(getStatus().reason(), "duplicate collection name 'a'");
     ASSERT_FALSE(_databaseCloner->isActive());
     ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());

@@ -419,7 +419,7 @@ Status insertRoleDocument(OperationContext* opCtx, const BSONObj& roleObj) {
     if (status.code() == ErrorCodes::DuplicateKey) {
         std::string name = roleObj[AuthorizationManager::ROLE_NAME_FIELD_NAME].String();
         std::string source = roleObj[AuthorizationManager::ROLE_DB_FIELD_NAME].String();
-        return Status(ErrorCodes::DuplicateKey,
+        return Status(ErrorCodes::Error(51002),
                       str::stream() << "Role \"" << name << "@" << source << "\" already exists");
     }
     if (status.code() == ErrorCodes::UnknownError) {
@@ -478,7 +478,7 @@ Status insertPrivilegeDocument(OperationContext* opCtx, const BSONObj& userObj) 
     if (status.code() == ErrorCodes::DuplicateKey) {
         std::string name = userObj[AuthorizationManager::USER_NAME_FIELD_NAME].String();
         std::string source = userObj[AuthorizationManager::USER_DB_FIELD_NAME].String();
-        return Status(ErrorCodes::DuplicateKey,
+        return Status(ErrorCodes::Error(51003),
                       str::stream() << "User \"" << name << "@" << source << "\" already exists");
     }
     if (status.code() == ErrorCodes::UnknownError) {

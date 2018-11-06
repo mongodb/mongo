@@ -820,7 +820,7 @@ TEST(ReplSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
                                            << BSON("getLastErrorModes"
                                                    << BSON("one" << BSON("tag" << 1) << "one"
                                                                  << BSON("tag" << 1)))));
-    ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
+    ASSERT_EQUALS(51001, status.code());
 }
 
 TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {

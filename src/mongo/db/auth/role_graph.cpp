@@ -81,7 +81,7 @@ bool RoleGraph::_roleExistsDontCreateBuiltin(const RoleName& role) {
 
 Status RoleGraph::createRole(const RoleName& role) {
     if (roleExists(role)) {
-        return Status(ErrorCodes::DuplicateKey,
+        return Status(ErrorCodes::Error(51007),
                       mongoutils::str::stream() << "Role: " << role.getFullName()
                                                 << " already exists");
     }
@@ -403,7 +403,7 @@ Status RoleGraph::replaceRole(const RoleName& roleName,
     for (size_t i = 0; i < roles.size(); ++i) {
         const RoleName& grantedRole = roles[i];
         status = createRole(grantedRole);
-        fassert(17170, status.isOK() || status == ErrorCodes::DuplicateKey);
+        fassert(17170, status.isOK() || status.code() == 51007);
         fassert(17171, addRoleToRole(roleName, grantedRole));
     }
     fassert(17172, addPrivilegesToRole(roleName, privileges));

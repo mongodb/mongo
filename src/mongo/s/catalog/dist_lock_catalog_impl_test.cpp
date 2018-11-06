@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
@@ -437,11 +438,7 @@ TEST_F(DistLockCatalogTest, GrabLockDupKeyError) {
     });
 
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return fromjson(R"({
-                ok: 0,
-                errmsg: "duplicate key error",
-                code: 11000
-            })");
+        return Status({DuplicateKeyErrorInfo(BSON("x" << 1)), "Mock duplicate key error"});
     });
 
     future.timed_get(kFutureTimeout);

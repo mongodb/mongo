@@ -33,6 +33,17 @@ env.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'duplicate_key_error_info',
+        ],
+    )
+
+env.Library(
+    target='duplicate_key_error_info',
+    source=[
+        'duplicate_key_error_info.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         ],
     )
 

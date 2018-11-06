@@ -1221,7 +1221,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     onCommand([&](const RemoteCommandRequest& request) {
         BSONObjBuilder responseBuilder;
         CommandHelpers::appendCommandStatusNoThrow(
-            responseBuilder, Status(ErrorCodes::DuplicateKey, "precondition failed"));
+            responseBuilder, Status(ErrorCodes::Error(51004), "precondition failed"));
         return responseBuilder.obj();
     });
 

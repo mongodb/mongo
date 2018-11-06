@@ -152,10 +152,10 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsCatchesInsertErrors) {
     ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::cloneDocumentsFromDonor(
                                     operationContext(), insertBatchFn, fetchBatchFn),
                                 DBException,
-                                ErrorCodes::FailedToParse,
+                                51008,
                                 "operation was interrupted");
 
-    ASSERT_EQ(operationContext()->getKillStatus(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(operationContext()->getKillStatus(), 51008);
 }
 
 }  // namespace

@@ -353,7 +353,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     for (auto&& modeElement : gleModes) {
         if (_customWriteConcernModes.find(modeElement.fieldNameStringData()) !=
             _customWriteConcernModes.end()) {
-            return Status(ErrorCodes::DuplicateKey,
+            return Status(ErrorCodes::Error(51001),
                           str::stream() << kSettingsFieldName << '.' << kGetLastErrorModesFieldName
                                         << " contains multiple fields named "
                                         << modeElement.fieldName());

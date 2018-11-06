@@ -346,7 +346,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         const std::string collectionName = nameElement.String();
         if (seen.find(collectionName) != seen.end()) {
             _finishCallback_inlock(lk,
-                                   {ErrorCodes::DuplicateKey,
+                                   {ErrorCodes::Error(51005),
                                     str::stream()
                                         << "collection info contains duplicate collection name "
                                         << "'"

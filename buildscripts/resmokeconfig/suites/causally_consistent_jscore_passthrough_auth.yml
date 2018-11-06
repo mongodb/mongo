@@ -169,8 +169,8 @@ executor:
               assert.commandWorked(res);
           } else {
               // If 'username' already exists, then attempts to create a user with the same name
-              // will fail with a duplicate key error.
-              assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+              // will fail with error code 51003.
+              assert.commandFailedWithCode(res, 51003);
           }
 
           // Log out as the __system user and auth as the newly created user.

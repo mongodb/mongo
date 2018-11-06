@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -28,46 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/util/fail_point_registry.h"
+#pragma once
 
-#include "mongo/util/fail_point_server_parameter.h"
-#include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/str.h"
-
-using mongoutils::str::stream;
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 
-using std::string;
+/**
+ * Represents an error returned from the storage engine when an attempt to insert a
+ * key into a unique index fails because the same key already exists.
+ */
+class DuplicateKeyErrorInfo final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::DuplicateKey;
 
-FailPointRegistry::FailPointRegistry() : _frozen(false) {}
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-Status FailPointRegistry::addFailPoint(const string& name, FailPoint* failPoint) {
-    if (_frozen) {
-        return Status(ErrorCodes::CannotMutateObject, "Registry is already frozen");
+    explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern)
+        : _keyPattern(keyPattern.getOwned()) {}
+
+    void serialize(BSONObjBuilder* bob) const override;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder bob;
+        serialize(&bob);
+        return bob.obj();
     }
 
-    if (_fpMap.count(name) > 0) {
-        return Status(ErrorCodes::Error(51006),
-                      stream() << "Fail point already registered: " << name);
+    const BSONObj& getKeyPattern() const {
+        return _keyPattern;
     }
 
-    _fpMap.insert(make_pair(name, failPoint));
-    return Status::OK();
-}
+private:
+    const BSONObj _keyPattern;
+};
 
-FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
-    return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(nullptr));
-}
-
-void FailPointRegistry::freeze() {
-    _frozen = true;
-}
-
-void FailPointRegistry::registerAllFailPointsAsServerParameters() {
-    for (auto it = _fpMap.begin(); it != _fpMap.end(); ++it) {
-        // Intentionally leaked.
-        new FailPointServerParameter(it->first, it->second);
-    }
-}
-}
+}  // namespace mongo

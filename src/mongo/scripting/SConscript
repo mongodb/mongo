@@ -153,6 +153,7 @@ if usemozjs:
             'scripting_common',
             '$BUILD_DIR/mongo/shell/mongojs',
             '$BUILD_DIR/mongo/db/service_context',
+            '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_network',

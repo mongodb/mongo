@@ -793,11 +793,10 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
             auto existingDocs = fetchDuplicate.getValue().value;
             if (existingDocs.empty()) {
-                return {ErrorCodes::DuplicateKey,
-                        stream() << "DuplicateKey error was returned after a retry attempt, but no "
-                                    "documents were found. This means a concurrent change occurred "
-                                    "together with the retries. Original error was "
-                                 << status.toString()};
+                return {status.withContext(
+                    stream() << "DuplicateKey error was returned after a retry attempt, but no "
+                                "documents were found. This means a concurrent change occurred "
+                                "together with the retries.")};
             }
 
             invariant(existingDocs.size() == 1);
