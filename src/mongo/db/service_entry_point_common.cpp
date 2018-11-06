@@ -99,38 +99,6 @@ MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
 namespace {
 using logger::LogComponent;
 
-// The command names for which to check out a session. These are commands that support retryable
-// writes, readConcern snapshot, or multi-statement transactions. We additionally check out the
-// session for commands that can take a lock and then run another whitelisted command in
-// DBDirectClient. Otherwise, the nested command would try to check out a session under a lock,
-// which is not allowed.
-const StringMap<int> sessionCheckOutList = {{"abortTransaction", 1},
-                                            {"aggregate", 1},
-                                            {"applyOps", 1},
-                                            {"commitTransaction", 1},
-                                            {"count", 1},
-                                            {"dbHash", 1},
-                                            {"delete", 1},
-                                            {"distinct", 1},
-                                            {"doTxn", 1},
-                                            {"explain", 1},
-                                            {"filemd5", 1},
-                                            {"find", 1},
-                                            {"findandmodify", 1},
-                                            {"findAndModify", 1},
-                                            {"geoNear", 1},
-                                            {"geoSearch", 1},
-                                            {"getMore", 1},
-                                            {"group", 1},
-                                            {"insert", 1},
-                                            {"killCursors", 1},
-                                            {"prepareTransaction", 1},
-                                            {"refreshLogicalSessionCacheNow", 1},
-                                            {"update", 1}};
-
-const StringMap<int> skipSessionCheckOutList = {
-    {"coordinateCommitTransaction", 1}, {"voteAbortTransaction", 1}, {"voteCommitTransaction", 1}};
-
 void generateLegacyQueryErrorResponse(const AssertionException& exception,
                                       const QueryMessage& queryMessage,
                                       CurOp* curop,
@@ -564,42 +532,15 @@ void execCommandDatabase(OperationContext* opCtx,
             str::stream() << "Invalid database name: '" << dbname << "'",
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        // Session ids are forwarded in requests, so commands that require roundtrips between
-        // servers may result in a deadlock when a server tries to check out a session it is already
-        // using to service an earlier operation in the command's chain. To avoid this, only check
-        // out sessions for commands that require them.
-        const bool shouldCheckoutSession = static_cast<bool>(opCtx->getTxnNumber()) &&
-            sessionCheckOutList.find(command->getName()) != sessionCheckOutList.cend();
-
-        // Reject commands with 'txnNumber' that do not check out the Session, since no retryable
-        // writes or transaction machinery will be used to execute commands that do not check out
-        // the Session. Do not check this if we are in DBDirectClient because the outer command is
-        // responsible for checking out the Session.
-        const auto skipSessionCheckout =
-            skipSessionCheckOutList.find(command->getName()) != skipSessionCheckOutList.cend();
-        const auto shouldNotCheckOutSession = !shouldCheckoutSession  //
-            && !opCtx->getClient()->isInDirectClient()                // Skip DBDirectClient.
-            && !skipSessionCheckout;  // If we know they cannot check out, don't bother.
-
-        if (shouldNotCheckOutSession) {
-            uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                    str::stream() << "It is illegal to run command " << command->getName()
-                                  << " in a multi-document transaction.",
-                    !sessionOptions.getAutocommit());
-            uassert(50768,
-                    str::stream() << "It is illegal to provide a txnNumber for command "
-                                  << command->getName(),
-                    !opCtx->getTxnNumber());
-        }
-
-        if (sessionOptions.getAutocommit()) {
-            uassertStatusOK(CommandHelpers::canUseTransactions(dbname, command->getName()));
-        }
+        validateSessionOptions(sessionOptions, command->getName(), dbname);
 
         // This constructor will check out the session and start a transaction, if necessary. It
         // handles the appropriate state management for both multi-statement transactions and
-        // retryable writes.
-        OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckoutSession, sessionOptions);
+        // retryable writes. Currently, only requests with a transaction number will check out the
+        // session.
+        const bool shouldCheckOutSession = static_cast<bool>(sessionOptions.getTxnNumber()) &&
+            !cmdSkipsSessionCheckout(command->getName());
+        OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckOutSession, sessionOptions);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 

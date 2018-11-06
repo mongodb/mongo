@@ -376,6 +376,10 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
+    auto osi =
+        initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
+    validateSessionOptions(osi, command->getName(), nss.db());
+
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = readConcernArgs.initialize(request.body);
     if (!readConcernParseStatus.isOK()) {
@@ -395,9 +399,6 @@ void runCommand(OperationContext* opCtx,
     }
 
     boost::optional<ScopedRouterSession> scopedSession;
-    auto osi =
-        initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
-
     try {
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName);
         if (osi.getAutocommit()) {
@@ -411,8 +412,6 @@ void runCommand(OperationContext* opCtx,
 
             auto startTxnSetting = osi.getStartTransaction();
             bool startTransaction = startTxnSetting ? *startTxnSetting : false;
-
-            uassertStatusOK(CommandHelpers::canUseTransactions(nss.db(), command->getName()));
 
             txnRouter->beginOrContinueTxn(opCtx, *txnNumber, startTransaction);
         }

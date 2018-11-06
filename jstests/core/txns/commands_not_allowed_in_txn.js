@@ -15,6 +15,8 @@
     const session = db.getMongo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
+    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+
     assert.commandWorked(
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
     assert.commandWorked(testDB.runCommand({
@@ -92,10 +94,15 @@
     const sessionCommands = [
         {count: collName},
         {count: collName, query: {a: 1}},
-        {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]},
         {explain: {find: collName}},
         {filemd5: 1, root: "fs"},
     ];
+
+    // There is no applyOps command on mongos.
+    if (!isMongos) {
+        sessionCommands.push(
+            {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]});
+    }
 
     sessionCommands.forEach(testCommand);
 
@@ -132,30 +139,33 @@
     // Test that doTxn is not allowed at positions after the first in transactions.
     //
 
-    assert.commandWorked(sessionDb.runCommand({
-        find: collName,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(++txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        doTxn: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}],
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(1),
-        autocommit: false
-    }),
-                                 ErrorCodes.OperationNotSupportedInTransaction);
+    // There is no doTxn command on mongos.
+    if (!isMongos) {
+        assert.commandWorked(sessionDb.runCommand({
+            find: collName,
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(++txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+        assert.commandFailedWithCode(sessionDb.runCommand({
+            doTxn: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}],
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(1),
+            autocommit: false
+        }),
+                                     ErrorCodes.OperationNotSupportedInTransaction);
 
-    // It is still possible to commit the transaction. The rejected command does not abort the
-    // transaction.
-    assert.commandWorked(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(2),
-        autocommit: false
-    }));
+        // It is still possible to commit the transaction. The rejected command does not abort the
+        // transaction.
+        assert.commandWorked(sessionDb.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(2),
+            autocommit: false
+        }));
+    }
 
     session.endSession();
 }());
