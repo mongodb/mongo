@@ -46,6 +46,7 @@ StringData kModeFieldName = DocumentSourceOutSpec::kModeFieldName;
 StringData kUniqueKeyFieldName = DocumentSourceOutSpec::kUniqueKeyFieldName;
 StringData kDefaultMode = WriteMode_serializer(WriteModeEnum::kModeReplaceCollection);
 StringData kInsertDocumentsMode = WriteMode_serializer(WriteModeEnum::kModeInsertDocuments);
+StringData kReplaceDocumentsMode = WriteMode_serializer(WriteModeEnum::kModeReplaceDocuments);
 
 /**
  * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
@@ -279,6 +280,25 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfModeIsNotString) {
                                << "mode"
                                << BSON("" << kDefaultMode)));
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceOutTest, CorrectlyAddressesMatchingTargetAndAggregationNamespaces) {
+    const auto targetNsSameAsAggregationNs = getExpCtx()->ns;
+    const auto targetColl = targetNsSameAsAggregationNs.coll();
+    const auto targetDb = targetNsSameAsAggregationNs.db();
+
+    BSONObj spec = BSON(
+        "$out" << BSON("to" << targetColl << "mode" << kInsertDocumentsMode << "db" << targetDb));
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50992);
+
+    spec = BSON(
+        "$out" << BSON("to" << targetColl << "mode" << kReplaceDocumentsMode << "db" << targetDb));
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50992);
+
+    spec = BSON("$out" << BSON("to" << targetColl << "mode" << kDefaultMode << "db" << targetDb));
+    auto outStage = createOutStage(spec);
+    ASSERT_EQ(outStage->getOutputNs().db(), targetNsSameAsAggregationNs.db());
+    ASSERT_EQ(outStage->getOutputNs().coll(), targetNsSameAsAggregationNs.coll());
 }
 
 TEST_F(DocumentSourceOutTest, FailsToParseIfModeIsUnsupportedString) {

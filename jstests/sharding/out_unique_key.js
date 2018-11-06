@@ -67,8 +67,8 @@
     const doesNotExist = mongosDB.doesNotExist;
     doesNotExist.drop();
     withEachMode((mode) => {
-        explainResult =
-            doesNotExist.explain().aggregate([{$out: {to: doesNotExist.getName(), mode: mode}}]);
+        explainResult = sourceCollection.explain().aggregate(
+            [{$out: {to: doesNotExist.getName(), mode: mode}}]);
         assert.eq({_id: 1}, getAggPlanStage(explainResult, "$out").$out.uniqueKey);
     });
 

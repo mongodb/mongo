@@ -249,6 +249,12 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
                       << " is not supported when the output collection is in a different database",
         !(mode == WriteModeEnum::kModeReplaceCollection && outputNs.db() != expCtx->ns.db()));
 
+    uassert(50992,
+            str::stream() << "$out with mode  " << WriteMode_serializer(mode)
+                          << " is not supported when the output collection is the same as the"
+                          << " aggregation collection",
+            mode == WriteModeEnum::kModeReplaceCollection || expCtx->ns != outputNs);
+
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "$out cannot be used in a transaction",
             !expCtx->inMultiDocumentTransaction);
