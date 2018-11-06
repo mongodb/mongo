@@ -20,6 +20,9 @@
         assert(serverStatusResponse.transactions.hasOwnProperty("totalPreparedThenAborted"),
                "Expected the serverStatus response to have a 'totalPreparedThenAborted' field: " +
                    serverStatusResponse);
+        assert(serverStatusResponse.transactions.hasOwnProperty("currentPrepared"),
+               "Expected the serverStatus response to have a 'currentPrepared' field: " +
+                   serverStatusResponse);
     }
 
     /**
@@ -68,21 +71,26 @@
     assert.commandWorked(sessionColl.insert(doc1));
     const prepareTimestampForCommit = PrepareHelpers.prepareTransaction(session);
 
-    // Verify the total prepared transaction counter is updated and the oldest active oplog entry
-    // timestamp is shown.
+    // Verify the total and current prepared transaction counter is updated and the oldest active
+    // oplog entry timestamp is shown.
     let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalPrepared", 1);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
 
     assert.eq(newStatus.transactions.oldestActiveOplogEntryTimestamp, prepareTimestampForCommit);
 
-    // Verify the total prepared and committed transaction counters are updated after a commit.
+    // Verify the total prepared and committed transaction counters are updated after a commit
+    // and that the current prepared counter is decremented.
     PrepareHelpers.commitTransaction(session, prepareTimestampForCommit);
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalPreparedThenCommitted", 1);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentPrepared", 0);
 
     // Verify that other prepared transaction metrics have not changed.
     verifyServerStatusChange(
@@ -100,21 +108,26 @@
     assert.commandWorked(sessionColl.insert(doc2));
     const prepareTimestampForAbort = PrepareHelpers.prepareTransaction(session);
 
-    // Verify that the total prepared counter is updated and the oldest active oplog entry timestamp
-    // is shown.
+    // Verify that the total and current prepared counter is updated and the oldest active oplog
+    // entry timestamp is shown.
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalPrepared", 2);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
 
     assert.eq(newStatus.transactions.oldestActiveOplogEntryTimestamp, prepareTimestampForAbort);
 
-    // Verify the total prepared and aborted transaction counters are updated after an abort.
+    // Verify the total prepared and aborted transaction counters are updated after an abort and the
+    // current prepared counter is decremented.
     session.abortTransaction();
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalPreparedThenAborted", 1);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentPrepared", 0);
 
     // Verify that other prepared transaction metrics have not changed.
     verifyServerStatusChange(

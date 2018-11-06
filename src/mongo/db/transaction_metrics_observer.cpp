@@ -126,6 +126,7 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
 
     if (wasPrepared) {
         serverTransactionsMetrics->incrementTotalPreparedThenCommitted();
+        serverTransactionsMetrics->decrementCurrentPrepared();
     }
 
     auto duration =
@@ -165,6 +166,7 @@ void TransactionMetricsObserver::onAbortActive(ServerTransactionsMetrics* server
 
     if (wasPrepared) {
         serverTransactionsMetrics->incrementTotalPreparedThenAborted();
+        serverTransactionsMetrics->decrementCurrentPrepared();
     }
 
     // Remove this transaction's oldest oplog entry OpTime if one was written.
@@ -237,6 +239,7 @@ void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTran
     // the prepare state, the prepareOpTime is currently the oldest OpTime written to the
     // oplog for this transaction.
     serverTransactionsMetrics->addActiveOpTime(prepareOpTime);
+    serverTransactionsMetrics->incrementCurrentPrepared();
     serverTransactionsMetrics->incrementTotalPrepared();
 }
 

@@ -1753,6 +1753,37 @@ TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenAborted) {
               beforePreparedThenAbortedCount + 1U);
 }
 
+TEST_F(TransactionsMetricsTest, IncrementCurrentPreparedWithCommit) {
+    unsigned long long beforeCurrentPrepared =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(),
+              beforeCurrentPrepared + 1U);
+    txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
+    ASSERT(txnParticipant->transactionIsCommitted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(), beforeCurrentPrepared);
+}
+
+TEST_F(TransactionsMetricsTest, IncrementCurrentPreparedWithAbort) {
+    unsigned long long beforeCurrentPrepared =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared();
+
+    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    txnParticipant->prepareTransaction(opCtx(), {});
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(),
+              beforeCurrentPrepared + 1U);
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(), beforeCurrentPrepared);
+}
 
 TEST_F(TransactionsMetricsTest, TrackTotalOpenTransactionsWithAbort) {
     unsigned long long beforeTransactionStart =

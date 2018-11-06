@@ -137,6 +137,18 @@ void ServerTransactionsMetrics::incrementTotalPreparedThenAborted() {
     _totalPreparedThenAborted.fetchAndAdd(1);
 }
 
+unsigned long long ServerTransactionsMetrics::getCurrentPrepared() const {
+    return _currentPrepared.load();
+}
+
+void ServerTransactionsMetrics::incrementCurrentPrepared() {
+    _currentPrepared.fetchAndAdd(1);
+}
+
+void ServerTransactionsMetrics::decrementCurrentPrepared() {
+    _currentPrepared.fetchAndSubtract(1);
+}
+
 boost::optional<repl::OpTime> ServerTransactionsMetrics::_calculateOldestActiveOpTime() const {
     if (_oldestActiveOplogEntryOpTimes.empty()) {
         return boost::none;
@@ -263,6 +275,7 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalPrepared(_totalPrepared.load());
     stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
     stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
+    stats->setCurrentPrepared(_currentPrepared.load());
     // To avoid compression loss, we have Timestamp(0, 0) be the default value if no oldest active
     // transaction optime is stored.
     Timestamp oldestActiveOplogEntryTimestamp = (_oldestActiveOplogEntryOpTime != boost::none)

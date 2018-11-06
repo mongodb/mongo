@@ -79,5 +79,8 @@ structs:
       totalPreparedThenAborted:
         type: long
         default: 0
+      currentPrepared:
+        type: long
+        default: 0
       oldestActiveOplogEntryTimestamp:
         type: timestamp

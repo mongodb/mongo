@@ -81,6 +81,10 @@ public:
     unsigned long long getTotalPreparedThenAborted() const;
     void incrementTotalPreparedThenAborted();
 
+    unsigned long long getCurrentPrepared() const;
+    void incrementCurrentPrepared();
+    void decrementCurrentPrepared();
+
     /**
      * Returns the OpTime of the oldest oplog entry written across all open transactions.
      * Returns boost::none if there are no transaction oplog entry OpTimes stored.
@@ -171,6 +175,9 @@ private:
 
     // The total number of prepared transaction aborts.
     AtomicUInt64 _totalPreparedThenAborted{0};
+
+    // The current number of transactions in the prepared state.
+    AtomicUInt64 _currentPrepared{0};
 
     // The optime of the oldest oplog entry for any active transaction.
     boost::optional<repl::OpTime> _oldestActiveOplogEntryOpTime;
