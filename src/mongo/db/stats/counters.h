@@ -47,14 +47,29 @@ namespace mongo {
  */
 class OpCounters {
 public:
-    OpCounters();
-    void gotInserts(int n);
-    void gotInsert();
-    void gotQuery();
-    void gotUpdate();
-    void gotDelete();
-    void gotGetMore();
-    void gotCommand();
+    OpCounters() = default;
+
+    void gotInserts(int n) {
+        _checkWrap(&OpCounters::_insert, n);
+    }
+    void gotInsert() {
+        _checkWrap(&OpCounters::_insert, 1);
+    }
+    void gotQuery() {
+        _checkWrap(&OpCounters::_query, 1);
+    }
+    void gotUpdate() {
+        _checkWrap(&OpCounters::_update, 1);
+    }
+    void gotDelete() {
+        _checkWrap(&OpCounters::_delete, 1);
+    }
+    void gotGetMore() {
+        _checkWrap(&OpCounters::_getmore, 1);
+    }
+    void gotCommand() {
+        _checkWrap(&OpCounters::_command, 1);
+    }
 
     void gotOp(int op, bool isCommand);
 
@@ -81,7 +96,8 @@ public:
     }
 
 private:
-    void _checkWrap();
+    // Increment member `counter` by `n`, resetting all counters if it was > 2^60.
+    void _checkWrap(CacheAligned<AtomicInt64> OpCounters::*counter, int n);
 
     CacheAligned<AtomicInt64> _insert;
     CacheAligned<AtomicInt64> _query;

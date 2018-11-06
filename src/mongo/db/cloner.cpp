@@ -271,7 +271,8 @@ struct Cloner::Fun {
                 }
             });
 
-            RARELY if (time(0) - saveLast > 60) {
+            static Rarely sampler;
+            if (sampler.tick() && (time(0) - saveLast > 60)) {
                 log() << numSeen << " objects cloned so far from collection " << from_collection;
                 saveLast = time(0);
             }

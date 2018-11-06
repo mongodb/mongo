@@ -36,49 +36,9 @@
 #include "mongo/db/stats/counters.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::endl;
-
-OpCounters::OpCounters() {}
-
-void OpCounters::gotInserts(int n) {
-    RARELY _checkWrap();
-    _insert.fetchAndAdd(n);
-}
-
-void OpCounters::gotInsert() {
-    RARELY _checkWrap();
-    _insert.fetchAndAdd(1);
-}
-
-void OpCounters::gotQuery() {
-    RARELY _checkWrap();
-    _query.fetchAndAdd(1);
-}
-
-void OpCounters::gotUpdate() {
-    RARELY _checkWrap();
-    _update.fetchAndAdd(1);
-}
-
-void OpCounters::gotDelete() {
-    RARELY _checkWrap();
-    _delete.fetchAndAdd(1);
-}
-
-void OpCounters::gotGetMore() {
-    RARELY _checkWrap();
-    _getmore.fetchAndAdd(1);
-}
-
-void OpCounters::gotCommand() {
-    RARELY _checkWrap();
-    _command.fetchAndAdd(1);
-}
 
 void OpCounters::gotOp(int op, bool isCommand) {
     switch (op) {
@@ -104,18 +64,14 @@ void OpCounters::gotOp(int op, bool isCommand) {
         case opReply:
             break;
         default:
-            log() << "OpCounters::gotOp unknown op: " << op << endl;
+            log() << "OpCounters::gotOp unknown op: " << op << std::endl;
     }
 }
 
-void OpCounters::_checkWrap() {
-    const int64_t MAX = 1ULL << 60;
-
-    bool wrap = _insert.loadRelaxed() > MAX || _query.loadRelaxed() > MAX ||
-        _update.loadRelaxed() > MAX || _delete.loadRelaxed() > MAX ||
-        _getmore.loadRelaxed() > MAX || _command.loadRelaxed() > MAX;
-
-    if (wrap) {
+void OpCounters::_checkWrap(CacheAligned<AtomicInt64> OpCounters::*counter, int n) {
+    static constexpr auto maxCount = AtomicInt64::WordType{1} << 60;
+    auto oldValue = (this->*counter).fetchAndAddRelaxed(n);
+    if (oldValue > maxCount) {
         _insert.store(0);
         _query.store(0);
         _update.store(0);

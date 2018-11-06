@@ -218,7 +218,8 @@ bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
         // checkShardVersion is required (which includes initShardVersion information) if these
         // connections are used.
 
-        OCCASIONALLY {
+        static Occasionally sampler;
+        if (sampler.tick()) {
             warning() << "failed to initialize new replica set connection version, "
                       << "will initialize on first use";
         }

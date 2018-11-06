@@ -33,6 +33,7 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -45,16 +46,19 @@ const bool kDebugBuild = false;
 #define MONGO_DEV if (kDebugBuild)
 #define DEV MONGO_DEV
 
-// The following declare one unique counter per enclosing function.
-// NOTE The implementation double-increments on a match, but we don't really care.
-#define MONGO_SOMETIMES(occasion, howOften) \
-    for (static unsigned occasion = 0; ++occasion % howOften == 0;)
-#define SOMETIMES MONGO_SOMETIMES
+template <unsigned period>
+class SampleEveryNth {
+public:
+    // Increment, returning true on first call and each subsequent 'period'.
+    bool tick() {
+        return _count.fetchAndAddRelaxed(1) % period == 0;
+    }
 
-#define MONGO_OCCASIONALLY SOMETIMES(occasionally, 16)
-#define OCCASIONALLY MONGO_OCCASIONALLY
+private:
+    AtomicInt64 _count{0};
+};
 
-#define MONGO_RARELY SOMETIMES(rarely, 128)
-#define RARELY MONGO_RARELY
+struct Occasionally : SampleEveryNth<16> {};
+struct Rarely : SampleEveryNth<128> {};
 
 }  // namespace mongo

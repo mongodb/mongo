@@ -360,8 +360,10 @@ void Balancer::_mainThread() {
                        << ", secondaryThrottle: "
                        << balancerConfig->getSecondaryThrottle().toBSON();
 
-                OCCASIONALLY warnOnMultiVersion(
-                    uassertStatusOK(_clusterStats->getStats(opCtx.get())));
+                static Occasionally sampler;
+                if (sampler.tick()) {
+                    warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
+                }
 
                 Status status = _enforceTagRanges(opCtx.get());
                 if (!status.isOK()) {

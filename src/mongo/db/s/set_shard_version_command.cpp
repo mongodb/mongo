@@ -383,7 +383,10 @@ public:
                                        << ", requested version is " << requestedVersion.toString()
                                        << " but found version " << currVersion.toString();
 
-                OCCASIONALLY warning() << errmsg;
+                static Occasionally sampler;
+                if (sampler.tick()) {
+                    warning() << errmsg;
+                }
 
                 // WARNING: the exact fields below are important for compatibility with mongos
                 // version reload.

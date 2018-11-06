@@ -57,7 +57,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-class Rarely {
+class RarelyTest {
 public:
     void run() {
         int first = 0;
@@ -72,10 +72,14 @@ public:
 
 private:
     void incRarely(int& c) {
-        RARELY++ c;
+        static mongo::Rarely s;
+        if (s.tick())
+            ++c;
     }
     void incRarely2(int& c) {
-        RARELY++ c;
+        static mongo::Rarely s;
+        if (s.tick())
+            ++c;
     }
 };
 
@@ -387,7 +391,7 @@ public:
     All() : Suite("basic") {}
 
     void setupTests() {
-        add<Rarely>();
+        add<RarelyTest>();
         add<Base64Tests>();
 
         add<stringbuildertests::simple1>();

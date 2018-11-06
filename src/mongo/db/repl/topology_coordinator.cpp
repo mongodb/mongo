@@ -252,8 +252,10 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     int needMorePings = (_memberData.size() - 1) * 2 - _getTotalPings();
 
     if (needMorePings > 0) {
-        OCCASIONALLY log() << "waiting for " << needMorePings
-                           << " pings from other members before syncing";
+        static Occasionally sampler;
+        if (sampler.tick()) {
+            log() << "waiting for " << needMorePings << " pings from other members before syncing";
+        }
         _syncSource = HostAndPort();
         return _syncSource;
     }

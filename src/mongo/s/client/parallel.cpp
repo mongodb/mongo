@@ -375,7 +375,8 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
             // that the primary is now up on it's own and has to rely on other threads to refresh
             // node states.
 
-            OCCASIONALLY {
+            static Occasionally sampler;
+            if (sampler.tick()) {
                 const DBClientReplicaSet* repl = dynamic_cast<const DBClientReplicaSet*>(rawConn);
                 dassert(repl);
                 warning() << "Primary for " << repl->getServerAddress()
@@ -400,7 +401,8 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
             // It's okay if we don't set the version when talking to a secondary, we can
             // be stale in any case.
 
-            OCCASIONALLY {
+            static Occasionally sampler;
+            if (sampler.tick()) {
                 const DBClientReplicaSet* repl =
                     dynamic_cast<const DBClientReplicaSet*>(state->conn->getRawConn());
                 dassert(repl);

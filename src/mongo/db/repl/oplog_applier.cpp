@@ -148,7 +148,8 @@ void OplogApplier::enqueue(OperationContext* opCtx,
 void OplogApplier::enqueue(OperationContext* opCtx,
                            OplogBuffer::Batch::const_iterator begin,
                            OplogBuffer::Batch::const_iterator end) {
-    OCCASIONALLY {
+    static Occasionally sampler;
+    if (sampler.tick()) {
         LOG(2) << "oplog buffer has " << _oplogBuffer->getSize() << " bytes";
     }
     _oplogBuffer->pushAllNonBlocking(opCtx, begin, end);

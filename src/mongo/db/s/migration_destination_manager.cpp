@@ -1102,9 +1102,11 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
                                                       const repl::OpTime& lastOpApplied) {
     if (!opReplicatedEnough(opCtx, lastOpApplied, _writeConcern)) {
         repl::OpTime op(lastOpApplied);
-        OCCASIONALLY log() << "migrate commit waiting for a majority of slaves for '" << _nss.ns()
-                           << "' " << redact(_min) << " -> " << redact(_max)
-                           << " waiting for: " << op;
+        static Occasionally sampler;
+        if (sampler.tick()) {
+            log() << "migrate commit waiting for a majority of slaves for '" << _nss.ns() << "' "
+                  << redact(_min) << " -> " << redact(_max) << " waiting for: " << op;
+        }
         return false;
     }
 

@@ -125,6 +125,14 @@ public:
     }
 
     /**
+     * Like "fetchAndAdd", but with relaxed memory order. Appropriate where relative
+     * order of operations doesn't matter. A stat counter, for example.
+     */
+    WordType fetchAndAddRelaxed(WordType increment) {
+        return _value.fetch_add(increment, std::memory_order_relaxed);
+    }
+
+    /**
      * Get the current value of this, subtract "decrement" and store it, atomically.
      *
      * Returns the value of this before decrementing.
