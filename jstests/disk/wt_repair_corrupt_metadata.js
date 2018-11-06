@@ -26,7 +26,8 @@
         // Unfortunately using --nojournal triggers a WT_PANIC and aborts in debug builds, which the
         // following test case can exercise.
         // TODO: This return can be removed once WT-4310 is completed.
-        if (db.adminCommand('buildInfo').debug && mongodOptions.hasOwnProperty('nojournal')) {
+        let isDebug = db.adminCommand('buildInfo').debug;
+        if (isDebug && mongodOptions.hasOwnProperty('nojournal')) {
             jsTestLog(
                 "Skipping test case because this is a debug build and --nojournal was provided.");
             return;
@@ -76,6 +77,12 @@
         // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
         // invalid.
         if (mongodOptions.hasOwnProperty('journal')) {
+            // TODO: This return can be removed once WT-4310 is completed.
+            if (isDebug) {
+                jsTestLog("Skipping log file corruption because this is a debug build.");
+                return;
+            }
+
             jsTestLog("Corrupting log file metadata");
 
             let data = cat(turtleFile);
