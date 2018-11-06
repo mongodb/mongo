@@ -318,7 +318,6 @@ env.Library(
         'db/pipeline/process_interface_factory_mongod',
         'db/query_exec',
         'db/read_concern_d_impl',
-        'db/repair_database',
         'db/repair_database_and_check_version',
         'db/repl/repl_coordinator_impl',
         'db/repl/repl_set_commands',

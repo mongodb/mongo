@@ -1159,7 +1159,6 @@ env.Library(
         "ops/write_ops_parsers",
         "pipeline/aggregation",
         "query_exec",
-        "repair_database",
         "repl/bgsync",
         "repl/oplog_buffer_blocking_queue",
         "repl/oplog_buffer_collection",
