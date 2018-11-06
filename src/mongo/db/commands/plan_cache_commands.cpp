@@ -424,7 +424,6 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
     // Append the time the entry was inserted into the plan cache.
     bob->append("timeOfCreation", entry->timeOfCreation);
     bob->append("queryHash", unsignedIntToFixedLengthHex(entry->queryHash));
-    bob->append("planCacheKey", unsignedIntToFixedLengthHex(entry->planCacheKey));
     // Append whether or not the entry is active.
     bob->append("isActive", entry->isActive);
     bob->append("works", static_cast<long long>(entry->works));

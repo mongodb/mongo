@@ -262,7 +262,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         }
 
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        querySettings->removeAllowedIndices(cq->encodeKey());
+        querySettings->removeAllowedIndices(planCache->computeKey(*cq));
 
         // Remove entry from plan cache
         planCache->remove(*cq).transitional_ignore();
@@ -395,7 +395,7 @@ Status SetFilter::set(OperationContext* opCtx,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // Add allowed indices to query settings, overriding any previous entries.
-    querySettings->setAllowedIndices(*cq, indexes, indexNames);
+    querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes, indexNames);
 
     // Remove entry from plan cache.
     planCache->remove(*cq).transitional_ignore();

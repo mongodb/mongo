@@ -39,7 +39,7 @@
         'unexpected document count');
     const profileObj0 =
         getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query0 find command"});
-    assert(profileObj0.hasOwnProperty("planCacheKey"), tojson(profileObj0));
+    assert(profileObj0.hasOwnProperty("queryHash"), tojson(profileObj0));
     let shapes = getShapes(coll);
     assert.eq(1, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
 
@@ -50,30 +50,26 @@
         'unexpected document count');
     const profileObj1 =
         getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query1 find command"});
-    assert(profileObj1.hasOwnProperty("planCacheKey"), tojson(profileObj1));
+    assert(profileObj1.hasOwnProperty("queryHash"), tojson(profileObj1));
 
     // Since the query shapes are the same, we only expect there to be one query shape present in
     // the plan cache commands output.
     shapes = getShapes(coll);
     assert.eq(1, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
-    assert.eq(
-        profileObj0.planCacheKey, profileObj1.planCacheKey, 'unexpected not matching query hashes');
+    assert.eq(profileObj0.queryHash, profileObj1.queryHash, 'unexpected not matching query hashes');
 
-    // Test that the planCacheKey is the same in explain output for query0 and query1 as it was
-    // in system.profile output.
-    const explainQuery0 = assert.commandWorked(coll.find({a: 1, b: 1}, {a: 1})
-                                                   .sort({a: -1})
-                                                   .comment("Query0 find command")
-                                                   .explain("queryPlanner"));
-    assert.eq(explainQuery0.queryPlanner.planCacheKey, profileObj0.planCacheKey, explainQuery0);
-    const explainQuery1 = assert.commandWorked(coll.find({a: 2, b: 1}, {a: 1})
-                                                   .sort({a: -1})
-                                                   .comment("Query1 find command")
-                                                   .explain("queryPlanner"));
-    assert.eq(explainQuery1.queryPlanner.planCacheKey, profileObj0.planCacheKey, explainQuery1);
-
-    // Check that the 'planCacheKey' is the same for both query 0 and query 1.
-    assert.eq(explainQuery0.queryPlanner.planCacheKey, explainQuery1.queryPlanner.planCacheKey);
+    // Test that the queryHash is the same in explain output for query0 and query1 as it was in
+    // system.profile output.
+    let explain = assert.commandWorked(coll.find({a: 1, b: 1}, {a: 1})
+                                           .sort({a: -1})
+                                           .comment("Query0 find command")
+                                           .explain("queryPlanner"));
+    assert.eq(explain.queryPlanner.queryHash, profileObj0.queryHash, () => tojson(explain));
+    explain = assert.commandWorked(coll.find({a: 2, b: 1}, {a: 1})
+                                       .sort({a: -1})
+                                       .comment("Query1 find command")
+                                       .explain("queryPlanner"));
+    assert.eq(explain.queryPlanner.queryHash, profileObj0.queryHash, () => tojson(explain));
 
     // Executes query2 and gets the corresponding system.profile entry.
     assert.eq(0,
@@ -81,31 +77,19 @@
               'unexpected document count');
     const profileObj2 =
         getLatestProfilerEntry(testDB, {op: "query", "command.comment": "Query2 find command"});
-    assert(profileObj2.hasOwnProperty("planCacheKey"), tojson(profileObj2));
+    assert(profileObj2.hasOwnProperty("queryHash"), tojson(profileObj2));
 
     // Query0 and query1 should both have the same query hash for the given indexes. Whereas, query2
     // should have a unique hash. Asserts that a total of two distinct hashes results in two query
     // shapes.
     shapes = getShapes(coll);
     assert.eq(2, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
-    assert.neq(
-        profileObj0.planCacheKey, profileObj2.planCacheKey, 'unexpected matching query hashes');
+    assert.neq(profileObj0.queryHash, profileObj2.queryHash, 'unexpected matching query hashes');
 
-    // The planCacheKey in explain should be different for query2 than the hash from query0 and
-    // query1.
-    const explainQuery2 = assert.commandWorked(
+    // The queryHash in explain should be different for query2 than the hash from query0 and query1.
+    explain = assert.commandWorked(
         coll.find({a: 12000, b: 1}).comment("Query2 find command").explain("queryPlanner"));
-    assert(explainQuery2.queryPlanner.hasOwnProperty("planCacheKey"));
-    assert.neq(explainQuery2.queryPlanner.planCacheKey, profileObj0.planCacheKey, explainQuery2);
-    assert.eq(explainQuery2.queryPlanner.planCacheKey, profileObj2.planCacheKey, explainQuery2);
-
-    // Now drop an index. This should change the 'planCacheKey' value for queries, but not the
-    // 'queryHash'.
-    assert.commandWorked(coll.dropIndex({a: 1}));
-    const explainQuery2PostCatalogChange = assert.commandWorked(
-        coll.find({a: 12000, b: 1}).comment("Query2 find command").explain("queryPlanner"));
-    assert.eq(explainQuery2.queryPlanner.queryHash,
-              explainQuery2PostCatalogChange.queryPlanner.queryHash);
-    assert.neq(explainQuery2.queryPlanner.planCacheKey,
-               explainQuery2PostCatalogChange.queryPlanner.planCacheKey);
+    assert(explain.queryPlanner.hasOwnProperty("queryHash"));
+    assert.neq(explain.queryPlanner.queryHash, profileObj0.queryHash, () => tojson(explain));
+    assert.eq(explain.queryPlanner.queryHash, profileObj2.queryHash, () => tojson(explain));
 })();

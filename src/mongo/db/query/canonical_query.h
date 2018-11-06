@@ -46,10 +46,6 @@ class OperationContext;
 
 class CanonicalQuery {
 public:
-    // A type that encodes the notion of query shape. Essentialy a query's match, projection and
-    // sort with the values taken out.
-    typedef std::string QueryShapeString;
-
     /**
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
      * query (which will never be NULL).  If parsing fails, returns an error Status.
@@ -127,12 +123,6 @@ public:
     const CollatorInterface* getCollator() const {
         return _collator.get();
     }
-
-    /**
-     * Compute the "shape" of this query by encoding the match, projection and sort, and stripping
-     * out the appropriate values.
-     */
-    QueryShapeString encodeKey() const;
 
     /**
      * Sets this CanonicalQuery's collator, and sets the collator on this CanonicalQuery's match

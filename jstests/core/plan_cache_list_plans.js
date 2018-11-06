@@ -74,16 +74,12 @@
         print('plan ' + i + ': ' + tojson(plans[i]));
     }
 
-    // Test the queryHash and planCacheKey property by comparing entries for two different
-    // query shapes.
+    // Test the queryHash property by comparing entries for two different query shapes.
     assert.eq(0, t.find({a: 132}).sort({b: -1, a: 1}).itcount(), 'unexpected document count');
     let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1}, {});
     assert.eq(entry.hasOwnProperty("queryHash"), true);
     assert.eq(entryNewShape.hasOwnProperty("queryHash"), true);
     assert.neq(entry["queryHash"], entryNewShape["queryHash"]);
-    assert.eq(entry.hasOwnProperty("planCacheKey"), true);
-    assert.eq(entryNewShape.hasOwnProperty("planCacheKey"), true);
-    assert.neq(entry["planCacheKey"], entryNewShape["planCacheKey"]);
 
     //
     // Tests for plan reason and feedback in planCacheListPlans

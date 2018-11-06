@@ -60,7 +60,6 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -199,12 +198,13 @@ void fillOutPlannerParams(OperationContext* opCtx,
     // Ignore index filters when it is possible to use the id-hack.
     if (!IDHackStage::supportsQuery(collection, *canonicalQuery)) {
         QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
-        const auto key = canonicalQuery->encodeKey();
+        PlanCacheKey planCacheKey =
+            collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
 
         // Filter index catalog if index filters are specified for query.
         // Also, signal to planner that application hint should be ignored.
         if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
-                querySettings->getAllowedIndicesFilter(key)) {
+                querySettings->getAllowedIndicesFilter(planCacheKey)) {
             filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
             plannerParams->indexFiltersApplied = true;
         }
@@ -399,13 +399,10 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
     // Check that the query should be cached.
     if (collection->infoCache()->getPlanCache()->shouldCacheQuery(*canonicalQuery)) {
+        auto planCacheKey = collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
+
         // Fill in opDebug information.
-        const auto planCacheKey =
-            collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
-        CurOp::get(opCtx)->debug().queryHash =
-            canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
-        CurOp::get(opCtx)->debug().planCacheKey =
-            canonical_query_encoder::computeHash(planCacheKey.toString());
+        CurOp::get(opCtx)->debug().queryHash = PlanCache::computeQueryHash(planCacheKey);
 
         // Try to look up a cached solution for the query.
         if (auto cs =

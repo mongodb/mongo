@@ -78,7 +78,7 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
 //
 
 boost::optional<AllowedIndicesFilter> QuerySettings::getAllowedIndicesFilter(
-    const CanonicalQuery::QueryShapeString& key) const {
+    const PlanCacheKey& key) const {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
     AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
@@ -100,13 +100,13 @@ std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
 }
 
 void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
+                                      const PlanCacheKey& key,
                                       const BSONObjSet& indexKeyPatterns,
                                       const stdx::unordered_set<std::string>& indexNames) {
     const QueryRequest& qr = canonicalQuery.getQueryRequest();
     const BSONObj& query = qr.getFilter();
     const BSONObj& sort = qr.getSort();
     const BSONObj& projection = qr.getProj();
-    const auto key = canonicalQuery.encodeKey();
     const BSONObj collation =
         canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();
 
@@ -118,7 +118,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
         std::forward_as_tuple(query, sort, projection, collation, indexKeyPatterns, indexNames));
 }
 
-void QuerySettings::removeAllowedIndices(const CanonicalQuery::QueryShapeString& key) {
+void QuerySettings::removeAllowedIndices(const PlanCacheKey& key) {
     stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
     AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
 

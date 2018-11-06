@@ -91,11 +91,9 @@
     assert.eq(entryStats.createdFromQuery.projection, {});
     assert(!entryStats.createdFromQuery.hasOwnProperty("collation"));
 
-    // Verify that $planCacheStats reports the same 'queryHash' and 'planCacheKey' as explain
-    // for this query shape.
+    // Verify that $planCacheStats reports the same 'queryHash' as explain for this query shape.
     explain = assert.commandWorked(coll.find({a: 1, b: 1}).explain());
     assert.eq(entryStats.queryHash, explain.queryPlanner.queryHash);
-    assert.eq(entryStats.planCacheKey, explain.queryPlanner.planCacheKey);
 
     // Since the query shape was only run once, the plan cache entry should not be active.
     assert.eq(entryStats.isActive, false);

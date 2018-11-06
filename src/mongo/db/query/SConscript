@@ -18,7 +18,6 @@ env.Library(
     target='query_planner',
     source=[
         "canonical_query.cpp",
-        "canonical_query_encoder.cpp",
         "index_tag.cpp",
         "parsed_projection.cpp",
         "plan_cache.cpp",
@@ -241,17 +240,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "collation/collator_interface_mock",
-        "query_planner",
-        "query_test_service_context",
-    ],
-)
-
-env.CppUnitTest(
-    target="canonical_query_encoder_test",
-    source=[
-        "canonical_query_encoder_test.cpp"
-    ],
-    LIBDEPS=[
         "query_planner",
         "query_test_service_context",
     ],

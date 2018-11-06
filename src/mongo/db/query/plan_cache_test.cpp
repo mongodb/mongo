@@ -43,7 +43,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_knobs.h"
@@ -194,17 +193,6 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
-}
-
-/**
- * Check that the stable keys of 'a' and 'b' are equal, but the unstable parts are not.
- */
-void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKey& a, const PlanCacheKey& b) {
-    ASSERT_EQ(a.getStableKeyStringData(), b.getStableKeyStringData());
-    ASSERT_EQ(a.getUnstablePart().size(), b.getUnstablePart().size());
-    // Should always have the begin and end delimiters.
-    ASSERT_NE(a.getUnstablePart(), b.getUnstablePart());
-    ASSERT_GTE(a.getUnstablePart().size(), 2u);
 }
 
 /**
@@ -1092,9 +1080,8 @@ protected:
         std::vector<QuerySolution*> solutions;
         solutions.push_back(&qs);
 
-        uint32_t queryHash = canonical_query_encoder::computeHash(ck.stringData());
-        uint32_t planCacheKey = queryHash;
-        PlanCacheEntry entry(solutions, createDecision(1U).release(), queryHash, planCacheKey);
+        uint32_t queryHash = PlanCache::computeQueryHash(ck);
+        PlanCacheEntry entry(solutions, createDecision(1U).release(), queryHash);
         CachedSolution cachedSoln(ck, entry);
 
         auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);
@@ -1189,8 +1176,7 @@ protected:
     std::vector<std::unique_ptr<QuerySolution>> solns;
 };
 
-const std::string mockKey("mock_cache_key");
-const PlanCacheKey CachePlanSelectionTest::ck(mockKey, "");
+const PlanCacheKey CachePlanSelectionTest::ck = "mock_cache_key";
 
 //
 // Equality
@@ -1759,6 +1745,200 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
         "]}}}}");
 }
 
+/**
+ * Test functions for computeKey.  Cache keys are intentionally obfuscated and are
+ * meaningful only within the current lifetime of the server process. Users should treat plan
+ * cache keys as opaque.
+ */
+void testComputeKey(BSONObj query, BSONObj sort, BSONObj proj, const char* expectedStr) {
+    PlanCache planCache;
+    BSONObj collation;
+    unique_ptr<CanonicalQuery> cq(canonicalize(query, sort, proj, collation));
+    PlanCacheKey key = planCache.computeKey(*cq);
+    PlanCacheKey expectedKey(expectedStr);
+    if (key == expectedKey) {
+        return;
+    }
+    str::stream ss;
+    ss << "Unexpected plan cache key. Expected: " << expectedKey << ". Actual: " << key
+       << ". Query: " << cq->toString();
+    FAIL(ss);
+}
+
+void testComputeKey(const char* queryStr,
+                    const char* sortStr,
+                    const char* projStr,
+                    const char* expectedStr) {
+    testComputeKey(fromjson(queryStr), fromjson(sortStr), fromjson(projStr), expectedStr);
+}
+
+TEST(PlanCacheTest, ComputeKey) {
+    // Generated cache keys should be treated as opaque to the user.
+
+    // No sorts
+    testComputeKey("{}", "{}", "{}", "an");
+    testComputeKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "or[eqa,eqb]");
+    testComputeKey("{$or: [{a: 1}, {b: 1}, {c: 1}], d: 1}", "{}", "{}", "an[or[eqa,eqb,eqc],eqd]");
+    testComputeKey("{$or: [{a: 1}, {b: 1}], c: 1, d: 1}", "{}", "{}", "an[or[eqa,eqb],eqc,eqd]");
+    testComputeKey("{a: 1, b: 1, c: 1}", "{}", "{}", "an[eqa,eqb,eqc]");
+    testComputeKey("{a: 1, beqc: 1}", "{}", "{}", "an[eqa,eqbeqc]");
+    testComputeKey("{ap1a: 1}", "{}", "{}", "eqap1a");
+    testComputeKey("{aab: 1}", "{}", "{}", "eqaab");
+
+    // With sort
+    testComputeKey("{}", "{a: 1}", "{}", "an~aa");
+    testComputeKey("{}", "{a: -1}", "{}", "an~da");
+    testComputeKey("{}",
+                   "{a: {$meta: 'textScore'}}",
+                   "{a: {$meta: 'textScore'}}",
+                   "an~ta|{ $meta: \"textScore\" }a");
+    testComputeKey("{a: 1}", "{b: 1}", "{}", "eqa~ab");
+
+    // With projection
+    testComputeKey("{}", "{}", "{a: 1}", "an|ia");
+    testComputeKey("{}", "{}", "{a: -1}", "an|ia");
+    testComputeKey("{}", "{}", "{a: -1.0}", "an|ia");
+    testComputeKey("{}", "{}", "{a: true}", "an|ia");
+    testComputeKey("{}", "{}", "{a: 0}", "an|ea");
+    testComputeKey("{}", "{}", "{a: false}", "an|ea");
+    testComputeKey("{}", "{}", "{a: 99}", "an|ia");
+    testComputeKey("{}", "{}", "{a: 'foo'}", "an|ia");
+    testComputeKey("{}", "{}", "{a: {$slice: [3, 5]}}", "an|{ $slice: \\[ 3\\, 5 \\] }a");
+    testComputeKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "an|{ $elemMatch: { x: 2 } }a");
+    testComputeKey("{}", "{}", "{a: ObjectId('507f191e810c19729de860ea')}", "an|ia");
+    testComputeKey("{a: 1}", "{}", "{'a.$': 1}", "eqa|ia.$");
+    testComputeKey("{a: 1}", "{}", "{a: 1}", "eqa|ia");
+
+    // Projection should be order-insensitive
+    testComputeKey("{}", "{}", "{a: 1, b: 1}", "an|iaib");
+    testComputeKey("{}", "{}", "{b: 1, a: 1}", "an|iaib");
+
+    // With or-elimination and projection
+    testComputeKey("{$or: [{a: 1}]}", "{}", "{_id: 0, a: 1}", "eqa|e_idia");
+    testComputeKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqa|ia.$");
+}
+
+// Delimiters found in user field names or non-standard projection field values
+// must be escaped.
+TEST(PlanCacheTest, ComputeKeyEscaped) {
+    // Field name in query.
+    testComputeKey("{'a,[]~|<>': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|\\<\\>");
+
+    // Field name in sort.
+    testComputeKey("{}", "{'a,[]~|<>': 1}", "{}", "an~aa\\,\\[\\]\\~\\|\\<\\>");
+
+    // Field name in projection.
+    testComputeKey("{}", "{}", "{'a,[]~|<>': 1}", "an|ia\\,\\[\\]\\~\\|\\<\\>");
+
+    // Value in projection.
+    testComputeKey("{}", "{}", "{a: 'foo,[]~|<>'}", "an|ia");
+}
+
+// Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should
+// not be the same.
+TEST(PlanCacheTest, ComputeKeyGeoWithin) {
+    PlanCache planCache;
+
+    // Legacy coordinates.
+    unique_ptr<CanonicalQuery> cqLegacy(
+        canonicalize("{a: {$geoWithin: "
+                     "{$box: [[-180, -90], [180, 90]]}}}"));
+    // GeoJSON coordinates.
+    unique_ptr<CanonicalQuery> cqNew(
+        canonicalize("{a: {$geoWithin: "
+                     "{$geometry: {type: 'Polygon', coordinates: "
+                     "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
+    ASSERT_NOT_EQUALS(planCache.computeKey(*cqLegacy), planCache.computeKey(*cqNew));
+}
+
+// GEO_NEAR cache keys should include information on geometry and CRS in addition
+// to the match type and field name.
+TEST(PlanCacheTest, ComputeKeyGeoNear) {
+    testComputeKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}", "gnanrfl");
+    testComputeKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}", "gnanssp");
+    testComputeKey(
+        "{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
+        "$maxDistance:100}}}",
+        "{}",
+        "{}",
+        "gnanrsp");
+}
+
+TEST(PlanCacheTest, ComputeKeyRegexDependsOnFlags) {
+    testComputeKey("{a: {$regex: \"sometext\"}}", "{}", "{}", "rea");
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"\"}}", "{}", "{}", "rea");
+
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"s\"}}", "{}", "{}", "rea/s/");
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"ms\"}}", "{}", "{}", "rea/ms/");
+
+    // Test that the ordering of $options doesn't matter.
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"im\"}}", "{}", "{}", "rea/im/");
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"mi\"}}", "{}", "{}", "rea/im/");
+
+    // Test that only the options affect the key. Two regex match expressions with the same options
+    // but different $regex values should have the same shape.
+    testComputeKey("{a: {$regex: \"abc\", $options: \"mi\"}}", "{}", "{}", "rea/im/");
+    testComputeKey("{a: {$regex: \"efg\", $options: \"mi\"}}", "{}", "{}", "rea/im/");
+
+    testComputeKey("{a: {$regex: \"\", $options: \"ms\"}}", "{}", "{}", "rea/ms/");
+    testComputeKey("{a: {$regex: \"___\", $options: \"ms\"}}", "{}", "{}", "rea/ms/");
+
+    // Test that only valid regex flags contribute to the plan cache key encoding.
+    testComputeKey(BSON("a" << BSON("$regex"
+                                    << "abc"
+                                    << "$options"
+                                    << "abcdefghijklmnopqrstuvwxyz")),
+                   {},
+                   {},
+                   "rea/imsx/");
+    testComputeKey("{a: /abc/gim}", "{}", "{}", "rea/im/");
+}
+
+TEST(PlanCacheTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlags) {
+    // Test that an $in containing a single regex is unwrapped to $regex.
+    testComputeKey("{a: {$in: [/foo/]}}", "{}", "{}", "rea");
+    testComputeKey("{a: {$in: [/foo/i]}}", "{}", "{}", "rea/i/");
+
+    // Test that an $in with no regexes does not include any regex information.
+    testComputeKey("{a: {$in: [1, 'foo']}}", "{}", "{}", "ina");
+
+    // Test that an $in with a regex encodes the presence of the regex.
+    testComputeKey("{a: {$in: [1, /foo/]}}", "{}", "{}", "ina_re");
+
+    // Test that an $in with a regex encodes the presence of the regex and its flags.
+    testComputeKey("{a: {$in: [1, /foo/is]}}", "{}", "{}", "ina_re/is/");
+
+    // Test that the computed key is invariant to the order of the flags within each regex.
+    testComputeKey("{a: {$in: [1, /foo/si]}}", "{}", "{}", "ina_re/is/");
+
+    // Test that an $in with multiple regexes encodes all unique flags.
+    testComputeKey("{a: {$in: [1, /foo/i, /bar/m, /baz/s]}}", "{}", "{}", "ina_re/ims/");
+
+    // Test that an $in with multiple regexes deduplicates identical flags.
+    testComputeKey(
+        "{a: {$in: [1, /foo/i, /bar/m, /baz/s, /qux/i, /quux/s]}}", "{}", "{}", "ina_re/ims/");
+
+    // Test that the computed key is invariant to the ordering of the flags across regexes.
+    testComputeKey("{a: {$in: [1, /foo/ism, /bar/msi, /baz/im, /qux/si, /quux/im]}}",
+                   "{}",
+                   "{}",
+                   "ina_re/ims/");
+    testComputeKey("{a: {$in: [1, /foo/msi, /bar/ism, /baz/is, /qux/mi, /quux/im]}}",
+                   "{}",
+                   "{}",
+                   "ina_re/ims/");
+
+    // Test that $not-$in-$regex similarly records the presence and flags of any regexes.
+    testComputeKey("{a: {$not: {$in: [1, 'foo']}}}", "{}", "{}", "nt[ina]");
+    testComputeKey("{a: {$not: {$in: [1, /foo/]}}}", "{}", "{}", "nt[ina_re]");
+    testComputeKey(
+        "{a: {$not: {$in: [1, /foo/i, /bar/i, /baz/msi]}}}", "{}", "{}", "nt[ina_re/ims/]");
+
+    // Test that a $not-$in containing a single regex is unwrapped to $not-$regex.
+    testComputeKey("{a: {$not: {$in: [/foo/]}}}", "{}", "{}", "nt[rea]");
+    testComputeKey("{a: {$not: {$in: [/foo/i]}}}", "{}", "{}", "nt[rea/i/]");
+}
+
 // When a sparse index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query can use the index.
 TEST(PlanCacheTest, ComputeKeySparseIndex) {
@@ -1777,16 +1957,10 @@ TEST(PlanCacheTest, ComputeKeySparseIndex) {
 
     // 'cqEqNumber' and 'cqEqString' get the same key, since both are compatible with this
     // index.
-    const auto eqNumberKey = planCache.computeKey(*cqEqNumber);
-    const auto eqStringKey = planCache.computeKey(*cqEqString);
-    ASSERT_EQ(eqNumberKey, eqStringKey);
+    ASSERT_EQ(planCache.computeKey(*cqEqNumber), planCache.computeKey(*cqEqString));
 
     // 'cqEqNull' gets a different key, since it is not compatible with this index.
-    const auto eqNullKey = planCache.computeKey(*cqEqNull);
-    ASSERT_NOT_EQUALS(eqNullKey, eqNumberKey);
-
-    assertPlanCacheKeysUnequalDueToDiscriminators(eqNullKey, eqNumberKey);
-    assertPlanCacheKeysUnequalDueToDiscriminators(eqNullKey, eqStringKey);
+    ASSERT_NOT_EQUALS(planCache.computeKey(*cqEqNull), planCache.computeKey(*cqEqNumber));
 }
 
 // When a partial index is present, computeKey() should generate different keys depending on
@@ -1813,8 +1987,7 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
     ASSERT_EQ(planCache.computeKey(*cqGtZero), planCache.computeKey(*cqGtFive));
 
     // 'cqGtNegativeFive' gets a different key, since it is not compatible with this index.
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*cqGtNegativeFive),
-                                                  planCache.computeKey(*cqGtZero));
+    ASSERT_NOT_EQUALS(planCache.computeKey(*cqGtNegativeFive), planCache.computeKey(*cqGtZero));
 }
 
 // Query shapes should get the same plan cache key if they have the same collation indexability.
@@ -1845,20 +2018,11 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     ASSERT_EQ(planCache.computeKey(*containsString), planCache.computeKey(*containsArray));
 
     // 'noStrings' gets a different key since it is compatible with the index.
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*containsString),
-                                                  planCache.computeKey(*noStrings));
-    ASSERT_EQ(planCache.computeKey(*containsString).getUnstablePart(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*noStrings).getUnstablePart(), "<1>");
+    ASSERT_NOT_EQUALS(planCache.computeKey(*containsString), planCache.computeKey(*noStrings));
 
-    // 'noStrings' and 'containsStringHasCollation' get different keys, since the collation
-    // specified in the query is considered part of its shape. However, they have the same index
-    // compatibility, so the unstable part of their PlanCacheKeys should be the same.
-    PlanCacheKey noStringKey = planCache.computeKey(*noStrings);
-    PlanCacheKey withStringAndCollationKey = planCache.computeKey(*containsStringHasCollation);
-    ASSERT_NE(noStringKey, withStringAndCollationKey);
-    ASSERT_EQ(noStringKey.getUnstablePart(), withStringAndCollationKey.getUnstablePart());
-    ASSERT_NE(noStringKey.getStableKeyStringData(),
-              withStringAndCollationKey.getStableKeyStringData());
+    // 'noStrings' and 'containsStringHasCollation' get the same key since they compatible with the
+    // index.
+    ASSERT_EQ(planCache.computeKey(*noStrings), planCache.computeKey(*containsStringHasCollation));
 
     unique_ptr<CanonicalQuery> inContainsString(canonicalize("{a: {$in: [1, 'abc', 2]}}"));
     unique_ptr<CanonicalQuery> inContainsObject(canonicalize("{a: {$in: [1, {b: 'abc'}, 2]}}"));
@@ -1873,17 +2037,12 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     ASSERT_EQ(planCache.computeKey(*inContainsString), planCache.computeKey(*inContainsArray));
 
     // 'inNoStrings' gets a different key since it is compatible with the index.
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*inContainsString),
-                                                  planCache.computeKey(*inNoStrings));
-    ASSERT_EQ(planCache.computeKey(*inContainsString).getUnstablePart(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*inNoStrings).getUnstablePart(), "<1>");
+    ASSERT_NOT_EQUALS(planCache.computeKey(*inContainsString), planCache.computeKey(*inNoStrings));
 
     // 'inNoStrings' and 'inContainsStringHasCollation' get the same key since they compatible with
     // the index.
-    ASSERT_NE(planCache.computeKey(*inNoStrings),
+    ASSERT_EQ(planCache.computeKey(*inNoStrings),
               planCache.computeKey(*inContainsStringHasCollation));
-    ASSERT_EQ(planCache.computeKey(*inNoStrings).getUnstablePart(),
-              planCache.computeKey(*inContainsStringHasCollation).getUnstablePart());
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
@@ -1914,10 +2073,7 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
     // different keys.
     ASSERT_EQ(planCacheWithNoIndexes.computeKey(*usesPathWithScalar),
               planCacheWithNoIndexes.computeKey(*usesPathWithObject));
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*usesPathWithScalar),
-                                                  planCache.computeKey(*usesPathWithObject));
-    ASSERT_EQ(planCache.computeKey(*usesPathWithScalar).getUnstablePart(), "<1>");
-    ASSERT_EQ(planCache.computeKey(*usesPathWithObject).getUnstablePart(), "<0>");
+    ASSERT_NE(planCache.computeKey(*usesPathWithScalar), planCache.computeKey(*usesPathWithObject));
 
     ASSERT_EQ(planCache.computeKey(*usesPathWithObject), planCache.computeKey(*usesPathWithArray));
     ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
@@ -1934,19 +2090,14 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
 
     // More complex queries with similar shapes. This is to ensure that plan cache key encoding
     // correctly traverses the expression tree.
-    auto orQueryWithOneBranchAllowed = canonicalize("{$or: [{a: 3}, {a: {$gt: [1,2]}}]}");
+    auto orQueryAllowed = canonicalize("{$or: [{a: 3}, {a: {$gt: [1,2]}}]}");
     // Same shape except 'a' is compared to an object.
-    auto orQueryWithNoBranchesAllowed =
-        canonicalize("{$or: [{a: {someobject: 1}}, {a: {$gt: [1,2]}}]}");
+    auto orQueryNotAllowed = canonicalize("{$or: [{a: {someobject: 1}}, {a: {$gt: [1,2]}}]}");
     // The two queries should have the same shape when no indexes are present, but different shapes
     // when a $** index is present.
-    ASSERT_EQ(planCacheWithNoIndexes.computeKey(*orQueryWithOneBranchAllowed),
-              planCacheWithNoIndexes.computeKey(*orQueryWithNoBranchesAllowed));
-    assertPlanCacheKeysUnequalDueToDiscriminators(
-        planCache.computeKey(*orQueryWithOneBranchAllowed),
-        planCache.computeKey(*orQueryWithNoBranchesAllowed));
-    ASSERT_EQ(planCache.computeKey(*orQueryWithOneBranchAllowed).getUnstablePart(), "<1><0>");
-    ASSERT_EQ(planCache.computeKey(*orQueryWithNoBranchesAllowed).getUnstablePart(), "<0><0>");
+    ASSERT_EQ(planCacheWithNoIndexes.computeKey(*orQueryAllowed),
+              planCacheWithNoIndexes.computeKey(*orQueryNotAllowed));
+    ASSERT_NE(planCache.computeKey(*orQueryAllowed), planCache.computeKey(*orQueryNotAllowed));
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
@@ -1958,41 +2109,12 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
     // Equality to empty obj and equality to non-empty obj have different plan cache keys.
     std::unique_ptr<CanonicalQuery> equalsEmptyObj(canonicalize("{a: {}}"));
     std::unique_ptr<CanonicalQuery> equalsNonEmptyObj(canonicalize("{a: {b: 1}}"));
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*equalsEmptyObj),
-                                                  planCache.computeKey(*equalsNonEmptyObj));
-    ASSERT_EQ(planCache.computeKey(*equalsNonEmptyObj).getUnstablePart(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*equalsEmptyObj).getUnstablePart(), "<1>");
+    ASSERT_NE(planCache.computeKey(*equalsEmptyObj), planCache.computeKey(*equalsNonEmptyObj));
 
     // $in with empty obj and $in with non-empty obj have different plan cache keys.
     std::unique_ptr<CanonicalQuery> inWithEmptyObj(canonicalize("{a: {$in: [{}]}}"));
     std::unique_ptr<CanonicalQuery> inWithNonEmptyObj(canonicalize("{a: {$in: [{b: 1}]}}"));
-    assertPlanCacheKeysUnequalDueToDiscriminators(planCache.computeKey(*inWithEmptyObj),
-                                                  planCache.computeKey(*inWithNonEmptyObj));
-    ASSERT_EQ(planCache.computeKey(*inWithNonEmptyObj).getUnstablePart(), "<0>");
-    ASSERT_EQ(planCache.computeKey(*inWithEmptyObj).getUnstablePart(), "<1>");
-}
-
-TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
-    PlanCache planCache;
-    unique_ptr<CanonicalQuery> cq(canonicalize("{a: 0}}"));
-    const PlanCacheKey preIndexKey = planCache.computeKey(*cq);
-    const auto preIndexStableKey = preIndexKey.getStableKey();
-    ASSERT_EQ(preIndexKey.getUnstablePart(), "");
-
-    // Create a sparse index (which requires a discriminator).
-    planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
-                                               false,                       // multikey
-                                               true,                        // sparse
-                                               false,                       // unique
-                                               IndexEntry::Identifier{""},  // name
-                                               nullptr,                     // filterExpr
-                                               BSONObj())});
-
-    const PlanCacheKey postIndexKey = planCache.computeKey(*cq);
-    const auto postIndexStableKey = postIndexKey.getStableKey();
-    ASSERT_NE(preIndexKey, postIndexKey);
-    ASSERT_EQ(preIndexStableKey, postIndexStableKey);
-    ASSERT_EQ(postIndexKey.getUnstablePart(), "<1>");
+    ASSERT_NE(planCache.computeKey(*inWithEmptyObj), planCache.computeKey(*inWithNonEmptyObj));
 }
 
 }  // namespace
