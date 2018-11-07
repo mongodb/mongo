@@ -399,6 +399,6 @@ protected:
     /**
      * The default capped size (in bytes) for capped collections, unless overridden.
      */
-    static const int64_t kDefaultCappedSizeBytes = 4096;
+    const int64_t kDefaultCappedSizeBytes = 4096;
 };
 }
