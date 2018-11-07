@@ -14,16 +14,19 @@ import optparse
 import os
 import sys
 import time
-import warnings
 
 try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse  # type: ignore
 
-import requests
-import requests.exceptions
 import yaml
+
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from buildscripts.client import evergreen as evergreen  # pylint: disable=wrong-import-position
 
 LOGGER = logging.getLogger(__name__)
 
@@ -316,25 +319,13 @@ class Missing(object):
 
 
 class TestHistory(object):
-    """Class for interacting with the /test_history Evergreen API endpoint."""
+    """Class for interacting with the /test_stats Evergreen API endpoint."""
 
-    DEFAULT_API_SERVER = "https://evergreen.mongodb.com"
     DEFAULT_PROJECT = "mongodb-mongo-master"
 
-    DEFAULT_TEST_STATUSES = ("pass", "fail", "silentfail")
-    DEFAULT_TASK_STATUSES = ("success", "failed", "timeout", "sysfail")
-
-    # The Evergreen API requires specifying the "limit" parameter when not specifying a range of
-    # revisions.
-    DEFAULT_LIMIT = 20
-
-    DEFAULT_NUM_RETRIES = 5
-
-    _MISSING_DISTRO = Missing("distro")
-
     def __init__(  # pylint: disable=too-many-arguments
-            self, api_server=DEFAULT_API_SERVER, project=DEFAULT_PROJECT, tests=None, tasks=None,
-            variants=None, distros=None):
+            self, project=DEFAULT_PROJECT, tests=None, tasks=None, variants=None, distros=None,
+            retries=evergreen.EvergreenApiV2.DEFAULT_RETRIES):
         """Initialize the TestHistory instance with the list of tests, tasks, variants, and distros.
 
         The list of tests specified are augmented to ensure that failures on both POSIX and Windows
@@ -348,156 +339,37 @@ class TestHistory(object):
         self._tasks = tasks if tasks is not None else []
         self._variants = variants if variants is not None else []
         self._distros = distros if distros is not None else []
+        self._project = project
 
-        # The number of API call retries on error. It can be set to 0 to disable the feature.
-        self.num_retries = TestHistory.DEFAULT_NUM_RETRIES
+        self.evg_api = evergreen.get_evergreen_apiv2(num_retries=retries)
 
-        self._test_history_url = "{api_server}/rest/v1/projects/{project}/test_history".format(
-            api_server=api_server,
-            project=project,
-        )
-
-    def get_history_by_revision(self, start_revision, end_revision,
-                                test_statuses=DEFAULT_TEST_STATUSES,
-                                task_statuses=DEFAULT_TASK_STATUSES):
+    def get_history_by_date(self, start_date, end_date, group_num_days=1):
         """Return a list of ReportEntry instances.
 
-        The result corresponds to each individual test execution between 'start_revision' and
-        'end_revision'.
-
-        Only tests with status 'test_statuses' are included in the result. Similarly, only tests
-        with status 'task_statuses' are included in the result. By default, both passing and failing
-        test executions are returned.
+        The result corresponds to aggregated test executions between 'start_date' and
+        'end_date'.
         """
-
-        params = self._history_request_params(test_statuses, task_statuses)
-        params["beforeRevision"] = end_revision
+        test_stats = self.evg_api.test_stats(
+            self._project, start_date, end_date, group_num_days=group_num_days, tests=self._tests,
+            tasks=self._tasks, variants=self._variants, distros=self._distros)
 
         history_data = []
-
-        # Since the API limits the results, with each invocation being distinct, we can simulate
-        # pagination by making subsequent requests using "afterRevision".
-        while start_revision != end_revision:
-            params["afterRevision"] = start_revision
-
-            test_results = self._get_history(params)
-            if not test_results:
-                break
-
-            for test_result in test_results:
-                history_data.append(self._process_test_result(test_result))
-
-            # The first test will have the latest revision for this result set because
-            # TestHistory._history_request_params() sorts by "latest".
-            start_revision = test_results[0]["revision"]
+        for test_stat in test_stats:
+            history_data.append(self._process_test_result(test_stat, group_num_days))
 
         return history_data
 
-    def get_history_by_date(self, start_date, end_date, test_statuses=DEFAULT_TEST_STATUSES,
-                            task_statuses=DEFAULT_TASK_STATUSES):
-        """Return a list of ReportEntry instances.
-
-        The result corresponds to each individual test execution between 'start_date' and
-        'end_date'.
-
-        Only tests with status 'test_statuses' are included in the result. Similarly, only tests
-        with status 'task_statuses' are included in the result. By default, both passing and
-        failing test executions are returned.
-        """
-
-        warnings.warn(
-            "Until https://jira.mongodb.org/browse/EVG-1653 is implemented, pagination using dates"
-            " isn't guaranteed to returned a complete result set. It is possible for the results"
-            " from an Evergreen task that started between the supplied start date and the"
-            " response's latest test start time to be omitted.", RuntimeWarning)
-
-        params = self._history_request_params(test_statuses, task_statuses)
-        params["beforeDate"] = "{:%Y-%m-%d}T23:59:59Z".format(end_date)
-        params["limit"] = self.DEFAULT_LIMIT
-
-        start_time = "{:%Y-%m-%d}T00:00:00Z".format(start_date)
-        history_data = set()
-
-        # Since the API limits the results, with each invocation being distinct, we can simulate
-        # pagination by making subsequent requests using "afterDate" and being careful to filter
-        # out duplicate test results.
-        while True:
-            params["afterDate"] = start_time
-
-            test_results = self._get_history(params)
-            if not test_results:
-                break
-
-            original_size = len(history_data)
-            for test_result in test_results:
-                start_time = max(test_result["start_time"], start_time)
-                history_data.add(self._process_test_result(test_result))
-
-            # To prevent an infinite loop, we need to bail out if test results returned by the
-            # request were identical to the ones we got back in an earlier request.
-            if original_size == len(history_data):
-                break
-
-        return list(history_data)
-
-    def _get_history(self, params):
-        """Call the test_history API endpoint with the given parameters and return the JSON result.
-
-        The API calls will be retried on HTTP and connection errors.
-        """
-        retries = 0
-        while True:
-            try:
-                LOGGER.debug("Request to the test_history endpoint")
-                start = time.time()
-                response = requests.get(url=self._test_history_url, params=params)
-                LOGGER.debug("Request took %fs", round(time.time() - start, 2))
-                response.raise_for_status()
-                return self._get_json(response)
-            except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError,
-                    JSONResponseError) as err:
-                if isinstance(err, JSONResponseError):
-                    err = err.cause
-                retries += 1
-                LOGGER.error("Error while querying the test_history API: %s", str(err))
-                if retries > self.num_retries:
-                    raise err
-                # We use 'retries' as the value for the backoff duration to space out the
-                # requests when doing multiple retries.
-                backoff_secs = retries
-                LOGGER.info("Retrying after %ds", backoff_secs)
-                time.sleep(backoff_secs)
-            except:
-                LOGGER.exception("Unexpected error while querying the test_history API"
-                                 " with params: %s", params)
-                raise
-
-    @staticmethod
-    def _get_json(response):
-        try:
-            return response.json()
-        except ValueError as err:
-            # ValueError can be raised if the connection is interrupted and we receive a truncated
-            # json response. We raise a JSONResponseError instead to distinguish this error from
-            # other ValueErrors.
-            raise JSONResponseError(err)
-
-    def _process_test_result(self, test_result):
+    def _process_test_result(self, test_result, group_num_days):
         """Return a ReportEntry() tuple representing the 'test_result' dictionary."""
 
-        # For individual test executions, we intentionally use the "start_time" of the test as both
-        # its 'start_date' and 'end_date' to avoid complicating how the test history is potentially
-        # summarized by time. By the time the test has started, the Evergreen task has already been
-        # assigned to a particular machine and is using a specific set of binaries, so there's
-        # unlikely to be a significance to when the test actually finishes.
-        start_date = end_date = _parse_date(test_result["start_time"])
-
+        # The end_date is computed as an offset from 'date'.
+        end_date = _parse_date(test_result["date"]) + datetime.timedelta(days=group_num_days - 1)
         return ReportEntry(
-            test=self._normalize_test_file(test_result["test_file"]),
-            task=test_result["task_name"], variant=test_result["variant"], distro=test_result.get(
-                "distro", self._MISSING_DISTRO), start_date=start_date, end_date=end_date,
-            num_pass=(1 if test_result["test_status"] == "pass" else
-                      0), num_fail=(1 if test_result["test_status"] not in ("pass", "skip") else 0))
+            test=self._normalize_test_file(test_result["test_file"]), task=test_result.get(
+                "task_name", Wildcard("tasks")), variant=test_result.get(
+                    "variant", Wildcard("variants")), distro=test_result.get(
+                        "distro", Wildcard("distros")), start_date=_parse_date(test_result["date"]),
+            end_date=end_date, num_pass=test_result["num_pass"], num_fail=test_result["num_fail"])
 
     @staticmethod
     def _normalize_test_file(test_file):
@@ -539,19 +411,6 @@ class TestHistory(object):
 
         return [test_file]
 
-    def _history_request_params(self, test_statuses, task_statuses):
-        """Return the query parameters for /test_history GET request as a dictionary."""
-
-        return {
-            "distros": ",".join(self._distros),
-            "sort": "latest",
-            "tasks": ",".join(self._tasks),
-            "tests": ",".join(self._tests),
-            "taskStatuses": ",".join(task_statuses),
-            "testStatuses": ",".join(test_statuses),
-            "variants": ",".join(self._variants),
-        }
-
 
 def _parse_date(date_str):
     """Return a datetime.date instance representing the specified yyyy-mm-dd date string.
@@ -563,18 +422,16 @@ def _parse_date(date_str):
     return datetime.date(int(year), int(month), int(day))
 
 
-class JSONResponseError(Exception):
-    """An exception raised when failing to decode the JSON from an Evergreen response."""
-
-    def __init__(self, cause):  # pylint: disable=super-init-not-called
-        """Initialize the JSONResponseError.
-
-        It it set with the exception raised by the requests library when decoding the response.
-        """
-        self.cause = cause
+def _group_days(group_period):
+    """Return a number of days for a group period."""
+    if group_period == Report.DAILY:
+        return 1
+    elif group_period == Report.WEEKLY:
+        return 7
+    return int(group_period)
 
 
-def main():
+def main():  # pylint: disable=too-many-locals
     """Execute computing test failure rates from the Evergreen API."""
 
     parser = optparse.OptionParser(description=main.__doc__,
@@ -595,20 +452,6 @@ def main():
                       help=("The ending period as a date in UTC to analyze the test history for,"
                             " including the specified date. Defaults to today (%default)."))
 
-    parser.add_option("--sinceRevision", dest="since_revision", metavar="<gitrevision>",
-                      default=None,
-                      help=("The starting period as a git revision to analyze the test history for,"
-                            " excluding the specified commit. This option must be specified in"
-                            " conjuction with --untilRevision and takes precedence over --sinceDate"
-                            " and --untilDate."))
-
-    parser.add_option("--untilRevision", dest="until_revision", metavar="<gitrevision>",
-                      default=None,
-                      help=("The ending period as a git revision to analyze the test history for,"
-                            " including the specified commit. This option must be specified in"
-                            " conjuction with --sinceRevision and takes precedence over --sinceDate"
-                            " and --untilDate."))
-
     parser.add_option("--groupPeriod", dest="group_period", metavar="[{}]".format(
         "|".join([Report.DAILY, Report.WEEKLY, "<ndays>"])), default=Report.WEEKLY,
                       help=("The time period over which to group test executions. Defaults to"
@@ -625,19 +468,25 @@ def main():
                             " as the beginning of the week. Defaults to '%default'.".format(
                                 Report.WEEKLY, Report.FIRST_DAY)))
 
-    parser.add_option("--tasks", dest="tasks", metavar="<task1,task2,...>", default="",
+    parser.add_option("--tasks", dest="tasks", metavar="<task1,task2,...>", default=None,
                       help="Comma-separated list of Evergreen task names to analyze.")
 
-    parser.add_option("--variants", dest="variants", metavar="<variant1,variant2,...>", default="",
+    parser.add_option("--variants", dest="variants", metavar="<variant1,variant2,...>",
+                      default=None,
                       help="Comma-separated list of Evergreen build variants to analyze.")
 
-    parser.add_option("--distros", dest="distros", metavar="<distro1,distro2,...>", default="",
+    parser.add_option("--distros", dest="distros", metavar="<distro1,distro2,...>", default=None,
                       help="Comma-separated list of Evergreen build distros to analyze.")
 
     parser.add_option("--numRequestRetries", dest="num_request_retries",
-                      metavar="<num-request-retries>", default=TestHistory.DEFAULT_NUM_RETRIES,
+                      metavar="<num-request-retries>",
+                      default=evergreen.EvergreenApiV2.DEFAULT_RETRIES,
                       help=("The number of times a request to the Evergreen API will be retried on"
                             " failure. Defaults to '%default'."))
+
+    log_levels = ["critical", "debug", "error", "info", "notset", "warning"]
+    parser.add_option("--logLevel", dest="log_level", default="error", choices=log_levels,
+                      help="Set the log level, from {}.".format(log_levels))
 
     (options, tests) = parser.parse_args()
 
@@ -652,18 +501,10 @@ def main():
             parser.error("{} must be specified in yyyy-mm-dd format, but got {}".format(
                 option_name, option_value))
 
-    if options.since_revision and not options.until_revision:
-        parser.print_help(file=sys.stderr)
-        print(file=sys.stderr)
-        parser.error("Must specify --untilRevision in conjuction with --sinceRevision")
-    elif options.until_revision and not options.since_revision:
-        parser.print_help(file=sys.stderr)
-        print(file=sys.stderr)
-        parser.error("Must specify --sinceRevision in conjuction with --untilRevision")
-
+    group_period = options.group_period
     if options.group_period not in (Report.DAILY, Report.WEEKLY):
         try:
-            options.group_period = datetime.timedelta(days=int(options.group_period))
+            group_period = datetime.timedelta(days=int(options.group_period))
         except ValueError:
             parser.print_help(file=sys.stderr)
             print(file=sys.stderr)
@@ -675,45 +516,22 @@ def main():
         print(file=sys.stderr)
         parser.error("Must specify either --tasks or at least one test")
 
-    def read_evg_config():
-        """
-        Attempt to parse the user's or system's Evergreen configuration from its known locations.
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s",
+                        level=options.log_level.upper())
+    logging.Formatter.converter = time.gmtime
 
-        Returns None if the configuration file wasn't found anywhere.
-        """
+    tasks = options.tasks.split(",") if options.tasks else None
+    variants = options.variants.split(",") if options.variants else None
+    distros = options.distros.split(",") if options.distros else None
+    test_history = TestHistory(project=options.project, tests=tests, tasks=tasks, variants=variants,
+                               distros=distros, retries=options.num_request_retries)
 
-        known_locations = [
-            "./.evergreen.yml",
-            os.path.expanduser("~/.evergreen.yml"),
-            os.path.expanduser("~/cli_bin/.evergreen.yml"),
-        ]
-
-        for filename in known_locations:
-            if os.path.isfile(filename):
-                with open(filename, "r") as fstream:
-                    return yaml.safe_load(fstream)
-
-        return None
-
-    evg_config = read_evg_config()
-    evg_config = evg_config if evg_config is not None else {}
-    api_server = "{url.scheme}://{url.netloc}".format(
-        url=urlparse(evg_config.get("api_server_host", TestHistory.DEFAULT_API_SERVER)))
-
-    test_history = TestHistory(api_server=api_server, project=options.project, tests=tests,
-                               tasks=options.tasks.split(","), variants=options.variants.split(","),
-                               distros=options.distros.split(","))
-    test_history.num_retries = options.num_request_retries
-
-    if options.since_revision:
-        history_data = test_history.get_history_by_revision(start_revision=options.since_revision,
-                                                            end_revision=options.until_revision)
-    elif options.since_date:
-        history_data = test_history.get_history_by_date(start_date=options.since_date,
-                                                        end_date=options.until_date)
+    history_data = test_history.get_history_by_date(
+        start_date=options.since_date, end_date=options.until_date, group_num_days=_group_days(
+            options.group_period))
 
     report = Report(history_data)
-    summary = report.summarize_by(Report.TEST_TASK_VARIANT_DISTRO, time_period=options.group_period,
+    summary = report.summarize_by(Report.TEST_TASK_VARIANT_DISTRO, time_period=group_period,
                                   start_day_of_week=options.start_day_of_week)
 
     for entry in summary:

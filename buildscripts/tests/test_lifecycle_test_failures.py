@@ -8,6 +8,7 @@ import datetime
 import unittest
 
 from buildscripts import lifecycle_test_failures as test_failures
+from buildscripts.client import evergreen as evergreen
 
 # pylint: disable=invalid-name,missing-docstring,protected-access
 
@@ -683,3 +684,177 @@ class TestReportSummarization(unittest.TestCase):
                              num_pass=1,
                              num_fail=0,
                          ))
+
+
+class mockEvergreenApiV2(object):
+    """Mock class for EvergreenApiV2."""
+    pass
+
+
+def _get_evergreen_apiv2(api_server=None, api_headers=None, num_retries=0):
+    """Mock function for evergreen.get_evergreen_apiv2."""
+    return mockEvergreenApiV2()
+
+
+class TestHistoryTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        evergreen.get_evergreen_apiv2 = _get_evergreen_apiv2
+        cls.test_history = test_failures.TestHistory()
+
+    @staticmethod
+    def dt_to_str(dt):
+        return dt.strftime("%Y-%m-%d")
+
+    def _test_stats(self, project, after_date, before_date, group_num_days=None, requester=None,
+                    sort=None, limit=None, tests=None, tasks=None, variants=None, distros=None):
+        return self.my_api_results
+
+class TestHistoryTests(TestHistoryTestCase):
+    """
+    Tests for test_failures.TestHistory.
+    """
+
+    def test_by_date(self):
+        """
+        Tests get_history_by_date.
+        """
+        my_date = "2018-01-01"
+        my_tests = ["jstests/core/and3.js", "jstests/core/or3.js"]
+        my_passes = [11, 6]
+        my_fails = [2, 3]
+        self.my_api_results = []
+        for i in range(len(my_tests)):
+            self.my_api_results.append({
+                    "test_file": my_tests[i],
+                    "date": my_date,
+                    "num_pass": my_passes[i],
+                    "num_fail": my_fails[i],
+                    "avg_duration_pass": 1.1
+                })
+        mockEvergreenApiV2.test_stats = self._test_stats
+        history_data = self.test_history.get_history_by_date(my_date, my_date)
+        self.assertEqual(len(self.my_api_results), len(history_data))
+        for i in range(len(self.my_api_results)):
+            self.assertEqual(my_tests[i], getattr(history_data[i], "test"))
+            self.assertEqual(my_passes[i], getattr(history_data[i], "num_pass"))
+            self.assertEqual(my_fails[i], getattr(history_data[i], "num_fail"))
+            self.assertEqual(my_date, self.dt_to_str(getattr(history_data[i], "start_date")))
+            self.assertEqual(my_date, self.dt_to_str(getattr(history_data[i], "end_date")))
+            self.assertEqual("<multiple tasks>", str(getattr(history_data[i], "task")))
+            self.assertEqual("<multiple variants>", str(getattr(history_data[i], "variant")))
+            self.assertEqual("<multiple distros>", str(getattr(history_data[i], "distro")))
+
+    def test_by_date_windows_file(self):
+        """
+        Tests get_history_by_date with a Windows named test file.
+        """
+        my_date = "2018-01-01"
+        my_test = "jstests\\core\\and3.js"
+        my_pass = 11
+        my_fail = 2
+        self.my_api_results = [{
+            "test_file": my_test,
+            "date": my_date,
+            "num_pass": my_pass,
+            "num_fail": my_fail,
+            "avg_duration_pass": 1.1
+            }]
+        mockEvergreenApiV2.test_stats = self._test_stats
+        history_data = self.test_history.get_history_by_date(my_date, my_date)
+        self.assertEqual(1, len(history_data))
+        self.assertEqual("jstests/core/and3.js", getattr(history_data[0], "test"))
+
+    def test_by_date_tasks(self):
+        """
+        Tests get_history_by_date with tasks specified.
+        """
+        my_date = "2018-01-01"
+        my_test = "jstests/core/and3.js"
+        my_pass = 11
+        my_fail = 2
+        my_task = "jsCore"
+        self.my_api_results = [{
+            "test_file": my_test,
+            "task_name": my_task,
+            "date": my_date,
+            "num_pass": my_pass,
+            "num_fail": my_fail,
+            "avg_duration_pass": 1.1
+            }]
+        mockEvergreenApiV2.test_stats = self._test_stats
+        history_data = self.test_history.get_history_by_date(my_date, my_date)
+        self.assertEqual(1, len(history_data))
+        self.assertEqual(my_test, getattr(history_data[0], "test"))
+        self.assertEqual(my_pass, getattr(history_data[0], "num_pass"))
+        self.assertEqual(my_fail, getattr(history_data[0], "num_fail"))
+        self.assertEqual(my_date, self.dt_to_str(getattr(history_data[0], "start_date")))
+        self.assertEqual(my_date, self.dt_to_str(getattr(history_data[0], "end_date")))
+        self.assertEqual(my_task, getattr(history_data[0], "task"))
+        self.assertEqual("<multiple variants>", str(getattr(history_data[0], "variant")))
+        self.assertEqual("<multiple distros>", str(getattr(history_data[0], "distro")))
+
+    def test_by_date_tasks_variants(self):
+        """
+        Tests get_history_by_date with tasks & variants specified.
+        """
+        my_date = "2018-01-01"
+        my_test = "jstests/core/and3.js"
+        my_variant = "linux-64"
+        my_pass = 11
+        my_fail = 2
+        my_task = "jsCore"
+        self.my_api_results = [{
+            "test_file": my_test,
+            "task_name": my_task,
+            "variant": my_variant,
+            "date": my_date,
+            "num_pass": my_pass,
+            "num_fail": my_fail,
+            "avg_duration_pass": 1.1
+            }]
+        mockEvergreenApiV2.test_stats = self._test_stats
+        history_data = self.test_history.get_history_by_date(my_date, my_date)
+        self.assertEqual(1, len(history_data))
+        self.assertEqual(my_test, getattr(history_data[0], "test"))
+        self.assertEqual(my_pass, getattr(history_data[0], "num_pass"))
+        self.assertEqual(my_fail, getattr(history_data[0], "num_fail"))
+        self.assertEqual(my_date, self.dt_to_str(getattr(history_data[0], "start_date")))
+        self.assertEqual(my_date, self.dt_to_str(getattr(history_data[0], "end_date")))
+        self.assertEqual(my_task, getattr(history_data[0], "task"))
+        self.assertEqual(my_variant, getattr(history_data[0], "variant"))
+        self.assertEqual("<multiple distros>", str(getattr(history_data[0], "distro")))
+
+    def test_by_date_tasks_variants_distros(self):
+        """
+        Tests get_history_by_date with tasks, variants & distros specified.
+        """
+        my_date1 = "2018-01-01"
+        my_date2 = "2019-01-01"
+        my_test = "jstests/core/and3.js"
+        my_variant = "linux-64"
+        my_distro = "rhel62-large"
+        my_pass = 11
+        my_fail = 2
+        my_task = "jsCore"
+        self.my_api_results = [{
+            "test_file": my_test,
+            "task_name": my_task,
+            "variant": my_variant,
+            "distro": my_distro,
+            "date": my_date1,
+            "num_pass": my_pass,
+            "num_fail": my_fail,
+            "avg_duration_pass": 1.1
+            }]
+        mockEvergreenApiV2.test_stats = self._test_stats
+        history_data = self.test_history.get_history_by_date(my_date1, my_date2)
+        self.assertEqual(1, len(history_data))
+        self.assertEqual(my_test, getattr(history_data[0], "test"))
+        self.assertEqual(my_pass, getattr(history_data[0], "num_pass"))
+        self.assertEqual(my_fail, getattr(history_data[0], "num_fail"))
+        self.assertEqual(my_date1, self.dt_to_str(getattr(history_data[0], "start_date")))
+        self.assertEqual(my_date1, self.dt_to_str(getattr(history_data[0], "end_date")))
+        self.assertEqual(my_task, getattr(history_data[0], "task"))
+        self.assertEqual(my_variant, getattr(history_data[0], "variant"))
+        self.assertEqual(my_distro, getattr(history_data[0], "distro"))
