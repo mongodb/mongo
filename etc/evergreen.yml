@@ -5653,7 +5653,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_collections_causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
+      resmoke_jobs_max: 0  # No cap on number of jobs.
 
 - <<: *task_template
   name: replica_sets_jscore_passthrough
@@ -5874,6 +5874,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: multi_shard_multi_stmt_txn_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=multi_shard_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_jobs_max: 0  # No cap on number of jobs.
 
 - <<: *task_template
   name: parallel
@@ -8599,6 +8610,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -11660,6 +11672,9 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
   - name: multiversion_auth
   - name: multiversion
   - name: noPassthroughWithMongod
@@ -12762,6 +12777,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
   - name: noPassthroughWithMongod
@@ -15159,6 +15175,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
   - name: noPassthroughWithMongod
@@ -15353,6 +15370,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
   - name: noPassthroughWithMongod

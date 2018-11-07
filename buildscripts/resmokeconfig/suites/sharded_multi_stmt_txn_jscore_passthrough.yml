@@ -222,17 +222,6 @@ selector:
   # Collection drops done through applyOps are not converted to w:majority
   - jstests/core/views/invalid_system_views.js
 
-  # Operations run on the "out" collection of a MapReduce call, which is not always
-  # immediately available to a transaction as it is still being replicated. Transactions
-  # fail with "Unable to acquire lock" errors.
-  - jstests/core/function_string_representations.js
-  - jstests/core/mr_errorhandling.js
-  - jstests/core/mr_merge.js
-  - jstests/core/mr_merge2.js
-  - jstests/core/mr_replaceIntoDB.js
-  - jstests/core/mr_outreduce.js
-  - jstests/core/mr_outreduce2.js
-
   ##
   ## Misc. reasons.
   ##
@@ -333,6 +322,7 @@ executor:
         var testingReplication = true;
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/txns/txn_override.js');
+        load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
       global_vars:
         TestData:
           sessionOptions:

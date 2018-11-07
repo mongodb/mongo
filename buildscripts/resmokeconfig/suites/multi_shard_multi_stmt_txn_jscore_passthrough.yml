@@ -3,16 +3,95 @@ test_kind: multi_stmt_txn_passthrough
 selector:
   roots:
   - jstests/core/**/*.js
-  - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_files:
-  # These tests already run with transactions.
-  - jstests/core/txns/*.js
-
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/capped_update.js
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
+  # These tests run in the jscore_txn passthrough suites.
+  - jstests/core/txns/**/*.js
+  
+  # The following tests fail because a certain command or functionality is not supported by
+  # mongos. This command or functionality is placed in a comment next to the failing test.
+  - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
+  - jstests/core/apitest_db_profile_level.js  # profiling.
+  - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
+  - jstests/core/awaitdata_getmore_cmd.js  # capped collections.
+  - jstests/core/bypass_doc_validation.js  # sharded $out output not permitted
+  - jstests/core/capped*.js  # capped collections.
+  - jstests/core/check_shard_index.js  # checkShardingIndex.
+  - jstests/core/collection_truncate.js  # emptycapped.
+  - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
+  - jstests/core/compact_keeps_indexes.js  # compact.
+  - jstests/core/currentop.js  # uses fsync.
+  - jstests/core/dbadmin.js  # "local" database.
+  - jstests/core/dbhash.js  # dbhash.
+  - jstests/core/dbhash2.js  # dbhash.
+  - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/do_txn*.js  # doTxn
+  - jstests/core/dropdb_race.js  # syncdelay.
+  - jstests/core/fsync.js  # uses fsync.
+  - jstests/core/geo_haystack*.js  # geoSearch.
+  - jstests/core/geo_s2cursorlimitskip.js  # profiling.
+  - jstests/core/geo_update_btree2.js  # notablescan.
+  - jstests/core/index_id_options.js  # "local" database.
+  - jstests/core/index9.js  # "local" database.
+  - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
+  - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
+  - jstests/core/notablescan.js  # notablescan.
+  - jstests/core/profile*.js  # profiling.
+  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/rename*.js # renameCollection.
+  - jstests/core/stages*.js  # stageDebug.
+  - jstests/core/startup_log.js  # "local" database.
+  - jstests/core/tailable_cursor_invalidation.js # capped collections.
+  - jstests/core/tailable_getmore_batch_size.js # capped collections.
+  - jstests/core/tailable_skip_limit.js # capped collections.
+  - jstests/core/top.js  # top.
+  # The following tests fail because mongos behaves differently from mongod when testing certain
+  # functionality. The differences are in a comment next to the failing test.
+  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos, SERVER-18047.
+  - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
+  - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
+  - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
+  - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
+  # Test expects to run against a standalone, but shards in this passthrough are repl sets.
   - jstests/core/read_after_optime.js
+  # The following tests fail because they count indexes. These counts do not take into account the
+  # additional hashed shard key indexes that are automatically added by this passthrough.
+  - jstests/core/apitest_dbcollection.js
+  - jstests/core/bad_index_plugin.js
+  - jstests/core/create_indexes.js
+  - jstests/core/list_indexes_non_existent_ns.js
+  - jstests/core/rename6.js
+  # The following tests fail because they expect no databases to be created. However a DB is created
+  # automatically when we shard a collection.
+  - jstests/core/dbcase.js
+  - jstests/core/dbcase2.js
+  - jstests/core/no_db_created.js
+  - jstests/core/ns_length.js
+  - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
+  - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+  # These tests fail because sharded clusters do not clean up correctly after failed index builds.
+  # See SERVER-33207 as an example.
+  - jstests/core/geo_borders.js
+  # TODO: Remove after fixing SERVER-32555. executionStats.nReturned is incorrect for sharded
+  # queries with a limit or for distinct commands.
+  - jstests/core/distinct_index1.js
+  - jstests/core/explain1.js
+  - jstests/core/explain4.js
+  - jstests/core/sortk.js
+  # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
+  # incorrect on sharded collections.
+  - jstests/core/explain_count.js
+  # TODO: Remove after fixing SERVER-14324. mapReduce behaves unpredictably when the out collection
+  # is sharded on anything other than {_id: 1}.
+  - jstests/core/mr_undef.js
+  # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+  - jstests/core/expr_index_use.js
+  - jstests/core/index_multikey.js
+  - jstests/core/optimized_match_explain.js
+  - jstests/core/sort_array.js
+  # TODO: SERVER-16605 MapReduce into sharded collection with hashed index fails
+  - jstests/core/mr1.js
+  - jstests/core/mr3.js
+  - jstests/core/mr4.js
 
   ##
   ## Limitations with the way the runner file injects transactions.
@@ -69,6 +148,12 @@ selector:
   - jstests/core/updateh.js
   - jstests/core/updatej.js
 
+  # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
+  - jstests/core/opcounters_write_cmd.js
+
+  # SERVER-36311 Remove txn_override.js restriction of snapshot readConcern
+  - jstests/core/read_after_optime.js
+
   # Consecutive writes totalling more than the size upper threshold will cause the txn to
   # abort with a TransactionTooLarge error.
   - jstests/core/batch_size.js
@@ -77,6 +162,53 @@ selector:
   # of the transaction, which uses the size of the oplog entry and is 8 bytes larger on
   # Windows debug builds than other builds.
   - jstests/core/insert1.js
+
+  # TODO: SERVER-38121 multi-index writes in transactions hangs secondary
+  - jstests/core/all.js
+  - jstests/core/*array*.js
+  - jstests/core/countc.js
+  - jstests/core/count7.js
+  - jstests/core/distinct_array1.js
+  - jstests/core/distinct_multikey.js
+  - jstests/core/*fts*.js
+  - jstests/core/*geo*.js
+  - jstests/core/in4.js
+  - jstests/core/index1.js
+  - jstests/core/index13.js
+  - jstests/core/indexl.js
+  - jstests/core/indexr.js
+  - jstests/core/indext.js
+  - jstests/core/indexu.js
+  - jstests/core/*multikey*.js
+  - jstests/core/nin.js
+  - jstests/core/nestedarr1.js
+  - jstests/core/not3.js
+  - jstests/core/null_query_semantics.js
+  - jstests/core/or_inexact.js
+  - jstests/core/or4.js
+  - jstests/core/or8.js
+  - jstests/core/ork.js
+  - jstests/core/remove2.js
+  - jstests/core/removeb.js
+  - jstests/core/removec.js
+  - jstests/core/sort7.js
+  - jstests/core/sparse_index_supports_ne_null.js
+  - jstests/core/text_covered_matching.js
+  - jstests/core/type3.js
+  - jstests/core/update_affects_indexes.js
+  - jstests/core/update_setOnInsert.js
+  - jstests/core/wildcard_index*.js
+
+  # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
+  - jstests/core/type8.js
+
+  # TODO: SERVER-38326 mapReduce cleanup doesn't obey writeConcern, rendering
+  # txn_passthrough_cmd_massage.js ineffective for preventing 2 phase drops
+  # from contesting db/coll locks.
+  - jstests/core/function_string_representations.js
+  - jstests/core/geo_mapreduce2.js
+  - jstests/core/mr*.js
+  - jstests/core/temp_cleanup.js
 
   ##
   ## Some aggregation stages don't support snapshot readconcern.
@@ -265,12 +397,19 @@ selector:
   - assumes_read_concern_unchanged
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
+  - assumes_against_mongod_not_mongos
+  # Tests tagged with the following will fail because they assume collections are not sharded.
+  - assumes_no_implicit_collection_creation_after_drop
+  - assumes_no_implicit_index_creation
+  - assumes_unsharded_collection
+  - cannot_create_unique_index_when_using_hashed_shard_key
 
 executor:
   config:
     shell_options:
       eval: >-
         var testingReplication = true;
+        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
         load('jstests/libs/txns/txn_override.js');
@@ -283,14 +422,19 @@ executor:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
-  - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
   fixture:
-    class: ReplicaSetFixture
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-    num_nodes: 2
+        numInitialSyncAttempts: 1
+        writePeriodicNoops: true
+    num_rs_nodes_per_shard: 2
+    num_shards: 2
