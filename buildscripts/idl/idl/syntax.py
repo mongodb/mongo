@@ -68,6 +68,7 @@ class IDLSpec(object):
         self.globals = None  # type: Optional[Global]
         self.imports = None  # type: Optional[Import]
         self.server_parameters = []  # type: List[ServerParameter]
+        self.configs = []  # type: List[ConfigOption]
 
 
 def parse_array_type(name):
@@ -231,6 +232,8 @@ class Global(common.SourceLocation):
         """Construct a Global."""
         self.cpp_namespace = None  # type: unicode
         self.cpp_includes = []  # type: List[unicode]
+        self.configs = None  # type: ConfigGlobal
+
         super(Global, self).__init__(file_name, line, column)
 
 
@@ -483,3 +486,50 @@ class ServerParameter(common.SourceLocation):
         self.from_string = None  # type: unicode
 
         super(ServerParameter, self).__init__(file_name, line, column)
+
+
+class ConfigGlobal(common.SourceLocation):
+    """Global values to apply to all ConfigOptions."""
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a ConfigGlobal."""
+        self.section = None  # type: unicode
+        self.source = []  # type: List[unicode]
+        self.initializer_name = None  # type: unicode
+
+        super(ConfigGlobal, self).__init__(file_name, line, column)
+
+
+class ConfigOption(common.SourceLocation):
+    """Runtime configuration setting definition."""
+
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a ConfigOption."""
+        self.name = None  # type: unicode
+        self.deprecated_name = []  # type: List[unicode]
+        self.short_name = None  # type: unicode
+        self.single_name = None  # type: unicode
+        self.deprecated_short_name = []  # type: List[unicode]
+
+        self.description = None  # type: unicode
+        self.section = None  # type: unicode
+        self.arg_vartype = None  # type: unicode
+        self.cpp_vartype = None  # type: unicode
+        self.cpp_varname = None  # type: unicode
+
+        self.conflicts = []  # type: List[unicode]
+        self.requires = []  # type: List[unicode]
+        self.hidden = False  # type: bool
+        self.default = None  # type: unicode
+        self.implicit = None  # type: unicode
+        self.source = []  # type: List[unicode]
+
+        self.duplicate_behavior = None  # type: unicode
+        self.positional = None  # type unicode
+        self.validator = None  # type: Validator
+
+        super(ConfigOption, self).__init__(file_name, line, column)

@@ -745,6 +745,12 @@ def _bind_globals(parsed_spec):
                                 parsed_spec.globals.column)
         ast_global.cpp_namespace = parsed_spec.globals.cpp_namespace
         ast_global.cpp_includes = parsed_spec.globals.cpp_includes
+
+        configs = parsed_spec.globals.configs
+        if configs:
+            ast_global.configs = ast.ConfigGlobal(configs.file_name, configs.line, configs.column)
+            ast_global.configs.initializer_name = configs.initializer_name
+
     else:
         ast_global = ast.Global("<implicit>", 0, 0)
 
@@ -885,6 +891,137 @@ def _bind_server_parameter(ctxt, param):
     return ast_param
 
 
+def _is_invalid_config_short_name(name):
+    # type: (unicode) -> bool
+    """Check if a given name is valid as a short name."""
+    return ('.' in name) or (',' in name)
+
+
+def _parse_config_option_sources(source_list):
+    # type: (List[unicode]) -> unicode
+    """Parse source list into enum value used by runtime."""
+    sources = 0
+    if not source_list:
+        return None
+
+    for source in source_list:
+        if source == "cli":
+            sources |= 1
+        elif source == "ini":
+            sources |= 2
+        elif source == "yaml":
+            sources |= 4
+        else:
+            return None
+
+    source_map = [
+        "SourceCommandLine",
+        "SourceINIConfig",
+        "SourceAllLegacy",  # cli + ini
+        "SourceYAMLConfig",
+        "SourceYAMLCLI",  # cli + yaml
+        "SourceAllConfig",  # ini + yaml
+        "SourceAll",
+    ]
+    return source_map[sources - 1]
+
+
+def _bind_config_option(ctxt, globals_spec, option):
+    # type: (errors.ParserContext, syntax.Global, syntax.ConfigOption) -> ast.ConfigOption
+    """Bind a config setting."""
+
+    # pylint: disable=too-many-branches,too-many-statements,too-many-return-statements
+    node = ast.ConfigOption(option.file_name, option.line, option.column)
+
+    if _is_invalid_config_short_name(option.short_name or ''):
+        ctxt.add_invalid_short_name(option, option.short_name)
+        return None
+
+    for name in option.deprecated_short_name:
+        if _is_invalid_config_short_name(name):
+            ctxt.add_invalid_short_name(option, name)
+            return None
+
+    if option.single_name is not None:
+        if (len(option.single_name) != 1) or not option.single_name.isalpha():
+            ctxt.add_invalid_single_name(option, option.single_name)
+            return None
+
+    node.name = option.name
+    node.short_name = option.short_name
+    node.deprecated_name = option.deprecated_name
+    node.deprecated_short_name = option.deprecated_short_name
+
+    if (node.short_name is None) and not _is_invalid_config_short_name(node.name):
+        # If the "dotted name" is usable as a "short name", mirror it by default.
+        node.short_name = node.name
+
+    if option.single_name:
+        # Compose short_name/single_name into boost::program_options format.
+        if not node.short_name:
+            ctxt.add_missing_short_name_with_single_name(option, option.single_name)
+            return None
+
+        node.short_name = node.short_name + ',' + option.single_name
+
+    node.description = option.description
+    node.arg_vartype = option.arg_vartype
+    node.cpp_vartype = option.cpp_vartype
+    node.cpp_varname = option.cpp_varname
+
+    node.requires = option.requires
+    node.conflicts = option.conflicts
+    node.hidden = option.hidden
+    node.default = option.default
+    node.implicit = option.implicit
+
+    # Commonly repeated attributes section and source may be set in globals.
+    if globals_spec and globals_spec.configs:
+        node.section = option.section or globals_spec.configs.section
+        source_list = option.source or globals_spec.configs.source or []
+    else:
+        node.section = option.section
+        source_list = option.source or []
+
+    node.source = _parse_config_option_sources(source_list)
+    if node.source is None:
+        ctxt.add_bad_source_specifier(option, ', '.join(source_list))
+        return None
+
+    if option.duplicate_behavior:
+        if option.duplicate_behavior == "append":
+            node.duplicates_append = True
+        elif option.duplicate_behavior != "overwrite":
+            ctxt.add_bad_duplicate_behavior(option, option.duplicate_behavior)
+            return None
+
+    if option.positional:
+        if not node.short_name:
+            ctxt.add_missing_shortname_for_positional_arg(option)
+            return None
+
+        # Parse single digit, closed range, or open range of digits.
+        spread = option.positional.split('-')
+        if len(spread) == 1:
+            # Make a single number behave like a range of that number, (e.g. "2" -> "2-2").
+            spread.append(spread[0])
+        if (len(spread) != 2) or ((spread[0] == "") and (spread[1] == "")):
+            ctxt.add_bad_numeric_range(option, 'positional', option.positional)
+        try:
+            node.positional_start = int(spread[0] or "-1")
+            node.positional_end = int(spread[1] or "-1")
+        except ValueError:
+            ctxt.add_bad_numeric_range(option, 'positional', option.positional)
+            return None
+
+    if option.validator is not None:
+        node.validator = _bind_validator(ctxt, option.validator)
+        if node.validator is None:
+            return None
+
+    return node
+
+
 def bind(parsed_spec):
     # type: (syntax.IDLSpec) -> ast.IDLBoundSpec
     """Read an idl.syntax, create an idl.ast tree, and validate the final IDL Specification."""
@@ -912,6 +1049,9 @@ def bind(parsed_spec):
 
     for server_parameter in parsed_spec.server_parameters:
         bound_spec.server_parameters.append(_bind_server_parameter(ctxt, server_parameter))
+
+    for option in parsed_spec.configs:
+        bound_spec.configs.append(_bind_config_option(ctxt, parsed_spec.globals, option))
 
     if ctxt.errors.has_errors():
         return ast.IDLBoundSpec(None, ctxt.errors)

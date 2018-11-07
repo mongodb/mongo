@@ -36,7 +36,8 @@ import os
 import string
 import sys
 import textwrap
-from typing import cast, List, Mapping, Union
+import uuid
+from typing import cast, Dict, List, Mapping, Union
 
 from . import ast
 from . import bson
@@ -314,12 +315,20 @@ def _encaps(val):
     # type: (unicode) -> unicode
     if val is None:
         return '""'
-    assert isinstance(val, unicode)
 
     for i in ["\\", '"', "'"]:
         if i in val:
             val = val.replace(i, '\\' + i)
     return '"' + val + '"'
+
+
+# Turn a list of pything strings into a C++ initializer list.
+def _encaps_list(vals):
+    # type: (List[unicode]) -> unicode
+    if vals is None:
+        return '{}'
+
+    return '{' + ', '.join([_encaps(v) for v in vals]) + '}'
 
 
 class _CppFileWriterBase(object):
@@ -687,19 +696,23 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-    def gen_extern_server_parameters(self, scps):
-        # type: (List[ast.ServerParameter]) -> None
-        """Generate externs for storage declaring server parameters."""
-        for scp in scps:
-            if (scp.cpp_vartype is None) or (scp.cpp_varname is None):
-                continue
-            idents = scp.cpp_varname.split('::')
-            decl = idents.pop()
-            for ns in idents:
-                self._writer.write_line('namespace %s {' % (ns))
-            self._writer.write_line('extern %s %s;' % (scp.cpp_vartype, decl))
-            for ns in reversed(idents):
-                self._writer.write_line('}  // namespace ' + ns)
+    def gen_extern_declaration(self, vartype, varname):
+        # type: (unicode, unicode) -> None
+        """Generate externs for storage declaration."""
+        if (vartype is None) or (varname is None):
+            return
+
+        idents = varname.split('::')
+        decl = idents.pop()
+        for ns in idents:
+            self._writer.write_line('namespace %s {' % (ns))
+
+        self._writer.write_line('extern %s %s;' % (vartype, decl))
+
+        for ns in reversed(idents):
+            self._writer.write_line('}  // namespace ' + ns)
+
+        if idents:
             self.write_empty_line()
 
     def generate(self, spec):
@@ -721,6 +734,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'vector',
         ]
 
+        if spec.server_parameters:
+            header_list.append('boost/thread/synchronized_value.hpp')
+
         header_list.sort()
 
         for include in header_list:
@@ -735,10 +751,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'mongo/bson/bsonobj.h',
             'mongo/bson/bsonobjbuilder.h',
             'mongo/idl/idl_parser.h',
-            'mongo/idl/server_parameter.h',
-            'mongo/idl/server_parameter_with_storage.h',
             'mongo/rpc/op_msg.h',
         ] + spec.globals.cpp_includes
+
+        if spec.configs:
+            header_list.append('mongo/util/options_parser/option_description.h')
 
         header_list.sort()
 
@@ -820,7 +837,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                 self.write_empty_line()
 
-            self.gen_extern_server_parameters(spec.server_parameters)
+            for scp in spec.server_parameters:
+                self.gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname)
+            for opt in spec.configs:
+                self.gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
@@ -1674,7 +1694,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # pylint: disable=too-many-branches
 
         for param in params:
-            # Optiona storage declarations.
+            # Optional storage declarations.
             if (param.cpp_vartype is not None) and (param.cpp_varname is not None):
                 self._writer.write_line('%s %s;' % (param.cpp_vartype, param.cpp_varname))
 
@@ -1731,6 +1751,147 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 self.write_empty_line()
 
+    def gen_config_option(self, opt, section):
+        # type: (ast.ConfigOption, unicode) -> None
+        """Generate Config Option instance."""
+
+        # Derive cpp_vartype from arg_vartype if needed.
+        vartype = ("moe::OptionTypeMap<moe::%s>::type" %
+                   (opt.arg_vartype)) if opt.cpp_vartype is None else opt.cpp_vartype
+
+        with self._block(section, ';'):
+            self._writer.write_line(
+                common.template_args(
+                    '.addOptionChaining(${name}, ${short}, moe::${argtype}, ${desc}, ${deprname}, ${deprshortname})',
+                    name=_encaps(opt.name), short=_encaps(opt.short_name),
+                    argtype=opt.arg_vartype, desc=_encaps(opt.description), deprname=_encaps_list(
+                        opt.deprecated_name), deprshortname=_encaps_list(
+                            opt.deprecated_short_name)))
+            self._writer.write_line('.setSources(moe::%s)' % (opt.source))
+            if opt.hidden:
+                self._writer.write_line('.hidden()')
+            for requires in opt.requires:
+                self._writer.write_line('.requires(%s)' % (_encaps(requires)))
+            for conflicts in opt.conflicts:
+                self._writer.write_line('.incompatibleWith(%s)' % (_encaps(conflicts)))
+            if opt.default is not None:
+                dflt = _encaps(opt.default) if opt.arg_vartype == "String" else opt.default
+                self._writer.write_line('.setDefault(moe::Value(%s))' % (dflt))
+            if opt.implicit is not None:
+                impl = _encaps(opt.implicit) if opt.arg_vartype == "String" else opt.implicit
+                self._writer.write_line('.setImplicit(moe::Value(%s))' % (impl))
+            if opt.duplicates_append:
+                self._writer.write_line('.composing()')
+            if (opt.positional_start is not None) and (opt.positional_end is not None):
+                self._writer.write_line('.positional(%d, %d)' % (opt.positional_start,
+                                                                 opt.positional_end))
+
+            if opt.validator:
+                if opt.validator.callback:
+                    self._writer.write_line(
+                        common.template_args(
+                            '.addConstraint(new moe::CallbackKeyConstraint<${argtype}>(${key}, ${callback}))',
+                            argtype=vartype, key=_encaps(
+                                opt.name), callback=opt.validator.callback))
+
+                if (opt.validator.gt is not None) or (opt.validator.lt is not None) or (
+                        opt.validator.gte is not None) or (opt.validator.lte is not None):
+                    self._writer.write_line(
+                        common.template_args(
+                            '.addConstraint(new moe::BoundaryKeyConstraint<${argtype}>(${key}, ${gt}, ${lt}, ${gte}, ${lte}))',
+                            argtype=vartype, key=_encaps(opt.name), gt='boost::none'
+                            if opt.validator.gt is None else unicode(opt.validator.gt),
+                            lt='boost::none' if opt.validator.lt is None else unicode(
+                                opt.validator.lt), gte='boost::none'
+                            if opt.validator.gte is None else unicode(
+                                opt.validator.gte), lte='boost::none'
+                            if opt.validator.lte is None else unicode(opt.validator.lte)))
+
+        self.write_empty_line()
+
+    def gen_config_options(self, spec):
+        # type: (ast.IDLAST) -> None
+        """Generate Config Option instances."""
+
+        # pylint: disable=too-many-branches
+
+        has_storage_targets = False
+        for opt in spec.configs:
+            if opt.cpp_varname is not None:
+                has_storage_targets = True
+                if opt.cpp_vartype is not None:
+                    self._writer.write_line('%s %s;' % (opt.cpp_vartype, opt.cpp_varname))
+        self.write_empty_line()
+
+        root_opts = []  # type: List[ast.ConfigOption]
+        sections = {}  # type: Dict[unicode, List[ast.ConfigOption]]
+        for opt in spec.configs:
+            if opt.section:
+                try:
+                    sections[opt.section].append(opt)
+                except KeyError:
+                    sections[opt.section] = [opt]
+            else:
+                root_opts.append(opt)
+
+        with self.gen_namespace_block(''):
+            # Group together options by section
+            if spec.globals.configs and spec.globals.configs.initializer_name:
+                blockname = spec.globals.configs.initializer_name
+            else:
+                blockname = 'idl_' + uuid.uuid4().hex
+
+            with self._block('MONGO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
+                             (blockname), '}'):
+                self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
+                self.write_empty_line()
+
+                for opt in root_opts:
+                    self.gen_config_option(opt, 'moe::startupOptions')
+
+                for section_name, section_opts in sections.iteritems():
+                    with self._block('{', '}'):
+                        self._writer.write_line('moe::OptionSection section(%s);' %
+                                                (_encaps(section_name)))
+                        self.write_empty_line()
+
+                        for opt in section_opts:
+                            self.gen_config_option(opt, 'section')
+
+                        self._writer.write_line(
+                            'auto status = moe::startupOptions.addSection(section);')
+                        with self._block('if (!status.isOK()) {', '}'):
+                            self._writer.write_line('return status;')
+                    self.write_empty_line()
+
+                self._writer.write_line('return Status::OK();')
+            self.write_empty_line()
+
+            if has_storage_targets:
+                # Setup initializer for storing configured options in their variables.
+                with self._block('MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {' %
+                                 (blockname), '}'):
+                    self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
+                    self._writer.write_line('const auto& params = moe::startupOptionsParsed;')
+                    self.write_empty_line()
+
+                    for opt in spec.configs:
+                        if opt.cpp_varname is None:
+                            continue
+
+                        vartype = ("moe::OptionTypeMap<moe::%s>::type" % (
+                            opt.arg_vartype)) if opt.cpp_vartype is None else opt.cpp_vartype
+                        with self._block('if (params.count(%s)) {' % (_encaps(opt.name)), '}'):
+                            self._writer.write_line('%s = params[%s].as<%s>();' %
+                                                    (opt.cpp_varname, _encaps(opt.name), vartype))
+                        self.write_empty_line()
+
+                    self._writer.write_line('return Status::OK();')
+
+                self.write_empty_line()
+
+        self.write_empty_line()
+
     def generate(self, spec, header_file_name):
         # type: (ast.IDLAST, unicode) -> None
         """Generate the C++ header to a stream."""
@@ -1761,6 +1922,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             'mongo/db/command_generic_argument.h',
             'mongo/db/commands.h',
         ]
+
+        if spec.server_parameters:
+            header_list.append('mongo/idl/server_parameter.h')
+            header_list.append('mongo/idl/server_parameter_with_storage.h')
+
+        if spec.configs:
+            header_list.append('mongo/util/options_parser/option_section.h')
+            header_list.append('mongo/util/options_parser/startup_option_init.h')
+            header_list.append('mongo/util/options_parser/startup_options.h')
+
         header_list.sort()
 
         for include in header_list:
@@ -1811,7 +1982,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.gen_to_bson_serializer_method(struct)
                 self.write_empty_line()
 
-            self.gen_server_parameter(spec.server_parameters or [])
+            if spec.server_parameters:
+                self.gen_server_parameter(spec.server_parameters)
+            if spec.configs:
+                self.gen_config_options(spec)
 
 
 def generate_header_str(spec):

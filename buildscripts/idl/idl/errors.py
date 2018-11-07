@@ -103,6 +103,13 @@ ERROR_ID_SERVER_PARAM_MISSING_METHOD = "ID0054"
 ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE = "ID0055"
 ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE = "ID0056"
 ERROR_ID_BAD_SETAT_SPECIFIER = "ID0057"
+ERROR_ID_BAD_SOURCE_SPECIFIER = "ID0058"
+ERROR_ID_BAD_DUPLICATE_BEHAVIOR_SPECIFIER = "ID0059"
+ERROR_ID_BAD_NUMERIC_RANGE = "ID0060"
+ERROR_ID_MISSING_SHORTNAME_FOR_POSITIONAL = "ID0061"
+ERROR_ID_INVALID_SHORT_NAME = "ID0062"
+ERROR_ID_INVALID_SINGLE_NAME = "ID0063"
+ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME = "ID0064"
 
 
 class IDLError(Exception):
@@ -722,6 +729,55 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE,
                         ("'%s' conflicts with server parameter definition with storage") %
                         (attrname))
+
+    def add_bad_source_specifier(self, location, value):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about invalid source specifier."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_BAD_SOURCE_SPECIFIER,
+                        ("'%s' is not a valid source specifier") % (value))
+
+    def add_bad_duplicate_behavior(self, location, value):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about invalid duplicate behavior specifier."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_BAD_DUPLICATE_BEHAVIOR_SPECIFIER,
+                        ("'%s' is not a valid duplicate behavior specifier") % (value))
+
+    def add_bad_numeric_range(self, location, attrname, value):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about invalid range specifier."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_BAD_NUMERIC_RANGE,
+                        ("'%s' is not a valid numeric range for '%s'") % (value, attrname))
+
+    def add_missing_shortname_for_positional_arg(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about required short_name for positional args."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_MISSING_SHORTNAME_FOR_POSITIONAL,
+                        "Missing 'short_name' for positional arg")
+
+    def add_invalid_short_name(self, location, name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about invalid short names."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_INVALID_SHORT_NAME,
+                        ("Invalid 'short_name' value '%s'") % (name))
+
+    def add_invalid_single_name(self, location, name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about invalid single names."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_INVALID_SINGLE_NAME,
+                        ("Invalid 'single_name' value '%s'") % (name))
+
+    def add_missing_short_name_with_single_name(self, location, name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about missing required short name when using single name."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME,
+                        ("Missing 'short_name' required with 'single_name' value '%s'") % (name))
 
 
 def _assert_unique_error_messages():

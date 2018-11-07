@@ -244,5 +244,49 @@ public:
     Canonicalize_t _canonicalize;
 };
 
+template <OptionType T>
+struct OptionTypeMap;
+
+template <>
+struct OptionTypeMap<StringVector> {
+    using type = std::vector<std::string>;
+};
+template <>
+struct OptionTypeMap<StringMap> {
+    using type = std::vector<std::string>;
+};
+template <>
+struct OptionTypeMap<Bool> {
+    using type = bool;
+};
+template <>
+struct OptionTypeMap<Double> {
+    using type = double;
+};
+template <>
+struct OptionTypeMap<Int> {
+    using type = int;
+};
+template <>
+struct OptionTypeMap<Long> {
+    using type = long;
+};
+template <>
+struct OptionTypeMap<String> {
+    using type = std::string;
+};
+template <>
+struct OptionTypeMap<UnsignedLongLong> {
+    using type = unsigned long long;
+};
+template <>
+struct OptionTypeMap<Unsigned> {
+    using type = unsigned;
+};
+template <>
+struct OptionTypeMap<Switch> {
+    using type = bool;
+};
+
 }  // namespace optionenvironment
 }  // namespace mongo
