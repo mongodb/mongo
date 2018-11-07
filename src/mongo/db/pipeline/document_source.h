@@ -336,8 +336,8 @@ private:
                          Pipeline::SourceContainer* container);
 
     /**
-     * Attempt to push a sample stage from directly ahead of the current stage given by itr to before
-     * the current stage. Returns whether the optimization was performed.
+     * Attempt to push a sample stage from directly ahead of the current stage given by itr to
+     * before the current stage. Returns whether the optimization was performed.
      */
     bool pushSampleBefore(Pipeline::SourceContainer::iterator itr,
                           Pipeline::SourceContainer* container);
