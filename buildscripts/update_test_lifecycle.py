@@ -18,7 +18,6 @@ import posixpath
 import subprocess
 import sys
 import textwrap
-import warnings
 
 import yaml
 
@@ -70,6 +69,8 @@ DEFAULT_CONFIG = Config(
 DEFAULT_PROJECT = "mongodb-mongo-master"
 
 DEFAULT_NUM_THREADS = 12
+
+MAX_BATCH_SIZE = 50
 
 
 def get_suite_tasks_membership(evg_conf):
@@ -127,11 +128,22 @@ def create_batch_groups(test_groups, batch_size):
     return batch_groups
 
 
+def get_date_range(num_days):
+    """Return a tuple of start_date, end_date, formatted as YYYY-MM-DD.
+
+    The end_date is tomorrow as the test_history API excludes the before_date in the results.
+    The start_date is 'num_days' from tomorrow's date.
+    """
+    tomorrow_dt = datetime.date.today() + datetime.timedelta(days=1)
+    start_dt = tomorrow_dt - datetime.timedelta(days=num_days)
+    return start_dt.strftime("%Y-%m-%d"), tomorrow_dt.strftime("%Y-%m-%d")
+
+
 class TestHistorySource(object):
     """A class used to parallelize requests to buildscripts.test_failures.TestHistory."""
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, project, variants, distros, start_revision, end_revision,
+            self, project, variants, distros, start_date, end_date,
             thread_pool_size=DEFAULT_NUM_THREADS):
         """Initialize the TestHistorySource.
 
@@ -139,15 +151,15 @@ class TestHistorySource(object):
             project: the Evergreen project name.
             variants: a list of variant names.
             distros: a list of distro names.
-            start_revision: the revision delimiting the begining of the history we want to retrieve.
-            end_revision: the revision delimiting the end of the history we want to retrieve.
+            start_date: the start date of the history we want to retrieve.
+            end_revision: the end date of the history we want to retrieve.
             thread_pool_size: the size of the thread pool used to make parallel requests.
         """
         self._project = project
         self._variants = variants
         self._distros = distros
-        self._start_revision = start_revision
-        self._end_revision = end_revision
+        self._start_date = start_date
+        self._end_date = end_date
         self._thread_pool = multiprocessing.dummy.Pool(thread_pool_size)
 
     def get_history_data(self, tests, tasks):
@@ -167,32 +179,8 @@ class TestHistorySource(object):
     def _get_task_history_data(self, tests, task):
         test_history = tf.TestHistory(project=self._project, tests=tests, tasks=[task],
                                       variants=self._variants, distros=self._distros)
-        return test_history.get_history_by_revision(start_revision=self._start_revision,
-                                                    end_revision=self._end_revision)
-
-
-def callo(args):
-    """Call a program, and capture its output."""
-    return subprocess.check_output(args)
-
-
-def git_commit_range_since(since):
-    """Return first and last commit in 'since' period specified.
-
-    Specify 'since' as any acceptable period for git log --since.
-    The period can be specified as '4.weeks' or '3.days'.
-    """
-    git_command = "git log --since={} --pretty=format:%H".format(since)
-    commits = callo(git_command.split()).split("\n")
-    return commits[-1], commits[0]
-
-
-def git_commit_prior(revision):
-    """Return commit revision prior to one specified."""
-    git_format = "git log -2 {revision} --pretty=format:%H"
-    git_command = git_format.format(revision=revision)
-    commits = callo(git_command.split()).split("\n")
-    return commits[-1]
+        return test_history.get_history_by_date(start_date=self._start_date,
+                                                end_date=self._end_date)
 
 
 def unreliable_test(test_fr, unacceptable_fr, test_runs, min_run):
@@ -211,19 +199,6 @@ def reliable_test(test_fr, acceptable_fr, test_runs, min_run):
     less than min_run executions or has a failure percentage less than acceptable_fr.
     """
     return test_runs < min_run or test_fr <= acceptable_fr
-
-
-def check_fail_rates(fr_name, acceptable_fr, unacceptable_fr):
-    """Raise an error if the acceptable_fr > unacceptable_fr."""
-    if acceptable_fr > unacceptable_fr:
-        raise ValueError("'{}' acceptable failure rate {} must be <= the unacceptable failure rate"
-                         " {}".format(fr_name, acceptable_fr, unacceptable_fr))
-
-
-def check_days(name, days):
-    """Raise an error if days < 1."""
-    if days < 1:
-        raise ValueError("'{}' days must be greater than 0.".format(name))
 
 
 def unreliable_tag(task, variant, distro):
@@ -451,7 +426,7 @@ def _is_tag_still_relevant(evg_conf, tag):
         variant_conf = evg_conf.get_variant(variant)
         if not variant_conf or task not in variant_conf.task_names:
             return False
-        if distro and distro not in variant_conf.distros:
+        if distro and distro not in variant_conf.distro_names:
             return False
     return True
 
@@ -991,10 +966,11 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
                             "mappings. Defaults to '%default'."))
 
     parser.add_option("--requestBatchSize", type="int", dest="batch_size", metavar="<batch-size>",
-                      default=100,
+                      default=10,
                       help=("The maximum number of tests to query the Evergreen API for in a single"
                             " request. A higher value for this option will reduce the number of"
-                            " roundtrips between this client and Evergreen. Defaults to %default."))
+                            " roundtrips between this client and Evergreen. The maximium value is"
+                            " {}. Defaults to %default.".format(MAX_BATCH_SIZE)))
 
     parser.add_option("--requestThreads", type="int", dest="num_request_threads",
                       metavar="<num-request-threads>", default=DEFAULT_NUM_THREADS,
@@ -1043,11 +1019,9 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
 
     (options, tests) = parser.parse_args()
 
-    if options.distros:
-        warnings.warn(
-            ("Until https://jira.mongodb.org/browse/EVG-1665 is implemented, distro information"
-             " isn't returned by the Evergreen API. This option will therefore be ignored."),
-            RuntimeWarning)
+    if options.batch_size < 1 or options.batch_size > MAX_BATCH_SIZE:
+        parser.print_help()
+        parser.error("Invalid --requestBatchSize specified: {}.".format(options.batch_size))
 
     logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=options.log_level,
                         filename=options.log_file)
@@ -1086,14 +1060,13 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
         if not options.tasks:
             use_test_tasks_membership = True
 
-    commit_first, commit_last = git_commit_range_since("{}.days".format(options.unreliable_days))
-    commit_prior = git_commit_prior(commit_first)
+    start_date, end_date = get_date_range(max(options.reliable_days, options.unreliable_days))
 
     # For efficiency purposes, group the tests and process in batches of batch_size.
     test_groups = create_batch_groups(create_test_groups(tests), options.batch_size)
 
-    test_history_source = TestHistorySource(options.project, variants, distros, commit_prior,
-                                            commit_last, options.num_request_threads)
+    test_history_source = TestHistorySource(options.project, variants, distros, start_date,
+                                            end_date, options.num_request_threads)
 
     LOGGER.info("Updating the tags")
     nb_groups = len(test_groups)
