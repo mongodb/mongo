@@ -33,9 +33,6 @@ selector:
   # TODO SERVER-28756: Mongos CSRS write retry logic drops txnNumbers.
   - jstests/core/txns/banned_txn_dbs.js
 
-  # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.
-  - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
-
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
