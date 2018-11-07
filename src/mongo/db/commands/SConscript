@@ -315,6 +315,8 @@ env.Library(
         "touch.cpp",
         "txn_cmds.cpp",
         "user_management_commands.cpp",
+        "vote_commit_index_builds_command.cpp",
+        env.Idlc('vote_commit_index_build.idl')[0],
     ],
     LIBDEPS=[
         'txn_cmd_request',
@@ -336,6 +338,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/exec/stagedebug_cmd',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repl/dbcheck',
         '$BUILD_DIR/mongo/db/repl/oplog',

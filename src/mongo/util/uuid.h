@@ -76,6 +76,7 @@ class UUID {
     friend class repl::OplogEntryBase;
     friend class repl::ReplOperation;
     friend class ResumeTokenInternal;
+    friend class VoteCommitIndexBuild;
 
 public:
     /**

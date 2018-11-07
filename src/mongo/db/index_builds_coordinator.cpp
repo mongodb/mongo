@@ -277,8 +277,11 @@ void IndexBuildsCoordinator::signalChangeToInitialSyncMode() {
     _replMode = ReplState::InitialSync;
 }
 
-void IndexBuildsCoordinator::voteCommitIndexBuild(const UUID& buildUUID,
-                                                  const HostAndPort& hostAndPort) {}
+Status IndexBuildsCoordinator::voteCommitIndexBuild(const UUID& buildUUID,
+                                                    const HostAndPort& hostAndPort) {
+    // TODO: not yet implemented.
+    return Status::OK();
+}
 
 Status IndexBuildsCoordinator::setCommitQuorum(const NamespaceString& nss,
                                                const std::vector<std::string>& indexNames,

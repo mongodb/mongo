@@ -185,7 +185,7 @@ public:
     /**
      * TODO: This is not yet implemented.
      */
-    void voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort);
+    Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort);
 
     /**
      * TODO: This is not yet implemented. (This will have to take a collection IS lock to look up

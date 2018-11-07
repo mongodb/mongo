@@ -539,6 +539,7 @@
         usersInfo: {skip: isUnrelated},
         validate: {command: {validate: "view"}, expectFailure: true},
         waitForOngoingChunkSplits: {skip: isUnrelated},
+        voteCommitIndexBuild: {skip: isUnrelated},
         voteCommitTransaction: {skip: isUnrelated},
         voteAbortTransaction: {skip: isUnrelated},
         whatsmyuri: {skip: isUnrelated}
