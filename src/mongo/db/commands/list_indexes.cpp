@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/clientcursor.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -62,6 +64,7 @@ namespace {
  * Lists the indexes for a given collection.
  * If the optional 'includeIndexBuilds' field is set to true, returns indexes that are not
  * ready. Defaults to false.
+ * These not-ready indexes are identified by a 'buildUUID' field in the index spec.
  *
  * Format:
  * {
@@ -158,10 +161,17 @@ public:
             auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
 
             for (size_t i = 0; i < indexNames.size(); i++) {
-                BSONObj indexSpec = writeConflictRetry(
-                    opCtx, "listIndexes", nss.ns(), [&cce, &opCtx, &indexNames, i] {
-                        return cce->getIndexSpec(opCtx, indexNames[i]);
-                    });
+                auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
+                    if (includeIndexBuilds && !cce->isIndexReady(opCtx, indexNames[i])) {
+                        auto spec = cce->getIndexSpec(opCtx, indexNames[i]);
+                        BSONObjBuilder builder(spec);
+                        // TODO(SERVER-37980): Replace with index build UUID.
+                        auto indexBuildUUID = UUID::gen();
+                        indexBuildUUID.appendToBuilder(&builder, "buildUUID"_sd);
+                        return builder.obj();
+                    }
+                    return cce->getIndexSpec(opCtx, indexNames[i]);
+                });
 
                 WorkingSetID id = ws->allocate();
                 WorkingSetMember* member = ws->get(id);

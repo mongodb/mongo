@@ -14,12 +14,45 @@
     const testDB = conn.getDB("test");
     assert.commandWorked(testDB.dropDatabase());
 
-    function assertIndexes(coll, numIndexes, indexes, options) {
+    /**
+     * Runs listIndexes command on collection.
+     * If 'options' is provided, these will be sent along with the command request.
+     * Asserts that all the indexes on this collection fit within the first batch of results.
+     */
+    function assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
+        notReadyIndexes = notReadyIndexes || [];
         options = options || {};
+
         let res = coll.runCommand("listIndexes", options);
         assert.eq(numIndexes, res.cursor.firstBatch.length);
-        for (var i = 0; i < numIndexes; i++) {
-            assert.eq(indexes[i], res.cursor.firstBatch[i].name);
+
+        // First batch contains all the indexes in the collection.
+        assert.eq(0, res.cursor.id);
+
+        // A map of index specs keyed by index name.
+        const indexMap = res.cursor.firstBatch.reduce(
+            (m, spec) => {
+                m[spec.name] = spec;
+                return m;
+            },
+            {});
+
+        // Check ready indexes.
+        for (let name of readyIndexes) {
+            assert(indexMap.hasOwnProperty(name),
+                   'ready index ' + name + ' missing from listIndexes result: ' + tojson(res));
+            const spec = indexMap[name];
+            assert(!spec.hasOwnProperty('buildUUID'),
+                   'unexpected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
+        }
+
+        // Check indexes that are not ready.
+        for (let name of notReadyIndexes) {
+            assert(indexMap.hasOwnProperty(name),
+                   'not-ready index ' + name + ' missing from listIndexes result: ' + tojson(res));
+            const spec = indexMap[name];
+            assert(spec.hasOwnProperty('buildUUID'),
+                   'expected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
         }
     }
 
@@ -44,7 +77,7 @@
     assertIndexes(coll, 2, ["_id_", "a_1"]);
 
     // The listIndexes command supports returning all indexes, including ones that are not ready.
-    assertIndexes(coll, 3, ["_id_", "a_1", "b_1"], {includeIndexBuilds: true});
+    assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeIndexBuilds: true});
 
     assert.commandWorked(
         testDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
