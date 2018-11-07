@@ -1,0 +1,83 @@
+test_kind: js_test
+selector:
+  roots:
+  - jstests/core/txns/**/*.js
+  exclude_files:
+  # Profile can only be run against the admin database on mongos.
+  - jstests/core/txns/transactions_profiling.js
+  - jstests/core/txns/transactions_profiling_with_drops.js
+
+  # No featureCompatibilityVersion parameter on mongos.
+  - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
+
+  # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
+  - jstests/core/txns/upconvert_read_concern.js
+
+  # Implicitly creates a database through a collection rename, which does not work in a sharded
+  # cluster.
+  - jstests/core/txns/transactions_block_ddl.js
+
+  # TODO SERVER-36124: maxTimeMS doesn't work for insert on mongos.
+  - jstests/core/txns/write_conflicts_with_non_txns.js
+
+  # TODO SERVER-36120: No doTxn command on mongos.
+  - jstests/core/txns/do_txn_atomicity.js
+  - jstests/core/txns/do_txn_basic.js
+
+  # TODO SERVER-36121: Set the transactionLifetimeLimitSeconds parameter, which is not on mongos.
+  - jstests/core/txns/abort_expired_transaction.js
+  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+  - jstests/core/txns/kill_op_on_txn_expiry.js
+
+  # Writes to the local database are not allowed through mongos.
+  # TODO SERVER-28756: Mongos CSRS write retry logic drops txnNumbers.
+  - jstests/core/txns/banned_txn_dbs.js
+
+  # Uses hangAfterCollectionInserts failpoint not available on mongos.
+  - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+
+  # Cannot shard a capped collection.
+  - jstests/core/txns/ban_tailable_cursor.js
+
+  # View tests aren't expected to work when collections are implicitly sharded.
+  - jstests/core/txns/view_reads_in_transaction.js
+
+  # Does not use the transactions shell helpers so afterClusterTime read concern is incorrectly
+  # attached to statements in a transaction beyond the first one.
+  - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
+  exclude_with_any_tags:
+  - assumes_against_mongod_not_mongos
+  # Tests tagged with the following will fail because they assume collections are not sharded.
+  - assumes_no_implicit_collection_creation_after_drop
+  - assumes_no_implicit_index_creation
+  - assumes_unsharded_collection
+  - cannot_create_unique_index_when_using_hashed_shard_key
+  # Prepare is not a command on mongos.
+  - uses_prepare_transaction
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+      readMode: commands
+  hooks:
+  # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+  # node.
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+    num_rs_nodes_per_shard: 2
+    num_shards: 2

@@ -5708,6 +5708,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharded_collections_causally_consistent_jscore_txns_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_collections_causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets_jscore_passthrough
   depends_on:
   - name: jsCore
@@ -8641,6 +8650,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -8831,6 +8841,7 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -9065,6 +9076,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -9161,6 +9173,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -9429,6 +9442,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -9520,6 +9534,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -9652,6 +9667,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -9754,6 +9770,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -9851,6 +9868,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -9953,6 +9971,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -10040,6 +10059,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -10146,6 +10166,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -10430,6 +10451,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_auth_0
@@ -10762,6 +10784,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_auth
@@ -10876,6 +10899,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -11037,6 +11061,7 @@ buildvariants:
   - name: serial_run
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -11969,6 +11994,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -12994,6 +13020,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -13228,6 +13255,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -13334,6 +13362,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding
@@ -13443,6 +13472,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -13561,6 +13591,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -13671,6 +13702,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -14077,6 +14109,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -14192,6 +14225,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
@@ -14516,6 +14550,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -14660,6 +14695,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharded_collections_jscore_passthrough
@@ -15016,6 +15052,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -15094,6 +15131,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -15198,6 +15236,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -15356,6 +15395,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -15549,6 +15589,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
@@ -15697,6 +15738,7 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
