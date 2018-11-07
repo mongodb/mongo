@@ -55,6 +55,30 @@ env.Library(
 )
 
 env.Library(
+    target='index_build_entry_idl',
+    source=[
+        env.Idlc('index_build_entry.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.CppUnitTest(
+    target='index_build_entry_test',
+    source=[
+        'index_build_entry_test.cpp',
+    ],
+    LIBDEPS=[
+        'index_build_entry_idl',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.Library(
     target='health_log',
     source=[
         "health_log.cpp",

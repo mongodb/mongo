@@ -161,6 +161,12 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
     return Status::OK();
 }
 
+WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) {
+    WriteConcernOptions writeConcernOptions;
+    uassertStatusOK(writeConcernOptions.parse(obj));
+    return writeConcernOptions;
+}
+
 StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
     const BSONObj& cmdObj, const WriteConcernOptions& defaultWC) {
     WriteConcernOptions writeConcern = defaultWC;

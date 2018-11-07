@@ -1,0 +1,85 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/write_concern_options.h"
+        - "mongo/util/uuid.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/util/net/hostandport.idl"
+
+types:
+  commitQuorum:
+    bson_serialization_type: object
+    description: "commitQuorum type that shadows the behaviour of WriteConcernOptions."
+    cpp_type: "mongo::WriteConcernOptions"
+    serializer: "mongo::WriteConcernOptions::toBSON"
+    deserializer: "mongo::WriteConcernOptions::deserializerForIDL"
+
+structs:
+    IndexBuildEntry:
+        description: "A document that tracks the progress of an index build across replica set
+                      members."
+        strict: true
+        fields:
+            _id:
+                cpp_name: buildUUID
+                optional: false
+                type: uuid
+                description: "Unique identifier of an index build across replica set members."
+            collectionUUID:
+                optional: false
+                type: uuid
+                description: "Identifies the collection upon which the index is being built."
+            commitQuorum:
+                optional: false
+                type: commitQuorum
+                description: "commitQuorum has the same behaviour as writeConcern, indicating how
+                              many replica set members are needed to commit the index build."
+            indexNames:
+                optional: false
+                type: array<string>
+                description: "An array of index names associated with this particular cross replica
+                              set index build."
+            prepareIndexBuild:
+                optional: false
+                type: bool
+                default: false
+                description: "Indicates that the primary has entered the commit phase, and 
+                              secondaries are allowed to proceed with the index constraint 
+                              violations resolution phase when ready and then send 
+                              voteCommitIndexBuild."
+            commitReadyMembers:
+                optional: true
+                type: array<HostAndPort>
+                description: "List of replica set members, by their host and port, that are in the
+                              commit phase waiting for the primary to write the commitIndexBuild
+                              oplog entry."

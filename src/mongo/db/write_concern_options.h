@@ -75,6 +75,13 @@ public:
     Status parse(const BSONObj& obj);
 
     /**
+     * Returns an instance of WriteConcernOptions from a BSONObj.
+     *
+     * uasserts() if the obj cannot be deserialized.
+     */
+    static WriteConcernOptions deserializerForIDL(const BSONObj& obj);
+
+    /**
      * Attempts to extract a writeConcern from cmdObj.
      * Verifies that the writeConcern is of type Object (BSON type).
      */
