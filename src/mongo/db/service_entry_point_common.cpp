@@ -539,7 +539,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // retryable writes. Currently, only requests with a transaction number will check out the
         // session.
         const bool shouldCheckOutSession = static_cast<bool>(sessionOptions.getTxnNumber()) &&
-            !cmdSkipsSessionCheckout(command->getName());
+            !shouldCommandSkipSessionCheckout(command->getName());
         OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckOutSession, sessionOptions);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;

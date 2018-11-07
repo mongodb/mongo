@@ -73,7 +73,7 @@ const StringMap<int> sessionCheckOutList = {{"abortTransaction", 1},
 const StringMap<int> skipSessionCheckoutList = {
     {"coordinateCommitTransaction", 1}, {"voteAbortTransaction", 1}, {"voteCommitTransaction", 1}};
 
-bool cmdCanCheckOutSession(StringData cmdName) {
+bool commandCanCheckOutSession(StringData cmdName) {
     return sessionCheckOutList.find(cmdName) != sessionCheckOutList.cend();
 }
 
@@ -87,7 +87,7 @@ void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, Str
                 cmdName == "doTxn");
 }
 
-bool cmdSkipsSessionCheckout(StringData cmdName) {
+bool shouldCommandSkipSessionCheckout(StringData cmdName) {
     return skipSessionCheckoutList.find(cmdName) != skipSessionCheckoutList.cend();
 }
 
@@ -101,7 +101,7 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
     if (sessionOptions.getTxnNumber()) {
         uassert(50768,
                 str::stream() << "It is illegal to provide a txnNumber for command " << cmdName,
-                cmdCanCheckOutSession(cmdName) || cmdSkipsSessionCheckout(cmdName));
+                commandCanCheckOutSession(cmdName) || shouldCommandSkipSessionCheckout(cmdName));
     }
 }
 
