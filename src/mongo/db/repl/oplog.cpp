@@ -72,7 +72,6 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
@@ -1370,9 +1369,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 request.setUpsert();
                 request.setFromOplogApplication(true);
 
-                UpdateLifecycleImpl updateLifecycle(requestNss);
-                request.setLifecycle(&updateLifecycle);
-
                 const StringData ns = fieldNs.valuestrsafe();
                 writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
                     WriteUnitOfWork wuow(opCtx);
@@ -1414,9 +1410,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
         request.setUpdates(o);
         request.setUpsert(upsert);
         request.setFromOplogApplication(true);
-
-        UpdateLifecycleImpl updateLifecycle(requestNss);
-        request.setLifecycle(&updateLifecycle);
 
         Timestamp timestamp;
         if (assignOperationTimestamp) {

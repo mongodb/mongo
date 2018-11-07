@@ -78,19 +78,15 @@ DeleteStage::DeleteStage(OperationContext* opCtx,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType, opCtx),
+    : RequiresMutableCollectionStage(kStageType, opCtx, collection),
       _params(params),
       _ws(ws),
-      _collection(collection),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID) {
     _children.emplace_back(child);
 }
 
 bool DeleteStage::isEOF() {
-    if (!_collection) {
-        return true;
-    }
     if (!_params.isMulti && _specificStats.docsDeleted > 0) {
         return true;
     }
@@ -102,7 +98,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
-    invariant(_collection);  // If isEOF() returns false, we must have a collection.
 
     // It is possible that after a delete was executed, a WriteConflictException occurred
     // and prevented us from returning ADVANCED with the old version of the document.
@@ -169,7 +164,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     bool docStillMatches;
     try {
         docStillMatches = write_stage_common::ensureStillMatches(
-            _collection, getOpCtx(), _ws, id, _params.canonicalQuery);
+            collection(), getOpCtx(), _ws, id, _params.canonicalQuery);
     } catch (const WriteConflictException&) {
         // There was a problem trying to detect if the document still exists, so retry.
         memberFreer.Dismiss();
@@ -208,14 +203,14 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (!_params.isExplain) {
         try {
             WriteUnitOfWork wunit(getOpCtx());
-            _collection->deleteDocument(getOpCtx(),
-                                        _params.stmtId,
-                                        recordId,
-                                        _params.opDebug,
-                                        _params.fromMigrate,
-                                        false,
-                                        _params.returnDeleted ? Collection::StoreDeletedDoc::On
-                                                              : Collection::StoreDeletedDoc::Off);
+            collection()->deleteDocument(getOpCtx(),
+                                         _params.stmtId,
+                                         recordId,
+                                         _params.opDebug,
+                                         _params.fromMigrate,
+                                         false,
+                                         _params.returnDeleted ? Collection::StoreDeletedDoc::On
+                                                               : Collection::StoreDeletedDoc::Off);
             wunit.commit();
         } catch (const WriteConflictException&) {
             memberFreer.Dismiss();  // Keep this member around so we can retry deleting it.
@@ -263,9 +258,8 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     return PlanStage::NEED_TIME;
 }
 
-void DeleteStage::doRestoreState() {
-    invariant(_collection);
-    const NamespaceString& ns(_collection->ns());
+void DeleteStage::restoreState(RequiresCollTag) {
+    const NamespaceString& ns = collection()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
             !getOpCtx()->writesAreReplicated() ||
@@ -287,11 +281,26 @@ const SpecificStats* DeleteStage::getSpecificStats() const {
 // static
 long long DeleteStage::getNumDeleted(const PlanExecutor& exec) {
     invariant(exec.getRootStage()->isEOF());
-    invariant(exec.getRootStage()->stageType() == STAGE_DELETE);
-    DeleteStage* deleteStage = static_cast<DeleteStage*>(exec.getRootStage());
-    const DeleteStats* deleteStats =
-        static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
-    return deleteStats->docsDeleted;
+
+    // If we're deleting from a non-existent collection, then the delete plan may have an EOF as the
+    // root stage.
+    if (exec.getRootStage()->stageType() == STAGE_EOF) {
+        return 0LL;
+    }
+
+    // If the collection exists, the delete plan may either have a delete stage at the root, or (for
+    // findAndModify) a projection stage wrapping a delete stage.
+    if (StageType::STAGE_PROJECTION == exec.getRootStage()->stageType()) {
+        invariant(exec.getRootStage()->getChildren().size() == 1U);
+        invariant(StageType::STAGE_DELETE == exec.getRootStage()->child()->stageType());
+        const SpecificStats* stats = exec.getRootStage()->child()->getSpecificStats();
+        return static_cast<const DeleteStats*>(stats)->docsDeleted;
+    } else {
+        invariant(StageType::STAGE_DELETE == exec.getRootStage()->stageType());
+        const auto* deleteStats =
+            static_cast<const DeleteStats*>(exec.getRootStage()->getSpecificStats());
+        return deleteStats->docsDeleted;
+    }
 }
 
 PlanStage::StageState DeleteStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {

@@ -42,7 +42,6 @@ namespace mongo {
 namespace str = mongoutils::str;
 
 class FieldRef;
-class UpdateLifecycle;
 
 class UpdateRequest {
 public:
@@ -65,7 +64,6 @@ public:
           _multi(false),
           _fromMigration(false),
           _fromOplogApplication(false),
-          _lifecycle(NULL),
           _isExplain(false),
           _returnDocs(ReturnDocOption::RETURN_NONE),
           _yieldPolicy(PlanExecutor::NO_YIELD) {}
@@ -163,14 +161,6 @@ public:
 
     bool isFromOplogApplication() const {
         return _fromOplogApplication;
-    }
-
-    inline void setLifecycle(UpdateLifecycle* value) {
-        _lifecycle = value;
-    }
-
-    inline UpdateLifecycle* getLifecycle() const {
-        return _lifecycle;
     }
 
     inline void setExplain(bool value = true) {
@@ -283,9 +273,6 @@ private:
 
     // True if this update was triggered by the application of an oplog entry.
     bool _fromOplogApplication;
-
-    // The lifecycle data, and events used during the update request.
-    UpdateLifecycle* _lifecycle;
 
     // Whether or not we are requesting an explained update. Explained updates are read-only.
     bool _isExplain;

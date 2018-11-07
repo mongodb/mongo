@@ -82,6 +82,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     PlanExecutor::YieldPolicy yieldPolicy,
     Direction direction,
     const RecordId& startLoc) {
+    invariant(collection);
     auto ws = stdx::make_unique<WorkingSet>();
 
     auto root = _collectionScan(opCtx, ws.get(), collection, direction, startLoc);
@@ -133,6 +134,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     BoundInclusion boundInclusion,
     PlanExecutor::YieldPolicy yieldPolicy,
     Direction direction) {
+    invariant(collection);
     auto ws = stdx::make_unique<WorkingSet>();
 
     std::unique_ptr<PlanStage> root = _indexScan(opCtx,
@@ -160,6 +162,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     const IndexDescriptor* descriptor,
     const BSONObj& key,
     PlanExecutor::YieldPolicy yieldPolicy) {
+    invariant(collection);
     auto ws = stdx::make_unique<WorkingSet>();
 
     auto idHackStage = stdx::make_unique<IDHackStage>(opCtx, collection, key, ws.get(), descriptor);

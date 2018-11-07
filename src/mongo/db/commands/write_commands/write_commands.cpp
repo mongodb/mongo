@@ -43,7 +43,6 @@
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/explain.h"
@@ -357,9 +356,7 @@ private:
                     "explained write batches must be of size 1",
                     _batch.getUpdates().size() == 1);
 
-            UpdateLifecycleImpl updateLifecycle(_batch.getNamespace());
             UpdateRequest updateRequest(_batch.getNamespace());
-            updateRequest.setLifecycle(&updateLifecycle);
             updateRequest.setQuery(_batch.getUpdates()[0].getQ());
             updateRequest.setUpdates(_batch.getUpdates()[0].getU());
             updateRequest.setCollation(write_ops::collationOf(_batch.getUpdates()[0]));

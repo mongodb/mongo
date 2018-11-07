@@ -44,6 +44,7 @@
 #include "mongo/db/commands/find_and_modify_common.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/lasterror.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/explain.h"
@@ -75,32 +75,6 @@
 
 namespace mongo {
 namespace {
-
-const UpdateStats* getUpdateStats(const PlanExecutor* exec) {
-    // The stats may refer to an update stage, or a projection stage wrapping an update stage.
-    if (StageType::STAGE_PROJECTION == exec->getRootStage()->stageType()) {
-        invariant(exec->getRootStage()->getChildren().size() == 1U);
-        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->child()->stageType());
-        const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
-        return static_cast<const UpdateStats*>(stats);
-    } else {
-        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->stageType());
-        return static_cast<const UpdateStats*>(exec->getRootStage()->getSpecificStats());
-    }
-}
-
-const DeleteStats* getDeleteStats(const PlanExecutor* exec) {
-    // The stats may refer to a delete stage, or a projection stage wrapping a delete stage.
-    if (StageType::STAGE_PROJECTION == exec->getRootStage()->stageType()) {
-        invariant(exec->getRootStage()->getChildren().size() == 1U);
-        invariant(StageType::STAGE_DELETE == exec->getRootStage()->child()->stageType());
-        const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
-        return static_cast<const DeleteStats*>(stats);
-    } else {
-        invariant(StageType::STAGE_DELETE == exec->getRootStage()->stageType());
-        return static_cast<const DeleteStats*>(exec->getRootStage()->getSpecificStats());
-    }
-}
 
 /**
  * If the operation succeeded, then Status::OK() is returned, possibly with a document value
@@ -135,7 +109,6 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 void makeUpdateRequest(const OperationContext* opCtx,
                        const FindAndModifyRequest& args,
                        bool explain,
-                       UpdateLifecycleImpl* updateLifecycle,
                        UpdateRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
@@ -148,7 +121,6 @@ void makeUpdateRequest(const OperationContext* opCtx,
                                                      : UpdateRequest::RETURN_OLD);
     requestOut->setMulti(false);
     requestOut->setExplain(explain);
-    requestOut->setLifecycle(updateLifecycle);
 
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     requestOut->setYieldPolicy(readConcernArgs.getLevel() ==
@@ -181,9 +153,9 @@ void appendCommandResponse(const PlanExecutor* exec,
                            const boost::optional<BSONObj>& value,
                            BSONObjBuilder* result) {
     if (isRemove) {
-        find_and_modify::serializeRemove(getDeleteStats(exec)->docsDeleted, value, result);
+        find_and_modify::serializeRemove(DeleteStage::getNumDeleted(*exec), value, result);
     } else {
-        const auto updateStats = getUpdateStats(exec);
+        const auto updateStats = UpdateStage::getUpdateStats(exec);
 
         // Note we have to use the objInserted from the stats here, rather than 'value' because the
         // _id field could have been excluded by a projection.
@@ -295,9 +267,8 @@ public:
             Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
         } else {
             UpdateRequest request(nsString);
-            UpdateLifecycleImpl updateLifecycle(nsString);
             const bool isExplain = true;
-            makeUpdateRequest(opCtx, args, isExplain, &updateLifecycle, &request);
+            makeUpdateRequest(opCtx, args, isExplain, &request);
 
             ParsedUpdate parsedUpdate(opCtx, &request);
             uassertStatusOK(parsedUpdate.parseRequest());
@@ -422,7 +393,7 @@ public:
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
                 // Fill out OpDebug with the number of deleted docs.
-                opDebug->additiveMetrics.ndeleted = getDeleteStats(exec.get())->docsDeleted;
+                opDebug->additiveMetrics.ndeleted = DeleteStage::getNumDeleted(*exec);
 
                 if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;
@@ -434,9 +405,8 @@ public:
                 appendCommandResponse(exec.get(), args.isRemove(), docFound, &result);
             } else {
                 UpdateRequest request(nsString);
-                UpdateLifecycleImpl updateLifecycle(nsString);
                 const bool isExplain = false;
-                makeUpdateRequest(opCtx, args, isExplain, &updateLifecycle, &request);
+                makeUpdateRequest(opCtx, args, isExplain, &request);
 
                 if (opCtx->getTxnNumber()) {
                     request.setStmtId(stmtId);
@@ -517,7 +487,8 @@ public:
                 if (collection) {
                     collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
                 }
-                UpdateStage::recordUpdateStatsInOpDebug(getUpdateStats(exec.get()), opDebug);
+                UpdateStage::recordUpdateStatsInOpDebug(UpdateStage::getUpdateStats(exec.get()),
+                                                        opDebug);
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
                 if (curOp->shouldDBProfile()) {

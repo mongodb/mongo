@@ -47,7 +47,6 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/query/get_executor.h"
@@ -236,8 +235,6 @@ void Helpers::upsert(OperationContext* opCtx,
     request.setUpdates(o);
     request.setUpsert();
     request.setFromMigration(fromMigrate);
-    UpdateLifecycleImpl updateLifecycle(requestNs);
-    request.setLifecycle(&updateLifecycle);
 
     update(opCtx, context.db(), request);
 }
@@ -250,8 +247,6 @@ void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj)
 
     request.setUpdates(obj);
     request.setUpsert();
-    UpdateLifecycleImpl updateLifecycle(requestNs);
-    request.setLifecycle(&updateLifecycle);
 
     update(opCtx, context.db(), request);
 

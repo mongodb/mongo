@@ -54,7 +54,6 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -575,9 +574,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         curOp.ensureStarted();
     }
 
-    UpdateLifecycleImpl updateLifecycle(ns);
     UpdateRequest request(ns);
-    request.setLifecycle(&updateLifecycle);
     request.setQuery(op.getQ());
     request.setUpdates(op.getU());
     request.setCollation(write_ops::collationOf(op));

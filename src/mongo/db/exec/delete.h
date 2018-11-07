@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 
@@ -85,7 +85,7 @@ struct DeleteStageParams {
  * Callers of work() must be holding a write lock (and, for replicated deletes, callers must have
  * had the replication coordinator approve the write).
  */
-class DeleteStage final : public PlanStage {
+class DeleteStage final : public RequiresMutableCollectionStage {
     MONGO_DISALLOW_COPYING(DeleteStage);
 
 public:
@@ -97,8 +97,6 @@ public:
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
-
-    void doRestoreState() final;
 
     StageType stageType() const final {
         return STAGE_DELETE;
@@ -117,6 +115,11 @@ public:
      */
     static long long getNumDeleted(const PlanExecutor& exec);
 
+protected:
+    void saveState(RequiresCollTag) final {}
+
+    void restoreState(RequiresCollTag) final;
+
 private:
     /**
      * Stores 'idToRetry' in '_idRetrying' so the delete can be retried during the next call to
@@ -128,11 +131,6 @@ private:
 
     // Not owned by us.
     WorkingSet* _ws;
-
-    // Collection to operate on.  Not owned by us.  Can be NULL (if NULL, isEOF() will always
-    // return true).  If non-NULL, the lifetime of the collection must supersede that of the
-    // stage.
-    Collection* _collection;
 
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;

@@ -43,7 +43,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -161,15 +160,16 @@ CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& update
 
 const char* UpdateStage::kStageType = "UPDATE";
 
+const UpdateStats UpdateStage::kEmptyUpdateStats;
+
 UpdateStage::UpdateStage(OperationContext* opCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType, opCtx),
+    : RequiresMutableCollectionStage(kStageType, opCtx, collection),
       _params(params),
       _ws(ws),
-      _collection(collection),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
       _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : NULL),
@@ -193,7 +193,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     const UpdateRequest* request = _params.request;
     UpdateDriver* driver = _params.driver;
     CanonicalQuery* cq = _params.canonicalQuery;
-    UpdateLifecycle* lifecycle = request->getLifecycle();
 
     // If asked to return new doc, default to the oldObj, in case nothing changes.
     BSONObj newObj = oldObj.value();
@@ -205,7 +204,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     // only enable in-place mutations if the underlying storage engine offers support for
     // writing damage events.
     _doc.reset(oldObj.value(),
-               (_collection->updateWithDamagesSupported()
+               (collection()->updateWithDamagesSupported()
                     ? mutablebson::Document::kInPlaceEnabled
                     : mutablebson::Document::kInPlaceDisabled));
 
@@ -217,13 +216,10 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     const bool validateForStorage = getOpCtx()->writesAreReplicated() && _enforceOkForStorage;
     FieldRefSet immutablePaths;
     if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
-        if (lifecycle) {
-            auto immutablePathsVector =
-                getImmutableFields(getOpCtx(), request->getNamespaceString());
-            if (immutablePathsVector) {
-                immutablePaths.fillFrom(
-                    transitional_tools_do_not_use::unspool_vector(*immutablePathsVector));
-            }
+        auto immutablePathsVector = getImmutableFields(getOpCtx(), request->getNamespaceString());
+        if (immutablePathsVector) {
+            immutablePaths.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(*immutablePathsVector));
         }
         immutablePaths.keepShortest(&idFieldRef);
     }
@@ -253,7 +249,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     // Skip adding _id field if the collection is capped (since capped collection documents can
     // neither grow nor shrink).
-    const auto createIdField = !_collection->isCapped();
+    const auto createIdField = !collection()->isCapped();
 
     // Ensure if _id exists it is first
     status = ensureIdFieldIsFirst(&_doc);
@@ -288,8 +284,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         RecordId newRecordId;
         CollectionUpdateArgs args;
         if (!request->isExplain()) {
-            invariant(_collection);
-            auto* css = CollectionShardingState::get(getOpCtx(), _collection->ns());
+            auto* css = CollectionShardingState::get(getOpCtx(), collection()->ns());
             args.stmtId = request->getStmtId();
             args.update = logObj;
             auto metadata = css->getMetadata(getOpCtx());
@@ -311,7 +306,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                StatusWith<RecordData> newRecStatus = _collection->updateDocumentWithDamages(
+                StatusWith<RecordData> newRecStatus = collection()->updateDocumentWithDamages(
                     getOpCtx(), recordId, std::move(snap), source, _damages, &args);
 
                 newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
@@ -328,13 +323,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->isExplain()) {
-                newRecordId = _collection->updateDocument(getOpCtx(),
-                                                          recordId,
-                                                          oldObj,
-                                                          newObj,
-                                                          driver->modsAffectIndices(),
-                                                          _params.opDebug,
-                                                          &args);
+                newRecordId = collection()->updateDocument(getOpCtx(),
+                                                           recordId,
+                                                           oldObj,
+                                                           newObj,
+                                                           driver->modsAffectIndices(),
+                                                           _params.opDebug,
+                                                           &args);
             }
         }
 
@@ -463,13 +458,12 @@ void UpdateStage::doInsert() {
         return;
     }
 
-    writeConflictRetry(getOpCtx(), "upsert", _collection->ns().ns(), [&] {
+    writeConflictRetry(getOpCtx(), "upsert", collection()->ns().ns(), [&] {
         WriteUnitOfWork wunit(getOpCtx());
-        invariant(_collection);
-        uassertStatusOK(_collection->insertDocument(getOpCtx(),
-                                                    InsertStatement(request->getStmtId(), newObj),
-                                                    _params.opDebug,
-                                                    request->isFromMigration()));
+        uassertStatusOK(collection()->insertDocument(getOpCtx(),
+                                                     InsertStatement(request->getStmtId(), newObj),
+                                                     _params.opDebug,
+                                                     request->isFromMigration()));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.
@@ -531,10 +525,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    // If we're here, then we still have to ask for results from the child and apply
-    // updates to them. We should only get here if the collection exists.
-    invariant(_collection);
-
     // It is possible that after an update was applied, a WriteConflictException
     // occurred and prevented us from returning ADVANCED with the requested version
     // of the document.
@@ -589,7 +579,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         bool docStillMatches;
         try {
             docStillMatches = write_stage_common::ensureStillMatches(
-                _collection, getOpCtx(), _ws, id, _params.canonicalQuery);
+                collection(), getOpCtx(), _ws, id, _params.canonicalQuery);
         } catch (const WriteConflictException&) {
             // There was a problem trying to detect if the document still exists, so retry.
             memberFreer.Dismiss();
@@ -702,7 +692,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     return status;
 }
 
-void UpdateStage::doRestoreState() {
+void UpdateStage::restoreState(RequiresCollTag) {
     const UpdateRequest& request = *_params.request;
     const NamespaceString& nsString(request.getNamespaceString());
 
@@ -716,16 +706,10 @@ void UpdateStage::doRestoreState() {
                                 << nsString.ns());
     }
 
-    if (request.getLifecycle()) {
-        UpdateLifecycle* lifecycle = request.getLifecycle();
-        lifecycle->setCollection(_collection);
-
-        if (!lifecycle->canContinue()) {
-            uasserted(17270, "Update aborted due to invalid state transitions after yield.");
-        }
-
-        _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(getOpCtx()));
-    }
+    // The set of indices may have changed during yield. Make sure that the update driver has up to
+    // date index information.
+    const auto& updateIndexData = collection()->infoCache()->getIndexKeys(getOpCtx());
+    _params.driver->refreshIndexKeys(&updateIndexData);
 }
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {
@@ -742,9 +726,24 @@ const SpecificStats* UpdateStage::getSpecificStats() const {
 
 const UpdateStats* UpdateStage::getUpdateStats(const PlanExecutor* exec) {
     invariant(exec->getRootStage()->isEOF());
-    invariant(exec->getRootStage()->stageType() == STAGE_UPDATE);
-    UpdateStage* updateStage = static_cast<UpdateStage*>(exec->getRootStage());
-    return static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+
+    // If we're updating a non-existent collection, then the delete plan may have an EOF as the root
+    // stage.
+    if (exec->getRootStage()->stageType() == STAGE_EOF) {
+        return &kEmptyUpdateStats;
+    }
+
+    // If the collection exists, then we expect the root of the plan tree to either be an update
+    // stage, or (for findAndModify) a projection stage wrapping an update stage.
+    if (StageType::STAGE_PROJECTION == exec->getRootStage()->stageType()) {
+        invariant(exec->getRootStage()->getChildren().size() == 1U);
+        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->child()->stageType());
+        const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
+        return static_cast<const UpdateStats*>(stats);
+    } else {
+        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->stageType());
+        return static_cast<const UpdateStats*>(exec->getRootStage()->getSpecificStats());
+    }
 }
 
 void UpdateStage::recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpDebug* opDebug) {

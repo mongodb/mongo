@@ -32,7 +32,7 @@
 
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
@@ -75,7 +75,7 @@ private:
  *
  * Callers of work() must be holding a write lock.
  */
-class UpdateStage final : public PlanStage {
+class UpdateStage final : public RequiresMutableCollectionStage {
     MONGO_DISALLOW_COPYING(UpdateStage);
 
 public:
@@ -87,8 +87,6 @@ public:
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
-
-    void doRestoreState() final;
 
     StageType stageType() const final {
         return STAGE_UPDATE;
@@ -146,7 +144,14 @@ public:
                                            bool enforceOkForStorage,
                                            UpdateStats* stats);
 
+protected:
+    void saveState(RequiresCollTag) final {}
+
+    void restoreState(RequiresCollTag) final;
+
 private:
+    static const UpdateStats kEmptyUpdateStats;
+
     /**
      * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in
      * memory, then commits these changes to the database. Returns a possibly unowned copy
@@ -182,9 +187,6 @@ private:
 
     // Not owned by us.
     WorkingSet* _ws;
-
-    // Not owned by us. May be NULL.
-    Collection* _collection;
 
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;

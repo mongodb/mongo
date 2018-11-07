@@ -67,7 +67,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -881,10 +880,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in
         // the event it was specified as a UUID.
         UpdateRequest request(collection->ns());
-        UpdateLifecycleImpl lifeCycle(collection->ns());
         request.setQuery(query);
         request.setUpdates(update);
-        request.setLifecycle(&lifeCycle);
         request.setUpsert(true);
         invariant(!request.isMulti());  // This follows from using an exact _id query.
         invariant(!request.shouldReturnAnyDocs());
@@ -923,10 +920,8 @@ Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
-    UpdateLifecycleImpl lifeCycle(nss);
     request.setQuery({});
     request.setUpdates(update.obj);
-    request.setLifecycle(&lifeCycle);
     request.setUpsert(true);
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
@@ -936,10 +931,8 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
                                              const BSONObj& query,
                                              const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
-    UpdateLifecycleImpl lifeCycle(nss);
     request.setQuery(query);
     request.setUpdates(update.obj);
-    request.setLifecycle(&lifeCycle);
     invariant(!request.isUpsert());
     return _updateWithQuery(opCtx, request, update.timestamp);
 }

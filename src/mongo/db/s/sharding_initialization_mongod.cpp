@@ -47,7 +47,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
@@ -310,8 +309,6 @@ Status ShardingInitializationMongoD::updateShardIdentityConfigString(
     UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
     updateReq.setQuery(BSON("_id" << ShardIdentityType::IdName));
     updateReq.setUpdates(updateObj);
-    UpdateLifecycleImpl updateLifecycle(NamespaceString::kServerConfigurationNamespace);
-    updateReq.setLifecycle(&updateLifecycle);
 
     try {
         AutoGetOrCreateDb autoDb(

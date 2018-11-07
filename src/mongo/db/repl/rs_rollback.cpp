@@ -57,7 +57,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
@@ -1392,8 +1391,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     request.setUpdates(idAndDoc.second);
                     request.setGod();
                     request.setUpsert();
-                    UpdateLifecycleImpl updateLifecycle(nss);
-                    request.setLifecycle(&updateLifecycle);
 
                     update(opCtx, ctx.db(), request);
                 }

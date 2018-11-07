@@ -48,7 +48,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
@@ -201,13 +200,12 @@ public:
             const CollatorInterface* collator = nullptr;
             UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
             Collection* collection = ctx.getCollection();
+            ASSERT(collection);
 
             // Collection should be empty.
             ASSERT_EQUALS(0U, count(BSONObj()));
 
             UpdateRequest request(nss);
-            UpdateLifecycleImpl updateLifecycle(nss);
-            request.setLifecycle(&updateLifecycle);
 
             // Update is the upsert {_id: 0, x: 1}, {$set: {y: 2}}.
             BSONObj query = fromjson("{_id: 0, x: 1}");
@@ -273,14 +271,13 @@ public:
             UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
             Database* db = ctx.db();
             Collection* coll = db->getCollection(&_opCtx, nss);
+            ASSERT(coll);
 
             // Get the RecordIds that would be returned by an in-order scan.
             vector<RecordId> recordIds;
             getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
             UpdateRequest request(nss);
-            UpdateLifecycleImpl updateLifecycle(nss);
-            request.setLifecycle(&updateLifecycle);
 
             // Update is a multi-update that sets 'bar' to 3 in every document
             // where foo is less than 5.
@@ -325,11 +322,11 @@ public:
             }
 
             // Remove recordIds[targetDocIndex];
-            updateStage->saveState();
+            static_cast<PlanStage*>(updateStage.get())->saveState();
             BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);
-            updateStage->restoreState();
+            static_cast<PlanStage*>(updateStage.get())->restoreState();
 
             // Do the remaining updates.
             while (!updateStage->isEOF()) {
@@ -382,7 +379,7 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
-        UpdateLifecycleImpl updateLifecycle(nss);
+        ASSERT(coll);
         UpdateRequest request(nss);
         const CollatorInterface* collator = nullptr;
         UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
@@ -401,7 +398,6 @@ public:
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
-        request.setLifecycle(&updateLifecycle);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
@@ -473,7 +469,7 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
-        UpdateLifecycleImpl updateLifecycle(nss);
+        ASSERT(coll);
         UpdateRequest request(nss);
         const CollatorInterface* collator = nullptr;
         UpdateDriver driver(new ExpressionContext(&_opCtx, collator));
@@ -492,7 +488,6 @@ public:
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
-        request.setLifecycle(&updateLifecycle);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 

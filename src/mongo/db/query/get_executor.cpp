@@ -59,7 +59,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -821,21 +820,19 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     const PlanExecutor::YieldPolicy policy = parsedDelete->yieldPolicy();
 
-    if (!parsedDelete->hasParsedQuery()) {
-        // This is the idhack fast-path for getting a PlanExecutor without doing the work
-        // to create a CanonicalQuery.
-        const BSONObj& unparsedQuery = request->getQuery();
+    if (!collection) {
+        // Treat collections that do not exist as empty collections. Return a PlanExecutor which
+        // contains an EOF stage.
+        LOG(2) << "Collection " << nss.ns() << " does not exist."
+               << " Using EOF stage: " << redact(request->getQuery());
+        return PlanExecutor::make(
+            opCtx, std::move(ws), std::make_unique<EOFStage>(opCtx), nss, policy);
+    }
 
-        if (!collection) {
-            // Treat collections that do not exist as empty collections.  Note that the explain
-            // reporting machinery always assumes that the root stage for a delete operation is
-            // a DeleteStage, so in this case we put a DeleteStage on top of an EOFStage.
-            LOG(2) << "Collection " << nss.ns() << " does not exist."
-                   << " Using EOF stage: " << redact(unparsedQuery);
-            auto deleteStage = make_unique<DeleteStage>(
-                opCtx, deleteStageParams, ws.get(), nullptr, new EOFStage(opCtx));
-            return PlanExecutor::make(opCtx, std::move(ws), std::move(deleteStage), nss, policy);
-        }
+    if (!parsedDelete->hasParsedQuery()) {
+        // This is the idhack fast-path for getting a PlanExecutor without doing the work to create
+        // a CanonicalQuery.
+        const BSONObj& unparsedQuery = request->getQuery();
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
@@ -922,7 +919,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     UpdateDriver* driver = parsedUpdate->getDriver();
 
     const NamespaceString& nss = request->getNamespaceString();
-    UpdateLifecycle* lifecycle = request->getLifecycle();
 
     if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         uassert(10156,
@@ -959,31 +955,31 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
                       str::stream() << "Not primary while performing update on " << nss.ns());
     }
 
-    if (lifecycle) {
-        lifecycle->setCollection(collection);
-        driver->refreshIndexKeys(lifecycle->getIndexKeys(opCtx));
-    }
-
     const PlanExecutor::YieldPolicy policy = parsedUpdate->yieldPolicy();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     UpdateStageParams updateStageParams(request, driver, opDebug);
 
+    // If the collection doesn't exist, then return a PlanExecutor for a no-op EOF plan. We have
+    // should have already enforced upstream that in this case either the upsert flag is false, or
+    // we are an explain. If the collection doesn't exist, we're not an explain, and the upsert flag
+    // is true, we expect the caller to have created the collection already.
+    if (!collection) {
+        LOG(2) << "Collection " << nss.ns() << " does not exist."
+               << " Using EOF stage: " << redact(request->getQuery());
+        return PlanExecutor::make(
+            opCtx, std::move(ws), std::make_unique<EOFStage>(opCtx), nss, policy);
+    }
+
+    // Pass index information to the update driver, so that it can determine for us whether the
+    // update affects indices.
+    const auto& updateIndexData = collection->infoCache()->getIndexKeys(opCtx);
+    driver->refreshIndexKeys(&updateIndexData);
+
     if (!parsedUpdate->hasParsedQuery()) {
         // This is the idhack fast-path for getting a PlanExecutor without doing the work
         // to create a CanonicalQuery.
         const BSONObj& unparsedQuery = request->getQuery();
-
-        if (!collection) {
-            // Treat collections that do not exist as empty collections. Note that the explain
-            // reporting machinery always assumes that the root stage for an update operation is
-            // an UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
-            LOG(2) << "Collection " << nss.ns() << " does not exist."
-                   << " Using EOF stage: " << redact(unparsedQuery);
-            auto updateStage = make_unique<UpdateStage>(
-                opCtx, updateStageParams, ws.get(), collection, new EOFStage(opCtx));
-            return PlanExecutor::make(opCtx, std::move(ws), std::move(updateStage), nss, policy);
-        }
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 

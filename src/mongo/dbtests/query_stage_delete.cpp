@@ -131,6 +131,7 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
         Collection* coll = ctx.getCollection();
+        ASSERT(coll);
 
         // Get the RecordIds that would be returned by an in-order scan.
         vector<RecordId> recordIds;
@@ -163,11 +164,11 @@ public:
         }
 
         // Remove recordIds[targetDocIndex];
-        deleteStage.saveState();
+        static_cast<PlanStage*>(&deleteStage)->saveState();
         BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
-        deleteStage.restoreState();
+        static_cast<PlanStage*>(&deleteStage)->restoreState();
 
         // Remove the rest.
         while (!deleteStage.isEOF()) {
@@ -190,6 +191,7 @@ public:
         // Various variables we'll need.
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
+        ASSERT(coll);
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = make_unique<WorkingSet>();

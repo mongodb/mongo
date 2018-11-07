@@ -35,14 +35,16 @@
 
 namespace mongo {
 
-void RequiresCollectionStage::doSaveState() {
+template <typename CollectionT>
+void RequiresCollectionStageBase<CollectionT>::doSaveState() {
     // A stage may not access storage while in a saved state.
     _collection = nullptr;
 
     saveState(RequiresCollTag{});
 }
 
-void RequiresCollectionStage::doRestoreState() {
+template <typename CollectionT>
+void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     invariant(!_collection);
 
     const UUIDCatalog& catalog = UUIDCatalog::get(getOpCtx());
@@ -53,5 +55,8 @@ void RequiresCollectionStage::doRestoreState() {
 
     restoreState(RequiresCollTag{});
 }
+
+template class RequiresCollectionStageBase<const Collection*>;
+template class RequiresCollectionStageBase<Collection*>;
 
 }  // namespace mongo
