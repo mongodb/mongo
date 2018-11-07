@@ -7,13 +7,13 @@ set -o errexit
 # Yaml-cpp does not use any autotools/cmake/config system to it is a simple import.
 # This script is designed to run on Linux or Mac OS X
 #
-# Yaml-cpp tarballs use the name "yaml-cpp-release" so we need to rename it
+# Yaml-cpp tarballs use the name "yaml-cpp-yaml-cpp-$VERSION" so we need to rename it
 #
 
-VERSION=0.5.3
+VERSION=0.6.2
 NAME=yaml-cpp
-TARBALL=release-$VERSION.tar.gz
-TARBALL_DEST_DIR=$NAME-release-$VERSION
+TARBALL=$NAME-$VERSION.tar.gz
+TARBALL_DEST_DIR=$NAME-$NAME-$VERSION
 DEST_DIR=`git rev-parse --show-toplevel`/src/third_party/$NAME-$VERSION
 
 if [ ! -f $TARBALL ]; then
