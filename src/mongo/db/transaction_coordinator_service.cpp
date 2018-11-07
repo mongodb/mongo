@@ -142,7 +142,20 @@ Future<TransactionCoordinator::CommitDecision> TransactionCoordinatorService::co
         txn::launchCoordinateCommitTask(_threadPool, coordinator, lsid, txnNumber, initialAction);
     }
 
-    return coordinator.get()->waitForDecision();
+    return coordinator.get()->waitForCompletion().then([](auto finalState) {
+        switch (finalState) {
+            case TransactionCoordinator::StateMachine::State::kAborted:
+                return TransactionCoordinator::CommitDecision::kAbort;
+            case TransactionCoordinator::StateMachine::State::kCommitted:
+                return TransactionCoordinator::CommitDecision::kCommit;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    });
+    // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
+    // is made durable. Currently the coordinator waits to hear acks because participants in prepare
+    // reject requests with a higher transaction number, causing tests to fail.
+    // return coordinator.get()->waitForDecision();
 }
 
 }  // namespace mongo
