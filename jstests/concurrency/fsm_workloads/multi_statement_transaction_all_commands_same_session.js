@@ -27,9 +27,11 @@ var $config = extendWorkload($config, function($config, $super) {
         print("Overriding sessionID " + tojson(oldId) + " with " + tojson(lsid) + " for test.");
         this.session._serverSession.handle.getId = () => lsid;
 
-        this.txnNumber = -1;
         this.sessionDb = this.session.getDatabase(db.getName());
         this.iteration = 1;
+
+        this.session.startTransaction_forTesting({readConcern: {level: 'snapshot'}});
+        this.txnNumber = 0;
     };
 
     return $config;
