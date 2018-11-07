@@ -558,14 +558,14 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     }
 
     auto opCtx = cc().makeOperationContext();
-    boost::optional<Lock::GlobalWrite> globalExclusiveLock;
+    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard;
     stdx::unique_lock<stdx::mutex> lk{_mutex};
     if (_memberState.primary()) {
-        // If we are primary, we need the global lock in MODE_X to step down. If we somehow
-        // transition out of primary while waiting for the global lock, there's no harm in holding
+        // If we are primary, we need the RSTL in mode X to step down. If we somehow
+        // transition out of primary while waiting for the RSTL, there's no harm in holding
         // it.
         lk.unlock();
-        globalExclusiveLock.emplace(opCtx.get());
+        transitionGuard.emplace(opCtx.get());
         lk.lock();
     }
 

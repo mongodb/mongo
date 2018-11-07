@@ -50,6 +50,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -339,9 +340,9 @@ void BackgroundSync::_produce() {
         // Mark yourself as too stale.
         _tooStale = true;
 
-        // Need to take global X lock to transition out of SECONDARY.
+        // Need to take the RSTL in mode X to transition out of SECONDARY.
         auto opCtx = cc().makeOperationContext();
-        Lock::GlobalWrite globalWriteLock(opCtx.get());
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
 
         error() << "too stale to catch up -- entering maintenance mode";
         log() << "Our newest OpTime : " << lastOpTimeFetched;

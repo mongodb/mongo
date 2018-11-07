@@ -39,6 +39,9 @@
 namespace mongo {
 namespace repl {
 
+ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx)
+    : ReplicationStateTransitionLockGuard(opCtx, Args()) {}
+
 ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx,
                                                                          const Args& args)
     : _opCtx(opCtx), _args(args) {

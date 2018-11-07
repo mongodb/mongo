@@ -67,6 +67,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
@@ -1492,7 +1493,8 @@ void rollback(OperationContext* opCtx,
     // then.
 
     {
-        Lock::GlobalWrite globalWrite(opCtx);
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+
         auto status = replCoord->setFollowerMode(MemberState::RS_ROLLBACK);
         if (!status.isOK()) {
             log() << "Cannot transition from " << replCoord->getMemberState().toString() << " to "

@@ -963,25 +963,25 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorImpl::getApplierState
 
 void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
                                                      long long termWhenBufferIsEmpty) {
-    // This logic is a little complicated in order to avoid acquiring the global exclusive lock
+    // This logic is a little complicated in order to avoid acquiring the RSTL in mode X
     // unnecessarily.  This is important because the applier may call signalDrainComplete()
     // whenever it wants, not only when the ReplicationCoordinator is expecting it.
     //
     // The steps are:
     // 1.) Check to see if we're waiting for this signal.  If not, return early.
-    // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
-    //     since that might take a while (NB there's a deadlock cycle otherwise, too).
+    // 2.) Otherwise, release the mutex while acquiring the RSTL in mode X, since that might take a
+    //     while (NB there's a deadlock cycle otherwise, too).
     // 3.) Re-check to see if we've somehow left drain mode.  If we have not, clear
     //     producer and applier's states, set the flag allowing non-local database writes and
-    //     drop the mutex.  At this point, no writes can occur from other threads, due to the
-    //     global exclusive lock.
+    //     drop the mutex.  At this point, no writes can occur from other threads, due to the RSTL
+    //     in mode X.
     // 4.) Drop all temp collections, and log the drops to the oplog.
     // 5.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
     //     consider to be committed.
-    // 6.) Drop the global exclusive lock.
+    // 6.) Drop the RSTL.
     //
     // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
-    // mode until we have the global exclusive lock, which forbids all other threads from making
+    // mode until we have the RSTL in mode X, which forbids all other threads from making
     // writes, we know that from the time that _canAcceptNonLocalWrites is set until
     // this method returns, no external writes will be processed.  This is important so that a new
     // temp collection isn't introduced on the new primary before we drop all the temp collections.
@@ -1012,7 +1012,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         }
     }
 
-    Lock::GlobalWrite globalWriteLock(opCtx);
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx);
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
@@ -2341,12 +2341,12 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
         return;
     }
     auto opCtx = cc().makeOperationContext();
-    boost::optional<Lock::GlobalWrite> globalExclusiveLock;
+    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard;
     if (isForceReconfig) {
         // Since it's a force reconfig, the primary node may not be electable after the
         // configuration change.  In case we are that primary node, finish the reconfig under the
-        // global lock, so that the step down occurs safely.
-        globalExclusiveLock.emplace(opCtx.get());
+        // RSTL, so that the step down occurs safely.
+        transitionGuard.emplace(opCtx.get());
     }
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 

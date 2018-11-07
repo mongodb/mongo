@@ -58,10 +58,16 @@ public:
     };
 
     /**
-     * Acquires the global X lock and performs any other required actions accoriding to the Args
+     * Acquires the global X lock.
+     */
+    ReplicationStateTransitionLockGuard(OperationContext* opCtx);
+
+    /**
+     * Acquires the global X lock and performs any other required actions according to the Args
      * provided.
      */
     ReplicationStateTransitionLockGuard(OperationContext* opCtx, const Args& args);
+
     ~ReplicationStateTransitionLockGuard();
 
     /**

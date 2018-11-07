@@ -48,6 +48,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
@@ -297,7 +298,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
 
     log() << "transition to ROLLBACK";
     {
-        Lock::GlobalWrite globalWrite(opCtx);
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx);
 
         auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_ROLLBACK);
         if (!status.isOK()) {
@@ -878,7 +879,7 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 
     log() << "transition to SECONDARY";
 
-    Lock::GlobalWrite globalWrite(opCtx);
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx);
 
     auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {

@@ -54,6 +54,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
+#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -1549,7 +1550,7 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     // Prevent _stepDownFinish() from running and becoming secondary by blocking in this
     // exclusive task.
     const auto opCtx = makeOperationContext();
-    boost::optional<Lock::GlobalWrite> globalExclusiveLock(opCtx.get());
+    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard(opCtx.get());
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
@@ -1565,7 +1566,7 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     ASSERT(!updateTermEvh3.isValid());
 
     // Unblock the tasks for updateTerm and _stepDownFinish.
-    globalExclusiveLock.reset();
+    transitionGuard.reset();
 
     // Wait stepdown to finish and term 3 to be installed.
     replExec->waitForEvent(updateTermEvh2);
@@ -1882,9 +1883,9 @@ TEST_F(StepDownTest,
 
     const auto opCtx = makeOperationContext();
 
-    // Make sure stepDown cannot grab the global exclusive lock. We need to use a different
+    // Make sure stepDown cannot grab the RSTL in mode X. We need to use a different
     // locker to test this, or otherwise stepDown will be granted the lock automatically.
-    Lock::GlobalWrite lk(opCtx.get());
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
     ASSERT_TRUE(opCtx->lockState()->isW());
     auto locker = opCtx.get()->swapLockState(stdx::make_unique<LockerImpl>());
 

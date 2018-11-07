@@ -68,6 +68,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
@@ -643,8 +644,8 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
     // This needs to happen after the attempt so readers can be sure we've already tried.
     ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
 
-    // Need global X lock to transition to SECONDARY
-    Lock::GlobalWrite writeLock(opCtx);
+    // Need the RSTL in mode X to transition to SECONDARY
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx);
 
     // Maintenance mode will force us to remain in RECOVERING state, no matter what.
     if (replCoord->getMaintenanceMode()) {
