@@ -90,8 +90,8 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
 
     MockMongoInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(
-        OperationContext*, NamespaceStringOrUUID) const final {
+    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
+        OperationContext*, const NamespaceString&, UUID) const final {
         return {_fields, false};
     }
 
@@ -1091,16 +1091,18 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
     };
     // Although the chunk manager and sharding catalog are not aware of the shard key in this test,
     // the expectation is for the $changeStream stage to infer the shard key from the resume token.
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 
     // Verify the same behavior with resuming using 'startAfter'.
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPresentInOplogEntry) {
@@ -1133,16 +1135,18 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPres
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 
     // Verify the same behavior with resuming using 'startAfter'.
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
@@ -1562,10 +1566,11 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken)
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
     };
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPresentInOplogEntry) {
@@ -1598,10 +1603,11 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPr
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDoesntContainUUID) {
@@ -1635,10 +1641,11 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeToken
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
@@ -1684,10 +1691,11 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 
@@ -1711,10 +1719,11 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
-    checkTransformation(insertEntry,
-                        expectedInsert,
-                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
+    checkTransformation(
+        insertEntry,
+        expectedInsert,
+        {{"_id"}},  // Mock the 'collectDocumentKeyFieldsForHostedCollection' response.
+        BSON("$changeStream" << BSON("startAfter" << resumeToken)));
 }
 
 }  // namespace

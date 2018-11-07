@@ -229,8 +229,9 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         // unsharded when the entry was last populated.
         auto it = _documentKeyCache.find(uuid.getUuid());
         if (it == _documentKeyCache.end() || !it->second.isFinal) {
-            auto docKeyFields = pExpCtx->mongoProcessInterface->collectDocumentKeyFields(
-                pExpCtx->opCtx, NamespaceStringOrUUID(nss.db().toString(), uuid.getUuid()));
+            auto docKeyFields =
+                pExpCtx->mongoProcessInterface->collectDocumentKeyFieldsForHostedCollection(
+                    pExpCtx->opCtx, nss, uuid.getUuid());
             if (it == _documentKeyCache.end() || docKeyFields.second) {
                 _documentKeyCache[uuid.getUuid()] = DocumentKeyCacheEntry(docKeyFields);
             }

@@ -60,11 +60,21 @@ public:
                                        CurrentOpTruncateMode truncateMode,
                                        CurrentOpCursorMode cursorMode) const final;
 
+    virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
+        OperationContext*, const NamespaceString&) const override;
+
     virtual boost::optional<OID> refreshAndGetEpoch(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const final;
 
 protected:
+    /**
+     * Converts the fields from a ShardKeyPattern to a vector of FieldPaths, including the _id if
+     * it's not already in 'keyPatternFields'.
+     */
+    std::vector<FieldPath> _shardKeyToDocumentKeyFields(
+        const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const;
+
     /**
      * Returns a BSONObj representing a report of the operation which is currently being
      * executed by the supplied client. This method is called by the getCurrentOps method of

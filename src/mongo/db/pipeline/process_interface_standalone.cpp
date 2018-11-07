@@ -247,7 +247,7 @@ void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
-    Lock::GlobalWrite globalLock(opCtx);
+    Lock::DBLock(opCtx, targetNs.db(), MODE_X);
 
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "collection options of target collection " << targetNs.ns()
@@ -341,9 +341,16 @@ std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) cons
     return std::string();
 }
 
-std::pair<std::vector<FieldPath>, bool> MongoInterfaceStandalone::collectDocumentKeyFields(
-    OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const {
+std::pair<std::vector<FieldPath>, bool>
+MongoInterfaceStandalone::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
+                                                                      const NamespaceString& nss,
+                                                                      UUID uuid) const {
     return {{"_id"}, false};  // Nothing is sharded.
+}
+
+std::vector<FieldPath> MongoInterfaceStandalone::collectDocumentKeyFieldsActingAsRouter(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    return {"_id"};  // Nothing is sharded.
 }
 
 std::vector<GenericCursor> MongoInterfaceStandalone::getIdleCursors(

@@ -220,12 +220,26 @@ public:
     /**
      * Returns the fields of the document key (in order) for the collection corresponding to 'uuid',
      * including the shard key and _id. If _id is not in the shard key, it is added last. If the
-     * collection is not sharded or no longer exists, returns only _id. Also retrurns a boolean that
+     * collection is not sharded or no longer exists, returns only _id. Also returns a boolean that
      * indicates whether the returned fields of the document key are final and will never change for
      * the given collection, either because the collection was dropped or has become sharded.
+     *
+     * This method is meant to be called from a mongod which owns at least one chunk for this
+     * collection. It will inspect the CollectionShardingState, not the CatalogCache. If asked about
+     * a collection not hosted on this shard, the answer will be incorrect.
      */
-    virtual std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(
-        OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const = 0;
+    virtual std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
+        OperationContext* opCtx, const NamespaceString&, UUID) const = 0;
+
+    /**
+     * Returns the fields of the document key (in order) for the collection 'nss', according to the
+     * CatalogCache. The document key fields are the shard key (if sharded) and the _id (if not
+     * already in the shard key). If _id is not in the shard key, it is added last. If the
+     * collection is not sharded or is not known to exist, returns only _id. Does not refresh the
+     * CatalogCache.
+     */
+    virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
+        OperationContext* opCtx, const NamespaceString&) const = 0;
 
     /**
      * Returns zero or one documents with the document key 'documentKey'. 'documentKey' is treated

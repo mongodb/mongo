@@ -365,6 +365,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
                         expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(
                             expCtx, outputNs, uniqueKey));
         } else {
+            uassert(51009, "Expected uniqueKey to be provided from mongos", !expCtx->fromMongos);
             if (expCtx->inMongos && mode != WriteModeEnum::kModeReplaceCollection) {
                 // In case there are multiple shards which will perform this $out in parallel, we
                 // need to figure out and attach the collection's epoch to ensure each shard is
@@ -382,8 +383,11 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
                 // waiting for that request to return instead of forcing another refresh.
                 targetEpoch = expCtx->mongoProcessInterface->refreshAndGetEpoch(expCtx, outputNs);
             }
-            std::vector<FieldPath> docKeyPaths = std::get<0>(
-                expCtx->mongoProcessInterface->collectDocumentKeyFields(expCtx->opCtx, outputNs));
+            // Even if we're not on mongos, we're still acting as a router here - the targeted
+            // collection may not be completely on our shard.
+            auto docKeyPaths =
+                expCtx->mongoProcessInterface->collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx,
+                                                                                      outputNs);
             uniqueKey = std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                             std::make_move_iterator(docKeyPaths.end()));
         }

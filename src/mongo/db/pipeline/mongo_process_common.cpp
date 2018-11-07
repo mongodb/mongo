@@ -122,6 +122,18 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     return ops;
 }
 
+std::vector<FieldPath> MongoProcessCommon::collectDocumentKeyFieldsActingAsRouter(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    if (auto chunkManager =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
+                .cm()) {
+        return _shardKeyToDocumentKeyFields(
+            chunkManager->getShardKeyPattern().getKeyPatternFields());
+    }
+    // We have no evidence this collection is sharded, so the document key is just _id.
+    return {"_id"};
+}
+
 bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
                                                    const std::set<FieldPath>& uniqueKeyPaths) {
     size_t nFieldsMatched = 0;
@@ -148,5 +160,19 @@ boost::optional<OID> MongoProcessCommon::refreshAndGetEpoch(
         return chunkManager->getVersion().epoch();
     }
     return boost::none;
+}
+
+std::vector<FieldPath> MongoProcessCommon::_shardKeyToDocumentKeyFields(
+    const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const {
+    std::vector<FieldPath> result;
+    bool gotId = false;
+    for (auto& field : keyPatternFields) {
+        result.emplace_back(field->dottedField());
+        gotId |= (result.back().fullPath() == "_id");
+    }
+    if (!gotId) {  // If not part of the shard key, "_id" comes last.
+        result.emplace_back("_id");
+    }
+    return result;
 }
 }  // namespace mongo

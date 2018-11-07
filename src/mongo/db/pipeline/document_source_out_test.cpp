@@ -63,9 +63,9 @@ public:
      * For the purposes of these tests, pretend each collection is unsharded and has a document key
      * of just "_id".
      */
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(
-        OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const override {
-        return {{"_id"}, false};
+    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
+        OperationContext* opCtx, const NamespaceString& nss) const override {
+        return {"_id"};
     }
 };
 
