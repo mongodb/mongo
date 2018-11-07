@@ -242,6 +242,10 @@ int ReplicationCoordinatorMock::getMyId() const {
     return 0;
 }
 
+HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
+    return HostAndPort();
+}
+
 Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     _memberState = newState;
     return Status::OK();

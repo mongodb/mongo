@@ -141,6 +141,8 @@ public:
 
     virtual int getMyId() const;
 
+    virtual HostAndPort getMyHostAndPort() const;
+
     virtual Status setFollowerMode(const MemberState& newState);
 
     virtual ApplierState getApplierState();

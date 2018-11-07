@@ -126,6 +126,8 @@ public:
 
     int getMyId() const override;
 
+    HostAndPort getMyHostAndPort() const override;
+
     Status setFollowerMode(const repl::MemberState&) override;
 
     ApplierState getApplierState() override;

@@ -2007,6 +2007,11 @@ int ReplicationCoordinatorImpl::getMyId() const {
     return _getMyId_inlock();
 }
 
+HostAndPort ReplicationCoordinatorImpl::getMyHostAndPort() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _rsConfig.getMemberAt(_selfIndex).getHostAndPort();
+}
+
 int ReplicationCoordinatorImpl::_getMyId_inlock() const {
     const MemberConfig& self = _rsConfig.getMemberAt(_selfIndex);
     return self.getId();

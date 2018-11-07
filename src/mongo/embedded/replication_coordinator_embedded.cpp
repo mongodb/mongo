@@ -250,6 +250,10 @@ int ReplicationCoordinatorEmbedded::getMyId() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+HostAndPort ReplicationCoordinatorEmbedded::getMyHostAndPort() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::resyncData(OperationContext*, bool) {
     UASSERT_NOT_IMPLEMENTED;
 }

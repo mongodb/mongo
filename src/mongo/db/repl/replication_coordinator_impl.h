@@ -168,6 +168,8 @@ public:
 
     virtual int getMyId() const override;
 
+    virtual HostAndPort getMyHostAndPort() const override;
+
     virtual Status setFollowerMode(const MemberState& newState) override;
 
     virtual ApplierState getApplierState() override;
