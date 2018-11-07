@@ -795,6 +795,11 @@ public:
      */
     virtual boost::optional<Timestamp> getRecoveryTimestamp() = 0;
 
+    /**
+     * Returns true if the current replica set config has at least one arbiter.
+     */
+    virtual bool setContainsArbiter() const = 0;
+
 protected:
     ReplicationCoordinator();
 };

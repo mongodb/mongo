@@ -3589,5 +3589,10 @@ int64_t ReplicationCoordinatorImpl::_nextRandomInt64_inlock(int64_t limit) {
     return _random.nextInt64(limit);
 }
 
+bool ReplicationCoordinatorImpl::setContainsArbiter() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _rsConfig.containsArbiter();
+}
+
 }  // namespace repl
 }  // namespace mongo

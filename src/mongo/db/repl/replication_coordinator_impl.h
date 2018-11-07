@@ -303,6 +303,8 @@ public:
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
 
+    virtual bool setContainsArbiter() const override;
+
     // ================== Test support API ===================
 
     /**

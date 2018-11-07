@@ -435,5 +435,9 @@ boost::optional<Timestamp> ReplicationCoordinatorEmbedded::getRecoveryTimestamp(
     UASSERT_NOT_IMPLEMENTED;
 }
 
+bool ReplicationCoordinatorEmbedded::setContainsArbiter() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

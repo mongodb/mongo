@@ -486,5 +486,9 @@ boost::optional<Timestamp> ReplicationCoordinatorMock::getRecoveryTimestamp() {
     return boost::none;
 }
 
+bool ReplicationCoordinatorMock::setContainsArbiter() const {
+    return false;
+}
+
 }  // namespace repl
 }  // namespace mongo

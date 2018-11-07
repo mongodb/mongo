@@ -286,6 +286,8 @@ public:
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
 
+    virtual bool setContainsArbiter() const override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     ServiceContext* const _service;

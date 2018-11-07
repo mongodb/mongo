@@ -76,6 +76,19 @@ public:
                 uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             }
 
+            // We automatically fail 'prepareTransaction' against a primary that has
+            // 'enableMajorityReadConcern' set to 'false'.
+            uassert(50993,
+                    "'prepareTransaction' is not supported with 'enableMajorityReadConcern=false'",
+                    serverGlobalParams.enableMajorityReadConcern);
+
+            // We do not allow preparing a transaction if the replica set has any arbiters.
+            auto replCoord =
+                repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+            uassert(50995,
+                    "'prepareTransaction' is not supported for replica sets with arbiters",
+                    !replCoord->setContainsArbiter());
+
             auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::CommandFailed,
                     "prepareTransaction must be run within a transaction",
@@ -94,12 +107,6 @@ public:
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant->inMultiDocumentTransaction());
-
-            // We automatically fail 'prepareTransaction' against a primary that has
-            // 'enableMajorityReadConcern' set to 'false'.
-            uassert(50993,
-                    "'prepareTransaction' is not supported with 'enableMajorityReadConcern=false'",
-                    serverGlobalParams.enableMajorityReadConcern);
 
             if (txnParticipant->transactionIsPrepared()) {
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
