@@ -123,7 +123,10 @@
           indexes: [{name: "a_1", key: {a: 1}}],
           writeConcern: {w: "majority"}
         },
-        {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
+        // Output inline so the implicitly shard accessed collections override won't drop the
+        // output collection during the active transaction test case, which would hang indefinitely
+        // waiting for a database exclusive lock.
+        {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: {inline: 1}},
     ];
 
     nonSessionCommands.forEach(testCommand);

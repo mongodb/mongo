@@ -33,11 +33,6 @@ selector:
   # TODO SERVER-28756: Mongos CSRS write retry logic drops txnNumbers.
   - jstests/core/txns/banned_txn_dbs.js
 
-  # TODO SERVER-36260: Mongos should reject commands with txnNumbers that aren't allowed in a
-  # transaction.
-  # TODO SERVER-33709: Support readConcern snapshot in cluster count command.
-  - jstests/core/txns/commands_not_allowed_in_txn.js
-
   # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.
   - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
 
