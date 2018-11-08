@@ -662,11 +662,9 @@ DBCollection.prototype.reIndex = function() {
     return this._db.runCommand({reIndex: this.getName()});
 };
 
-DBCollection.prototype.dropIndexes = function() {
-    if (arguments.length)
-        throw Error("dropIndexes doesn't take arguments");
-
-    var res = this._db.runCommand({deleteIndexes: this.getName(), index: "*"});
+DBCollection.prototype.dropIndexes = function(indexNames) {
+    indexNames = indexNames || '*';
+    var res = this._db.runCommand({deleteIndexes: this.getName(), index: indexNames});
     assert(res, "no result from dropIndex result");
     if (res.ok)
         return res;

@@ -61,6 +61,25 @@
     assert.commandWorked(t.createIndex({a: 1}));
     assertIndexes(['a_1', 'c_1', 'd_1', 'e_1'], 'recreating {a: 1}');
 
+    // Drop multiple indexes.
+    assert.commandWorked(t.dropIndexes(['c_1', 'd_1']));
+    assertIndexes(['a_1', 'e_1'], 'dropping {c: 1} and {d: 1}');
+
+    // Must drop all the indexes provided or none at all - for example, if one of the index names
+    // provided is invalid.
+    let ex = assert.throws(() => {
+        t.dropIndexes(['a_1', '_id_']);
+    });
+    assert.commandFailedWithCode(ex, ErrorCodes.InvalidOptions);
+    assertIndexes(['a_1', 'e_1'], 'failed dropIndexes command with _id index');
+
+    // List of index names must contain only strings.
+    ex = assert.throws(() => {
+        t.dropIndexes(['a_1', 123]);
+    });
+    assert.commandFailedWithCode(ex, ErrorCodes.TypeMismatch);
+    assertIndexes(['a_1', 'e_1'], 'failed dropIndexes command with non-string index name');
+
     // Drop all indexes.
     assert.commandWorked(t.dropIndexes());
     assertIndexes([], 'dropping all indexes');

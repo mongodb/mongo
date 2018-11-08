@@ -54,6 +54,7 @@ namespace {
 // 1) '*' - drop all indexes.
 // 2) <index name> - name of single index to drop.
 // 3) <index key pattern> - BSON document representing key pattern of index to drop.
+// 4) [<index name 1>, <index name 2>, ...] - array containing names of indexes to drop.
 constexpr auto kIndexFieldName = "index"_sd;
 
 /**
@@ -155,6 +156,35 @@ Status wrappedRun(OperationContext* opCtx,
 
         opCtx->getServiceContext()->getOpObserver()->onDropIndex(
             opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
+
+        return Status::OK();
+    }
+
+    // The 'index' field contains a list of names of indexes to drop.
+    // Drops all or none of the indexes due to the enclosing WriteUnitOfWork.
+    if (indexElem.type() == Array) {
+        for (auto indexNameElem : indexElem.Array()) {
+            if (indexNameElem.type() != String) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "dropIndexes " << collection->ns().ns() << " ("
+                                            << collection->uuid()
+                                            << ") failed to drop multiple indexes "
+                                            << indexElem.toString(false)
+                                            << ": index name must be a string");
+            }
+
+            auto indexToDelete = indexNameElem.String();
+            auto status = dropIndexByName(opCtx, collection, indexCatalog, indexToDelete);
+            if (!status.isOK()) {
+                return status.withContext(str::stream() << "dropIndexes " << collection->ns().ns()
+                                                        << " ("
+                                                        << collection->uuid()
+                                                        << ") failed to drop multiple indexes "
+                                                        << indexElem.toString(false)
+                                                        << ": "
+                                                        << indexToDelete);
+            }
+        }
 
         return Status::OK();
     }
