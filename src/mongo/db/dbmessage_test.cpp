@@ -47,7 +47,7 @@ TEST(DBMessage1, ShortFlags) {
     Message toSend;
     toSend.setData(dbDelete, b.buf(), b.len());
 
-    ASSERT_THROWS(DbMessage d1(toSend), AssertionException);
+    ASSERT_THROWS(DbMessage(toSend), AssertionException);
 }
 
 // Test a short NS missing a trailing null
@@ -63,7 +63,7 @@ TEST(DBMessage1, BadNS) {
     Message toSend;
     toSend.setData(dbDelete, b.buf(), b.len());
 
-    ASSERT_THROWS(DbMessage d1(toSend), AssertionException);
+    ASSERT_THROWS(DbMessage(toSend), AssertionException);
 }
 
 // Test a valid kill message and try an extra pull

@@ -81,7 +81,7 @@ protected:
 
 TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
     BSONObj query = fromjson("{$text: {$search:\"awesome\"}}");
-    ASSERT_THROWS_CODE(StatusWithMatchExpression result(
+    ASSERT_THROWS_CODE(StatusWithMatchExpression(
                            ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement())),
                        AssertionException,
                        ErrorCodes::IndexNotFound);
@@ -117,7 +117,7 @@ TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
                                    false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"spanglish\"}}");
-    ASSERT_THROWS_CODE(StatusWithMatchExpression result(
+    ASSERT_THROWS_CODE(StatusWithMatchExpression(
                            ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement())),
                        AssertionException,
                        ErrorCodes::BadValue);

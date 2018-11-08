@@ -166,23 +166,10 @@
  * normal `.ignore()` code.  This macro exists only to make using `ASSERT_THROWS` less inconvenient
  * on functions which both throw and return `Status` or `StatusWith`.
  */
-//#define UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(STATEMENT)
-#ifdef __GNUC__
-// The `(void) 0`s are to permit more readable formatting of these in-macro pragma statements.
-#define UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(STATEMENT)   \
-    do {                                                               \
-        _Pragma("GCC diagnostic push")(void) 0;                        \
-        _Pragma("GCC diagnostic ignored \"-Wunused\"")(void) 0;        \
-        _Pragma("GCC diagnostic ignored \"-Wunused-result\"")(void) 0; \
-        STATEMENT;                                                     \
-        _Pragma("GCC diagnostic pop")(void) 0;                         \
+#define UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(EXPRESSION) \
+    do {                                                              \
+        (void)(EXPRESSION);                                           \
     } while (false)
-#else
-#define UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(STATEMENT) \
-    do {                                                             \
-        STATEMENT;                                                   \
-    } while (false)
-#endif
 
 /**
  * Behaves like ASSERT_THROWS, above, but also calls CHECK(caughtException) which may contain

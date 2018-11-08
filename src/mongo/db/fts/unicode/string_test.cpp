@@ -218,10 +218,10 @@ TEST(UnicodeString, BadUTF8) {
                              static_cast<char>(0x64),
                              0};
 
-    ASSERT_THROWS(String test1(invalid1), AssertionException);
-    ASSERT_THROWS(String test2(invalid2), AssertionException);
-    ASSERT_THROWS(String test3(invalid3), AssertionException);
-    ASSERT_THROWS(String test4(invalid4), AssertionException);
+    ASSERT_THROWS(String(invalid1), AssertionException);
+    ASSERT_THROWS(String(invalid2), AssertionException);
+    ASSERT_THROWS(String(invalid3), AssertionException);
+    ASSERT_THROWS(String(invalid4), AssertionException);
 
     StackBufBuilder buf;
 

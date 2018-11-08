@@ -51,7 +51,7 @@ TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
 }
 
 TEST(InternalSchemaFmodMatchExpression, ZeroDivisor) {
-    ASSERT_THROWS_CODE(InternalSchemaFmodMatchExpression fmod("", Decimal128(0), Decimal128(1)),
+    ASSERT_THROWS_CODE(InternalSchemaFmodMatchExpression("", Decimal128(0), Decimal128(1)),
                        AssertionException,
                        ErrorCodes::BadValue);
 }

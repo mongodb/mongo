@@ -717,9 +717,8 @@ TEST(RegexMatchExpression, MatchesElementExact) {
 
 TEST(RegexMatchExpression, TooLargePattern) {
     string tooLargePattern(50 * 1000, 'z');
-    ASSERT_THROWS_CODE(RegexMatchExpression regex("a", tooLargePattern, ""),
-                       AssertionException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        RegexMatchExpression("a", tooLargePattern, ""), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST(RegexMatchExpression, MatchesElementSimplePrefix) {
@@ -921,28 +920,28 @@ TEST(RegexMatchExpression, Equality1) {
 TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
     {
         const auto embeddedNull = "a\0b"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", embeddedNull, ""),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", embeddedNull, ""),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
 
     {
         const auto singleNullByte = "\0"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", singleNullByte, ""),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", singleNullByte, ""),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
 
     {
         const auto leadingNullByte = "\0bbbb"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", leadingNullByte, ""),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", leadingNullByte, ""),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
 
     {
         const auto trailingNullByte = "bbbb\0"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", trailingNullByte, ""),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", trailingNullByte, ""),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
@@ -951,28 +950,28 @@ TEST(RegexMatchExpression, RegexCannotContainEmbeddedNullByte) {
 TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
     {
         const auto embeddedNull = "a\0b"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", "pattern", embeddedNull),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", embeddedNull),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
 
     {
         const auto singleNullByte = "\0"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", "pattern", singleNullByte),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", singleNullByte),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
 
     {
         const auto leadingNullByte = "\0bbbb"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", "pattern", leadingNullByte),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", leadingNullByte),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
 
     {
         const auto trailingNullByte = "bbbb\0"_sd;
-        ASSERT_THROWS_CODE(RegexMatchExpression regex("path", "pattern", trailingNullByte),
+        ASSERT_THROWS_CODE(RegexMatchExpression("path", "pattern", trailingNullByte),
                            AssertionException,
                            ErrorCodes::BadValue);
     }
@@ -1011,7 +1010,7 @@ TEST(ModMatchExpression, MatchesElement) {
 }
 
 TEST(ModMatchExpression, ZeroDivisor) {
-    ASSERT_THROWS_CODE(ModMatchExpression mod("", 0, 1), AssertionException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(ModMatchExpression("", 0, 1), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST(ModMatchExpression, MatchesScalar) {
