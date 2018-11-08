@@ -70,7 +70,7 @@ Status DuplicateKeyTracker::recordDuplicates(OperationContext* opCtx,
 
     for (auto&& key : keys) {
         BSONObjBuilder builder;
-        builder.appendNumber("_id", _idCounter++);
+        builder.append("_id", _idCounter++);
         builder.append(kKeyField, key);
 
         BSONObj obj = builder.obj();

@@ -80,7 +80,7 @@ public:
     }
 
 private:
-    std::uint64_t _idCounter;
+    std::int64_t _idCounter;
 
     const IndexCatalogEntry* _indexCatalogEntry;
     const NamespaceString _nss;
