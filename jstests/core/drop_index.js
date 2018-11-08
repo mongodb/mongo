@@ -1,23 +1,67 @@
 // Cannot implicitly shard accessed collections because of extra shard key index in sharded
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
+(function() {
+    'use strict';
 
-t = db.dropIndex;
-t.drop();
+    const t = db.drop_index;
+    t.drop();
 
-t.insert({_id: 1, a: 2, b: 3});
-assert.eq(1, t.getIndexes().length, "A1");
+    /**
+     * Extracts index names from listIndexes result.
+     */
+    function getIndexNames(cmdRes) {
+        return t.getIndexes().map(spec => spec.name);
+    }
 
-t.ensureIndex({a: 1});
-t.ensureIndex({b: 1});
-assert.eq(3, t.getIndexes().length, "A2");
+    /**
+     * Checks that collection contains the given list of non-id indexes and nothing else.
+     */
+    function assertIndexes(expectedIndexNames, msg) {
+        const actualIndexNames = getIndexNames();
+        const testMsgSuffix = () => msg + ': expected ' + tojson(expectedIndexNames) + ' but got ' +
+            tojson(actualIndexNames) + ' instead.';
+        assert.eq(expectedIndexNames.length + 1,
+                  actualIndexNames.length,
+                  'unexpected number of indexes after ' + testMsgSuffix());
+        assert(actualIndexNames.includes('_id_'),
+               '_id index missing after ' + msg + ': ' + tojson(actualIndexNames));
+        for (let expectedIndexName of expectedIndexNames) {
+            assert(actualIndexNames.includes(expectedIndexName),
+                   expectedIndexName + ' index missing after ' + testMsgSuffix());
+        }
+    }
 
-x = db._dbCommand({dropIndexes: t.getName(), index: t._genIndexName({a: 1})});
-assert.eq(2, t.getIndexes().length, "B1 " + tojson(x));
+    assert.writeOK(t.insert({_id: 1, a: 2, b: 3, c: 1, d: 1, e: 1}));
+    assertIndexes([], 'inserting test document');
 
-x = db._dbCommand({dropIndexes: t.getName(), index: {b: 1}});
-assert.eq(1, t.getIndexes().length, "B2");
+    assert.commandWorked(t.createIndex({a: 1}));
+    assert.commandWorked(t.createIndex({b: 1}));
+    assert.commandWorked(t.createIndex({c: 1}));
+    assert.commandWorked(t.createIndex({d: 1}));
+    assert.commandWorked(t.createIndex({e: 1}));
+    assertIndexes(['a_1', 'b_1', 'c_1', 'd_1', 'e_1'], 'creating indexes');
 
-// ensure you can recreate indexes, even if you don't use dropIndex method
-t.ensureIndex({a: 1});
-assert.eq(2, t.getIndexes().length);
+    // Drop single index by name.
+    // Collection.dropIndex() throws if the dropIndexes command fails.
+    t.dropIndex(t._genIndexName({a: 1}));
+    assertIndexes(['b_1', 'c_1', 'd_1', 'e_1'], 'dropping {a: 1} by name');
+
+    // Drop single index by key pattern.
+    t.dropIndex({b: 1});
+    assertIndexes(['c_1', 'd_1', 'e_1'], 'dropping {b: 1} by key pattern');
+
+    // Not allowed to drop _id index.
+    assert.commandFailedWithCode(t.dropIndex('_id_'), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(t.dropIndex({_id: 1}), ErrorCodes.InvalidOptions);
+
+    // Ensure you can recreate indexes, even if you don't use dropIndex method.
+    // Prior to SERVER-7168, the shell used to cache names of indexes created using
+    // Collection.ensureIndex().
+    assert.commandWorked(t.createIndex({a: 1}));
+    assertIndexes(['a_1', 'c_1', 'd_1', 'e_1'], 'recreating {a: 1}');
+
+    // Drop all indexes.
+    assert.commandWorked(t.dropIndexes());
+    assertIndexes([], 'dropping all indexes');
+}());
