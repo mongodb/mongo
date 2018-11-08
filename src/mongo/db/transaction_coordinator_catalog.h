@@ -57,14 +57,15 @@ public:
     virtual ~TransactionCoordinatorCatalog();
 
     /**
-     * Creates a coordinator, inserts it into the catalog, and returns the newly created
-     * coordinator.
+     * Inserts a coordinator into the catalog.
      *
-     * Note: Creating a duplicate coordinator for the given session id and transaction number
+     * Note: Inserting a duplicate coordinator for the given session id and transaction number
      * is not allowed and will lead to an invariant failure. Users of the catalog must ensure this
      * does not take place.
      */
-    std::shared_ptr<TransactionCoordinator> create(LogicalSessionId lsid, TxnNumber txnNumber);
+    void insert(LogicalSessionId lsid,
+                TxnNumber txnNumber,
+                std::shared_ptr<TransactionCoordinator> coordinator);
 
     /**
      * Returns the coordinator with the given session id and transaction number, if it exists. If it

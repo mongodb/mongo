@@ -32,7 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_catalog.h"
 
 #include "mongo/db/transaction_coordinator.h"
@@ -44,8 +43,9 @@ TransactionCoordinatorCatalog::TransactionCoordinatorCatalog() = default;
 
 TransactionCoordinatorCatalog::~TransactionCoordinatorCatalog() = default;
 
-std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::create(LogicalSessionId lsid,
-                                                                              TxnNumber txnNumber) {
+void TransactionCoordinatorCatalog::insert(LogicalSessionId lsid,
+                                           TxnNumber txnNumber,
+                                           std::shared_ptr<TransactionCoordinator> coordinator) {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -61,23 +61,18 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::create(Lo
               "Cannot insert a TransactionCoordinator into the TransactionCoordinatorCatalog with "
               "the same session ID and transaction number as a previous coordinator");
 
-    auto newCoordinator = std::make_shared<TransactionCoordinator>();
     // Schedule callback to remove coordinator from catalog when it either commits or aborts.
-    newCoordinator->waitForCompletion().getAsync([
+    coordinator->onCompletion().getAsync([
         catalogWeakPtr = std::weak_ptr<TransactionCoordinatorCatalog>(shared_from_this()),
         lsid,
         txnNumber
-    ](auto finalState) {
+    ](Status) {
         if (auto catalog = catalogWeakPtr.lock()) {
             catalog->remove(lsid, txnNumber);
         }
     });
-
-    _coordinatorsBySession[lsid][txnNumber] = newCoordinator;
-
-    return newCoordinator;
+    _coordinatorsBySession[lsid][txnNumber] = std::move(coordinator);
 }
-
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(LogicalSessionId lsid,
                                                                            TxnNumber txnNumber) {
 
@@ -121,8 +116,6 @@ TransactionCoordinatorCatalog::getLatestOnSession(LogicalSessionId lsid) {
 }
 
 void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnNumber) {
-    using CoordinatorState = TransactionCoordinator::StateMachine::State;
-
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
@@ -133,15 +126,6 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
 
         if (coordinatorForTxnIter != coordinatorsForSession.end()) {
             auto coordinator = coordinatorForTxnIter->second;
-            // TODO (SERVER-36304/37021): Reenable the below invariant once transaction participants
-            // are able to send votes and once we validate the state of the coordinator when a new
-            // transaction comes in for an existing session. For now, we're not validating the state
-            // of the coordinator which means it is possible that starting a new transaction before
-            // waiting for the previous one's coordinator to reach state committed or aborted will
-            // corrupt the previous transaction.
-
-            // invariant(coordinator->state() == CoordinatorState::kCommitted ||
-            //           coordinator->state() == CoordinatorState::kAborted);
             coordinatorsForSession.erase(coordinatorForTxnIter);
             if (coordinatorsForSession.size() == 0) {
                 _coordinatorsBySession.erase(coordinatorsForSessionIter);

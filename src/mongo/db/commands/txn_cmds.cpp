@@ -98,7 +98,7 @@ public:
             auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClient.setLastOpToSystemLastOpTime(opCtx);
             if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
-                uasserted(ErrorCodes::SocketException,
+                uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
 
@@ -118,7 +118,7 @@ public:
             txnParticipant->commitUnpreparedTransaction(opCtx);
         }
         if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
-            uasserted(ErrorCodes::SocketException,
+            uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");
         }
 
@@ -185,7 +185,7 @@ public:
             throw;
         }
         if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
-            uasserted(ErrorCodes::SocketException,
+            uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");
         }
 

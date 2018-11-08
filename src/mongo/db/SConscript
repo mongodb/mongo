@@ -725,9 +725,7 @@ env.CppUnitTest(
     target='transaction_two_phase_commit_test',
     source=[
         'transaction_coordinator_catalog_test.cpp',
-        'transaction_coordinator_participant_list_test.cpp',
         'transaction_coordinator_service_test.cpp',
-        'transaction_coordinator_state_machine_test.cpp',
         'transaction_coordinator_test.cpp',
     ],
     LIBDEPS=[

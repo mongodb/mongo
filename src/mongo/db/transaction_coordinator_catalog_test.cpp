@@ -56,7 +56,7 @@ public:
         // catalog). This has the added benefit of testing whether it's okay to destroy
         // the catalog while there are outstanding coordinators.
         for (auto& coordinator : _coordinatorsForTest) {
-            coordinator->recvTryAbort();
+            coordinator->cancelIfCommitNotYetStarted();
         }
         _coordinatorsForTest.clear();
     }
@@ -65,11 +65,12 @@ public:
         return *_coordinatorCatalog;
     }
 
-    std::shared_ptr<TransactionCoordinator> createCoordinatorInCatalog(LogicalSessionId lsid,
-                                                                       TxnNumber txnNumber) {
-        auto coordinator = coordinatorCatalog().create(lsid, txnNumber);
-        _coordinatorsForTest.push_back(coordinator);
-        return coordinator;
+    void createCoordinatorInCatalog(LogicalSessionId lsid, TxnNumber txnNumber) {
+        auto newCoordinator = std::make_shared<TransactionCoordinator>(
+            nullptr /* TaskExecutor */, nullptr /* ThreadPool */, lsid, txnNumber);
+
+        coordinatorCatalog().insert(lsid, txnNumber, newCoordinator);
+        _coordinatorsForTest.push_back(newCoordinator);
     }
 
 private:
@@ -108,8 +109,8 @@ TEST_F(TransactionCoordinatorCatalogTest, SecondCreateForSessionDoesNotOverwrite
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumber txnNumber1 = 1;
     TxnNumber txnNumber2 = 2;
-    auto coordinator1 = createCoordinatorInCatalog(lsid, txnNumber1);
-    auto coordinator2 = createCoordinatorInCatalog(lsid, txnNumber2);
+    createCoordinatorInCatalog(lsid, txnNumber1);
+    createCoordinatorInCatalog(lsid, txnNumber2);
 
     auto coordinator1InCatalog = coordinatorCatalog().get(lsid, txnNumber1);
     ASSERT(coordinator1InCatalog != nullptr);
@@ -142,41 +143,17 @@ TEST_F(TransactionCoordinatorCatalogTest,
     ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber);
 }
 
-// TODO (SERVER-XXXX): Re-enable once coordinators are also participants and decision recovery
-// works correctly.
-// TEST_F(TransactionCoordinatorCatalogTest,
-//        CoordinatorsRemoveThemselvesFromCatalogWhenTheyReachCommittedState) {
-//     using CoordinatorState = TransactionCoordinator::StateMachine::State;
-//
-//     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-//     TxnNumber txnNumber = 1;
-//     auto coordinator = createCoordinatorInCatalog(lsid, txnNumber);
-//
-//     coordinator->recvCoordinateCommit({ShardId("shard0000")});
-//     coordinator->recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
-//     coordinator->recvCommitAck(ShardId("shard0000"));
-//     ASSERT_EQ(coordinator->state(), CoordinatorState::kCommitted);
-//
-//     auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
-//     ASSERT_FALSE(latestTxnNumAndCoordinator);
-// }
+TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalogWhenTheyComplete) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+    createCoordinatorInCatalog(lsid, txnNumber);
+    auto coordinator = coordinatorCatalog().get(lsid, txnNumber);
+    coordinator->cancelIfCommitNotYetStarted();
+    ASSERT(coordinator->getState() == TransactionCoordinator::CoordinatorState::kDone);
 
-// TODO (SERVER-XXXX): Re-enable once coordinators are also participants and decision recovery
-// works correctly.
-// TEST_F(TransactionCoordinatorCatalogTest,
-//        CoordinatorsRemoveThemselvesFromCatalogWhenTheyReachAbortedState) {
-//     using CoordinatorState = TransactionCoordinator::StateMachine::State;
-//
-//     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-//     TxnNumber txnNumber = 1;
-//     auto coordinator = createCoordinatorInCatalog(lsid, txnNumber);
-//
-//     coordinator->recvVoteAbort(ShardId("shard0000"));
-//     ASSERT_EQ(coordinator->state(), CoordinatorState::kAborted);
-//
-//     auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
-//     ASSERT_FALSE(latestTxnNumAndCoordinator);
-// }
+    auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
+    ASSERT_FALSE(latestTxnNumAndCoordinator);
+}
 
 TEST_F(TransactionCoordinatorCatalogTest,
        TwoCreatesFollowedByGetLatestOnSessionReturnsCoordinatorWithHighestTxnNumber) {
@@ -189,20 +166,6 @@ TEST_F(TransactionCoordinatorCatalogTest,
 
     ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber2);
 }
-
-// TODO (SERVER-36304/37021): Reenable once transaction participants are able to send
-// votes and once we validate the state of the coordinator when a new transaction comes
-// in for an existing session. For now, we're not validating the state of the
-// coordinator which means it is possible that if we hit invalid behavior in testing
-// that this will result in hidden incorrect behavior.
-// DEATH_TEST_F(TransactionCoordinatorCatalogTest,
-//              RemovingACoordinatorNotInCommittedOrAbortedStateFails,
-//              "Invariant failure") {
-//     LogicalSessionId lsid = makeLogicalSessionIdForTest();
-//     TxnNumber txnNumber = 1;
-//     coordinatorCatalog().create(lsid, txnNumber);
-//     coordinatorCatalog().remove(lsid, txnNumber);
-// }
 
 }  // namespace
 }  // namespace mongo

@@ -128,7 +128,7 @@ public:
 
                 if (MONGO_FAIL_POINT(
                         participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {
-                    uasserted(ErrorCodes::SocketException,
+                    uasserted(ErrorCodes::HostUnreachable,
                               "returning network error because failpoint is on");
                 }
                 return PrepareTimestamp(prepareOpTime.getTimestamp());
@@ -137,7 +137,7 @@ public:
             const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx, {});
             if (MONGO_FAIL_POINT(
                     participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {
-                uasserted(ErrorCodes::SocketException,
+                uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
             return PrepareTimestamp(std::move(prepareTimestamp));

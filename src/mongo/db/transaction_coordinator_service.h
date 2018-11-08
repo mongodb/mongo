@@ -95,11 +95,15 @@ public:
      */
     boost::optional<Future<TransactionCoordinator::CommitDecision>> recoverCommit(
         OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
+    /*
+     * TESTING ONLY
+     */
+    void setThreadPool(std::unique_ptr<ThreadPool> pool);
 
 private:
     std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
 
-    ThreadPool _threadPool;
+    std::unique_ptr<ThreadPool> _threadPool;
 };
 
 }  // namespace mongo
