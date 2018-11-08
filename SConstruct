@@ -521,9 +521,9 @@ add_option('git-decider',
     type="choice",
 )
 
-add_option('android-toolchain-path',
+add_option('toolchain-root',
     default=None,
-    help="Android NDK standalone toolchain path. Required when using --variables-files=etc/scons/android_ndk.vars",
+    help="Names a toolchain root for use with toolchain selection Variables files in etc/scons",
 )
 
 add_option('msvc-debugging-format',
