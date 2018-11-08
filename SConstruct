@@ -143,8 +143,12 @@ add_option('disable-minimum-compiler-version-enforcement',
 )
 
 add_option('ssl',
-    help='Enable SSL',
-    nargs=0
+    help='Enable or Disable SSL',
+    choices=['on', 'off'],
+    default='on',
+    const='on',
+    nargs='?',
+    type='choice',
 )
 
 add_option('ssl-provider',
@@ -3111,8 +3115,11 @@ def doConfigure(myenv):
                 'Security',
             ])
 
+    # We require ssl by default unless the user has specified --ssl=off
+    require_ssl = get_option("ssl") != "off"
+
     if ssl_provider == 'openssl':
-        if has_option("ssl"):
+        if require_ssl:
             checkOpenSSL(conf)
             # Working OpenSSL available, use it.
             env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
@@ -3122,7 +3129,7 @@ def doConfigure(myenv):
             # If we don't need an SSL build, we can get by with TomCrypt.
             conf.env.Append( MONGO_CRYPTO=["tom"] )
 
-    if has_option( "ssl" ):
+    if require_ssl:
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")

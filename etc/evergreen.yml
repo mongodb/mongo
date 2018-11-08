@@ -3832,6 +3832,7 @@ tasks:
           --dbg=off
           --opt=size
           --enable-free-mon=off
+          --ssl=off
           --enable-http-client=off
           --use-system-mongo-c=on
           --wiredtiger=off
@@ -8506,7 +8507,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --ssl=off --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
