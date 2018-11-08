@@ -1,5 +1,7 @@
 /**
  * Test that initial sync works without error when the sync source has an oplog hole.
+ *
+ * @tags: [requires_document_locking]
  */
 (function() {
     "use strict";
