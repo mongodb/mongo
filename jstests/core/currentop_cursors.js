@@ -79,7 +79,10 @@
                 assert(result[0].lsid.hasOwnProperty('id'), result);
                 assert(result[0].lsid.hasOwnProperty('uid'), result);
             }
-            assert.eq(result[0].host, getHostName(), result);
+            const uri = new MongoURI(db.getMongo().host);
+            assert(uri.servers.some((server) => {
+                return result[0].host == getHostName() + ":" + server.port;
+            }));
             const idleCursor = result[0].cursor;
             assert.eq(idleCursor.nDocsReturned, 2, result);
             assert.eq(idleCursor.nBatchesReturned, 1, result);

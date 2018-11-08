@@ -87,7 +87,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
             auto ns = cursor.getNs();
             auto lsid = cursor.getLsid();
             cursorObj.append("type", "idleCursor");
-            cursorObj.append("host", getHostNameCached());
+            cursorObj.append("host", getHostNameCachedAndPort());
             cursorObj.append("ns", ns->toString());
             // If in legacy read mode, lsid is not present.
             if (lsid) {
