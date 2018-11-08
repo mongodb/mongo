@@ -15561,3 +15561,42 @@ buildvariants:
   stepback: false
   tasks:
   - name: shared_scons_cache_pruning
+
+- name: enterprise-ubuntu1804-64-v3-toolchain-canary-debug
+  display_name: Enterprise Ubuntu 18.04 (Toolchain V3 Canary Builder) DEBUG
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-test
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --dbg=on
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
+    tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+    has_packages: false
+  display_tasks:
+  - *dbtest
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+  - name: audit
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: sasl
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
