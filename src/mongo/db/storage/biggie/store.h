@@ -460,6 +460,10 @@ public:
         return other_iter == other.end();
     }
 
+    bool operator!=(const RadixStore& other) const {
+        return !(*this == other);
+    }
+
     // Capacity
     bool empty() const {
         return _root->_numSubtreeElems == 0;

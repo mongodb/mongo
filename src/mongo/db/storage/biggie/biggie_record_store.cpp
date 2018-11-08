@@ -177,11 +177,10 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
         workingCopy->insert(StringStore::value_type{
             createKey(_ident, thisRecordId), std::string(record.data.data(), record.data.size())});
         record.id = RecordId(thisRecordId);
+        RecoveryUnit::get(opCtx)->makeDirty();
     }
 
     cappedDeleteAsNeeded(opCtx, workingCopy);
-    RecoveryUnit::get(opCtx)->makeDirty();
-
     return Status::OK();
 }
 
@@ -210,11 +209,10 @@ Status RecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
         workingCopy->insert(std::move(vt));
         if (idsOut)
             idsOut[i] = RecordId(thisRecordId);
+        RecoveryUnit::get(opCtx)->makeDirty();
     }
 
     cappedDeleteAsNeeded(opCtx, workingCopy);
-    RecoveryUnit::get(opCtx)->makeDirty();
-
     return Status::OK();
 }
 
@@ -268,8 +266,9 @@ Status RecordStore::truncate(OperationContext* opCtx) {
             numErased += workingCopy->erase(key);
         }
         invariant(numErased == toDelete.size());
+        RecoveryUnit::get(opCtx)->makeDirty();
     }
-    RecoveryUnit::get(opCtx)->makeDirty();
+
     return Status::OK();
 }
 
@@ -295,9 +294,9 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
         // Don't need to increment the iterator because the iterator gets revalidated and placed
         // on the next item after the erase.
         workingCopy->erase(recordIt->first);
+        RecoveryUnit::get(opCtx)->makeDirty();
     }
 
-    RecoveryUnit::get(opCtx)->makeDirty();
     wuow.commit();
 }
 
@@ -394,9 +393,8 @@ void RecordStore::cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* wor
         // Don't need to increment the iterator because the iterator gets revalidated and placed
         // on the next item after the erase.
         workingCopy->erase(recordIt->first);
+        RecoveryUnit::get(opCtx)->makeDirty();
     }
-
-    RecoveryUnit::get(opCtx)->makeDirty();
 }
 
 RecordStore::Cursor::Cursor(OperationContext* opCtx, const RecordStore& rs) : opCtx(opCtx) {

@@ -343,6 +343,8 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
                                   bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string removeKeyString;
+    size_t numErased = 0;
+
     if (_isUnique) {
         // For unique indexes, to unindex them we do the following:
         //   - Create the KeyString with or without the RecordId in it depending on dupsAllowed
@@ -351,7 +353,6 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
         //     - If the index entry was not removed, we generate a KeyString with or without the
         //       RecordId in it.
         // This is required because of the way we insert on unique indexes when dups are allowed.
-        size_t numErased = 0;
         if (dupsAllowed)
             removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
         else
@@ -366,14 +367,15 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
                 removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ true);
             else
                 removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
-            workingCopy->erase(removeKeyString);
+            numErased = workingCopy->erase(removeKeyString);
         }
     } else {
         removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
-        workingCopy->erase(removeKeyString);
+        numErased = workingCopy->erase(removeKeyString);
     }
 
-    RecoveryUnit::get(opCtx)->makeDirty();
+    if (numErased >= 1)
+        RecoveryUnit::get(opCtx)->makeDirty();
 }
 
 // This function is, as of now, not in the interface, but there exists a server ticket to add
@@ -386,11 +388,11 @@ Status SortedDataInterface::truncate(OperationContext* opCtx) {
         toDelete.push_back(it->first);
     }
     if (!toDelete.empty()) {
-        for (const auto& key : toDelete) {
+        for (const auto& key : toDelete)
             workingCopy->erase(key);
-        }
+        RecoveryUnit::get(opCtx)->makeDirty();
     }
-    RecoveryUnit::get(opCtx)->makeDirty();
+
     return Status::OK();
 }
 

@@ -75,6 +75,11 @@ void RecoveryUnit::commitUnitOfWork() {
         }
         _forked = false;
         _dirty = false;
+    } else if (_forked) {
+        DEV {
+            std::pair<uint64_t, StringStore> masterInfo = _KVEngine->getMasterInfo();
+            invariant(masterInfo.second == _workingCopy);
+        }
     }
 
     _inUnitOfWork = false;
