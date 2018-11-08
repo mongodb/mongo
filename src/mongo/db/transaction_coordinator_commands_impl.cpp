@@ -136,50 +136,6 @@ void sendCommandToShards(OperationContext* opCtx,
     LOG(3) << "Coordinator shard sending " << commandObj << " to " << ss.str();
 }
 
-void driveCoordinatorUntilDone(OperationContext* opCtx,
-                               std::shared_ptr<TransactionCoordinator> coordinator,
-                               const LogicalSessionId& lsid,
-                               const TxnNumber& txnNumber,
-                               Action action) {
-    while (true) {
-        switch (action) {
-            case Action::kWriteParticipantList:
-                action = coordinator->madeParticipantListDurable();
-                break;
-            case Action::kSendPrepare:
-                action = txn::sendPrepare(
-                    opCtx, lsid, txnNumber, coordinator, coordinator->getParticipants());
-                break;
-            case Action::kWriteAbortDecision:
-                action = coordinator->madeAbortDecisionDurable();
-                break;
-            case Action::kSendAbort:
-                action = txn::sendAbort(opCtx,
-                                        lsid,
-                                        txnNumber,
-                                        coordinator,
-                                        coordinator->getNonVotedAbortParticipants());
-                break;
-            case Action::kWriteCommitDecision:
-                action = coordinator->madeCommitDecisionDurable();
-                break;
-            case Action::kSendCommit:
-                action = txn::sendCommit(opCtx,
-                                         lsid,
-                                         txnNumber,
-                                         coordinator,
-                                         coordinator->getNonAckedCommitParticipants(),
-                                         coordinator->getCommitTimestamp().get());
-                break;
-            case Action::kDone:
-                return;
-            case Action::kNone:
-                // This means an event was delivered to the coordinator outside the expected order
-                // of events.
-                MONGO_UNREACHABLE;
-        }
-    }
-}
 }  // namespace
 
 namespace txn {
@@ -313,23 +269,6 @@ Action sendAbort(OperationContext* opCtx,
     };
     sendCommandToShards(opCtx, nonVotedAbortParticipants, abortObj, abortCallback);
     return actionNotification->get(opCtx);
-}
-
-
-void launchCoordinateCommitTask(ThreadPool& threadPool,
-                                std::shared_ptr<TransactionCoordinator> coordinator,
-                                const LogicalSessionId& lsid,
-                                const TxnNumber& txnNumber,
-                                TransactionCoordinator::StateMachine::Action initialAction) {
-    auto ch = threadPool.schedule([coordinator, lsid, txnNumber, initialAction]() {
-        try {
-            // The opCtx destructor handles unsetting itself from the Client
-            auto opCtx = Client::getCurrent()->makeOperationContext();
-            driveCoordinatorUntilDone(opCtx.get(), coordinator, lsid, txnNumber, initialAction);
-        } catch (const DBException& e) {
-            log() << "Exception was thrown while coordinating commit: " << causedBy(e.toStatus());
-        }
-    });
 }
 
 }  // namespace txn

@@ -40,12 +40,6 @@ class ThreadPool;
 
 namespace txn {
 
-void launchCoordinateCommitTask(ThreadPool& threadPool,
-                                std::shared_ptr<TransactionCoordinator> coordinator,
-                                const LogicalSessionId& lsid,
-                                const TxnNumber& txnNumber,
-                                TransactionCoordinator::StateMachine::Action initialAction);
-
 /**
  * Schedules prepare to be sent asynchronously to all participants and blocks on being signaled that
  * a voteAbort or the final voteCommit has been received.
