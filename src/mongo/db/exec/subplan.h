@@ -128,9 +128,9 @@ public:
     }
 
 protected:
-    void saveState(RequiresCollTag) final {}
+    void doSaveStateRequiresCollection() final {}
 
-    void restoreState(RequiresCollTag) final {}
+    void doRestoreStateRequiresCollection() final {}
 
 private:
     /**

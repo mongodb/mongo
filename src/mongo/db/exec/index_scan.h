@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -45,49 +45,35 @@ namespace mongo {
 class WorkingSet;
 
 struct IndexScanParams {
-    IndexScanParams(const IndexDescriptor& descriptor,
+    IndexScanParams(const IndexDescriptor* descriptor,
                     std::string indexName,
                     BSONObj keyPattern,
                     MultikeyPaths multikeyPaths,
                     bool multikey)
-        : accessMethod(descriptor.getIndexCatalog()->getIndex(&descriptor)),
+        : indexDescriptor(descriptor),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
-          isMultiKey(multikey),
-          isSparse(descriptor.isSparse()),
-          isUnique(descriptor.unique()),
-          isPartial(descriptor.isPartial()),
-          version(descriptor.version()),
-          collation(descriptor.infoObj()
-                        .getObjectField(IndexDescriptor::kCollationFieldName)
-                        .getOwned()) {
-        invariant(accessMethod);
-    }
+          isMultiKey(multikey) {}
 
-    IndexScanParams(OperationContext* opCtx, const IndexDescriptor& descriptor)
+    IndexScanParams(OperationContext* opCtx, const IndexDescriptor* descriptor)
         : IndexScanParams(descriptor,
-                          descriptor.indexName(),
-                          descriptor.keyPattern(),
-                          descriptor.getMultikeyPaths(opCtx),
-                          descriptor.isMultikey(opCtx)) {}
+                          descriptor->indexName(),
+                          descriptor->keyPattern(),
+                          descriptor->getMultikeyPaths(opCtx),
+                          descriptor->isMultikey(opCtx)) {}
 
-    const IndexAccessMethod* accessMethod;
+    const IndexDescriptor* indexDescriptor;
+
     std::string name;
 
     BSONObj keyPattern;
-    IndexBounds bounds;
 
     MultikeyPaths multikeyPaths;
+
     bool isMultiKey;
 
-    bool isSparse;
-    bool isUnique;
-    bool isPartial;
-
-    IndexDescriptor::IndexVersion version;
-
-    BSONObj collation;
+    IndexBounds bounds;
 
     int direction{1};
 
@@ -103,7 +89,7 @@ struct IndexScanParams {
  *
  * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
  */
-class IndexScan final : public PlanStage {
+class IndexScan final : public RequiresIndexStage {
 public:
     /**
      * Keeps track of what this index scan is currently doing so that it
@@ -130,8 +116,6 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -145,6 +129,11 @@ public:
 
     static const char* kStageType;
 
+protected:
+    void doSaveStateRequiresIndex() final;
+
+    void doRestoreStateRequiresIndex() final;
+
 private:
     /**
      * Initialize the underlying index Cursor, returning first result if any.
@@ -154,27 +143,32 @@ private:
     // The WorkingSet we fill with results.  Not owned by us.
     WorkingSet* const _workingSet;
 
-    // Index access.
-    const IndexAccessMethod* const _iam;  // owned by Collection -> IndexCatalog
     std::unique_ptr<SortedDataInterface::Cursor> _indexCursor;
     const BSONObj _keyPattern;
 
-    // Keeps track of what work we need to do next.
-    ScanState _scanState;
+    const IndexBounds _bounds;
 
     // Contains expressions only over fields in the index key.  We assume this is built
     // correctly by whomever creates this class.
     // The filter is not owned by us.
     const MatchExpression* const _filter;
 
-    // Could our index have duplicates?  If so, we use _returned to dedup.
-    stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
-
+    const int _direction;
     const bool _forward;
-    const IndexScanParams _params;
+
+    const bool _shouldDedup;
+
+    // Do we want to add the key as metadata?
+    const bool _addKeyMetadata;
 
     // Stats
     IndexScanStats _specificStats;
+
+    // Keeps track of what work we need to do next.
+    ScanState _scanState = ScanState::INITIALIZING;
+
+    // Could our index have duplicates?  If so, we use _returned to dedup.
+    stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
 
     //
     // This class employs one of two different algorithms for determining when the index scan

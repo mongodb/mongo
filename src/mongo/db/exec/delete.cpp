@@ -258,7 +258,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     return PlanStage::NEED_TIME;
 }
 
-void DeleteStage::restoreState(RequiresCollTag) {
+void DeleteStage::doRestoreStateRequiresCollection() {
     const NamespaceString& ns = collection()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),

@@ -103,7 +103,7 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
     // Get all the index scans for each term in our query.
     std::vector<std::unique_ptr<PlanStage>> indexScanList;
     for (const auto& term : _params.query.getTermsForBounds()) {
-        IndexScanParams ixparams(opCtx, *_params.index);
+        IndexScanParams ixparams(opCtx, _params.index);
         ixparams.bounds.startKey = FTSIndexFormat::getIndexKey(
             MAX_WEIGHT, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
         ixparams.bounds.endKey = FTSIndexFormat::getIndexKey(

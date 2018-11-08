@@ -132,13 +132,13 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
     return status;
 }
 
-void FetchStage::saveState(RequiresCollTag) {
+void FetchStage::doSaveStateRequiresCollection() {
     if (_cursor) {
         _cursor->saveUnpositioned();
     }
 }
 
-void FetchStage::restoreState(RequiresCollTag) {
+void FetchStage::doRestoreStateRequiresCollection() {
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
         uassert(50982, "could not restore cursor for FETCH stage", couldRestore);

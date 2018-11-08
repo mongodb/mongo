@@ -143,7 +143,7 @@ public:
                                                                       int end) {
         // Build the index scan stage.
         auto descriptor = getIndex(db, indexSpec);
-        IndexScanParams ixparams(&_opCtx, *descriptor);
+        IndexScanParams ixparams(&_opCtx, descriptor);
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << start);
         ixparams.bounds.endKey = BSON("" << end);

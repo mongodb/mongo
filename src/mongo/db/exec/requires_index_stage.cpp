@@ -29,34 +29,36 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/requires_collection_stage.h"
-
-#include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/exec/requires_index_stage.h"
 
 namespace mongo {
 
-template <typename CollectionT>
-void RequiresCollectionStageBase<CollectionT>::doSaveState() {
-    doSaveStateRequiresCollection();
+void RequiresIndexStage::doSaveStateRequiresCollection() {
+    doSaveStateRequiresIndex();
 
-    // A stage may not access storage while in a saved state.
-    _collection = nullptr;
+    // During yield, we relinquish our shared ownership of the index catalog entry. This allows the
+    // index to be dropped during yield, but permits us to check via the weak_ptr interface
+    // whether the index is still valid on yield recovery.
+    //
+    // We also set catalog pointers to null, since accessing these pointers is illegal during yield.
+    _indexCatalogEntry.reset();
+    _indexDescriptor = nullptr;
+    _indexAccessMethod = nullptr;
 }
 
-template <typename CollectionT>
-void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
-    invariant(!_collection);
-
-    const UUIDCatalog& catalog = UUIDCatalog::get(getOpCtx());
-    _collection = catalog.lookupCollectionByUUID(_collectionUUID);
+void RequiresIndexStage::doRestoreStateRequiresCollection() {
+    // Reacquire shared ownership of the index catalog entry. If we're unable to do so, then the
+    // our index is no longer valid, and the query should die.
+    _indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "UUID " << _collectionUUID << " no longer exists.",
-            _collection);
+            str::stream() << "query plan killed :: index named '" << _indexName
+                          << "' is no longer valid",
+            _indexCatalogEntry);
 
-    doRestoreStateRequiresCollection();
+    _indexDescriptor = _indexCatalogEntry->descriptor();
+    _indexAccessMethod = _indexCatalogEntry->accessMethod();
+
+    doRestoreStateRequiresIndex();
 }
-
-template class RequiresCollectionStageBase<const Collection*>;
-template class RequiresCollectionStageBase<Collection*>;
 
 }  // namespace mongo

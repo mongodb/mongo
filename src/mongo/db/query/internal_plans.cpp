@@ -207,7 +207,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* opCtx,
     invariant(collection);
     invariant(descriptor);
 
-    IndexScanParams params(opCtx, *descriptor);
+    IndexScanParams params(opCtx, descriptor);
     params.direction = direction;
     params.bounds.isSimpleRange = true;
     params.bounds.startKey = startKey;

@@ -692,7 +692,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     return status;
 }
 
-void UpdateStage::restoreState(RequiresCollTag) {
+void UpdateStage::doRestoreStateRequiresCollection() {
     const UpdateRequest& request = *_params.request;
     const NamespaceString& nsString(request.getNamespaceString());
 

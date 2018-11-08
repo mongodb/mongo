@@ -98,7 +98,7 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
-            IndexScanParams params{*descriptor,
+            IndexScanParams params{descriptor,
                                    ixn->index.identifier.catalogName,
                                    ixn->index.keyPattern,
                                    ixn->index.multikeyPaths,

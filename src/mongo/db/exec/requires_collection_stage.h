@@ -41,7 +41,7 @@ namespace mongo {
  * for checking that the collection is still valid (e.g. has not been dropped) when recovering from
  * yield.
  *
- * Subclasses must implement the saveStage() and restoreState() variants tagged with RequiresCollTag
+ * Subclasses must implement doSaveStateRequiresCollection() and doRestoreStateRequiresCollection()
  * in order to supply custom yield preparation or yield recovery logic.
  *
  * Templated on 'CollectionT', which may be instantiated using either Collection* or const
@@ -63,8 +63,6 @@ public:
     virtual ~RequiresCollectionStageBase() = default;
 
 protected:
-    struct RequiresCollTag {};
-
     void doSaveState() final;
 
     void doRestoreState() final;
@@ -72,12 +70,12 @@ protected:
     /**
      * Performs yield preparation specific to a stage which subclasses from RequiresCollectionStage.
      */
-    virtual void saveState(RequiresCollTag) = 0;
+    virtual void doSaveStateRequiresCollection() = 0;
 
     /**
      * Performs yield recovery specific to a stage which subclasses from RequiresCollectionStage.
      */
-    virtual void restoreState(RequiresCollTag) = 0;
+    virtual void doRestoreStateRequiresCollection() = 0;
 
     CollectionT collection() const {
         return _collection;

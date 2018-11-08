@@ -116,9 +116,9 @@ public:
     static long long getNumDeleted(const PlanExecutor& exec);
 
 protected:
-    void saveState(RequiresCollTag) final {}
+    void doSaveStateRequiresCollection() final {}
 
-    void restoreState(RequiresCollTag) final;
+    void doRestoreStateRequiresCollection() final;
 
 private:
     /**

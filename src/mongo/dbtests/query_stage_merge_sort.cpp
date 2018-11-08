@@ -80,7 +80,7 @@ public:
 
     IndexScanParams makeIndexScanParams(OperationContext* opCtx,
                                         const IndexDescriptor* descriptor) {
-        IndexScanParams params(opCtx, *descriptor);
+        IndexScanParams params(opCtx, descriptor);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = objWithMinKey(1);
         params.bounds.endKey = objWithMaxKey(1);

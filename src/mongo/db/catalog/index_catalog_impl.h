@@ -162,8 +162,9 @@ public:
     const IndexDescriptor* refreshEntry(OperationContext* opCtx,
                                         const IndexDescriptor* oldDesc) override;
 
-    // never returns NULL
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
+
+    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
     IndexAccessMethod* getIndex(const IndexDescriptor* desc) override;
     const IndexAccessMethod* getIndex(const IndexDescriptor* desc) const override;

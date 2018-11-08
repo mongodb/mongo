@@ -103,7 +103,7 @@ public:
         ASSERT_EQ(indexes.size(), 1U);
 
         // We are not testing indexing here so use maximal bounds
-        IndexScanParams params(&_opCtx, *indexes[0]);
+        IndexScanParams params(&_opCtx, indexes[0]);
         params.bounds.isSimpleRange = true;
         params.bounds.startKey = startKey;
         params.bounds.endKey = endKey;
@@ -125,7 +125,7 @@ public:
         catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
-        IndexScanParams params(&_opCtx, *indexes[0]);
+        IndexScanParams params(&_opCtx, indexes[0]);
         params.direction = direction;
 
         OrderedIntervalList oil("x");
@@ -197,10 +197,10 @@ public:
         ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         // Save state and insert a few indexed docs.
-        ixscan->saveState();
+        static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
         insert(fromjson("{_id: 5, x: 11}"));
-        ixscan->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState();
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
@@ -231,9 +231,9 @@ public:
         ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         // Save state and insert an indexed doc.
-        ixscan->saveState();
+        static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 7}"));
-        ixscan->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState();
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
@@ -264,9 +264,9 @@ public:
         ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
 
         // Save state and insert an indexed doc.
-        ixscan->saveState();
+        static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
-        ixscan->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState();
 
         // Ensure that we're EOF and we don't erroneously return {'': 12}.
         WorkingSetID id;
@@ -297,10 +297,10 @@ public:
         ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 8));
 
         // Save state and insert an indexed doc.
-        ixscan->saveState();
+        static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 6}"));
         insert(fromjson("{_id: 5, x: 9}"));
-        ixscan->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState();
 
         // Ensure that we don't erroneously return {'': 9} or {'':3}.
         member = getNext(ixscan.get());

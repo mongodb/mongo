@@ -63,6 +63,16 @@ IndexCatalogEntry* IndexCatalogEntryContainer::find(const IndexDescriptor* desc)
     return nullptr;
 }
 
+std::shared_ptr<IndexCatalogEntry> IndexCatalogEntryContainer::findShared(
+    const IndexDescriptor* desc) const {
+    for (auto&& entry : _entries) {
+        if (entry->descriptor() == desc) {
+            return entry;
+        }
+    }
+    return {};
+}
+
 IndexCatalogEntry* IndexCatalogEntryContainer::find(const std::string& name) {
     for (iterator i = begin(); i != end(); ++i) {
         IndexCatalogEntry* e = i->get();
@@ -72,11 +82,12 @@ IndexCatalogEntry* IndexCatalogEntryContainer::find(const std::string& name) {
     return nullptr;
 }
 
-IndexCatalogEntry* IndexCatalogEntryContainer::release(const IndexDescriptor* desc) {
+std::shared_ptr<IndexCatalogEntry> IndexCatalogEntryContainer::release(
+    const IndexDescriptor* desc) {
     for (auto i = _entries.begin(); i != _entries.end(); ++i) {
         if ((*i)->descriptor() != desc)
             continue;
-        IndexCatalogEntry* e = i->release();
+        auto e = std::move(*i);
         _entries.erase(i);
         return e;
     }

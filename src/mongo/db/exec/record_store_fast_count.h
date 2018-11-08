@@ -64,9 +64,9 @@ public:
     }
 
 protected:
-    void saveState(RequiresCollTag) override {}
+    void doSaveStateRequiresCollection() override {}
 
-    void restoreState(RequiresCollTag) override {}
+    void doRestoreStateRequiresCollection() override {}
 
 private:
     long long _skip = 0;

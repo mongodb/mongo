@@ -84,13 +84,13 @@ bool MultiIteratorStage::isEOF() {
     return _iterators.empty();
 }
 
-void MultiIteratorStage::saveState(RequiresCollTag) {
+void MultiIteratorStage::doSaveStateRequiresCollection() {
     for (auto&& iterator : _iterators) {
         iterator->save();
     }
 }
 
-void MultiIteratorStage::restoreState(RequiresCollTag) {
+void MultiIteratorStage::doRestoreStateRequiresCollection() {
     for (auto&& iterator : _iterators) {
         const bool couldRestore = iterator->restore();
         uassert(50991, "could not restore cursor for MULTI_ITERATOR stage", couldRestore);

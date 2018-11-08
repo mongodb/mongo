@@ -280,9 +280,17 @@ public:
                                                 const IndexDescriptor* const oldDesc) = 0;
 
     /**
-     * Never returns nullptr.
+     * Returns a pointer to the index catalog entry associated with 'desc'. Throws if there is no
+     * such index. Never returns nullptr.
      */
     virtual const IndexCatalogEntry* getEntry(const IndexDescriptor* const desc) const = 0;
+
+    /**
+     * Returns a pointer to the index catalog entry associated with 'desc', where the caller assumes
+     * shared ownership of the entry. Returns null if the entry does not exist.
+     */
+    virtual std::shared_ptr<const IndexCatalogEntry> getEntryShared(
+        const IndexDescriptor*) const = 0;
 
     virtual IndexAccessMethod* getIndex(const IndexDescriptor* const desc) = 0;
 

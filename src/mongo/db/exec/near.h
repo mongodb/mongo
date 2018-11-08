@@ -145,9 +145,9 @@ protected:
                                   WorkingSet* workingSet,
                                   WorkingSetID* out) = 0;
 
-    void saveState(RequiresCollTag) final {}
+    void doSaveStateRequiresCollection() final {}
 
-    void restoreState(RequiresCollTag) final {}
+    void doRestoreStateRequiresCollection() final {}
 
     // Filled in by subclasses.
     NearStats _specificStats;

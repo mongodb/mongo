@@ -211,13 +211,13 @@ bool CollectionScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void CollectionScan::saveState(RequiresCollTag) {
+void CollectionScan::doSaveStateRequiresCollection() {
     if (_cursor) {
         _cursor->save();
     }
 }
 
-void CollectionScan::restoreState(RequiresCollTag) {
+void CollectionScan::doRestoreStateRequiresCollection() {
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
         uassert(ErrorCodes::CappedPositionLost,

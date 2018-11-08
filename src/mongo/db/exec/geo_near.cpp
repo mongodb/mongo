@@ -316,7 +316,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
                                                       WorkingSet* workingSet) {
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
-    IndexScanParams scanParams(opCtx, *_twoDIndex);
+    IndexScanParams scanParams(opCtx, _twoDIndex);
     scanParams.bounds = _nearParams->baseBounds;
 
     // The "2d" field is always the first in the index
@@ -684,7 +684,7 @@ StatusWith<NearStage::CoveredInterval*>  //
 
     // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
     // This is handled in query planning.
-    IndexScanParams scanParams(opCtx, *_twoDIndex);
+    IndexScanParams scanParams(opCtx, _twoDIndex);
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;
@@ -874,7 +874,7 @@ private:
 // Setup the index scan stage for neighbors at this level.
 void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
                                                             WorkingSet* workingSet) {
-    IndexScanParams scanParams(opCtx, *_s2Index);
+    IndexScanParams scanParams(opCtx, _s2Index);
     scanParams.bounds = _nearParams->baseBounds;
 
     // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
@@ -1044,7 +1044,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     // Setup the covering region and stages for this interval
     //
 
-    IndexScanParams scanParams(opCtx, *_s2Index);
+    IndexScanParams scanParams(opCtx, _s2Index);
 
     // This does force us to do our own deduping of results.
     scanParams.bounds = _nearParams.baseBounds;

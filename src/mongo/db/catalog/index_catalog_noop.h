@@ -115,6 +115,10 @@ public:
         return nullptr;
     }
 
+    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override {
+        return nullptr;
+    }
+
     IndexAccessMethod* getIndex(const IndexDescriptor* const desc) override {
         return nullptr;
     }

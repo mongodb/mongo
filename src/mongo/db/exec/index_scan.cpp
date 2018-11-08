@@ -65,38 +65,41 @@ IndexScan::IndexScan(OperationContext* opCtx,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : PlanStage(kStageType, opCtx),
+    : RequiresIndexStage(kStageType, opCtx, params.indexDescriptor),
       _workingSet(workingSet),
-      _iam(params.accessMethod),
       _keyPattern(params.keyPattern.getOwned()),
-      _scanState(INITIALIZING),
+      _bounds(std::move(params.bounds)),
       _filter(filter),
+      _direction(params.direction),
       _forward(params.direction == 1),
-      _params(std::move(params)),
-      _startKeyInclusive(IndexBounds::isStartIncludedInBound(_params.bounds.boundInclusion)),
-      _endKeyInclusive(IndexBounds::isEndIncludedInBound(_params.bounds.boundInclusion)) {
-    _specificStats.indexName = _params.name;
+      _shouldDedup(params.shouldDedup),
+      _addKeyMetadata(params.addKeyMetadata),
+      _startKeyInclusive(IndexBounds::isStartIncludedInBound(params.bounds.boundInclusion)),
+      _endKeyInclusive(IndexBounds::isEndIncludedInBound(params.bounds.boundInclusion)) {
+    _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
-    _specificStats.isMultiKey = _params.isMultiKey;
-    _specificStats.multiKeyPaths = _params.multikeyPaths;
-    _specificStats.isUnique = _params.isUnique;
-    _specificStats.isSparse = _params.isSparse;
-    _specificStats.isPartial = _params.isPartial;
-    _specificStats.indexVersion = static_cast<int>(_params.version);
-    _specificStats.collation = _params.collation.getOwned();
+    _specificStats.isMultiKey = params.isMultiKey;
+    _specificStats.multiKeyPaths = params.multikeyPaths;
+    _specificStats.isUnique = params.indexDescriptor->unique();
+    _specificStats.isSparse = params.indexDescriptor->isSparse();
+    _specificStats.isPartial = params.indexDescriptor->isPartial();
+    _specificStats.indexVersion = static_cast<int>(params.indexDescriptor->version());
+    _specificStats.collation = params.indexDescriptor->infoObj()
+                                   .getObjectField(IndexDescriptor::kCollationFieldName)
+                                   .getOwned();
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
-    _indexCursor = _iam->newCursor(getOpCtx(), _forward);
+    _indexCursor = indexAccessMethod()->newCursor(getOpCtx(), _forward);
 
     // We always seek once to establish the cursor position.
     ++_specificStats.seeks;
 
-    if (_params.bounds.isSimpleRange) {
+    if (_bounds.isSimpleRange) {
         // Start at one key, end at another.
-        _startKey = _params.bounds.startKey;
-        _endKey = _params.bounds.endKey;
+        _startKey = _bounds.startKey;
+        _endKey = _bounds.endKey;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
         return _indexCursor->seek(_startKey, _startKeyInclusive);
     } else {
@@ -104,11 +107,11 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         // of an end cursor.  For all other index scans, we fall back on using
         // IndexBoundsChecker to determine when we've finished the scan.
         if (IndexBoundsBuilder::isSingleInterval(
-                _params.bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
+                _bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
             _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
             return _indexCursor->seek(_startKey, _startKeyInclusive);
         } else {
-            _checker.reset(new IndexBoundsChecker(&_params.bounds, _keyPattern, _params.direction));
+            _checker.reset(new IndexBoundsChecker(&_bounds, _keyPattern, _direction));
 
             if (!_checker->getStartSeekPoint(&_seekPoint))
                 return boost::none;
@@ -188,7 +191,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     _scanState = GETTING_NEXT;
 
-    if (_params.shouldDedup) {
+    if (_shouldDedup) {
         ++_specificStats.dupsTested;
         if (!_returned.insert(kv->loc).second) {
             // We've seen this RecordId before. Skip it this time.
@@ -210,10 +213,10 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = kv->loc;
-    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
+    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, indexAccessMethod()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
-    if (_params.addKeyMetadata) {
+    if (_addKeyMetadata) {
         member->addComputed(
             new IndexKeyComputedData(IndexKeyComputedData::rehydrateKey(_keyPattern, kv->key)));
     }
@@ -226,7 +229,7 @@ bool IndexScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void IndexScan::doSaveState() {
+void IndexScan::doSaveStateRequiresIndex() {
     if (!_indexCursor)
         return;
 
@@ -238,7 +241,7 @@ void IndexScan::doSaveState() {
     _indexCursor->save();
 }
 
-void IndexScan::doRestoreState() {
+void IndexScan::doRestoreStateRequiresIndex() {
     if (_indexCursor)
         _indexCursor->restore();
 }
@@ -268,9 +271,9 @@ std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     if (_specificStats.indexType.empty()) {
         _specificStats.indexType = "BtreeCursor";  // TODO amName;
 
-        _specificStats.indexBounds = _params.bounds.toBSON();
+        _specificStats.indexBounds = _bounds.toBSON();
 
-        _specificStats.direction = _params.direction;
+        _specificStats.direction = _direction;
     }
 
     std::unique_ptr<PlanStageStats> ret =
