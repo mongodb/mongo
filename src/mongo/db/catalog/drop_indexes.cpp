@@ -50,6 +50,40 @@
 namespace mongo {
 namespace {
 
+// Field name in dropIndexes command for indexes to drop. This field can contain one of:
+// 1) '*' - drop all indexes.
+// 2) <index name> - name of single index to drop.
+// 3) <index key pattern> - BSON document representing key pattern of index to drop.
+constexpr auto kIndexFieldName = "index"_sd;
+
+/**
+ * Drops single index by name.
+ */
+Status dropIndexByName(OperationContext* opCtx,
+                       Collection* collection,
+                       IndexCatalog* indexCatalog,
+                       const std::string& indexToDelete) {
+    auto desc = indexCatalog->findIndexByName(opCtx, indexToDelete);
+    if (!desc) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream() << "index not found with name [" << indexToDelete << "]");
+    }
+
+    if (desc->isIdIndex()) {
+        return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
+    }
+
+    auto s = indexCatalog->dropIndex(opCtx, desc);
+    if (!s.isOK()) {
+        return s;
+    }
+
+    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+        opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
+
+    return Status::OK();
+}
+
 Status wrappedRun(OperationContext* opCtx,
                   Collection* collection,
                   const BSONObj& jsobj,
@@ -58,9 +92,9 @@ Status wrappedRun(OperationContext* opCtx,
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
     anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(opCtx));
 
-    BSONElement f = jsobj.getField("index");
-    if (f.type() == String) {
-        std::string indexToDelete = f.valuestr();
+    BSONElement indexElem = jsobj.getField(kIndexFieldName);
+    if (indexElem.type() == String) {
+        std::string indexToDelete = indexElem.valuestr();
 
         if (indexToDelete == "*") {
             indexCatalog->dropAllIndexes(
@@ -77,39 +111,21 @@ Status wrappedRun(OperationContext* opCtx,
             return Status::OK();
         }
 
-        IndexDescriptor* desc =
-            collection->getIndexCatalog()->findIndexByName(opCtx, indexToDelete);
-        if (desc == NULL) {
-            return Status(ErrorCodes::IndexNotFound,
-                          str::stream() << "index not found with name [" << indexToDelete << "]");
-        }
-
-        if (desc->isIdIndex()) {
-            return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
-        }
-
-        Status s = indexCatalog->dropIndex(opCtx, desc);
-        if (!s.isOK()) {
-            return s;
-        }
-
-        opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
-
-        return Status::OK();
+        return dropIndexByName(opCtx, collection, indexCatalog, indexToDelete);
     }
 
-    if (f.type() == Object) {
+    if (indexElem.type() == Object) {
         std::vector<IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(
-            opCtx, f.embeddedObject(), false, &indexes);
+            opCtx, indexElem.embeddedObject(), false, &indexes);
         if (indexes.empty()) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream() << "can't find index with key: " << f.embeddedObject());
+                          str::stream() << "can't find index with key: "
+                                        << indexElem.embeddedObject());
         } else if (indexes.size() > 1) {
             return Status(ErrorCodes::AmbiguousIndexKeyPattern,
                           str::stream() << indexes.size() << " indexes found for key: "
-                                        << f.embeddedObject()
+                                        << indexElem.embeddedObject()
                                         << ", identify by name instead."
                                         << " Conflicting indexes: "
                                         << indexes[0]->infoObj()
@@ -143,56 +159,55 @@ Status wrappedRun(OperationContext* opCtx,
         return Status::OK();
     }
 
-    return Status(ErrorCodes::IndexNotFound, "invalid index name spec");
+    return Status(ErrorCodes::IndexNotFound,
+                  str::stream() << "invalid index name spec: " << indexElem.toString(false));
 }
 
 }  // namespace
 
 Status dropIndexes(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const BSONObj& idxDescriptor,
+                   const BSONObj& cmdObj,
                    BSONObjBuilder* result) {
-    return writeConflictRetry(
-        opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &idxDescriptor, result] {
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+    return writeConflictRetry(opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &cmdObj, result] {
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
 
-            bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-                !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
+        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
 
-            if (userInitiatedWritesAndNotPrimary) {
-                return Status(ErrorCodes::NotMaster,
-                              str::stream() << "Not primary while dropping indexes in "
-                                            << nss.ns());
+        if (userInitiatedWritesAndNotPrimary) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while dropping indexes in " << nss.ns());
+        }
+
+        if (!serverGlobalParams.quiet.load()) {
+            LOG(0) << "CMD: dropIndexes " << nss << ": " << cmdObj[kIndexFieldName].toString(false);
+        }
+
+        // If db/collection does not exist, short circuit and return.
+        Database* db = autoDb.getDb();
+        Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
+        if (!db || !collection) {
+            if (db && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
+                return Status(ErrorCodes::CommandNotSupportedOnView,
+                              str::stream() << "Cannot drop indexes on view " << nss.ns());
             }
 
-            if (!serverGlobalParams.quiet.load()) {
-                LOG(0) << "CMD: dropIndexes " << nss;
-            }
+            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        }
 
-            // If db/collection does not exist, short circuit and return.
-            Database* db = autoDb.getDb();
-            Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
-            if (!db || !collection) {
-                if (db && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
-                    return Status(ErrorCodes::CommandNotSupportedOnView,
-                                  str::stream() << "Cannot drop indexes on view " << nss.ns());
-                }
+        WriteUnitOfWork wunit(opCtx);
+        OldClientContext ctx(opCtx, nss.ns());
+        BackgroundOperation::assertNoBgOpInProgForNs(nss);
 
-                return Status(ErrorCodes::NamespaceNotFound, "ns not found");
-            }
+        Status status = wrappedRun(opCtx, collection, cmdObj, result);
+        if (!status.isOK()) {
+            return status;
+        }
 
-            WriteUnitOfWork wunit(opCtx);
-            OldClientContext ctx(opCtx, nss.ns());
-            BackgroundOperation::assertNoBgOpInProgForNs(nss);
-
-            Status status = wrappedRun(opCtx, collection, idxDescriptor, result);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            wunit.commit();
-            return Status::OK();
-        });
+        wunit.commit();
+        return Status::OK();
+    });
 }
 
 }  // namespace mongo
