@@ -82,7 +82,7 @@
 
     // Verify the total prepared and committed transaction counters are updated after a commit
     // and that the current prepared counter is decremented.
-    PrepareHelpers.commitTransaction(session, prepareTimestampForCommit);
+    PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestampForCommit);
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(

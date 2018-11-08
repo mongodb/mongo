@@ -903,8 +903,8 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
     uassert(
         ErrorCodes::InvalidOptions, "'commitTimestamp' cannot be null", !commitTimestamp.isNull());
     uassert(ErrorCodes::InvalidOptions,
-            "'commitTimestamp' must be greater than or equal to 'prepareTimestamp'",
-            commitTimestamp >= _prepareOpTime.getTimestamp());
+            "'commitTimestamp' must be greater than the 'prepareTimestamp'",
+            commitTimestamp > _prepareOpTime.getTimestamp());
 
     _txnState.transitionTo(lk, TransactionState::kCommittingWithPrepare);
     opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);

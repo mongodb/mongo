@@ -42,7 +42,7 @@
 
     // Since the commitTimestamp is after the last snapshot, this oplog entry will be replayed
     // during replication recovery during restart.
-    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
 
     jsTestLog("Restarting node");
 
@@ -66,7 +66,7 @@
     // Also, make sure that we can run another transaction after recovery without any problems.
     assert.commandWorked(sessionDB[collName].update({_id: 1}, {_id: 1, a: 1}));
     prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
     assert.eq(testDB[collName].findOne({_id: 1}), {_id: 1, a: 1});
 
     replTest.stopSet();
