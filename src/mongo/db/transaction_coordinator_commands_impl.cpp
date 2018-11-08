@@ -201,6 +201,13 @@ Action sendPrepare(OperationContext* opCtx,
     CallbackFn prepareCallback;
     prepareCallback = [coordinator, actionNotification, &prepareCallback](
         const RemoteCommandCallbackArgs& args, const ShardId& shardId, const BSONObj& commandObj) {
+        if (coordinator->state() != State::kWaitingForVotes) {
+            LOG(3)
+                << "Coordinator shard not processing prepare response or retrying prepare against "
+                << shardId << " because coordinator is no longer waiting for votes";
+            return;
+        }
+
         auto status = (!args.response.isOK()) ? args.response.status
                                               : getStatusFromCommandResult(args.response.data);
 
@@ -230,13 +237,8 @@ Action sendPrepare(OperationContext* opCtx,
             return;
         }
 
-        if (coordinator->state() != State::kWaitingForVotes) {
-            LOG(3) << "Coordinator shard not retrying prepare against " << shardId
-                   << " because coordinator is no longer waiting for votes";
-        } else {
-            LOG(3) << "Coordinator shard retrying " << commandObj << " against " << shardId;
-            sendAsyncCommandToShard(args.executor, shardId, commandObj, prepareCallback);
-        }
+        LOG(3) << "Coordinator shard retrying " << commandObj << " against " << shardId;
+        sendAsyncCommandToShard(args.executor, shardId, commandObj, prepareCallback);
     };
 
     sendCommandToShards(opCtx, participants, prepareObj, prepareCallback);
