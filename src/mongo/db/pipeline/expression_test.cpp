@@ -3628,7 +3628,7 @@ public:
                 const BSONObj obj = BSON(asserters[i].getString() << args);
                 VariablesParseState vps = expCtx->variablesParseState;
                 ASSERT_THROWS(
-                    [&]{
+                    [&] {
                         // NOTE: parse and evaluatation failures are treated the
                         // same
                         const intrusive_ptr<Expression> expr =
@@ -4159,7 +4159,7 @@ TEST(ExpressionSubstrTest, ThrowsWithNegativeStart) {
     const auto str = "abcdef"_sd;
     const auto expr =
         Expression::parseExpression(expCtx, BSON("$substrCP" << BSON_ARRAY(str << -5 << 1)), vps);
-    ASSERT_THROWS([&]{ expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
 }
 
 }  // namespace Substr
@@ -4173,7 +4173,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithBadContinuationByte) {
     const auto continuationByte = "\x80\x00"_sd;
     const auto expr = Expression::parseExpression(
         expCtx, BSON("$substrCP" << BSON_ARRAY(continuationByte << 0 << 1)), vps);
-    ASSERT_THROWS([&]{ expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
 }
 
 TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
@@ -4183,7 +4183,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
     const auto leadingByte = "\xFF\x00"_sd;
     const auto expr = Expression::parseExpression(
         expCtx, BSON("$substrCP" << BSON_ARRAY(leadingByte << 0 << 1)), vps);
-    ASSERT_THROWS([&]{ expr->evaluate(Document()); }(), AssertionException);
+    ASSERT_THROWS([&] { expr->evaluate(Document()); }(), AssertionException);
 }
 
 TEST(ExpressionSubstrCPTest, WithStandardValue) {
@@ -5288,7 +5288,7 @@ public:
                 const BSONObj obj = BSON(asserters[i].getString() << args);
                 VariablesParseState vps = expCtx->variablesParseState;
                 ASSERT_THROWS(
-                    [&]{
+                    [&] {
                         // NOTE: parse and evaluatation failures are treated the
                         // same
                         const intrusive_ptr<Expression> expr =
