@@ -324,6 +324,11 @@ private:
     // True if this is currently being used by a request.
     bool _isCheckedOut{false};
 
+    // Whether the router has initiated a two-phase commit by handing off commit coordination to the
+    // coordinator. If so, the router should no longer implicitly abort the transaction on errors,
+    // since the coordinator may independently make a commit decision.
+    bool _initiatedTwoPhaseCommit{false};
+
     // Map of current participants of the current transaction.
     StringMap<Participant> _participants;
 

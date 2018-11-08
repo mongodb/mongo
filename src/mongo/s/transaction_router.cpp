@@ -580,6 +580,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _participants.clear();
     _coordinatorId.reset();
     _atClusterTime.reset();
+    _initiatedTwoPhaseCommit = false;
 
     // TODO SERVER-37115: Parse statement ids from the client and remember the statement id of the
     // command that started the transaction, if one was included.
@@ -630,6 +631,8 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
     CoordinateCommitTransaction coordinateCommitCmd;
     coordinateCommitCmd.setDbName("admin");
     coordinateCommitCmd.setParticipants(participantList);
+
+    _initiatedTwoPhaseCommit = true;
 
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -690,6 +693,13 @@ ScopedRouterSession::~ScopedRouterSession() {
 
 void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
     if (_participants.empty()) {
+        return;
+    }
+
+    if (_initiatedTwoPhaseCommit) {
+        LOG(0) << "Router not sending implicit abortTransaction for transaction "
+               << *opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON()
+               << " because already initiated two phase commit for the transaction";
         return;
     }
 
