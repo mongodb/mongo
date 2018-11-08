@@ -37,7 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_coordinator.h"
-#include "mongo/db/transaction_coordinator_commands_impl.h"
+#include "mongo/db/transaction_coordinator_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"

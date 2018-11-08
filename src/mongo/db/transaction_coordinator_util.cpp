@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_commands_impl.h"
+#include "mongo/db/transaction_coordinator_util.h"
 
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/txn_cmds_gen.h"

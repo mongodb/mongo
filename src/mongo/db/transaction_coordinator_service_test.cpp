@@ -36,7 +36,6 @@
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session_catalog.h"
-#include "mongo/db/transaction_coordinator_commands_impl.h"
 #include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
