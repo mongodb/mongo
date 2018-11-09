@@ -542,7 +542,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     ru->beginUnitOfWork(opCtx);
     StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(NULL));
+    ASSERT_EQUALS(1, rs->numRecords(opCtx));
     ru->commitUnitOfWork();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.

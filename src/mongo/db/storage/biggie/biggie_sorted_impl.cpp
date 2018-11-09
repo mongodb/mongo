@@ -181,6 +181,7 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
 
 SpecialFormatInserted SortedDataBuilderInterface::commit(bool mayInterrupt) {
     biggie::RecoveryUnit* ru = checked_cast<biggie::RecoveryUnit*>(_opCtx->recoveryUnit());
+    ru->beginUnitOfWork(_opCtx);
     ru->commitUnitOfWork();
     return SpecialFormatInserted::NoSpecialFormatInserted;
 }

@@ -28,71 +28,51 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <vector>
+#include <memory>
 
-#include "mongo/db/record_id.h"
+#include "mongo/base/init.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
-#include "mongo/db/storage/biggie/store.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/recovery_unit_test_harness.h"
 
 namespace mongo {
 namespace biggie {
+namespace {
 
-class RecoveryUnit : public ::mongo::RecoveryUnit {
+class BiggieRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelper {
 public:
-    RecoveryUnit(KVEngine* parentKVEngine, stdx::function<void()> cb = nullptr);
-    ~RecoveryUnit();
+    BiggieRecoveryUnitHarnessHelper() = default;
 
-    void beginUnitOfWork(OperationContext* opCtx) override final;
-    void commitUnitOfWork() override final;
-    void abortUnitOfWork() override final;
-
-    virtual bool waitUntilDurable() override;
-
-    virtual void abandonSnapshot() override;
-
-    virtual void registerChange(Change* change) override;
-
-    virtual SnapshotId getSnapshotId() const override;
-
-    virtual void setOrderedCommit(bool orderedCommit) override;
-
-    // Biggie specific function declarations below.
-    StringStore* getHead() {
-        forkIfNeeded();
-        return &_workingCopy;
+    virtual std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
+        return std::make_unique<RecoveryUnit>(&_kvEngine);
     }
 
-    inline void makeDirty() {
-        _dirty = true;
+    virtual std::unique_ptr<mongo::RecordStore> createRecordStore(OperationContext* opCtx,
+                                                                  const std::string& ns) {
+        return std::make_unique<RecordStore>(ns,
+                                             "ident"_sd /* ident */,
+                                             false /* isCapped */,
+                                             -1 /* cappedMaxSize */,
+                                             -1 /* cappedMaxDocs */,
+                                             nullptr /* cappedCallback */);
     }
-
-    /**
-     * Checks if there already exists a current working copy and merge base; if not fetches
-     * one and creates them.
-     */
-    bool forkIfNeeded();
-
-    static RecoveryUnit* get(OperationContext* opCtx);
 
 private:
-    stdx::function<void()> _waitUntilDurableCallback;
-    // Official master is kept by KVEngine
-    KVEngine* _KVEngine;
-    StringStore _mergeBase;
-    StringStore _workingCopy;
-
-    bool _forked = false;
-    bool _dirty = false;  // Whether or not we have written to this _workingCopy.
-    bool _inUnitOfWork = false;
-
-    typedef std::shared_ptr<Change> ChangePtr;
-    typedef std::vector<ChangePtr> Changes;
-    Changes _changes;
+    KVEngine _kvEngine{};
 };
 
+std::unique_ptr<HarnessHelper> makeHarnessHelper() {
+    return std::make_unique<BiggieRecoveryUnitHarnessHelper>();
+}
+
+MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
+    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    return Status::OK();
+}
+
+}  // namespace
 }  // namespace biggie
 }  // namespace mongo

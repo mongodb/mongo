@@ -69,3 +69,12 @@ env.CppUnitTest(
         ],
 )
 
+env.CppUnitTest(
+   target='biggie_recovery_unit_test',
+   source=['biggie_recovery_unit_test.cpp'
+           ],
+   LIBDEPS=[
+        'storage_biggie_core',
+        '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness'
+        ],
+)

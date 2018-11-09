@@ -57,7 +57,7 @@ TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     ru->beginUnitOfWork(opCtx.get());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(NULL));
+    ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     ru->commitUnitOfWork();
     RecordData rd;
     ASSERT_TRUE(rs->findRecord(opCtx.get(), s.getValue(), &rd));
@@ -68,7 +68,7 @@ TEST_F(RecoveryUnitTestHarness, AbortUnitOfWork) {
     ru->beginUnitOfWork(opCtx.get());
     StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
-    ASSERT_EQUALS(1, rs->numRecords(NULL));
+    ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     ru->abortUnitOfWork();
     ASSERT_FALSE(rs->findRecord(opCtx.get(), s.getValue(), nullptr));
 }
@@ -82,7 +82,12 @@ DEATH_TEST_F(RecoveryUnitTestHarness, AbortMustBeInUnitOfWork, "invariant") {
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
-    opCtx->recoveryUnit()->prepareUnitOfWork();
+    try {
+        opCtx->recoveryUnit()->prepareUnitOfWork();
+    } catch (ExceptionFor<ErrorCodes::CommandNotSupported>) {
+        bool prepareCommandSupported = false;
+        invariant(prepareCommandSupported);
+    }
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {

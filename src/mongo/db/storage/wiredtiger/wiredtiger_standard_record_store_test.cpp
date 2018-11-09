@@ -431,8 +431,8 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
     ret->postConstructorInit(opCtx.get());
     rs.reset(ret);
 
-    ASSERT_EQUALS(expectedNumRecords * 2, rs->numRecords(NULL));
-    ASSERT_EQUALS(expectedDataSize * 2, rs->dataSize(NULL));
+    ASSERT_EQUALS(expectedNumRecords * 2, rs->numRecords(opCtx.get()));
+    ASSERT_EQUALS(expectedDataSize * 2, rs->dataSize(opCtx.get()));
 
     // Full validation should fix record and size counters.
     GoodValidateAdaptor adaptor;
@@ -444,8 +444,8 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
     ASSERT_EQUALS(expectedNumRecords, getNumRecords());
     ASSERT_EQUALS(expectedDataSize, getDataSize());
 
-    ASSERT_EQUALS(expectedNumRecords, rs->numRecords(NULL));
-    ASSERT_EQUALS(expectedDataSize, rs->dataSize(NULL));
+    ASSERT_EQUALS(expectedNumRecords, rs->numRecords(opCtx.get()));
+    ASSERT_EQUALS(expectedDataSize, rs->dataSize(opCtx.get()));
 }
 
 }  // namespace
