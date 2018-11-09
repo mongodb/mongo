@@ -6,6 +6,11 @@
 
 (function() {
 
+    if (_isWindows()) {
+        jsTestLog("Skipping test on Windows");
+        return;
+    }
+
     load('jstests/disk/libs/wt_file_helper.js');
 
     const baseName = "wt_repair_corrupt_metadata";
