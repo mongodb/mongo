@@ -1889,6 +1889,111 @@ class UnwindWithOther : public Base {
 };
 }  // namespace moveFinalUnwindFromShardsToMerger
 
+namespace propagateDocLimitToShards {
+
+/**
+ * The $skip stage splits the pipeline into a shard pipeline and merge pipeline. Because the $limit
+ * stage in the merge pipeline creates an upper bound on how many documents are necessary from any
+ * of the shards, we can add a $limit to the shard pipeline to prevent it from sending more
+ * documents than necessary. See the comment for propagateDocLimitToShard in
+ * cluster_aggregation_planner.cpp and the explanation in SERVER-36881.
+ */
+class MatchWithSkipAndLimit : public Base {
+    string inputPipeJson() {
+        return "[{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {x: {$eq: 4}}}, {$limit: 15}]";
+    }
+    string mergePipeJson() {
+        return "[{$skip: 10}, {$limit: 5}]";
+    }
+};
+
+/**
+ * When computing an upper bound on how many documents we need from each shard, make sure to count
+ * all $skip stages in any pipeline that has more than one.
+ */
+class MatchWithMultipleSkipsAndLimit : public Base {
+    string inputPipeJson() {
+        return "[{$match: {x: 4}}, {$skip: 7}, {$skip: 3}, {$limit: 5}]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {x: {$eq: 4}}}, {$limit: 15}]";
+    }
+    string mergePipeJson() {
+        return "[{$skip: 10}, {$limit: 5}]";
+    }
+};
+
+/**
+ * A $limit stage splits the pipeline with the $limit in place on both the shard and merge
+ * pipelines. Make sure that the propagateDocLimitToShards() optimization does not add another
+ * $limit to the shard pipeline.
+ */
+class MatchWithLimitAndSkip : public Base {
+    string inputPipeJson() {
+        return "[{$match: {x: 4}}, {$limit: 10}, {$skip: 5}]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {x: {$eq: 4}}}, {$limit: 10}]";
+    }
+    string mergePipeJson() {
+        return "[{$limit: 10}, {$skip: 5}]";
+    }
+};
+
+
+/**
+ * The addition of an $addFields stage between the $skip and $limit stages does not prevent us from
+ * propagating the limit to the shards.
+ */
+class MatchWithSkipAddFieldsAndLimit : public Base {
+    string inputPipeJson() {
+        return "[{$match: {x: 4}}, {$skip: 10}, {$addFields: {y: 1}}, {$limit: 5}]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {x: {$eq: 4}}}, {$limit: 15}]";
+    }
+    string mergePipeJson() {
+        return "[{$skip: 10}, {$addFields: {y: {$const: 1}}}, {$limit: 5}]";
+    }
+};
+
+/**
+ * The addition of a $group stage between the $skip and $limit stages _does_ prevent us from
+ * propagating the limit to the shards. The merger will need to see all the documents from each
+ * shard before it can aply the $limit.
+ */
+class MatchWithSkipGroupAndLimit : public Base {
+    string inputPipeJson() {
+        return "[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {x: {$eq: 4}}}, {$project: {_id: false, y: true}}]";
+    }
+    string mergePipeJson() {
+        return "[{$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]";
+    }
+};
+
+/**
+ * The addition of a $match stage between the $skip and $limit stages also prevents us from
+ * propagating the limit to the shards. We don't know in advance how many documents will pass the
+ * filter in the second $match, so we also don't know how many documents we'll need from the shards.
+ */
+class MatchWithSkipSecondMatchAndLimit : public Base {
+    string inputPipeJson() {
+        return "[{$match: {x: 4}}, {$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {x: {$eq: 4}}}]";
+    }
+    string mergePipeJson() {
+        return "[{$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]";
+    }
+};
+}  // namespace propagateDocLimitToShards
 
 namespace limitFieldsSentFromShardsToMerger {
 // These tests use $limit to split the pipelines between shards and merger as it is
@@ -2945,6 +3050,12 @@ public:
         add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::TwoUnwind>();
         add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindNotFinal>();
         add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindWithOther>();
+        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipAndLimit>();
+        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithMultipleSkipsAndLimit>();
+        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithLimitAndSkip>();
+        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipAddFieldsAndLimit>();
+        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipGroupAndLimit>();
+        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipSecondMatchAndLimit>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::NeedWholeDoc>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsId>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsNonId>();

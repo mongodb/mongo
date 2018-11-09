@@ -113,6 +113,102 @@ void moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
 }
 
 /**
+ * Returns true if the final stage of the pipeline limits the number of documents it could output
+ * (such as a $limit stage).
+ *
+ * This function is not meant to exhaustively catch every single case where a pipeline might have
+ * some kind of limit. It's only here so that propagateDocLimitsToShards() can avoid adding an
+ * obviously unnecessary $limit to a shard's pipeline.
+ */
+boost::optional<long long> getPipelineLimit(Pipeline* pipeline) {
+    for (auto source_it = pipeline->getSources().rbegin();
+         source_it != pipeline->getSources().rend();
+         ++source_it) {
+        const auto source = source_it->get();
+
+        auto limitStage = dynamic_cast<DocumentSourceLimit*>(source);
+        if (limitStage) {
+            return limitStage->getLimit();
+        }
+
+        auto sortStage = dynamic_cast<DocumentSourceSort*>(source);
+        if (sortStage) {
+            return (sortStage->getLimit() >= 0) ? boost::optional<long long>(sortStage->getLimit())
+                                                : boost::none;
+        }
+
+        auto cursorStage = dynamic_cast<DocumentSourceSort*>(source);
+        if (cursorStage) {
+            return (cursorStage->getLimit() >= 0)
+                ? boost::optional<long long>(cursorStage->getLimit())
+                : boost::none;
+        }
+
+        // If this stage is one that can swap with a $limit stage, then we can look at the previous
+        // stage to see if it includes a limit. Otherwise, we give up trying to find a limit on this
+        // stage's output.
+        if (!source->constraints().canSwapWithLimitAndSample) {
+            break;
+        }
+    }
+
+    return boost::none;
+}
+
+/**
+ * If the merging pipeline includes a $limit stage that creates an upper bound on how many input
+ * documents it needs to compute the aggregation, we can use that as an upper bound on how many
+ * documents each of the shards needs to produce. Propagating that upper bound to the shards (using
+ * a $limit in the shard pipeline) can reduce the number of documents the shards need to process and
+ * transfer over the network (see SERVER-36881).
+ *
+ * If there are $skip stages before the $limit, the skipped documents also contribute to the upper
+ * bound.
+ */
+void propagateDocLimitToShards(Pipeline* shardPipe, Pipeline* mergePipe) {
+    long long numDocumentsNeeded = 0;
+
+    for (auto&& source : mergePipe->getSources()) {
+        auto skipStage = dynamic_cast<DocumentSourceSkip*>(source.get());
+        if (skipStage) {
+            numDocumentsNeeded += skipStage->getSkip();
+            continue;
+        }
+
+        auto limitStage = dynamic_cast<DocumentSourceLimit*>(source.get());
+        if (limitStage) {
+            numDocumentsNeeded += limitStage->getLimit();
+
+            auto existingShardLimit = getPipelineLimit(shardPipe);
+            if (existingShardLimit && *existingShardLimit <= numDocumentsNeeded) {
+                // The sharding pipeline already has a limit that is no greater than the limit we
+                // were going to add, so no changes are necessary.
+                return;
+            }
+
+            auto shardLimit =
+                DocumentSourceLimit::create(mergePipe->getContext(), numDocumentsNeeded);
+            shardPipe->addFinalSource(shardLimit);
+
+            // We have successfully applied a limit to the number of documents we need from each
+            // shard.
+            return;
+        }
+
+        // If there are any stages in the merge pipeline before the $skip and $limit stages, then we
+        // cannot use the $limit to determine an upper bound, unless those stages could be swapped
+        // with the $limit.
+        if (!source->constraints().canSwapWithLimitAndSample) {
+            return;
+        }
+    }
+
+    // We did not find any limit in the merge pipeline that would allow us to set an upper bound on
+    // the number of documents we need from each shard.
+    return;
+}
+
+/**
  * Adds a stage to the end of 'shardPipe' explicitly requesting all fields that 'mergePipe' needs.
  * This is only done if it heuristically determines that it is needed. This optimization can reduce
  * the amount of network traffic and can also enable the shards to convert less source BSON into
@@ -366,6 +462,7 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
     // The order in which optimizations are applied can have significant impact on the efficiency of
     // the final pipeline. Be Careful!
     moveFinalUnwindFromShardsToMerger(shardsPipeline.get(), mergePipeline.get());
+    propagateDocLimitToShards(shardsPipeline.get(), mergePipeline.get());
     limitFieldsSentFromShardsToMerger(shardsPipeline.get(), mergePipeline.get());
     shardsPipeline->setSplitState(Pipeline::SplitState::kSplitForShards);
     mergePipeline->setSplitState(Pipeline::SplitState::kSplitForMerge);
