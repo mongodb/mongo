@@ -3,6 +3,9 @@
 /**
  * Runs a variety commands which need to interact with the global cursor manager. This test was
  * designed to reproduce SERVER-33959.
+ *
+ * The "grandparent test," invalidated_cursors.js, uses $currentOp.
+ * @tags: [uses_curop_agg_stage]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js');  // for $config

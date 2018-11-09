@@ -8,6 +8,9 @@
  * SERVER-24386. Threads perform an aggregation pipeline on one of a few collections, optionally
  * specifying a $lookup stage, a $graphLookup stage, or a $facet stage, while the database, a
  * collection, or an index is dropped concurrently.
+ *
+ * The parent test, invalidated_cursors.js, uses $currentOp.
+ * @tags: [uses_curop_agg_stage]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/invalidated_cursors.js');  // for $config
