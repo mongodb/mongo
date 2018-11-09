@@ -84,8 +84,6 @@ struct ShellGlobalParams {
 
 extern ShellGlobalParams shellGlobalParams;
 
-Status addMongoShellOptions(moe::OptionSection* options);
-
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options);
 
 /**

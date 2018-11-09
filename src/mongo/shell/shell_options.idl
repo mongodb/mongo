@@ -1,0 +1,204 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+  - "mongo/shell/shell_options.h"
+  - "mongo/shell/shell_utils.h"
+  configs:
+    source: [ cli, ini, yaml ]
+
+imports:
+  - "mongo/idl/basic_types.idl"
+
+configs:
+  "ipv6":
+    description: "enable IPv6 support (disabled by default)"
+    arg_vartype: Switch
+  "host":
+    description: "server to connect to"
+    arg_vartype: String
+  "port":
+    description: "port to connect to"
+    arg_vartype: String
+
+  "help":
+    short_name: "help"
+    single_name: h
+    description: "show this usage information"
+    arg_vartype: Switch
+  "version":
+    description: "show version information"
+    arg_vartype: Switch
+  "verbose":
+    description: "increase verbosity"
+    arg_vartype: Switch
+  "shell":
+    description: "run the shell after executing files"
+    arg_vartype: Switch
+    cpp_varname: shellGlobalParams.runShell
+  "nodb":
+    description: "don't connect to mongod on startup - no 'db address' arg expected"
+    arg_vartype: Switch
+  "norc":
+    description: "will not run the \".mongorc.js\" file on start up"
+    arg_vartype: Switch
+    cpp_varname: shellGlobalParams.norc
+  "quiet":
+    description: "be less chatty"
+    arg_vartype: Switch
+  "eval":
+    description: "evaluate javascript"
+    arg_vartype: String
+    cpp_varname: shellGlobalParams.script
+
+  "objcheck":
+    description: "inspect client data for validity on receipt"
+    arg_vartype: Switch
+    source: [ cli, ini ]
+    conflicts: "noobjcheck"
+    hidden: true
+  "noobjcheck":
+    description: "do NOT inspect client data for validity on receipt (DEFAULT)"
+    arg_vartype: Switch
+    source: [ cli, ini ]
+    conflicts: "objcheck"
+    hidden: true
+
+  "disableJavaScriptJIT":
+    description: "disable the Javascript Just In Time compiler"
+    arg_vartype: Switch
+    conflicts: "enableJavaScriptJIT"
+  "enableJavaScriptJIT":
+    description: "enable the Javascript Just In Time compiler"
+    arg_vartype: Switch
+    conflicts: "disableJavaScriptJIT"
+
+  "disableJavaScriptProtection":
+    description: "allow automatic JavaScript function marshalling"
+    arg_vartype: Switch
+    conflicts: "enableJavaScriptProtection"
+  "enableJavaScriptProtection":
+    description: "disable automatic JavaScript function marshalling (defaults to true)"
+    arg_vartype: Switch
+    conflicts: "disableJavaScriptProtection"
+    hidden: true
+
+  "nokillop":
+    # For testing, kill op will also be disabled automatically if the tests starts a mongo program.
+    description: "nokillop"
+    arg_vartype: Switch
+    cpp_varname: mongo::shell_utils::_nokillop
+    hidden: true
+  "autokillop":
+    # For testing, will kill op without prompting.
+    description: "autokillop"
+    arg_vartype: Switch
+    cpp_varname: shellGlobalParams.autoKillOp
+    hidden: true
+
+  "useLegacyWriteOps":
+    description: "use legacy write ops instead of write commands"
+    arg_vartype: Switch
+    hidden: true
+  "writeMode":
+    description: "mode to determine how writes are done: commands, compatibility, legacy"
+    arg_vartype: String
+    hidden: true
+  "readMode":
+    description: "mode to determine how .find() querues are done: commands, compatibility, legacy"
+    arg_vartype: String
+    hidden: true
+
+  "retryWrites":
+    description: "automatically retry write operations upon transient network errors"
+    arg_vartype: Switch
+    cpp_varname: shellGlobalParams.shouldRetryWrites
+  "disableImplicitSessions":
+    description: "do not automatically create and use implicit sessions"
+    arg_vartype: Switch
+  "rpcProtocols":
+    description: " none, opQueryOnly, opMsgOnly, all"
+    arg_vartype: String
+    hidden: true
+  "jsHeapLimitMB":
+    description: "set the js scope's heap size limit"
+    arg_vartype: Int
+
+  "setShellParameter":
+    description: "Set a configurable parameter"
+    arg_vartype: StringMap
+    duplicate_behavior: append
+    hidden: true
+
+  # Positional Arguments.
+  "dbaddress":
+    description: "dbaddress"
+    arg_vartype: String
+    hidden: true
+    positional: 1
+  "files":
+    description: "files"
+    arg_vartype: StringVector
+    hidden: true
+    positional: "2-"
+
+  # Authentication Options.
+  "username":
+    section: "Authentication Options"
+    short_name: "username"
+    single_name: u
+    description: "username for authentication"
+    arg_vartype: String
+  "password":
+    section: "Authentication Options"
+    short_name: "password"
+    single_name: p
+    description: "password for authentication"
+    arg_vartype: String
+    implicit: ""
+  "authenticationDatabase":
+    section: "Authentication Options"
+    description: "user source (defaults to dbname)"
+    arg_vartype: String
+    default: ""
+  "authenticationMechanism":
+    section: "Authentication Options"
+    description: "authentication mechanism"
+    arg_vartype: String
+  "gssapiServiceName":
+    section: "Authentication Options"
+    description: "Service name to use when authenticating using GSSAPI/Kerberos"
+    arg_vartype: String
+    default: mongodb
+  "gssapiHostName":
+    section: "Authentication Options"
+    description: "Remote host name to use for purpose of GSSAPI/Kerberos authentication"
+    arg_vartype: String
+

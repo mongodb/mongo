@@ -533,6 +533,7 @@ if not has_option('noshell') and usemozjs:
             "shell/dbshell.cpp",
             "shell/mongodbcr.cpp",
             "shell/shell_options_init.cpp",
+            env.Idlc('shell/shell_options.idl')[0],
         ] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=[
             "$BUILD_DIR/third_party/shim_pcrecpp",

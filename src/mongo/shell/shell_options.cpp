@@ -68,189 +68,6 @@ const std::set<std::string> kSetShellParameterWhitelist = {
     "disabledSecureAllocatorDomains",
 };
 
-Status addMongoShellOptions(moe::OptionSection* options) {
-    options->addOptionChaining(
-        "shell", "shell", moe::Switch, "run the shell after executing files");
-
-    options->addOptionChaining("nodb",
-                               "nodb",
-                               moe::Switch,
-                               "don't connect to mongod on startup - no 'db address' arg expected");
-
-    options->addOptionChaining(
-        "norc", "norc", moe::Switch, "will not run the \".mongorc.js\" file on start up");
-
-    options->addOptionChaining("quiet", "quiet", moe::Switch, "be less chatty");
-
-    options->addOptionChaining("port", "port", moe::String, "port to connect to");
-
-    options->addOptionChaining("host", "host", moe::String, "server to connect to");
-
-    options->addOptionChaining("eval", "eval", moe::String, "evaluate javascript");
-
-    options
-        ->addOptionChaining(
-            "objcheck", "objcheck", moe::Switch, "inspect client data for validity on receipt")
-        .hidden()
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("noobjcheck");
-
-    options
-        ->addOptionChaining("noobjcheck",
-                            "noobjcheck",
-                            moe::Switch,
-                            "do NOT inspect client data for validity on receipt (DEFAULT)")
-        .hidden()
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("objcheck");
-
-    moe::OptionSection authenticationOptions("Authentication Options");
-
-    authenticationOptions.addOptionChaining(
-        "username", "username,u", moe::String, "username for authentication");
-
-    authenticationOptions
-        .addOptionChaining("password", "password,p", moe::String, "password for authentication")
-        .setImplicit(moe::Value(std::string("")));
-
-    authenticationOptions
-        .addOptionChaining("authenticationDatabase",
-                           "authenticationDatabase",
-                           moe::String,
-                           "user source (defaults to dbname)")
-        .setDefault(moe::Value(std::string("")));
-
-    authenticationOptions.addOptionChaining("authenticationMechanism",
-                                            "authenticationMechanism",
-                                            moe::String,
-                                            "authentication mechanism");
-
-    authenticationOptions
-        .addOptionChaining("gssapiServiceName",
-                           "gssapiServiceName",
-                           moe::String,
-                           "Service name to use when authenticating using GSSAPI/Kerberos")
-        .setDefault(moe::Value(saslDefaultServiceName.toString()));
-
-    authenticationOptions.addOptionChaining(
-        "gssapiHostName",
-        "gssapiHostName",
-        moe::String,
-        "Remote host name to use for purpose of GSSAPI/Kerberos authentication");
-
-    options->addSection(authenticationOptions).transitional_ignore();
-
-    options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
-
-    options->addOptionChaining("version", "version", moe::Switch, "show version information");
-
-    options->addOptionChaining("verbose", "verbose", moe::Switch, "increase verbosity");
-
-    options->addOptionChaining(
-        "ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
-
-    options
-        ->addOptionChaining("disableJavaScriptJIT",
-                            "disableJavaScriptJIT",
-                            moe::Switch,
-                            "disable the Javascript Just In Time compiler")
-        .incompatibleWith("enableJavaScriptJIT");
-
-    options
-        ->addOptionChaining("enableJavaScriptJIT",
-                            "enableJavaScriptJIT",
-                            moe::Switch,
-                            "enable the Javascript Just In Time compiler")
-        .incompatibleWith("disableJavaScriptJIT");
-
-    options
-        ->addOptionChaining("disableJavaScriptProtection",
-                            "disableJavaScriptProtection",
-                            moe::Switch,
-                            "allow automatic JavaScript function marshalling")
-        .incompatibleWith("enableJavaScriptProtection");
-
-    options
-        ->addOptionChaining("enableJavaScriptProtection",
-                            "enableJavaScriptProtection",
-                            moe::Switch,
-                            "disable automatic JavaScript function marshalling (defaults to true)")
-        .hidden()
-        .incompatibleWith("disableJavaScriptProtection");
-
-    options->addOptionChaining("dbaddress", "dbaddress", moe::String, "dbaddress")
-        .hidden()
-        .positional(1, 1);
-
-    options->addOptionChaining("files", "files", moe::StringVector, "files")
-        .hidden()
-        .positional(2, -1);
-
-    // for testing, kill op will also be disabled automatically if the tests starts a mongo
-    // program
-    options->addOptionChaining("nokillop", "nokillop", moe::Switch, "nokillop").hidden();
-
-    // for testing, will kill op without prompting
-    options->addOptionChaining("autokillop", "autokillop", moe::Switch, "autokillop").hidden();
-
-    options
-        ->addOptionChaining("useLegacyWriteOps",
-                            "useLegacyWriteOps",
-                            moe::Switch,
-                            "use legacy write ops instead of write commands")
-        .hidden();
-
-    options
-        ->addOptionChaining("writeMode",
-                            "writeMode",
-                            moe::String,
-                            "mode to determine how writes are done:"
-                            " commands, compatibility, legacy")
-        .hidden();
-
-    options
-        ->addOptionChaining("readMode",
-                            "readMode",
-                            moe::String,
-                            "mode to determine how .find() queries are done:"
-                            " commands, compatibility, legacy")
-        .hidden();
-
-    options->addOptionChaining(
-        "retryWrites",
-        "retryWrites",
-        moe::Switch,
-        "automatically retry write operations upon transient network errors");
-
-    options->addOptionChaining("disableImplicitSessions",
-                               "disableImplicitSessions",
-                               moe::Switch,
-                               "do not automatically create and use implicit sessions");
-
-    options
-        ->addOptionChaining(
-            "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opMsgOnly, all")
-        .hidden();
-
-    auto ret = addMessageCompressionOptions(options, true);
-    if (!ret.isOK()) {
-        return ret;
-    }
-
-    options->addOptionChaining(
-        "jsHeapLimitMB", "jsHeapLimitMB", moe::Int, "set the js scope's heap size limit");
-
-    options
-        ->addOptionChaining("setShellParameter",
-                            "setShellParameter",
-                            moe::StringMap,
-                            "Set a configurable parameter")
-        .composing()
-        .hidden();
-
-    return Status::OK();
-}
-
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
     StringBuilder sb;
     sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
@@ -314,10 +131,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
         shellGlobalParams.dbhost = params["host"].as<string>();
     }
 
-    if (params.count("eval")) {
-        shellGlobalParams.script = params["eval"].as<string>();
-    }
-
     if (params.count("username")) {
         shellGlobalParams.username = params["username"].as<string>();
     }
@@ -349,17 +162,11 @@ Status storeMongoShellOptions(const moe::Environment& params,
         }
     }
 
-    if (params.count("shell")) {
-        shellGlobalParams.runShell = true;
-    }
     if (params.count("nodb")) {
         shellGlobalParams.nodb = true;
     }
     if (params.count("disableJavaScriptProtection")) {
         shellGlobalParams.javascriptProtection = false;
-    }
-    if (params.count("norc")) {
-        shellGlobalParams.norc = true;
     }
     if (params.count("disableJavaScriptJIT")) {
         shellGlobalParams.nojit = true;
@@ -369,12 +176,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("files")) {
         shellGlobalParams.files = params["files"].as<vector<string>>();
-    }
-    if (params.count("nokillop")) {
-        mongo::shell_utils::_nokillop = true;
-    }
-    if (params.count("autokillop")) {
-        shellGlobalParams.autoKillOp = true;
     }
     if (params.count("useLegacyWriteOps")) {
         shellGlobalParams.writeMode = "legacy";
@@ -396,9 +197,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
                           << "'. Valid modes are: {commands, compatibility, legacy}");
         }
         shellGlobalParams.readMode = mode;
-    }
-    if (params.count("retryWrites")) {
-        shellGlobalParams.shouldRetryWrites = true;
     }
     if (params.count("disableImplicitSessions")) {
         shellGlobalParams.shouldUseImplicitSessions = false;
