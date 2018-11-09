@@ -147,7 +147,7 @@ private:
 
     // Stamp each message with a unique counter. This ensures that if two messages are queued with
     // the same deadline, FIFO is achieved.
-    uint64_t _counter;
+    uint64_t _counter{0};
 
     // Number of messages to ignore
     size_t _countMessagesToIgnore{0};
