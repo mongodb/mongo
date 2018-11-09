@@ -288,7 +288,7 @@ private:
     AtomicUInt64 _snapshotNameGenerator;
     ServiceContext* const _service;
     ReplSettings _settings;
-    StorageInterface* _storage;
+    StorageInterface* _storage = nullptr;
     MemberState _memberState;
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;
