@@ -66,7 +66,13 @@
     // the session to not work anymore for retryable writes for that session, but not for any other
     const lsidManual = config.transactions.find({'_id.id': lsid1}).toArray()[0]._id;
     assert.writeOK(config.transactions.remove({'_id.id': lsid1}));
-    assert.writeOK(config.transactions.insert({_id: lsidManual}));
+
+    // Direct writes to the transactions table mark the session as killed and then asynchronously
+    // complete the cleanup process. Because of this, by the time the insert below starts, it is
+    // possible that the cleanup thread from the remove above has not yet completed and so the write
+    // could fail with ConflictingOperationInProgress.
+    assert.commandWorkedOrFailedWithCode(config.transactions.insert({_id: lsidManual}),
+                                         ErrorCodes.ConflictingOperationInProgress);
 
     const lsid3 = UUID();
     assert.commandWorked(db.runCommand({
