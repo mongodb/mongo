@@ -33,6 +33,7 @@ selector:
   - jstests/sharding/collation_lookup.js
   - jstests/sharding/collation_targeting.js
   - jstests/sharding/collation_targeting_inherited.js
+  - jstests/sharding/explain_cmd.js
   - jstests/sharding/failcommand_failpoint_not_parallel.js
   - jstests/sharding/failcommand_ignores_internal.js
   - jstests/sharding/geo_near_random1.js

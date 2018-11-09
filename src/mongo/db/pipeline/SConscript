@@ -259,6 +259,7 @@ env.Library(
     target='lite_parsed_document_source',
     source=[
         'lite_parsed_document_source.cpp',
+        'lite_parsed_pipeline.cpp',
         ],
     LIBDEPS=[
         'aggregation_request',

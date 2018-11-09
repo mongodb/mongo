@@ -28,7 +28,6 @@ selector:
   - jstests/sharding/write_transactions_during_migration.js
   - jstests/sharding/migration_critical_section_concurrency.js
   - jstests/sharding/multi_mongos2.js
-  - jstests/sharding/explain_cmd.js
   - jstests/sharding/move_chunk_open_cursors.js
   - jstests/sharding/time_zone_info_mongos.js
   - jstests/sharding/agg_sort.js

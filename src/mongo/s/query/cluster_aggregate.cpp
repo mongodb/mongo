@@ -513,6 +513,19 @@ ShardId pickMergingShard(OperationContext* opCtx,
                                   : targetedShards[prng.nextInt32(targetedShards.size())];
 }
 
+// "Resolve" involved namespaces into a map. We won't try to execute anything on a mongos, but we
+// still have to populate this map so that any $lookups, etc. will be able to have a resolved view
+// definition. It's okay that this is incorrect, we will repopulate the real namespace map on the
+// mongod. Note that this function must be called before forwarding an aggregation command on an
+// unsharded collection, in order to verify that the involved namespaces are allowed to be sharded.
+auto resolveInvolvedNamespaces(OperationContext* opCtx, const LiteParsedPipeline& litePipe) {
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    for (auto&& nss : litePipe.getInvolvedNamespaces()) {
+        resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+    }
+    return resolvedNamespaces;
+}
+
 // Build an appropriate ExpressionContext for the pipeline. This helper instantiates an appropriate
 // collator, creates a MongoProcessInterface for use by the pipeline's stages, and optionally
 // extracts the UUID from the collection info if present.
@@ -669,6 +682,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         MongoSInterface::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
     LiteParsedPipeline litePipe(request);
+    const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) -> bool {
+        const auto resolvedNsRoutingInfo =
+            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        return resolvedNsRoutingInfo.cm().get();
+    };
+    const bool involvesShardedCollections = litePipe.verifyIsSupported(
+        opCtx, isSharded, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
 
     // If the routing table is valid, we obtain a reference to it. If the table is not valid, then
     // either the database does not exist, or there are no shards in the cluster. In the latter
@@ -692,21 +712,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If we don't have a routing table, then this is a $changeStream which must run on all shards.
     invariant(routingInfo || (mustRunOnAll && litePipe.hasChangeStream()));
 
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    bool involvesShardedCollections = false;
-    for (auto&& nss : litePipe.getInvolvedNamespaces()) {
-        const auto resolvedNsRoutingInfo =
-            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-
-        uassert(28769,
-                str::stream() << nss.ns() << " cannot be sharded",
-                !resolvedNsRoutingInfo.cm() || litePipe.allowShardedForeignCollection(nss));
-
-        resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
-        if (resolvedNsRoutingInfo.cm()) {
-            involvesShardedCollections = true;
-        }
-    }
+    auto resolvedNamespaces = resolveInvolvedNamespaces(opCtx, litePipe);
 
     // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
     // met:

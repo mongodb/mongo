@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -136,30 +137,19 @@ public:
      */
     void assertSupportsReadConcern(OperationContext* opCtx,
                                    boost::optional<ExplainOptions::Verbosity> explain,
-                                   bool enableMajorityReadConcern) const {
-        auto readConcern = repl::ReadConcernArgs::get(opCtx);
+                                   bool enableMajorityReadConcern) const;
 
-        // Reject non change stream aggregation queries that try to use "majority" read concern when
-        // enableMajorityReadConcern=false.
-        if (!hasChangeStream() && !enableMajorityReadConcern &&
-            (repl::ReadConcernArgs::get(opCtx).getLevel() ==
-             repl::ReadConcernLevel::kMajorityReadConcern)) {
-            uasserted(ErrorCodes::ReadConcernMajorityNotEnabled,
-                      "Only change stream aggregation queries support 'majority' read concern when "
-                      "enableMajorityReadConcern=false");
-        }
-
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Explain for the aggregate command cannot run with a readConcern "
-                              << "other than 'local', or in a multi-document transaction. Current "
-                              << "readConcern: "
-                              << readConcern.toString(),
-                !explain || readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
-
-        for (auto&& spec : _stageSpecs) {
-            spec->assertSupportsReadConcern(readConcern);
-        }
-    }
+    /**
+     * Perform checks that verify that the LitePipe is valid. Note that this function must be called
+     * before forwarding an aggregation command on an unsharded collection, in order to verify that
+     * the involved namespaces are allowed to be sharded. Returns true if any involved namespace is
+     * sharded.
+     */
+    bool verifyIsSupported(
+        OperationContext* opCtx,
+        const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
+        const boost::optional<ExplainOptions::Verbosity> explain,
+        bool enableMajorityReadConcern) const;
 
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;

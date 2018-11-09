@@ -331,20 +331,15 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         }));
 
         // Test that $currentOp fails if a non-local readConcern is specified for any data-bearing
-        // target. When run on a mongoS with {localOps:true}, read concern is not applicable and is
-        // therefore ignored.
+        // target.
         const linearizableAggCmd = {
             aggregate: 1,
             pipeline: [{$currentOp: curOpSpec}],
             readConcern: {level: "linearizable"},
             cursor: {}
         };
-        if (isLocalMongosCurOp) {
-            assert.commandWorked(adminDB.runCommand(linearizableAggCmd));
-        } else {
-            assert.commandFailedWithCode(adminDB.runCommand(linearizableAggCmd),
-                                         ErrorCodes.InvalidOptions);
-        }
+        assert.commandFailedWithCode(adminDB.runCommand(linearizableAggCmd),
+                                     ErrorCodes.InvalidOptions);
 
         // Test that {idleConnections: false} returns only active connections.
         const idleConn = new Mongo(conn.host);
