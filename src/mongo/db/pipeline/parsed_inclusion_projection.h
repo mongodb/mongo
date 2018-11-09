@@ -62,6 +62,11 @@ public:
     void reportDependencies(DepsTracker* deps) const final;
 
 protected:
+    // For inclusions, we can apply an optimization here by simply appending to the output document
+    // via MutableDocument::addField, rather than always checking for existing fields via setField.
+    void outputProjectedField(StringData field, Value val, MutableDocument* outputDoc) const final {
+        outputDoc->addField(field, val);
+    }
     std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const final {
         return std::make_unique<InclusionNode>(
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));

@@ -100,22 +100,25 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
         auto fieldPair = it.next();
         auto fieldName = fieldPair.first.toString();
         if (_projectedFields.count(fieldName)) {
-            outputDoc->setField(fieldName, applyLeafProjectionToValue(fieldPair.second));
+            outputProjectedField(
+                fieldName, applyLeafProjectionToValue(fieldPair.second), outputDoc);
             continue;
         }
 
         auto childIt = _children.find(fieldName);
         if (childIt != _children.end()) {
-            outputDoc->setField(fieldName,
-                                childIt->second->applyProjectionsToValue(fieldPair.second));
+            outputProjectedField(
+                fieldName, childIt->second->applyProjectionsToValue(fieldPair.second), outputDoc);
         }
     }
 
     // Ensure we project all specified fields, including those not present in the input document.
-    const bool shouldProjectNonExistentFields = applyLeafProjectionToValue(Value(true)).missing();
-    for (auto&& fieldName : _projectedFields) {
-        if (shouldProjectNonExistentFields && inputDoc[fieldName].missing()) {
-            outputDoc->setField(fieldName, applyLeafProjectionToValue(inputDoc[fieldName]));
+    // TODO SERVER-37791: This block is only necessary due to a bug in exclusion semantics.
+    if (applyLeafProjectionToValue(Value(true)).missing()) {
+        for (auto&& fieldName : _projectedFields) {
+            if (inputDoc[fieldName].missing()) {
+                outputProjectedField(fieldName, Value(), outputDoc);
+            }
         }
     }
 }
@@ -141,6 +144,10 @@ Value ProjectionNode::applyProjectionsToValue(Value inputValue) const {
         // any children; for instance, applying the projection {"a.b": true} to the document {a: 2}.
         return transformSkippedValueForOutput(inputValue);
     }
+}
+
+void ProjectionNode::outputProjectedField(StringData field, Value val, MutableDocument* doc) const {
+    doc->setField(field, val);
 }
 
 void ProjectionNode::applyExpressions(const Document& root, MutableDocument* outputDoc) const {
