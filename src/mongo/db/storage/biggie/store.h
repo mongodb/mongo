@@ -110,12 +110,12 @@ public:
 
         reference operator*() {
             _restoreIfChanged();
-            return *(_current->data);
+            return *(_current->_data);
         }
 
         const_pointer operator->() {
             _restoreIfChanged();
-            return &*(_current->data);
+            return &*(_current->_data);
         }
 
     private:
@@ -132,10 +132,10 @@ public:
             if (!_root->_nextVersion)
                 return;
 
-            invariant(_current->data);
+            invariant(_current->_data);
 
             // Copy the key from _current before we move our _root reference.
-            auto key = _current->data->first;
+            auto key = _current->_data->first;
 
             do {
                 _root = _root->_nextVersion;
@@ -165,7 +165,7 @@ public:
             }
 
             // Get path from root to '_current' since it is required to traverse up the tree.
-            Key key = _current->data->first;
+            Key key = _current->_data->first;
 
             std::vector<Node*> context = RadixStore::_buildContext(key, _root.get());
 
@@ -180,13 +180,14 @@ public:
             // of the traversal.
             _current = nullptr;
             while (!context.empty()) {
-                uint8_t oldKey = node->trieKey.front();
+                uint8_t oldKey = node->_trieKey.front();
                 node = context.back();
                 context.pop_back();
 
                 // Check the children right of the node that the iterator was at already. This way,
                 // there will be no backtracking in the traversal.
-                for (auto iter = oldKey + 1 + node->children.begin(); iter != node->children.end();
+                for (auto iter = oldKey + 1 + node->_children.begin();
+                     iter != node->_children.end();
                      ++iter) {
 
                     // If the node has a child, then the sub-tree must have a node with data that
@@ -196,7 +197,7 @@ public:
                         // If the current node has data, return it and exit. If not, continue
                         // following the nodes to find the next one with data. It is necessary to go
                         // to the left-most node in this sub-tree.
-                        if ((*iter)->data) {
+                        if ((*iter)->_data) {
                             _current = iter->get();
                             return;
                         }
@@ -214,19 +215,19 @@ public:
             // '_current' is root. However, it cannot return the root, and hence at least 1
             // iteration of the while loop is required.
             do {
-                for (auto child : _current->children) {
+                for (auto child : _current->_children) {
                     if (child != nullptr) {
                         _current = child.get();
                         break;
                     }
                 }
-            } while (!_current->data);
+            } while (!_current->_data);
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
         std::shared_ptr<Head> _root;
 
-        // "_current" is the node that the iterator is currently on. _current->data will never be
+        // "_current" is the node that the iterator is currently on. _current->_data will never be
         // boost::none (unless it is within the process of tree traversal), and _current will be
         // become a nullptr once there are no more nodes left to iterate.
         Node* _current;
@@ -301,12 +302,12 @@ public:
 
         reference operator*() {
             _restoreIfChanged();
-            return *(_current->data);
+            return *(_current->_data);
         }
 
         const_pointer operator->() {
             _restoreIfChanged();
-            return &*(_current->data);
+            return &*(_current->_data);
         }
 
 
@@ -325,10 +326,10 @@ public:
             if (!_root->_nextVersion)
                 return;
 
-            invariant(_current->data);
+            invariant(_current->_data);
 
             // Copy the key from _current before we move our _root reference.
-            auto key = _current->data->first;
+            auto key = _current->_data->first;
 
             do {
                 _root = _root->_nextVersion;
@@ -348,7 +349,7 @@ public:
                 _current = it._current;
                 // lower_bound(), moved us one up in a forwards direction since the currentKey
                 // didn't exist anymore, move one back.
-                if (_current->data->first > key)
+                if (_current->_data->first > key)
                     _findNextReverse();
             }
         }
@@ -361,7 +362,7 @@ public:
             if (_current == nullptr)
                 return;
 
-            Key key = _current->data->first;
+            Key key = _current->_data->first;
 
             std::vector<Node*> context = RadixStore::_buildContext(key, _root.get());
             Node* node = context.back();
@@ -373,17 +374,17 @@ public:
             uint8_t oldKey;
             _current = nullptr;
             while (!context.empty()) {
-                oldKey = node->trieKey.front();
+                oldKey = node->_trieKey.front();
                 node = context.back();
                 context.pop_back();
 
                 // After moving up in the tree, continue searching for neighboring nodes to see if
                 // they have data, moving from right to left.
                 for (int i = oldKey - 1; i >= 0; i--) {
-                    if (node->children[i] != nullptr) {
+                    if (node->_children[i] != nullptr) {
                         // If there is a sub-tree found, it must have data, therefore it's necessary
                         // to traverse to the right most node.
-                        _current = node->children[i].get();
+                        _current = node->_children[i].get();
                         _traverseRightSubtree();
                         return;
                     }
@@ -391,7 +392,7 @@ public:
 
                 // If there were no sub-trees that contained data, and the 'current' node has data,
                 // it can now finally be 'visited'.
-                if (node->data) {
+                if (node->_data) {
                     _current = node;
                     return;
                 }
@@ -402,7 +403,7 @@ public:
             // This function traverses the given tree to the right most leaf of the subtree where
             // 'current' is the root.
             do {
-                for (auto iter = _current->children.rbegin(); iter != _current->children.rend();
+                for (auto iter = _current->_children.rbegin(); iter != _current->_children.rend();
                      ++iter) {
                     if (*iter != nullptr) {
                         _current = iter->get();
@@ -415,7 +416,7 @@ public:
         // "_root" is a pointer to the root of the tree over which this is iterating.
         std::shared_ptr<Head> _root;
 
-        // "_current" is a the node that the iterator is currently on. _current->data will never be
+        // "_current" is a the node that the iterator is currently on. _current->_data will never be
         // boost::none, and _current will be become a nullptr once there are no more nodes left to
         // iterate.
         Node* _current;
@@ -424,27 +425,21 @@ public:
     using reverse_iterator = reverse_radix_iterator<pointer, value_type&>;
     using const_reverse_iterator = reverse_radix_iterator<const_pointer, const value_type&>;
 
-    // Constructor
-    RadixStore() {
-        _root = std::make_shared<Head>();
+    // Constructors
+    RadixStore() : _root(std::make_shared<Head>()) {}
+    RadixStore(const RadixStore& other) : _root(std::make_shared<Head>(*(other._root))) {}
+    RadixStore(const Head& other) : _root(std::make_shared<Head>(other)) {}
+
+    friend void swap(RadixStore& first, RadixStore& second) {
+        std::swap(first._root, second._root);
     }
 
-    RadixStore(const RadixStore& other) {
-        _root = std::make_shared<Head>(*(other._root));
-        _root->_nextVersion = nullptr;
+    RadixStore(RadixStore&& other) {
+        _root = std::move(other._root);
     }
 
-    RadixStore(const Head& other) {
-        _root = std::make_shared<Head>(other);
-        _root->_nextVersion = nullptr;
-    }
-
-    ~RadixStore() = default;
-
-    // Assignment Operator.
-    RadixStore& operator=(const RadixStore& other) {
-        _root = std::make_shared<Head>(*(other._root));
-        _root->_nextVersion = nullptr;
+    RadixStore& operator=(RadixStore other) {
+        swap(*this, other);
         return *this;
     }
 
@@ -534,27 +529,27 @@ public:
         Node* node = nullptr;
 
         const char* charKey = key.data();
-        size_t depth = prev->depth + prev->trieKey.size();
+        size_t depth = prev->_depth + prev->_trieKey.size();
         while (depth < key.size()) {
             uint8_t c = static_cast<uint8_t>(charKey[depth]);
-            node = prev->children[c].get();
+            node = prev->_children[c].get();
             if (node == nullptr) {
                 return 0;
             }
 
             // If the prefixes mismatch, this key cannot exist in the tree.
-            size_t p = _comparePrefix(node->trieKey, charKey + depth, key.size() - depth);
-            if (p != node->trieKey.size()) {
+            size_t p = _comparePrefix(node->_trieKey, charKey + depth, key.size() - depth);
+            if (p != node->_trieKey.size()) {
                 return 0;
             }
 
-            isUniquelyOwned = isUniquelyOwned && prev->children[c].use_count() == 1;
+            isUniquelyOwned = isUniquelyOwned && prev->_children[c].use_count() == 1;
             context.push_back(std::make_pair(node, isUniquelyOwned));
-            depth = node->depth + node->trieKey.size();
+            depth = node->_depth + node->_trieKey.size();
             prev = node;
         }
 
-        size_t sizeOfRemovedNode = node->data->second.size();
+        size_t sizeOfRemovedNode = node->_data->second.size();
         Node* deleted = context.back().first;
         context.pop_back();
 
@@ -582,10 +577,10 @@ public:
             Node* child = context.at(node).first;
             isUniquelyOwned = context.at(node).second;
 
-            uint8_t childFirstChar = child->trieKey.front();
+            uint8_t childFirstChar = child->_trieKey.front();
             if (!isUniquelyOwned) {
-                parent->children[childFirstChar] = std::make_shared<Node>(*child);
-                child = parent->children[childFirstChar].get();
+                parent->_children[childFirstChar] = std::make_shared<Node>(*child);
+                child = parent->_children[childFirstChar].get();
             }
 
             child->_numSubtreeElems -= 1;
@@ -595,7 +590,7 @@ public:
         }
 
         // Handle the deleted node, as it is a leaf.
-        parent->children[deleted->trieKey.front()] = nullptr;
+        parent->_children[deleted->_trieKey.front()] = nullptr;
 
         // 'parent' may only have one child, in which case we need to evaluate whether or not
         // this node is redundant.
@@ -608,8 +603,8 @@ public:
         std::vector<Node*> context;
         std::vector<uint8_t> trieKeyIndex;
 
-        invariant(this->_root->trieKey.size() == 0 && base._root->trieKey.size() == 0 &&
-                  other._root->trieKey.size() == 0);
+        invariant(this->_root->_trieKey.size() == 0 && base._root->_trieKey.size() == 0 &&
+                  other._root->_trieKey.size() == 0);
         _merge3Helper(
             this->_root.get(), base._root.get(), other._root.get(), context, trieKeyIndex);
     }
@@ -629,7 +624,7 @@ public:
 
         std::shared_ptr<Node> node = _root;
         while (!node->isLeaf()) {
-            for (auto iter = node->children.rbegin(); iter != node->children.rend(); ++iter) {
+            for (auto iter = node->_children.rbegin(); iter != node->_children.rend(); ++iter) {
                 if (*iter != nullptr) {
                     node = *iter;
                     break;
@@ -667,7 +662,7 @@ public:
         // when we go back up the tree we never search anything less than something
         // we already examined.
         uint8_t idx = 0;
-        size_t depth = node->depth + node->trieKey.size();
+        size_t depth = node->_depth + node->_trieKey.size();
 
         // Traverse the path given the key to see if the node exists.
         while (depth < key.size()) {
@@ -675,25 +670,26 @@ public:
             // not trivial. It is necessary to convert the signed char to a unsigned 8-bit int (aka
             // 'unsigned char' or 'uint8_t'). Then only it can be assigned to an unsigned int.
             idx = static_cast<uint8_t>(charKey[depth]);
-            if (node->children[idx] == nullptr) {
+            if (node->_children[idx] == nullptr) {
                 break;
             }
 
-            node = node->children[idx].get();
+            node = node->_children[idx].get();
             // We may eventually need to search this node's parent for larger children.
             idx += 1;
-            size_t mismatchIdx = _comparePrefix(node->trieKey, charKey + depth, key.size() - depth);
+            size_t mismatchIdx =
+                _comparePrefix(node->_trieKey, charKey + depth, key.size() - depth);
 
             // There is a prefix mismatch, so we don't need to traverse anymore.
-            if (mismatchIdx < node->trieKey.size()) {
+            if (mismatchIdx < node->_trieKey.size()) {
                 // Check if the current key in the tree is greater than the one we are looking
                 // for since it can't be equal at this point. It can be greater in two ways:
                 // It can be longer or it can have a larger character at the mismatch index.
                 uint8_t mismatchChar = static_cast<uint8_t>(charKey[mismatchIdx + depth]);
                 if (mismatchIdx == key.size() - depth ||
-                    node->trieKey[mismatchIdx] > mismatchChar) {
+                    node->_trieKey[mismatchIdx] > mismatchChar) {
                     // If the current key is greater and has a value it is the lower bound.
-                    if (node->data) {
+                    if (node->_data) {
                         return const_iterator(_root, node);
                     }
 
@@ -711,10 +707,10 @@ public:
             }
 
             context.push_back(node);
-            depth = node->depth + node->trieKey.size();
+            depth = node->_depth + node->_trieKey.size();
         }
 
-        if (depth == key.size() && node->data) {
+        if (depth == key.size() && node->_data) {
             // If the node exists, then we can just return an iterator to that node.
             return const_iterator(_root, node);
         } else if (depth == key.size()) {
@@ -730,13 +726,13 @@ public:
             node = context.back();
             context.pop_back();
 
-            for (auto iter = idx + node->children.begin(); iter != node->children.end(); ++iter) {
+            for (auto iter = idx + node->_children.begin(); iter != node->_children.end(); ++iter) {
                 if (*iter != nullptr) {
                     // There exists a node with a key larger than the one given, traverse to
                     // this node which will be the left-most node in this sub-tree.
                     node = iter->get();
-                    while (!node->data) {
-                        for (auto iter = node->children.begin(); iter != node->children.end();
+                    while (!node->_data) {
+                        for (auto iter = node->_children.begin(); iter != node->_children.end();
                              ++iter) {
                             if (*iter != nullptr) {
                                 node = iter->get();
@@ -748,11 +744,11 @@ public:
                 }
             }
 
-            if (node->trieKey.empty()) {
+            if (node->_trieKey.empty()) {
                 // We have searched the root. There's nothing left to search.
                 return end();
             } else {
-                unsigned char c = static_cast<unsigned char>(node->trieKey.front());
+                unsigned char c = static_cast<unsigned char>(node->_trieKey.front());
                 idx = c + 1;
             }
         }
@@ -790,48 +786,59 @@ private:
         friend class RadixStore;
 
     public:
-        Node() {
-            depth = 0;
-            data = boost::none;
-            children.fill(nullptr);
-            _numSubtreeElems = 0;
-            _sizeSubtreeElems = 0;
-        }
-
-        Node(std::vector<uint8_t> key) : trieKey(key) {
-            depth = 0;
-            data = boost::none;
-            children.fill(nullptr);
-            _numSubtreeElems = 0;
-            _sizeSubtreeElems = 0;
+        Node() = default;
+        Node(std::vector<uint8_t> key) {
+            _trieKey = key;
         }
 
         Node(const Node& other) {
-            trieKey = other.trieKey;
-            depth = other.depth;
-            if (other.data)
-                data.emplace(other.data->first, other.data->second);
-            children = other.children;
+            _trieKey = other._trieKey;
+            _depth = other._depth;
+            if (other._data)
+                _data.emplace(other._data->first, other._data->second);
+            _children = other._children;
             _numSubtreeElems = other._numSubtreeElems;
             _sizeSubtreeElems = other._sizeSubtreeElems;
         }
 
+        friend void swap(Node& first, Node& second) {
+            std::swap(first.trieKey, second.trieKey);
+            std::swap(first.depth, second.depth);
+            std::swap(first.data, second.data);
+            std::swap(first.children, second.children);
+            std::swap(first._numSubtreeElems, second._numSubtreeElems);
+            std::swap(first._sizeSubtreeElems, second._sizeSubtreeElems);
+        }
+
+        Node(Node&& other) {
+            _depth = std::move(other._depth);
+            _numSubtreeElems = std::move(other._numSubtreeElems);
+            _sizeSubtreeElems = std::move(other._sizeSubtreeElems);
+            _trieKey = std::move(other._trieKey);
+            _data = std::move(other._data);
+            _children = std::move(other._children);
+        }
+
+        Node& operator=(const Node other) {
+            swap(*this, other);
+            return *this;
+        }
+
         bool isLeaf() const {
-            for (auto child : children) {
+            for (auto child : _children) {
                 if (child != nullptr)
                     return false;
             }
             return true;
         }
 
-        std::vector<uint8_t> trieKey;
-        unsigned int depth;
-        boost::optional<value_type> data;
-        std::array<std::shared_ptr<Node>, 256> children;
-
     protected:
-        size_type _numSubtreeElems;
-        size_type _sizeSubtreeElems;
+        unsigned int _depth = 0;
+        size_type _numSubtreeElems = 0;
+        size_type _sizeSubtreeElems = 0;
+        std::vector<uint8_t> _trieKey;
+        boost::optional<value_type> _data;
+        std::array<std::shared_ptr<Node>, 256> _children;
     };
 
     /**
@@ -843,20 +850,25 @@ private:
         friend class RadixStore;
 
     public:
-        Head() : Node() {
-            _nextVersion = nullptr;
-        }
-
-        Head(std::vector<uint8_t> key) : Node(key) {
-            _nextVersion = nullptr;
-        }
-
+        Head() = default;
+        Head(std::vector<uint8_t> key) : Node(key) {}
+        Head(const Node& other) : Node(other) {}
         Head(const Head& other) : Node(other) {
             _nextVersion = other._nextVersion;
         }
 
-        Head(const Node& other) : Node(other) {
-            _nextVersion = nullptr;
+        friend void swap(Head& first, Head& second) {
+            Node::swap(first, second);
+            std::swap(first._nextVersion, second._nextVersion);
+        }
+
+        Head(Head&& other) : Node(std::move(other)) {
+            _nextVersion = std::move(other._nextVersion);
+        }
+
+        Head& operator=(const Head other) {
+            swap(*this, other);
+            return *this;
         }
 
     protected:
@@ -880,15 +892,15 @@ private:
             ret.push_back(' ');
         }
 
-        for (uint8_t ch : node->trieKey) {
+        for (uint8_t ch : node->_trieKey) {
             ret.push_back(ch);
         }
-        if (node->data) {
+        if (node->_data) {
             ret.push_back('*');
         }
         ret.push_back('\n');
 
-        for (auto child : node->children) {
+        for (auto child : node->_children) {
             if (child != nullptr) {
                 ret.append(_walkTree(child.get(), depth + 1));
             }
@@ -899,12 +911,12 @@ private:
     Node* _findNode(const Key& key, bool allowNext, bool allowEmpty) const {
         const char* charKey = key.data();
 
-        unsigned int depth = _root->depth;
+        unsigned int depth = _root->_depth;
         unsigned int initialDepthOffset = depth;
 
         // If the root node's triekey is not empty then the tree is a subtree, and so we examine it.
-        for (unsigned int i = 0; i < _root->trieKey.size(); i++) {
-            if (charKey[i + initialDepthOffset] != _root->trieKey[i]) {
+        for (unsigned int i = 0; i < _root->_trieKey.size(); i++) {
+            if (charKey[i + initialDepthOffset] != _root->_trieKey[i]) {
                 return nullptr;
             }
             depth++;
@@ -914,30 +926,31 @@ private:
             }
         }
 
-        depth = _root->depth + _root->trieKey.size();
+        depth = _root->_depth + _root->_trieKey.size();
         uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
-        auto node = _root->children[childFirstChar];
+        auto node = _root->_children[childFirstChar];
 
         while (node != nullptr) {
 
-            depth = node->depth;
+            depth = node->_depth;
 
-            size_t mismatchIdx = _comparePrefix(node->trieKey, charKey + depth, key.size() - depth);
-            if (mismatchIdx != node->trieKey.size()) {
+            size_t mismatchIdx =
+                _comparePrefix(node->_trieKey, charKey + depth, key.size() - depth);
+            if (mismatchIdx != node->_trieKey.size()) {
                 // The node with the key was not found in the tree. This could be because the
                 // node which will be located at that key was not yet compressed due to the
                 // prefixes. Until then we return its future children.
                 if (allowNext && node->_numSubtreeElems > 0)
                     return node.get();
                 return nullptr;
-            } else if (mismatchIdx == key.size() - depth && (node->data || allowEmpty)) {
+            } else if (mismatchIdx == key.size() - depth && (node->_data || allowEmpty)) {
                 return node.get();
             }
 
-            depth = node->depth + node->trieKey.size();
+            depth = node->_depth + node->_trieKey.size();
 
             childFirstChar = static_cast<uint8_t>(charKey[depth]);
-            node = node->children[childFirstChar];
+            node = node->_children[childFirstChar];
         }
 
         return nullptr;
@@ -976,7 +989,7 @@ private:
 
         const char* charKey = key.data();
 
-        int depth = _root->depth + _root->trieKey.size();
+        int depth = _root->_depth + _root->_trieKey.size();
         uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
 
         if (_root.use_count() > 1) {
@@ -993,24 +1006,25 @@ private:
         _root->_sizeSubtreeElems += elemSize;
 
         Node* prev = _root.get();
-        std::shared_ptr<Node> node = prev->children[childFirstChar];
+        std::shared_ptr<Node> node = prev->_children[childFirstChar];
         while (node != nullptr) {
             if (node.use_count() - 1 > 1) {
                 // Copy node on a modifying operation when it isn't owned uniquely.
                 node = std::make_shared<Node>(*node);
-                prev->children[childFirstChar] = node;
+                prev->_children[childFirstChar] = node;
             }
 
             // 'node' is uniquely owned at this point, so we are free to modify it.
-            // Get the index at which node->trieKey and the new key differ.
-            size_t mismatchIdx = _comparePrefix(node->trieKey, charKey + depth, key.size() - depth);
+            // Get the index at which node->_trieKey and the new key differ.
+            size_t mismatchIdx =
+                _comparePrefix(node->_trieKey, charKey + depth, key.size() - depth);
 
             // The keys mismatch, so we need to split this node.
-            if (mismatchIdx != node->trieKey.size()) {
+            if (mismatchIdx != node->_trieKey.size()) {
 
-                // Make a new node with whatever prefix is shared between node->trieKey
+                // Make a new node with whatever prefix is shared between node->_trieKey
                 // and the new key. This will replace the current node in the tree.
-                std::vector<uint8_t> newKey = _makeKey(node->trieKey, 0, mismatchIdx);
+                std::vector<uint8_t> newKey = _makeKey(node->_trieKey, 0, mismatchIdx);
                 Node* newNode = _addChild(prev, newKey, boost::none);
 
                 depth += mismatchIdx;
@@ -1025,26 +1039,26 @@ private:
                 } else {
                     // The new key is a prefix of an existing key, and has its own node, so we don't
                     // need to add any new nodes.
-                    newNode->data.emplace(value->first, value->second);
+                    newNode->_data.emplace(value->first, value->second);
                     newNode->_numSubtreeElems += 1;
                     newNode->_sizeSubtreeElems += value->second.size();
                 }
 
                 // Change the current node's trieKey and make a child of the new node.
-                newKey = _makeKey(node->trieKey, mismatchIdx, node->trieKey.size() - mismatchIdx);
-                newNode->children[newKey.front()] = node;
+                newKey = _makeKey(node->_trieKey, mismatchIdx, node->_trieKey.size() - mismatchIdx);
+                newNode->_children[newKey.front()] = node;
 
-                node->trieKey = newKey;
-                node->depth = newNode->depth + newNode->trieKey.size();
+                node->_trieKey = newKey;
+                node->_depth = newNode->_depth + newNode->_trieKey.size();
 
                 return std::pair<const_iterator, bool>(it, true);
             } else if (mismatchIdx == key.size() - depth) {
                 // Update an internal node.
                 if (!value) {
-                    node->data = boost::none;
+                    node->_data = boost::none;
                     _compressOnlyChild(node.get());
                 } else {
-                    node->data.emplace(value->first, value->second);
+                    node->_data.emplace(value->first, value->second);
                 }
                 node->_numSubtreeElems += elemNum;
                 node->_sizeSubtreeElems += elemSize;
@@ -1056,11 +1070,11 @@ private:
             node->_numSubtreeElems += elemNum;
             node->_sizeSubtreeElems += elemSize;
 
-            depth = node->depth + node->trieKey.size();
+            depth = node->_depth + node->_trieKey.size();
             childFirstChar = static_cast<uint8_t>(charKey[depth]);
 
             prev = node.get();
-            node = node->children[childFirstChar];
+            node = node->_children[childFirstChar];
         }
 
         // Add a completely new child to a node. The new key at this depth does not
@@ -1102,17 +1116,17 @@ private:
     Node* _addChild(Node* node, std::vector<uint8_t> key, boost::optional<value_type> value) {
 
         std::shared_ptr<Node> newNode = std::make_shared<Node>(key);
-        newNode->depth = node->depth + node->trieKey.size();
+        newNode->_depth = node->_depth + node->_trieKey.size();
         if (value) {
-            newNode->data.emplace(value->first, value->second);
+            newNode->_data.emplace(value->first, value->second);
             newNode->_numSubtreeElems = 1;
             newNode->_sizeSubtreeElems = value->second.size();
         }
-        if (node->children[key.front()] != nullptr) {
-            newNode->_numSubtreeElems += node->children[key.front()]->_numSubtreeElems;
-            newNode->_sizeSubtreeElems += node->children[key.front()]->_sizeSubtreeElems;
+        if (node->_children[key.front()] != nullptr) {
+            newNode->_numSubtreeElems += node->_children[key.front()]->_numSubtreeElems;
+            newNode->_sizeSubtreeElems += node->_children[key.front()]->_sizeSubtreeElems;
         }
-        node->children[key.front()] = newNode;
+        node->_children[key.front()] = newNode;
         return newNode.get();
     }
 
@@ -1129,13 +1143,13 @@ private:
         context.push_back(node);
 
         const char* charKey = key.data();
-        size_t depth = node->depth + node->trieKey.size();
+        size_t depth = node->_depth + node->_trieKey.size();
 
         while (depth < key.size()) {
             uint8_t c = static_cast<uint8_t>(charKey[depth]);
-            node = node->children[c].get();
+            node = node->_children[c].get();
             context.push_back(node);
-            depth = node->depth + node->trieKey.size();
+            depth = node->_depth + node->_trieKey.size();
         }
         return context;
     }
@@ -1163,31 +1177,31 @@ private:
      */
     void _compressOnlyChild(Node* node) {
         // Don't compress if this node has an actual value associated with it or is the root.
-        if (node->data || node->trieKey.empty()) {
+        if (node->_data || node->_trieKey.empty()) {
             return;
         }
 
         // Determine if this node has only one child.
         std::shared_ptr<Node> onlyChild = nullptr;
 
-        for (size_t i = 0; i < node->children.size(); ++i) {
-            if (node->children[i] != nullptr) {
+        for (size_t i = 0; i < node->_children.size(); ++i) {
+            if (node->_children[i] != nullptr) {
                 if (onlyChild != nullptr) {
                     return;
                 }
-                onlyChild = node->children[i];
+                onlyChild = node->_children[i];
             }
         }
 
         // Append the child's key onto the parent.
-        for (char item : onlyChild->trieKey) {
-            node->trieKey.push_back(item);
+        for (char item : onlyChild->_trieKey) {
+            node->_trieKey.push_back(item);
         }
 
-        if (onlyChild->data) {
-            node->data.emplace(onlyChild->data->first, onlyChild->data->second);
+        if (onlyChild->_data) {
+            node->_data.emplace(onlyChild->_data->first, onlyChild->_data->second);
         }
-        node->children = onlyChild->children;
+        node->_children = onlyChild->_children;
     }
 
     /**
@@ -1200,7 +1214,7 @@ private:
         context[0] = replaceNode;
 
         for (size_t node = 1; node < context.size(); node++) {
-            replaceNode = replaceNode->children[trieKeyIndex[node - 1]].get();
+            replaceNode = replaceNode->_children[trieKeyIndex[node - 1]].get();
             context[node] = replaceNode;
         }
     }
@@ -1229,13 +1243,13 @@ private:
         for (size_t idx = 1; idx < context.size(); idx++) {
             node = context[idx];
 
-            if (prev->children[node->trieKey.front()].use_count() > 1) {
+            if (prev->_children[node->_trieKey.front()].use_count() > 1) {
                 std::shared_ptr<Node> nodeCopy = std::make_shared<Node>(*node);
-                prev->children[nodeCopy->trieKey.front()] = nodeCopy;
+                prev->_children[nodeCopy->_trieKey.front()] = nodeCopy;
                 context[idx] = nodeCopy.get();
                 prev = nodeCopy.get();
             } else {
-                prev = prev->children[node->trieKey.front()].get();
+                prev = prev->_children[node->_trieKey.front()].get();
             }
         }
 
@@ -1348,16 +1362,16 @@ private:
         context.push_back(current);
 
         // Root doesn't have a trie key.
-        if (!current->trieKey.empty())
-            trieKeyIndex.push_back(current->trieKey.at(0));
+        if (!current->_trieKey.empty())
+            trieKeyIndex.push_back(current->_trieKey.at(0));
 
         for (size_t key = 0; key < 256; ++key) {
             // Since _makeBranchUnique may make changes to the pointer addresses in recursive calls.
             current = context.back();
 
-            Node* node = current->children[key].get();
-            Node* baseNode = base->children[key].get();
-            Node* otherNode = other->children[key].get();
+            Node* node = current->_children[key].get();
+            Node* baseNode = base->_children[key].get();
+            Node* otherNode = other->_children[key].get();
 
             if (!node && !baseNode && !otherNode)
                 continue;
@@ -1378,7 +1392,7 @@ private:
                     // modifications that go on in _makeBranchUnique.
                     _rebuildContext(context, trieKeyIndex);
 
-                    current->children[key] = other->children[key];
+                    current->_children[key] = other->_children[key];
                     current->_sizeSubtreeElems += localSizeDelta;
                     current->_numSubtreeElems += localNumDelta;
 
@@ -1398,7 +1412,7 @@ private:
 
                     current = _makeBranchUnique(context);
                     _rebuildContext(context, trieKeyIndex);
-                    current->children[key] = nullptr;
+                    current->_children[key] = nullptr;
                     current->_sizeSubtreeElems -= localSizeDelta;
                     current->_numSubtreeElems -= localNumDelta;
 
@@ -1411,7 +1425,7 @@ private:
 
                     current = _makeBranchUnique(context);
                     _rebuildContext(context, trieKeyIndex);
-                    current->children[key] = other->children[key];
+                    current->_children[key] = other->_children[key];
                     current->_sizeSubtreeElems += localSizeDelta;
                     current->_numSubtreeElems += localNumDelta;
 
@@ -1428,7 +1442,8 @@ private:
                 // structure of compressed radix tries makes it difficult to compare the
                 // trees node by node, hence the reason for resolving these differences
                 // element by element.
-                if (node->trieKey == baseNode->trieKey && baseNode->trieKey == otherNode->trieKey) {
+                if (node->_trieKey == baseNode->_trieKey &&
+                    baseNode->_trieKey == otherNode->_trieKey) {
                     std::pair<int, int> diff =
                         _merge3Helper(node, baseNode, otherNode, context, trieKeyIndex);
                     numDelta += diff.first;
@@ -1459,11 +1474,11 @@ private:
 
     Node* _begin(Node* root) const noexcept {
         Node* node = root;
-        while (!node->data) {
-            if (node->children.empty())
+        while (!node->_data) {
+            if (node->_children.empty())
                 return nullptr;
 
-            for (auto child : node->children) {
+            for (auto child : node->_children) {
                 if (child != nullptr) {
                     node = child.get();
                     break;
