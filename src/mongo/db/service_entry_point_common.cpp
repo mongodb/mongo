@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -343,11 +342,11 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
     operationTime.appendAsOperationTime(commandBodyFieldsBob);
 }
 
-void invokeInTransaction(OperationContext* opCtx,
-                         CommandInvocation* invocation,
-                         TransactionParticipant* txnParticipant,
-                         const OperationSessionInfoFromClient& sessionOptions,
-                         rpc::ReplyBuilderInterface* replyBuilder) {
+void invokeWithSessionCheckedOut(OperationContext* opCtx,
+                                 CommandInvocation* invocation,
+                                 TransactionParticipant* txnParticipant,
+                                 const OperationSessionInfoFromClient& sessionOptions,
+                                 rpc::ReplyBuilderInterface* replyBuilder) {
 
     if (!opCtx->getClient()->isInDirectClient()) {
         txnParticipant->beginOrContinue(*sessionOptions.getTxnNumber(),
@@ -428,7 +427,8 @@ bool runCommandImpl(OperationContext* opCtx,
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         if (txnParticipant) {
-            invokeInTransaction(opCtx, invocation, txnParticipant, sessionOptions, replyBuilder);
+            invokeWithSessionCheckedOut(
+                opCtx, invocation, txnParticipant, sessionOptions, replyBuilder);
         } else {
             invocation->run(opCtx, replyBuilder);
         }
@@ -460,7 +460,7 @@ bool runCommandImpl(OperationContext* opCtx,
 
         try {
             if (txnParticipant) {
-                invokeInTransaction(
+                invokeWithSessionCheckedOut(
                     opCtx, invocation, txnParticipant, sessionOptions, replyBuilder);
             } else {
                 invocation->run(opCtx, replyBuilder);
