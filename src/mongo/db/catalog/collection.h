@@ -393,6 +393,13 @@ public:
         return this->_impl().ns();
     }
 
+    /**
+     * Sets a new namespace on this Collection, in the case that the Collection is being renamed.
+     * In general, reads and writes to Collection objects are synchronized using locks from the lock
+     * manager. However, there is special synchronization for ns() and setNs() so that the
+     * UUIDCatalog can perform UUID to namespace lookup without holding a Collection lock. See
+     * UUIDCatalog::setCollectionNamespace().
+     */
     inline void setNs(NamespaceString nss) {
         this->_impl().setNs(std::move(nss));
     }

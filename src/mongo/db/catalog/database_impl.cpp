@@ -180,7 +180,6 @@ public:
         invariant(it->second == _coll);
         _db->_collections[_fromNs.ns()] = _coll;
         _db->_collections.erase(_toNs.ns());
-        _coll->setNs(_fromNs);
     }
 
     DatabaseImpl* const _db;
@@ -745,8 +744,10 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     _collections.erase(fromNS);
     _collections[toNS] = collToRename;
 
-    // Update Collection's ns.
-    collToRename->setNs(toNSS);
+    // Set the namespace of 'collToRename' from within the UUIDCatalog. This is necessary because
+    // the UUIDCatalog mutex synchronizes concurrent access to the collection's namespace for
+    // callers that may not hold a collection lock.
+    UUIDCatalog::get(opCtx).setCollectionNamespace(opCtx, collToRename, fromNSS, toNSS);
 
     // Register a Change which, on rollback, will reinstall the Collection* in the collections map
     // so that it is associated with 'fromNS', not 'toNS'.

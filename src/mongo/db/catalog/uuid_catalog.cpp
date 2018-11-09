@@ -96,42 +96,6 @@ repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-void UUIDCatalogObserver::onRenameCollection(OperationContext* opCtx,
-                                             const NamespaceString& fromCollection,
-                                             const NamespaceString& toCollection,
-                                             OptionalCollectionUUID uuid,
-                                             OptionalCollectionUUID dropTargetUUID,
-                                             bool stayTemp) {
-
-    if (!uuid)
-        return;
-    auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, toCollection.db());
-    auto newColl = db->getCollection(opCtx, toCollection);
-    invariant(newColl);
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    catalog.onRenameCollection(opCtx, newColl, uuid.get());
-}
-
-repl::OpTime UUIDCatalogObserver::preRenameCollection(OperationContext* opCtx,
-                                                      const NamespaceString& fromCollection,
-                                                      const NamespaceString& toCollection,
-                                                      OptionalCollectionUUID uuid,
-                                                      OptionalCollectionUUID dropTargetUUID,
-                                                      bool stayTemp) {
-    return {};
-}
-
-void UUIDCatalogObserver::postRenameCollection(OperationContext* opCtx,
-                                               const NamespaceString& fromCollection,
-                                               const NamespaceString& toCollection,
-                                               OptionalCollectionUUID uuid,
-                                               OptionalCollectionUUID dropTargetUUID,
-                                               bool stayTemp) {
-    // postRenameCollection and onRenameCollection are semantically equivalent from the perspective
-    // of the UUIDCatalogObserver.
-    onRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
-}
-
 UUIDCatalog& UUIDCatalog::get(ServiceContext* svcCtx) {
     return getCatalog(svcCtx);
 }
@@ -155,13 +119,25 @@ void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid)
         [this, foundColl, uuid] { registerUUIDCatalogEntry(uuid, foundColl); });
 }
 
-void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
-                                     Collection* coll,
-                                     CollectionUUID uuid) {
+void UUIDCatalog::setCollectionNamespace(OperationContext* opCtx,
+                                         Collection* coll,
+                                         const NamespaceString& fromCollection,
+                                         const NamespaceString& toCollection) {
+    // Rather than maintain, in addition to the UUID -> Collection* mapping, an auxiliary data
+    // structure with the UUID -> namespace mapping, the UUIDCatalog relies on Collection::ns() to
+    // provide UUID to namespace lookup. In addition, the UUIDCatalog does not require callers to
+    // hold locks.
+    //
+    // This means that Collection::ns() may be called while only '_catalogLock' (and no lock manager
+    // locks) are held. The purpose of this function is ensure that we write to the Collection's
+    // namespace string under '_catalogLock'.
     invariant(coll);
-    Collection* oldColl = replaceUUIDCatalogEntry(uuid, coll);
-    opCtx->recoveryUnit()->onRollback(
-        [this, oldColl, uuid] { replaceUUIDCatalogEntry(uuid, oldColl); });
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    coll->setNs(toCollection);
+    opCtx->recoveryUnit()->onRollback([this, coll, fromCollection] {
+        stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+        coll->setNs(std::move(fromCollection));
+    });
 }
 
 void UUIDCatalog::onCloseDatabase(Database* db) {

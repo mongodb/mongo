@@ -489,11 +489,6 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-
-        auto newColl = autoDB.getDb()->getCollection(opCtx, toNS);
-        if (newColl->uuid()) {
-            UUIDCatalog::get(opCtx).onRenameCollection(opCtx, newColl, newColl->uuid().get());
-        }
         wunit.commit();
         return status;
     });

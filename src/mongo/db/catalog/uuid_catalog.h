@@ -93,24 +93,35 @@ public:
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
                      const BSONObj& idxDescriptor) override {}
+
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             OptionalCollectionUUID uuid,
                             OptionalCollectionUUID dropTargetUUID,
-                            bool stayTemp) override;
+                            bool stayTemp) override {
+        // Do nothing: collection renames don't affect the UUID mapping.
+    }
+
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      OptionalCollectionUUID uuid,
                                      OptionalCollectionUUID dropTargetUUID,
-                                     bool stayTemp) override;
+                                     bool stayTemp) override {
+        // Do nothing: collection renames don't affect the UUID mapping.
+        return {};
+    }
+
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
                               OptionalCollectionUUID uuid,
                               OptionalCollectionUUID dropTargetUUID,
-                              bool stayTemp) override;
+                              bool stayTemp) override {
+        // Do nothing: collection renames don't affect the UUID mapping.
+    }
+
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
                     const BSONObj& applyOpCmd) override {}
@@ -155,11 +166,16 @@ public:
     void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
 
     /**
-     * This function atomically removes any existing entry for uuid from the UUID catalog and adds
-     * a new entry for uuid associated with the Collection coll. It is called by the op observer
-     * when a collection is renamed.
+     * This function is responsible for safely setting the namespace string inside 'coll' to the
+     * value of 'toCollection'. The caller need not hold locks on the collection.
+     *
+     * Must be called within a WriteUnitOfWork. The Collection namespace will be set back to
+     * 'fromCollection' if the WriteUnitOfWork aborts.
      */
-    void onRenameCollection(OperationContext* opCtx, Collection* coll, CollectionUUID uuid);
+    void setCollectionNamespace(OperationContext* opCtx,
+                                Collection* coll,
+                                const NamespaceString& fromCollection,
+                                const NamespaceString& toCollection);
 
     /**
      * Implies onDropCollection for all collections in db, but is not transactional.

@@ -112,17 +112,17 @@ TEST_F(UUIDCatalogTest, OnDropCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
 }
 
-TEST_F(UUIDCatalogTest, OnRenameCollection) {
-    auto oldUUID = CollectionUUID::gen();
+TEST_F(UUIDCatalogTest, RenameCollection) {
+    auto uuid = CollectionUUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
-    Collection oldCol(stdx::make_unique<CollectionMock>(oldNss));
-    catalog.onCreateCollection(&opCtx, &oldCol, oldUUID);
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(oldUUID), &oldCol);
+    Collection collection(stdx::make_unique<CollectionMock>(oldNss));
+    catalog.onCreateCollection(&opCtx, &collection, uuid);
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(uuid), &collection);
 
     NamespaceString newNss(nss.db(), "newcol");
-    Collection newCol(stdx::make_unique<CollectionMock>(newNss));
-    catalog.onRenameCollection(&opCtx, &newCol, oldUUID);
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(oldUUID), &newCol);
+    catalog.setCollectionNamespace(&opCtx, &collection, oldNss, newNss);
+    ASSERT_EQ(collection.ns(), newNss);
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(uuid), &collection);
 }
 
 TEST_F(UUIDCatalogTest, NonExistingNextCol) {
