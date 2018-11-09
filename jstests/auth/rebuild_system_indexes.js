@@ -1,6 +1,9 @@
-// This test verifies that the server will attempt to rebuild admin.system.users index on startup if
-// it is in a partially built state.
-
+/**
+ * This test verifies that the server will attempt to rebuild admin.system.users index on startup if
+ * it is in a partially built state using the mmapv1 storage engine.
+ *
+ * @tags: [requires_journaling, requires_mmapv1]
+ */
 (() => {
     "use strict";
 
