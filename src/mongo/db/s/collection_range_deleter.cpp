@@ -374,6 +374,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         invariant(PlanExecutor::ADVANCED == state);
 
         exec->saveState();
+
         writeConflictRetry(opCtx, "delete range", nss.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
             if (saver) {
