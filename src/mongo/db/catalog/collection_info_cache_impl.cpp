@@ -84,13 +84,14 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
     std::unique_ptr<IndexCatalog::IndexIterator> it =
         _collection->getIndexCatalog()->getIndexIterator(opCtx, true);
     while (it->more()) {
-        IndexCatalogEntry* entry = it->next();
-        IndexDescriptor* descriptor = entry->descriptor();
-        IndexAccessMethod* iam = entry->accessMethod();
+        const IndexCatalogEntry* entry = it->next();
+        const IndexDescriptor* descriptor = entry->descriptor();
+        const IndexAccessMethod* iam = entry->accessMethod();
 
         if (descriptor->getAccessMethodName() == IndexNames::WILDCARD) {
             // Obtain the projection used by the $** index's key generator.
-            const auto* pathProj = static_cast<WildcardAccessMethod*>(iam)->getProjectionExec();
+            const auto* pathProj =
+                static_cast<const WildcardAccessMethod*>(iam)->getProjectionExec();
             // If the projection is an exclusion, then we must check the new document's keys on all
             // updates, since we do not exhaustively know the set of paths to be indexed.
             if (pathProj->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection) {

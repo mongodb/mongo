@@ -219,7 +219,7 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
                           << NamespaceString::kSessionTransactionsTableNamespace.ns(),
             idIndex);
 
-    auto indexAccess = collection->getIndexCatalog()->getIndex(idIndex);
+    auto indexAccess = collection->getIndexCatalog()->getEntry(idIndex)->accessMethod();
     // Since we are looking up a key inside the _id index, create a key object consisting of only
     // the _id field.
     auto idToFetch = updateRequest.getQuery().firstElement();

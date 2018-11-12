@@ -89,7 +89,7 @@ public:
         int indexesIterated = 0;
         bool foundIndex = false;
         while (ii->more()) {
-            IndexDescriptor* indexDesc = ii->next()->descriptor();
+            auto indexDesc = ii->next()->descriptor();
             indexesIterated++;
             BSONObjIterator boit(indexDesc->infoObj());
             while (boit.more() && !foundIndex) {

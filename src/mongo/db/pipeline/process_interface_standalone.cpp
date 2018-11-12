@@ -505,7 +505,7 @@ bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
 
     auto indexIterator = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (indexIterator->more()) {
-        IndexCatalogEntry* entry = indexIterator->next();
+        const IndexCatalogEntry* entry = indexIterator->next();
         if (supportsUniqueKey(expCtx, entry, uniqueKeyPaths)) {
             return true;
         }

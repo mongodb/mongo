@@ -89,7 +89,7 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         int indexNumber = _indexConsistency->getIndexNumber(indexNs);
         ValidateResults curRecordResults;
 
-        const IndexAccessMethod* iam = _indexCatalog->getIndex(descriptor);
+        const IndexAccessMethod* iam = _indexCatalog->getEntry(descriptor)->accessMethod();
 
         if (descriptor->isPartial()) {
             const IndexCatalogEntry* ice = _indexCatalog->getEntry(descriptor);
@@ -254,7 +254,7 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
     output->appendNumber("nrecords", nrecords);
 }
 
-void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,
+void RecordStoreValidateAdaptor::validateIndexKeyCount(const IndexDescriptor* idx,
                                                        int64_t numRecs,
                                                        ValidateResults& results) {
     const std::string indexNs = idx->indexNamespace();

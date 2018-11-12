@@ -47,7 +47,6 @@ class Client;
 class Collection;
 
 class IndexDescriptor;
-class IndexAccessMethod;
 struct InsertDeleteOptions;
 
 struct BsonRecord {
@@ -80,19 +79,19 @@ public:
     public:
         virtual ~IndexIterator() = default;
         bool more();
-        IndexCatalogEntry* next();
+        const IndexCatalogEntry* next();
 
     protected:
         /**
          * Advance the underlying iterator and returns the next index entry. Returns nullptr when
          * the iterator is exhausted.
          */
-        virtual IndexCatalogEntry* _advance() = 0;
+        virtual const IndexCatalogEntry* _advance() = 0;
 
     private:
         bool _start = true;
-        IndexCatalogEntry* _prev = nullptr;
-        IndexCatalogEntry* _next = nullptr;
+        const IndexCatalogEntry* _prev = nullptr;
+        const IndexCatalogEntry* _next = nullptr;
     };
 
     class ReadyIndexesIterator : public IndexIterator {
@@ -102,7 +101,7 @@ public:
                              IndexCatalogEntryContainer::const_iterator endIterator);
 
     private:
-        IndexCatalogEntry* _advance() override;
+        const IndexCatalogEntry* _advance() override;
 
         OperationContext* const _opCtx;
         IndexCatalogEntryContainer::const_iterator _iterator;
@@ -120,7 +119,7 @@ public:
                            std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer);
 
     private:
-        IndexCatalogEntry* _advance() override;
+        const IndexCatalogEntry* _advance() override;
 
         OperationContext* const _opCtx;
         std::vector<IndexCatalogEntry*>::const_iterator _iterator;
@@ -205,16 +204,17 @@ public:
      */
     virtual BSONObj getDefaultIdIndexSpec() const = 0;
 
-    virtual IndexDescriptor* findIdIndex(OperationContext* const opCtx) const = 0;
+    virtual const IndexDescriptor* findIdIndex(OperationContext* const opCtx) const = 0;
 
     /**
      * Find index by name.  The index name uniquely identifies an index.
      *
      * @return null if cannot find
      */
-    virtual IndexDescriptor* findIndexByName(OperationContext* const opCtx,
-                                             const StringData name,
-                                             const bool includeUnfinishedIndexes = false) const = 0;
+    virtual const IndexDescriptor* findIndexByName(
+        OperationContext* const opCtx,
+        const StringData name,
+        const bool includeUnfinishedIndexes = false) const = 0;
 
     /**
      * Find index by matching key pattern and collation spec.  The key pattern and collation spec
@@ -226,7 +226,7 @@ public:
      * @return null if cannot find index, otherwise the index with a matching key pattern and
      * collation.
      */
-    virtual IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
+    virtual const IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
         OperationContext* const opCtx,
         const BSONObj& key,
         const BSONObj& collationSpec,
@@ -238,10 +238,11 @@ public:
      *
      * Consider using 'findIndexByName' if expecting to match one index.
      */
-    virtual void findIndexesByKeyPattern(OperationContext* const opCtx,
-                                         const BSONObj& key,
-                                         const bool includeUnfinishedIndexes,
-                                         std::vector<IndexDescriptor*>* const matches) const = 0;
+    virtual void findIndexesByKeyPattern(
+        OperationContext* const opCtx,
+        const BSONObj& key,
+        const bool includeUnfinishedIndexes,
+        std::vector<const IndexDescriptor*>* const matches) const = 0;
 
     /**
      * Returns an index suitable for shard key range scans.
@@ -256,13 +257,13 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    virtual IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
-                                                       const BSONObj& shardKey,
-                                                       const bool requireSingleKey) const = 0;
+    virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
+                                                             const BSONObj& shardKey,
+                                                             const bool requireSingleKey) const = 0;
 
     virtual void findIndexByType(OperationContext* const opCtx,
                                  const std::string& type,
-                                 std::vector<IndexDescriptor*>& matches,
+                                 std::vector<const IndexDescriptor*>& matches,
                                  const bool includeUnfinishedIndexes = false) const = 0;
 
     /**
@@ -297,10 +298,6 @@ public:
      */
     virtual std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared()
         const = 0;
-
-    virtual IndexAccessMethod* getIndex(const IndexDescriptor* const desc) = 0;
-
-    virtual const IndexAccessMethod* getIndex(const IndexDescriptor* const desc) const = 0;
 
     /**
      * Returns a not-ok Status if there are any unfinished index builds. No new indexes should
@@ -344,7 +341,7 @@ public:
                                 stdx::function<void(const IndexDescriptor*)> onDropFn) = 0;
     virtual void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) = 0;
 
-    virtual Status dropIndex(OperationContext* const opCtx, IndexDescriptor* const desc) = 0;
+    virtual Status dropIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) = 0;
 
     /**
      * Drops all incomplete indexes and returns specs. After this, the indexes can be rebuilt.
@@ -369,6 +366,15 @@ public:
      */
     virtual MultikeyPaths getMultikeyPaths(OperationContext* const opCtx,
                                            const IndexDescriptor* const idx) = 0;
+
+    /**
+     * Sets the index 'desc' to be multikey with the provided 'multikeyPaths'.
+     *
+     * See IndexCatalogEntry::setMultikey().
+     */
+    virtual void setMultikeyPaths(OperationContext* const opCtx,
+                                  const IndexDescriptor* const desc,
+                                  const MultikeyPaths& multikeyPaths) = 0;
 
     // ----- data modifiers ------
 
@@ -404,6 +410,12 @@ public:
                                const RecordId& loc,
                                const bool noWarn,
                                int64_t* const keysDeletedOut) = 0;
+
+    /*
+     * Attempt compaction on all ready indexes to regain disk space, if the storage engine's index
+     * supports compaction in-place.
+     */
+    virtual Status compactIndexes(OperationContext* opCtx) = 0;
 
     virtual std::string getAccessMethodName(const BSONObj& keyPattern) = 0;
 

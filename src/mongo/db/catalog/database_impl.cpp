@@ -572,7 +572,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         // rename. In the case that this collection drop gets rolled back, this will incur a
         // performance hit, since those indexes will have to be rebuilt from scratch, but data
         // integrity is maintained.
-        std::vector<IndexDescriptor*> indexesToDrop;
+        std::vector<const IndexDescriptor*> indexesToDrop;
         auto indexIter = collection->getIndexCatalog()->getIndexIterator(opCtx, true);
 
         // Determine which index names are too long. Since we don't have the collection drop optime

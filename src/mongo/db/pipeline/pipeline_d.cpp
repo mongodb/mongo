@@ -255,7 +255,7 @@ BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {
 StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, Collection* collection) {
     invariant(collection);
 
-    std::vector<IndexDescriptor*> idxs;
+    std::vector<const IndexDescriptor*> idxs;
     collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2D, idxs);
     uassert(ErrorCodes::IndexNotFound,
             str::stream() << "There is more than one 2d index on " << collection->ns().ns()

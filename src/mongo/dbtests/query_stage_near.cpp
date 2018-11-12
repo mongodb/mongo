@@ -80,7 +80,7 @@ protected:
     DBDirectClient directClient{_opCtx};
 
     boost::optional<AutoGetCollectionForRead> _autoColl;
-    IndexDescriptor* _mockGeoIndex;
+    const IndexDescriptor* _mockGeoIndex;
 };
 
 /**

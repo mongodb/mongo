@@ -78,7 +78,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* opCtx,
                                          double maxDistance,
                                          const BSONObj& search,
                                          BSONObjBuilder* result,
-                                         unsigned limit) {
+                                         unsigned limit) const {
     Timer t;
 
     LOG(1) << "SEARCH near:" << redact(nearObj) << " maxDistance:" << maxDistance

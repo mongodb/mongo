@@ -118,7 +118,7 @@ public:
             return false;
         }
 
-        IndexDescriptor* idx =
+        const IndexDescriptor* idx =
             collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
                                                                      keyPattern,
                                                                      true);  // requireSingleKey

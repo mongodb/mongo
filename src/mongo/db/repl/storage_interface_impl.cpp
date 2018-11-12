@@ -528,7 +528,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                                         << nss.ns()
                                         << " to set to multikey.");
         }
-        collection->getIndexCatalog()->getIndex(idx)->setIndexIsMultikey(opCtx, paths);
+        collection->getIndexCatalog()->setMultikeyPaths(opCtx, idx, paths);
         wunit.commit();
         return Status::OK();
     });
@@ -609,7 +609,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 auto indexCatalog = collection->getIndexCatalog();
                 invariant(indexCatalog);
                 bool includeUnfinishedIndexes = false;
-                IndexDescriptor* indexDescriptor =
+                const IndexDescriptor* indexDescriptor =
                     indexCatalog->findIndexByName(opCtx, *indexName, includeUnfinishedIndexes);
                 if (!indexDescriptor) {
                     return Result(ErrorCodes::IndexNotFound,

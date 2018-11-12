@@ -448,7 +448,7 @@ public:
                 keyPattern = Helpers::inferKeyPattern(min);
             }
 
-            IndexDescriptor* idx =
+            const IndexDescriptor* idx =
                 collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
                                                                          keyPattern,
                                                                          true);  // requireSingleKey

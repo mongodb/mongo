@@ -859,8 +859,9 @@ public:
 
         // Replace a correct index entry with a bad one and check it's invalid.
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
-        IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
+        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto iam =
+            const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
 
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -935,7 +936,8 @@ public:
         // Change the IndexDescriptor's keyPattern to descending so the index ordering
         // appears wrong.
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
-        IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+        IndexDescriptor* descriptor =
+            const_cast<IndexDescriptor*>(indexCatalog->findIndexByName(&_opCtx, indexName));
         descriptor->setKeyPatternForTest(BSON("a" << -1));
 
         ASSERT_FALSE(checkValid());
@@ -1017,8 +1019,10 @@ public:
         lockDb(MODE_X);
         const RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
-        IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto sortedDataInterface = indexCatalog->getIndex(descriptor)->getSortedDataInterface();
+        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto accessMethod =
+            const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+        auto sortedDataInterface = accessMethod->getSortedDataInterface();
         {
             WriteUnitOfWork wunit(&_opCtx);
             const BSONObj indexKey = BSON("" << 1 << ""
@@ -1123,8 +1127,10 @@ public:
 
         lockDb(MODE_X);
         IndexCatalog* indexCatalog = coll->getIndexCatalog();
-        IndexDescriptor* descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto sortedDataInterface = indexCatalog->getIndex(descriptor)->getSortedDataInterface();
+        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+        auto accessMethod =
+            const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+        auto sortedDataInterface = accessMethod->getSortedDataInterface();
 
         // Removing a multikey metadata path for a path included in the projection causes validate
         // to fail.

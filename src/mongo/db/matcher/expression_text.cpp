@@ -77,7 +77,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
                               << "')",
                 collection);
 
-        std::vector<IndexDescriptor*> idxMatches;
+        std::vector<const IndexDescriptor*> idxMatches;
         collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::TEXT, idxMatches);
 
         uassert(
@@ -87,9 +87,9 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
                 idxMatches.size() < 2);
         invariant(idxMatches.size() == 1);
 
-        IndexDescriptor* index = idxMatches[0];
-        const FTSAccessMethod* fam =
-            static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(index));
+        const IndexDescriptor* index = idxMatches[0];
+        const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
+            collection->getIndexCatalog()->getEntry(index)->accessMethod());
         invariant(fam);
 
         // Extract version and default language from text index.

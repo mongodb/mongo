@@ -188,7 +188,7 @@ public:
      */
     virtual void validate(OperationContext* opCtx,
                           int64_t* numKeys,
-                          ValidateResults* fullResults) = 0;
+                          ValidateResults* fullResults) const = 0;
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.
@@ -500,7 +500,9 @@ public:
 
     Status touch(OperationContext* opCtx) const final;
 
-    void validate(OperationContext* opCtx, int64_t* numKeys, ValidateResults* fullResults) final;
+    void validate(OperationContext* opCtx,
+                  int64_t* numKeys,
+                  ValidateResults* fullResults) const final;
 
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* result,

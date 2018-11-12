@@ -147,7 +147,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                 << nss.ns());
                 }
             } else {
-                std::vector<IndexDescriptor*> indexes;
+                std::vector<const IndexDescriptor*> indexes;
                 coll->getIndexCatalog()->findIndexesByKeyPattern(
                     opCtx, keyPattern, false, &indexes);
 

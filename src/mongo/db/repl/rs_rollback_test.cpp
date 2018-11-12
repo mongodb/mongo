@@ -712,7 +712,7 @@ TEST_F(RSRollbackTest, RollingBackCreateIndexAndRenameWithLongName) {
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
 
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("b" << 1), false, &indexes);
         ASSERT(indexes.size() == 0);
     }
@@ -771,12 +771,12 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
                                               << ", UUID: "
                                               << options.uuid->toString()
                                               << ", index: a_1"));
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("a" << 1), false, &indexes);
         ASSERT(indexes.size() == 1);
         ASSERT(indexes[0]->indexName() == "a_1");
 
-        std::vector<IndexDescriptor*> indexes2;
+        std::vector<const IndexDescriptor*> indexes2;
         indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("b" << 1), false, &indexes2);
         ASSERT(indexes2.size() == 0);
     }

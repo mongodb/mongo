@@ -85,7 +85,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-        IndexDescriptor* idx =
+        const IndexDescriptor* idx =
             collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
         if (idx == NULL) {
             return {ErrorCodes::IndexNotFound,

@@ -757,9 +757,9 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx, BSONObjBuilder* d
     uint64_t totalSize = 0;
 
     while (ii->more()) {
-        IndexCatalogEntry* entry = ii->next();
-        IndexDescriptor* descriptor = entry->descriptor();
-        IndexAccessMethod* iam = entry->accessMethod();
+        const IndexCatalogEntry* entry = ii->next();
+        const IndexDescriptor* descriptor = entry->descriptor();
+        const IndexAccessMethod* iam = entry->accessMethod();
 
         long long ds = iam->getSpaceUsedBytes(opCtx);
 
@@ -996,9 +996,9 @@ void _validateIndexes(OperationContext* opCtx,
     // Validate Indexes.
     while (it->more()) {
         opCtx->checkForInterrupt();
-        IndexCatalogEntry* entry = it->next();
-        IndexDescriptor* descriptor = entry->descriptor();
-        IndexAccessMethod* iam = entry->accessMethod();
+        const IndexCatalogEntry* entry = it->next();
+        const IndexDescriptor* descriptor = entry->descriptor();
+        const IndexAccessMethod* iam = entry->accessMethod();
 
         log(LogComponent::kIndex) << "validating index " << descriptor->indexNamespace() << endl;
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexNamespace()];
@@ -1060,7 +1060,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
     std::unique_ptr<IndexCatalog::IndexIterator> indexIterator =
         indexCatalog->getIndexIterator(opCtx, false);
     while (indexIterator->more()) {
-        IndexDescriptor* descriptor = indexIterator->next()->descriptor();
+        const IndexDescriptor* descriptor = indexIterator->next()->descriptor();
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexNamespace()];
 
         if (curIndexResults.valid) {
@@ -1253,8 +1253,8 @@ Status CollectionImpl::touch(OperationContext* opCtx,
         std::unique_ptr<IndexCatalog::IndexIterator> ii =
             _indexCatalog->getIndexIterator(opCtx, false);
         while (ii->more()) {
-            IndexCatalogEntry* entry = ii->next();
-            IndexAccessMethod* iam = entry->accessMethod();
+            const IndexCatalogEntry* entry = ii->next();
+            const IndexAccessMethod* iam = entry->accessMethod();
             Status status = iam->touch(opCtx);
             if (!status.isOK())
                 return status;

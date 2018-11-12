@@ -207,7 +207,7 @@ private:
             return;
         }
 
-        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
+        const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
         if (!desc) {
             LOG(1) << "index not found (index build in progress? index dropped?), skipping "
                    << "ttl job for: " << idx;

@@ -116,7 +116,7 @@ public:
             return false;
         }
 
-        vector<IndexDescriptor*> idxs;
+        vector<const IndexDescriptor*> idxs;
         collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_HAYSTACK, idxs);
         if (idxs.size() == 0) {
             errmsg = "no geoSearch index";
@@ -139,9 +139,9 @@ public:
         if (cmdObj["limit"].isNumber())
             limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
 
-        IndexDescriptor* desc = idxs[0];
-        HaystackAccessMethod* ham =
-            static_cast<HaystackAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
+        const IndexDescriptor* desc = idxs[0];
+        auto ham = static_cast<const HaystackAccessMethod*>(
+            collection->getIndexCatalog()->getEntry(desc)->accessMethod());
         ham->searchCommand(opCtx,
                            collection,
                            nearElt.Obj(),

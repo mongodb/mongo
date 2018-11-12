@@ -536,7 +536,7 @@ void State::prepTempCollection() {
                 finalColl->getIndexCatalog()->getIndexIterator(_opCtx, true);
             // Iterate over finalColl's indexes.
             while (ii->more()) {
-                IndexDescriptor* currIndex = ii->next()->descriptor();
+                const IndexDescriptor* currIndex = ii->next()->descriptor();
                 BSONObjBuilder b;
                 b.append("ns", _config.tempNamespace.ns());
 
@@ -1124,7 +1124,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
             autoIncColl.getCollection()->getIndexCatalog()->getIndexIterator(_opCtx, true);
         // Iterate over incColl's indexes.
         while (ii->more()) {
-            IndexDescriptor* currIndex = ii->next()->descriptor();
+            const IndexDescriptor* currIndex = ii->next()->descriptor();
             BSONObj x = currIndex->infoObj();
             if (sortKey.woCompare(x["key"].embeddedObject()) == 0) {
                 foundIndex = true;

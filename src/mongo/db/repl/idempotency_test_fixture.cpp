@@ -403,7 +403,7 @@ OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
 }
 
 std::string IdempotencyTest::computeDataHash(Collection* collection) {
-    IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());
+    auto desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());
     ASSERT_TRUE(desc);
     auto exec = InternalPlanner::indexScan(_opCtx.get(),
                                            collection,

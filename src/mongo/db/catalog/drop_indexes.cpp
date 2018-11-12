@@ -116,7 +116,7 @@ Status wrappedRun(OperationContext* opCtx,
     }
 
     if (indexElem.type() == Object) {
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(
             opCtx, indexElem.embeddedObject(), false, &indexes);
         if (indexes.empty()) {
@@ -134,7 +134,7 @@ Status wrappedRun(OperationContext* opCtx,
                                         << indexes[1]->infoObj());
         }
 
-        IndexDescriptor* desc = indexes[0];
+        const IndexDescriptor* desc = indexes[0];
         if (desc->isIdIndex()) {
             return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
         }

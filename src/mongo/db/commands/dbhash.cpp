@@ -246,7 +246,7 @@ private:
             invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_S));
         }
 
-        IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+        auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         if (desc) {

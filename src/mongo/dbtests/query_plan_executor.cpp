@@ -177,9 +177,9 @@ protected:
     OperationContext& _opCtx = *_opCtxPtr;
 
 private:
-    IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
+    const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
         Collection* collection = db->getCollection(&_opCtx, nss);
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         ASSERT_LTE(indexes.size(), 1U);
         return indexes.size() == 0 ? nullptr : indexes[0];

@@ -133,10 +133,10 @@ size_t getNumIndexEntries(OperationContext* opCtx,
     Collection* coll =
         DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     IndexCatalog* catalog = coll->getIndexCatalog();
-    IndexDescriptor* desc = catalog->findIndexByName(opCtx, idxName, false);
+    auto desc = catalog->findIndexByName(opCtx, idxName, false);
 
     if (desc) {
-        auto cursor = catalog->getIndex(desc)->newCursor(opCtx);
+        auto cursor = catalog->getEntry(desc)->accessMethod()->newCursor(opCtx);
 
         for (auto kv = cursor->seek(kMinBSONKey, true); kv; kv = cursor->next()) {
             numEntries++;
@@ -149,7 +149,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
     Collection* coll =
         DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
-    IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
+    auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
     ASSERT_OK(coll->getIndexCatalog()->dropIndex(opCtx, desc));
 }
@@ -697,7 +697,7 @@ public:
             uow.commit();
         }
 
-        IndexDescriptor* indexDesc = catalog->findIndexByName(&opCtx, idxName);
+        auto indexDesc = catalog->findIndexByName(&opCtx, idxName);
         invariant(indexDesc);
         const IndexCatalogEntry* ice = catalog->getEntry(indexDesc);
         invariant(ice);

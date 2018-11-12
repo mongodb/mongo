@@ -246,7 +246,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByName(
+            const IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByName(
                 opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
@@ -264,7 +264,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByName(
+            const IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByName(
                 opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
@@ -272,11 +272,11 @@ PlanStage* buildStages(OperationContext* opCtx,
         }
         case STAGE_TEXT: {
             const TextNode* node = static_cast<const TextNode*>(root);
-            IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(
+            const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(
                 opCtx, node->index.identifier.catalogName);
             invariant(desc);
-            const FTSAccessMethod* fam =
-                static_cast<const FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
+            const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
+                collection->getIndexCatalog()->getEntry(desc)->accessMethod());
             invariant(fam);
 
             TextStageParams params(fam->getSpec());

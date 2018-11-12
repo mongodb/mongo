@@ -210,7 +210,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
-        IndexCatalogEntry* ice = ii->next();
+        const IndexCatalogEntry* ice = ii->next();
         plannerParams->indices.push_back(
             indexEntryFromIndexCatalogEntry(opCtx, *ice, canonicalQuery));
     }
@@ -1516,7 +1516,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     auto query = parsedDistinct.getQuery()->getQueryRequest().getFilter();
     while (ii->more()) {
-        IndexCatalogEntry* ice = ii->next();
+        const IndexCatalogEntry* ice = ii->next();
         const IndexDescriptor* desc = ice->descriptor();
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             plannerParams.indices.push_back(
@@ -1524,7 +1524,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
             const auto* proj =
-                static_cast<WildcardAccessMethod*>(ice->accessMethod())->getProjectionExec();
+                static_cast<const WildcardAccessMethod*>(ice->accessMethod())->getProjectionExec();
             if (proj->applyProjectionToOneField(parsedDistinct.getKey())) {
                 plannerParams.indices.push_back(
                     indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));

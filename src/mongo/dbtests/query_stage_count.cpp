@@ -199,10 +199,10 @@ public:
 
     IndexScan* createIndexScan(MatchExpression* expr, WorkingSet* ws) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
-        IndexDescriptor* descriptor = indexes[0];
+        auto descriptor = indexes[0];
 
         // We are not testing indexing here so use maximal bounds
         IndexScanParams params(&_opCtx, descriptor);

@@ -49,7 +49,6 @@ class Client;
 class Collection;
 
 class IndexDescriptor;
-class IndexAccessMethod;
 struct InsertDeleteOptions;
 
 /**
@@ -87,16 +86,16 @@ public:
      */
     BSONObj getDefaultIdIndexSpec() const override;
 
-    IndexDescriptor* findIdIndex(OperationContext* opCtx) const override;
+    const IndexDescriptor* findIdIndex(OperationContext* opCtx) const override;
 
     /**
      * Find index by name.  The index name uniquely identifies an index.
      *
      * @return null if cannot find
      */
-    IndexDescriptor* findIndexByName(OperationContext* opCtx,
-                                     StringData name,
-                                     bool includeUnfinishedIndexes = false) const override;
+    const IndexDescriptor* findIndexByName(OperationContext* opCtx,
+                                           StringData name,
+                                           bool includeUnfinishedIndexes = false) const override;
 
     /**
      * Find index by matching key pattern and collation spec.  The key pattern and collation spec
@@ -108,7 +107,7 @@ public:
      * @return null if cannot find index, otherwise the index with a matching key pattern and
      * collation.
      */
-    IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
+    const IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
         OperationContext* opCtx,
         const BSONObj& key,
         const BSONObj& collationSpec,
@@ -123,7 +122,7 @@ public:
     void findIndexesByKeyPattern(OperationContext* opCtx,
                                  const BSONObj& key,
                                  bool includeUnfinishedIndexes,
-                                 std::vector<IndexDescriptor*>* matches) const override;
+                                 std::vector<const IndexDescriptor*>* matches) const override;
 
     /**
      * Returns an index suitable for shard key range scans.
@@ -138,13 +137,13 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                               const BSONObj& shardKey,
-                                               bool requireSingleKey) const override;
+    const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
+                                                     const BSONObj& shardKey,
+                                                     bool requireSingleKey) const override;
 
     void findIndexByType(OperationContext* opCtx,
                          const std::string& type,
-                         std::vector<IndexDescriptor*>& matches,
+                         std::vector<const IndexDescriptor*>& matches,
                          bool includeUnfinishedIndexes = false) const override;
 
 
@@ -167,9 +166,6 @@ public:
     std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
-
-    IndexAccessMethod* getIndex(const IndexDescriptor* desc) override;
-    const IndexAccessMethod* getIndex(const IndexDescriptor* desc) const override;
 
     /**
      * Returns a not-ok Status if there are any unfinished index builds. No new indexes should
@@ -208,7 +204,7 @@ public:
                         stdx::function<void(const IndexDescriptor*)> onDropFn) override;
     void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) override;
 
-    Status dropIndex(OperationContext* opCtx, IndexDescriptor* desc) override;
+    Status dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) override;
 
     /**
      * will drop all incompleted indexes and return specs
@@ -240,6 +236,10 @@ public:
      * each element in the vector is an empty set.
      */
     MultikeyPaths getMultikeyPaths(OperationContext* opCtx, const IndexDescriptor* idx) override;
+
+    void setMultikeyPaths(OperationContext* const opCtx,
+                          const IndexDescriptor* desc,
+                          const MultikeyPaths& multikeyPaths) override;
 
     // --- these probably become private?
 
@@ -329,6 +329,8 @@ public:
                        const RecordId& loc,
                        bool noWarn,
                        int64_t* keysDeletedOut) override;
+
+    Status compactIndexes(OperationContext* opCtx) override;
 
     inline std::string getAccessMethodName(const BSONObj& keyPattern) override {
         return _getAccessMethodName(keyPattern);

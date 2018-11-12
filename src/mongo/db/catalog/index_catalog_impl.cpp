@@ -701,7 +701,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     // Collections should only have one text index.
     string pluginName = IndexNames::findPluginName(key);
     if (pluginName == IndexNames::TEXT) {
-        vector<IndexDescriptor*> textIndexes;
+        vector<const IndexDescriptor*> textIndexes;
         const bool includeUnfinishedIndexes = true;
         findIndexByType(opCtx, IndexNames::TEXT, textIndexes, includeUnfinishedIndexes);
         if (textIndexes.size() > 0) {
@@ -758,7 +758,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, true);
         while (ii->more()) {
             seen++;
-            IndexDescriptor* desc = ii->next()->descriptor();
+            const IndexDescriptor* desc = ii->next()->descriptor();
             if (desc->isIdIndex() && includingIdIndex == false) {
                 haveIdIndex = true;
                 continue;
@@ -770,7 +770,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
 
     for (size_t i = 0; i < indexNamesToDrop.size(); i++) {
         string indexName = indexNamesToDrop[i];
-        IndexDescriptor* desc = findIndexByName(opCtx, indexName, true);
+        const IndexDescriptor* desc = findIndexByName(opCtx, indexName, true);
         invariant(desc);
         LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
         IndexCatalogEntry* entry = _readyIndexes.find(desc);
@@ -813,7 +813,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx, bool includingIdI
     dropAllIndexes(opCtx, includingIdIndex, {});
 }
 
-Status IndexCatalogImpl::dropIndex(OperationContext* opCtx, IndexDescriptor* desc) {
+Status IndexCatalogImpl::dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));
     BackgroundOperation::assertNoBgOpInProgForNs(_collection->ns().ns());
     invariant(_buildingIndexes.size() == 0);
@@ -951,6 +951,17 @@ MultikeyPaths IndexCatalogImpl::getMultikeyPaths(OperationContext* opCtx,
     return entry->getMultikeyPaths(opCtx);
 }
 
+void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
+                                        const IndexDescriptor* desc,
+                                        const MultikeyPaths& multikeyPaths) {
+    IndexCatalogEntry* entry = _readyIndexes.find(desc);
+    if (!entry) {
+        entry = _buildingIndexes.find(desc);
+    }
+    invariant(entry);
+    entry->setMultikey(opCtx, multikeyPaths);
+};
+
 // ---------------------------
 
 bool IndexCatalogImpl::haveAnyIndexes() const {
@@ -964,7 +975,7 @@ int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
 }
 
 int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
-    std::vector<IndexDescriptor*> itIndexes;
+    std::vector<const IndexDescriptor*> itIndexes;
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, /*includeUnfinished*/ false);
     while (ii->more()) {
         itIndexes.push_back(ii->next()->descriptor());
@@ -977,7 +988,7 @@ int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
         // entry and the index catalog differ. Log as much information as possible here.
         if (itIndexes.size() != completedIndexes.size()) {
             log() << "index catalog reports: ";
-            for (IndexDescriptor* i : itIndexes) {
+            for (const IndexDescriptor* i : itIndexes) {
                 log() << "  index: " << i->toString();
             }
 
@@ -998,36 +1009,36 @@ bool IndexCatalogImpl::haveIdIndex(OperationContext* opCtx) const {
     return findIdIndex(opCtx) != nullptr;
 }
 
-IndexDescriptor* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) const {
+const IndexDescriptor* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) const {
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, false);
     while (ii->more()) {
-        IndexDescriptor* desc = ii->next()->descriptor();
+        const IndexDescriptor* desc = ii->next()->descriptor();
         if (desc->isIdIndex())
             return desc;
     }
     return nullptr;
 }
 
-IndexDescriptor* IndexCatalogImpl::findIndexByName(OperationContext* opCtx,
-                                                   StringData name,
-                                                   bool includeUnfinishedIndexes) const {
+const IndexDescriptor* IndexCatalogImpl::findIndexByName(OperationContext* opCtx,
+                                                         StringData name,
+                                                         bool includeUnfinishedIndexes) const {
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
-        IndexDescriptor* desc = ii->next()->descriptor();
+        const IndexDescriptor* desc = ii->next()->descriptor();
         if (desc->indexName() == name)
             return desc;
     }
     return nullptr;
 }
 
-IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndCollationSpec(
+const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndCollationSpec(
     OperationContext* opCtx,
     const BSONObj& key,
     const BSONObj& collationSpec,
     bool includeUnfinishedIndexes) const {
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
-        IndexDescriptor* desc = ii->next()->descriptor();
+        const IndexDescriptor* desc = ii->next()->descriptor();
         if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key) &&
             SimpleBSONObjComparator::kInstance.evaluate(
                 desc->infoObj().getObjectField("collation") == collationSpec)) {
@@ -1040,25 +1051,25 @@ IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndCollationSpec(
 void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
                                                const BSONObj& key,
                                                bool includeUnfinishedIndexes,
-                                               std::vector<IndexDescriptor*>* matches) const {
+                                               std::vector<const IndexDescriptor*>* matches) const {
     invariant(matches);
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
-        IndexDescriptor* desc = ii->next()->descriptor();
+        const IndexDescriptor* desc = ii->next()->descriptor();
         if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key)) {
             matches->push_back(desc);
         }
     }
 }
 
-IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                             const BSONObj& shardKey,
-                                                             bool requireSingleKey) const {
-    IndexDescriptor* best = nullptr;
+const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* opCtx,
+                                                                   const BSONObj& shardKey,
+                                                                   bool requireSingleKey) const {
+    const IndexDescriptor* best = nullptr;
 
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, false);
     while (ii->more()) {
-        IndexDescriptor* desc = ii->next()->descriptor();
+        const IndexDescriptor* desc = ii->next()->descriptor();
         bool hasSimpleCollation = desc->infoObj().getObjectField("collation").isEmpty();
 
         if (desc->isPartial())
@@ -1079,29 +1090,15 @@ IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* o
 
 void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
                                        const string& type,
-                                       vector<IndexDescriptor*>& matches,
+                                       vector<const IndexDescriptor*>& matches,
                                        bool includeUnfinishedIndexes) const {
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
-        IndexDescriptor* desc = ii->next()->descriptor();
+        const IndexDescriptor* desc = ii->next()->descriptor();
         if (IndexNames::findPluginName(desc->keyPattern()) == type) {
             matches.push_back(desc);
         }
     }
-}
-
-IndexAccessMethod* IndexCatalogImpl::getIndex(const IndexDescriptor* desc) {
-    IndexCatalogEntry* entry = _readyIndexes.find(desc);
-    if (!entry) {
-        entry = _buildingIndexes.find(desc);
-    }
-
-    massert(17334, "cannot find index entry", entry);
-    return entry->accessMethod();
-}
-
-const IndexAccessMethod* IndexCatalogImpl::getIndex(const IndexDescriptor* desc) const {
-    return getEntry(desc)->accessMethod();
 }
 
 const IndexCatalogEntry* IndexCatalogImpl::getEntry(const IndexDescriptor* desc) const {
@@ -1380,6 +1377,22 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
         bool logIfError = entry->isReady(opCtx) ? !noWarn : false;
         invariant(_unindexRecord(opCtx, entry, obj, loc, logIfError, keysDeletedOut));
     }
+}
+
+Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) {
+    for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
+         it != _readyIndexes.end();
+         ++it) {
+        IndexCatalogEntry* entry = it->get();
+
+        LOG(1) << "compacting index: " << entry->descriptor()->toString();
+        Status status = entry->accessMethod()->compact(opCtx);
+        if (!status.isOK()) {
+            error() << "failed to compact index: " << entry->descriptor()->toString();
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 std::unique_ptr<IndexCatalog::IndexBuildBlockInterface> IndexCatalogImpl::createIndexBuildBlock(

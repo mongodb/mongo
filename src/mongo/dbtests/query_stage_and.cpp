@@ -74,8 +74,8 @@ public:
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
-    IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-        std::vector<IndexDescriptor*> indexes;
+    const IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
+        std::vector<const IndexDescriptor*> indexes;
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         if (indexes.empty()) {
             FAIL(mongoutils::str::stream() << "Unable to find index with key pattern " << obj);

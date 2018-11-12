@@ -98,7 +98,7 @@ public:
 
     IndexScan* createIndexScanSimpleRange(BSONObj startKey, BSONObj endKey) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
@@ -121,7 +121,7 @@ public:
                                bool endInclusive,
                                int direction = 1) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 

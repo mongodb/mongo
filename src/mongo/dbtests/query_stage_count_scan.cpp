@@ -92,9 +92,9 @@ public:
         return countWorks;
     }
 
-    IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
+    const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
         Collection* collection = db->getCollection(&_opCtx, ns());
-        std::vector<IndexDescriptor*> indexes;
+        std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }

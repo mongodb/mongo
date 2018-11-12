@@ -190,7 +190,7 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
     md5_init(&_state);
 
     // Get the _id index.
-    IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+    const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
     uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
 

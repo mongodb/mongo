@@ -68,7 +68,7 @@ protected:
                        double maxDistance,
                        const BSONObj& search,
                        BSONObjBuilder* result,
-                       unsigned limit);
+                       unsigned limit) const;
 
 private:
     /**

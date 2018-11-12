@@ -49,7 +49,7 @@ bool IndexIterator::more() {
     return _next != nullptr;
 }
 
-IndexCatalogEntry* IndexIterator::next() {
+const IndexCatalogEntry* IndexIterator::next() {
     if (!more())
         return nullptr;
     _prev = _next;
@@ -62,7 +62,7 @@ ReadyIndexesIterator::ReadyIndexesIterator(OperationContext* const opCtx,
                                            IndexCatalogEntryContainer::const_iterator endIterator)
     : _opCtx(opCtx), _iterator(beginIterator), _endIterator(endIterator) {}
 
-IndexCatalogEntry* ReadyIndexesIterator::_advance() {
+const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
     while (_iterator != _endIterator) {
         IndexCatalogEntry* entry = _iterator->get();
         ++_iterator;
@@ -90,7 +90,7 @@ AllIndexesIterator::AllIndexesIterator(
     _endIterator = _ownedContainer->end();
 }
 
-IndexCatalogEntry* AllIndexesIterator::_advance() {
+const IndexCatalogEntry* AllIndexesIterator::_advance() {
     if (_iterator == _endIterator) {
         return nullptr;
     }

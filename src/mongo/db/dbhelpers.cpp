@@ -165,7 +165,7 @@ bool Helpers::findById(OperationContext* opCtx,
     if (indexFound)
         *indexFound = 1;
 
-    RecordId loc = catalog->getIndex(desc)->findSingle(opCtx, query["_id"].wrap());
+    RecordId loc = catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, query["_id"].wrap());
     if (loc.isNull())
         return false;
     result = collection->docFor(opCtx, loc).value();
@@ -179,7 +179,7 @@ RecordId Helpers::findById(OperationContext* opCtx,
     IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
     uassert(13430, "no _id index", desc);
-    return catalog->getIndex(desc)->findSingle(opCtx, idquery["_id"].wrap());
+    return catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, idquery["_id"].wrap());
 }
 
 bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {

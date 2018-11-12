@@ -169,7 +169,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             invariant(indexCatalog);
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            std::vector<IndexDescriptor*> indexes;
+            std::vector<const IndexDescriptor*> indexes;
             indexCatalog->findIndexesByKeyPattern(opCtx, v1SystemUsersKeyPattern, false, &indexes);
 
             if (!indexes.empty()) {
@@ -198,7 +198,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
-            std::vector<IndexDescriptor*> indexes;
+            std::vector<const IndexDescriptor*> indexes;
             indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemRolesKeyPattern, false, &indexes);
             if (indexes.empty()) {
                 try {

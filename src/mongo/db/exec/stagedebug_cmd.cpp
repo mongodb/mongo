@@ -274,11 +274,11 @@ public:
         string nodeName = firstElt.fieldName();
 
         if ("ixscan" == nodeName) {
-            IndexDescriptor* desc;
+            const IndexDescriptor* desc;
             if (BSONElement keyPatternElement = nodeArgs["keyPattern"]) {
                 // This'll throw if it's not an obj but that's OK.
                 BSONObj keyPatternObj = keyPatternElement.Obj();
-                std::vector<IndexDescriptor*> indexes;
+                std::vector<const IndexDescriptor*> indexes;
                 collection->getIndexCatalog()->findIndexesByKeyPattern(
                     opCtx, keyPatternObj, false, &indexes);
                 uassert(16890,
@@ -453,13 +453,14 @@ public:
         } else if ("text" == nodeName) {
             string search = nodeArgs["search"].String();
 
-            vector<IndexDescriptor*> idxMatches;
+            vector<const IndexDescriptor*> idxMatches;
             collection->getIndexCatalog()->findIndexByType(opCtx, "text", idxMatches);
             uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
 
-            IndexDescriptor* index = idxMatches[0];
-            FTSAccessMethod* fam =
-                dynamic_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(index));
+            const IndexDescriptor* index = idxMatches[0];
+            const FTSAccessMethod* fam = dynamic_cast<const FTSAccessMethod*>(
+                collection->getIndexCatalog()->getEntry(index)->accessMethod());
+            invariant(fam);
             TextStageParams params(fam->getSpec());
             params.index = index;
 

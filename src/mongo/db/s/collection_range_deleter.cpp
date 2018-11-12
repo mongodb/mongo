@@ -377,7 +377,8 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     LOG(1) << "begin removal of " << min << " to " << max << " in " << nss.ns();
 
     const auto indexName = idx->indexName();
-    IndexDescriptor* descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    const IndexDescriptor* descriptor =
+        collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!descriptor) {
         std::string msg = str::stream() << "shard key index with name " << indexName << " on '"
                                         << nss.ns() << "' was dropped";
