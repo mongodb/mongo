@@ -45,9 +45,7 @@ class OperationContext;
  */
 class OperationContextSessionMongod {
 public:
-    OperationContextSessionMongod(OperationContext* opCtx,
-                                  bool shouldCheckOutSession,
-                                  const OperationSessionInfoFromClient& sessionInfo);
+    OperationContextSessionMongod(OperationContext* opCtx, bool shouldCheckOutSession);
 
 private:
     OperationContextSession _operationContextSession;

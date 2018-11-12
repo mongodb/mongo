@@ -557,7 +557,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // session.
         const bool shouldCheckOutSession = static_cast<bool>(sessionOptions.getTxnNumber()) &&
             !shouldCommandSkipSessionCheckout(command->getName());
-        OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckOutSession, sessionOptions);
+        OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckOutSession);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 

@@ -156,10 +156,7 @@ void DoTxnTest::setUp() {
     // Set up the transaction and session.
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     _opCtx->setTxnNumber(0);  // TxnNumber can always be 0 because we have a new session.
-    OperationSessionInfoFromClient sessionInfo;
-    sessionInfo.setAutocommit(false);
-    sessionInfo.setStartTransaction(true);
-    _ocs.emplace(_opCtx.get(), true /* checkOutSession */, sessionInfo);
+    _ocs.emplace(_opCtx.get(), true /* checkOutSession */);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);

@@ -90,15 +90,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none);                  // post-image optime
 }
 
-OperationSessionInfoFromClient makeSessionInfo(bool startTransaction = true) {
-    OperationSessionInfoFromClient sessionInfo;
-    sessionInfo.setAutocommit(false);
-    if (startTransaction) {
-        sessionInfo.setStartTransaction(startTransaction);
-    }
-    return sessionInfo;
-}
-
 class OpObserverMock : public OpObserverNoop {
 public:
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override;
@@ -282,9 +273,7 @@ protected:
     }
 
     std::unique_ptr<OperationContextSessionMongod> checkOutSession() {
-        auto sessionInfo = makeSessionInfo();
-        auto opCtxSession =
-            std::make_unique<OperationContextSessionMongod>(opCtx(), true, sessionInfo);
+        auto opCtxSession = std::make_unique<OperationContextSessionMongod>(opCtx(), true);
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
         return opCtxSession;
@@ -329,7 +318,7 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
 
-        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, makeSessionInfo());
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true);
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant->beginOrContinue(newTxnNum, false, true);
         newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "insert");
@@ -1088,7 +1077,7 @@ TEST_F(TxnParticipantTest, ContinuingATransactionWithNoResourcesAborts) {
     checkOutSession();
 
     // Check out the session again for a new operation.
-    OperationContextSessionMongod sessionCheckout(opCtx(), true, makeSessionInfo(false));
+    OperationContextSessionMongod sessionCheckout(opCtx(), true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     ASSERT_THROWS_CODE(
@@ -1289,7 +1278,7 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, makeSessionInfo(false));
+    OperationContextSessionMongod opCtxSession(opCtx(), true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, boost::none),
@@ -1344,7 +1333,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     {
         // Make it look like we're in a DBDirectClient running a nested operation.
         DirectClientSetter inDirectClient(opCtx());
-        OperationContextSessionMongod innerScopedSession(opCtx(), true, {});
+        OperationContextSessionMongod innerScopedSession(opCtx(), true);
 
         txnParticipant->stashTransactionResources(opCtx());
 
@@ -1377,7 +1366,7 @@ TEST_F(TxnParticipantTest, UnstashInNestedSessionIsANoop) {
     {
         // Make it look like we're in a DBDirectClient running a nested operation.
         DirectClientSetter inDirectClient(opCtx());
-        OperationContextSessionMongod innerScopedSession(opCtx(), true, {});
+        OperationContextSessionMongod innerScopedSession(opCtx(), true);
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->unstashTransactionResources(opCtx(), "find");
@@ -1462,7 +1451,7 @@ protected:
     }
 
     void cannotSpecifyStartTransactionOnStartedRetryableWrite() {
-        OperationContextSessionMongod opCtxSession(opCtx(), true, {});
+        OperationContextSessionMongod opCtxSession(opCtx(), true);
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), boost::none, boost::none);
@@ -2870,7 +2859,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     ASSERT(opCtx()->lockState());
     ASSERT(opCtx()->recoveryUnit());
 
-    OperationContextSessionMongod opCtxSession(opCtx(), true, {});
+    OperationContextSessionMongod opCtxSession(opCtx(), true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), boost::none, boost::none);
     txnParticipant->unstashTransactionResources(opCtx(), "find");
@@ -3546,7 +3535,7 @@ TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
 
-        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, makeSessionInfo());
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true);
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant->beginOrContinue(newTxnNum, false, true);
         newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "prepareTransaction");
@@ -3608,7 +3597,7 @@ TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
         newOpCtx.get()->setLogicalSessionId(newSessionId);
         newOpCtx.get()->setTxnNumber(newTxnNum);
 
-        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, makeSessionInfo());
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true);
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant->beginOrContinue(newTxnNum, false, true);
         newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "prepareTransaction");

@@ -540,11 +540,7 @@ public:
         _times.emplace(opCtx());
         opCtx()->setLogicalSessionId(session()->getSessionId());
         opCtx()->setTxnNumber(txnNum());
-        OperationSessionInfoFromClient sessionInfo;
-        sessionInfo.setAutocommit(false);
-        sessionInfo.setStartTransaction(true);
-        _sessionCheckout =
-            std::make_unique<OperationContextSessionMongod>(opCtx(), true, sessionInfo);
+        _sessionCheckout = std::make_unique<OperationContextSessionMongod>(opCtx(), true);
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
     }

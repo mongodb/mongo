@@ -2498,17 +2498,13 @@ public:
         _opCtx->setLogicalSessionId(sessionId);
         _opCtx->setTxnNumber(26);
 
-        OperationSessionInfoFromClient sessionInfo;
-        sessionInfo.setAutocommit(false);
-        sessionInfo.setStartTransaction(true);
-        ocs = std::make_unique<OperationContextSessionMongod>(_opCtx, true, sessionInfo);
+        ocs = std::make_unique<OperationContextSessionMongod>(_opCtx, true);
 
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
-        txnParticipant->beginOrContinue(*_opCtx->getTxnNumber(),
-                                        sessionInfo.getAutocommit(),
-                                        sessionInfo.getStartTransaction());
+        txnParticipant->beginOrContinue(
+            *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
         txnParticipant->unstashTransactionResources(_opCtx, "insert");
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);

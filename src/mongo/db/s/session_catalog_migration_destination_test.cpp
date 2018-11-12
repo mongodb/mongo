@@ -37,7 +37,6 @@
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_gen.h"
 #include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -251,7 +250,7 @@ public:
             // requests with txnNumbers aren't allowed. To get around this, we have to manually set
             // up the session state and perform the insert.
             initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
-            OperationContextSessionMongod sessionTxnState(innerOpCtx.get(), true, {});
+            OperationContextSessionMongod sessionTxnState(innerOpCtx.get(), true);
             auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());
             txnParticipant->beginOrContinue(*sessionInfo.getTxnNumber(), boost::none, boost::none);
 

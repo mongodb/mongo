@@ -36,10 +36,8 @@
 
 namespace mongo {
 
-OperationContextSessionMongod::OperationContextSessionMongod(
-    OperationContext* opCtx,
-    bool shouldCheckOutSession,
-    const OperationSessionInfoFromClient& sessionInfo)
+OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* opCtx,
+                                                             bool shouldCheckOutSession)
     : _operationContextSession(opCtx, shouldCheckOutSession) {
     if (shouldCheckOutSession && !opCtx->getClient()->isInDirectClient()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
