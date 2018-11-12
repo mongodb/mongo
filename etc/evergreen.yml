@@ -1090,30 +1090,25 @@ functions:
     command: shell.exec
     params:
       silent: true
+      shell: bash
       script: |
         cd src/src/mongo/embedded/mongo_embedded/java
 
-        echo -n "${mongodb_mobile_release_signing_secret_key}" > mobile-release-signing-key.secret
-        echo -n "${mongodb_mobile_release_signing_public_key}" > mobile-release-signing-key.public
+        echo '${mongodb_mobile_release_secring}' | base64 -d > embedded-android/secring.gpg
 
-        gpg --homedir ${workingdir}/.gnupg --allow-secret-key-import --import mobile-release-signing-key.secret
-        gpg --homedir ${workingdir}/.gnupg --import mobile-release-signing-key.public
-        # Required for gradle to pick up the keys
-        gpg --homedir ${workingdir}/.gnupg --keyring secring.gpg --export-secret-keys secring.gpg
-
-        echo -n <<EOF
+        cat <<EOF > local.properties
         signing.keyId=${mongodb_mobile_release_signing_keyid}
         signing.password=${mongodb_mobile_release_signing_password}
         signing.secretKeyRingFile=${mongodb_mobile_release_signing_secretkeyringfile}
 
         ossrhUsername=${mongodb_mobile_ossrh_username}
         ossrhPassword=${mongodb_mobile_ossrh_password}
-        EOF > local.properties
+        EOF
 
-        echo <<EOF
+        cat <<EOF > artifactory_mobile_creds.sh
         export artifactory_mobile_user=${artifactory_mobile_user}
         export artifactory_mobile_pass=${artifactory_mobile_pass}
-        EOF > artifactory_mobile_creds.sh
+        EOF
 
   "setup android toolchain" :
     command: shell.exec
@@ -1129,6 +1124,7 @@ functions:
   "build java embedded sdk":
     command: shell.exec
     params:
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
