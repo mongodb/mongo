@@ -138,11 +138,11 @@ public:
     }
 
 private:
+    AutoGetDb _autoDb;
+
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
     // the same as the input namespace string
     NamespaceString _resolvedNss;
-
-    AutoGetDb _autoDb;
 
     // This field is boost::optional, because in the case of lookup by UUID, the collection lock
     // might need to be relocked for the correct namespace

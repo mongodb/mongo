@@ -68,19 +68,11 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      LockMode modeColl,
                                      ViewMode viewMode,
                                      Date_t deadline)
-    :  // The UUID to NamespaceString resolution is performed outside of any locks
-      _resolvedNss(resolveNamespaceStringOrUUID(opCtx, nsOrUUID)),
-      // The database locking is performed based on the resolved NamespaceString
-      _autoDb(opCtx, _resolvedNss.db(), modeDB, deadline) {
-    // In order to account for possible collection rename happening because the resolution from UUID
-    // to NamespaceString was done outside of database lock, if UUID was specified we need to
-    // re-resolve the _resolvedNss after acquiring the database lock so it has the correct value.
-    //
-    // Holding a database lock prevents collection renames, so this guarantees a stable UUID to
-    // NamespaceString mapping.
-    if (nsOrUUID.uuid())
-        _resolvedNss = resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-
+    : _autoDb(opCtx,
+              !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
+              modeDB,
+              deadline),
+      _resolvedNss(resolveNamespaceStringOrUUID(opCtx, nsOrUUID)) {
     _collLock.emplace(opCtx->lockState(), _resolvedNss.ns(), modeColl, deadline);
     uassertLockTimeout(
         str::stream() << "collection " << nsOrUUID.toString(), modeColl, _collLock->isLocked());
