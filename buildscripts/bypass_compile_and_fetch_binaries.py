@@ -315,6 +315,7 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
         # bypass SCons.
         os.chmod("jstests/libs/key1", 0600)
         os.chmod("jstests/libs/key2", 0600)
+        os.chmod("jstests/libs/keyForRollover", 0600)
 
         # This is the artifacts.json file.
         write_out_artifacts(args.jsonArtifact, artifacts)
