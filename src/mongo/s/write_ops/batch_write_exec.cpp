@@ -71,6 +71,8 @@ WriteErrorDetail errorFromStatus(const Status& status) {
 // Helper to note several stale errors from a response
 void noteStaleResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
     for (const auto& error : staleErrors) {
+        LOG(4) << "Noting stale config response " << error.error.getErrInfo() << " from shard "
+               << error.endpoint.shardName;
         targeter->noteStaleResponse(
             error.endpoint,
             StaleConfigInfo::parseFromCommandError(
@@ -352,6 +354,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         bool targeterChanged = false;
         Status refreshStatus = targeter.refreshIfNeeded(opCtx, &targeterChanged);
+
+        LOG(4) << "executeBatch targeter changed: " << targeterChanged;
 
         if (!refreshStatus.isOK()) {
             // It's okay if we can't refresh, we'll just record errors for the ops if

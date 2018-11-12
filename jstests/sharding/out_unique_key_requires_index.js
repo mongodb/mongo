@@ -26,6 +26,11 @@
     assert.commandWorked(foreignDB.adminCommand({enableSharding: foreignDB.getName()}));
     st.ensurePrimaryShard(foreignDB.getName(), st.rs1.getURL());
 
+    // Increase the log verbosity for sharding, in the hope of getting a clearer picture of the
+    // cluster writer as part of BF-11106. This should be removed once BF-11106 is fixed.
+    st.shard0.getDB("admin").setLogLevel(4, 'sharding');
+    st.shard1.getDB("admin").setLogLevel(4, 'sharding');
+
     function resetTargetColl(shardKey, split) {
         targetColl.drop();
         // Shard the target collection, and set the unique flag to ensure that there's a unique
@@ -39,6 +44,7 @@
     }
 
     function runUniqueKeyTests(targetShardKey, targetSplit) {
+        jsTestLog("Running unique key tests for target shard key " + tojson(targetShardKey));
         resetTargetColl(targetShardKey, targetSplit);
 
         // Not specifying a uniqueKey should always pass.

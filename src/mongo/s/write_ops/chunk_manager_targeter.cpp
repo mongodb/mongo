@@ -729,6 +729,10 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
 
     *wasChanged = false;
 
+    LOG(4) << "ChunkManagerTargeter checking if refresh is needed, needsTargetingRefresh("
+           << _needsTargetingRefresh << ") remoteShardVersions empty ("
+           << _remoteShardVersions.empty() << ")";
+
     //
     // Did we have any stale config or targeting errors at all?
     //
@@ -781,6 +785,8 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
         // NOTE: Not sure yet if this can happen simultaneously with targeting issues
 
         CompareResult result = compareAllShardVersions(*_routingInfo, _remoteShardVersions);
+
+        LOG(4) << "ChunkManagerTargeter shard versions comparison result: " << (int)result;
 
         // Reset the versions
         _remoteShardVersions.clear();
