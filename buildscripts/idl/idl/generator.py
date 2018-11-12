@@ -916,14 +916,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 with self._predicate(_get_bson_type_check('arrayElement', 'arrayCtxt', field)):
                     array_value = self._gen_field_deserializer_expression('arrayElement', field)
-
-                    # HACK - SERVER-32431
-                    # GCC 5.4.0 on s390x has a code gen bug, work around it by not using std::move
-                    if self._target_arch == "s390x":
-                        self._writer.write_line('auto localValue = %s;' % (array_value))
-                        self._writer.write_line('values.push_back(localValue);')
-                    else:
-                        self._writer.write_line('values.emplace_back(%s);' % (array_value))
+                    self._writer.write_line('values.emplace_back(%s);' % (array_value))
 
             with self._block('else {', '}'):
                 self._writer.write_line('arrayCtxt.throwBadArrayFieldNumberValue(arrayFieldName);')
