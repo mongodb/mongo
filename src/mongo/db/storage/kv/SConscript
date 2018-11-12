@@ -45,7 +45,10 @@ env.Library(
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_storage_engine',
-    source=['kv_storage_engine.cpp'],
+    source=[
+        'kv_storage_engine.cpp',
+        'temporary_kv_record_store.cpp'
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',

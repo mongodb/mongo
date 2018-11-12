@@ -68,6 +68,8 @@ struct WiredTigerFileVersion {
 class WiredTigerKVEngine final : public KVEngine {
 public:
     static const int kDefaultJournalDelayMillis;
+    static StringData kTableUriPrefix;
+
     WiredTigerKVEngine(const std::string& canonicalName,
                        const std::string& path,
                        ClockSource* cs,

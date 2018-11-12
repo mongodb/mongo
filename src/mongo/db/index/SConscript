@@ -157,7 +157,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multi_key_path_tracker',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         'index_access_methods',
     ],
 )

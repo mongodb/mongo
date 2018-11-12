@@ -370,6 +370,19 @@ public:
                                 int64_t* const keysInsertedOut) = 0;
 
     /**
+     * Both 'keysInsertedOut' and 'keysDeletedOut' are required and will be set to the number of
+     * index keys inserted and deleted by this operation, respectively.
+     *
+     * This method may throw.
+     */
+    virtual Status updateRecord(OperationContext* const opCtx,
+                                const BSONObj& oldDoc,
+                                const BSONObj& newDoc,
+                                const RecordId& recordId,
+                                int64_t* const keysInsertedOut,
+                                int64_t* const keysDeletedOut) = 0;
+
+    /**
      * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
      * this operation.
      */

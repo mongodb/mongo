@@ -97,9 +97,9 @@ public:
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
         WiredTigerRecoveryUnit* ru =
-            dynamic_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
+            checked_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
         OperationContextNoop opCtx(ru);
-        string uri = "table:" + ns;
+        string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
 
         const bool prefixed = false;
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
@@ -116,7 +116,7 @@ public:
 
         WiredTigerRecordStore::Params params;
         params.ns = ns;
-        params.uri = uri;
+        params.ident = ns;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.isEphemeral = false;
@@ -141,7 +141,8 @@ public:
         WiredTigerRecoveryUnit* ru =
             dynamic_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
         OperationContextNoop opCtx(ru);
-        string uri = "table:a.b";
+        string ident = "a.b";
+        string uri = WiredTigerKVEngine::kTableUriPrefix + "a.b";
 
         CollectionOptions options;
         options.capped = true;
@@ -161,7 +162,7 @@ public:
 
         WiredTigerRecordStore::Params params;
         params.ns = ns;
-        params.uri = uri;
+        params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = true;
         params.isEphemeral = false;
@@ -215,9 +216,10 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
+    string ident = rs->getIdent();
     string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
-    string indexUri = "table:myindex";
+    string indexUri = WiredTigerKVEngine::kTableUriPrefix + "myindex";
     const bool enableWtLogging = false;
     WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri, enableWtLogging);
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
@@ -252,7 +254,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WiredTigerRecordStore::Params params;
         params.ns = "a.b"_sd;
-        params.uri = uri;
+        params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.isEphemeral = false;
@@ -318,10 +320,13 @@ private:
         harnessHelper.reset(new WiredTigerHarnessHelper());
         const bool enableWtLogging = false;
         sizeStorer.reset(
-            new WiredTigerSizeStorer(harnessHelper->conn(), "table:sizeStorer", enableWtLogging));
+            new WiredTigerSizeStorer(harnessHelper->conn(),
+                                     WiredTigerKVEngine::kTableUriPrefix + "sizeStorer",
+                                     enableWtLogging));
         rs = harnessHelper->newNonCappedRecordStore();
         WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtrs->setSizeStorer(sizeStorer.get());
+        ident = wtrs->getIdent();
         uri = wtrs->getURI();
 
         expectedNumRecords = 100;
@@ -361,6 +366,7 @@ protected:
     std::unique_ptr<WiredTigerHarnessHelper> harnessHelper;
     std::unique_ptr<WiredTigerSizeStorer> sizeStorer;
     std::unique_ptr<RecordStore> rs;
+    std::string ident;
     std::string uri;
 
     long long expectedNumRecords;
@@ -418,7 +424,7 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
 
     WiredTigerRecordStore::Params params;
     params.ns = "a.b"_sd;
-    params.uri = uri;
+    params.ident = ident;
     params.engineName = kWiredTigerEngineName;
     params.isCapped = false;
     params.isEphemeral = false;

@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -60,6 +62,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -67,6 +71,10 @@ namespace mongo {
 using std::string;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
+
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 
 namespace {
 
@@ -389,11 +397,7 @@ public:
             dbLock.relockWithMode(MODE_IX);
         }
 
-        try {
-            Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
-            uassertStatusOK(indexer.insertAllDocumentsInCollection());
-        } catch (const DBException& e) {
-            invariant(e.code() != ErrorCodes::WriteConflict);
+        auto relockOnErrorGuard = MakeGuard([&] {
             // Must have exclusive DB lock before we clean up the index build via the
             // destructor of 'indexer'.
             if (indexer.getBuildInBackground()) {
@@ -406,8 +410,50 @@ public:
                     std::terminate();
                 }
             }
-            throw;
+        });
+
+        // Collection scan and insert into index, followed by a drain of writes received in the
+        // background.
+        {
+            Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
+            uassertStatusOK(indexer.insertAllDocumentsInCollection());
         }
+
+        if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
+            log() << "Hanging after dumping inserts from bulk builder";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
+        }
+
+        // Perform the first drain while holding an intent lock.
+        {
+            opCtx->recoveryUnit()->abandonSnapshot();
+            Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IS);
+
+            LOG(1) << "performing first index build drain";
+            uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
+        }
+
+        if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
+            log() << "Hanging after index build first drain";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
+        }
+
+        // Perform the second drain while stopping writes on the collection.
+        {
+            opCtx->recoveryUnit()->abandonSnapshot();
+            Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
+
+            LOG(1) << "performing second index build drain";
+            uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
+        }
+
+        if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
+            log() << "Hanging after index build second drain";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
+        }
+
+        relockOnErrorGuard.Dismiss();
+
         // Need to return db lock back to exclusive, to complete the index build.
         if (indexer.getBuildInBackground()) {
             opCtx->recoveryUnit()->abandonSnapshot();
@@ -418,9 +464,14 @@ public:
                 DatabaseShardingState::get(db).checkDbVersion(opCtx);
             }
 
-            uassert(28551, "database dropped during index build", db);
-            uassert(28552, "collection dropped during index build", db->getCollection(opCtx, ns));
+            invariant(db);
+            invariant(db->getCollection(opCtx, ns));
         }
+
+        // Perform the third and final drain after releasing a shared lock and reacquiring an
+        // exclusive lock on the database.
+        LOG(1) << "performing final index build drain";
+        uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
 
         writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);

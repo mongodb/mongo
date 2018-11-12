@@ -462,7 +462,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             return status;
         }
 
-        status = indexer.doneInserting();
+        status = indexer.dumpInsertsFromBulk();
         if (!status.isOK()) {
             return status;
         }

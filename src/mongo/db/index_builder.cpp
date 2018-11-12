@@ -170,25 +170,30 @@ void IndexBuilder::waitForBgIndexStarting() {
 }
 
 namespace {
-/**
- * @param status shalt not be of code `WriteConflict`.
- */
-Status _failIndexBuild(MultiIndexBlock& indexer, Status status, bool allowBackgroundBuilding) {
+Status _failIndexBuild(OperationContext* opCtx,
+                       MultiIndexBlock& indexer,
+                       Lock::DBLock* dbLock,
+                       Status status,
+                       bool allowBackgroundBuilding) {
     invariant(status.code() != ErrorCodes::WriteConflict);
+
+    if (!allowBackgroundBuilding) {
+        return status;
+    }
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    if (dbLock->mode() != MODE_X) {
+        dbLock->relockWithMode(MODE_X);
+    }
 
     if (status.code() == ErrorCodes::InterruptedAtShutdown) {
         // leave it as-if kill -9 happened. This will be handled on restart.
-        invariant(allowBackgroundBuilding);  // Foreground builds aren't interrupted.
         indexer.abortWithoutCleanup();
         return status;
     }
 
-    if (allowBackgroundBuilding) {
-        error() << "Background index build failed. Status: " << redact(status);
-        fassertFailed(50769);
-    } else {
-        return status;
-    }
+    error() << "Background index build failed. Status: " << redact(status);
+    fassertFailed(50769);
 }
 }  // namespace
 
@@ -242,12 +247,13 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         return Status::OK();
     }
     if (!status.isOK()) {
-        return _failIndexBuild(indexer, status, allowBackgroundBuilding);
+        return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
     }
 
     if (allowBackgroundBuilding) {
         _setBgIndexStarting();
         invariant(dbLock);
+        opCtx->recoveryUnit()->abandonSnapshot();
         dbLock->relockWithMode(MODE_IX);
     }
 
@@ -255,21 +261,38 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         Lock::CollectionLock collLock(opCtx->lockState(), ns.ns(), MODE_IX);
         // WriteConflict exceptions and statuses are not expected to escape this method.
         status = indexer.insertAllDocumentsInCollection();
+        if (!status.isOK()) {
+            return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
+        }
+
+        // Perform the first drain while holding an intent lock.
+        status = indexer.drainBackgroundWritesIfNeeded();
     }
     if (!status.isOK()) {
-        if (allowBackgroundBuilding) {
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            dbLock->relockWithMode(MODE_X);
-            if (status == ErrorCodes::InterruptedAtShutdown)
-                return _failIndexBuild(indexer, status, allowBackgroundBuilding);
-            opCtx->checkForInterrupt();
-        }
-        return _failIndexBuild(indexer, status, allowBackgroundBuilding);
+        return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
+    }
+
+    // Perform the second drain while stopping inserts into the collection.
+    {
+        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
+        status = indexer.drainBackgroundWritesIfNeeded();
+    }
+    if (!status.isOK()) {
+        return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
     }
 
     if (allowBackgroundBuilding) {
+        opCtx->recoveryUnit()->abandonSnapshot();
         dbLock->relockWithMode(MODE_X);
     }
+
+    // Perform the third and final drain after releasing a shared lock and reacquiring an
+    // exclusive lock on the database.
+    status = indexer.drainBackgroundWritesIfNeeded();
+    if (!status.isOK()) {
+        return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
+    }
+
     status = writeConflictRetry(opCtx, "Commit index build", ns.ns(), [this, opCtx, &indexer, &ns] {
         WriteUnitOfWork wunit(opCtx);
         auto status = indexer.commit();
@@ -301,7 +324,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         return Status::OK();
     });
     if (!status.isOK()) {
-        return _failIndexBuild(indexer, status, allowBackgroundBuilding);
+        return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
     }
 
     if (allowBackgroundBuilding) {

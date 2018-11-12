@@ -151,9 +151,20 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    virtual Status doneInserting() = 0;
-    virtual Status doneInserting(std::set<RecordId>* const dupRecords) = 0;
-    virtual Status doneInserting(std::vector<BSONObj>* const dupKeysInserted) = 0;
+    virtual Status dumpInsertsFromBulk() = 0;
+    virtual Status dumpInsertsFromBulk(std::set<RecordId>* const dupRecords) = 0;
+    virtual Status dumpInsertsFromBulk(std::vector<BSONObj>* const dupKeysInserted) = 0;
+
+    /**
+     * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
+     * drain these writes into the index. If intent locks are held on the collection, more writes
+     * may come in after this drain completes. To ensure that all writes are completely drained
+     * before calling commit(), stop writes on the collection by holding a S or X while calling this
+     * method.
+     *
+     * Must not be in a WriteUnitOfWork.
+     */
+    virtual Status drainBackgroundWritesIfNeeded() = 0;
 
     /**
      * Marks the index ready for use. Should only be called as the last method after

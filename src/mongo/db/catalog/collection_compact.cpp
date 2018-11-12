@@ -137,14 +137,12 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
-    // The MMAPv1 storage engine used to add documents to indexer through the
-    // RecordStoreCompactAdaptor interface.
     status = recordStore->compact(opCtx);
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
     log() << "starting index commits";
-    status = indexer.doneInserting();
+    status = indexer.dumpInsertsFromBulk();
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 

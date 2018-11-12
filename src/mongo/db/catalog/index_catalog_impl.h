@@ -306,6 +306,15 @@ public:
                         int64_t* keysInsertedOut) override;
 
     /**
+     * See IndexCatalog::updateRecord
+     */
+    Status updateRecord(OperationContext* const opCtx,
+                        const BSONObj& oldDoc,
+                        const BSONObj& newDoc,
+                        const RecordId& recordId,
+                        int64_t* const keysInsertedOut,
+                        int64_t* const keysDeletedOut) override;
+    /**
      * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
      * this operation.
      */

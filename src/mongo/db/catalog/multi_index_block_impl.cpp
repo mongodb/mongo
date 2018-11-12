@@ -276,7 +276,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         if (!status.isOK())
             return status;
 
-        if (!_buildInBackground) {
+        // Foreground builds and background builds using an interceptor can use the bulk builder.
+        const bool useBulk =
+            !_buildInBackground || index.block->getEntry()->indexBuildInterceptor();
+        if (useBulk) {
             // Bulk build process requires foreground building as it assumes nothing is changing
             // under it.
             index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes);
@@ -287,6 +290,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         _collection->getIndexCatalog()->prepareInsertDeleteOptions(
             _opCtx, descriptor, &index.options);
         index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
+        index.options.fromIndexBuilder = true;
         if (_ignoreUnique) {
             index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
         }
@@ -487,11 +491,12 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
 
     progress->finished();
 
-    Status ret = doneInserting();
+    Status ret = dumpInsertsFromBulk();
     if (!ret.isOK())
         return ret;
 
-    log() << "build index done.  scanned " << n << " total records. " << t.seconds() << " secs";
+    log() << "build index collection scan done.  scanned " << n << " total records. " << t.seconds()
+          << " secs";
 
     return Status::OK();
 }
@@ -534,19 +539,20 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc,
     return Status::OK();
 }
 
-Status MultiIndexBlockImpl::doneInserting() {
-    return _doneInserting(nullptr, nullptr);
+Status MultiIndexBlockImpl::dumpInsertsFromBulk() {
+    return _dumpInsertsFromBulk(nullptr, nullptr);
 }
 
-Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupRecords) {
-    return _doneInserting(dupRecords, nullptr);
+Status MultiIndexBlockImpl::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
+    return _dumpInsertsFromBulk(dupRecords, nullptr);
 }
 
-Status MultiIndexBlockImpl::doneInserting(std::vector<BSONObj>* dupKeysInserted) {
-    return _doneInserting(nullptr, dupKeysInserted);
+Status MultiIndexBlockImpl::dumpInsertsFromBulk(std::vector<BSONObj>* dupKeysInserted) {
+    return _dumpInsertsFromBulk(nullptr, dupKeysInserted);
 }
-Status MultiIndexBlockImpl::_doneInserting(std::set<RecordId>* dupRecords,
-                                           std::vector<BSONObj>* dupKeysInserted) {
+
+Status MultiIndexBlockImpl::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
+                                                 std::vector<BSONObj>* dupKeysInserted) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -561,7 +567,7 @@ Status MultiIndexBlockImpl::_doneInserting(std::set<RecordId>* dupRecords,
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == NULL)
             continue;
-        LOG(1) << "\t bulk commit starting for index: "
+        LOG(1) << "\t dumping from external sorter into index: "
                << _indexes[i].block->getEntry()->descriptor()->indexName();
         Status status = _indexes[i].real->commitBulk(_opCtx,
                                                      _indexes[i].bulk.get(),
@@ -578,6 +584,43 @@ Status MultiIndexBlockImpl::_doneInserting(std::set<RecordId>* dupRecords,
 
     return Status::OK();
 }
+
+Status MultiIndexBlockImpl::drainBackgroundWritesIfNeeded() {
+    if (State::kAborted == _getState()) {
+        return {ErrorCodes::IndexBuildAborted,
+                str::stream() << "Index build aborted: " << _abortReason
+                              << ". Cannot complete drain phase: "
+                              << _collection->ns().ns()
+                              << "("
+                              << *_collection->uuid()
+                              << ")"};
+    }
+
+    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
+
+    // Drain side-writes table for each index. This only drains what is visible. Assuming intent
+    // locks are held on the user collection, more writes can come in after this drain completes.
+    // Callers are responsible for stopping writes by holding an S or X lock while draining before
+    // completing the index build.
+    for (size_t i = 0; i < _indexes.size(); i++) {
+        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        if (!interceptor)
+            continue;
+
+        LOG(1) << "draining background writes on collection " << _collection->ns()
+               << " into index: " << _indexes[i].block->getEntry()->descriptor()->indexName();
+
+        auto status = interceptor->drainWritesIntoIndex(_opCtx,
+                                                        _indexes[i].real,
+                                                        _indexes[i].block->getEntry()->descriptor(),
+                                                        _indexes[i].options);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 
 void MultiIndexBlockImpl::abortWithoutCleanup() {
     _setStateToAbortedIfNotCommitted("aborted without cleanup"_sd);
@@ -611,6 +654,16 @@ Status MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onC
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (onCreateFn) {
             onCreateFn(_indexes[i].block->getSpec());
+        }
+
+        // Do this before calling success(), which unsets the interceptor pointer on the index
+        // catalog entry.
+        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        if (interceptor) {
+            auto multikeyPaths = interceptor->getMultikeyPaths();
+            if (multikeyPaths) {
+                _indexes[i].block->getEntry()->setMultikey(_opCtx, multikeyPaths.get());
+            }
         }
 
         _indexes[i].block->success();

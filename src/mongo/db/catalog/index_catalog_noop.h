@@ -175,6 +175,15 @@ public:
         return Status::OK();
     }
 
+    Status updateRecord(OperationContext* const opCtx,
+                        const BSONObj& oldDoc,
+                        const BSONObj& newDoc,
+                        const RecordId& recordId,
+                        int64_t* const keysInsertedOut,
+                        int64_t* const keysDeletedOut) override {
+        return Status::OK();
+    };
+
     void unindexRecord(OperationContext* const opCtx,
                        const BSONObj& obj,
                        const RecordId& loc,

@@ -267,6 +267,10 @@ public:
         _ns = ns.ns();
     }
 
+    bool isTemp() const {
+        return ns().size() == 0;
+    }
+
     virtual const std::string& getIdent() const = 0;
 
     /**

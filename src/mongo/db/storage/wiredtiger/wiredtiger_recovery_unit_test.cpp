@@ -74,7 +74,8 @@ public:
 
     virtual std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
                                                            const std::string& ns) final {
-        std::string uri = "table:" + ns;
+        std::string ident = ns;
+        std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
         const bool prefixed = false;
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
             kWiredTigerEngineName, ns, CollectionOptions(), "", prefixed);
@@ -92,7 +93,7 @@ public:
 
         WiredTigerRecordStore::Params params;
         params.ns = ns;
-        params.uri = uri;
+        params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.isEphemeral = false;
@@ -536,7 +537,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
 
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.read_once"));
-    auto uri = rs->getIdent();
+    auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     // Insert a record.
     ru->beginUnitOfWork(opCtx);

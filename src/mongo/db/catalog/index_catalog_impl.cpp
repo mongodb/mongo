@@ -1168,8 +1168,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
         }
 
         Status status = Status::OK();
-        const bool hybridBuildsEnabled = false;
-        if (hybridBuildsEnabled && index->isBuilding()) {
+        if (index->isBuilding()) {
             int64_t inserted;
             status = index->indexBuildInterceptor()->sideWrite(opCtx,
                                                                index->accessMethod(),
@@ -1219,8 +1218,7 @@ Status IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                         const RecordId& loc,
                                         bool logIfError,
                                         int64_t* keysDeletedOut) {
-    const bool hybridBuildsEnabled = false;
-    if (hybridBuildsEnabled && index->isBuilding()) {
+    if (index->isBuilding()) {
         int64_t removed;
         auto status = index->indexBuildInterceptor()->sideWrite(
             opCtx, index->accessMethod(), &obj, loc, IndexBuildInterceptor::Op::kDelete, &removed);
@@ -1278,6 +1276,61 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
             return s;
     }
 
+    return Status::OK();
+}
+
+Status IndexCatalogImpl::updateRecord(OperationContext* const opCtx,
+                                      const BSONObj& oldDoc,
+                                      const BSONObj& newDoc,
+                                      const RecordId& recordId,
+                                      int64_t* const keysInsertedOut,
+                                      int64_t* const keysDeletedOut) {
+    *keysInsertedOut = 0;
+    *keysDeletedOut = 0;
+
+    // Ready indexes go directly through the IndexAccessMethod.
+    for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
+         it != _readyIndexes.end();
+         ++it) {
+        IndexCatalogEntry* entry = it->get();
+
+        IndexDescriptor* descriptor = entry->descriptor();
+        IndexAccessMethod* iam = entry->accessMethod();
+
+        InsertDeleteOptions options;
+        prepareInsertDeleteOptions(opCtx, descriptor, &options);
+
+        UpdateTicket updateTicket;
+
+        auto status = iam->validateUpdate(
+            opCtx, oldDoc, newDoc, recordId, options, &updateTicket, entry->getFilterExpression());
+        if (!status.isOK())
+            return status;
+
+        int64_t keysInserted;
+        int64_t keysDeleted;
+        status = iam->update(opCtx, updateTicket, &keysInserted, &keysDeleted);
+        if (!status.isOK())
+            return status;
+
+        *keysInsertedOut += keysInserted;
+        *keysDeletedOut += keysDeleted;
+    }
+
+    // Building indexes go through the interceptor.
+    BsonRecord record{recordId, Timestamp(), &newDoc};
+    for (IndexCatalogEntryContainer::const_iterator it = _buildingIndexes.begin();
+         it != _buildingIndexes.end();
+         ++it) {
+        IndexCatalogEntry* entry = it->get();
+
+        bool logIfError = false;
+        invariant(_unindexRecord(opCtx, entry, oldDoc, recordId, logIfError, keysDeletedOut));
+
+        auto status = _indexRecords(opCtx, entry, {record}, keysInsertedOut);
+        if (!status.isOK())
+            return status;
+    }
     return Status::OK();
 }
 
@@ -1359,10 +1412,18 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEn
     auto releasedEntry = _buildingIndexes.release(index->descriptor());
     invariant(releasedEntry.get() == index);
     _readyIndexes.add(std::move(releasedEntry));
-    opCtx->recoveryUnit()->onRollback([this, index]() {
+
+    auto interceptor = index->indexBuildInterceptor();
+    index->setIndexBuildInterceptor(nullptr);
+    index->setIsReady(true);
+
+    opCtx->recoveryUnit()->onRollback([this, index, interceptor]() {
         auto releasedEntry = _readyIndexes.release(index->descriptor());
         invariant(releasedEntry.get() == index);
         _buildingIndexes.add(std::move(releasedEntry));
+
+        index->setIndexBuildInterceptor(interceptor);
+        index->setIsReady(false);
     });
 }
 

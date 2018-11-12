@@ -165,7 +165,7 @@ Status CollectionBulkLoaderImpl::commit() {
         // deleted.
         if (_secondaryIndexesBlock) {
             std::set<RecordId> secDups;
-            auto status = _secondaryIndexesBlock->doneInserting(&secDups);
+            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(&secDups);
             if (!status.isOK()) {
                 return status;
             }
@@ -193,8 +193,8 @@ Status CollectionBulkLoaderImpl::commit() {
         if (_idIndexBlock) {
             // Delete dups.
             std::set<RecordId> dups;
-            // Do not do inside a WriteUnitOfWork (required by doneInserting).
-            auto status = _idIndexBlock->doneInserting(&dups);
+            // Do not do inside a WriteUnitOfWork (required by dumpInsertsFromBulk).
+            auto status = _idIndexBlock->dumpInsertsFromBulk(&dups);
             if (!status.isOK()) {
                 return status;
             }

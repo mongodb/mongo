@@ -280,7 +280,7 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
         std::vector<BSONObj> dupsInserted;
 
         // Neither of these inserts will recognize duplicates because the bulk inserter does not
-        // detect them until doneInserting() is called.
+        // detect them until dumpInsertsFromBulk() is called.
         ASSERT_OK(indexer.insert(record1->data.releaseToBson(), record1->id, &dupsInserted));
         ASSERT_EQ(0u, dupsInserted.size());
 
@@ -289,7 +289,7 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
         ASSERT_OK(indexer.insert(record2->data.releaseToBson(), record2->id, &dupsInserted));
         ASSERT_EQ(0u, dupsInserted.size());
 
-        ASSERT_OK(indexer.doneInserting(&dupsInserted));
+        ASSERT_OK(indexer.dumpInsertsFromBulk(&dupsInserted));
         ASSERT_EQ(1u, dupsInserted.size());
 
         // Record that duplicates were inserted.

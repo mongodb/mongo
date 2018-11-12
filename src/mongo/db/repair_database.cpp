@@ -213,7 +213,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
         }
     }
 
-    Status status = indexer->doneInserting();
+    Status status = indexer->dumpInsertsFromBulk();
     if (!status.isOK())
         return status;
 
