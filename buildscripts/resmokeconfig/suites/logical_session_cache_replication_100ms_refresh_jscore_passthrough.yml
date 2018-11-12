@@ -38,10 +38,6 @@ selector:
   - jstests/core/txns/disallow_operations_on_prepared_transaction.js
   - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
   - jstests/core/txns/prepare_requires_fcv42.js
-  # This test sets the "failCommand" failpoint which forces find commands to fail. It cannot be run
-  # with the CheckReplDBHashInBackground hook because it will fail the find commands run by the hook.
-  - jstests/core/failcommand_failpoint.js
-
 
 executor:
   archive:

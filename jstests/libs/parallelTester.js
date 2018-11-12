@@ -207,11 +207,6 @@ if (typeof _threadInject != "undefined") {
 
             // Destroys and recreates the catalog, which will interfere with other tests.
             "restart_catalog.js",
-
-            // This test makes the assumption that a command is run a certain number of times,
-            // so the test cannot be run in parallel with other tests. Also, it sets a failpoint
-            // on "find" as part of testing, causing tests run in parallel with it to possibly fail.
-            "failcommand_failpoint.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.

@@ -302,8 +302,8 @@ void execCommandClient(OperationContext* opCtx,
         auto body = result->getBodyBuilder();
 
         MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-            return CommandHelpers::shouldActivateFailCommandFailPoint(data,
-                                                                      request.getCommandName()) &&
+            return CommandHelpers::shouldActivateFailCommandFailPoint(
+                       data, request.getCommandName(), opCtx->getClient()) &&
                 data.hasField("writeConcernError");
         }) {
             body.append(data.getData()["writeConcernError"]);

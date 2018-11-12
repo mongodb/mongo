@@ -465,9 +465,18 @@ constexpr StringData CommandHelpers::kHelpFieldName;
 
 MONGO_FAIL_POINT_DEFINE(failCommand);
 
-bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName) {
+bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
+                                                        StringData cmdName,
+                                                        Client* client) {
     if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
+
+    if (data.hasField("threadName") &&
+        (client->desc() !=
+         data.getStringField(
+             "threadName"))) {  // only activate failpoint on thread from certain client
+        return false;
+    }
 
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
@@ -480,7 +489,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data, Str
 
 void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-        return shouldActivateFailCommandFailPoint(data, commandName) &&
+        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient()) &&
             (data.hasField("closeConnection") || data.hasField("errorCode"));
     }) {
         bool closeConnection;
