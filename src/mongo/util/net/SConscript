@@ -1,7 +1,7 @@
 # -*- mode: python; -*-
 
 Import('env')
-Import("has_option")
+Import("get_option")
 Import('http_client')
 Import('ssl_provider')
 
@@ -150,7 +150,7 @@ env.Library(
         "ssl_dummy.cpp",
     ],
     LIBDEPS=[
-        'ssl_manager_impl' if has_option('ssl') else 'ssl_manager_none',
+        'ssl_manager_impl' if get_option('ssl') == 'on' else 'ssl_manager_none',
     ],
 )
 
@@ -189,7 +189,7 @@ env.CppUnitTest(
     ],
 )
 
-if has_option('ssl'):
+if get_option('ssl') == 'on':
     env.CppUnitTest(
         target='ssl_manager_test',
         source=[

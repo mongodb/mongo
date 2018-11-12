@@ -3,6 +3,7 @@
 import os
 
 Import("env")
+Import("get_option")
 Import("has_option")
 
 env = env.Clone()
@@ -60,7 +61,7 @@ if 'enterprise' in env['MONGO_MODULES']:
   upgrade_code = '0375833f-c12d-4faa-9a83-60730647cac3'
 # Community
 else:
-  if has_option('ssl'):
+  if get_option('ssl') == 'on':
     msi_edition = 'SSL'
     upgrade_code = '8a8f9bb3-27f7-4e47-b9a0-e52c92639e44'
   else:

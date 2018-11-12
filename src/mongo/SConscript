@@ -287,7 +287,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'db/mongod_options',
-        '$BUILD_DIR/mongo/util/net/ssl_options_server' if has_option('ssl') else '',
+        '$BUILD_DIR/mongo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
     ]
 )
 
@@ -441,7 +441,7 @@ mongos = env.Program(
         'transport/transport_layer_manager',
         'util/clock_sources',
         'util/fail_point',
-        'util/net/ssl_options_server' if has_option('ssl') else '',
+        'util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
         'util/ntservice',
         'util/options_parser/options_parser_init',
         'util/version_impl',
@@ -542,7 +542,7 @@ if not has_option('noshell') and usemozjs:
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/client/connection_string",
-            '$BUILD_DIR/mongo/util/net/ssl_options_client' if has_option('ssl') else '',
+            '$BUILD_DIR/mongo/util/net/ssl_options_client' if get_option('ssl') == 'on' else '',
         ],
         INSTALL_ALIAS=[
             'shell',
