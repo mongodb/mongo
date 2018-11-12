@@ -578,8 +578,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         // Determine which index names are too long. Since we don't have the collection drop optime
         // at this time, use the maximum optime to check the index names.
         auto longDpns = fullns.makeDropPendingNamespace(repl::OpTime::max());
-        while (indexIter.more()) {
-            auto index = indexIter.next();
+        while (indexIter->more()) {
+            auto index = indexIter->next()->descriptor();
             auto status = longDpns.checkLengthForRename(index->indexName().size());
             if (!status.isOK()) {
                 indexesToDrop.push_back(index);

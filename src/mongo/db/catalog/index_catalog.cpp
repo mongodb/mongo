@@ -37,69 +37,66 @@
 
 
 namespace mongo {
+using IndexIterator = IndexCatalog::IndexIterator;
+using ReadyIndexesIterator = IndexCatalog::ReadyIndexesIterator;
+using AllIndexesIterator = IndexCatalog::AllIndexesIterator;
 
-IndexCatalog::IndexIterator::IndexIterator(OperationContext* opCtx,
-                                           IndexCatalogEntryContainer::const_iterator beginIterator,
-                                           IndexCatalogEntryContainer::const_iterator endIterator,
-                                           bool includeUnfinishedIndexes)
-    : _includeUnfinishedIndexes(includeUnfinishedIndexes),
-      _opCtx(opCtx),
-      _iterator(beginIterator),
-      _endIterator(endIterator),
-      _start(true),
-      _prev(nullptr),
-      _next(nullptr) {}
-
-bool IndexCatalog::IndexIterator::more() {
+bool IndexIterator::more() {
     if (_start) {
-        _advance();
+        _next = _advance();
         _start = false;
     }
     return _next != nullptr;
 }
 
-IndexDescriptor* IndexCatalog::IndexIterator::next() {
+IndexCatalogEntry* IndexIterator::next() {
     if (!more())
         return nullptr;
     _prev = _next;
-    _advance();
-    return _prev->descriptor();
-}
-
-IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod(const IndexDescriptor* desc) {
-    invariant(desc == _prev->descriptor());
-    return _prev->accessMethod();
-}
-
-IndexCatalogEntry* IndexCatalog::IndexIterator::catalogEntry(const IndexDescriptor* desc) {
-    invariant(desc == _prev->descriptor());
+    _next = _advance();
     return _prev;
 }
 
-void IndexCatalog::IndexIterator::_advance() {
-    _next = nullptr;
+ReadyIndexesIterator::ReadyIndexesIterator(OperationContext* const opCtx,
+                                           IndexCatalogEntryContainer::const_iterator beginIterator,
+                                           IndexCatalogEntryContainer::const_iterator endIterator)
+    : _opCtx(opCtx), _iterator(beginIterator), _endIterator(endIterator) {}
 
+IndexCatalogEntry* ReadyIndexesIterator::_advance() {
     while (_iterator != _endIterator) {
         IndexCatalogEntry* entry = _iterator->get();
         ++_iterator;
 
-        if (!_includeUnfinishedIndexes) {
-            if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
-                if (auto mySnapshot = _opCtx->recoveryUnit()->getPointInTimeReadTimestamp()) {
-                    if (mySnapshot < minSnapshot) {
-                        // This index isn't finished in my snapshot.
-                        continue;
-                    }
+        if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
+            if (auto mySnapshot = _opCtx->recoveryUnit()->getPointInTimeReadTimestamp()) {
+                if (mySnapshot < minSnapshot) {
+                    // This index isn't finished in my snapshot.
+                    continue;
                 }
             }
-
-            if (!entry->isReady(_opCtx))
-                continue;
         }
 
-        _next = entry;
-        return;
+        return entry;
     }
+
+    return nullptr;
 }
 
+AllIndexesIterator::AllIndexesIterator(
+    OperationContext* const opCtx, std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer)
+    : _opCtx(opCtx), _ownedContainer(std::move(ownedContainer)) {
+    // Explicitly order calls onto the ownedContainer with respect to its move.
+    _iterator = _ownedContainer->begin();
+    _endIterator = _ownedContainer->end();
+}
+
+IndexCatalogEntry* AllIndexesIterator::_advance() {
+    if (_iterator == _endIterator) {
+        return nullptr;
+    }
+
+    IndexCatalogEntry* entry = *_iterator;
+    ++_iterator;
+    return entry;
+}
 }  // namespace mongo

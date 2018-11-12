@@ -660,11 +660,12 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     // newDoc.
     OwnedPointerMap<IndexDescriptor*, UpdateTicket> updateTickets;
     if (indexesAffected) {
-        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, true);
-        while (ii.more()) {
-            IndexDescriptor* descriptor = ii.next();
-            IndexCatalogEntry* entry = ii.catalogEntry(descriptor);
-            IndexAccessMethod* iam = ii.accessMethod(descriptor);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            _indexCatalog->getIndexIterator(opCtx, true);
+        while (ii->more()) {
+            IndexCatalogEntry* entry = ii->next();
+            IndexDescriptor* descriptor = entry->descriptor();
+            IndexAccessMethod* iam = entry->accessMethod();
 
             InsertDeleteOptions options;
             _indexCatalog->prepareInsertDeleteOptions(opCtx, descriptor, &options);
@@ -687,10 +688,12 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 
     // Update each index with each respective UpdateTicket.
     if (indexesAffected) {
-        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, true);
-        while (ii.more()) {
-            IndexDescriptor* descriptor = ii.next();
-            IndexAccessMethod* iam = ii.accessMethod(descriptor);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            _indexCatalog->getIndexIterator(opCtx, true);
+        while (ii->more()) {
+            IndexCatalogEntry* entry = ii->next();
+            IndexDescriptor* descriptor = entry->descriptor();
+            IndexAccessMethod* iam = entry->accessMethod();
 
             int64_t keysInserted;
             int64_t keysDeleted;
@@ -764,19 +767,20 @@ uint64_t CollectionImpl::dataSize(OperationContext* opCtx) const {
 uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx, BSONObjBuilder* details, int scale) {
     IndexCatalog* idxCatalog = getIndexCatalog();
 
-    IndexCatalog::IndexIterator ii = idxCatalog->getIndexIterator(opCtx, true);
+    std::unique_ptr<IndexCatalog::IndexIterator> ii = idxCatalog->getIndexIterator(opCtx, true);
 
     uint64_t totalSize = 0;
 
-    while (ii.more()) {
-        IndexDescriptor* d = ii.next();
-        IndexAccessMethod* iam = idxCatalog->getIndex(d);
+    while (ii->more()) {
+        IndexCatalogEntry* entry = ii->next();
+        IndexDescriptor* descriptor = entry->descriptor();
+        IndexAccessMethod* iam = entry->accessMethod();
 
         long long ds = iam->getSpaceUsedBytes(opCtx);
 
         totalSize += ds;
         if (details) {
-            details->appendNumber(d->indexName(), ds / scale);
+            details->appendNumber(descriptor->indexName(), ds / scale);
         }
     }
 
@@ -798,9 +802,10 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     // 1) store index specs
     vector<BSONObj> indexSpecs;
     {
-        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, false);
-        while (ii.more()) {
-            const IndexDescriptor* idx = ii.next();
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            _indexCatalog->getIndexIterator(opCtx, false);
+        while (ii->more()) {
+            const IndexDescriptor* idx = ii->next()->descriptor();
             indexSpecs.push_back(idx->infoObj().getOwned());
         }
     }
@@ -1031,14 +1036,16 @@ void _validateIndexes(OperationContext* opCtx,
                       ValidateResultsMap* indexNsResultsMap,
                       ValidateResults* results) {
 
-    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(opCtx, false);
+    std::unique_ptr<IndexCatalog::IndexIterator> it = indexCatalog->getIndexIterator(opCtx, false);
 
     // Validate Indexes.
-    while (i.more()) {
+    while (it->more()) {
         opCtx->checkForInterrupt();
-        const IndexDescriptor* descriptor = i.next();
+        IndexCatalogEntry* entry = it->next();
+        IndexDescriptor* descriptor = entry->descriptor();
+        IndexAccessMethod* iam = entry->accessMethod();
+
         log(LogComponent::kIndex) << "validating index " << descriptor->indexNamespace() << endl;
-        IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexNamespace()];
         bool checkCounts = false;
         int64_t numTraversedKeys;
@@ -1095,9 +1102,10 @@ void _validateIndexKeyCount(OperationContext* opCtx,
                             RecordStoreValidateAdaptor* indexValidator,
                             ValidateResultsMap* indexNsResultsMap) {
 
-    IndexCatalog::IndexIterator indexIterator = indexCatalog->getIndexIterator(opCtx, false);
-    while (indexIterator.more()) {
-        IndexDescriptor* descriptor = indexIterator.next();
+    std::unique_ptr<IndexCatalog::IndexIterator> indexIterator =
+        indexCatalog->getIndexIterator(opCtx, false);
+    while (indexIterator->more()) {
+        IndexDescriptor* descriptor = indexIterator->next()->descriptor();
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexNamespace()];
 
         if (curIndexResults.valid) {
@@ -1287,10 +1295,11 @@ Status CollectionImpl::touch(OperationContext* opCtx,
 
     if (touchIndexes) {
         Timer t;
-        IndexCatalog::IndexIterator ii = _indexCatalog->getIndexIterator(opCtx, false);
-        while (ii.more()) {
-            const IndexDescriptor* desc = ii.next();
-            const IndexAccessMethod* iam = _indexCatalog->getIndex(desc);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
+            _indexCatalog->getIndexIterator(opCtx, false);
+        while (ii->more()) {
+            IndexCatalogEntry* entry = ii->next();
+            IndexAccessMethod* iam = entry->accessMethod();
             Status status = iam->touch(opCtx);
             if (!status.isOK())
                 return status;
@@ -1326,4 +1335,8 @@ void CollectionImpl::setNs(NamespaceString nss) {
     _cursorManager = std::make_unique<CursorManager>(_ns);
 }
 
+void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
+    _details->indexBuildSuccess(opCtx, index->descriptor()->indexName());
+    _indexCatalog->indexBuildSuccess(opCtx, index);
+}
 }  // namespace mongo

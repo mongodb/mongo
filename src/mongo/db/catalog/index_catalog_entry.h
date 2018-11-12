@@ -50,6 +50,7 @@ class CollectionCatalogEntry;
 class CollectionInfoCache;
 class HeadManager;
 class IndexAccessMethod;
+class IndexBuildInterceptor;
 class IndexDescriptor;
 class MatchExpression;
 class OperationContext;
@@ -73,6 +74,12 @@ public:
     virtual IndexAccessMethod* accessMethod() = 0;
 
     virtual const IndexAccessMethod* accessMethod() const = 0;
+
+    virtual bool isBuilding() const = 0;
+
+    virtual IndexBuildInterceptor* indexBuildInterceptor() = 0;
+
+    virtual void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) = 0;
 
     virtual const Ordering& ordering() const = 0;
 

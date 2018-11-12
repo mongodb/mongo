@@ -91,10 +91,11 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     BSONObjBuilder indexDetails;
 
-    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(opCtx, false);
-    while (i.more()) {
-        const IndexDescriptor* descriptor = i.next();
-        IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
+    std::unique_ptr<IndexCatalog::IndexIterator> it = indexCatalog->getIndexIterator(opCtx, false);
+    while (it->more()) {
+        IndexCatalogEntry* entry = it->next();
+        IndexDescriptor* descriptor = entry->descriptor();
+        IndexAccessMethod* iam = entry->accessMethod();
         invariant(iam);
 
         BSONObjBuilder bob;

@@ -506,7 +506,6 @@ env.Library(
     target='service_context',
     source=[
         'client.cpp',
-        'multi_key_path_tracker.cpp',
         'operation_context.cpp',
         'operation_context_group.cpp',
         'service_context.cpp',
@@ -515,6 +514,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/clock_sources',
@@ -536,6 +536,16 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.Library(
+    target='multi_key_path_tracker',
+    source=[
+        'multi_key_path_tracker.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 

@@ -448,9 +448,9 @@ bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
     }
 
     auto indexIterator = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
-    while (indexIterator.more()) {
-        IndexDescriptor* descriptor = indexIterator.next();
-        if (supportsUniqueKey(expCtx, indexIterator.catalogEntry(descriptor), uniqueKeyPaths)) {
+    while (indexIterator->more()) {
+        IndexCatalogEntry* entry = indexIterator->next();
+        if (supportsUniqueKey(expCtx, entry, uniqueKeyPaths)) {
             return true;
         }
     }

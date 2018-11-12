@@ -78,47 +78,54 @@ class IndexCatalog {
 public:
     class IndexIterator {
     public:
-        explicit IndexIterator(OperationContext* const opCtx,
-                               IndexCatalogEntryContainer::const_iterator beginIterator,
-                               IndexCatalogEntryContainer::const_iterator endIterator,
-                               const bool includeUnfinishedIndexes);
-
-    public:
-        inline ~IndexIterator() = default;
-
-        inline IndexIterator(const IndexIterator& copy) = default;
-        inline IndexIterator& operator=(const IndexIterator& copy) = default;
-
-        inline IndexIterator(IndexIterator&& copy) = default;
-        inline IndexIterator& operator=(IndexIterator&& copy) = default;
-
+        virtual ~IndexIterator() = default;
         bool more();
+        IndexCatalogEntry* next();
 
-        IndexDescriptor* next();
-
+    protected:
         /**
-         * Returns the access method for the last return IndexDescriptor.
+         * Advance the underlying iterator and returns the next index entry. Returns nullptr when
+         * the iterator is exhausted.
          */
-        IndexAccessMethod* accessMethod(const IndexDescriptor* const desc);
-
-        /**
-         * Returns the IndexCatalogEntry for the last return IndexDescriptor.
-         */
-        IndexCatalogEntry* catalogEntry(const IndexDescriptor* const desc);
+        virtual IndexCatalogEntry* _advance() = 0;
 
     private:
-        void _advance();
+        bool _start = true;
+        IndexCatalogEntry* _prev = nullptr;
+        IndexCatalogEntry* _next = nullptr;
+    };
 
-        bool _includeUnfinishedIndexes;
+    class ReadyIndexesIterator : public IndexIterator {
+    public:
+        ReadyIndexesIterator(OperationContext* const opCtx,
+                             IndexCatalogEntryContainer::const_iterator beginIterator,
+                             IndexCatalogEntryContainer::const_iterator endIterator);
+
+    private:
+        IndexCatalogEntry* _advance() override;
 
         OperationContext* const _opCtx;
         IndexCatalogEntryContainer::const_iterator _iterator;
         IndexCatalogEntryContainer::const_iterator _endIterator;
+    };
 
-        bool _start;  // only true before we've called next() or more()
+    class AllIndexesIterator : public IndexIterator {
+    public:
+        /**
+         * `ownedContainer` is a container whose lifetime the begin and end iterators depend
+         * on. If the caller will keep control of the container for the entire iterator lifetime,
+         * it should pass in a null value.
+         */
+        AllIndexesIterator(OperationContext* const opCtx,
+                           std::unique_ptr<std::vector<IndexCatalogEntry*>> ownedContainer);
 
-        IndexCatalogEntry* _prev;
-        IndexCatalogEntry* _next;
+    private:
+        IndexCatalogEntry* _advance() override;
+
+        OperationContext* const _opCtx;
+        std::vector<IndexCatalogEntry*>::const_iterator _iterator;
+        std::vector<IndexCatalogEntry*>::const_iterator _endIterator;
+        std::unique_ptr<std::vector<IndexCatalogEntry*>> _ownedContainer;
     };
 
     /**
@@ -170,7 +177,6 @@ public:
         virtual const BSONObj& getSpec() const = 0;
     };
 
-public:
     IndexCatalog() = default;
     virtual ~IndexCatalog() = default;
 
@@ -291,8 +297,8 @@ public:
     /**
      * Returns an iterator for the index descriptors in this IndexCatalog.
      */
-    virtual IndexIterator getIndexIterator(OperationContext* const opCtx,
-                                           const bool includeUnfinishedIndexes) const = 0;
+    virtual std::unique_ptr<IndexIterator> getIndexIterator(
+        OperationContext* const opCtx, const bool includeUnfinishedIndexes) const = 0;
 
     // ---- index set modifiers ------
 
@@ -396,6 +402,8 @@ public:
                                             InsertDeleteOptions* options) const = 0;
 
     virtual void setNs(NamespaceString ns) = 0;
+
+    virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 };
 
 }  // namespace mongo

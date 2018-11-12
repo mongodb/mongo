@@ -187,10 +187,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           QueryPlannerParams* plannerParams) {
     invariant(canonicalQuery);
     // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
-    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
-    while (ii.more()) {
-        const IndexDescriptor* desc = ii.next();
-        IndexCatalogEntry* ice = ii.catalogEntry(desc);
+    std::unique_ptr<IndexCatalog::IndexIterator> ii =
+        collection->getIndexCatalog()->getIndexIterator(opCtx, false);
+    while (ii->more()) {
+        IndexCatalogEntry* ice = ii->next();
         plannerParams->indices.push_back(
             indexEntryFromIndexCatalogEntry(opCtx, *ice, canonicalQuery));
     }
@@ -1491,18 +1491,19 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
 
-    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
+    std::unique_ptr<IndexCatalog::IndexIterator> ii =
+        collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     auto query = parsedDistinct.getQuery()->getQueryRequest().getFilter();
-    while (ii.more()) {
-        const IndexDescriptor* desc = ii.next();
-        IndexCatalogEntry* ice = ii.catalogEntry(desc);
+    while (ii->more()) {
+        IndexCatalogEntry* ice = ii->next();
+        const IndexDescriptor* desc = ice->descriptor();
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             plannerParams.indices.push_back(
                 indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
             const auto* proj =
-                static_cast<WildcardAccessMethod*>(ii.accessMethod(desc))->getProjectionExec();
+                static_cast<WildcardAccessMethod*>(ice->accessMethod())->getProjectionExec();
             if (proj->applyProjectionToOneField(parsedDistinct.getKey())) {
                 plannerParams.indices.push_back(
                     indexEntryFromIndexCatalogEntry(opCtx, *ice, parsedDistinct.getQuery()));

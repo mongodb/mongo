@@ -365,6 +365,8 @@ public:
         PlanExecutor::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) final;
 
+    void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
+
 private:
     inline DatabaseCatalogEntry* dbce() const final {
         return this->_dbce;

@@ -530,11 +530,11 @@ void State::prepTempCollection() {
         if (finalColl) {
             finalOptions = finalColl->getCatalogEntry()->getCollectionOptions(_opCtx);
 
-            IndexCatalog::IndexIterator ii =
+            std::unique_ptr<IndexCatalog::IndexIterator> ii =
                 finalColl->getIndexCatalog()->getIndexIterator(_opCtx, true);
             // Iterate over finalColl's indexes.
-            while (ii.more()) {
-                IndexDescriptor* currIndex = ii.next();
+            while (ii->more()) {
+                IndexDescriptor* currIndex = ii->next()->descriptor();
                 BSONObjBuilder b;
                 b.append("ns", _config.tempNamespace.ns());
 
@@ -1114,11 +1114,11 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
         assertCollectionNotNull(_config.incLong, autoIncColl);
 
         bool foundIndex = false;
-        IndexCatalog::IndexIterator ii =
+        std::unique_ptr<IndexCatalog::IndexIterator> ii =
             autoIncColl.getCollection()->getIndexCatalog()->getIndexIterator(_opCtx, true);
         // Iterate over incColl's indexes.
-        while (ii.more()) {
-            IndexDescriptor* currIndex = ii.next();
+        while (ii->more()) {
+            IndexDescriptor* currIndex = ii->next()->descriptor();
             BSONObj x = currIndex->infoObj();
             if (sortKey.woCompare(x["key"].embeddedObject()) == 0) {
                 foundIndex = true;

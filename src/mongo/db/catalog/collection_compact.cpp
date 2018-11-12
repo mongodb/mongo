@@ -67,13 +67,15 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
             return StatusWith<CompactStats>(status);
 
         // Compact all indexes (not including unfinished indexes)
-        IndexCatalog::IndexIterator ii(indexCatalog->getIndexIterator(opCtx, false));
-        while (ii.more()) {
-            IndexDescriptor* descriptor = ii.next();
-            IndexAccessMethod* index = indexCatalog->getIndex(descriptor);
+        std::unique_ptr<IndexCatalog::IndexIterator> ii(
+            indexCatalog->getIndexIterator(opCtx, false));
+        while (ii->more()) {
+            IndexCatalogEntry* entry = ii->next();
+            IndexDescriptor* descriptor = entry->descriptor();
+            IndexAccessMethod* iam = entry->accessMethod();
 
             LOG(1) << "compacting index: " << descriptor->toString();
-            Status status = index->compact(opCtx);
+            Status status = iam->compact(opCtx);
             if (!status.isOK()) {
                 error() << "failed to compact index: " << descriptor->toString();
                 return status;
@@ -89,9 +91,10 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
 
     std::vector<BSONObj> indexSpecs;
     {
-        IndexCatalog::IndexIterator ii(indexCatalog->getIndexIterator(opCtx, false));
-        while (ii.more()) {
-            IndexDescriptor* descriptor = ii.next();
+        std::unique_ptr<IndexCatalog::IndexIterator> ii(
+            indexCatalog->getIndexIterator(opCtx, false));
+        while (ii->more()) {
+            IndexDescriptor* descriptor = ii->next()->descriptor();
 
             // Compact always creates the new index in the foreground.
             const BSONObj spec =

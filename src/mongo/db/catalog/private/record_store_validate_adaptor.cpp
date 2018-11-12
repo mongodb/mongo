@@ -80,10 +80,11 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
         return status;
     }
 
-    IndexCatalog::IndexIterator i = _indexCatalog->getIndexIterator(_opCtx, false);
+    std::unique_ptr<IndexCatalog::IndexIterator> it =
+        _indexCatalog->getIndexIterator(_opCtx, false);
 
-    while (i.more()) {
-        const IndexDescriptor* descriptor = i.next();
+    while (it->more()) {
+        const IndexDescriptor* descriptor = it->next()->descriptor();
         const std::string indexNs = descriptor->indexNamespace();
         int indexNumber = _indexConsistency->getIndexNumber(indexNs);
         ValidateResults curRecordResults;

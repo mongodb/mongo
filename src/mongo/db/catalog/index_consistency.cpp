@@ -75,12 +75,13 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
                Milliseconds(internalQueryExecYieldPeriodMS.load())) {
 
     IndexCatalog* indexCatalog = _collection->getIndexCatalog();
-    IndexCatalog::IndexIterator indexIterator = indexCatalog->getIndexIterator(_opCtx, false);
+    std::unique_ptr<IndexCatalog::IndexIterator> indexIterator =
+        indexCatalog->getIndexIterator(_opCtx, false);
 
     int indexNumber = 0;
-    while (indexIterator.more()) {
+    while (indexIterator->more()) {
 
-        const IndexDescriptor* descriptor = indexIterator.next();
+        const IndexDescriptor* descriptor = indexIterator->next()->descriptor();
         std::string indexNs = descriptor->indexNamespace();
 
         _indexNumber[descriptor->indexNamespace()] = indexNumber;

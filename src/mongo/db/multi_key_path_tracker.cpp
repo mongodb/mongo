@@ -32,6 +32,8 @@
 
 #include "mongo/db/multi_key_path_tracker.h"
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 const OperationContext::Decoration<MultikeyPathTracker> MultikeyPathTracker::get =

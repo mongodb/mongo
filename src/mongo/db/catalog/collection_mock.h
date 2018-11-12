@@ -290,5 +290,9 @@ public:
     OptionalCollectionUUID uuid() const {
         std::abort();
     }
+
+    void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
+        std::abort();
+    }
 };
 }  // namespace mongo

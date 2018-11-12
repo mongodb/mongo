@@ -338,6 +338,8 @@ public:
             OperationContext* opCtx,
             PlanExecutor::YieldPolicy yieldPolicy,
             ScanDirection scanDirection) = 0;
+
+        virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
     };
 
 public:
@@ -732,6 +734,10 @@ public:
         PlanExecutor::YieldPolicy yieldPolicy,
         ScanDirection scanDirection) {
         return this->_impl().makePlanExecutor(opCtx, yieldPolicy, scanDirection);
+    }
+
+    inline void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
+        return this->_impl().indexBuildSuccess(opCtx, index);
     }
 
 private:

@@ -90,6 +90,18 @@ public:
         return _accessMethod.get();
     }
 
+    bool isBuilding() const final {
+        return _indexBuildInterceptor != nullptr;
+    }
+
+    IndexBuildInterceptor* indexBuildInterceptor() final {
+        return _indexBuildInterceptor;
+    }
+
+    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+        _indexBuildInterceptor = interceptor;
+    }
+
     const Ordering& ordering() const final {
         return _ordering;
     }
@@ -200,6 +212,8 @@ private:
     CollectionInfoCache* _infoCache;  // not owned here
 
     std::unique_ptr<IndexAccessMethod> _accessMethod;
+
+    IndexBuildInterceptor* _indexBuildInterceptor = nullptr;  // not owned here
 
     // Owned here.
     std::unique_ptr<HeadManager> _headManager;

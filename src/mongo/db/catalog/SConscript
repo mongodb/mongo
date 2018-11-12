@@ -273,6 +273,7 @@ env.Library(
         "collection_info_cache_impl.cpp",
         "database_holder_impl.cpp",
         "database_impl.cpp",
+        "index_build_block.cpp",
         "index_catalog_entry_impl.cpp",
         "index_catalog_impl.cpp",
         "index_consistency.cpp",
@@ -309,7 +310,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
