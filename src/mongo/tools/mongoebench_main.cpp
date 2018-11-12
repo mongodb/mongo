@@ -63,13 +63,14 @@ namespace {
  */
 class DBDirectClientWithOwnOpCtx : public DBDirectClient {
 public:
-    DBDirectClientWithOwnOpCtx() : DBDirectClient(nullptr) {
-        Client::initThreadIfNotAlready();
+    DBDirectClientWithOwnOpCtx()
+        : DBDirectClient(nullptr), _threadClient(getGlobalServiceContext()) {
         _opCtx = cc().makeOperationContext();
         setOpCtx(_opCtx.get());
     }
 
 private:
+    ThreadClient _threadClient;
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
