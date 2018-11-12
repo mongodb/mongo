@@ -115,6 +115,7 @@ selector:
   # Uses getmores.
   - jstests/concurrency/fsm_workloads/agg_base.js
   - jstests/concurrency/fsm_workloads/create_index_background.js
+  - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
   - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
   - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
   - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js

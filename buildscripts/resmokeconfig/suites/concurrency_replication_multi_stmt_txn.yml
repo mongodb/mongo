@@ -22,6 +22,7 @@ selector:
   # Relies on having one thread observe writes from the other threads, which won't become visible
   # once a transaction in the thread is started because it'll keep reading from the same snapshot.
   - jstests/concurrency/fsm_workloads/create_index_background.js
+  - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
   - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
 
   # These start a transaction in one state function and use it in other state functions. This suite
