@@ -27,11 +27,11 @@ if debugBuild:
 env.Append(CPPDEFINES=["HAVE_VERBOSE"])
 
 conf = Configure(env)
-if conf.CheckFunc("fallocate", "fcntl.h"):
+if conf.CheckFunc("fallocate"):
     conf.env.Append(CPPDEFINES=[
         "HAVE_FALLOCATE"
     ])
-if conf.CheckFunc("sync_file_range", "fcntl.h"):
+if conf.CheckFunc("sync_file_range"):
     conf.env.Append(CPPDEFINES=[
         "HAVE_SYNC_FILE_RANGE"
     ])
