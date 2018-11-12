@@ -1,0 +1,38 @@
+
+# Copyright 2017 Daniel James.
+# Distributed under the Boost Software License, Version 1.0. (See accompanying
+# file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+# Using clang format 4.0
+# http://llvm.org/releases/4.0.0/tools/clang/docs/ClangFormatStyleOptions.html
+
+# Becuase you have to start somewhere.
+BasedOnStyle: LLVM
+
+# Basic settings
+ColumnLimit: 80
+NamespaceIndentation: All
+ContinuationIndentWidth: 2
+IndentWidth: 2
+UseTab: Never
+Language: Cpp
+Standard: Cpp03
+
+# Code layout
+AlignAfterOpenBracket: DontAlign
+AlignTrailingComments: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterNamespace: false
+    AfterClass: true
+    AfterStruct: true
+    AfterUnion: true
+    AfterEnum: true
+    AfterFunction: true
+    AfterControlStatement: false
+    BeforeCatch: false
+    BeforeElse: false
+PointerAlignment: Left
+
+# Boost specific stuff
+ForEachMacros: [ BOOST_FOREACH, UNORDERED_AUTO_TEST ]

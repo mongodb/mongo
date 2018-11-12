@@ -6,7 +6,7 @@ Import("env use_system_version_of_library usemozjs get_option")
 Import("wiredtiger")
 Import("mobile_se")
 
-boostSuffix = "-1.60.0"
+boostSuffix = "-1.68.0"
 snappySuffix = '-1.1.3'
 zlibSuffix = '-1.2.11'
 pcreSuffix = "-8.41"

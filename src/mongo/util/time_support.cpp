@@ -48,7 +48,6 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
-#include <boost/date_time/filetime_functions.hpp>
 #include <mmsystem.h>
 #elif defined(__linux__)
 #include <time.h>
@@ -213,6 +212,29 @@ void _dateToCtimeString(Date_t date, DateStringBuffer* result) {
              static_cast<unsigned>(date.toMillisSinceEpoch() % 1000));
     result->size = ctimeSubstrLen + millisSubstrLen;
 }
+
+#if defined(_WIN32)
+
+uint64_t fileTimeToMicroseconds(FILETIME const ft) {
+    // Microseconds between 1601-01-01 00:00:00 UTC and 1970-01-01 00:00:00 UTC
+    constexpr uint64_t kEpochDifferenceMicros = 11644473600000000ull;
+
+    // Construct a 64 bit value that is the number of nanoseconds from the
+    // Windows epoch which is 1601-01-01 00:00:00 UTC
+    auto totalMicros = static_cast<uint64_t>(ft.dwHighDateTime) << 32;
+    totalMicros |= static_cast<uint64_t>(ft.dwLowDateTime);
+
+    // FILETIME is 100's of nanoseconds since Windows epoch
+    totalMicros /= 10;
+
+    // Move it from micros since the Windows epoch to micros since the Unix epoch
+    totalMicros -= kEpochDifferenceMicros;
+
+    return totalMicros;
+}
+
+#endif
+
 }  // namespace
 
 std::string dateToISOStringUTC(Date_t date) {
@@ -867,7 +889,7 @@ unsigned long long curTimeMicros64() {
     if (GetSystemTimePreciseAsFileTimeFunc != NULL) {
         FILETIME time;
         GetSystemTimePreciseAsFileTimeFunc(&time);
-        return boost::date_time::winapi::file_time_to_microseconds(time);
+        return fileTimeToMicroseconds(time);
     }
 
     // Get a current value for QueryPerformanceCounter; if it is not time to resync we will
@@ -898,9 +920,13 @@ unsigned long long curTimeMicros64() {
         ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) /
             SystemTickSource::get()->getTicksPerSecond();
 
+    FILETIME fileTimeComputed;
+    fileTimeComputed.dwHighDateTime = computedTime >> 32;
+    fileTimeComputed.dwLowDateTime = computedTime;
+
     // Convert the computed FILETIME into microseconds since the Unix epoch (1/1/1970).
     //
-    return boost::date_time::winapi::file_time_to_microseconds(computedTime);
+    return fileTimeToMicroseconds(fileTimeComputed);
 }
 
 #else

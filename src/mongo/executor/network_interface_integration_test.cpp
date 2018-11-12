@@ -188,7 +188,7 @@ private:
                             const BSONObj& request,
                             const RemoteCommandResponse& isMasterReply) override {
             stdx::lock_guard<stdx::mutex> lk(_parent->_mutex);
-            _parent->_isMasterResult = {request, isMasterReply};
+            _parent->_isMasterResult = IsMasterData{request, isMasterReply};
             _parent->_isMasterCond.notify_all();
             return Status::OK();
         }

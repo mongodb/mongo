@@ -1094,6 +1094,18 @@ Status OptionsParser::parseCommandLine(const OptionSection& options,
         argc++;
     }
 
+    // The function boost::program_options makes the assumption there is at
+    // least one argument passed (usually the executable). When no options are
+    // passed to the executable we're left with an argc value of 0 and an
+    // empty argv_buffer vector from our post-processing above.
+    //
+    // This simply ensures that we always have at least one argument for
+    // boost::program_options
+    if (!argc) {
+        argc = 1;
+        argv_buffer.push_back(nullptr);
+    }
+
     /**
      * Style options for boost command line parser
      *
@@ -1122,7 +1134,7 @@ Status OptionsParser::parseCommandLine(const OptionSection& options,
     }
 
     try {
-        po::store(po::command_line_parser(argc, (argc > 0 ? &argv_buffer[0] : NULL))
+        po::store(po::command_line_parser(argc, &argv_buffer[0])
                       .options(boostOptions)
                       .positional(boostPositionalOptions)
                       .style(style)
@@ -1324,7 +1336,7 @@ namespace {
  * instead they only support "--option=value", this function
  * attempts to workound this by translating the former into the later.
  */
-StatusWith<std::vector<std::string>> transformImplictOptions(
+StatusWith<std::vector<std::string>> transformImplicitOptions(
     const OptionSection& options, const std::vector<std::string>& argvOriginal) {
     if (argvOriginal.empty()) {
         return {std::vector<std::string>()};
@@ -1557,7 +1569,7 @@ Status OptionsParser::run(const OptionSection& options,
     Environment configEnvironment;
     Environment composedEnvironment;
 
-    auto swTransform = transformImplictOptions(options, argvOriginal);
+    auto swTransform = transformImplicitOptions(options, argvOriginal);
     if (!swTransform.isOK()) {
         return swTransform.getStatus();
     }

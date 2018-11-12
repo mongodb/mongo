@@ -13,7 +13,7 @@ if [ "$#" -ne 0 ]; then
 fi
 
 NAME=boost
-VERSION=1.60.0
+VERSION=1.68.0
 VERSION_UNDERSCORE=$(echo $VERSION | tr . _)
 SRC_ROOT=$(mktemp -d /tmp/boost.XXXXXX)
 trap "rm -rf $SRC_ROOT" EXIT

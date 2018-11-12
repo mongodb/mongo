@@ -572,7 +572,7 @@ TEST(LRUCacheTest, CustomHashAndEqualityTypeTest) {
     // this should replace the original value of 20 with 0.
     FunkyKeyType sortaEqual(10, 0);
     assertEquals(cache.size(), size_t(1));
-    auto replaced = cache.add(sortaEqual, sortaEqual._b);
+    cache.add(sortaEqual, sortaEqual._b);
     assertEquals(cache.size(), size_t(1));
     found = cache.find(key);
     assertNotEquals(found, cache.end());

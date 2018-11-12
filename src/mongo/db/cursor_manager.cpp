@@ -530,7 +530,7 @@ Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId CursorManager::regi
 }
 
 void CursorManager::deregisterExecutor(PlanExecutor* exec) {
-    if (auto partitionId = exec->getRegistrationToken()) {
+    if (exec->getRegistrationToken()) {
         _registeredPlanExecutors.erase(exec);
     }
 }
