@@ -136,8 +136,11 @@
             }
 
             if (OverrideHelpers.isAggregationWithOutStage(commandName, commandObjUnwrapped)) {
-                // The $out stage can only be used with readConcern={level: "local"}.
-                shouldForceReadConcern = false;
+                // The $out stage can only be used with readConcern={level: "local"} or
+                // readConcern={level: "majority"}
+                if (TestData.defaultReadConcernLevel === "linearizable") {
+                    shouldForceReadConcern = false;
+                }
             } else {
                 // A writeConcern can only be used with a $out stage.
                 shouldForceWriteConcern = false;
