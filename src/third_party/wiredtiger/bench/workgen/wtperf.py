@@ -129,7 +129,7 @@ class Translator:
     # Convert a time value, by default a number of seconds, that can be
     # modified to microseconds using 'ms' as a suffix.
     def get_intms_opt(self, optname, wtperf_optname, dfault):
-        s = self._get_opt(wtperf_optname, str(dfault))
+        s = str(self._get_opt(wtperf_optname, str(dfault)))
         if s.endswith('ms'):
             v = int(s[:-2])
         else:
@@ -555,7 +555,6 @@ class Translator:
         if self.options.sample_interval_ms != 0:
             workloadopts += 'workload.options.sample_interval_ms = ' + \
                 str(self.options.sample_interval_ms) + '\n'
-            print('X: ' + workloadopts)
 
         s = '#/usr/bin/env python\n'
         s += '# generated from ' + self.filename + '\n'
@@ -594,8 +593,11 @@ class Translator:
         if conn_config != '':
             s += 'conn_config += ",' + conn_config + '"   # explicitly added\n'
         if compression != '':
-            s += 'conn_config += extensions_config(["compressors/' + \
-                compression + '"])\n'
+            # We require WiredTiger to be configured with snappy built-in,
+            # so do not add snappy to the list of extensions to be loaded.
+            if compression != 'snappy':
+                s += 'conn_config += extensions_config(["compressors/' + \
+                    compression + '"])\n'
             compression = 'block_compressor=' + compression + ','
         s += 'conn = wiredtiger_open("' + self.homedir + \
              '", "create," + conn_config)\n'
