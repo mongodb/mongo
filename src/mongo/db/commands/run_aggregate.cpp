@@ -393,7 +393,11 @@ Status runAggregate(OperationContext* opCtx,
         // If this is a collectionless aggregation with no foreign namespaces, we don't want to
         // acquire any locks. Otherwise, lock the collection or view.
         if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
-            statsTracker.emplace(opCtx, nss, Top::LockType::NotLocked, 0);
+            statsTracker.emplace(opCtx,
+                                 nss,
+                                 Top::LockType::NotLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                 0);
         } else {
             ctx.emplace(opCtx, nss);
         }

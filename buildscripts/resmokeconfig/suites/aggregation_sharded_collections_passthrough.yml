@@ -31,6 +31,9 @@ selector:
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # TODO: Remove after SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
+
+  # Uses the profiler, which is not supported through mongos.
+  - jstests/aggregation/sources/lookup/profile_lookup.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop

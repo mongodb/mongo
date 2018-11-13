@@ -44,26 +44,29 @@ namespace mongo {
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    Top::LockType lockType,
+                                   LogMode logMode,
                                    boost::optional<int> dbProfilingLevel)
-    : _opCtx(opCtx), _lockType(lockType) {
-    if (!dbProfilingLevel) {
+    : _opCtx(opCtx), _lockType(lockType), _nss(nss) {
+    if (!dbProfilingLevel && logMode == LogMode::kUpdateTopAndCurop) {
         // No profiling level was determined, attempt to read the profiling level from the Database
         // object.
-        AutoGetDb autoDb(_opCtx, nss.db(), MODE_IS);
+        AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IS);
         if (autoDb.getDb()) {
             dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
         }
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-    CurOp::get(_opCtx)->enter_inlock(nss.ns().c_str(), dbProfilingLevel);
+    if (logMode == LogMode::kUpdateTopAndCurop) {
+        CurOp::get(_opCtx)->enter_inlock(_nss.ns().c_str(), dbProfilingLevel);
+    }
 }
 
 AutoStatsTracker::~AutoStatsTracker() {
     auto curOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getServiceContext())
         .record(_opCtx,
-                curOp->getNS(),
+                _nss.ns(),
                 curOp->getLogicalOp(),
                 _lockType,
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
@@ -108,6 +111,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // Note: this can yield.
     _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
 }
+
 void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
                                                                        OperationContext* opCtx) {
     while (true) {
@@ -148,12 +152,14 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     OperationContext* opCtx,
     const NamespaceString& nss,
     AutoGetCollection::ViewMode viewMode,
-    Lock::DBLock lock) {
+    Lock::DBLock lock,
+    AutoStatsTracker::LogMode logMode) {
     _autoCollForRead.emplace(opCtx, nss, viewMode, std::move(lock));
     const int doNotChangeProfilingLevel = 0;
     _statsTracker.emplace(opCtx,
                           nss,
                           Top::LockType::ReadLocked,
+                          logMode,
                           _autoCollForRead->getDb() ? _autoCollForRead->getDb()->getProfilingLevel()
                                                     : doNotChangeProfilingLevel);
 
@@ -164,33 +170,45 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
 }
 
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
-    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode)
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    AutoGetCollection::ViewMode viewMode,
+    AutoStatsTracker::LogMode logMode)
     : AutoGetCollectionForReadCommand(
-          opCtx, nss, viewMode, Lock::DBLock(opCtx, nss.db(), MODE_IS)) {}
+          opCtx, nss, viewMode, Lock::DBLock(opCtx, nss.db(), MODE_IS), logMode) {}
 
 AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
     OperationContext* opCtx, const NamespaceString& nss)
-    : AutoGetCollectionForReadCommand(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted),
+    : AutoGetCollectionForReadCommand(opCtx,
+                                      nss,
+                                      AutoGetCollection::ViewMode::kViewsPermitted,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurop),
       _view(_autoCollForRead->getDb() && !getCollection()
                 ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
                 : nullptr) {}
 
 AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
     OperationContext* opCtx, const NamespaceString& nss, Lock::DBLock lock)
-    : AutoGetCollectionForReadCommand(
-          opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted, std::move(lock)),
+    : AutoGetCollectionForReadCommand(opCtx,
+                                      nss,
+                                      AutoGetCollection::ViewMode::kViewsPermitted,
+                                      std::move(lock),
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurop),
       _view(_autoCollForRead->getDb() && !getCollection()
                 ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
                 : nullptr) {}
 
-AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(OperationContext* opCtx,
-                                                                 const StringData dbName,
-                                                                 const UUID& uuid) {
+AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
+    OperationContext* opCtx,
+    const StringData dbName,
+    const UUID& uuid,
+    AutoStatsTracker::LogMode logMode) {
     _autoCollForRead.emplace(opCtx, dbName, uuid);
     if (_autoCollForRead->getCollection()) {
         _statsTracker.emplace(opCtx,
                               _autoCollForRead->getCollection()->ns(),
                               Top::LockType::ReadLocked,
+                              logMode,
                               _autoCollForRead->getDb()->getProfilingLevel());
 
         // We have both the DB and collection locked, which is the prerequisite to do a stable shard

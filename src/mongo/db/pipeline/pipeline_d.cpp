@@ -236,14 +236,17 @@ public:
 
         boost::optional<AutoGetCollectionForReadCommand> autoColl;
         if (expCtx->uuid) {
-            autoColl.emplace(expCtx->opCtx, expCtx->ns.db(), *expCtx->uuid);
+            autoColl.emplace(expCtx->opCtx,
+                             expCtx->ns.db(),
+                             *expCtx->uuid,
+                             AutoStatsTracker::LogMode::kUpdateTop);
             if (autoColl->getCollection() == nullptr) {
                 // The UUID doesn't exist anymore.
                 return {ErrorCodes::NamespaceNotFound,
                         "No namespace with UUID " + expCtx->uuid->toString()};
             }
         } else {
-            autoColl.emplace(expCtx->opCtx, expCtx->ns);
+            autoColl.emplace(expCtx->opCtx, expCtx->ns, AutoStatsTracker::LogMode::kUpdateTop);
         }
 
         // makePipeline() is only called to perform secondary aggregation requests and expects the

@@ -39,22 +39,35 @@
 namespace mongo {
 
 /**
- * RAII-style class which automatically tracks the operation namespace in CurrentOp and records the
- * operation via Top upon destruction.
+ * RAII-style class which can update the diagnostic state on the operation's CurOp object and record
+ * the operation via Top upon destruction. Can be configured to only update the Top counters if
+ * desired.
  */
 class AutoStatsTracker {
     MONGO_DISALLOW_COPYING(AutoStatsTracker);
 
 public:
     /**
-     * Sets the namespace of the CurOp object associated with 'opCtx' to be 'nss' and starts the
-     * CurOp timer. 'lockType' describes which type of lock is held by this operation, and will be
-     * used for reporting via Top. If 'dbProfilingLevel' is not given, this constructor will acquire
-     * and then drop a database lock in order to determine the database's profiling level.
+     * Describes which diagnostics to update during the lifetime of this object.
+     */
+    enum class LogMode {
+        kUpdateTop,  // Increments the Top counter for this operation type and this namespace upon
+                     // destruction.
+        kUpdateTopAndCurop,  // In addition to incrementing the Top counter, adjusts state on the
+                             // CurOp object associated with the OperationContext. Updates the
+                             // namespace to be 'nss', starts a timer for the operation (if it
+                             // hasn't started already), and figures out and records the profiling
+                             // level of the operation.
+    };
+
+    /**
+     * If 'logMode' is 'kUpdateTopAndCurop', sets up and records state on the CurOp object attached
+     * to 'opCtx', as described above.
      */
     AutoStatsTracker(OperationContext* opCtx,
                      const NamespaceString& nss,
                      Top::LockType lockType,
+                     LogMode logMode,
                      boost::optional<int> dbProfilingLevel);
 
     /**
@@ -65,6 +78,7 @@ public:
 private:
     OperationContext* _opCtx;
     Top::LockType _lockType;
+    const NamespaceString _nss;
 };
 
 /**
@@ -142,19 +156,26 @@ class AutoGetCollectionForReadCommand {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForReadCommand);
 
 public:
-    AutoGetCollectionForReadCommand(OperationContext* opCtx, const NamespaceString& nss)
+    AutoGetCollectionForReadCommand(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurop)
         : AutoGetCollectionForReadCommand(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, logMode) {}
 
-    AutoGetCollectionForReadCommand(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    Lock::DBLock lock)
+    AutoGetCollectionForReadCommand(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        Lock::DBLock lock,
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurop)
         : AutoGetCollectionForReadCommand(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock), logMode) {}
 
-    AutoGetCollectionForReadCommand(OperationContext* opCtx,
-                                    const StringData dbName,
-                                    const UUID& uuid);
+    AutoGetCollectionForReadCommand(
+        OperationContext* opCtx,
+        const StringData dbName,
+        const UUID& uuid,
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurop);
 
     Database* getDb() const {
         return _autoCollForRead->getDb();
@@ -167,12 +188,14 @@ public:
 protected:
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    AutoGetCollection::ViewMode viewMode);
+                                    AutoGetCollection::ViewMode viewMode,
+                                    AutoStatsTracker::LogMode logMode);
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     AutoGetCollection::ViewMode viewMode,
-                                    Lock::DBLock lock);
+                                    Lock::DBLock lock,
+                                    AutoStatsTracker::LogMode logMode);
 
     // '_autoCollForRead' may need to be reset by AutoGetCollectionOrViewForReadCommand, so needs to
     // be a boost::optional.
