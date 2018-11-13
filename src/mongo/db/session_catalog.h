@@ -251,6 +251,7 @@ class OperationContextSession {
 
 public:
     OperationContextSession(OperationContext* opCtx, bool checkOutSession);
+
     ~OperationContextSession();
 
     /**

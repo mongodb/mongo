@@ -45,10 +45,7 @@ OperationContext* Session::currentOperation() const {
 
 Session::KillToken Session::kill(WithLock sessionCatalogLock, ErrorCodes::Error reason) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Session " << getSessionId().getId()
-                          << " is already killed and is in the process of being cleaned up",
-            !_killRequested);
+    uassert(ErrorCodes::ConflictingOperationInProgress, "Session already killed", !_killRequested);
     _killRequested = true;
 
     // For currently checked-out sessions, interrupt the operation context so that the current owner
