@@ -259,8 +259,11 @@ public:
                     ? request.nss.getTargetNSForGloballyManagedNamespace()
                     : request.nss) {
                 const boost::optional<int> dbProfilingLevel = boost::none;
-                statsTracker.emplace(
-                    opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
+                statsTracker.emplace(opCtx,
+                                     *nssForCurOp,
+                                     Top::LockType::NotLocked,
+                                     AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                     dbProfilingLevel);
             }
         } else {
             readLock.emplace(opCtx, request.nss);
@@ -268,6 +271,7 @@ public:
             statsTracker.emplace(opCtx,
                                  request.nss,
                                  Top::LockType::ReadLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurop,
                                  readLock->getDb() ? readLock->getDb()->getProfilingLevel()
                                                    : doNotChangeProfilingLevel);
 

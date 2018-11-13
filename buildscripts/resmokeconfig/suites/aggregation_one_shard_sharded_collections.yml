@@ -18,6 +18,7 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  - requires_profiling
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding
   - requires_replication
