@@ -402,12 +402,23 @@ BackupCursorState MongoInterfaceStandalone::openBackupCursor(OperationContext* o
     }
 }
 
-void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, UUID backupId) {
+void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, const UUID& backupId) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         backupCursorHooks->closeBackupCursor(opCtx, backupId);
     } else {
         uasserted(50955, "Backup cursors are an enterprise only feature.");
+    }
+}
+
+BackupCursorExtendState MongoInterfaceStandalone::extendBackupCursor(OperationContext* opCtx,
+                                                                     const UUID& backupId,
+                                                                     const Timestamp& extendTo) {
+    auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+    if (backupCursorHooks->enabled()) {
+        return backupCursorHooks->extendBackupCursor(opCtx, backupId, extendTo);
+    } else {
+        uasserted(51010, "Backup cursors are an enterprise only feature.");
     }
 }
 

@@ -169,7 +169,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void closeBackupCursor(OperationContext* opCtx, UUID backupId) final {
+    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {
+        MONGO_UNREACHABLE;
+    }
+
+    BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
+                                               const UUID& backupId,
+                                               const Timestamp& extendTo) final {
         MONGO_UNREACHABLE;
     }
 

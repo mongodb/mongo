@@ -44,4 +44,8 @@ struct BackupCursorState {
     std::vector<std::string> filenames;
 };
 
+struct BackupCursorExtendState {
+    std::vector<std::string> filenames;
+};
+
 }  // namespace mongo

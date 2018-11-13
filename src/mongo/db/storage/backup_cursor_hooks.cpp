@@ -82,7 +82,13 @@ BackupCursorState BackupCursorHooks::openBackupCursor(OperationContext* opCtx) {
     MONGO_UNREACHABLE;
 }
 
-void BackupCursorHooks::closeBackupCursor(OperationContext* opCtx, UUID backupId) {
+void BackupCursorHooks::closeBackupCursor(OperationContext* opCtx, const UUID& backupId) {
+    MONGO_UNREACHABLE;
+}
+
+BackupCursorExtendState BackupCursorHooks::extendBackupCursor(OperationContext* opCtx,
+                                                              const UUID& backupId,
+                                                              const Timestamp& extendTo) {
     MONGO_UNREACHABLE;
 }
 
