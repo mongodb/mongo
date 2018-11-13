@@ -64,7 +64,7 @@ public:
 
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx);
 
-    virtual void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId);
+    virtual void closeBackupCursor(OperationContext* opCtx, UUID backupId);
 
     virtual bool isBackupCursorOpen() const;
 };

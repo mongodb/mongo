@@ -252,7 +252,7 @@ public:
      */
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx) = 0;
 
-    virtual void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) = 0;
+    virtual void closeBackupCursor(OperationContext* opCtx, UUID backupId) = 0;
 
     /**
      * Returns a vector of BSON objects, where each entry in the vector describes a plan cache entry

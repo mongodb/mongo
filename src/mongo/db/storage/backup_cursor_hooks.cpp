@@ -82,7 +82,7 @@ BackupCursorState BackupCursorHooks::openBackupCursor(OperationContext* opCtx) {
     MONGO_UNREACHABLE;
 }
 
-void BackupCursorHooks::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
+void BackupCursorHooks::closeBackupCursor(OperationContext* opCtx, UUID backupId) {
     MONGO_UNREACHABLE;
 }
 

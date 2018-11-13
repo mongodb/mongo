@@ -146,7 +146,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final {
+    void closeBackupCursor(OperationContext* opCtx, UUID backupId) final {
         MONGO_UNREACHABLE;
     }
 

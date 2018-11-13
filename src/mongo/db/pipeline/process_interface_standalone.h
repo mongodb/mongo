@@ -105,7 +105,7 @@ public:
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
     BackupCursorState openBackupCursor(OperationContext* opCtx) final;
-    void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final;
+    void closeBackupCursor(OperationContext* opCtx, UUID backupId) final;
 
     std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
                                                         const NamespaceString&,
