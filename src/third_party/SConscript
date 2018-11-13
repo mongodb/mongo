@@ -36,6 +36,10 @@ if not use_system_version_of_library('boost'):
     thirdPartyIncludePathList.append(
         ('boost', '#/src/third_party/boost' + boostSuffix))
 
+if not use_system_version_of_library('abseil-cpp'):
+    thirdPartyIncludePathList.append(
+        ('abseil-cpp', '#/src/third_party/abseil-cpp-master/abseil-cpp'))
+
 if not use_system_version_of_library('snappy'):
     thirdPartyIncludePathList.append(
         ('snappy', '#/src/third_party/snappy' + snappySuffix))
@@ -120,7 +124,7 @@ murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
 
 
 s2Env = env.Clone()
-s2Env.InjectThirdPartyIncludePaths(libraries=['s2', 'boost'])
+s2Env.InjectThirdPartyIncludePaths(libraries=['s2', 'boost', 'abseil-cpp'])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
@@ -178,6 +182,29 @@ boostEnv.Library(
         'shim_boost.cpp',
     ])
 
+abseilEnv = env
+if use_system_version_of_library("abseil-cpp"):
+    abseilEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_ABSL_CONTAINER_SYSLIBDEP'],
+            env['LIBDEPS_ABSL_HASH_SYSLIBDEP'],
+        ])
+else:
+    abseilDirectory = 'abseil-cpp-master'
+    abseilEnv = env.Clone()
+    abseilEnv.InjectThirdPartyIncludePaths(libraries=['abseil-cpp'])
+    abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={ 'env' : abseilEnv })
+    abseilEnv = abseilEnv.Clone(
+        LIBDEPS_INTERFACE=[
+            abseilDirectory + '/absl_container',
+            abseilDirectory + '/absl_hash',
+        ])
+
+abseilEnv.Library(
+    target="shim_abseil",
+    source=[
+        'shim_abseil.cpp',
+    ])
 
 if use_system_version_of_library("snappy"):
     snappyEnv = env.Clone(

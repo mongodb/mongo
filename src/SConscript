@@ -11,11 +11,12 @@ Import('module_sconscripts')
 env = env.Clone()
 env.SConscript('third_party/SConscript', exports=['env'])
 
-# Inject boost and pcre from third_party globally for all core mongo code
+# Inject abseil-cpp, boost and pcre from third_party globally for all core mongo code
 # and modules. Ideally, pcre wouldn't be here, but enough things require it
 # now that it seems hopeless to remove it now.
 env = env.Clone()
 env.InjectThirdPartyIncludePaths(libraries=[
+    'abseil-cpp',
     'boost',
     'pcre',
 ])

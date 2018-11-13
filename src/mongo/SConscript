@@ -141,6 +141,7 @@ env.Library(
     # the ones declared here. Do not add to this list.
     LIBDEPS=[
         '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+        '$BUILD_DIR/third_party/shim_abseil',
         '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/third_party/shim_intel_decimal128',
