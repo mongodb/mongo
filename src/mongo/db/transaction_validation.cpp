@@ -103,6 +103,12 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
                 str::stream() << "It is illegal to provide a txnNumber for command " << cmdName,
                 commandCanCheckOutSession(cmdName) || shouldCommandSkipSessionCheckout(cmdName));
     }
+
+    if (sessionOptions.getStartTransaction()) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "Cannot run killCursors as the first operation in a multi-document transaction.",
+                cmdName != "killCursors");
+    }
 }
 
 }  // namespace mongo

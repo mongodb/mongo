@@ -25,22 +25,16 @@
     assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
     session.commitTransaction();
 
-    jsTest.log("Test that the killCursors can be the first operation in a transaction.");
-    // Note that it is not a requirement to support this behavior. This test is present to ensure
-    // that the server does not crash or return an unhelpful error message.
-
+    jsTest.log("Test that the killCursors cannot be the first operation in a transaction.");
     res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
     assert(res.hasOwnProperty("cursor"), tojson(res));
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
     session.startTransaction();
-    assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-
-    try {
-        session.commitTransaction();
-    } catch (ex) {
-        assert.eq(50940, ex.code);
-        print('Error (expected) returned while performing commit: ' + tojson(ex));
-    }
+    assert.commandFailedWithCode(
+        sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+        ErrorCodes.OperationNotSupportedInTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTest.log("killCursors must not block on locks held by the transaction in which it is run.");
 
