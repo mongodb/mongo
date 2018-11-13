@@ -84,7 +84,7 @@ DEATH_TEST_F(RecoveryUnitTestHarness, AbortMustBeInUnitOfWork, "invariant") {
 DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {
     try {
         opCtx->recoveryUnit()->prepareUnitOfWork();
-    } catch (ExceptionFor<ErrorCodes::CommandNotSupported>) {
+    } catch (const ExceptionFor<ErrorCodes::CommandNotSupported>&) {
         bool prepareCommandSupported = false;
         invariant(prepareCommandSupported);
     }
