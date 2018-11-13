@@ -813,6 +813,10 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* opCtx) {
+    // Acquire the GlobalLock in mode IS to conflict with database drops which acquire the
+    // GlobalLock in mode X.
+    Lock::GlobalLock lk(opCtx, MODE_IS);
+
     std::vector<std::string> dbNames;
     StorageEngine* storageEngine = _service->getStorageEngine();
     storageEngine->listDatabases(&dbNames);
@@ -823,12 +827,9 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         if (*it == "local")
             continue;
         LOG(2) << "Removing temporary collections from " << *it;
-        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, *it);
-        // Since we must be holding the global lock during this function, if listDatabases
-        // returned this dbname, we should be able to get a reference to it - it can't have
-        // been dropped.
-        invariant(db, str::stream() << "Unable to get reference to database " << *it);
-        db->clearTmpCollections(opCtx);
+        AutoGetDb autoDb(opCtx, *it, MODE_X);
+        invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
+        autoDb.getDb()->clearTmpCollections(opCtx);
     }
 }
 
