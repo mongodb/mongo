@@ -14523,6 +14523,7 @@ buildvariants:
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --mobile-se=on
+      --ssl=off
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       MONGO_DISTMOD=rhel62
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -14602,6 +14603,7 @@ buildvariants:
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
         --mobile-se=on
+        --ssl=off
         --release
         --variables-files=etc/scons/mongodbtoolchain_gcc.vars
         CCFLAGS="-march=armv8-a+crc -mtune=generic"
@@ -14682,6 +14684,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --mobile-se=on
+      --ssl=off
       --release
       CCFLAGS="-mmacosx-version-min=10.10"
       CPPPATH=/opt/mongodbtoolchain/v2/include
