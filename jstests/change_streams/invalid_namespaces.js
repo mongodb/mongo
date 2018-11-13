@@ -12,7 +12,7 @@
     assertInvalidChangeStreamNss("admin");
     assertInvalidChangeStreamNss("config");
     // Not allowed to access 'local' database through mongos.
-    if (!FixtureHelpers.isMongos()) {
+    if (!FixtureHelpers.isMongos(db)) {
         assertInvalidChangeStreamNss("local");
     }
 

@@ -110,7 +110,7 @@
     // If this test is running with secondary read preference, it's necessary for the remove
     // to propagate to all secondary nodes and be available for majority reads before we can
     // assume looking up the document will fail.
-    FixtureHelpers.awaitLastOpCommitted();
+    FixtureHelpers.awaitLastOpCommitted(db);
 
     latestChange = cst.getOneChange(cursor);
     assert.eq(latestChange.operationType, "update");

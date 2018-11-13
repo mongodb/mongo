@@ -5,6 +5,8 @@
  * replica set, a sharded cluster, etc.
  */
 var FixtureHelpers = (function() {
+    load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
+
     function _getHostStringForReplSet(connectionToNodeInSet) {
         const isMaster = assert.commandWorked(connectionToNodeInSet.getDB("test").isMaster());
         assert(
@@ -13,17 +15,13 @@ var FixtureHelpers = (function() {
         return isMaster.setName + "/" + isMaster.hosts.join(",");
     }
 
-    function isMongos() {
-        return db.runCommand({isdbgrid: 1}).isdbgrid;
-    }
-
     /**
      * Returns an array of connections to each data-bearing replica set in the fixture (not
      * including the config servers).
      */
-    function _getAllReplicas() {
+    function _getAllReplicas(db) {
         let replicas = [];
-        if (isMongos()) {
+        if (isMongos(db)) {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1});
             replicas = shardObjs.map((shardObj) => new ReplSetTest(shardObj.host));
         } else {
@@ -37,8 +35,8 @@ var FixtureHelpers = (function() {
      * in each replica set in the fixture (besides the config servers) to reach the same op time.
      * Asserts if the fixture is a standalone or if the shards are standalones.
      */
-    function awaitReplication() {
-        _getAllReplicas().forEach((replSet) => replSet.awaitReplication());
+    function awaitReplication(db) {
+        _getAllReplicas(db).forEach((replSet) => replSet.awaitReplication());
     }
 
     /**
@@ -48,8 +46,8 @@ var FixtureHelpers = (function() {
      *
      * Asserts if the fixture is a standalone or if the shards are standalones.
      */
-    function awaitLastOpCommitted() {
-        _getAllReplicas().forEach((replSet) => replSet.awaitLastOpCommitted());
+    function awaitLastOpCommitted(db) {
+        _getAllReplicas(db).forEach((replSet) => replSet.awaitLastOpCommitted());
     }
 
     /**
@@ -58,9 +56,10 @@ var FixtureHelpers = (function() {
      * array with the responses from each shard, or with a single element if the fixture was a
      * replica set. Asserts if the fixture is a standalone or if the shards are standalones.
      */
-    function runCommandOnEachPrimary({dbName, cmdObj}) {
-        return _getAllReplicas().map((replSet) => assert.commandWorked(
-                                         replSet.getPrimary().getDB(dbName).runCommand(cmdObj)));
+    function runCommandOnEachPrimary({db, cmdObj}) {
+        return _getAllReplicas(db).map(
+            (replSet) =>
+                assert.commandWorked(replSet.getPrimary().getDB(db.getName()).runCommand(cmdObj)));
     }
 
     /**
@@ -68,7 +67,7 @@ var FixtureHelpers = (function() {
      * Returns the same connection that 'db' is using if the fixture is not a sharded cluster.
      */
     function getPrimaryForNodeHostingDatabase(db) {
-        if (!isMongos()) {
+        if (!isMongos(db)) {
             return db.getMongo();
         }
         const configDB = db.getSiblingDB("config");

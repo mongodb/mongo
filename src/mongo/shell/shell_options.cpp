@@ -491,7 +491,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
         if (uriOptions.count("compressors"))
             shellGlobalParams.networkMessageCompressors = uriOptions["compressors"];
     }
-    
+
     if (!shellGlobalParams.networkMessageCompressors.empty()) {
         const auto ret =
             storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);

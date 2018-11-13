@@ -50,7 +50,7 @@
     // If this test is running with secondary read preference, it's necessary for the drop to
     // propagate to all secondary nodes and be available for majority reads before we can assume
     // looking up the document will fail.
-    FixtureHelpers.awaitLastOpCommitted();
+    FixtureHelpers.awaitLastOpCommitted(db);
 
     // Check the next $changeStream entry; this is the test document inserted above.
     let latestChange = cst.getOneChange(firstResumeCursor);

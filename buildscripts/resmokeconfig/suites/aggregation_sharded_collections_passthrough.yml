@@ -10,6 +10,7 @@ selector:
   # The following tests start their own ShardingTest.
   - jstests/aggregation/bugs/server6179.js
   - jstests/aggregation/bugs/server7781.js
+  - jstests/aggregation/bugs/server37750.js
   - jstests/aggregation/mongos_merge.js
   - jstests/aggregation/mongos_slaveok.js
   - jstests/aggregation/shard_targeting.js
