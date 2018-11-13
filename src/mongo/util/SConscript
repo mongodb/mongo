@@ -727,6 +727,13 @@ env.Benchmark(
     ],
 )
 
+env.Benchmark(
+    target='hash_table_bm',
+    source='hash_table_bm.cpp',
+    LIBDEPS=[
+    ],
+)
+
 if env.TargetOSIs('linux'):
     env.Library(
         target='procparser',
