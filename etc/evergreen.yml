@@ -1781,8 +1781,9 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=aggregation --storageEngine=mmapv1
+      resmoke_args: --suites=aggregation --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
       run_multiple_jobs: true
+      task_excluded_tags: requires_wiredtiger
 
 - <<: *task_template
   name: aggregation_WT
@@ -1823,7 +1824,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=aggregation_facet_unwind_passthrough --storageEngine=wiredTiger
+      resmoke_args: --suites=aggregation_facet_unwind_passthrough --storageEngine=wiredTiger --excludeWithAnyTags=do_not_wrap_aggregations_in_facets
       run_multiple_jobs: true
       task_excluded_tags: do_not_wrap_aggregations_in_facets
 

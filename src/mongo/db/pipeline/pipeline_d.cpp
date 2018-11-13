@@ -211,6 +211,10 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
                                                                 OperationContext* txn,
                                                                 long long sampleSize,
                                                                 long long numRecords) {
+    // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
+    // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
+    invariant(txn->lockState()->isCollectionLockedForMode(collection->ns().ns(), MODE_IS));
+
     double kMaxSampleRatioForRandCursor = 0.05;
     if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
         return {nullptr};
@@ -254,22 +258,15 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
             txn, ws.get(), idxIterator.release(), nullptr, collection);
     }
 
-    {
-        AutoGetCollection autoColl(txn, collection->ns(), MODE_IS);
-
-        // If we're in a sharded environment, we need to filter out documents we don't own.
-        if (ShardingState::get(txn)->needCollectionMetadata(txn, collection->ns().ns())) {
-            auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
-                txn,
-                CollectionShardingState::get(txn, collection->ns())->getMetadata(),
-                ws.get(),
-                stage.release());
-            return PlanExecutor::make(txn,
-                                      std::move(ws),
-                                      std::move(shardFilterStage),
-                                      collection,
-                                      PlanExecutor::YIELD_AUTO);
-        }
+    // If we're in a sharded environment, we need to filter out documents we don't own.
+    if (ShardingState::get(txn)->needCollectionMetadata(txn, collection->ns().ns())) {
+        auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
+            txn,
+            CollectionShardingState::get(txn, collection->ns())->getMetadata(),
+            ws.get(),
+            stage.release());
+        return PlanExecutor::make(
+            txn, std::move(ws), std::move(shardFilterStage), collection, PlanExecutor::YIELD_AUTO);
     }
 
     return PlanExecutor::make(
