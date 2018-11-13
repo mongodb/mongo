@@ -13,6 +13,7 @@ selector:
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   exclude_with_any_tags:
+  - requires_profiling
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding
   - requires_replication

@@ -345,7 +345,12 @@ public:
         // Use AutoStatsTracker to update Top.
         boost::optional<AutoStatsTracker> statsTracker;
         const boost::optional<int> dbProfilingLevel = boost::none;
-        statsTracker.emplace(opCtx, ns, Top::LockType::WriteLocked, dbProfilingLevel);
+        statsTracker.emplace(opCtx,
+                             ns,
+                             Top::LockType::WriteLocked,
+                             AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                             dbProfilingLevel);
+
 
         MultiIndexBlockImpl indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();

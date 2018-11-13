@@ -83,8 +83,11 @@ private:
                     ? nss.getTargetNSForGloballyManagedNamespace()
                     : nss) {
                 const boost::optional<int> dbProfilingLevel = boost::none;
-                statsTracker.emplace(
-                    opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
+                statsTracker.emplace(opCtx,
+                                     *nssForCurOp,
+                                     Top::LockType::NotLocked,
+                                     AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                     dbProfilingLevel);
             }
         }
 

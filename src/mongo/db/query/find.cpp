@@ -272,7 +272,11 @@ Message getMore(OperationContext* opCtx,
             const auto profilingLevel = autoDb.getDb()
                 ? boost::optional<int>{autoDb.getDb()->getProfilingLevel()}
                 : boost::none;
-            statsTracker.emplace(opCtx, *nssForCurOp, Top::LockType::NotLocked, profilingLevel);
+            statsTracker.emplace(opCtx,
+                                 *nssForCurOp,
+                                 Top::LockType::NotLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                 profilingLevel);
             auto view = autoDb.getDb()
                 ? autoDb.getDb()->getViewCatalog()->lookup(opCtx, nssForCurOp->ns())
                 : nullptr;
@@ -290,6 +294,7 @@ Message getMore(OperationContext* opCtx,
         statsTracker.emplace(opCtx,
                              nss,
                              Top::LockType::ReadLocked,
+                             AutoStatsTracker::LogMode::kUpdateTopAndCurop,
                              readLock->getDb() ? readLock->getDb()->getProfilingLevel()
                                                : doNotChangeProfilingLevel);
         Collection* collection = readLock->getCollection();

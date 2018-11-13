@@ -305,13 +305,20 @@ Status MongoInterfaceStandalone::attachCursorSourceToPipeline(
     if (expCtx->uuid) {
         try {
             autoColl.emplace(expCtx->opCtx,
-                             NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid});
+                             NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid},
+                             AutoGetCollection::ViewMode::kViewsForbidden,
+                             Date_t::max(),
+                             AutoStatsTracker::LogMode::kUpdateTop);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             // The UUID doesn't exist anymore
             return ex.toStatus();
         }
     } else {
-        autoColl.emplace(expCtx->opCtx, expCtx->ns);
+        autoColl.emplace(expCtx->opCtx,
+                         expCtx->ns,
+                         AutoGetCollection::ViewMode::kViewsForbidden,
+                         Date_t::max(),
+                         AutoStatsTracker::LogMode::kUpdateTop);
     }
 
     // makePipeline() is only called to perform secondary aggregation requests and expects the

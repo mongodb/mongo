@@ -57,27 +57,30 @@ MONGO_EXPORT_SERVER_PARAMETER(allowSecondaryReadsDuringBatchApplication, bool, t
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    Top::LockType lockType,
+                                   LogMode logMode,
                                    boost::optional<int> dbProfilingLevel,
                                    Date_t deadline)
-    : _opCtx(opCtx), _lockType(lockType) {
-    if (!dbProfilingLevel) {
+    : _opCtx(opCtx), _lockType(lockType), _nss(nss) {
+    if (!dbProfilingLevel && logMode == LogMode::kUpdateTopAndCurop) {
         // No profiling level was determined, attempt to read the profiling level from the Database
         // object.
-        AutoGetDb autoDb(_opCtx, nss.db(), MODE_IS, deadline);
+        AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IS, deadline);
         if (autoDb.getDb()) {
             dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
         }
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-    CurOp::get(_opCtx)->enter_inlock(nss.ns().c_str(), dbProfilingLevel);
+    if (logMode == LogMode::kUpdateTopAndCurop) {
+        CurOp::get(_opCtx)->enter_inlock(_nss.ns().c_str(), dbProfilingLevel);
+    }
 }
 
 AutoStatsTracker::~AutoStatsTracker() {
     auto curOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getServiceContext())
         .record(_opCtx,
-                curOp->getNS(),
+                _nss.ns(),
                 curOp->getLogicalOp(),
                 _lockType,
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
@@ -257,11 +260,13 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     AutoGetCollection::ViewMode viewMode,
-    Date_t deadline)
+    Date_t deadline,
+    AutoStatsTracker::LogMode logMode)
     : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline),
       _statsTracker(opCtx,
                     _autoCollForRead.getNss(),
                     Top::LockType::ReadLocked,
+                    logMode,
                     _autoCollForRead.getDb() ? _autoCollForRead.getDb()->getProfilingLevel()
                                              : kDoNotChangeProfilingLevel,
                     deadline) {
