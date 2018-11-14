@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
-#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/do_txn.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -117,7 +116,7 @@ protected:
     OpObserverMock* _opObserver = nullptr;
     std::unique_ptr<StorageInterface> _storage;
     ServiceContext::UniqueOperationContext _opCtx;
-    boost::optional<OperationContextSessionMongod> _ocs;
+    boost::optional<MongoDOperationContextSession> _ocs;
 };
 
 void DoTxnTest::setUp() {
@@ -156,7 +155,7 @@ void DoTxnTest::setUp() {
     // Set up the transaction and session.
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     _opCtx->setTxnNumber(0);  // TxnNumber can always be 0 because we have a new session.
-    _ocs.emplace(_opCtx.get(), true /* checkOutSession */);
+    _ocs.emplace(_opCtx.get());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);

@@ -680,7 +680,6 @@ env.Library(
     target='catalog_raii',
     source=[
         'catalog_raii.cpp',
-        'operation_context_session_mongod.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',

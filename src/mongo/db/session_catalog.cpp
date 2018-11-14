@@ -186,55 +186,44 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid,
     }
 }
 
-OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)
-    : _opCtx(opCtx) {
-    if (!opCtx->getLogicalSessionId()) {
-        return;
-    }
-
-    if (!checkOutSession) {
-        return;
-    }
-
+OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opCtx(opCtx) {
     auto& checkedOutSession = operationSessionDecoration(opCtx);
-    if (!checkedOutSession) {
-        auto sessionTransactionTable = SessionCatalog::get(opCtx);
-        auto scopedCheckedOutSession = sessionTransactionTable->checkOutSession(opCtx);
-        // We acquire a Client lock here to guard the construction of this session so that
-        // references to this session are safe to use while the lock is held.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        checkedOutSession.emplace(std::move(scopedCheckedOutSession));
-    } else {
-        // The only reason to be trying to check out a session when you already have a session
-        // checked out is if you're in DBDirectClient.
+    if (checkedOutSession) {
+        // The only case where a session can be checked-out more than once is due to DBDirectClient
+        // reentrancy
         invariant(opCtx->getClient()->isInDirectClient());
         return;
     }
 
-    const auto session = checkedOutSession->get();
-    invariant(opCtx->getLogicalSessionId() == session->getSessionId());
+    const auto catalog = SessionCatalog::get(opCtx);
+    auto scopedCheckedOutSession = catalog->checkOutSession(opCtx);
+
+    // We acquire a Client lock here to guard the construction of this session so that references to
+    // this session are safe to use while the lock is held
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    checkedOutSession.emplace(std::move(scopedCheckedOutSession));
 }
 
 OperationContextSession::~OperationContextSession() {
-    // Only release the checked out session at the end of the top-level request from the client,
-    // not at the end of a nested DBDirectClient call.
+    // Only release the checked out session at the end of the top-level request from the client, not
+    // at the end of a nested DBDirectClient call
     if (_opCtx->getClient()->isInDirectClient()) {
         return;
     }
 
     auto& checkedOutSession = operationSessionDecoration(_opCtx);
-    if (checkedOutSession) {
-        // Removing the checkedOutSession from the OperationContext must be done under the Client
-        // lock, but destruction of the checkedOutSession must not be, as it takes the
-        // SessionCatalog mutex, and other code may take the Client lock while holding that mutex.
-        stdx::unique_lock<Client> lk(*_opCtx->getClient());
-        ScopedCheckedOutSession sessionToDelete(std::move(checkedOutSession.get()));
+    if (!checkedOutSession)
+        return;
 
-        // This destroys the moved-from ScopedCheckedOutSession, and must be done within the client
-        // lock.
-        checkedOutSession = boost::none;
-        lk.unlock();
-    }
+    // Removing the checkedOutSession from the OperationContext must be done under the Client lock,
+    // but destruction of the checkedOutSession must not be, as it takes the SessionCatalog mutex,
+    // and other code may take the Client lock while holding that mutex.
+    stdx::unique_lock<Client> lk(*_opCtx->getClient());
+    ScopedCheckedOutSession sessionToDelete(std::move(checkedOutSession.get()));
+
+    // This destroys the moved-from ScopedCheckedOutSession, and must be done within the client lock
+    checkedOutSession = boost::none;
+    lk.unlock();
 }
 
 Session* OperationContextSession::get(OperationContext* opCtx) {

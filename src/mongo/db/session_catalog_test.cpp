@@ -92,19 +92,10 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, OperationContextCheckedOutSession) {
     const TxnNumber txnNum = 20;
     _opCtx->setTxnNumber(txnNum);
 
-    OperationContextSession ocs(_opCtx, true);
+    OperationContextSession ocs(_opCtx);
     auto session = OperationContextSession::get(_opCtx);
     ASSERT(session);
     ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
-}
-
-TEST_F(SessionCatalogTestWithDefaultOpCtx, OperationContextNonCheckedOutSession) {
-    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-
-    OperationContextSession ocs(_opCtx, false);
-    auto session = OperationContextSession::get(_opCtx);
-
-    ASSERT(!session);
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, GetOrCreateNonExistentSession) {
@@ -120,7 +111,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, GetOrCreateSessionAfterCheckOutSessio
     _opCtx->setLogicalSessionId(lsid);
 
     boost::optional<OperationContextSession> ocs;
-    ocs.emplace(_opCtx, true);
+    ocs.emplace(_opCtx);
 
     stdx::async(stdx::launch::async, [&] {
         ThreadClient tc(getGlobalServiceContext());
@@ -149,11 +140,11 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, NestedOperationContextSession) {
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(_opCtx, true);
+        OperationContextSession outerScopedSession(_opCtx);
 
         {
             DirectClientSetter inDirectClient(_opCtx);
-            OperationContextSession innerScopedSession(_opCtx, true);
+            OperationContextSession innerScopedSession(_opCtx);
 
             auto session = OperationContextSession::get(_opCtx);
             ASSERT(session);
@@ -214,7 +205,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
     {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
-        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+        OperationContextSession unusedOperationContextSession(opCtx.get());
     }
 
     auto killToken = catalog()->killSession(lsid);
@@ -224,9 +215,8 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
         opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-        ASSERT_THROWS_CODE(OperationContextSession(opCtx.get(), true),
-                           AssertionException,
-                           ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
     }
 
     // Schedule a separate "regular operation" thread, which will block on checking-out the session,
@@ -236,7 +226,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         sideOpCtx->setLogicalSessionId(lsid);
 
-        OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+        OperationContextSession unusedOperationContextSession(sideOpCtx.get());
     });
     ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
@@ -251,7 +241,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
     {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
-        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+        OperationContextSession unusedOperationContextSession(opCtx.get());
     }
 
     // Make sure the "regular operation" eventually is able to proceed and use the just killed
@@ -266,7 +256,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
         // Create the session so there is something to kill
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
-        OperationContextSession operationContextSession(opCtx.get(), true);
+        OperationContextSession operationContextSession(opCtx.get());
 
         auto killToken = catalog()->killSession(lsid);
 
@@ -281,7 +271,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
             sideOpCtx->setLogicalSessionId(lsid);
             sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
 
-            OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+            OperationContextSession unusedOperationContextSession(sideOpCtx.get());
         });
 
         ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
@@ -294,9 +284,8 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
         opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-        ASSERT_THROWS_CODE(OperationContextSession(opCtx.get(), true),
-                           AssertionException,
-                           ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
     }
 
     // Schedule a separate "regular operation" thread, which will block on checking-out the session,
@@ -306,7 +295,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         sideOpCtx->setLogicalSessionId(lsid);
 
-        OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+        OperationContextSession unusedOperationContextSession(sideOpCtx.get());
     });
     ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
@@ -321,7 +310,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
     {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
-        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+        OperationContextSession unusedOperationContextSession(opCtx.get());
     }
 
     // Make sure the "regular operation" eventually is able to proceed and use the just killed
@@ -336,7 +325,7 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledThrowsWhenCalledTwice) {
     {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
-        OperationContextSession unusedOperationContextSession(opCtx.get(), true);
+        OperationContextSession unusedOperationContextSession(opCtx.get());
     }
 
     auto killToken = catalog()->killSession(lsid);
@@ -351,9 +340,8 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledThrowsWhenCalledTwice) {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
         opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-        ASSERT_THROWS_CODE(OperationContextSession(opCtx.get(), true),
-                           AssertionException,
-                           ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
     }
 
     // Finish "killing" the session so the SessionCatalog destructor doesn't complain
@@ -388,7 +376,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
                     auto sideOpCtx = Client::getCurrent()->makeOperationContext();
                     sideOpCtx->setLogicalSessionId(lsid);
 
-                    OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+                    OperationContextSession unusedOperationContextSession(sideOpCtx.get());
                     firstUseOfTheSessionReachedBarrier.countDownAndWait();
 
                     ASSERT_THROWS_CODE(sideOpCtx->sleepFor(Hours{6}),
@@ -400,7 +388,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
                     auto sideOpCtx = Client::getCurrent()->makeOperationContext();
                     sideOpCtx->setLogicalSessionId(lsid);
 
-                    OperationContextSession unusedOperationContextSession(sideOpCtx.get(), true);
+                    OperationContextSession unusedOperationContextSession(sideOpCtx.get());
                 }
             }));
     }

@@ -57,7 +57,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find.h"
@@ -70,6 +69,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/snapshot_window_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
@@ -576,9 +576,11 @@ void execCommandDatabase(OperationContext* opCtx,
         // handles the appropriate state management for both multi-statement transactions and
         // retryable writes. Currently, only requests with a transaction number will check out the
         // session.
-        const bool shouldCheckOutSession = static_cast<bool>(sessionOptions.getTxnNumber()) &&
-            !shouldCommandSkipSessionCheckout(command->getName());
-        OperationContextSessionMongod sessionTxnState(opCtx, shouldCheckOutSession);
+        boost::optional<MongoDOperationContextSession> sessionTxnState;
+        const bool shouldCheckOutSession =
+            sessionOptions.getTxnNumber() && !shouldCommandSkipSessionCheckout(command->getName());
+        if (shouldCheckOutSession)
+            sessionTxnState.emplace(opCtx);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 

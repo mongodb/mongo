@@ -250,7 +250,7 @@ class OperationContextSession {
     MONGO_DISALLOW_COPYING(OperationContextSession);
 
 public:
-    OperationContextSession(OperationContext* opCtx, bool checkOutSession);
+    OperationContextSession(OperationContext* opCtx);
     ~OperationContextSession();
 
     /**

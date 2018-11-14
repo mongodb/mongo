@@ -28,13 +28,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/transaction_oplog_application.h"
-
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/repl/transaction_oplog_application.h"
+
 #include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 
@@ -89,7 +89,7 @@ Status applyCommitTransaction(OperationContext* opCtx,
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    OperationContextSessionMongodWithoutRefresh sessionCheckout(opCtx);
+    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
     invariant(transaction);
@@ -123,7 +123,7 @@ Status applyAbortTransaction(OperationContext* opCtx,
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    OperationContextSessionMongodWithoutRefresh sessionCheckout(opCtx);
+    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
     transaction->unstashTransactionResources(opCtx, "abortTransaction");

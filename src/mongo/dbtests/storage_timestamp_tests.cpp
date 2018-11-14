@@ -53,7 +53,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer_registry.h"
-#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/multiapplier.h"
@@ -2498,7 +2497,7 @@ public:
         _opCtx->setLogicalSessionId(sessionId);
         _opCtx->setTxnNumber(26);
 
-        ocs = std::make_unique<OperationContextSessionMongod>(_opCtx, true);
+        ocs.emplace(_opCtx);
 
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
@@ -2539,7 +2538,8 @@ protected:
     Timestamp presentTs;
     Timestamp beforeTxnTs;
     Timestamp commitEntryTs;
-    std::unique_ptr<OperationContextSessionMongod> ocs;
+
+    boost::optional<MongoDOperationContextSession> ocs;
 };
 
 class MultiDocumentTransaction : public MultiDocumentTransactionTest {

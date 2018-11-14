@@ -65,4 +65,32 @@ public:
                                    boost::optional<BSONObj> singleSessionDoc);
 };
 
+/**
+ * Scoped object, which checks out the session specified in the passed operation context and stores
+ * it for later access by the command. The session is installed at construction time and is removed
+ * at destruction.
+ */
+class MongoDOperationContextSession {
+public:
+    MongoDOperationContextSession(OperationContext* opCtx);
+
+private:
+    OperationContextSession _operationContextSession;
+};
+
+/**
+ * Similar to MongoDOperationContextSession, but marks the TransactionParticipant as valid without
+ * refreshing from disk and starts a new transaction unconditionally.
+ *
+ * NOTE: Only used by the replication oplog application logic on secondaries in order to replay
+ * prepared transactions.
+ */
+class MongoDOperationContextSessionWithoutRefresh {
+public:
+    MongoDOperationContextSessionWithoutRefresh(OperationContext* opCtx);
+
+private:
+    OperationContextSession _operationContextSession;
+};
+
 }  // namespace mongo

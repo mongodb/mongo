@@ -171,4 +171,23 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
     }));
 }
 
+
+MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)
+    : _operationContextSession(opCtx) {
+    if (!opCtx->getClient()->isInDirectClient()) {
+        const auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant->refreshFromStorageIfNeeded(opCtx);
+    }
+}
+
+MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
+    OperationContext* opCtx)
+    : _operationContextSession(opCtx) {
+    invariant(!opCtx->getClient()->isInDirectClient());
+    const auto clientTxnNumber = *opCtx->getTxnNumber();
+
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant->beginOrContinueTransactionUnconditionally(clientTxnNumber);
+}
+
 }  // namespace mongo

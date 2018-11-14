@@ -40,7 +40,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer_impl.h"
-#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -540,7 +539,8 @@ public:
         _times.emplace(opCtx());
         opCtx()->setLogicalSessionId(session()->getSessionId());
         opCtx()->setTxnNumber(txnNum());
-        _sessionCheckout = std::make_unique<OperationContextSessionMongod>(opCtx(), true);
+
+        _sessionCheckout = std::make_unique<MongoDOperationContextSession>(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
     }
@@ -627,7 +627,7 @@ private:
     boost::optional<ScopedSession> _session;
     ServiceContext::UniqueOperationContext _opCtx;
     boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
-    std::unique_ptr<OperationContextSessionMongod> _sessionCheckout;
+    std::unique_ptr<MongoDOperationContextSession> _sessionCheckout;
     TxnNumber _txnNum = 0;
 };
 
