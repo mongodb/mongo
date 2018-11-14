@@ -149,8 +149,8 @@ public:
     virtual LockResult lockRSTLBegin(OperationContext* opCtx);
     virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline);
 
-    virtual void beginWriteUnitOfWork();
-    virtual void endWriteUnitOfWork();
+    virtual void beginWriteUnitOfWork() override;
+    virtual void endWriteUnitOfWork() override;
 
     virtual bool inAWriteUnitOfWork() const {
         return _wuowNestingLevel > 0;
@@ -193,6 +193,10 @@ public:
     virtual void restoreLockState(const LockSnapshot& stateToRestore) {
         restoreLockState(nullptr, stateToRestore);
     }
+
+    bool releaseWriteUnitOfWork(LockSnapshot* stateOut) override;
+    void restoreWriteUnitOfWork(OperationContext* opCtx,
+                                const LockSnapshot& stateToRestore) override;
 
     virtual void releaseTicket();
     virtual void reacquireTicket(OperationContext* opCtx);

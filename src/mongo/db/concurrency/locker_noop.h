@@ -111,9 +111,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void beginWriteUnitOfWork() {}
+    virtual void beginWriteUnitOfWork() override {}
 
-    virtual void endWriteUnitOfWork() {}
+    virtual void endWriteUnitOfWork() override {}
 
     virtual bool inAWriteUnitOfWork() const {
         return false;
@@ -186,6 +186,15 @@ public:
     virtual void restoreLockState(const LockSnapshot& stateToRestore) {
         MONGO_UNREACHABLE;
     }
+
+    bool releaseWriteUnitOfWork(LockSnapshot* stateOut) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void restoreWriteUnitOfWork(OperationContext* opCtx,
+                                const LockSnapshot& stateToRestore) override {
+        MONGO_UNREACHABLE;
+    };
 
     virtual void releaseTicket() {
         MONGO_UNREACHABLE;

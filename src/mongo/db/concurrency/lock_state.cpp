@@ -423,6 +423,40 @@ void LockerImpl::endWriteUnitOfWork() {
     }
 }
 
+bool LockerImpl::releaseWriteUnitOfWork(LockSnapshot* stateOut) {
+    // Only the global WUOW can be released.
+    invariant(_wuowNestingLevel == 1);
+    --_wuowNestingLevel;
+    invariant(!isGlobalLockedRecursively());
+
+    // All locks should be pending to unlock.
+    invariant(_requests.size() == _numResourcesToUnlockAtEndUnitOfWork);
+    for (auto it = _requests.begin(); it; it.next()) {
+        // No converted lock so we don't need to unlock more than once.
+        invariant(it->unlockPending == 1);
+    }
+    _numResourcesToUnlockAtEndUnitOfWork = 0;
+
+    return saveLockStateAndUnlock(stateOut);
+}
+
+void LockerImpl::restoreWriteUnitOfWork(OperationContext* opCtx,
+                                        const LockSnapshot& stateToRestore) {
+    if (stateToRestore.globalMode != MODE_NONE) {
+        restoreLockState(opCtx, stateToRestore);
+    }
+
+    invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
+    for (auto it = _requests.begin(); it; it.next()) {
+        invariant(_shouldDelayUnlock(it.key(), (it->mode)));
+        invariant(it->unlockPending == 0);
+        it->unlockPending++;
+    }
+    _numResourcesToUnlockAtEndUnitOfWork = static_cast<unsigned>(_requests.size());
+
+    beginWriteUnitOfWork();
+}
+
 LockResult LockerImpl::lock(OperationContext* opCtx,
                             ResourceId resId,
                             LockMode mode,

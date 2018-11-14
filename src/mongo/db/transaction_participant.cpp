@@ -529,6 +529,12 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool
     }
     _locker->unsetThreadId();
 
+    // On secondaries, we yield the locks for transactions.
+    if (!opCtx->writesAreReplicated()) {
+        _lockSnapshot = std::make_unique<Locker::LockSnapshot>();
+        _locker->releaseWriteUnitOfWork(_lockSnapshot.get());
+    }
+
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
     auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
@@ -553,25 +559,35 @@ TransactionParticipant::TxnResources::~TxnResources() {
         // when starting a new transaction before completing an old one.  So we should
         // be at WUOW nesting level 1 (only the top level WriteUnitOfWork).
         _recoveryUnit->abortUnitOfWork();
-        _locker->endWriteUnitOfWork();
+        // If locks are not yielded, release them.
+        if (!_lockSnapshot) {
+            _locker->endWriteUnitOfWork();
+        }
         invariant(!_locker->inAWriteUnitOfWork());
     }
 }
 
 void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // Perform operations that can fail the release before marking the TxnResources as released.
+
+    // Restore locks if they are yielded.
+    if (_lockSnapshot) {
+        invariant(!_locker->isLocked());
+        // opCtx is passed in to enable the restoration to be interrupted.
+        _locker->restoreWriteUnitOfWork(opCtx, *_lockSnapshot);
+        _lockSnapshot.reset(nullptr);
+    }
     _locker->reacquireTicket(opCtx);
 
     invariant(!_released);
     _released = true;
 
-    // We intentionally do not capture the return value of swapLockState(), which is just an empty
-    // locker. At the end of the operation, if the transaction is not complete, we will stash the
-    // operation context's locker and replace it with a new empty locker.
-
     // It is necessary to lock the client to change the Locker on the OperationContext.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
+    // We intentionally do not capture the return value of swapLockState(), which is just an empty
+    // locker. At the end of the operation, if the transaction is not complete, we will stash the
+    // operation context's locker and replace it with a new empty locker.
     opCtx->swapLockState(std::move(_locker));
     opCtx->lockState()->updateThreadIdToCurrentThread();
 
@@ -700,6 +716,11 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
                                                  ? SpeculativeTransactionOpTime::kAllCommitted
                                                  : SpeculativeTransactionOpTime::kLastApplied);
         }
+
+        // All locks of transactions must be acquired inside the global WUOW so that we can
+        // yield and restore all locks on state transition. Otherwise, we'd have to remember
+        // which locks are managed by WUOW.
+        invariant(!opCtx->lockState()->isLocked());
 
         // Stashed transaction resources do not exist for this in-progress multi-document
         // transaction. Set up the transaction resources on the opCtx.

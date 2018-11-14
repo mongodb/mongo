@@ -206,8 +206,8 @@ public:
 
     /**
      * beginWriteUnitOfWork/endWriteUnitOfWork are called at the start and end of WriteUnitOfWorks.
-     * They can be used to implement two-phase locking. Each call to begin should be matched with an
-     * eventual call to end.
+     * They can be used to implement two-phase locking. Each call to begin or restore should be
+     * matched with an eventual call to end or release.
      *
      * endWriteUnitOfWork, if not called in a nested WUOW, will release all two-phase locking held
      * lock resources.
@@ -373,6 +373,15 @@ public:
      */
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) = 0;
     virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
+
+    /**
+     * releaseWriteUnitOfWork opts out two-phase locking and yield the locks after a WUOW
+     * has been released. restoreWriteUnitOfWork reaquires the locks and resume the two-phase
+     * locking behavior of WUOW.
+     */
+    virtual bool releaseWriteUnitOfWork(LockSnapshot* stateOut) = 0;
+    virtual void restoreWriteUnitOfWork(OperationContext* opCtx,
+                                        const LockSnapshot& stateToRestore) = 0;
 
     /**
      * Releases the ticket associated with the Locker. This allows locks to be held without

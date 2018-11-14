@@ -254,6 +254,138 @@ TEST(LockerImpl, saveAndRestoreDBAndCollection) {
     ASSERT(locker.unlockGlobal());
 }
 
+TEST(LockerImpl, releaseWriteUnitOfWork) {
+    Locker::LockSnapshot lockInfo;
+
+    LockerImpl locker;
+
+    const ResourceId resIdDatabase(RESOURCE_DATABASE, "TestDB"_sd);
+    const ResourceId resIdCollection(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    locker.beginWriteUnitOfWork();
+    // Lock some stuff.
+    locker.lockGlobal(MODE_IX);
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdDatabase, MODE_IX));
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdCollection, MODE_X));
+    // Unlock them so that they will be pending to unlock.
+    ASSERT_FALSE(locker.unlock(resIdCollection));
+    ASSERT_FALSE(locker.unlock(resIdDatabase));
+    ASSERT_FALSE(locker.unlockGlobal());
+
+    ASSERT(locker.releaseWriteUnitOfWork(&lockInfo));
+
+    // Things shouldn't be locked anymore.
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
+    ASSERT_FALSE(locker.isLocked());
+
+    // Destructor should succeed since the locker's state should be empty.
+}
+
+TEST(LockerImpl, restoreWriteUnitOfWork) {
+    Locker::LockSnapshot lockInfo;
+
+    LockerImpl locker;
+
+    const ResourceId resIdDatabase(RESOURCE_DATABASE, "TestDB"_sd);
+    const ResourceId resIdCollection(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    locker.beginWriteUnitOfWork();
+    // Lock some stuff.
+    locker.lockGlobal(MODE_IX);
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdDatabase, MODE_IX));
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdCollection, MODE_X));
+    // Unlock them so that they will be pending to unlock.
+    ASSERT_FALSE(locker.unlock(resIdCollection));
+    ASSERT_FALSE(locker.unlock(resIdDatabase));
+    ASSERT_FALSE(locker.unlockGlobal());
+
+    ASSERT(locker.releaseWriteUnitOfWork(&lockInfo));
+
+    // Things shouldn't be locked anymore.
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
+    ASSERT_FALSE(locker.isLocked());
+
+    // Restore lock state.
+    locker.restoreWriteUnitOfWork(nullptr, lockInfo);
+
+    // Make sure things were re-locked.
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT(locker.isLocked());
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
+    ASSERT_FALSE(locker.isLocked());
+}
+
+TEST(LockerImpl, releaseAndRestoreReadOnlyWriteUnitOfWork) {
+    Locker::LockSnapshot lockInfo;
+
+    LockerImpl locker;
+
+    const ResourceId resIdDatabase(RESOURCE_DATABASE, "TestDB"_sd);
+    const ResourceId resIdCollection(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    // Snapshot transactions delay shared locks as well.
+    locker.setSharedLocksShouldTwoPhaseLock(true);
+
+    locker.beginWriteUnitOfWork();
+    // Lock some stuff in IS mode.
+    locker.lockGlobal(MODE_IS);
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdDatabase, MODE_IS));
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdCollection, MODE_IS));
+    // Unlock them.
+    ASSERT_FALSE(locker.unlock(resIdCollection));
+    ASSERT_FALSE(locker.unlock(resIdDatabase));
+    ASSERT_FALSE(locker.unlockGlobal());
+    ASSERT_EQ(3u, locker.numResourcesToUnlockAtEndUnitOfWorkForTest());
+
+    // Things shouldn't be locked anymore.
+    ASSERT_TRUE(locker.releaseWriteUnitOfWork(&lockInfo));
+
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
+    ASSERT_FALSE(locker.isLocked());
+
+    // Restore lock state.
+    locker.restoreWriteUnitOfWork(nullptr, lockInfo);
+
+    ASSERT_EQUALS(MODE_IS, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_IS, locker.getLockMode(resIdCollection));
+    ASSERT_TRUE(locker.isLocked());
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
+    ASSERT_FALSE(locker.isLocked());
+}
+
+TEST(LockerImpl, releaseAndRestoreEmptyWriteUnitOfWork) {
+    Locker::LockSnapshot lockInfo;
+    LockerImpl locker;
+
+    // Snapshot transactions delay shared locks as well.
+    locker.setSharedLocksShouldTwoPhaseLock(true);
+
+    locker.beginWriteUnitOfWork();
+
+    // Nothing to yield.
+    ASSERT_FALSE(locker.releaseWriteUnitOfWork(&lockInfo));
+    ASSERT_FALSE(locker.isLocked());
+
+    // Restore lock state.
+    locker.restoreWriteUnitOfWork(nullptr, lockInfo);
+    ASSERT_FALSE(locker.isLocked());
+
+    locker.endWriteUnitOfWork();
+    ASSERT_FALSE(locker.isLocked());
+}
+
 TEST(LockerImpl, DefaultLocker) {
     const ResourceId resId(RESOURCE_DATABASE, "TestDB"_sd);
 

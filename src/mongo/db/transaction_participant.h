@@ -113,6 +113,7 @@ public:
     private:
         bool _released = false;
         std::unique_ptr<Locker> _locker;
+        std::unique_ptr<Locker::LockSnapshot> _lockSnapshot;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;

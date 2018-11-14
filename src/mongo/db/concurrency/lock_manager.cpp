@@ -1033,6 +1033,7 @@ void LockRequest::initNew(Locker* locker, LockGrantNotification* notify) {
     partitioned = false;
     mode = MODE_NONE;
     convertMode = MODE_NONE;
+    unlockPending = 0;
 }
 
 
