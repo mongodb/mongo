@@ -55,6 +55,20 @@ public:
     static const std::string kAtClusterTimeFieldName;
     static const std::string kLevelFieldName;
 
+    /**
+     * Represents the internal mechanism an operation uses to satisfy 'majority' read concern.
+     */
+    enum class MajorityReadMechanism {
+        // The storage engine will read from a historical, majority committed snapshot of data. This
+        // is the default mechanism.
+        kMajoritySnapshot,
+
+        // A mechanism to be used when the storage engine does not support reading from a historical
+        // snapshot. A query will read from a local (potentially uncommitted) snapshot, and, after
+        // reading data, will block until it knows that data has become majority committed.
+        kSpeculative
+    };
+
     static ReadConcernArgs& get(OperationContext* opCtx);
     static const ReadConcernArgs& get(const OperationContext* opCtx);
 
@@ -95,6 +109,20 @@ public:
      * readConcern cannot be upconverted.
      */
     Status upconvertReadConcernLevelToSnapshot();
+
+    /**
+     * Sets the mechanism we should use to satisfy 'majority' reads.
+     *
+     * Invalid to call unless the read concern level is 'kMajorityReadConcern'.
+     */
+    void setMajorityReadMechanism(MajorityReadMechanism m);
+
+    /**
+     * Returns the mechanism to use for satisfying 'majority' read concern.
+     *
+     * Invalid to call unless the read concern level is 'kMajorityReadConcern'.
+     */
+    MajorityReadMechanism getMajorityReadMechanism() const;
 
     /**
      * Appends level and afterOpTime.
@@ -152,6 +180,12 @@ private:
      * If the read concern was upconverted, the original read concern level.
      */
     boost::optional<ReadConcernLevel> _originalLevel;
+
+    /**
+     * The mechanism to use for satisfying 'majority' reads. Only meaningful if the read concern
+     * level is 'majority'.
+     */
+    MajorityReadMechanism _majorityReadMechanism{MajorityReadMechanism::kMajoritySnapshot};
 };
 
 }  // namespace repl

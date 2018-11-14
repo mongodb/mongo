@@ -515,6 +515,19 @@ public:
     }
 
     /**
+     * Returns true if this command invocation is allowed to utilize "speculative" majority reads to
+     * service 'majority' read concern requests. This allows a query to satisfy a 'majority' read
+     * without storage engine support for reading from a historical snapshot.
+     *
+     * Note: This feature is currently only limited to a very small subset of commands (related to
+     * change streams), and is not intended to be generally used, which is why it is disabled by
+     * default.
+     */
+    virtual bool allowsSpeculativeMajorityReads() const {
+        return false;
+    }
+
+    /**
      * The command definition that this invocation runs.
      * Note: nonvirtual.
      */

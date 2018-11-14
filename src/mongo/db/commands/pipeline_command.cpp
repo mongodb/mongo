@@ -80,6 +80,11 @@ public:
                 !AggregationRequest::parseNs(_dbName, _request.body).isCollectionlessAggregateNS();
         }
 
+        bool allowsSpeculativeMajorityReads() const override {
+            // TODO (SERVER-37560): Support this for change stream queries.
+            return false;
+        }
+
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             const auto aggregationRequest = uassertStatusOK(
                 AggregationRequest::parseFromBSON(_dbName, _request.body, boost::none));

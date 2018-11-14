@@ -123,6 +123,11 @@ public:
             return true;
         }
 
+        bool allowsSpeculativeMajorityReads() const override {
+            // TODO (SERVER-37560): Support this for change stream update lookup queries.
+            return false;
+        }
+
         NamespaceString ns() const override {
             // TODO get the ns from the parsed QueryRequest.
             return NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body));

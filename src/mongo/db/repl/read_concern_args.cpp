@@ -262,6 +262,16 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
     return Status::OK();
 }
 
+void ReadConcernArgs::setMajorityReadMechanism(MajorityReadMechanism mechanism) {
+    invariant(*_level == ReadConcernLevel::kMajorityReadConcern);
+    _majorityReadMechanism = mechanism;
+}
+
+ReadConcernArgs::MajorityReadMechanism ReadConcernArgs::getMajorityReadMechanism() const {
+    invariant(*_level == ReadConcernLevel::kMajorityReadConcern);
+    return _majorityReadMechanism;
+}
+
 Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
     if (_level && *_level != ReadConcernLevel::kSnapshotReadConcern &&
         *_level != ReadConcernLevel::kMajorityReadConcern &&
