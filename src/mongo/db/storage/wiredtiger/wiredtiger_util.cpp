@@ -567,19 +567,35 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
         setting = "log=(enabled=false)";
     }
 
+    // This method does some "weak" parsing to see if the table is in the expected logging
+    // state. Only attempt to alter the table when a change is needed. This avoids grabbing heavy
+    // locks in WT when creating new tables for collections and indexes. Those tables are created
+    // with the proper settings and consequently should not be getting changed here.
+    //
+    // If the settings need to be changed (only expected at startup), the alter table call must
+    // succeed.
+    std::string existingMetadata = getMetadataRaw(session, uri).getValue();
+    if (existingMetadata.find("log=(enabled=true)") != std::string::npos &&
+        existingMetadata.find("log=(enabled=false)") != std::string::npos) {
+        // Sanity check against a table having multiple logging specifications.
+        invariant(false,
+                  str::stream() << "Table has contradictory logging settings. Uri: " << uri
+                                << " Conf: "
+                                << existingMetadata);
+    }
+
+    if (existingMetadata.find(setting) != std::string::npos) {
+        // The table is running with the expected logging settings.
+        return Status::OK();
+    }
+
+    LOG(1) << "Changing table logging settings. Uri: " << uri << " Enable? " << on;
     int ret = session->alter(session, uri.c_str(), setting.c_str());
     if (ret) {
-        // `setTableLogging` can be called even when the table is in the desired state. WT can
-        // return EBUSY if it cannot access the table to be altered before it knows whether
-        // there's anything to change.  Assert that if alter call returned an error, the table is
-        // in the expected state.
-        std::string existingMetadata = getMetadataRaw(session, uri).getValue();
-        if (existingMetadata.find(setting) == std::string::npos) {
-            severe() << "Failed to update log setting. Uri: " << uri << " Enable? " << on
-                     << " Ret: " << ret << " MD: " << redact(existingMetadata)
-                     << " Msg: " << session->strerror(session, ret);
-            fassertFailed(50756);
-        }
+        severe() << "Failed to update log setting. Uri: " << uri << " Enable? " << on
+                 << " Ret: " << ret << " MD: " << redact(existingMetadata)
+                 << " Msg: " << session->strerror(session, ret);
+        fassertFailed(50756);
     }
 
     return Status::OK();
