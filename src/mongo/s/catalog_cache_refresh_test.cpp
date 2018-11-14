@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -39,6 +40,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/database_version_helpers.h"
+#include "mongo/unittest/death_test.h"
 
 namespace mongo {
 namespace {
@@ -118,6 +120,20 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     auto cm = routingInfo->cm();
 
     ASSERT_EQ(4, cm->numChunks());
+}
+
+class MockLockerAlwaysReportsToBeLocked : public LockerNoop {
+public:
+    using LockerNoop::LockerNoop;
+
+    bool isLocked() const final {
+        return true;
+    }
+};
+
+DEATH_TEST_F(CatalogCacheRefreshTest, ShouldFailToRefreshWhenLocksAreHeld, "Invariant") {
+    operationContext()->setLockState(std::make_unique<MockLockerAlwaysReportsToBeLocked>());
+    scheduleRoutingInfoRefresh(kNss);
 }
 
 TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {

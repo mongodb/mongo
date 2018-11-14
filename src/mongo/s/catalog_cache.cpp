@@ -121,6 +121,10 @@ CatalogCache::~CatalogCache() = default;
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
+    invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
+              "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
+              "hold the lock during a network call, and can lead to a deadlock as described in "
+              "SERVER-37398.");
     try {
         while (true) {
             stdx::unique_lock<stdx::mutex> ul(_mutex);
@@ -196,6 +200,10 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt
 
 CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, boost::optional<Timestamp> atClusterTime) {
+    invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
+              "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
+              "hold the lock during a network call, and can lead to a deadlock as described in "
+              "SERVER-37398.");
     // This default value can cause a single unnecessary extra refresh if this thread did do the
     // refresh but the refresh failed, or if the database or collection was not found, but only if
     // the caller is getCollectionRoutingInfoWithRefresh with the parameter
