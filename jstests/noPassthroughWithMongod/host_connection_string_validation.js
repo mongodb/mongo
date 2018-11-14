@@ -10,6 +10,10 @@
         // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
         // with that address.
         var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
+        if (mongod == null) {
+            jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
+            return;
+        }
         var args = [
             "mongo",
             "--nodb",
