@@ -11125,6 +11125,101 @@ buildvariants:
     distros:
     - rhel70-small
 
+- name: enterprise-osx-1011-xcode-10
+  display_name: ~ Enterprise macOS 10.11 (XCode 10)
+  modules:
+  - enterprise
+  run_on:
+  - macos-1014
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.0.app
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
+    num_jobs_available: 1
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
+    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    build_mongoreplay: true
+  display_tasks:
+  - *dbtest
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+  - name: audit
+  - name: auth_audit
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: ssl
+  - name: sslSpecial
+
+- name: enterprise-osx-1011-xcode-10-cxx17
+  display_name: ~ Enterprise macOS 10.11 (XCode 10 C++17)
+  modules:
+  - enterprise
+  run_on:
+  - macos-1014
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.0.app
+    compile_flags: >-
+      --ssl
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --variables-files=etc/scons/xcode_macosx.vars
+      --cxx-std=17
+      CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
+      CXXFLAGS="-Wno-register"
+    num_jobs_available: 1
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
+    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    build_mongoreplay: true
+  display_tasks:
+  - *dbtest
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+  - name: audit
+  - name: auth_audit
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: ssl
+  - name: sslSpecial
+
 - name: enterprise-osx-1010-openssl
   display_name: ~ Enterprise macOS 10.10 OpenSSL
   modules:
