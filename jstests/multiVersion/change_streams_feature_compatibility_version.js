@@ -116,12 +116,11 @@
 
     assert.writeOK(coll.insert({_id: 2}));
 
-    // Test that the stream opened in FCV 3.6 continues to work and still generates tokens in the
-    // old format.
+    // Test that the stream opened in FCV 3.6 continues to work.
     change = cst.getOneChange(streamOnOldVersion);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 2);
-    assertResumeTokenUsesBinDataFormat(change._id);
+    assertResumeTokenUsesStringFormat(change._id);
 
     // Test all the newly created streams can see an insert.
     change = cst.getOneChange(wholeDbCursor);
@@ -169,22 +168,23 @@
     // Set the feature compatibility version to 3.6.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
 
-    // Test that existing streams continue, but still generate resume tokens in the new format.
+    // Test that existing streams continue, but switch back to the BinData format after observing
+    // the change to FCV.
     assert.writeOK(coll.insert({_id: 3}));
     change = cst.getOneChange(wholeDbCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 3);
-    assertResumeTokenUsesStringFormat(change._id);
+    assertResumeTokenUsesBinDataFormat(change._id);
 
     change = adminCST.getOneChange(wholeClusterCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 3);
-    assertResumeTokenUsesStringFormat(change._id);
+    assertResumeTokenUsesBinDataFormat(change._id);
 
     change = cst.getOneChange(cursorStartedWithTime);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 3);
-    assertResumeTokenUsesStringFormat(change._id);
+    assertResumeTokenUsesBinDataFormat(change._id);
 
     // Creating a new change stream with a 4.0 feature should fail.
     assert.commandFailedWithCode(
