@@ -37,13 +37,13 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/mock_ns_targeter.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -628,14 +628,13 @@ public:
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
-        _scopedSession.emplace(operationContext());
-
         auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
 
+        _scopedSession.emplace(operationContext());
+
         auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter->checkOut();
         txnRouter->beginOrContinueTxn(operationContext(), kTxnNumber, true);
         txnRouter->setDefaultAtClusterTime(operationContext());
     }
@@ -648,7 +647,7 @@ public:
     }
 
 private:
-    boost::optional<ScopedRouterSession> _scopedSession;
+    boost::optional<RouterOperationContextSession> _scopedSession;
 };
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {

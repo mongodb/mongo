@@ -42,76 +42,20 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
 
-class RouterSessionCatalog {
-public:
-    std::shared_ptr<TransactionRouter> checkoutSessionState(OperationContext* opCtx);
-    void checkInSessionState(const LogicalSessionId& sessionId);
-
-    static RouterSessionCatalog* get(ServiceContext* service);
-    static RouterSessionCatalog* get(OperationContext* service);
-
-private:
-    stdx::mutex _mutex;
-    stdx::unordered_map<LogicalSessionId, std::shared_ptr<TransactionRouter>, LogicalSessionIdHash>
-        _catalog;
-};
-
-const auto getRouterSessionCatalog = ServiceContext::declareDecoration<RouterSessionCatalog>();
-const auto getRouterSessionRuntimeState =
-    OperationContext::declareDecoration<std::shared_ptr<TransactionRouter>>();
-
-std::shared_ptr<TransactionRouter> RouterSessionCatalog::checkoutSessionState(
-    OperationContext* opCtx) {
-    auto logicalSessionId = opCtx->getLogicalSessionId();
-    invariant(logicalSessionId);
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto iter = _catalog.find(*logicalSessionId);
-    if (iter != _catalog.end()) {
-        uassert(50866,
-                str::stream() << "cannot checkout " << *logicalSessionId
-                              << ", session already in use",
-                !iter->second->isCheckedOut());
-        iter->second->checkOut();
-        return iter->second;
-    }
-
-    auto newRuntimeState = std::make_shared<TransactionRouter>(*logicalSessionId);
-    newRuntimeState->checkOut();
-    _catalog.insert(std::make_pair(*logicalSessionId, newRuntimeState));
-    return newRuntimeState;
-}
-
-void RouterSessionCatalog::checkInSessionState(const LogicalSessionId& sessionId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto iter = _catalog.find(sessionId);
-    invariant(iter != _catalog.end());
-    invariant(iter->second->isCheckedOut());
-    iter->second->checkIn();
-}
-
-RouterSessionCatalog* RouterSessionCatalog::get(ServiceContext* service) {
-    auto& catalog = getRouterSessionCatalog(service);
-    return &catalog;
-}
-
-RouterSessionCatalog* RouterSessionCatalog::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
+const auto getTransactionRouter = Session::declareDecoration<TransactionRouter>();
 
 bool isTransactionCommand(const BSONObj& cmd) {
     auto cmdName = cmd.firstElement().fieldNameStringData();
@@ -301,35 +245,24 @@ bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
 }
 
 TransactionRouter* TransactionRouter::get(OperationContext* opCtx) {
-    auto& opCtxSession = getRouterSessionRuntimeState(opCtx);
-    if (!opCtxSession) {
-        return nullptr;
+    const auto session = OperationContextSession::get(opCtx);
+    if (session) {
+        return &getTransactionRouter(session);
     }
 
-    return opCtxSession.get();
+    return nullptr;
 }
 
-TransactionRouter::TransactionRouter(LogicalSessionId sessionId)
-    : _sessionId(std::move(sessionId)) {}
+TransactionRouter::TransactionRouter() = default;
 
-void TransactionRouter::checkIn() {
-    _isCheckedOut = false;
-}
-
-void TransactionRouter::checkOut() {
-    _isCheckedOut = true;
-}
-
-bool TransactionRouter::isCheckedOut() {
-    return _isCheckedOut;
-}
+TransactionRouter::~TransactionRouter() = default;
 
 const boost::optional<TransactionRouter::AtClusterTime>& TransactionRouter::getAtClusterTime()
     const {
     return _atClusterTime;
 }
 
-boost::optional<ShardId> TransactionRouter::getCoordinatorId() const {
+const boost::optional<ShardId>& TransactionRouter::getCoordinatorId() const {
     return _coordinatorId;
 }
 
@@ -391,10 +324,6 @@ TransactionRouter::Participant& TransactionRouter::_createParticipant(const Shar
                                       isFirstParticipant, _latestStmtId, std::move(sharedOptions)));
 
     return resultPair.first->second;
-}
-
-const LogicalSessionId& TransactionRouter::getSessionId() const {
-    return _sessionId;
 }
 
 void TransactionRouter::_clearPendingParticipants() {
@@ -526,13 +455,11 @@ void TransactionRouter::_setAtClusterTime(const boost::optional<LogicalTime>& af
 void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
                                            TxnNumber txnNumber,
                                            bool startTransaction) {
-    invariant(_isCheckedOut);
-
     if (startTransaction) {
         // TODO: do we need more robust checking? Like, did we actually sent start to the
         // participants?
         uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "txnNumber " << _txnNumber << " for session " << _sessionId
+                str::stream() << "txnNumber " << _txnNumber << " for session " << _sessionId()
                               << " already started",
                 txnNumber != _txnNumber);
 
@@ -540,7 +467,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
                 str::stream() << "txnNumber " << txnNumber << " is less than last txnNumber "
                               << _txnNumber
                               << " seen in session "
-                              << _sessionId,
+                              << _sessionId(),
                 txnNumber > _txnNumber);
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -559,7 +486,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
         // TODO: figure out what to do with recovery
         uassert(ErrorCodes::NoSuchTransaction,
                 str::stream() << "cannot continue txnId " << _txnNumber << " for session "
-                              << _sessionId
+                              << _sessionId()
                               << " with txnId "
                               << txnNumber,
                 txnNumber == _txnNumber);
@@ -592,6 +519,10 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     }
 }
 
+const LogicalSessionId& TransactionRouter::_sessionId() const {
+    const auto* owningSession = getTransactionRouter.owner(this);
+    return owningSession->getSessionId();
+}
 
 Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -673,22 +604,6 @@ std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                            Shard::RetryPolicy::kIdempotent,
                            abortRequests);
-}
-
-ScopedRouterSession::ScopedRouterSession(OperationContext* opCtx) : _opCtx(opCtx) {
-    auto& opCtxSession = getRouterSessionRuntimeState(opCtx);
-    invariant(!opCtxSession);  // multiple sessions per OperationContext not supported
-
-    auto logicalSessionId = opCtx->getLogicalSessionId();
-    invariant(logicalSessionId);
-
-    RouterSessionCatalog::get(opCtx)->checkoutSessionState(opCtx).swap(opCtxSession);
-}
-
-ScopedRouterSession::~ScopedRouterSession() {
-    auto opCtxSession = TransactionRouter::get(_opCtx);
-    invariant(opCtxSession);
-    RouterSessionCatalog::get(_opCtx)->checkInSessionState(opCtxSession->getSessionId());
 }
 
 void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {

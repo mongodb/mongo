@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -42,7 +42,7 @@
 namespace mongo {
 namespace {
 
-class SessionCatalogTest : public ServiceContextMongoDTest {
+class SessionCatalogTest : public ServiceContextTest {
 protected:
     SessionCatalog* catalog() {
         return SessionCatalog::get(getServiceContext());

@@ -32,7 +32,6 @@
 
 #include <boost/optional.hpp>
 #include <map>
-#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
@@ -148,16 +147,14 @@ public:
         LogicalTime _atClusterTime;
     };
 
-    TransactionRouter(LogicalSessionId sessionId);
+    TransactionRouter();
+    ~TransactionRouter();
 
     /**
      * Starts a fresh transaction in this session or continue an existing one. Also cleans up the
      * previous transaction state.
      */
     void beginOrContinueTxn(OperationContext* opCtx, TxnNumber txnNumber, bool startTransaction);
-
-    void checkIn();
-    void checkOut();
 
     /**
      * Attaches the required transaction related fields for a request to be sent to the given
@@ -222,11 +219,10 @@ public:
      */
     const boost::optional<AtClusterTime>& getAtClusterTime() const;
 
-    bool isCheckedOut();
-
-    const LogicalSessionId& getSessionId() const;
-
-    boost::optional<ShardId> getCoordinatorId() const;
+    /**
+     * If a coordinator has been selected for the current transaction, returns its identifier
+     */
+    const boost::optional<ShardId>& getCoordinatorId() const;
 
     /**
      * Commits the transaction. For transactions with multiple participants, this will initiate
@@ -257,6 +253,9 @@ public:
     boost::optional<Participant&> getParticipant(const ShardId& shard);
 
 private:
+    // Shortcut to obtain the id of the session under which this transaction router runs
+    const LogicalSessionId& _sessionId() const;
+
     /**
      * Run basic commit for transactions that touched a single shard.
      */
@@ -318,11 +317,8 @@ private:
      */
     void _verifyParticipantAtClusterTime(const Participant& participant);
 
-    const LogicalSessionId _sessionId;
+    // The currently active transaction number on this transaction router (i.e. on the session)
     TxnNumber _txnNumber{kUninitializedTxnNumber};
-
-    // True if this is currently being used by a request.
-    bool _isCheckedOut{false};
 
     // Whether the router has initiated a two-phase commit by handing off commit coordination to the
     // coordinator. If so, the router should no longer implicitly abort the transaction on errors,
@@ -351,22 +347,6 @@ private:
     // The statement id of the command that began this transaction. Defaults to zero if no statement
     // id was included in the first command.
     StmtId _firstStmtId = kUninitializedStmtId;
-};
-
-/**
- * Scoped object, which checks out the session specified in the passed operation context and stores
- * it for later access by the command. The session is installed at construction time and is removed
- * at destruction. This can only be used for multi-statement transactions.
- */
-class ScopedRouterSession {
-    MONGO_DISALLOW_COPYING(ScopedRouterSession);
-
-public:
-    ScopedRouterSession(OperationContext* opCtx);
-    ~ScopedRouterSession();
-
-private:
-    OperationContext* const _opCtx;
 };
 
 }  // namespace mongo

@@ -28,27 +28,17 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/session_catalog_router.h"
 
 namespace mongo {
-namespace unittest {
 
-template <typename T>
-Test::RegistrationAgent<T>::RegistrationAgent(const std::string& suiteName,
-                                              const std::string& testName)
-    : _suiteName(suiteName), _testName(testName) {
-    Suite::getSuite(suiteName)->add<T>(testName);
-}
+RouterOperationContextSession::RouterOperationContextSession(OperationContext* opCtx)
+    : _operationContextSession(opCtx) {}
 
-template <typename T>
-std::string Test::RegistrationAgent<T>::getSuiteName() const {
-    return _suiteName;
-}
-
-template <typename T>
-std::string Test::RegistrationAgent<T>::getTestName() const {
-    return _testName;
-}
+RouterOperationContextSession::~RouterOperationContextSession() = default;
 
 }  // namespace mongo
-}  // namespace unittest

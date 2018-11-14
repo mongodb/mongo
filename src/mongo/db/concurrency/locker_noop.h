@@ -116,7 +116,7 @@ public:
     virtual void endWriteUnitOfWork() {}
 
     virtual bool inAWriteUnitOfWork() const {
-        MONGO_UNREACHABLE;
+        return false;
     }
 
     virtual LockResult lock(OperationContext* opCtx,

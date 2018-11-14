@@ -57,16 +57,19 @@ env.Library(
         'cluster_commands_helpers.cpp',
         'multi_statement_transaction_requests_sender.cpp',
         'transaction_router.cpp',
+        'session_catalog_router.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         'async_requests_sender',
         'common_s',
         'grid',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/session_catalog',
     ],
 )
 

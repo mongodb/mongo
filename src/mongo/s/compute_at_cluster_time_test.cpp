@@ -38,6 +38,7 @@
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction_router.h"
@@ -83,8 +84,6 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         _scopedSession.emplace(operationContext());
-
-        txnRouter()->checkOut();
         txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
     }
 
@@ -97,7 +96,7 @@ protected:
     }
 
 private:
-    boost::optional<ScopedRouterSession> _scopedSession;
+    boost::optional<RouterOperationContextSession> _scopedSession;
 };
 
 TEST_F(AtClusterTimeTest, ComputeValidValid) {
@@ -187,8 +186,6 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         _scopedSession.emplace(operationContext());
-
-        txnRouter()->checkOut();
         txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
     }
 
@@ -201,7 +198,7 @@ protected:
     }
 
 private:
-    boost::optional<ScopedRouterSession> _scopedSession;
+    boost::optional<RouterOperationContextSession> _scopedSession;
 };
 
 // Verifies that the latest in-memory logical time is returned when lastCommittedOpTime on one

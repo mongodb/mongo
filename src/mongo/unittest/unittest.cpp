@@ -55,7 +55,6 @@
 
 namespace mongo {
 namespace unittest {
-
 namespace {
 
 bool stringContains(const std::string& haystack, const std::string& needle) {
@@ -66,7 +65,7 @@ logger::MessageLogDomain* unittestOutput = logger::globalLogManager()->getNamedD
 
 typedef std::map<std::string, std::shared_ptr<Suite>> SuiteMap;
 
-inline SuiteMap& _allSuites() {
+SuiteMap& _allSuites() {
     static SuiteMap allSuites;
     return allSuites;
 }
@@ -75,6 +74,10 @@ inline SuiteMap& _allSuites() {
 
 logger::LogstreamBuilder log() {
     return LogstreamBuilder(unittestOutput, getThreadName(), logger::LogSeverity::Log());
+}
+
+logger::LogstreamBuilder warning() {
+    return LogstreamBuilder(unittestOutput, getThreadName(), logger::LogSeverity::Warning());
 }
 
 void setupTestLogger() {
@@ -94,17 +97,23 @@ public:
     Result(const std::string& name)
         : _name(name), _rc(0), _tests(0), _fails(), _asserts(0), _millis(0) {}
 
-    std::string toString() {
-        std::stringstream ss;
+    std::string toString() const {
+        char result[144];
+        size_t numWritten = std::snprintf(
+            result,
+            sizeof(result),
+            "%-40s | tests: %4d | fails: %4d | assert calls: %10d | time secs: %6.3f\n",
+            _name.c_str(),
+            _tests,
+            static_cast<int>(_fails.size()),
+            _asserts,
+            _millis / 1000.0);
 
-        char result[128];
-        sprintf(result,
-                "%-30s | tests: %4d | fails: %4d | assert calls: %10d | time secs: %6.3f\n",
-                _name.c_str(),
-                _tests,
-                static_cast<int>(_fails.size()),
-                _asserts,
-                _millis / 1000.0);
+        if (numWritten >= sizeof(result)) {
+            warning() << "Output for test " << _name << " was truncated";
+        }
+
+        std::stringstream ss;
         ss << result;
 
         for (const auto& i : _messages) {

@@ -77,6 +77,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point_service.h"
@@ -403,11 +404,11 @@ void runCommand(OperationContext* opCtx,
                 !readConcernArgs.getArgsAtClusterTime());
     }
 
-    boost::optional<ScopedRouterSession> scopedSession;
+    boost::optional<RouterOperationContextSession> routerSession;
     try {
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, commandName);
         if (osi.getAutocommit()) {
-            scopedSession.emplace(opCtx);
+            routerSession.emplace(opCtx);
 
             auto txnRouter = TransactionRouter::get(opCtx);
             invariant(txnRouter);
