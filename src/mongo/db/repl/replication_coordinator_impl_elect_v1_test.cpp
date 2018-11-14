@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
+#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -639,7 +640,6 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -648,8 +648,12 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
 
+    // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
+    const auto opCtx = makeOperationContext();
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
+
     ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
-                  getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
+                  getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
 
     ASSERT_FALSE(getReplCoord()->getMemberState().rollback());
 
@@ -1369,7 +1373,6 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
     // Update the current term to simulate a scenario where an election has occured
     // and some other node became the new primary. Once you hear about a primary election
@@ -1397,8 +1400,12 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
+    // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
+    const auto opCtx = makeOperationContext();
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
+
     // Transitioning to rollback state should cancel the takeover
-    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_ROLLBACK));
+    ASSERT_OK(replCoord->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
     ASSERT_TRUE(replCoord->getMemberState().rollback());
 
     stopCapturingLogMessages();

@@ -1492,7 +1492,7 @@ void rollback(OperationContext* opCtx,
     {
         ReplicationStateTransitionLockGuard transitionGuard(opCtx);
 
-        auto status = replCoord->setFollowerMode(MemberState::RS_ROLLBACK);
+        auto status = replCoord->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);
         if (!status.isOK()) {
             log() << "Cannot transition from " << replCoord->getMemberState().toString() << " to "
                   << MemberState(MemberState::RS_ROLLBACK).toString() << causedBy(status);

@@ -106,7 +106,11 @@ Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
     return Status::OK();
 }
 
-bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
+bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState(OperationContext* opCtx) const {
+    return isInPrimaryOrSecondaryState_UNSAFE();
+}
+
+bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState_UNSAFE() const {
     return _memberState.primary() || _memberState.secondary();
 }
 
@@ -249,6 +253,11 @@ HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
 Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     _memberState = newState;
     return Status::OK();
+}
+
+Status ReplicationCoordinatorMock::setFollowerModeStrict(OperationContext* opCtx,
+                                                         const MemberState& newState) {
+    return setFollowerMode(newState);
 }
 
 ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {

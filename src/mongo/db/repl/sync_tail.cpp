@@ -637,7 +637,8 @@ void fillWriterVectors(OperationContext* opCtx,
 void tryToGoLiveAsASecondary(OperationContext* opCtx,
                              ReplicationCoordinator* replCoord,
                              OpTime minValid) {
-    if (replCoord->isInPrimaryOrSecondaryState()) {
+    // Check to see if we can immediately return without taking any locks.
+    if (replCoord->isInPrimaryOrSecondaryState_UNSAFE()) {
         return;
     }
 
@@ -646,6 +647,11 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
 
     // Need the RSTL in mode X to transition to SECONDARY
     ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+
+    // Check if we are primary or secondary again now that we have the RSTL in mode X.
+    if (replCoord->isInPrimaryOrSecondaryState(opCtx)) {
+        return;
+    }
 
     // Maintenance mode will force us to remain in RECOVERING state, no matter what.
     if (replCoord->getMaintenanceMode()) {

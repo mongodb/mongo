@@ -111,7 +111,9 @@ public:
 
     virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
 
-    virtual bool isInPrimaryOrSecondaryState() const override;
+    virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;
+
+    virtual bool isInPrimaryOrSecondaryState_UNSAFE() const override;
 
     virtual Seconds getSlaveDelaySecs() const override;
 
@@ -171,6 +173,9 @@ public:
     virtual HostAndPort getMyHostAndPort() const override;
 
     virtual Status setFollowerMode(const MemberState& newState) override;
+
+    virtual Status setFollowerModeStrict(OperationContext* opCtx,
+                                         const MemberState& newState) override;
 
     virtual ApplierState getApplierState() override;
 
@@ -348,7 +353,7 @@ public:
     executor::TaskExecutor::CallbackHandle getCatchupTakeoverCbh_forTest() const;
 
     /**
-     * Simple wrappers around _setLastOptime_inlock to make it easier to test.
+     * Simple wrappers around _setLastOptime to make it easier to test.
      */
     Status setLastAppliedOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
     Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
@@ -555,7 +560,49 @@ private:
         std::unique_ptr<CallbackWaiter> _waiter;
     };
 
-    void _resetMyLastOpTimes_inlock();
+    // Inner class to manage the concurrency of _canAcceptNonLocalWrites and _canServeNonLocalReads.
+    class ReadWriteAbility {
+    public:
+        ReadWriteAbility(bool canAcceptNonLocalWrites)
+            : _canAcceptNonLocalWrites(canAcceptNonLocalWrites), _canServeNonLocalReads(0U) {}
+
+        // Asserts ReplicationStateTransitionLock is held in mode X.
+        void setCanAcceptNonLocalWrites(WithLock, OperationContext* opCtx, bool newVal);
+
+        bool canAcceptNonLocalWrites(WithLock) const;
+        bool canAcceptNonLocalWrites_UNSAFE() const;  // For early errors.
+
+        // Asserts ReplicationStateTransitionLock is held in an intent or exclusive mode.
+        bool canAcceptNonLocalWrites(OperationContext* opCtx) const;
+
+        bool canServeNonLocalReads_UNSAFE() const;
+
+        // Asserts ReplicationStateTransitionLock is held in an intent or exclusive mode.
+        bool canServeNonLocalReads(OperationContext* opCtx) const;
+
+        // Asserts ReplicationStateTransitionLock is held in mode X.
+        void setCanServeNonLocalReads(OperationContext* opCtx, unsigned int newVal);
+
+        void setCanServeNonLocalReads_UNSAFE(unsigned int newVal);
+
+    private:
+        // Flag that indicates whether writes to databases other than "local" are allowed.  Used to
+        // answer canAcceptWritesForDatabase() and canAcceptWritesFor() questions. In order to read
+        // it, must have either the RSTL in some intent mode or the replication coordinator mutex.
+        // To set it, must have both the RSTL in mode X and the replication coordinator mutex.
+        // Always true for standalone nodes.
+        bool _canAcceptNonLocalWrites;
+
+        // Flag that indicates whether reads from databases other than "local" are allowed. Unlike
+        // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries.
+        // Accidentally providing the prior value for a limited period of time is acceptable, except
+        // during rollback. In order to read it, must have the RSTL in some intent mode. To set it
+        // when transitioning into RS_ROLLBACK, must have the RSTL in mode X. Otherwise, no lock or
+        // mutex is necessary to set it.
+        AtomicUInt32 _canServeNonLocalReads;
+    };
+
+    void _resetMyLastOpTimes(WithLock lk);
 
     /**
      * Returns the _writeConcernMajorityJournalDefault of our current _rsConfig.
@@ -584,9 +631,10 @@ private:
      * Returns an action to be performed after unlocking _mutex, via
      * _performPostMemberStateUpdateAction.
      */
-    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(OperationContext* opCtx,
-                                                           const ReplSetConfig& newConfig,
-                                                           int myIndex);
+    PostMemberStateUpdateAction _setCurrentRSConfig(WithLock lk,
+                                                    OperationContext* opCtx,
+                                                    const ReplSetConfig& newConfig,
+                                                    int myIndex);
 
     /**
      * Helper to wake waiters in _replicationWaiterList that are doneWaitingForReplication.
@@ -644,8 +692,9 @@ private:
      * "configVersion" will be populated with our config version if it and the configVersion
      * of "args" differ.
      */
-    Status _setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args,
-                                 long long* configVersion);
+    Status _setLastOptime(WithLock lk,
+                          const UpdatePositionArgs::UpdateInfo& args,
+                          long long* configVersion);
 
     /**
      * This function will report our position externally (like upstream) if necessary.
@@ -659,10 +708,11 @@ private:
     /**
      * Helpers to set the last applied and durable OpTime.
      */
-    void _setMyLastAppliedOpTime_inlock(const OpTime& opTime,
-                                        bool isRollbackAllowed,
-                                        DataConsistency consistency);
-    void _setMyLastDurableOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
+    void _setMyLastAppliedOpTime(WithLock lk,
+                                 const OpTime& opTime,
+                                 bool isRollbackAllowed,
+                                 DataConsistency consistency);
+    void _setMyLastDurableOpTime(WithLock lk, const OpTime& opTime, bool isRollbackAllowed);
 
     /**
      * Schedules a heartbeat to be sent to "target" at "when". "targetIndex" is the index
@@ -719,6 +769,13 @@ private:
 
 
     MemberState _getMemberState_inlock() const;
+
+    /**
+     * Helper method for setting this node to a specific follower mode.
+     *
+     * Note: The opCtx may be null, but must be non-null if the new state is RS_ROLLBACK.
+     */
+    Status _setFollowerMode(OperationContext* opCtx, const MemberState& newState);
 
     /**
      * Starts loading the replication configuration from local storage, and if it is valid,
@@ -784,8 +841,8 @@ private:
      * Note: opCtx may be null as currently not all paths thread an OperationContext all the way
      * down, but it must be non-null for any calls that change _canAcceptNonLocalWrites.
      */
-    PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator_inlock(
-        OperationContext* opCtx);
+    PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator(WithLock lk,
+                                                                          OperationContext* opCtx);
 
     /**
      * Performs a post member-state update action.  Do not call while holding _mutex.
@@ -904,7 +961,7 @@ private:
      * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
      * current last committed OpTime.
      */
-    void _advanceCommitPoint_inlock(const OpTime& committedOpTime);
+    void _advanceCommitPoint(WithLock lk, const OpTime& committedOpTime);
 
     /**
      * Scan the memberData and determine the highest last applied or last
@@ -915,7 +972,7 @@ private:
      * Whether the last applied or last durable op time is used depends on whether
      * the config getWriteConcernMajorityShouldJournal is set.
      */
-    void _updateLastCommittedOpTime_inlock();
+    void _updateLastCommittedOpTime(WithLock lk);
 
     /**
      * Callback that attempts to set the current term in topology coordinator and
@@ -960,15 +1017,16 @@ private:
      * A helper method that returns the current stable optime based on the current commit point and
      * set of stable optime candidates.
      */
-    boost::optional<OpTime> _getStableOpTime_inlock();
+    boost::optional<OpTime> _getStableOpTime(WithLock lk);
 
     /**
      * Calculates the 'stable' replication optime given a set of optime candidates and the
      * current commit point. The stable optime is the greatest optime in 'candidates' that is
      * also less than or equal to 'commitPoint'.
      */
-    boost::optional<OpTime> _calculateStableOpTime_inlock(const std::set<OpTime>& candidates,
-                                                          const OpTime& commitPoint);
+    boost::optional<OpTime> _calculateStableOpTime(WithLock lk,
+                                                   const std::set<OpTime>& candidates,
+                                                   const OpTime& commitPoint);
 
     /**
      * Removes any optimes from the optime set 'candidates' that are less than
@@ -981,7 +1039,7 @@ private:
      * See ReplicationCoordinatorImpl::_calculateStableOpTime for a definition of 'stable', in
      * this context.
      */
-    void _setStableTimestampForStorage_inlock();
+    void _setStableTimestampForStorage(WithLock lk);
 
     /**
      * Drops all snapshots and clears the "committed" snapshot.
@@ -1106,8 +1164,6 @@ private:
     // (PS) Pointer is read-only in concurrent operation, item pointed to is self-synchronizing;
     //      Access in any context.
     // (M)  Reads and writes guarded by _mutex
-    // (GM) Readable under any global intent lock or _mutex.  Must hold both the global lock in
-    //      exclusive mode (MODE_X) and hold _mutex to write.
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
@@ -1191,17 +1247,8 @@ private:
     // Whether we slept last time we attempted an election but possibly tied with other nodes.
     bool _sleptLastElection;  // (M)
 
-    // Flag that indicates whether writes to databases other than "local" are allowed.  Used to
-    // answer canAcceptWritesForDatabase() and canAcceptWritesFor() questions.
-    // Always true for standalone nodes.
-    bool _canAcceptNonLocalWrites;  // (GM)
-
-    // Flag that indicates whether reads from databases other than "local" are allowed.  Unlike
-    // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries,
-    // and we do not require that its observers be strongly synchronized.  Accidentally
-    // providing the prior value for a limited period of time is acceptable.  Also unlike
-    // _canAcceptNonLocalWrites, its value is only meaningful on replica set secondaries.
-    AtomicUInt32 _canServeNonLocalReads;  // (S)
+    // Used to manage the concurrency around _canAcceptNonLocalWrites and _canServeNonLocalReads.
+    std::unique_ptr<ReadWriteAbility> _readWriteAbility;  // (S)
 
     // ReplicationProcess used to hold information related to the replication and application of
     // operations from the sync source.

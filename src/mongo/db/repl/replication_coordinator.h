@@ -158,8 +158,13 @@ public:
      * This method may be optimized to reduce synchronization overhead compared to
      * reading the current member state with getMemberState().
      */
-    virtual bool isInPrimaryOrSecondaryState() const = 0;
+    virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const = 0;
 
+    /**
+     * Version which does not check for the RSTL. Without the RSTL, the return value may be
+     * inaccurate by the time the function returns.
+     */
+    virtual bool isInPrimaryOrSecondaryState_UNSAFE() const = 0;
 
     /**
      * Returns how slave delayed this node is configured to be, or 0 seconds if this node is not a
@@ -216,9 +221,8 @@ public:
     virtual bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName) = 0;
 
     /**
-     * Version which does not check for the global lock.  Do not use in new code.
-     * Without the global lock held, the return value may be inaccurate by the time
-     * the function returns.
+     * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL, the
+     * return value may be inaccurate by the time the function returns.
      */
     virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx, StringData dbName) = 0;
 
@@ -231,9 +235,8 @@ public:
     virtual bool canAcceptWritesFor(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
-     * Version which does not check for the global lock.  Do not use in new code.
-     * Without the global lock held, the return value may be inaccurate by the time
-     * the function returns.
+     * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
+     * the return value may be inaccurate by the time the function returns.
      */
     virtual bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
@@ -257,9 +260,8 @@ public:
                                          bool slaveOk) = 0;
 
     /**
-     * Version which does not check for the global lock.  Do not use in new code.
-     * Without the global lock held, the return value may be inaccurate by the time
-     * the function returns.
+     * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
+     * the return value may be inaccurate by the time the function returns.
      */
     virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                 const NamespaceString& ns,
@@ -401,6 +403,13 @@ public:
      * application process.
      */
     virtual Status setFollowerMode(const MemberState& newState) = 0;
+
+    /**
+     * Version which checks for the RSTL in mode X before setting this node into a specific follower
+     * mode. This is used for transitioning to RS_ROLLBACK so that we can conflict with readers
+     * holding the RSTL in intent mode.
+     */
+    virtual Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState) = 0;
 
     /**
      * Step-up

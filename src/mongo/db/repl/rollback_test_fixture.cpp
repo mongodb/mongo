@@ -138,6 +138,11 @@ Status RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerMode(
     return ReplicationCoordinatorMock::setFollowerMode(newState);
 }
 
+Status RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerModeStrict(
+    OperationContext* opCtx, const MemberState& newState) {
+    return setFollowerMode(newState);
+}
+
 std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
                                                       Timestamp ts,
                                                       UUID uuid,

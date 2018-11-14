@@ -180,7 +180,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
             // Arbiters are the only nodes allowed to advance their commit point via heartbeats.
             if (_getMemberState_inlock().arbiter()) {
-                _advanceCommitPoint_inlock(lastOpCommitted);
+                _advanceCommitPoint(lk, lastOpCommitted);
             }
             // Asynchronous stepdown could happen, but it will wait for _mutex and execute
             // after this function, so we cannot and don't need to wait for it to finish.
@@ -217,7 +217,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         hbStatusResponse.getValue().hasState() &&
         hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
         action.getAdvancedOpTime()) {
-        _updateLastCommittedOpTime_inlock();
+        _updateLastCommittedOpTime(lk);
     }
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.
@@ -251,7 +251,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             // Update the cached member state if different than the current topology member state
             if (_memberState != _topCoord->getMemberState()) {
                 const PostMemberStateUpdateAction postUpdateAction =
-                    _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
+                    _updateMemberStateFromTopologyCoordinator(lock, nullptr);
                 lock.unlock();
                 _performPostMemberStateUpdateAction(postUpdateAction);
                 lock.lock();
@@ -390,7 +390,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     _topCoord->finishUnconditionalStepDown();
-    const auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx.get());
+    const auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx.get());
     if (_pendingTermUpdateDuringStepDown) {
         TopologyCoordinator::UpdateTermResult result;
         _updateTerm_inlock(*_pendingTermUpdateDuringStepDown, &result);
@@ -612,7 +612,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
     const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndexValue);
+        _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 }

@@ -81,7 +81,9 @@ public:
 
     virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
 
-    virtual bool isInPrimaryOrSecondaryState() const;
+    virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const;
+
+    virtual bool isInPrimaryOrSecondaryState_UNSAFE() const;
 
     virtual Seconds getSlaveDelaySecs() const;
 
@@ -144,6 +146,8 @@ public:
     virtual HostAndPort getMyHostAndPort() const;
 
     virtual Status setFollowerMode(const MemberState& newState);
+
+    virtual Status setFollowerModeStrict(OperationContext* opCtx, const MemberState& newState);
 
     virtual ApplierState getApplierState();
 

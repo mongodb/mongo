@@ -300,7 +300,8 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
     {
         ReplicationStateTransitionLockGuard transitionGuard(opCtx);
 
-        auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_ROLLBACK);
+        auto status =
+            _replicationCoordinator->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);
         if (!status.isOK()) {
             status.addContext(str::stream() << "Cannot transition from "
                                             << _replicationCoordinator->getMemberState().toString()
