@@ -5924,6 +5924,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharded_multi_stmt_txn_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: parallel
   depends_on:
   - name: jsCore
@@ -8800,6 +8811,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_core_txns
   - name: sharded_core_txns_sharded_collections
+  - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_0
   - name: sharding_1
   - name: sharding_2
@@ -11803,6 +11815,9 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_core_txns
   - name: sharded_core_txns_sharded_collections
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
   - name: sharding_0
     distros:
     - rhel62-large
@@ -12821,6 +12836,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_core_txns
   - name: sharded_core_txns_sharded_collections
+  - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -15144,6 +15160,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_core_txns
   - name: sharded_core_txns_sharded_collections
+  - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -15333,6 +15350,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_core_txns
   - name: sharded_core_txns_sharded_collections
+  - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
