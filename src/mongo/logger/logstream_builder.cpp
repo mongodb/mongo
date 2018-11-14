@@ -88,13 +88,6 @@ LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
       _tee(nullptr),
       _shouldCache(shouldCache) {}
 
-LogstreamBuilder::LogstreamBuilder(logger::MessageLogDomain* domain,
-                                   StringData contextName,
-                                   LabeledLevel labeledLevel)
-    : LogstreamBuilder(domain, contextName, static_cast<LogSeverity>(labeledLevel)) {
-    setBaseMessage(labeledLevel.getLabel());
-}
-
 LogstreamBuilder::~LogstreamBuilder() {
     if (_os) {
         if (!_baseMessage.empty())

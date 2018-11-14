@@ -60,8 +60,7 @@ public:
     /**
      * Casts an integer to a severity.
      *
-     * Do not use this.  It exists to enable a handful of leftover uses of LOG(0) and the
-     * deprecated LabeledLevel.
+     * Do not use this.  It exists to enable a handful of leftover uses of LOG(0).
      */
     static inline LogSeverity cast(int);
 

@@ -79,7 +79,6 @@ Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
 namespace {
 
 using logger::LogstreamBuilder;
-using logger::LabeledLevel;
 using logger::Tee;
 
 /**

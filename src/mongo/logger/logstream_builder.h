@@ -37,7 +37,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/logger/labeled_level.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/message_log_domain.h"
@@ -59,9 +58,6 @@ public:
     }
     static LogSeverity severityCast(LogSeverity ls) {
         return ls;
-    }
-    static LabeledLevel severityCast(const LabeledLevel& labeled) {
-        return labeled;
     }
 
     /**
@@ -89,11 +85,6 @@ public:
                      LogSeverity severity,
                      LogComponent component,
                      bool shouldCache = true);
-
-    /**
-     * Deprecated.
-     */
-    LogstreamBuilder(MessageLogDomain* domain, StringData contextName, LabeledLevel labeledLevel);
 
     LogstreamBuilder(LogstreamBuilder&& other) = default;
     LogstreamBuilder& operator=(LogstreamBuilder&& other) = default;
