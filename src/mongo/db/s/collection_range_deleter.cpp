@@ -63,6 +63,14 @@
 
 namespace mongo {
 
+MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchSize, int, 0)
+    ->withValidator([](const int& newVal) {
+        if (newVal < 0) {
+            return Status(ErrorCodes::BadValue, "rangeDeleterBatchSize must not be negative");
+        }
+        return Status::OK();
+    });
+
 MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchDelayMS, int, 20)
     ->withValidator([](const int& newVal) {
         if (newVal < 0) {
@@ -108,6 +116,13 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     OID const& epoch,
     int maxToDelete,
     CollectionRangeDeleter* forTestOnly) {
+
+    if (maxToDelete <= 0) {
+        maxToDelete = rangeDeleterBatchSize.load();
+        if (maxToDelete <= 0) {
+            maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
+        }
+    }
 
     StatusWith<int> wrote = 0;
 

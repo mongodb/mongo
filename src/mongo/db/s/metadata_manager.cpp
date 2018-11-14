@@ -149,11 +149,9 @@ void scheduleCleanup(executor::TaskExecutor* executor,
             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
-            const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
-
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(suspendRangeDeletion);
 
-            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, epoch, maxToDelete);
+            auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, epoch);
             if (next) {
                 scheduleCleanup(executor, std::move(nss), std::move(epoch), *next);
             }

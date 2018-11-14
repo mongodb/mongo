@@ -44,6 +44,12 @@ class BSONObj;
 class Collection;
 class OperationContext;
 
+// The maximum number of documents to delete in a single batch during range deletion.
+// secondaryThrottle and rangeDeleterBatchDelayMS apply between each batch.
+// Must be positive or 0 (the default), which means to use the value of
+// internalQueryExecYieldIterations (or 1 if that's negative or zero).
+extern AtomicInt32 rangeDeleterBatchSize;
+
 // After completing a batch of document deletions, the time in millis to wait before commencing the
 // next batch of deletions.
 extern AtomicInt32 rangeDeleterBatchDelayMS;
@@ -166,13 +172,15 @@ public:
      * If it should be scheduled to run again because there might be more documents to delete,
      * returns the time to begin, or boost::none otherwise.
      *
+     * Negative (or zero) value for 'maxToDelete' indicates some canonical default should be used.
+     *
      * Argument 'forTestOnly' is used in unit tests that exercise the CollectionRangeDeleter class,
      * so that they do not need to set up CollectionShardingState and MetadataManager objects.
      */
     static boost::optional<Date_t> cleanUpNextRange(OperationContext*,
                                                     NamespaceString const& nss,
                                                     OID const& epoch,
-                                                    int maxToDelete,
+                                                    int maxToDelete = 0,
                                                     CollectionRangeDeleter* forTestOnly = nullptr);
 
 private:
