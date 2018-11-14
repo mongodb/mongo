@@ -267,8 +267,14 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     return kpBuilder.obj();
 }
 
-// After completing internalQueryExecYieldIterations document deletions, the time in millis to wait
-// before continuing deletions.
+// The maximum number of documents to delete in a single batch during range deletion.
+// secondaryThrottle and rangeDeleterBatchDelayMS apply between each batch.
+// Negative values or 0 (the default) means to use the value of internalQueryExecYieldIterations
+// (or 1 if that's negative or zero).
+MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchSize, int, 0);
+
+// After completing rangeDeleterBatchSize document deletions, the time in millis to wait before
+// continuing deletions.
 MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchDelayMS, int, 20);
 
 long long Helpers::removeRange(OperationContext* txn,
@@ -337,7 +343,10 @@ long long Helpers::removeRange(OperationContext* txn,
 
     while (1) {
         long long numDeletedPreviously = numDeleted;
-        long long iterationsBetweenSleeps = internalQueryExecYieldIterations.load();
+        long long iterationsBetweenSleeps = rangeDeleterBatchSize.load();
+        if (iterationsBetweenSleeps <= 0) {
+            iterationsBetweenSleeps = std::max(int(internalQueryExecYieldIterations.load()), 1);
+        }
         long long batchSize = writeConcern.shouldWaitForOtherNodes() ? 1 : iterationsBetweenSleeps;
 
         // Scoping for write lock.
@@ -491,7 +500,7 @@ long long Helpers::removeRange(OperationContext* txn,
             }
 
             // The `rangeDeleterBatchDelayMS` parameter is defined as a delay every
-            // `internalQueryExecYieldIterations` (aka `batchSize`) document deletions.
+            // `rangeDeleterBatchSize` (aka `batchSize`) document deletions.
             //
             // In v3.6+, this applies regardless of waiting for replication (aka
             // _secondaryThrottle), because in those versions the replication waits and query
