@@ -1,5 +1,18 @@
 /**
  * Use prototype overrides to set read concern and write concern while running tests.
+ *
+ * A test can override the default read and write concern of commands by loading this library before
+ * the test is run and setting the 'TestData.defaultReadConcernLevel' or
+ * 'TestData.defaultWriteConcern' variables with the desired read/write concern level. For example,
+ * setting:
+ *
+ * TestData.defaultReadConcernLevel = "majority"
+ * TestData.writeConcernLevel = {w: "majority"}
+ *
+ * will run all commands with read/write concern "majority". It is also possible to only override
+ * the write concern of commands, by setting 'TestData.defaultReadConcernLevel' = null. This will
+ * not affect the default read concern of commands in any way.
+ *
  */
 (function() {
     "use strict";
@@ -12,6 +25,8 @@
             " property on the global TestData object");
     }
 
+    // If the default read concern level is null, that indicates that no read concern overrides
+    // should be applied.
     const kDefaultReadConcern = {level: TestData.defaultReadConcernLevel};
     const kDefaultWriteConcern =
         (TestData.hasOwnProperty("defaultWriteConcern")) ? TestData.defaultWriteConcern : {
@@ -164,7 +179,8 @@
 
         const inWrappedForm = commandObj !== commandObjUnwrapped;
 
-        if (shouldForceReadConcern) {
+        // Only override read concern if an override level was specified.
+        if (shouldForceReadConcern && (kDefaultReadConcern.level !== null)) {
             // We create a copy of 'commandObj' to avoid mutating the parameter the caller
             // specified.
             commandObj = Object.assign({}, commandObj);
