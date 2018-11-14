@@ -157,7 +157,7 @@ bool useDefaultECKey(SSL_CTX* const ctx) {
     UniqueEC_KEY key(EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
 
     if (key) {
-        return ::SSL_CTX_set_tmp_ecdh(ctx, key.get()) == 1;
+        return SSL_CTX_set_tmp_ecdh(ctx, key.get()) == 1;
     }
 #endif
     return false;
@@ -168,12 +168,15 @@ bool useDefaultECKey(SSL_CTX* const ctx) {
 // If that fails, ECDHE will not be enabled.
 void enableECDHE(SSL_CTX* const ctx) {
 #ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
-    ::SSL_CTX_set_ecdh_auto(ctx, true);
-#else
+    SSL_CTX_set_ecdh_auto(ctx, true);
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L || \
+    (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)
     // SSL_CTRL_SET_ECDH_AUTO is defined to be 94 in OpenSSL 1.0.2. On RHEL 7, Mongo could be built
     // against 1.0.1 but actually linked with 1.0.2 at runtime. The define may not be present, but
-    // this call could actually enable auto ecdh.
-    if (::SSL_CTX_ctrl(ctx, 94, 1, NULL) != 1) {
+    // this call could actually enable auto ecdh. We also ensure the OpenSSL version is sufficiently
+    // old to protect against future versions where SSL_CTX_set_ecdh_auto could be removed and 94
+    // ctrl code could be repurposed.
+    if (SSL_CTX_ctrl(ctx, 94, 1, NULL) != 1) {
         // If manually setting the configuration option failed, use a hard coded curve
         if (!useDefaultECKey(ctx)) {
             error() << "Failed to enable ECDHE.";
