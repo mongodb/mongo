@@ -163,6 +163,76 @@ TEST(Future_EdgeCases, interrupted_wait_then_then_with_bgthread) {
     std::move(future).then([] {}).get();
 }
 
+TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_emplaceValue) {
+    SharedPromise<void> sp;
+    std::vector<Future<void>> futs;
+    futs.reserve(30);
+
+    // Note, this is intentionally somewhat racy. async() is defined to sleep 100ms before running
+    // the function so the first batch of futures will generally block before getting the value is
+    // emplaced, and the second batch will happen around the same time. In all cases the final batch
+    // happen after the emplaceValue(), but roughly at the same time. Under TSAN the sleep is
+    // removed to allow it to find more interesting interleavings, and give it a better chance at
+    // detecting data races.
+
+    for (int i = 0; i < 10; i++) {
+        futs.push_back(async([&] { sp.getFuture().get(); }));
+    }
+
+    sleepUnlessInTsan();
+
+    for (int i = 0; i < 10; i++) {
+        futs.push_back(async([&] { sp.getFuture().get(); }));
+    }
+
+    sleepUnlessInTsan();
+
+    sp.emplaceValue();
+
+    for (int i = 0; i < 10; i++) {
+        futs.push_back(async([&] { sp.getFuture().get(); }));
+    }
+
+    for (auto& fut : futs) {
+        fut.get();
+    }
+}
+
+TEST(Future_EdgeCases, Racing_SharePromise_getFuture_and_setError) {
+    SharedPromise<void> sp;
+    std::vector<Future<void>> futs;
+    futs.reserve(30);
+
+    // Note, this is intentionally somewhat racy. async() is defined to sleep 100ms before running
+    // the function so the first batch of futures will generally block before getting the value is
+    // emplaced, and the second batch will happen around the same time. In all cases the final batch
+    // happen after the emplaceValue(), but roughly at the same time. Under TSAN the sleep is
+    // removed to allow it to find more interesting interleavings, and give it a better chance at
+    // detecting data races.
+
+    for (int i = 0; i < 10; i++) {
+        futs.push_back(async([&] { sp.getFuture().get(); }));
+    }
+
+    sleepUnlessInTsan();
+
+    for (int i = 0; i < 10; i++) {
+        futs.push_back(async([&] { sp.getFuture().get(); }));
+    }
+
+    sleepUnlessInTsan();
+
+    sp.setError(failStatus());
+
+    for (int i = 0; i < 10; i++) {
+        futs.push_back(async([&] { sp.getFuture().get(); }));
+    }
+
+    for (auto& fut : futs) {
+        ASSERT_EQ(fut.getNoThrow(), failStatus());
+    }
+}
+
 // Make sure we actually die if someone throws from the getAsync callback.
 //
 // With gcc 5.8 we terminate, but print "terminate() called. No exception is active". This works in

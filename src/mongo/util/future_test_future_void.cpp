@@ -68,6 +68,16 @@ TEST(Future_Void, Success_getNothrowRvalue) {
         [] {}, [](Future<void>&& fut) { ASSERT_EQ(std::move(fut).getNoThrow(), Status::OK()); });
 }
 
+TEST(Future_Void, Success_shared_get) {
+    FUTURE_SUCCESS_TEST([] {}, [](Future<void>&& fut) { std::move(fut).share().get(); });
+}
+
+TEST(Future_Void, Success_shared_getNothrow) {
+    FUTURE_SUCCESS_TEST(
+        [] {},
+        [](Future<void>&& fut) { ASSERT_EQ(std::move(fut).share().getNoThrow(), Status::OK()); });
+}
+
 TEST(Future_Void, Success_getAsync) {
     FUTURE_SUCCESS_TEST(
         [] {},
@@ -106,6 +116,16 @@ TEST(Future_Void, Fail_getNothrowConstLvalue) {
 TEST(Future_Void, Fail_getNothrowRvalue) {
     FUTURE_FAIL_TEST<void>(
         [](Future<void>&& fut) { ASSERT_EQ(std::move(fut).getNoThrow(), failStatus()); });
+}
+
+TEST(Future_Void, Fail_share_getRvalue) {
+    FUTURE_FAIL_TEST<void>(
+        [](Future<void>&& fut) { ASSERT_THROWS_failStatus(std::move(fut).share().get()); });
+}
+
+TEST(Future_Void, Fail_share_getNothrow) {
+    FUTURE_FAIL_TEST<void>(
+        [](Future<void>&& fut) { ASSERT_EQ(std::move(fut).share().getNoThrow(), failStatus()); });
 }
 
 TEST(Future_Void, Fail_getAsync) {
@@ -149,9 +169,21 @@ TEST(Future_Void, Fail_isReady) {
 TEST(Future_Void, isReady_TSAN_OK) {
     bool done = false;
     auto fut = async([&] { done = true; });
+    //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
     while (!fut.isReady()) {
     }
-    // ASSERT(done);  // Data Race! Uncomment to make sure TSAN is working.
+    ASSERT(done);
+    fut.get();
+    ASSERT(done);
+}
+
+TEST(Future_Void, isReady_share_TSAN_OK) {
+    bool done = false;
+    auto fut = async([&] { done = true; }).share();
+    //(void)*const_cast<volatile bool*>(&done);  // Data Race! Uncomment to make sure TSAN works.
+    while (!fut.isReady()) {
+    }
+    ASSERT(done);
     fut.get();
     ASSERT(done);
 }

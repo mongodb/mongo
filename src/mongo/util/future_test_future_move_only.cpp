@@ -90,6 +90,11 @@ TEST(Future_MoveOnly, Success_getRvalue) {
                         [](Future<Widget>&& fut) { ASSERT_EQ(std::move(fut).get(), 1); });
 }
 
+TEST(Future_MoveOnly, Success_shared_get) {
+    FUTURE_SUCCESS_TEST([] { return Widget(1); },
+                        [](Future<Widget>&& fut) { ASSERT_EQ(std::move(fut).share().get(), 1); });
+}
+
 #if 0  // Needs copy
 TEST(Future_MoveOnly, Success_getNothrowLvalue) {
     FUTURE_SUCCESS_TEST([] { return Widget(1); },
@@ -99,6 +104,12 @@ TEST(Future_MoveOnly, Success_getNothrowLvalue) {
 TEST(Future_MoveOnly, Success_getNothrowConstLvalue) {
     FUTURE_SUCCESS_TEST([] { return Widget(1); },
                         [](const Future<Widget>& fut) { ASSERT_EQ(fut.getNoThrow(), 1); });
+}
+
+TEST(Future_MoveOnly, Success_shared_getNothrow) {
+    FUTURE_SUCCESS_TEST(
+        [] { return Widget(1); },
+        [](Future<Widget>&& fut) { ASSERT_EQ(std::move(fut).share().getNoThrow(), 1); });
 }
 #endif
 
@@ -136,6 +147,11 @@ TEST(Future_MoveOnly, Fail_getRvalue) {
         [](Future<Widget>&& fut) { ASSERT_THROWS_failStatus(std::move(fut).get()); });
 }
 
+TEST(Future_MoveOnly, Fail_shared_get) {
+    FUTURE_FAIL_TEST<Widget>(
+        [](Future<Widget>&& fut) { ASSERT_THROWS_failStatus(std::move(fut).share().get()); });
+}
+
 #if 0  // Needs copy
 TEST(Future_MoveOnly, Fail_getNothrowLvalue) {
     FUTURE_FAIL_TEST<Widget>([](Future<Widget>&& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus); });
@@ -144,6 +160,12 @@ TEST(Future_MoveOnly, Fail_getNothrowLvalue) {
 TEST(Future_MoveOnly, Fail_getNothrowConstLvalue) {
     FUTURE_FAIL_TEST<Widget>(
         [](const Future<Widget>& fut) { ASSERT_EQ(fut.getNoThrow(), failStatus); });
+}
+
+TEST(Future_MoveOnly, Fail_shared_getNothrow) {
+    FUTURE_FAIL_TEST<Widget>([](Future<Widget>&& fut) {
+        ASSERT_EQ(std::move(fut).share().getNoThrow().getStatus(), failStatus());
+    });
 }
 #endif
 
