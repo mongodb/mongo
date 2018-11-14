@@ -111,6 +111,7 @@ selector:
   - jstests/concurrency/fsm_workloads/database_versioning.js
 
   exclude_with_any_tags:
+  # This suite uses secondary read preference, which isn't currently compatible with transactions.
   - uses_transactions
   - assumes_balancer_off
   - requires_replication

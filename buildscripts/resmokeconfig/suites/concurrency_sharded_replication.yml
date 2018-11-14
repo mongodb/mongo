@@ -105,8 +105,21 @@ selector:
   # TODO Unblacklist (SERVER-35538).
   - jstests/concurrency/fsm_workloads/database_versioning.js
 
+  # serverStatus does not include transaction metrics on mongos.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+
+  # Uses the same transaction id across different routers, which is not allowed because when either
+  # router tries to commit, it may not know the full participant list.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+
+  # TODO SERVER-38190: Killing an operation committing a prepared txn can crash.
+  # TODO SERVER-38297: Killing session on a secondary applying a prepare oplog entry can crash.
+  # TODO SERVER-38299: Killing an operation preparing a transaction can crash.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+
   exclude_with_any_tags:
-  - uses_transactions
   - requires_replication
 
 executor:
@@ -140,6 +153,10 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # TODO SERVER-38302: Write noops to avoid hangs if the stable timestamp does not advance
+        # when the oldest prepared transaction commits or aborts.
+        periodicNoopIntervalSecs: 1
+        writePeriodicNoops: true
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

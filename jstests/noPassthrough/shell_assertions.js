@@ -628,6 +628,19 @@
         assert.throws(() => assert.sameMembers([new Timestamp(0, 1)], [new Timestamp(0, 2)]));
     });
 
+    tests.push(function sameMembersFailsWithCustomCompareFn() {
+        const compareBinaryEqual = (a, b) => bsonBinaryEqual(a, b);
+        assert.throws(() => {
+            assert.sameMembers([NumberLong(1)], [1], undefined /*msg*/, compareBinaryEqual);
+        });
+        assert.throws(() => {
+            assert.sameMembers([NumberLong(1), NumberInt(2)],
+                               [2, NumberLong(1)],
+                               undefined /*msg*/,
+                               compareBinaryEqual);
+        });
+    });
+
     tests.push(function sameMembersDoesNotSortNestedArrays() {
         assert.throws(() => assert.sameMembers([[1, 2]], [[2, 1]]));
         assert.throws(() => {
@@ -688,6 +701,19 @@
         assert.sameMembers([undefined], [undefined]);
         assert.sameMembers(["a"], ["a"]);
         assert.sameMembers([null, undefined, "a"], [undefined, "a", null]);
+    });
+
+    tests.push(function sameMembersDefaultCompareIsFriendly() {
+        assert.sameMembers([NumberLong(1), NumberInt(2)], [2, 1]);
+    });
+
+    tests.push(function sameMembersPassesWithCustomCompareFn() {
+        const compareBinaryEqual = (a, b) => bsonBinaryEqual(a, b);
+        assert.sameMembers([[1, 2]], [[1, 2]], undefined /*msg*/, compareBinaryEqual);
+        assert.sameMembers([NumberLong(1), NumberInt(2)],
+                           [NumberInt(2), NumberLong(1)],
+                           undefined /*msg*/,
+                           compareBinaryEqual);
     });
 
     /* main */

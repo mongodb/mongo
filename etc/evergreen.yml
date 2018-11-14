@@ -5979,6 +5979,24 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: concurrency_sharded_replication_no_txns
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_replication --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_sharded_replication_no_txns_with_balancer
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_replication_with_balancer --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: concurrency_sharded_causal_consistency
   commands:
   - func: "do setup"
@@ -12158,8 +12176,8 @@ buildvariants:
     distros:
     - rhel62-large
   - name: concurrency_replication_multi_stmt_txn
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
+  - name: concurrency_sharded_replication_no_txns
+  - name: concurrency_sharded_replication_no_txns_with_balancer
   - name: concurrency_sharded_causal_consistency
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_simultaneous

@@ -301,6 +301,19 @@ var Cluster = function(options) {
         });
     };
 
+    this.synchronizeMongosClusterTimes = function synchronizeMongosClusterTimes() {
+        const contactConfigServerFn = ((mongosConn) => {
+            // The admin database is hosted on the config server.
+            assert.commandWorked(mongosConn.adminCommand({find: "foo"}));
+        });
+
+        // After the first iteration, the config server will have been gossiped the highest cluster
+        // time any mongos has seen. After the second iteration, each mongos should have been
+        // gossiped this time as well.
+        this.executeOnMongosNodes(contactConfigServerFn);
+        this.executeOnMongosNodes(contactConfigServerFn);
+    };
+
     this.teardown = function teardown() {
         assert(initialized, 'cluster must be initialized first');
         options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);

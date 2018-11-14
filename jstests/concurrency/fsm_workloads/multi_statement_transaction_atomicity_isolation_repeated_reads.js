@@ -27,14 +27,13 @@ var $config = extendWorkload($config, function($config, $super) {
                 assertWhenOwnColl.eq(
                     this.numDocs, collectionDocs.length, () => tojson(collectionDocs));
                 if (prevDocuments) {
-                    assertAlways.eq(prevDocuments.length, collectionDocs.length);
-                    for (let j = 0; j < prevDocuments.length; j++) {
-                        assertAlways(bsonBinaryEqual(prevDocuments[j], collectionDocs[j]),
-                                     () => "Document mismatch for read " + i + " document index " +
-                                         j + " Previous documents: " +
-                                         tojsononeline(prevDocuments) + " Current documents: " +
-                                         tojsononeline(collectionDocs));
-                    }
+                    assertAlways.sameMembers(prevDocuments,
+                                             collectionDocs,
+                                             () => "Document mismatch - previous documents: " +
+                                                 tojsononeline(prevDocuments) +
+                                                 ", current documents: " +
+                                                 tojsononeline(collectionDocs),
+                                             bsonBinaryEqual);  // Exact document matches.
                 }
                 prevDocuments = collectionDocs;
             }

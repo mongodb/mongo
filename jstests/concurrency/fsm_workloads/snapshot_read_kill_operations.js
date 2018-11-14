@@ -35,10 +35,11 @@ var $config = (function() {
             doSnapshotGetMore(collName,
                               this,
                               [
-                                ErrorCodes.NoSuchTransaction,
+                                ErrorCodes.CursorKilled,
                                 ErrorCodes.CursorNotFound,
                                 ErrorCodes.Interrupted,
-                                ErrorCodes.LockTimeout
+                                ErrorCodes.LockTimeout,
+                                ErrorCodes.NoSuchTransaction,
                               ],
                               [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
         },
@@ -80,7 +81,7 @@ var $config = (function() {
                 this.sessionDb.adminCommand(
                     {currentOp: 1, ns: {$regex: db.getName() + "\." + collName}, op: "getmore"}),
                 ErrorCodes.Interrupted);
-            if (res.inprog.length) {
+            if (res.hasOwnProperty("inprog") && res.inprog.length) {
                 const killOpCmd = {killOp: 1, op: res.inprog[0].opid};
                 const killRes = this.sessionDb.adminCommand(killOpCmd);
                 assert.commandWorkedOrFailedWithCode(killRes, ErrorCodes.Interrupted);

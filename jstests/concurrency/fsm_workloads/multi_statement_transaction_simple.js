@@ -75,7 +75,7 @@ var $config = (function() {
         return {init: init, transferMoney: transferMoney, checkMoneyBalance: checkMoneyBalance};
     })();
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
 
         const bulk = db[collName].initializeUnorderedBulkOp();
@@ -86,6 +86,12 @@ var $config = (function() {
         const res = bulk.execute({w: 'majority'});
         assertWhenOwnColl.commandWorked(res);
         assertWhenOwnColl.eq(this.numAccounts, res.nInserted);
+
+        if (cluster.isSharded()) {
+            // Advance each router's cluster time to be >= the time of the writes, so the first
+            // global snapshots chosen by each is guaranteed to include the inserted documents.
+            cluster.synchronizeMongosClusterTimes();
+        }
     }
 
     function teardown(db, collName, cluster) {
