@@ -358,6 +358,37 @@ TEST_F(SessionCatalogTest, MarkSessionsAsKilledWhenSessionDoesNotExist) {
         catalog()->killSession(nonExistentLsid), AssertionException, ErrorCodes::NoSuchSession);
 }
 
+TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterCheckIn) {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+
+    {
+        OperationContextSession ocs(_opCtx);
+        ASSERT(OperationContextSession::get(_opCtx));
+
+        OperationContextSession::checkIn(_opCtx);
+        ASSERT(!OperationContextSession::get(_opCtx));
+    }
+
+    ASSERT(!OperationContextSession::get(_opCtx));
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterCheckInCheckOut) {
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+
+    {
+        OperationContextSession ocs(_opCtx);
+        ASSERT(OperationContextSession::get(_opCtx));
+
+        OperationContextSession::checkIn(_opCtx);
+        ASSERT(!OperationContextSession::get(_opCtx));
+
+        OperationContextSession::checkOut(_opCtx);
+        ASSERT(OperationContextSession::get(_opCtx));
+    }
+
+    ASSERT(!OperationContextSession::get(_opCtx));
+}
+
 TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     // Create three sessions
     const std::vector<LogicalSessionId> lsids{makeLogicalSessionIdForTest(),

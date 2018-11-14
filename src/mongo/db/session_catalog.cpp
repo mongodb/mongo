@@ -195,13 +195,7 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx) : _opC
         return;
     }
 
-    const auto catalog = SessionCatalog::get(opCtx);
-    auto scopedCheckedOutSession = catalog->checkOutSession(opCtx);
-
-    // We acquire a Client lock here to guard the construction of this session so that references to
-    // this session are safe to use while the lock is held
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    checkedOutSession.emplace(std::move(scopedCheckedOutSession));
+    checkOut(opCtx);
 }
 
 OperationContextSession::~OperationContextSession() {
@@ -215,15 +209,7 @@ OperationContextSession::~OperationContextSession() {
     if (!checkedOutSession)
         return;
 
-    // Removing the checkedOutSession from the OperationContext must be done under the Client lock,
-    // but destruction of the checkedOutSession must not be, as it takes the SessionCatalog mutex,
-    // and other code may take the Client lock while holding that mutex.
-    stdx::unique_lock<Client> lk(*_opCtx->getClient());
-    ScopedCheckedOutSession sessionToDelete(std::move(checkedOutSession.get()));
-
-    // This destroys the moved-from ScopedCheckedOutSession, and must be done within the client lock
-    checkedOutSession = boost::none;
-    lk.unlock();
+    checkIn(_opCtx);
 }
 
 Session* OperationContextSession::get(OperationContext* opCtx) {
@@ -233,6 +219,34 @@ Session* OperationContextSession::get(OperationContext* opCtx) {
     }
 
     return nullptr;
+}
+
+void OperationContextSession::checkIn(OperationContext* opCtx) {
+    auto& checkedOutSession = operationSessionDecoration(opCtx);
+    invariant(checkedOutSession);
+
+    // Removing the checkedOutSession from the OperationContext must be done under the Client lock,
+    // but destruction of the checkedOutSession must not be, as it takes the SessionCatalog mutex,
+    // and other code may take the Client lock while holding that mutex.
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    ScopedCheckedOutSession sessionToReleaseOutOfLock(std::move(*checkedOutSession));
+
+    // This destroys the moved-from ScopedCheckedOutSession, and must be done within the client lock
+    checkedOutSession = boost::none;
+    lk.unlock();
+}
+
+void OperationContextSession::checkOut(OperationContext* opCtx) {
+    auto& checkedOutSession = operationSessionDecoration(opCtx);
+    invariant(!checkedOutSession);
+
+    const auto catalog = SessionCatalog::get(opCtx);
+    auto scopedCheckedOutSession = catalog->checkOutSession(opCtx);
+
+    // We acquire a Client lock here to guard the construction of this session so that references to
+    // this session are safe to use while the lock is held
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    checkedOutSession.emplace(std::move(scopedCheckedOutSession));
 }
 
 }  // namespace mongo
