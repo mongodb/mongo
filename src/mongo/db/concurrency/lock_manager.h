@@ -73,10 +73,10 @@ public:
       *                 return value is not LOCK_WAITING, this pointer can be freed and will
       *                 not be used any more.
       *
-      *                 If the return value is LOCK_WAITING, the notification method will be
-      *                 called at some point into the future, when the lock either becomes
-      *                 granted or a deadlock is discovered. If unlock is called before the
-      *                 lock becomes granted, the notification will not be invoked.
+      *                 If the return value is LOCK_WAITING, the notification method will be called
+      *                 at some point into the future, when the lock becomes granted. If unlock is
+      *                 called before the lock becomes granted, the notification will not be
+      *                 invoked.
       *
       *                 If the return value is LOCK_WAITING, the notification object *must*
       *                 live at least until the notify method has been invoked or unlock has

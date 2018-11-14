@@ -236,57 +236,6 @@ TEST(LockerImpl, DefaultLocker) {
     ASSERT(locker.unlockGlobal());
 }
 
-TEST(LockerImpl, CanceledDeadlockUnblocks) {
-    const ResourceId db1(RESOURCE_DATABASE, "db1"_sd);
-    const ResourceId db2(RESOURCE_DATABASE, "db2"_sd);
-
-    LockerImpl locker1;
-    LockerImpl locker2;
-    LockerImpl locker3;
-
-    ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IX));
-    ASSERT(LOCK_OK == locker1.lock(db1, MODE_S));
-
-    ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
-    ASSERT(LOCK_OK == locker2.lock(db2, MODE_X));
-
-    // Set up locker1 and locker2 for deadlock
-    ASSERT(LOCK_WAITING == locker1.lockBegin(nullptr, db2, MODE_X));
-    ASSERT(LOCK_WAITING == locker2.lockBegin(nullptr, db1, MODE_X));
-
-    // Locker3 blocks behind locker 2
-    ASSERT(LOCK_OK == locker3.lockGlobal(MODE_IX));
-    ASSERT(LOCK_WAITING == locker3.lockBegin(nullptr, db1, MODE_S));
-
-    // Detect deadlock, canceling our request
-    ASSERT(
-        LOCK_DEADLOCK ==
-        locker2.lockComplete(db1, MODE_X, Date_t::now() + Milliseconds(1), /*checkDeadlock*/ true));
-
-    // Now locker3 must be able to complete its request
-    ASSERT(LOCK_OK ==
-           locker3.lockComplete(
-               db1, MODE_S, Date_t::now() + Milliseconds(1), /*checkDeadlock*/ false));
-
-    // Locker1 still can't complete its request
-    ASSERT(LOCK_TIMEOUT ==
-           locker1.lockComplete(db2, MODE_X, Date_t::now() + Milliseconds(1), false));
-
-    // Check ownership for db1
-    ASSERT(locker1.getLockMode(db1) == MODE_S);
-    ASSERT(locker2.getLockMode(db1) == MODE_NONE);
-    ASSERT(locker3.getLockMode(db1) == MODE_S);
-
-    // Check ownership for db2
-    ASSERT(locker1.getLockMode(db2) == MODE_NONE);
-    ASSERT(locker2.getLockMode(db2) == MODE_X);
-    ASSERT(locker3.getLockMode(db2) == MODE_NONE);
-
-    ASSERT(locker1.unlockGlobal());
-    ASSERT(locker2.unlockGlobal());
-    ASSERT(locker3.unlockGlobal());
-}
-
 TEST(LockerImpl, SharedLocksShouldTwoPhaseLockIsTrue) {
     // Test that when setSharedLocksShouldTwoPhaseLock is true and we are in a WUOW, unlock on IS
     // and S locks are postponed until endWriteUnitOfWork() is called. Mode IX and X locks always
@@ -526,9 +475,7 @@ TEST(LockerImpl, GetLockerInfoShouldReportPendingLocks) {
     ASSERT(successfulLocker.unlock(dbId));
     ASSERT(successfulLocker.unlockGlobal());
 
-    const bool checkDeadlock = false;
-    ASSERT_EQ(LOCK_OK,
-              conflictingLocker.lockComplete(collectionId, MODE_IS, Date_t::now(), checkDeadlock));
+    ASSERT_EQ(LOCK_OK, conflictingLocker.lockComplete(collectionId, MODE_IS, Date_t::now()));
 
     conflictingLocker.getLockerInfo(&lockerInfo, boost::none);
     ASSERT_FALSE(lockerInfo.waitingResource.isValid());

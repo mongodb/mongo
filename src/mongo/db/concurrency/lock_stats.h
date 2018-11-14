@@ -82,7 +82,6 @@ struct LockStatCounters {
         CounterOps::add(numAcquisitions, other.numAcquisitions);
         CounterOps::add(numWaits, other.numWaits);
         CounterOps::add(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
-        CounterOps::add(numDeadlocks, other.numDeadlocks);
     }
 
     template <typename OtherType>
@@ -90,21 +89,18 @@ struct LockStatCounters {
         CounterOps::add(numAcquisitions, -other.numAcquisitions);
         CounterOps::add(numWaits, -other.numWaits);
         CounterOps::add(combinedWaitTimeMicros, -other.combinedWaitTimeMicros);
-        CounterOps::add(numDeadlocks, -other.numDeadlocks);
     }
 
     void reset() {
         CounterOps::set(numAcquisitions, 0);
         CounterOps::set(numWaits, 0);
         CounterOps::set(combinedWaitTimeMicros, 0);
-        CounterOps::set(numDeadlocks, 0);
     }
 
 
     CounterType numAcquisitions;
     CounterType numWaits;
     CounterType combinedWaitTimeMicros;
-    CounterType numDeadlocks;
 };
 
 
@@ -133,10 +129,6 @@ public:
 
     void recordWaitTime(ResourceId resId, LockMode mode, int64_t waitMicros) {
         CounterOps::add(get(resId, mode).combinedWaitTimeMicros, waitMicros);
-    }
-
-    void recordDeadlock(ResourceId resId, LockMode mode) {
-        CounterOps::add(get(resId, mode).numDeadlocks, 1);
     }
 
     LockStatCountersType& get(ResourceId resId, LockMode mode) {

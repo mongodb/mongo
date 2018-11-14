@@ -71,10 +71,6 @@ public:
         _get(id).recordWaitTime(resId, mode, waitMicros);
     }
 
-    void recordDeadlock(ResourceId resId, LockMode mode) {
-        _get(resId).recordDeadlock(resId, mode);
-    }
-
     void report(SingleThreadedLockStats* outStats) const {
         for (int i = 0; i < NumPartitions; i++) {
             outStats->append(_partitions[i].stats);
@@ -114,7 +110,7 @@ LockManager globalLockManager;
 const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
 
 // How often (in millis) to check for deadlock if a lock has not been granted for some time
-const Milliseconds DeadlockTimeout = Milliseconds(500);
+const Milliseconds MaxWaitTime = Milliseconds(500);
 
 // Dispenses unique LockerId identifiers
 AtomicUInt64 idCounter(0);
@@ -361,8 +357,6 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
     if (result == LOCK_OK)
         return LOCK_OK;
 
-    // Currently, deadlock detection does not happen inline with lock acquisition so the only
-    // unsuccessful result that the lock manager would return is LOCK_WAITING.
     invariant(result == LOCK_WAITING);
 
     return result;
@@ -433,8 +427,6 @@ LockResult LockerImpl::lock(OperationContext* opCtx,
     if (result == LOCK_OK)
         return LOCK_OK;
 
-    // Currently, deadlock detection does not happen inline with lock acquisition so the only
-    // unsuccessful result that the lock manager would return is LOCK_WAITING.
     invariant(result == LOCK_WAITING);
 
     return lockComplete(opCtx, resId, mode, deadline);
@@ -758,9 +750,8 @@ LockResult LockerImpl::lockComplete(OperationContext* opCtx,
         timeout = std::min(timeout, _maxLockTimeout.get());
     }
 
-    // Don't go sleeping without bound in order to be able to report long waits or wake up for
-    // deadlock detection.
-    Milliseconds waitTime = std::min(timeout, DeadlockTimeout);
+    // Don't go sleeping without bound in order to be able to report long waits.
+    Milliseconds waitTime = std::min(timeout, MaxWaitTime);
     const uint64_t startOfTotalWaitTime = curTimeMicros64();
     uint64_t startOfCurrentWaitTime = startOfTotalWaitTime;
 
@@ -800,7 +791,7 @@ LockResult LockerImpl::lockComplete(OperationContext* opCtx,
 
         const auto totalBlockTime = duration_cast<Milliseconds>(
             Microseconds(int64_t(curTimeMicros - startOfTotalWaitTime)));
-        waitTime = (totalBlockTime < timeout) ? std::min(timeout - totalBlockTime, DeadlockTimeout)
+        waitTime = (totalBlockTime < timeout) ? std::min(timeout - totalBlockTime, MaxWaitTime)
                                               : Milliseconds(0);
 
         if (waitTime == Milliseconds(0)) {

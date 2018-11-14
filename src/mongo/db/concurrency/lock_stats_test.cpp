@@ -68,9 +68,8 @@ TEST(LockStats, Wait) {
         ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(nullptr, resId, MODE_S));
 
         // Sleep 1 millisecond so the wait time passes
-        ASSERT_EQUALS(
-            LOCK_TIMEOUT,
-            lockerConflict.lockComplete(resId, MODE_S, Date_t::now() + Milliseconds(5), false));
+        ASSERT_EQUALS(LOCK_TIMEOUT,
+                      lockerConflict.lockComplete(resId, MODE_S, Date_t::now() + Milliseconds(5)));
     }
 
     // Make sure that the waits/blocks are non-zero

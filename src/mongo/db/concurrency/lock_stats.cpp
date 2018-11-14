@@ -115,24 +115,6 @@ void LockStats<CounterType>::_report(BSONObjBuilder* builder,
             }
         }
     }
-
-    // Deadlocks
-    {
-        std::unique_ptr<BSONObjBuilder> deadlockCount;
-        for (int mode = 1; mode < LockModesCount; mode++) {
-            const long long value = CounterOps::get(stat.modeStats[mode].numDeadlocks);
-            if (value > 0) {
-                if (!deadlockCount) {
-                    if (!section) {
-                        section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
-                    }
-
-                    deadlockCount.reset(new BSONObjBuilder(section->subobjStart("deadlockCount")));
-                }
-                deadlockCount->append(legacyModeName(static_cast<LockMode>(mode)), value);
-            }
-        }
-    }
 }
 
 template <typename CounterType>

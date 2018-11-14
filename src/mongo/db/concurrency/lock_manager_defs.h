@@ -130,15 +130,6 @@ enum LockResult {
     LOCK_TIMEOUT,
 
     /**
-     * The lock request was not granted because it would result in a deadlock. No changes to
-     * the state of the Locker would be made if this value is returned (i.e., it will not be
-     * killed due to deadlock). It is up to the caller to decide how to recover from this
-     * return value - could be either release some locks and try again, or just bail with an
-     * error and have some upper code handle it.
-     */
-    LOCK_DEADLOCK,
-
-    /**
      * This is used as an initializer value. Should never be returned.
      */
     LOCK_INVALID

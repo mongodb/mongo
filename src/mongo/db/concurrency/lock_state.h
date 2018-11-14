@@ -231,7 +231,6 @@ public:
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
      * @param deadline The absolute time point when this lock acquisition will time out, if not yet
      * granted.
-     * @param checkDeadlock whether to perform deadlock detection while waiting.
      */
     LockResult lockComplete(OperationContext* opCtx,
                             ResourceId resId,
