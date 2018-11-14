@@ -83,11 +83,8 @@ std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
     options.poolName = "repl writer worker Pool";
     options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {
-        // Only do this once per thread
-        if (!Client::getCurrent()) {
-            Client::initThreadIfNotAlready();
-            AuthorizationSession::get(cc())->grantInternalAuthorization();
-        }
+        Client::initThread(getThreadName());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
     };
     auto pool = stdx::make_unique<ThreadPool>(options);
     pool->startup();

@@ -129,17 +129,6 @@ public:
         return std::move(_session);
     }
 
-    /**
-     * Inits a thread if that thread has not already been init'd, setting the thread name to
-     * "desc".
-     */
-    static void initThreadIfNotAlready(StringData desc);
-
-    /**
-     * Inits a thread if that thread has not already been init'd, using the existing thread name
-     */
-    static void initThreadIfNotAlready();
-
     std::string clientAddress(bool includePort = false) const;
     const std::string& desc() const {
         return _desc;

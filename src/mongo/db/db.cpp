@@ -865,7 +865,10 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 // NOTE: This function may be called at any time after registerShutdownTask is called below. It
 // must not depend on the prior execution of mongo initializers or the existence of threads.
 void shutdownTask() {
-    Client::initThreadIfNotAlready();
+    // This client initiation pattern is only to be used here, with plans to eliminate this pattern
+    // down the line.
+    if (!haveClient())
+        Client::initThread(getThreadName());
 
     auto const client = Client::getCurrent();
     auto const serviceContext = client->getServiceContext();

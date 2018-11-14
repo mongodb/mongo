@@ -63,6 +63,7 @@ void TaskRunnerTest::destroyTaskRunner() {
 void TaskRunnerTest::setUp() {
     ThreadPool::Options options;
     options.poolName = "TaskRunnerTest";
+    options.onCreateThread = [](const std::string& name) { Client::initThread(name); };
     _threadPool = stdx::make_unique<ThreadPool>(options);
     _threadPool->startup();
 

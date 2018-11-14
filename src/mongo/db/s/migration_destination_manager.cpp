@@ -387,7 +387,7 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
     SingleProducerSingleConsumerQueue<BSONObj> batches(options);
 
     stdx::thread inserterThread{[&] {
-        Client::initThreadIfNotAlready("chunkInserter");
+        ThreadClient tc("chunkInserter", opCtx->getServiceContext());
         auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
         auto consumerGuard = MakeGuard([&] { batches.closeConsumerEnd(); });
         try {

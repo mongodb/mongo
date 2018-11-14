@@ -56,16 +56,6 @@ namespace {
 thread_local ServiceContext::UniqueClient currentClient;
 }  // namespace
 
-void Client::initThreadIfNotAlready(StringData desc) {
-    if (currentClient)
-        return;
-    initThread(desc);
-}
-
-void Client::initThreadIfNotAlready() {
-    initThreadIfNotAlready(getThreadName());
-}
-
 void Client::initThread(StringData desc, transport::SessionHandle session) {
     initThread(desc, getGlobalServiceContext(), std::move(session));
 }

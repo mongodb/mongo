@@ -54,7 +54,6 @@ const std::string TARGET_HOST = "$dummy:27017";
 class ShardConnFixture : public ServiceContextTest {
 public:
     void setUp() {
-        Client::initThreadIfNotAlready("ShardConnFixture");
         _maxPoolSizePerHost = mongo::shardConnectionPool.getMaxPoolSize();
 
         mongo::ConnectionString::setConnectionHook(

@@ -222,17 +222,11 @@ Status CollectionBulkLoaderImpl::commit() {
 
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
-    if (_secondaryIndexesBlock) {
-        // A valid Client is required to drop unfinished indexes.
-        Client::initThreadIfNotAlready();
+    if (_secondaryIndexesBlock)
         _secondaryIndexesBlock.reset();
-    }
 
-    if (_idIndexBlock) {
-        // A valid Client is required to drop unfinished indexes.
-        Client::initThreadIfNotAlready();
+    if (_idIndexBlock)
         _idIndexBlock.reset();
-    }
 
     // release locks.
     _autoColl.reset();

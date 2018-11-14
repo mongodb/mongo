@@ -134,7 +134,6 @@ void TaskRunner::join() {
 void TaskRunner::_runTasks() {
     // We initialize cc() because ServiceContextMongoD::_newOpCtx() expects cc() to be equal to the
     // client used to create the operation context.
-    Client::initThreadIfNotAlready();
     Client* client = &cc();
     if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
         AuthorizationSession::get(client)->grantInternalAuthorization();

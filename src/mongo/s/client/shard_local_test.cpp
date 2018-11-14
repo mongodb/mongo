@@ -82,7 +82,6 @@ private:
 
 void ShardLocalTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    Client::initThreadIfNotAlready();
     _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     _shardLocal = stdx::make_unique<ShardLocal>(ShardRegistry::kConfigServerShardId);

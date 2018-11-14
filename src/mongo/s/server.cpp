@@ -179,7 +179,10 @@ Status waitForSigningKeys(OperationContext* opCtx) {
  */
 void cleanupTask(ServiceContext* serviceContext) {
     {
-        Client::initThreadIfNotAlready();
+        // This client initiation pattern is only to be used here, with plans to eliminate this
+        // pattern down the line.
+        if (!haveClient())
+            Client::initThread(getThreadName());
         Client& client = cc();
 
         // Shutdown the TransportLayer so that new connections aren't accepted

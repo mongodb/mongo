@@ -226,7 +226,7 @@ void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) 
 void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* service,
                                                                std::string threadName,
                                                                Milliseconds refreshInterval) {
-    Client::initThreadIfNotAlready(threadName);
+    ThreadClient tc(threadName, service);
 
     while (true) {
         bool hasRefreshRequestInitially = false;
