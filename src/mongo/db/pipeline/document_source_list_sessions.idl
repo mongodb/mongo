@@ -53,3 +53,7 @@ structs:
       users:
         type: array<ListSessionsUser>
         optional: true
+      $_internalPredicate:
+        cpp_name: predicate
+        type: object
+        optional: true

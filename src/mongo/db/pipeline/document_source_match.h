@@ -166,10 +166,11 @@ protected:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    BSONObj _predicate;
+
 private:
     std::unique_ptr<MatchExpression> _expression;
 
-    BSONObj _predicate;
     const bool _isTextQuery;
 
     // Cache the dependencies so that we know what fields we need to serialize to BSON for matching.

@@ -55,9 +55,15 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
             nss == NamespaceString::kLogicalSessionsNamespace);
 
     const auto& spec = listSessionsParseSpec(kStageName, elem);
+    if (const auto& pred = spec.getPredicate()) {
+        // Predicate has already been determined and might have changed during optimization, use it
+        // directly.
+        return new DocumentSourceListSessions(*pred, pExpCtx, spec.getAllUsers(), spec.getUsers());
+    }
     if (spec.getAllUsers()) {
         // No filtration. optimize() should later skip us.
-        return new DocumentSourceListSessions(BSONObj(), pExpCtx, spec);
+        return new DocumentSourceListSessions(
+            BSONObj(), pExpCtx, spec.getAllUsers(), spec.getUsers());
     }
     invariant(spec.getUsers() && !spec.getUsers()->empty());
 
@@ -67,7 +73,17 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
         builder.append(BSONBinData(cdr.data(), cdr.length(), BinDataGeneral));
     }
     const auto& query = BSON("_id.uid" << BSON("$in" << builder.arr()));
-    return new DocumentSourceListSessions(query, pExpCtx, spec);
+    return new DocumentSourceListSessions(query, pExpCtx, spec.getAllUsers(), spec.getUsers());
+}
+
+
+Value DocumentSourceListSessions::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    ListSessionsSpec spec;
+    spec.setAllUsers(_allUsers);
+    spec.setUsers(_users);
+    spec.setPredicate(_predicate);
+    return Value(Document{{getSourceName(), spec.toBSON()}});
 }
 
 }  // namespace mongo
