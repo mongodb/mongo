@@ -87,3 +87,9 @@ uploadArchives {
         }
     }
 }
+
+def deployer = uploadArchives.repositories.mavenDeployer
+deployer.pom*.whenConfigured { pom ->
+    pom.dependencies.find { dep -> dep.groupId == 'org.slf4j' }.optional = true
+}
+
