@@ -179,7 +179,7 @@ namespace {
 // it, otherwise this function will do nothing.
 void setECDHModeAuto(SSL_CTX* const ctx) {
 #ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
-    ::SSL_CTX_set_ecdh_auto(ctx, true);
+    SSL_CTX_set_ecdh_auto(ctx, true);
 #endif
     std::ignore = ctx;
 }
