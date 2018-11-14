@@ -63,10 +63,14 @@ Status applyCommitTransaction(OperationContext* opCtx,
             return Status::OK();
         }
 
+        // Since the TransactionHistoryIterator uses DBDirectClient, it cannot come with snapshot
+        // isolation.
+        invariant(!opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
+
         // Get the corresponding prepareTransaction oplog entry.
-        TransactionHistoryIterator iter(entry.getOpTime());
-        invariant(iter.hasNext());
-        const auto commitOplogEntry = iter.next(opCtx);
+        const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
+        invariant(prepareOpTime);
+        TransactionHistoryIterator iter(prepareOpTime.get());
         invariant(iter.hasNext());
         const auto prepareOplogEntry = iter.next(opCtx);
 

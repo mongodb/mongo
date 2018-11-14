@@ -103,5 +103,10 @@ Status applyOps(OperationContext* opCtx,
 Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode oplogApplicationMode);
+
+/**
+ * Called from recovery to apply a prepare transaction oplog entry.
+ */
+Status applyRecoveredPrepareTransaction(OperationContext* opCtx, const OplogEntry& entry);
 }  // namespace repl
 }  // namespace mongo

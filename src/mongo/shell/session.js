@@ -527,6 +527,10 @@ var {
             return _txnNumber;
         };
 
+        this.setTxnNumber_forTesting = function setTxnNumber_forTesting(newTxnNumber) {
+            _txnNumber = newTxnNumber;
+        };
+
         this.getTxnOptions = function getTxnOptions() {
             return _txnOptions;
         };
@@ -879,6 +883,10 @@ var {
 
             this.getTxnNumber_forTesting = function getTxnNumber_forTesting() {
                 return this._serverSession.getTxnNumber();
+            };
+
+            this.setTxnNumber_forTesting = function setTxnNumber_forTesting(newTxnNumber) {
+                this._serverSession.setTxnNumber_forTesting(newTxnNumber);
             };
 
             this.getOperationTime = function getOperationTime() {

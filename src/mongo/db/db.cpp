@@ -246,8 +246,6 @@ void logStartup(OperationContext* opCtx) {
  *          --replset.
  */
 unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
-    // This is helpful for the query below to work as you can't open files when readlocked
-    Lock::GlobalWrite lk(opCtx);
     if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets()) {
         DBDirectClient c(opCtx);
         return c.count(kSystemReplSetCollection.ns());

@@ -39,12 +39,16 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
+#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -267,9 +271,45 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     } else {
         _recoverFromUnstableCheckpoint(opCtx, appliedThrough, topOfOplog);
     }
+
+    _reconstructPreparedTransactions(opCtx);
 } catch (...) {
     severe() << "Caught exception during replication recovery: " << exceptionToStatus();
     std::terminate();
+}
+
+void ReplicationRecoveryImpl::_reconstructPreparedTransactions(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
+                                     {BSON("state"
+                                           << "prepared")});
+
+    // Iterate over each entry in the transactions table that has a prepared transaction.
+    while (cursor->more()) {
+        const auto txnRecordObj = cursor->next();
+        const auto txnRecord = SessionTxnRecord::parse(
+            IDLParserErrorContext("recovering prepared transaction"), txnRecordObj);
+
+        invariant(txnRecord.getState() == DurableTxnStateEnum::kPrepared);
+
+        // Get the prepareTransaction oplog entry corresponding to this transactions table entry.
+        invariant(!opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
+        const auto prepareOpTime = txnRecord.getLastWriteOpTime();
+        invariant(!prepareOpTime.isNull());
+        TransactionHistoryIterator iter(prepareOpTime);
+        invariant(iter.hasNext());
+        const auto prepareOplogEntry = iter.next(opCtx);
+
+        {
+            // Make a new opCtx so that we can set the lsid when applying the prepare transaction
+            // oplog entry. After going out of scope, the former opCtx will be restored.
+            AlternativeOpCtx aoc(opCtx);
+            const auto newOpCtx = aoc.getOperationContext();
+
+            // Checks out the session, applies the operations and prepares the transactions.
+            uassertStatusOK(applyRecoveredPrepareTransaction(newOpCtx, prepareOplogEntry));
+        }
+    }
 }
 
 void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCtx,

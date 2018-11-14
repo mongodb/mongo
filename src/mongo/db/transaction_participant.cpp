@@ -176,8 +176,11 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                            entry.getOpTime());
             }
 
-            // applyOps oplog entry marks the commit of a transaction.
-            if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+            // Either an applyOps oplog entry without a prepare flag or the state being kCommitted
+            // marks the commit of a transaction.
+            if ((entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
+                 !entry.shouldPrepare()) ||
+                (result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted)) {
                 result.transactionCommitted = true;
             }
         } catch (const DBException& ex) {

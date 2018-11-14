@@ -92,10 +92,21 @@ public:
         _supportsRecoveryTimestamp = supports;
     }
 
+    void setPointInTimeReadTimestamp(Timestamp pointInTimeReadTimestamp) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _pointInTimeReadTimestamp = pointInTimeReadTimestamp;
+    }
+
+    Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _pointInTimeReadTimestamp;
+    }
+
 private:
     mutable stdx::mutex _mutex;
     Timestamp _initialDataTimestamp = Timestamp::min();
     boost::optional<Timestamp> _recoveryTimestamp = boost::none;
+    Timestamp _pointInTimeReadTimestamp = {};
     bool _supportsRecoverToStableTimestamp = true;
     bool _supportsRecoveryTimestamp = true;
 };
@@ -124,11 +135,11 @@ protected:
     }
 
     StorageInterface* getStorageInterface() {
-        return _storageInterface.get();
+        return _storageInterface;
     }
 
     StorageInterfaceRecovery* getStorageInterfaceRecovery() {
-        return _storageInterface.get();
+        return _storageInterface;
     }
 
     ReplicationConsistencyMarkers* getConsistencyMarkers() {
@@ -155,11 +166,14 @@ private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
+        auto service = getServiceContext();
+        StorageInterface::set(service, stdx::make_unique<StorageInterfaceRecovery>());
+        _storageInterface = static_cast<StorageInterfaceRecovery*>(StorageInterface::get(service));
+
         _createOpCtx();
-        _storageInterface = stdx::make_unique<StorageInterfaceRecovery>();
         _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
 
-        auto service = getServiceContext();
+
         ReplicationCoordinator::set(
             service, stdx::make_unique<ReplicationCoordinatorMock>(service, getStorageInterface()));
 
@@ -175,13 +189,12 @@ private:
         observerRegistry->addObserver(std::make_unique<ReplicationRecoveryTestObObserver>());
 
         repl::DropPendingCollectionReaper::set(
-            service, stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get()));
+            service, stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface));
     }
 
     void tearDown() override {
         _opCtx.reset(nullptr);
         _consistencyMarkers.reset();
-        _storageInterface.reset();
 
         ServiceContextMongoDTest::tearDown();
     }
@@ -191,7 +204,7 @@ private:
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<StorageInterfaceRecovery> _storageInterface;
+    StorageInterfaceRecovery* _storageInterface;
     std::unique_ptr<ReplicationConsistencyMarkersMock> _consistencyMarkers;
 };
 
@@ -883,6 +896,7 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
     auto opCtx = getOperationContext();
 
     const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
+    getStorageInterfaceRecovery()->setPointInTimeReadTimestamp(Timestamp(1, 0));
     getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
     getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
