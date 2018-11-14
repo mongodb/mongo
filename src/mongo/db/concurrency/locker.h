@@ -222,26 +222,19 @@ public:
      *              returning LOCK_TIMEOUT. This parameter defaults to an infinite deadline.
      *              If Milliseconds(0) is passed, the request will return immediately, if
      *              the request could not be granted right away.
-     * @param checkDeadlock Whether to enable deadlock detection for this acquisition. This
-     *              parameter is put in place until we can handle deadlocks at all places,
-     *              which acquire locks.
      *
      * @return All LockResults except for LOCK_WAITING, because it blocks.
      */
     virtual LockResult lock(OperationContext* opCtx,
                             ResourceId resId,
                             LockMode mode,
-                            Date_t deadline = Date_t::max(),
-                            bool checkDeadlock = false) = 0;
+                            Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Calling lock without an OperationContext does not allow LOCK_WAITING states to be
      * interrupted.
      */
-    virtual LockResult lock(ResourceId resId,
-                            LockMode mode,
-                            Date_t deadline = Date_t::max(),
-                            bool checkDeadlock = false) = 0;
+    virtual LockResult lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Downgrades the specified resource's lock mode without changing the reference count.

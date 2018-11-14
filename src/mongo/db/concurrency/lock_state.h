@@ -162,14 +162,10 @@ public:
     virtual LockResult lock(OperationContext* opCtx,
                             ResourceId resId,
                             LockMode mode,
-                            Date_t deadline = Date_t::max(),
-                            bool checkDeadlock = false);
+                            Date_t deadline = Date_t::max());
 
-    virtual LockResult lock(ResourceId resId,
-                            LockMode mode,
-                            Date_t deadline = Date_t::max(),
-                            bool checkDeadlock = false) {
-        return lock(nullptr, resId, mode, deadline, checkDeadlock);
+    virtual LockResult lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) {
+        return lock(nullptr, resId, mode, deadline);
     }
 
     virtual void downgrade(ResourceId resId, LockMode newMode);
@@ -240,11 +236,10 @@ public:
     LockResult lockComplete(OperationContext* opCtx,
                             ResourceId resId,
                             LockMode mode,
-                            Date_t deadline,
-                            bool checkDeadlock);
+                            Date_t deadline);
 
-    LockResult lockComplete(ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
-        return lockComplete(nullptr, resId, mode, deadline, checkDeadlock);
+    LockResult lockComplete(ResourceId resId, LockMode mode, Date_t deadline) {
+        return lockComplete(nullptr, resId, mode, deadline);
     }
 
     /**

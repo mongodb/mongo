@@ -62,7 +62,6 @@ env.Benchmark(
 env.CppUnitTest(
     target='lock_manager_test',
     source=['d_concurrency_test.cpp',
-            'deadlock_detection_test.cpp',
             'fast_map_noalloc_test.cpp',
             'lock_manager_test.cpp',
             'lock_state_test.cpp',

@@ -369,7 +369,7 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
 }
 
 LockResult LockerImpl::lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
-    return lockComplete(opCtx, resourceIdGlobal, getLockMode(resourceIdGlobal), deadline, false);
+    return lockComplete(opCtx, resourceIdGlobal, getLockMode(resourceIdGlobal), deadline);
 }
 
 bool LockerImpl::unlockGlobal() {
@@ -422,8 +422,10 @@ void LockerImpl::endWriteUnitOfWork() {
     }
 }
 
-LockResult LockerImpl::lock(
-    OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
+LockResult LockerImpl::lock(OperationContext* opCtx,
+                            ResourceId resId,
+                            LockMode mode,
+                            Date_t deadline) {
 
     const LockResult result = lockBegin(opCtx, resId, mode);
 
@@ -435,7 +437,7 @@ LockResult LockerImpl::lock(
     // unsuccessful result that the lock manager would return is LOCK_WAITING.
     invariant(result == LOCK_WAITING);
 
-    return lockComplete(opCtx, resId, mode, deadline, checkDeadlock);
+    return lockComplete(opCtx, resId, mode, deadline);
 }
 
 void LockerImpl::downgrade(ResourceId resId, LockMode newMode) {
@@ -734,8 +736,10 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
     return result;
 }
 
-LockResult LockerImpl::lockComplete(
-    OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
+LockResult LockerImpl::lockComplete(OperationContext* opCtx,
+                                    ResourceId resId,
+                                    LockMode mode,
+                                    Date_t deadline) {
 
     LockResult result;
     Milliseconds timeout;
@@ -788,19 +792,6 @@ LockResult LockerImpl::lockComplete(
 
         if (result == LOCK_OK)
             break;
-
-        if (checkDeadlock) {
-            DeadlockDetector wfg(globalLockManager, this);
-            if (wfg.check().hasCycle()) {
-                warning() << "Deadlock found: " << wfg.toString();
-
-                globalStats.recordDeadlock(resId, mode);
-                _stats.recordDeadlock(resId, mode);
-
-                result = LOCK_DEADLOCK;
-                break;
-            }
-        }
 
         // If infinite timeout was requested, just keep waiting
         if (timeout == Milliseconds::max()) {
