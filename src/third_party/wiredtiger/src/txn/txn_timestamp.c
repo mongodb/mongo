@@ -444,8 +444,7 @@ __wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
 	 * Scan the global pinned timestamp again, it's possible that it got
 	 * changed after the previous scan.
 	 */
-	if ((ret = __txn_get_pinned_timestamp(
-	    session, &pinned_timestamp,
+	if ((ret = __txn_get_pinned_timestamp(session, &pinned_timestamp,
 	    WT_TXN_TS_ALREADY_LOCKED | WT_TXN_TS_INCLUDE_OLDEST)) != 0) {
 		__wt_writeunlock(session, &txn_global->rwlock);
 		return (ret == WT_NOTFOUND ? 0 : ret);
@@ -1061,7 +1060,7 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 		}
 		if (qtxn == NULL) {
 			TAILQ_INSERT_HEAD(&txn_global->commit_timestamph,
-			   txn, commit_timestampq);
+			    txn, commit_timestampq);
 			WT_STAT_CONN_INCR(session, txn_commit_queue_head);
 		} else
 			TAILQ_INSERT_AFTER(&txn_global->commit_timestamph,
@@ -1171,7 +1170,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 		}
 		if (qtxn == NULL) {
 			TAILQ_INSERT_HEAD(&txn_global->read_timestamph,
-			   txn, read_timestampq);
+			    txn, read_timestampq);
 			WT_STAT_CONN_INCR(session, txn_read_queue_head);
 		} else
 			TAILQ_INSERT_AFTER(&txn_global->read_timestamph,

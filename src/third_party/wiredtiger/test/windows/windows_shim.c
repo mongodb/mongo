@@ -52,8 +52,8 @@ usleep(useconds_t useconds)
 int
 gettimeofday(struct timeval* tp, void* tzp)
 {
-	uint64_t ns100;
 	FILETIME time;
+	uint64_t ns100;
 
 	tzp = tzp;
 

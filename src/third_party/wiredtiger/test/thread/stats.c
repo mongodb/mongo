@@ -40,8 +40,8 @@ stats(void)
 	WT_SESSION *session;
 	uint64_t v;
 	int ret;
-	char name[64];
 	const char *desc, *pval;
+	char name[64];
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 

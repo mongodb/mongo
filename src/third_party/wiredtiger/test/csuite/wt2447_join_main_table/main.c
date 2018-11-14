@@ -56,8 +56,8 @@ get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch,
     uint64_t *pval)
 {
 	WT_CURSOR *statcursor;
+	WT_DECL_RET;
 	uint64_t val;
-	int ret;
 	char *desc, *valstr;
 	bool match;
 

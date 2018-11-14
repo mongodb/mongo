@@ -185,8 +185,8 @@ static void
 test_bulk(THREAD_DATA *td)
 {
 	WT_CURSOR *c;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 	bool create;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
@@ -232,9 +232,9 @@ static void
 test_bulk_unique(THREAD_DATA *td, int force)
 {
 	WT_CURSOR *c;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t my_uid;
-	int ret;
 	char new_uri[64];
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
@@ -242,7 +242,7 @@ test_bulk_unique(THREAD_DATA *td, int force)
 	/* Generate a unique object name. */
 	my_uid = __wt_atomic_addv64(&uid, 1);
 	testutil_check(__wt_snprintf(
-	    new_uri, sizeof(new_uri), "%s.%u", uri, my_uid));
+	    new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, my_uid));
 
 	if (use_txn)
 		testutil_check(session->begin_transaction(session, NULL));
@@ -280,8 +280,8 @@ static void
 test_cursor(THREAD_DATA *td)
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -310,8 +310,8 @@ test_cursor(THREAD_DATA *td)
 static void
 test_create(THREAD_DATA *td)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -335,9 +335,9 @@ test_create(THREAD_DATA *td)
 static void
 test_create_unique(THREAD_DATA *td, int force)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t my_uid;
-	int ret;
 	char new_uri[64];
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
@@ -345,7 +345,7 @@ test_create_unique(THREAD_DATA *td, int force)
 	/* Generate a unique object name. */
 	my_uid = __wt_atomic_addv64(&uid, 1);
 	testutil_check(__wt_snprintf(
-	    new_uri, sizeof(new_uri), "%s.%u", uri, my_uid));
+	    new_uri, sizeof(new_uri), "%s.%" PRIu64, uri, my_uid));
 
 	if (use_txn)
 		testutil_check(session->begin_transaction(session, NULL));
@@ -377,8 +377,8 @@ test_create_unique(THREAD_DATA *td, int force)
 static void
 test_drop(THREAD_DATA *td, int force)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -412,8 +412,8 @@ test_drop(THREAD_DATA *td, int force)
 static void
 test_rebalance(THREAD_DATA *td)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -431,8 +431,8 @@ test_rebalance(THREAD_DATA *td)
 static void
 test_upgrade(THREAD_DATA *td)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -450,8 +450,8 @@ test_upgrade(THREAD_DATA *td)
 static void
 test_verify(THREAD_DATA *td)
 {
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ret;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -559,8 +559,7 @@ thread_ckpt_run(void *arg)
 	 * Keep writing checkpoints until killed by parent.
 	 */
 	__wt_epoch(NULL, &start);
-	i = 0;
-	while (true) {
+	for (i = 0;;) {
 		sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
 		sleep(sleep_time);
 		if (use_ts) {
@@ -575,8 +574,7 @@ thread_ckpt_run(void *arg)
 					printf("CKPT: !stable_set time %"
 					    PRIu64 "\n",
 					    WT_TIMEDIFF_SEC(now, start));
-				if (WT_TIMEDIFF_SEC(now, start) >
-				    MAX_STARTUP) {
+				if (WT_TIMEDIFF_SEC(now, start) > MAX_STARTUP) {
 					fprintf(stderr,
 					    "After %d seconds stable still not "
 					    "set. Aborting.\n", MAX_STARTUP);
@@ -985,20 +983,18 @@ main(int argc, char *argv[])
 	REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
 	WT_CONNECTION *conn;
 	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
+	WT_DECL_RET;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	pid_t pid;
 	uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;
 	uint64_t stable_fp, stable_val;
-	uint32_t i;
-	int ret;
-	char fname[64], kname[64];
-	bool fatal;
-	uint32_t nth, timeout;
+	uint32_t i, nth, timeout;
 	int ch, status;
-	const char *working_dir;
 	char buf[512], statname[1024];
-	bool rand_th, rand_time, verify_only;
+	char fname[64], kname[64];
+	const char *working_dir;
+	bool fatal, rand_th, rand_time, verify_only;
 
 	/* We have nothing to do if this is not a timestamp build */
 	if (!timestamp_build())

@@ -425,8 +425,16 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    session, session->bkp_cursor, false));
 		} else {
 			*log_only = false;
-			WT_ERR(__wt_schema_worker(session,
+
+			/*
+			 * If backing up individual tables, we have to include
+			 * indexes, which may involve opening those indexes.
+			 * Acquire the table lock in write mode for that case.
+			 */
+			WT_WITH_TABLE_WRITE_LOCK(session,
+			    ret = __wt_schema_worker(session,
 			    uri, NULL, __backup_list_uri_append, cfg, 0));
+			WT_ERR(ret);
 		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);

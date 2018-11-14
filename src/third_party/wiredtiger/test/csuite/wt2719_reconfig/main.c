@@ -208,7 +208,7 @@ on_alarm(int signo)
 static void
 reconfig(TEST_OPTS *opts, WT_SESSION *session, const char *config)
 {
-	int ret;
+	WT_DECL_RET;
 
 	current = config;
 

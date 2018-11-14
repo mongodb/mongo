@@ -81,8 +81,8 @@ thread_run(void *arg)
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	WT_THREAD_DATA *td;
-	uint64_t i;
 	size_t lsize;
+	uint64_t i;
 	char buf[MAX_VAL], kname[64], lgbuf[8];
 	char large[128*1024];
 
@@ -240,8 +240,8 @@ main(int argc, char *argv[])
 	uint64_t absent, count, key, last_key, middle;
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
-	const char *working_dir;
 	char buf[1024], fname[64], kname[64];
+	const char *working_dir;
 	bool fatal, rand_th, rand_time, verify_only;
 
 	(void)testutil_set_progname(argv);

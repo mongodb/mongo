@@ -809,8 +809,26 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			    log_table_cursor, value_buf);
 			if ((ret =
 			    log_table_cursor->insert(log_table_cursor)) != 0) {
-				lprintf(wtperf, ret, 0, "Cursor insert failed");
-				goto err;
+				lprintf(wtperf, ret, 1, "Cursor insert failed");
+				if (ret == WT_ROLLBACK && ops_per_txn == 0) {
+					lprintf(wtperf, ret, 1,
+					    "log-table: ROLLBACK");
+					if ((ret =
+					    session->rollback_transaction(
+					    session, NULL)) != 0) {
+						lprintf(wtperf, ret, 0, "Failed"
+						     " rollback_transaction");
+						goto err;
+					}
+					if ((ret = session->begin_transaction(
+					    session, NULL)) != 0) {
+						lprintf(wtperf, ret, 0,
+						    "Worker begin "
+						    "transaction failed");
+						goto err;
+					}
+				} else
+					goto err;
 			}
 		}
 
@@ -1256,7 +1274,7 @@ monitor(void *arg)
 	struct timespec t;
 	struct tm localt;
 	CONFIG_OPTS *opts;
-	FILE *fp;
+	FILE *fp, *jfp;
 	WTPERF *wtperf;
 	size_t len;
 	uint64_t min_thr, reads, inserts, updates;
@@ -1267,15 +1285,18 @@ monitor(void *arg)
 	uint32_t update_avg, update_min, update_max;
 	uint32_t latency_max, level;
 	u_int i;
+	size_t buf_size;
 	int msg_err;
 	const char *str;
 	char buf[64], *path;
+	bool first;
 
 	wtperf = (WTPERF *)arg;
 	opts = wtperf->opts;
 	assert(opts->sample_interval != 0);
 
-	fp = NULL;
+	fp = jfp = NULL;
+	first = true;
 	path = NULL;
 
 	min_thr = (uint64_t)opts->min_throughput;
@@ -1290,8 +1311,15 @@ monitor(void *arg)
 		lprintf(wtperf, errno, 0, "%s", path);
 		goto err;
 	}
+	testutil_check(__wt_snprintf(
+	    path, len, "%s/monitor.json", wtperf->monitor_dir));
+	if ((jfp = fopen(path, "w")) == NULL) {
+		lprintf(wtperf, errno, 0, "%s", path);
+		goto err;
+	}
 	/* Set line buffering for monitor file. */
 	__wt_stream_set_line_buffer(fp);
+	__wt_stream_set_line_buffer(jfp);
 	fprintf(fp,
 	    "#time,"
 	    "totalsec,"
@@ -1361,6 +1389,43 @@ monitor(void *arg)
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
 		    update_avg, update_min, update_max);
+		if (jfp != NULL) {
+			buf_size = strftime(buf,
+			    sizeof(buf), "%Y-%m-%dT%H:%M:%S", &localt);
+			testutil_assert(buf_size != 0);
+			testutil_check(__wt_snprintf(&buf[buf_size],
+			    sizeof(buf) - buf_size,
+			    ".%3.3" PRIu64 "Z",
+			    ns_to_ms((uint64_t)t.tv_nsec)));
+			(void)fprintf(jfp, "{");
+			if (first) {
+				(void)fprintf(jfp, "\"version\":\"%s\",",
+				    WIREDTIGER_VERSION_STRING);
+				first = false;
+			}
+			(void)fprintf(jfp,
+			    "\"localTime\":\"%s\",\"wtperf\":{", buf);
+			/* Note does not have initial comma before "read" */
+			(void)fprintf(jfp,
+			    "\"read\":{\"ops per sec\":%" PRIu64
+			    ",\"average latency\":%" PRIu32
+			    ",\"min latency\":%" PRIu32
+			    ",\"max latency\":%" PRIu32 "}",
+			    cur_reads, read_avg, read_min, read_max);
+			(void)fprintf(jfp,
+			    ",\"insert\":{\"ops per sec\":%" PRIu64
+			    ",\"average latency\":%" PRIu32
+			    ",\"min latency\":%" PRIu32
+			    ",\"max latency\":%" PRIu32 "}",
+			    cur_inserts, insert_avg, insert_min, insert_max);
+			(void)fprintf(jfp,
+			    ",\"update\":{\"ops per sec\":%" PRIu64
+			    ",\"average latency\":%" PRIu32
+			    ",\"min latency\":%" PRIu32
+			    ",\"max latency\":%" PRIu32 "}",
+			    cur_updates, update_avg, update_min, update_max);
+			fprintf(jfp, "}}\n");
+		}
 
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
@@ -1411,6 +1476,8 @@ err:		wtperf->error = wtperf->stop = true;
 
 	if (fp != NULL)
 		(void)fclose(fp);
+	if (jfp != NULL)
+		(void)fclose(jfp);
 	free(path);
 
 	return (WT_THREAD_RET_VALUE);

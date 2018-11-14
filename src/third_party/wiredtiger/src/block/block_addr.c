@@ -108,8 +108,8 @@ __wt_block_addr_invalid(WT_SESSION_IMPL *session,
 	 * In diagnostic mode, verify the address isn't on the available list,
 	 * or for live systems, the discard list.
 	 */
-	WT_RET(__wt_block_misplaced(
-	    session, block, "addr-valid", offset, size, live));
+	WT_RET(__wt_block_misplaced(session,
+	    block, "addr-valid", offset, size, live, __func__, __LINE__));
 #endif
 
 	/* Check if the address is past the end of the file. */

@@ -93,7 +93,7 @@
 		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT);			\
 	__update = !F_ISSET(&(s)->txn, WT_TXN_UPDATE);			\
 	if (__update)							\
-		F_SET(&(s)->txn, WT_TXN_UPDATE);			\
+		F_SET(&(s)->txn, WT_TXN_UPDATE);
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL_NOCONF(s, h, n, dh) do {				\
@@ -105,7 +105,7 @@
 		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT);			\
 	__update = !F_ISSET(&(s)->txn, WT_TXN_UPDATE);			\
 	if (__update)							\
-		F_SET(&(s)->txn, WT_TXN_UPDATE);			\
+		F_SET(&(s)->txn, WT_TXN_UPDATE);
 
 /* End a transactional API call, optional retry on deadlock. */
 #define	TXN_API_END_RETRY(s, ret, retry)				\

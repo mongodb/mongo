@@ -598,6 +598,10 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
 
 	WT_TRET(cursor->reset(cursor));
 
+	/* Don't keep buffers allocated for cached cursors. */
+	__wt_buf_free(session, &cursor->key);
+	__wt_buf_free(session, &cursor->value);
+
 	/*
 	 * Acquire a reference while decrementing the in-use counter.
 	 * After this point, the dhandle may be marked dead, but the
@@ -617,7 +621,8 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
 
 	(void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
 	WT_STAT_DATA_DECR(session, session_cursor_open);
-	WT_STAT_DATA_INCR(session, session_cursor_cached);
+	WT_STAT_DATA_INCR(session, session_cursors_cached);
+	WT_STAT_CONN_INCR(session, cursors_cached);
 	F_SET(cursor, WT_CURSTD_CACHED);
 	return (ret);
 }
@@ -642,7 +647,8 @@ __wt_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
 	}
 	(void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
 	WT_STAT_DATA_INCR(session, session_cursor_open);
-	WT_STAT_DATA_DECR(session, session_cursor_cached);
+	WT_STAT_DATA_DECR(session, session_cursors_cached);
+	WT_STAT_CONN_DECR(session, cursors_cached);
 
 	bucket = cursor->uri_hash % WT_HASH_ARRAY_SIZE;
 	TAILQ_REMOVE(&session->cursor_cache[bucket], cursor, q);
@@ -831,8 +837,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 					F_SET(cursor, WT_CURSTD_RAW);
 
 				if (cbt) {
-					WT_RET(__wt_config_gets_def(
-					    session,
+					WT_RET(__wt_config_gets_def(session,
 					    cfg, "read_once", 0, &cval));
 					if (cval.val != 0)
 						F_SET(cbt, WT_CBT_READ_ONCE);

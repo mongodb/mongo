@@ -183,14 +183,22 @@ struct OperationInternal {
     OperationInternal() : _flags(0) {}
     OperationInternal(const OperationInternal &other) : _flags(other._flags) {}
     virtual ~OperationInternal() {}
-    virtual void parse_config(const std::string &config) {}
+    virtual void parse_config(const std::string &config) { (void)config; }
     virtual int run(ThreadRunner *runner, WT_SESSION *session) {
 	(void)runner; (void)session; return (0); }
 };
 
 struct CheckpointOperationInternal : OperationInternal {
     CheckpointOperationInternal() : OperationInternal() {}
-    CheckpointOperationInternal(const CheckpointOperationInternal &other) {}
+    CheckpointOperationInternal(const CheckpointOperationInternal &other) :
+	OperationInternal(other) {}
+    virtual int run(ThreadRunner *runner, WT_SESSION *session);
+};
+
+struct LogFlushOperationInternal : OperationInternal {
+    LogFlushOperationInternal() : OperationInternal() {}
+    LogFlushOperationInternal(const LogFlushOperationInternal &other) :
+	OperationInternal(other) {}
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
 };
 
@@ -203,6 +211,7 @@ struct TableOperationInternal : OperationInternal {
     TableOperationInternal() : OperationInternal(), _keysize(0), _valuesize(0),
 			       _keymax(0),_valuemax(0) {}
     TableOperationInternal(const TableOperationInternal &other) :
+	OperationInternal(other),
 	_keysize(other._keysize), _valuesize(other._valuesize),
 	_keymax(other._keymax), _valuemax(other._valuemax) {}
     virtual void parse_config(const std::string &config);
@@ -213,7 +222,7 @@ struct SleepOperationInternal : OperationInternal {
 
     SleepOperationInternal() : OperationInternal(), _sleepvalue(0) {}
     SleepOperationInternal(const SleepOperationInternal &other) :
-	_sleepvalue(other._sleepvalue) {}
+	OperationInternal(other),_sleepvalue(other._sleepvalue) {}
     virtual void parse_config(const std::string &config);
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
 };

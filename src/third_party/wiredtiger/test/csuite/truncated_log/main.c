@@ -138,8 +138,8 @@ fill_db(void)
 	WT_LSN lsn, save_lsn;
 	WT_SESSION *session;
 	uint32_t i, max_key, min_key, units, unused;
-	bool first;
 	char k[K_SIZE], v[V_SIZE];
+	bool first;
 
 	/*
 	 * Run in the home directory so that the records file is in there too.

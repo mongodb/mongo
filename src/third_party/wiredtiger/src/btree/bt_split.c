@@ -336,9 +336,6 @@ __split_ref_prepare(WT_SESSION_IMPL *session,
 
 	locked = NULL;
 
-	/* The newly created subtree is complete. */
-	WT_WRITE_BARRIER();
-
 	/*
 	 * Update the moved WT_REFs so threads moving through them start looking
 	 * at the created children's page index information. Because we've not
@@ -529,8 +526,11 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_ASSERT(session,
 	    root_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
-	/* Start making real changes to the tree, errors are fatal. */
-	complete = WT_ERR_PANIC;
+	/*
+	 * Flush our writes and start making real changes to the tree, errors
+	 * are fatal.
+	 */
+	WT_PUBLISH(complete, WT_ERR_PANIC);
 
 	/* Prepare the WT_REFs for the move. */
 	WT_ERR(__split_ref_prepare(session, alloc_index, &locked, false));
@@ -1094,8 +1094,11 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ASSERT(session,
 	    page_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
-	/* Start making real changes to the tree, errors are fatal. */
-	complete = WT_ERR_PANIC;
+	/*
+	 * Flush our writes and start making real changes to the tree, errors
+	 * are fatal.
+	 */
+	WT_PUBLISH(complete, WT_ERR_PANIC);
 
 	/* Prepare the WT_REFs for the move. */
 	WT_ERR(__split_ref_prepare(session, alloc_index, &locked, true));

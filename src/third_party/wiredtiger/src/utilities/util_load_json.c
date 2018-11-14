@@ -173,10 +173,10 @@ static int
 json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 {
 	WT_DECL_RET;
+	size_t srclen;
+	ssize_t resultlen;
 	char *result, *resultcpy;
 	const char *src;
-	ssize_t resultlen;
-	size_t srclen;
 
 	result = NULL;
 	src = ins->tokstart + 1;  /*strip "" from token */

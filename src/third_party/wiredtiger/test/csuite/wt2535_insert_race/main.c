@@ -117,9 +117,9 @@ thread_insert_race(void *arg)
 	TEST_OPTS *opts;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t i, value;
-	int ret;
 
 	opts = (TEST_OPTS *)arg;
 	conn = opts->conn;

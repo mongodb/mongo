@@ -115,7 +115,15 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 				    file_func, name_func, cfg, open_flags));
 		}
 
-		WT_ERR(__wt_schema_open_indices(session, table));
+		/*
+		 * Some operations that walk handles, such as backup, need to
+		 * open indexes.  Others, such as checkpoints, do not.  Opening
+		 * indexes requires the handle write lock, so check whether
+		 * that lock is held when deciding what to do.
+		 */
+		if (F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE))
+			WT_ERR(__wt_schema_open_indices(session, table));
+
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
 			skip = false;
