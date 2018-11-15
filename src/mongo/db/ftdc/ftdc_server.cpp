@@ -300,7 +300,7 @@ void startFTDC(boost::filesystem::path& path,
         "serverStatus",
         "",
         BSON("serverStatus" << 1 << "tcMalloc" << true << "sharding" << false << "timing"
-                            << false)));
+                            << false << "oplog" << true)));
 
     registerCollectors(controller.get());
 
