@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/transaction_coordinator_service.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/shard_id.h"
@@ -81,31 +82,42 @@ public:
     }
 
     void assertCommandSentAndRespondWith(const StringData& commandName,
-                                         const StatusWith<BSONObj>& response) {
-        onCommand([commandName, response](const executor::RemoteCommandRequest& request) {
+                                         const StatusWith<BSONObj>& response,
+                                         boost::optional<BSONObj> expectedWriteConcern) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(commandName, request.cmdObj.firstElement().fieldNameStringData());
+            if (expectedWriteConcern) {
+                ASSERT_BSONOBJ_EQ(
+                    *expectedWriteConcern,
+                    request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
+            }
             return response;
         });
     }
 
     void assertPrepareSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName, kPrepareOk);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kPrepareOk,
+                                        WriteConcernOptions::InternalMajorityNoSnapshot);
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName, kNoSuchTransaction);
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kNoSuchTransaction,
+                                        WriteConcernOptions::InternalMajorityNoSnapshot);
     }
 
     void assertAbortSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith("abortTransaction", kOk);
+        assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
     }
 
     void assertCommitSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(CommitTransaction::kCommandName, kOk);
+        assertCommandSentAndRespondWith(CommitTransaction::kCommandName, kOk, boost::none);
     }
 
     void assertCommitSentAndRespondWithRetryableError() {
-        assertCommandSentAndRespondWith(CommitTransaction::kCommandName, kRetryableError);
+        assertCommandSentAndRespondWith(
+            CommitTransaction::kCommandName, kRetryableError, boost::none);
     }
 
     void assertNoMessageSent() {

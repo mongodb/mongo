@@ -150,7 +150,7 @@ Action sendPrepare(OperationContext* opCtx,
     auto prepareObj = prepareCmd.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
                     << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::Majority));
+                    << WriteConcernOptions::InternalMajorityNoSnapshot));
 
     auto actionNotification = std::make_shared<Notification<Action>>();
 
