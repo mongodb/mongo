@@ -354,7 +354,7 @@ public:
         auto& list = _getMapRef(T::isInternal);
         list.emplace_back(std::make_unique<T>());
         std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) {
-            return (a->securityLevel() >= b->securityLevel());
+            return (a->securityLevel() > b->securityLevel());
         });
 
         return true;
