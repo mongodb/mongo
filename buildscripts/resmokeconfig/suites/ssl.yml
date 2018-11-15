@@ -3,6 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/ssl/*.js
+  exclude_files:
+    # TODO: Unblacklist after we've removed sslyze dependency in SERVER-38155
+    - jstests/ssl/ssl_ECDHE_suites.js
 
 # ssl tests start their own mongod's.
 executor:
