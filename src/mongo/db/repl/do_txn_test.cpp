@@ -168,8 +168,6 @@ void DoTxnTest::tearDown() {
     _storage = {};
     _opObserver = nullptr;
 
-    SessionCatalog::get(getServiceContext())->reset_forTest();
-
     // Reset default log level in case it was changed.
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,
                                                         logger::LogSeverity::Debug(0));

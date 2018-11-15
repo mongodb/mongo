@@ -1132,7 +1132,8 @@ env.Library(
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
-        "commands/server_status_core",
+        'commands/server_status_core',
+        'kill_sessions',
     ],
 )
 
@@ -1584,6 +1585,9 @@ env.Library(
         'kill_sessions',
         'query_exec',
     ],
+    LIBDEPS_PRIVATE=[
+        'session_catalog',
+    ],
 )
 
 env.Library(
@@ -1796,9 +1800,9 @@ env.CppUnitTest(
         'logical_time_validator_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        'auth/authmocks',
         'keys_collection_manager',
         'logical_time_validator',
     ],
@@ -1879,11 +1883,11 @@ env.Library(
         'service_context_test_fixture',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/mongod',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
+        'commands/mongod',
         'service_context_d',
         'storage/devnull/storage_devnull',
         'storage/ephemeral_for_test/storage_ephemeral_for_test',
+        'storage/storage_options',
     ],
 )
 

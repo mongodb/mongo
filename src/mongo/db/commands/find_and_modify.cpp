@@ -66,7 +66,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"

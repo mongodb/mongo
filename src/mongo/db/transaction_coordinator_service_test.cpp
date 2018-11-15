@@ -31,12 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/transaction_coordinator_service.h"
+
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session_catalog.h"
-#include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"

@@ -154,6 +154,7 @@ protected:
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+
         _createOpCtx();
         _storageInterface = stdx::make_unique<StorageInterfaceRecovery>();
         _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
@@ -178,11 +179,10 @@ private:
     }
 
     void tearDown() override {
-        SessionCatalog::get(_opCtx->getServiceContext())->reset_forTest();
-
         _opCtx.reset(nullptr);
         _consistencyMarkers.reset();
         _storageInterface.reset();
+
         ServiceContextMongoDTest::tearDown();
     }
 

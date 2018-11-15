@@ -105,7 +105,6 @@ void createOplog(OperationContext* opCtx);
 std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  OptionalCollectionUUID uuid,
-                                 Session* session,
                                  std::vector<InsertStatement>::const_iterator begin,
                                  std::vector<InsertStatement>::const_iterator end,
                                  bool fromMigrate,

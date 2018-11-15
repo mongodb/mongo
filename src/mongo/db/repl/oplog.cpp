@@ -82,7 +82,6 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -505,7 +504,6 @@ OpTime logOp(OperationContext* opCtx,
 std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  OptionalCollectionUUID uuid,
-                                 Session* session,
                                  std::vector<InsertStatement>::const_iterator begin,
                                  std::vector<InsertStatement>::const_iterator end,
                                  bool fromMigrate,
@@ -540,11 +538,11 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     OperationSessionInfo sessionInfo;
     OplogLink oplogLink;
 
-    if (session) {
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
 
-        const auto txnParticipant = TransactionParticipant::get(opCtx);
         oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
     }
 

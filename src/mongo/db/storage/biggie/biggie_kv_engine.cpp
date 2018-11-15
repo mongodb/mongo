@@ -61,11 +61,11 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
     return Status::OK();
 }
 
-std::unique_ptr<::mongo::RecordStore> KVEngine::getRecordStore(OperationContext* opCtx,
-                                                               StringData ns,
-                                                               StringData ident,
-                                                               const CollectionOptions& options) {
-    std::unique_ptr<::mongo::RecordStore> recordStore;
+std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* opCtx,
+                                                             StringData ns,
+                                                             StringData ident,
+                                                             const CollectionOptions& options) {
+    std::unique_ptr<mongo::RecordStore> recordStore;
     if (options.capped) {
         recordStore = stdx::make_unique<RecordStore>(
             ns,

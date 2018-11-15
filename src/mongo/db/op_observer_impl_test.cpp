@@ -303,16 +303,9 @@ class OpObserverSessionCatalogRollbackTest : public OpObserverTest {
 public:
     void setUp() override {
         OpObserverTest::setUp();
+
         auto opCtx = cc().makeOperationContext();
-
         MongoDSessionCatalog::onStepUp(opCtx.get());
-    }
-
-    void tearDown() override {
-        auto sessionCatalog = SessionCatalog::get(getServiceContext());
-        sessionCatalog->reset_forTest();
-
-        OpObserverTest::tearDown();
     }
 
     /**
@@ -549,8 +542,6 @@ public:
         _sessionCheckout.reset();
         _times.reset();
         _opCtx.reset();
-        auto sessionCatalog = SessionCatalog::get(getServiceContext());
-        sessionCatalog->reset_forTest();
 
         OpObserverTest::tearDown();
     }

@@ -180,6 +180,9 @@ MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* o
     }
 }
 
+MongoDOperationContextSession::~MongoDOperationContextSession() = default;
+
+
 MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
     OperationContext* opCtx)
     : _operationContextSession(opCtx) {
@@ -189,5 +192,8 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
     const auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant->beginOrContinueTransactionUnconditionally(clientTxnNumber);
 }
+
+MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() =
+    default;
 
 }  // namespace mongo

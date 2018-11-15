@@ -84,6 +84,9 @@ env.Library(
         'sharding_catalog_manager',
         'sharding_logging',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/session_catalog',
+    ],
 )
 
 env.Library(

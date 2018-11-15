@@ -53,7 +53,6 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine_init.h"

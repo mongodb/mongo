@@ -195,11 +195,9 @@ class TxnParticipantTest : public MockReplCoordServerFixture {
 protected:
     void setUp() override {
         MockReplCoordServerFixture::setUp();
-
-        auto service = opCtx()->getServiceContext();
-
         MongoDSessionCatalog::onStepUp(opCtx());
 
+        const auto service = opCtx()->getServiceContext();
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
         auto mockObserver = stdx::make_unique<OpObserverMock>();
@@ -214,11 +212,12 @@ protected:
     }
 
     void tearDown() override {
+        _opObserver = nullptr;
+
         // Clear all sessions to free up any stashed resources.
         SessionCatalog::get(opCtx()->getServiceContext())->reset_forTest();
 
         MockReplCoordServerFixture::tearDown();
-        _opObserver = nullptr;
     }
 
     SessionCatalog* catalog() {
@@ -1668,8 +1667,7 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
  * Test fixture for transactions metrics.
  */
 class TransactionsMetricsTest : public TxnParticipantTest {
-
-public:
+protected:
     using TickSourceMicrosecondMock = TickSourceMock<Microseconds>;
 
     /**

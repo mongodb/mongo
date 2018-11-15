@@ -36,6 +36,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/catalog_control.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_clock.h"
@@ -45,8 +46,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mock_periodic_runner_impl.h"
-
-#include "mongo/db/catalog/database_holder.h"
 
 namespace mongo {
 
@@ -95,7 +94,9 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
         DatabaseHolder::getDatabaseHolder().closeAll(opCtx.get(), "all databases dropped");
     }
-    shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
+
+    shutdownGlobalStorageEngineCleanly(getServiceContext());
+
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);

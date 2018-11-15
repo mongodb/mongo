@@ -41,13 +41,14 @@
 
 namespace mongo {
 namespace biggie {
+
 class JournalListener;
 /**
  * The biggie storage engine is intended for unit and performance testing.
  */
-class KVEngine : public ::mongo::KVEngine {
+class KVEngine : public mongo::KVEngine {
 public:
-    KVEngine() : ::mongo::KVEngine() {}
+    KVEngine() : mongo::KVEngine() {}
 
     virtual ~KVEngine() {}
 
@@ -58,10 +59,10 @@ public:
                                      StringData ident,
                                      const CollectionOptions& options);
 
-    virtual std::unique_ptr<::mongo::RecordStore> getRecordStore(OperationContext* opCtx,
-                                                                 StringData ns,
-                                                                 StringData ident,
-                                                                 const CollectionOptions& options);
+    virtual std::unique_ptr<mongo::RecordStore> getRecordStore(OperationContext* opCtx,
+                                                               StringData ns,
+                                                               StringData ident,
+                                                               const CollectionOptions& options);
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,

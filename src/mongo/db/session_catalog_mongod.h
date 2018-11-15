@@ -73,6 +73,7 @@ public:
 class MongoDOperationContextSession {
 public:
     MongoDOperationContextSession(OperationContext* opCtx);
+    ~MongoDOperationContextSession();
 
 private:
     OperationContextSession _operationContextSession;
@@ -88,6 +89,7 @@ private:
 class MongoDOperationContextSessionWithoutRefresh {
 public:
     MongoDOperationContextSessionWithoutRefresh(OperationContext* opCtx);
+    ~MongoDOperationContextSessionWithoutRefresh();
 
 private:
     OperationContextSession _operationContextSession;

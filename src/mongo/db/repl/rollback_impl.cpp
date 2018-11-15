@@ -55,7 +55,6 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_recovery.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"

@@ -55,7 +55,8 @@ ServiceContext* ScopedGlobalServiceContextForTest::getServiceContext() {
     return getGlobalServiceContext();
 }
 
-ServiceContextTest::ServiceContextTest() : _threadClient(getGlobalServiceContext()) {}
+
+ServiceContextTest::ServiceContextTest() : _threadClient(getServiceContext()) {}
 
 Client* ServiceContextTest::getClient() {
     return Client::getCurrent();

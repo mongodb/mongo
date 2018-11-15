@@ -44,12 +44,6 @@ namespace {
 
 class SessionCatalogTest : public ServiceContextMongoDTest {
 protected:
-    void setUp() final {
-        ServiceContextMongoDTest::setUp();
-
-        catalog()->reset_forTest();
-    }
-
     SessionCatalog* catalog() {
         return SessionCatalog::get(getServiceContext());
     }

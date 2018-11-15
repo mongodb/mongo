@@ -135,11 +135,6 @@ public:
         LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
     }
 
-    void tearDown() override {
-        SessionCatalog::get(getServiceContext())->reset_forTest();
-        ShardServerTestFixture::tearDown();
-    }
-
     void returnOplog(const std::vector<OplogEntry>& oplogList) {
         onCommand([&oplogList](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
             BSONObjBuilder builder;

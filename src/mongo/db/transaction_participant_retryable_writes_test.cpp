@@ -155,13 +155,7 @@ protected:
     void tearDown() final {
         _opObserver = nullptr;
 
-        SessionCatalog::get(opCtx()->getServiceContext())->reset_forTest();
-
         MockReplCoordServerFixture::tearDown();
-    }
-
-    SessionCatalog* catalog() {
-        return SessionCatalog::get(opCtx()->getServiceContext());
     }
 
     static repl::OpTime logOp(OperationContext* opCtx,
