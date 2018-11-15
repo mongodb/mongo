@@ -7,4 +7,3 @@ selector:
     exclude_tasks:
     # Exclude list of jstests file names.
     exclude_tests:
-      - jstests/ssl/ssl_ECDHE_suites.js
