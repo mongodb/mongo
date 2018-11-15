@@ -373,7 +373,7 @@ public:
             {std::move(exec),
              cursorNss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             repl::ReadConcernArgs::get(opCtx).getLevel(),
+             repl::ReadConcernArgs::get(opCtx),
              jsobj});
 
         appendCursorResponseObject(

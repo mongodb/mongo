@@ -58,11 +58,11 @@ struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
-                       repl::ReadConcernLevel readConcernLevel,
+                       repl::ReadConcernArgs readConcernArgs,
                        BSONObj originatingCommandObj)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
-          readConcernLevel(readConcernLevel),
+          readConcernArgs(readConcernArgs),
           queryOptions(exec->getCanonicalQuery()
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
@@ -89,7 +89,7 @@ struct ClientCursorParams {
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
     std::vector<UserName> authenticatedUsers;
-    const repl::ReadConcernLevel readConcernLevel;
+    const repl::ReadConcernArgs readConcernArgs;
     int queryOptions = 0;
     BSONObj originatingCommandObj;
 };
@@ -134,8 +134,8 @@ public:
         return _txnNumber;
     }
 
-    repl::ReadConcernLevel getReadConcernLevel() const {
-        return _readConcernLevel;
+    repl::ReadConcernArgs getReadConcernArgs() const {
+        return _readConcernArgs;
     }
 
     /**
@@ -328,7 +328,7 @@ private:
     // A transaction number for this cursor, if it was provided in the originating command.
     const boost::optional<TxnNumber> _txnNumber;
 
-    const repl::ReadConcernLevel _readConcernLevel;
+    const repl::ReadConcernArgs _readConcernArgs;
 
     CursorManager* _cursorManager;
 

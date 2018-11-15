@@ -371,7 +371,8 @@ public:
             const auto replicationMode =
                 repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
             if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-                cursor->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+                cursor->getReadConcernArgs().getLevel() ==
+                    repl::ReadConcernLevel::kMajorityReadConcern) {
                 opCtx->recoveryUnit()->setTimestampReadSource(
                     RecoveryUnit::ReadSource::kMajorityCommitted);
                 uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());

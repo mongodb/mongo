@@ -595,7 +595,7 @@ Status runAggregate(OperationContext* opCtx,
             std::move(execs[idx]),
             origNss,
             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-            repl::ReadConcernArgs::get(opCtx).getLevel(),
+            repl::ReadConcernArgs::get(opCtx),
             cmdObj);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);

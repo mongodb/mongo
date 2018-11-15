@@ -356,7 +356,7 @@ Message getMore(OperationContext* opCtx,
         const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 
         if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-            cc->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+            cc->getReadConcernArgs().getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
             opCtx->recoveryUnit()->setTimestampReadSource(
                 RecoveryUnit::ReadSource::kMajorityCommitted);
             uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
@@ -676,7 +676,7 @@ std::string runQuery(OperationContext* opCtx,
             {std::move(exec),
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             readConcernArgs.getLevel(),
+             readConcernArgs,
              upconvertedQuery});
         ccId = pinnedCursor.getCursor()->cursorid();
 
