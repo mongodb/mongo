@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001 - 2016 The SCons Foundation
+# Copyright (c) 2001 - 2017 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -20,7 +20,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/netframework.py rel_2.5.0:3543:937e55cd78f7 2016/04/09 11:29:54 bdbaddog"
+__revision__ = "src/engine/SCons/Tool/MSCommon/netframework.py 74b2c53bc42290e911b334a6b44f187da698a668 2017/11/14 13:16:53 bdbaddog"
 
 __doc__ = """
 """
@@ -29,7 +29,7 @@ import os
 import re
 import SCons.Util
 
-from common import read_reg, debug
+from .common import read_reg, debug
 
 # Original value recorded by dcournapeau
 _FRAMEWORKDIR_HKEY_ROOT = r'Software\Microsoft\.NETFramework\InstallRoot'
@@ -40,13 +40,13 @@ def find_framework_root():
     # XXX: find it from environment (FrameworkDir)
     try:
         froot = read_reg(_FRAMEWORKDIR_HKEY_ROOT)
-        debug("Found framework install root in registry: %s" % froot)
-    except SCons.Util.WinError, e:
-        debug("Could not read reg key %s" % _FRAMEWORKDIR_HKEY_ROOT)
+        debug("Found framework install root in registry: {}".format(froot))
+    except SCons.Util.WinError as e:
+        debug("Could not read reg key {}".format(_FRAMEWORKDIR_HKEY_ROOT))
         return None
 
     if not os.path.exists(froot):
-        debug("%s not found on fs" % froot)
+        debug("{} not found on fs".format(froot))
         return None
 
     return froot

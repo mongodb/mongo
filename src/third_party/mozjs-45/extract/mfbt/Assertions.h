@@ -209,6 +209,10 @@ MOZ_ReportCrash(const char* aStr, const char* aFilename, int aLine)
     * by MSVC, so doing it this way reduces complexity.)
     */
 
+/* MongoDB Modification: intrin.h is needed for __debugbreak below */
+#include <intrin.h>
+/* MongoDB End Modification */
+
 __declspec(noreturn) __inline void MOZ_NoReturn() {}
 
 #  ifdef __cplusplus

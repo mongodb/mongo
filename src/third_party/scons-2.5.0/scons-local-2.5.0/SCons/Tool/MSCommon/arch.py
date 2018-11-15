@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001 - 2016 The SCons Foundation
+# Copyright (c) 2001 - 2017 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/arch.py rel_2.5.0:3543:937e55cd78f7 2016/04/09 11:29:54 bdbaddog"
+__revision__ = "src/engine/SCons/Tool/MSCommon/arch.py 74b2c53bc42290e911b334a6b44f187da698a668 2017/11/14 13:16:53 bdbaddog"
 
 __doc__ = """Module to define supported Windows chip architectures.
 """

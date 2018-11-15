@@ -1602,6 +1602,9 @@ elif env.TargetOSIs('windows'):
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
+    # Temporary fixes to allow compilation with VS2017
+    env.Append( CPPDEFINES=[ "_SILENCE_FPOS_SEEKPOS_DEPRECATION_WARNING" ] )
+
     # /EHsc exception handling style for visual studio
     # /W3 warning level
     env.Append(CCFLAGS=["/EHsc","/W3"])

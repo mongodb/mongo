@@ -189,8 +189,16 @@ TEST(BSONObjCompare, NumberLong_Double) {
         const double equal = -9223372036854775808.0;         // 2**63
         const double closestAbove = -9223372036854774784.0;  // -2**63 + epsilon
 
+// VS2017 Doesn't like the tests below, even though we're using static_cast
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4056)  // warning C4056: overflow in floating-point constant arithmetic
+#endif
         invariant(static_cast<double>(minLL) == equal);
         invariant(static_cast<long long>(equal) == minLL);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
         ASSERT_BSONOBJ_LT(BSON("" << minLL), BSON("" << (minLL + 1)));
 

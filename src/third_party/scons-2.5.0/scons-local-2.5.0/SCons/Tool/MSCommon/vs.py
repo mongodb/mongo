@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001 - 2016 The SCons Foundation
+# Copyright (c) 2001 - 2017 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/MSCommon/vs.py rel_2.5.0:3543:937e55cd78f7 2016/04/09 11:29:54 bdbaddog"
+__revision__ = "src/engine/SCons/Tool/MSCommon/vs.py 74b2c53bc42290e911b334a6b44f187da698a668 2017/11/14 13:16:53 bdbaddog"
 
 __doc__ = """Module to detect Visual Studio and/or Visual C/C++
 """
@@ -31,7 +31,7 @@ import os
 import SCons.Errors
 import SCons.Util
 
-from common import debug, \
+from .common import debug, \
                    get_output, \
                    is_win64, \
                    normalize_env, \
@@ -83,10 +83,10 @@ class VisualStudio(object):
             key = root + key
             try:
                 comps = read_reg(key)
-            except SCons.Util.WinError, e:
-                debug('find_vs_dir_by_reg(): no VS registry key %s' % repr(key))
+            except SCons.Util.WinError as e:
+                debug('find_vs_dir_by_reg(): no VS registry key {}'.format(repr(key)))
             else:
-                debug('find_vs_dir_by_reg(): found VS in registry: %s' % comps)
+                debug('find_vs_dir_by_reg(): found VS in registry: {}'.format(comps))
                 return comps
         return None
 
@@ -105,12 +105,12 @@ class VisualStudio(object):
     def find_executable(self):
         vs_dir = self.get_vs_dir()
         if not vs_dir:
-            debug('find_executable():  no vs_dir (%s)'%vs_dir)
+            debug('find_executable():  no vs_dir ({})'.format(vs_dir))
             return None
         executable = os.path.join(vs_dir, self.executable_path)
         executable = os.path.normpath(executable)
         if not os.path.isfile(executable):
-            debug('find_executable():  %s not on file system' % executable)
+            debug('find_executable():  {} not on file system'.format(executable))
             return None
         return executable
 
@@ -199,17 +199,28 @@ class VisualStudio(object):
 # Tool/MSCommon/vc.py, and the MSVC_VERSION documentation in Tool/msvc.xml.
 
 SupportedVSList = [
+    # Visual Studio 2017
+    VisualStudio('14.1',
+                 vc_version='14.1',
+                 sdk_version='10.0A',
+                 hkeys=[],
+                 common_tools_var='VS150COMNTOOLS',
+                 executable_path=r'Common7\IDE\devenv.com',
+                 batch_file_path=r'VC\Auxiliary\Build\vsvars32.bat',
+                 supported_arch=['x86', 'amd64', "arm"],
+                 ),
+
     # Visual Studio 2015
     VisualStudio('14.0',
                  vc_version='14.0',
-                 sdk_version='10.0A',
+                 sdk_version='10.0',
                  hkeys=[r'Microsoft\VisualStudio\14.0\Setup\VS\ProductDir'],
                  common_tools_var='VS140COMNTOOLS',
                  executable_path=r'Common7\IDE\devenv.com',
                  batch_file_path=r'Common7\Tools\vsvars32.bat',
                  supported_arch=['x86', 'amd64', "arm"],
     ),
- 
+
     # Visual C++ 2015 Express Edition (for Desktop)
     VisualStudio('14.0Exp',
                  vc_version='14.0',
