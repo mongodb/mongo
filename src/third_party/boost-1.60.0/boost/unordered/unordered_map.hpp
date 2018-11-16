@@ -84,7 +84,8 @@ namespace unordered
 
         // constructors
 
-        explicit unordered_map(
+        // MongoDB Modification: Removed explcit from constructor below to compile with MSVC 2017 with /std:c++17
+        unordered_map(
                 size_type = boost::unordered::detail::default_bucket_count,
                 const hasher& = hasher(),
                 const key_equal& = key_equal(),
