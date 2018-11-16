@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
@@ -47,13 +48,18 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
 
 using std::string;
 using std::unique_ptr;
@@ -432,6 +438,65 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     return newObj;
 }
 
+bool UpdateStage::matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
+    if (root.matchType() == MatchExpression::EQ) {
+        return true;
+    }
+
+    if (root.matchType() == MatchExpression::AND) {
+        for (size_t i = 0; i < root.numChildren(); ++i) {
+            if (root.getChild(i)->matchType() != MatchExpression::EQ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+bool UpdateStage::shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
+                                                   const DuplicateKeyErrorInfo& errorInfo) {
+    invariant(parsedUpdate.hasParsedQuery());
+
+    const auto updateRequest = parsedUpdate.getRequest();
+
+    // In order to be retryable, the update must be an upsert with multi:false.
+    if (!updateRequest->isUpsert() || updateRequest->isMulti()) {
+        return false;
+    }
+
+    auto matchExpr = parsedUpdate.getParsedQuery()->root();
+    invariant(matchExpr);
+
+    // In order to be retryable, the update query must contain no expressions other than AND and EQ.
+    if (!matchContainsOnlyAndedEqualityNodes(*matchExpr)) {
+        return false;
+    }
+
+    // In order to be retryable, the update equality field paths must be identical to the unique
+    // index key field paths.
+    pathsupport::EqualityMatches equalities;
+    auto status = pathsupport::extractEqualityMatches(*matchExpr, &equalities);
+    if (!status.isOK()) {
+        return false;
+    }
+
+    auto keyPattern = errorInfo.getKeyPattern();
+    if (equalities.size() != static_cast<size_t>(keyPattern.nFields())) {
+        return false;
+    }
+
+    for (const auto& key : keyPattern) {
+        if (!equalities.count(key.fieldNameStringData())) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void UpdateStage::doInsert() {
     _specificStats.inserted = true;
 
@@ -456,6 +521,11 @@ void UpdateStage::doInsert() {
     // If this is an explain, bail out now without doing the insert.
     if (request->isExplain()) {
         return;
+    }
+
+    if (MONGO_FAIL_POINT(hangBeforeUpsertPerformsInsert)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangBeforeUpsertPerformsInsert, getOpCtx(), "hangBeforeUpsertPerformsInsert");
     }
 
     writeConflictRetry(getOpCtx(), "upsert", collection()->ns().ns(), [&] {
@@ -498,11 +568,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     if (doneUpdating()) {
         // Even if we're done updating, we may have some inserting left to do.
         if (needInsert()) {
-            // TODO we may want to handle WriteConflictException here. Currently we bounce it
-            // out to a higher level since if this WCEs it is likely that we raced with another
-            // upsert that may have matched our query, and therefore this may need to perform an
-            // update rather than an insert. Bouncing to the higher level allows restarting the
-            // query in this case.
+
             doInsert();
 
             invariant(isEOF());

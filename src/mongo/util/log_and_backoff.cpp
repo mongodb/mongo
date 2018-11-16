@@ -1,6 +1,3 @@
-// write_conflict_exception.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -30,37 +27,33 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/util/log.h"
 #include "mongo/util/log_and_backoff.h"
-#include "mongo/util/stacktrace.h"
+
+#include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-AtomicBool WriteConflictException::trace(false);
+void logAndBackoff(logger::LogComponent logComponent,
+                   logger::LogSeverity logLevel,
+                   size_t numAttempts,
+                   StringData message) {
+    MONGO_LOG_COMPONENT(logLevel, logComponent) << message
+                                                << ". Retrying, attempt: " << numAttempts;
 
-WriteConflictException::WriteConflictException()
-    : DBException(Status(ErrorCodes::WriteConflict, "WriteConflict")) {
-    if (trace.load()) {
-        printStackTrace();
+    if (numAttempts < 4) {
+        // no-op
+    } else if (numAttempts < 10) {
+        sleepmillis(1);
+    } else if (numAttempts < 100) {
+        sleepmillis(5);
+    } else if (numAttempts < 200) {
+        sleepmillis(10);
+    } else {
+        sleepmillis(100);
     }
 }
 
-void WriteConflictException::logAndBackoff(int attempt, StringData operation, StringData ns) {
-    mongo::logAndBackoff(
-        ::mongo::logger::LogComponent::kWrite,
-        logger::LogSeverity::Debug(1),
-        static_cast<size_t>(attempt),
-        str::stream() << "Caught WriteConflictException doing " << operation << " on " << ns);
-}
-namespace {
-// for WriteConflictException
-ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> TraceWCExceptionsSetting(
-    ServerParameterSet::getGlobal(),
-    "traceWriteConflictExceptions",
-    &WriteConflictException::trace);
-}
-}
+}  // namespace mongo

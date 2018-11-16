@@ -1,6 +1,3 @@
-// write_conflict_exception.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -30,37 +27,21 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#pragma once
 
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/util/log.h"
-#include "mongo/util/log_and_backoff.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/base/string_data.h"
+#include "mongo/logger/log_component.h"
+#include "mongo/logger/log_severity.h"
 
 namespace mongo {
 
-AtomicBool WriteConflictException::trace(false);
+/**
+ * Will log a message at 'logLevel' for the given 'logComponent' and will perform truncated
+ * exponential backoff, with the backoff period based on 'numAttempts'.
+ */
+void logAndBackoff(logger::LogComponent logComponent,
+                   logger::LogSeverity logLevel,
+                   size_t numAttempts,
+                   StringData message);
 
-WriteConflictException::WriteConflictException()
-    : DBException(Status(ErrorCodes::WriteConflict, "WriteConflict")) {
-    if (trace.load()) {
-        printStackTrace();
-    }
-}
-
-void WriteConflictException::logAndBackoff(int attempt, StringData operation, StringData ns) {
-    mongo::logAndBackoff(
-        ::mongo::logger::LogComponent::kWrite,
-        logger::LogSeverity::Debug(1),
-        static_cast<size_t>(attempt),
-        str::stream() << "Caught WriteConflictException doing " << operation << " on " << ns);
-}
-namespace {
-// for WriteConflictException
-ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> TraceWCExceptionsSetting(
-    ServerParameterSet::getGlobal(),
-    "traceWriteConflictExceptions",
-    &WriteConflictException::trace);
-}
-}
+}  // namespace mongo

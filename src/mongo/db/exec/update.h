@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/update/update_driver.h"
@@ -73,7 +74,7 @@ private:
  * returned after updating or inserting a document. Otherwise, NEED_TIME is returned after
  * updating or inserting a document.
  *
- * Callers of work() must be holding a write lock.
+ * Callers of doWork() must be holding a write lock.
  */
 class UpdateStage final : public RequiresMutableCollectionStage {
     MONGO_DISALLOW_COPYING(UpdateStage);
@@ -144,6 +145,13 @@ public:
                                            bool enforceOkForStorage,
                                            UpdateStats* stats);
 
+    /**
+     * Returns true if an update failure due to a given DuplicateKey error is eligible for retry.
+     * Requires that parsedUpdate.hasParsedQuery() is true.
+     */
+    static bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
+                                                 const DuplicateKeyErrorInfo& errorInfo);
+
 protected:
     void doSaveStateRequiresCollection() final {}
 
@@ -151,6 +159,12 @@ protected:
 
 private:
     static const UpdateStats kEmptyUpdateStats;
+
+    /**
+     * Returns whether a given MatchExpression contains is a MatchType::EQ or a MatchType::AND node
+     * with only MatchType::EQ children.
+     */
+    static bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root);
 
     /**
      * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in
@@ -179,7 +193,7 @@ private:
 
     /**
      * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
-     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
+     * doWork(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
      */
     StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 

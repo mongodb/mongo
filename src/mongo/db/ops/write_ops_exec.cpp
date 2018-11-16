@@ -69,6 +69,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -76,6 +77,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -560,40 +562,8 @@ WriteResult performInserts(OperationContext* opCtx,
 static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
-                                               const write_ops::UpdateOpEntry& op) {
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    uassert(ErrorCodes::InvalidOptions,
-            "Cannot use (or request) retryable writes with multi=true",
-            (txnParticipant && txnParticipant->inMultiDocumentTransaction()) ||
-                !opCtx->getTxnNumber() || !op.getMulti());
-
-    globalOpCounters.gotUpdate();
-    auto& curOp = *CurOp::get(opCtx);
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(ns.ns());
-        curOp.setNetworkOp_inlock(dbUpdate);
-        curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
-        curOp.setOpDescription_inlock(op.toBSON());
-        curOp.ensureStarted();
-    }
-
-    UpdateRequest request(ns);
-    request.setQuery(op.getQ());
-    request.setUpdates(op.getU());
-    request.setCollation(write_ops::collationOf(op));
-    request.setStmtId(stmtId);
-    request.setArrayFilters(write_ops::arrayFiltersOf(op));
-    request.setMulti(op.getMulti());
-    request.setUpsert(op.getUpsert());
-
-    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    request.setYieldPolicy(readConcernArgs.getLevel() ==
-                                   repl::ReadConcernLevel::kSnapshotReadConcern
-                               ? PlanExecutor::INTERRUPT_ONLY
-                               : PlanExecutor::YIELD_AUTO);
-
-    ParsedUpdate parsedUpdate(opCtx, &request);
+                                               const UpdateRequest& updateRequest) {
+    ParsedUpdate parsedUpdate(opCtx, &updateRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     boost::optional<AutoGetCollection> collection;
@@ -612,12 +582,14 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                            ns,
                            MODE_IX,  // DB is always IX, even if collection is X.
                            MODE_IX);
-        if (collection->getCollection() || !op.getUpsert())
+        if (collection->getCollection() || !updateRequest.isUpsert())
             break;
 
         collection.reset();  // unlock.
         makeCollection(opCtx, ns);
     }
+
+    auto& curOp = *CurOp::get(opCtx);
 
     if (collection->getDb()) {
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
@@ -662,6 +634,76 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     result.setUpsertedId(res.upserted);
 
     return result;
+}
+
+/**
+ * Performs a single update, retrying failure due to DuplicateKeyError when eligible.
+ */
+static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* opCtx,
+                                                              const NamespaceString& ns,
+                                                              StmtId stmtId,
+                                                              const write_ops::UpdateOpEntry& op) {
+    globalOpCounters.gotUpdate();
+    auto& curOp = *CurOp::get(opCtx);
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curOp.setNS_inlock(ns.ns());
+        curOp.setNetworkOp_inlock(dbUpdate);
+        curOp.setLogicalOp_inlock(LogicalOp::opUpdate);
+        curOp.setOpDescription_inlock(op.toBSON());
+        curOp.ensureStarted();
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot use (or request) retryable writes with multi=true",
+            (txnParticipant && txnParticipant->inMultiDocumentTransaction()) ||
+                !opCtx->getTxnNumber() || !op.getMulti());
+
+    UpdateRequest request(ns);
+    request.setQuery(op.getQ());
+    request.setUpdates(op.getU());
+    request.setCollation(write_ops::collationOf(op));
+    request.setStmtId(stmtId);
+    request.setArrayFilters(write_ops::arrayFiltersOf(op));
+    request.setMulti(op.getMulti());
+    request.setUpsert(op.getUpsert());
+
+    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    request.setYieldPolicy(readConcernArgs.getLevel() ==
+                                   repl::ReadConcernLevel::kSnapshotReadConcern
+                               ? PlanExecutor::INTERRUPT_ONLY
+                               : PlanExecutor::YIELD_AUTO);
+
+    size_t numAttempts = 0;
+    while (true) {
+        ++numAttempts;
+
+        try {
+            return performSingleUpdateOp(opCtx, ns, stmtId, request);
+        } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+            ParsedUpdate parsedUpdate(opCtx, &request);
+            uassertStatusOK(parsedUpdate.parseRequest());
+
+            if (!parsedUpdate.hasParsedQuery()) {
+                uassertStatusOK(parsedUpdate.parseQueryToCQ());
+            }
+
+            if (!UpdateStage::shouldRetryDuplicateKeyException(
+                    parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+                throw;
+            }
+
+            logAndBackoff(::mongo::logger::LogComponent::kWrite,
+                          logger::LogSeverity::Debug(1),
+                          numAttempts,
+                          str::stream()
+                              << "Caught DuplicateKey exception during upsert for namespace "
+                              << ns.ns());
+        }
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& wholeOp) {
@@ -709,8 +751,8 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp); });
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(
-                performSingleUpdateOp(opCtx, wholeOp.getNamespace(), stmtId, singleOp));
+            out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
+                opCtx, wholeOp.getNamespace(), stmtId, singleOp));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =

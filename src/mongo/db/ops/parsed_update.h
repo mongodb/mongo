@@ -105,6 +105,14 @@ public:
     bool hasParsedQuery() const;
 
     /**
+     * Returns a const pointer to the canonical query. Requires that hasParsedQuery() is true.
+     */
+    const CanonicalQuery* getParsedQuery() const {
+        invariant(_canonicalQuery);
+        return _canonicalQuery.get();
+    }
+
+    /**
      * Releases ownership of the canonical query to the caller.
      */
     std::unique_ptr<CanonicalQuery> releaseParsedQuery();

@@ -42,6 +42,16 @@ env.Library(
         ]
     )
 
+env.Library(
+    target='log_and_backoff',
+    source= [
+        'log_and_backoff.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 debuggerEnv = env.Clone()
 if has_option("gdbserver"):
     debuggerEnv.Append(CPPDEFINES=["USE_GDBSERVER"])

@@ -587,14 +587,14 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
 
     int64_t keysDeleted;
     _indexCatalog->unindexRecord(opCtx, doc.value(), loc, noWarn, &keysDeleted);
-    if (opDebug) {
-        opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
-    }
-
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
         opCtx, ns(), uuid(), stmtId, fromMigrate, deletedDoc);
+
+    if (opDebug) {
+        opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+    }
 }
 
 Counter64 moveCounter;
@@ -689,6 +689,9 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 
     // Update each index with each respective UpdateTicket.
     if (indexesAffected) {
+        int64_t keysInsertedTotal = 0;
+        int64_t keysDeletedTotal = 0;
+
         std::unique_ptr<IndexCatalog::IndexIterator> ii =
             _indexCatalog->getIndexIterator(opCtx, true);
         while (ii->more()) {
@@ -700,10 +703,13 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
             int64_t keysDeleted;
             uassertStatusOK(iam->update(
                 opCtx, *updateTickets.mutableMap()[descriptor], &keysInserted, &keysDeleted));
-            if (opDebug) {
-                opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
-                opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
-            }
+            keysInsertedTotal += keysInserted;
+            keysDeletedTotal += keysDeleted;
+        }
+
+        if (opDebug) {
+            opDebug->additiveMetrics.incrementKeysInserted(keysInsertedTotal);
+            opDebug->additiveMetrics.incrementKeysDeleted(keysDeletedTotal);
         }
     }
 
