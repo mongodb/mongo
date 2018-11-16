@@ -212,8 +212,8 @@ public:
     public:
         ConstChunkIterator() = default;
         explicit ConstChunkIterator(ChunkInfoMap::const_iterator iter,
-                                    const boost::optional<Timestamp>& clusterTime)
-            : _iter{iter} {}
+                                    boost::optional<Timestamp> clusterTime)
+            : _iter{std::move(iter)}, _clusterTime{std::move(clusterTime)} {}
 
         ConstChunkIterator& operator++() {
             ++_iter;
@@ -234,7 +234,7 @@ public:
 
     private:
         ChunkInfoMap::const_iterator _iter;
-        const boost::optional<Timestamp> _clusterTime;
+        boost::optional<Timestamp> _clusterTime;
     };
 
     class ConstRangeOfChunks {
