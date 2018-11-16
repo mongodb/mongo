@@ -182,23 +182,13 @@ private:
         : _rawObj(spec), _policies(policies) {}
 
     /**
-     * Parses a single BSONElement, with 'fieldName' representing the path used for projection
-     * inclusion or exclusion. This code was broken out into a separate function as a workaround for
-     * SERVER-33125.
-     */
-    void parseElementWithFieldName(BSONElement elem, StringData fieldName) {
-        FieldPath elemPath(fieldName);
-        parseElement(elem, elemPath);
-    }
-
-    /**
      * Traverses '_rawObj' to determine the type of projection, populating '_parsedType' in the
      * process.
      */
     void parse() {
         size_t nFields = 0;
         for (auto&& elem : _rawObj) {
-            parseElementWithFieldName(elem, elem.fieldName());
+            parseElement(elem, FieldPath(elem.fieldName()));
             nFields++;
         }
 
