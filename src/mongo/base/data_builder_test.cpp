@@ -29,6 +29,7 @@
  */
 
 #include "mongo/base/data_builder.h"
+#include "mongo/base/data_type_terminated.h"
 
 #include "mongo/platform/endian.h"
 #include "mongo/unittest/unittest.h"
@@ -167,6 +168,17 @@ TEST(DataBuilder, Move) {
     ASSERT_EQUALS(0u, db.capacity());
     ASSERT_EQUALS(0u, db.size());
     ASSERT(!db.getCursor().data());
+}
+
+TEST(DataBuilder, TerminatedStringDatas) {
+    DataBuilder db{10};
+    StringData sample{"abcdefgh"};
+
+    auto status2 = db.writeAndAdvance<Terminated<'\0', StringData>>(sample);
+    ASSERT_EQUALS(true, status2.isOK());
+
+    auto status3 = db.writeAndAdvance<Terminated<'\0', StringData>>(sample);
+    ASSERT_EQUALS(true, status3.isOK());
 }
 
 }  // namespace mongo
