@@ -633,4 +633,20 @@ struct TextOrStats : public SpecificStats {
     size_t fetches;
 };
 
+struct TrialStats : public SpecificStats {
+    SpecificStats* clone() const final {
+        TrialStats* specific = new TrialStats(*this);
+        return specific;
+    }
+
+    size_t trialPeriodMaxWorks = 0;
+    double successThreshold = 0;
+
+    size_t trialWorks = 0;
+    size_t trialAdvanced = 0;
+
+    bool trialCompleted = false;
+    bool trialSucceeded = false;
+};
+
 }  // namespace mongo

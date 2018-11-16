@@ -47,6 +47,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/subplan.h"
+#include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/find_common.h"
@@ -271,6 +272,14 @@ Status PlanExecutorImpl::_pickBestPlan() {
     if (foundStage) {
         CachedPlanStage* cachedPlan = static_cast<CachedPlanStage*>(foundStage);
         return cachedPlan->pickBestPlan(_yieldPolicy.get());
+    }
+
+    // Finally, we might have an explicit TrialPhase. This specifies exactly two candidate plans,
+    // one of which is to be evaluated. If it fails the trial, then the backup plan is adopted.
+    foundStage = getStageByType(_root.get(), STAGE_TRIAL);
+    if (foundStage) {
+        TrialStage* trialStage = static_cast<TrialStage*>(foundStage);
+        return trialStage->pickBestPlan(_yieldPolicy.get());
     }
 
     // Either we chose a plan, or no plan selection was required. In both cases,

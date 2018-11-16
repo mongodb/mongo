@@ -42,9 +42,12 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/multi_iterator.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/shard_filter.h"
+#include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -94,50 +97,72 @@ using std::unique_ptr;
 using write_ops::Insert;
 
 namespace {
-
 /**
  * Returns a PlanExecutor which uses a random cursor to sample documents if successful. Returns {}
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
  * percentage of the collection.
  */
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorExecutor(
-    Collection* collection, OperationContext* opCtx, long long sampleSize, long long numRecords) {
+    Collection* coll, OperationContext* opCtx, long long sampleSize, long long numRecords) {
     // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
     // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns().ns(), MODE_IS));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns().ns(), MODE_IS));
 
-    double kMaxSampleRatioForRandCursor = 0.05;
+    static const double kMaxSampleRatioForRandCursor = 0.05;
     if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
         return {nullptr};
     }
 
     // Attempt to get a random cursor from the RecordStore.
-    auto rsRandCursor = collection->getRecordStore()->getRandomCursor(opCtx);
+    auto rsRandCursor = coll->getRecordStore()->getRandomCursor(opCtx);
     if (!rsRandCursor) {
         // The storage engine has no random cursor support.
         return {nullptr};
     }
 
-    auto ws = stdx::make_unique<WorkingSet>();
-    auto stage = stdx::make_unique<MultiIteratorStage>(opCtx, ws.get(), collection);
-    stage->addIterator(std::move(rsRandCursor));
+    // Build a MultiIteratorStage and pass it the random-sampling RecordCursor.
+    auto ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> root = std::make_unique<MultiIteratorStage>(opCtx, ws.get(), coll);
+    static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
 
-    // If we're in a sharded environment, we need to filter out documents we don't own.
-    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
-        auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
-            opCtx,
-            CollectionShardingState::get(opCtx, collection->ns())->getMetadataForOperation(opCtx),
-            ws.get(),
-            stage.release());
-        return PlanExecutor::make(opCtx,
-                                  std::move(ws),
-                                  std::move(shardFilterStage),
-                                  collection,
-                                  PlanExecutor::YIELD_AUTO);
+    // Determine whether this collection is sharded. If so, retrieve its sharding metadata.
+    boost::optional<ScopedCollectionMetadata> shardMetadata =
+        (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, coll->ns().ns())
+             ? CollectionShardingState::get(opCtx, coll->ns())->getMetadataForOperation(opCtx)
+             : boost::optional<ScopedCollectionMetadata>{});
+
+    // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
+    // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
+    // to a collection scan if the ratio of orphaned to owned documents encountered over the first
+    // 100 works() is such that we would have chosen not to optimize.
+    if (shardMetadata && (*shardMetadata)->isSharded()) {
+        // The ratio of owned to orphaned documents must be at least equal to the ratio between the
+        // requested sampleSize and the maximum permitted sampleSize for the original constraints to
+        // be satisfied. For instance, if there are 200 documents and the sampleSize is 5, then at
+        // least (5 / (200*0.05)) = (5/10) = 50% of those documents must be owned. If less than 5%
+        // of the documents in the collection are owned, we default to the backup plan.
+        static const size_t kMaxPresampleSize = 100;
+        const auto minWorkAdvancedRatio = std::max(
+            sampleSize / (numRecords * kMaxSampleRatioForRandCursor), kMaxSampleRatioForRandCursor);
+        // The trial plan is SHARDING_FILTER-MULTI_ITERATOR.
+        auto randomCursorPlan =
+            std::make_unique<ShardFilterStage>(opCtx, *shardMetadata, ws.get(), root.release());
+        // The backup plan is SHARDING_FILTER-COLLSCAN.
+        std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
+            opCtx, coll, CollectionScanParams{}, ws.get(), nullptr);
+        collScanPlan = std::make_unique<ShardFilterStage>(
+            opCtx, *shardMetadata, ws.get(), collScanPlan.release());
+        // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.
+        root = std::make_unique<TrialStage>(opCtx,
+                                            ws.get(),
+                                            std::move(randomCursorPlan),
+                                            std::move(collScanPlan),
+                                            kMaxPresampleSize,
+                                            minWorkAdvancedRatio);
     }
 
     return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+        opCtx, std::move(ws), std::move(root), coll, PlanExecutor::YIELD_AUTO);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
@@ -291,11 +316,19 @@ void PipelineD::prepareCursorSource(Collection* collection,
             auto exec = uassertStatusOK(
                 createRandomCursorExecutor(collection, expCtx->opCtx, sampleSize, numRecords));
             if (exec) {
-                // Replace $sample stage with $sampleFromRandomCursor stage.
-                sources.pop_front();
-                std::string idString = collection->ns().isOplog() ? "ts" : "_id";
-                sources.emplace_front(DocumentSourceSampleFromRandomCursor::create(
-                    expCtx, sampleSize, idString, numRecords));
+                // For sharded collections, the root of the plan tree is a TrialStage that may have
+                // chosen either a random-sampling cursor trial plan or a COLLSCAN backup plan. We
+                // can only optimize the $sample aggregation stage if the trial plan was chosen.
+                auto* trialStage = (exec->getRootStage()->stageType() == StageType::STAGE_TRIAL
+                                        ? static_cast<TrialStage*>(exec->getRootStage())
+                                        : nullptr);
+                if (!trialStage || !trialStage->pickedBackupPlan()) {
+                    // Replace $sample stage with $sampleFromRandomCursor stage.
+                    pipeline->popFront();
+                    std::string idString = collection->ns().isOplog() ? "ts" : "_id";
+                    pipeline->addInitialSource(DocumentSourceSampleFromRandomCursor::create(
+                        expCtx, sampleSize, idString, numRecords));
+                }
 
                 addCursorSource(
                     pipeline,

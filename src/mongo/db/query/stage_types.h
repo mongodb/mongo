@@ -95,6 +95,9 @@ enum StageType {
     STAGE_TEXT_OR,
     STAGE_TEXT_MATCH,
 
+    // Stage for choosing between two alternate plans based on an initial trial period.
+    STAGE_TRIAL,
+
     STAGE_UNKNOWN,
 
     STAGE_UPDATE,

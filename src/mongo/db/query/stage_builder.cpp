@@ -376,6 +376,7 @@ PlanStage* buildStages(OperationContext* opCtx,
         case STAGE_SUBPLAN:
         case STAGE_TEXT_MATCH:
         case STAGE_TEXT_OR:
+        case STAGE_TRIAL:
         case STAGE_UNKNOWN:
         case STAGE_UPDATE: {
             mongoutils::str::stream ss;

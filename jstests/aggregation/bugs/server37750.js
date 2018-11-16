@@ -57,7 +57,7 @@
                                   {
                                     $match: {
                                         "cursor.originatingCommand.comment": "$sample random",
-                                        planSummary: "MULTI_ITERATOR",
+                                        planSummary: "QUEUED_DATA, MULTI_ITERATOR",
                                         numYields: {$gt: 0}
                                     }
                                   }

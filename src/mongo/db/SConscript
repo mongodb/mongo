@@ -1111,6 +1111,7 @@ env.Library(
         'exec/text.cpp',
         'exec/text_match.cpp',
         'exec/text_or.cpp',
+        'exec/trial_stage.cpp',
         'exec/update.cpp',
         'exec/working_set_common.cpp',
         'exec/write_stage_common.cpp',
