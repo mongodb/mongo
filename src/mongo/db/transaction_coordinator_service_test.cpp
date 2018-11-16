@@ -55,10 +55,26 @@ const std::vector<ShardId> kThreeShardIdList{{"s1"}, {"s2"}, {"s3"}};
 const std::set<ShardId> kThreeShardIdSet{{"s1"}, {"s2"}, {"s3"}};
 const Timestamp kDummyTimestamp = Timestamp::min();
 const Date_t kCommitDeadline = Date_t::max();
+
+const BSONObj kDummyWriteConcernError = BSON("code"
+                                             << "12345"
+                                             << "errmsg"
+                                             << "dummy");
+
 const StatusWith<BSONObj> kRetryableError = {ErrorCodes::HostUnreachable, ""};
+
 const StatusWith<BSONObj> kNoSuchTransaction = {ErrorCodes::NoSuchTransaction, ""};
+const StatusWith<BSONObj> kNoSuchTransactionAndWriteConcernError =
+    BSON("ok" << 0 << "writeConcernError" << kDummyWriteConcernError);
+
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
+const StatusWith<BSONObj> kOkButWriteConcernError =
+    BSON("ok" << 1 << "writeConcernError" << kDummyWriteConcernError);
+
 const StatusWith<BSONObj> kPrepareOk = BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1));
+const StatusWith<BSONObj> kPrepareOkButWriteConcernError =
+    BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1) << "writeConcernError"
+              << kDummyWriteConcernError);
 
 HostAndPort makeHostAndPort(const ShardId& shardId) {
     return HostAndPort(str::stream() << shardId << ":123");
@@ -83,21 +99,34 @@ public:
 
     void assertCommandSentAndRespondWith(const StringData& commandName,
                                          const StatusWith<BSONObj>& response,
-                                         boost::optional<BSONObj> expectedWriteConcern) {
+                                         const BSONObj& expectedWriteConcern) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(commandName, request.cmdObj.firstElement().fieldNameStringData());
-            if (expectedWriteConcern) {
-                ASSERT_BSONOBJ_EQ(
-                    *expectedWriteConcern,
-                    request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
+            if (response.isOK()) {
+                log() << "Got command " << request.cmdObj.firstElement().fieldNameStringData()
+                      << " and responding with " << response.getValue();
+            } else {
+                log() << "Got command " << request.cmdObj.firstElement().fieldNameStringData()
+                      << " and responding with " << response.getStatus();
             }
+            ASSERT_EQ(commandName, request.cmdObj.firstElement().fieldNameStringData());
+            ASSERT_BSONOBJ_EQ(
+                expectedWriteConcern,
+                request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
             return response;
         });
     }
 
+    // Prepare responses
+
     void assertPrepareSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOk,
+                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+    }
+
+    void assertPrepareSentAndRespondWithSuccessAndWriteConcernError() {
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kPrepareOkButWriteConcernError,
                                         WriteConcernOptions::InternalMajorityNoSnapshot);
     }
 
@@ -107,18 +136,53 @@ public:
                                         WriteConcernOptions::InternalMajorityNoSnapshot);
     }
 
-    void assertAbortSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
+    void assertPrepareSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
+        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
+                                        kNoSuchTransactionAndWriteConcernError,
+                                        WriteConcernOptions::InternalMajorityNoSnapshot);
     }
 
+    // Abort responses
+
+    void assertAbortSentAndRespondWithSuccess() {
+        assertCommandSentAndRespondWith("abortTransaction", kOk, WriteConcernOptions::Majority);
+    }
+
+    void assertAbortSentAndRespondWithSuccessAndWriteConcernError() {
+        assertCommandSentAndRespondWith(
+            "abortTransaction", kOkButWriteConcernError, WriteConcernOptions::Majority);
+    }
+
+    void assertAbortSentAndRespondWithNoSuchTransaction() {
+        assertCommandSentAndRespondWith(
+            "abortTransaction", kNoSuchTransaction, WriteConcernOptions::Majority);
+    }
+
+    void assertAbortSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
+        assertCommandSentAndRespondWith("abortTransaction",
+                                        kNoSuchTransactionAndWriteConcernError,
+                                        WriteConcernOptions::Majority);
+    }
+
+    // Commit responses
+
     void assertCommitSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(CommitTransaction::kCommandName, kOk, boost::none);
+        assertCommandSentAndRespondWith(
+            CommitTransaction::kCommandName, kOk, WriteConcernOptions::Majority);
+    }
+
+    void assertCommitSentAndRespondWithSuccessAndWriteConcernError() {
+        assertCommandSentAndRespondWith(CommitTransaction::kCommandName,
+                                        kOkButWriteConcernError,
+                                        WriteConcernOptions::Majority);
     }
 
     void assertCommitSentAndRespondWithRetryableError() {
         assertCommandSentAndRespondWith(
-            CommitTransaction::kCommandName, kRetryableError, boost::none);
+            CommitTransaction::kCommandName, kRetryableError, WriteConcernOptions::Majority);
     }
+
+    // Other
 
     void assertNoMessageSent() {
         executor::NetworkInterfaceMock::InNetworkGuard networkGuard(network());
@@ -312,6 +376,93 @@ TEST_F(TransactionCoordinatorServiceTest,
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
     // commitTransaction(coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
+}
+
+TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToPrepare) {
+    TransactionCoordinatorService coordinatorService;
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+
+    // Coordinator sends prepare.
+    auto commitDecisionFuture = coordinatorService.coordinateCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+
+    // One participant responds with writeConcern error.
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccessAndWriteConcernError();
+
+    // Coordinator retries prepare against participant that responded with writeConcern error until
+    // participant responds without writeConcern error.
+    assertPrepareSentAndRespondWithSuccessAndWriteConcernError();
+    assertPrepareSentAndRespondWithSuccessAndWriteConcernError();
+    assertPrepareSentAndRespondWithSuccessAndWriteConcernError();
+    assertPrepareSentAndRespondWithNoSuchTransactionAndWriteConcernError();
+    assertPrepareSentAndRespondWithNoSuchTransactionAndWriteConcernError();
+    assertPrepareSentAndRespondWithSuccessAndWriteConcernError();
+    assertPrepareSentAndRespondWithSuccess();
+
+    // Coordinator sends commit.
+    assertCommitSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+
+    // The transaction should now be committed.
+    ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
+              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
+}
+
+TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToAbort) {
+    TransactionCoordinatorService coordinatorService;
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+
+    // Coordinator sends prepare.
+    auto commitDecisionFuture = coordinatorService.coordinateCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+
+    // One participant votes to abort.
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithNoSuchTransaction();
+
+    // Coordinator retries abort against other participant until other participant responds without
+    // writeConcern error.
+    assertAbortSentAndRespondWithSuccessAndWriteConcernError();
+    assertAbortSentAndRespondWithSuccessAndWriteConcernError();
+    assertAbortSentAndRespondWithSuccessAndWriteConcernError();
+    assertAbortSentAndRespondWithSuccessAndWriteConcernError();
+    assertAbortSentAndRespondWithNoSuchTransactionAndWriteConcernError();
+    assertAbortSentAndRespondWithNoSuchTransactionAndWriteConcernError();
+    assertAbortSentAndRespondWithNoSuchTransaction();
+
+    // The transaction should now be aborted.
+    ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
+              static_cast<int>(TransactionCoordinator::CommitDecision::kAbort));
+}
+
+TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToCommit) {
+    TransactionCoordinatorService coordinatorService;
+    coordinatorService.createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+
+    // Coordinator sends prepare.
+    auto commitDecisionFuture = coordinatorService.coordinateCommit(
+        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+
+    // Both participants vote to commit.
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+
+    // One participant responds to commit with success.
+    assertCommitSentAndRespondWithSuccess();
+
+    // Coordinator retries commit against other participant until other participant responds without
+    // writeConcern error.
+    assertCommitSentAndRespondWithSuccessAndWriteConcernError();
+    assertCommitSentAndRespondWithSuccessAndWriteConcernError();
+    assertCommitSentAndRespondWithSuccessAndWriteConcernError();
+    assertCommitSentAndRespondWithSuccessAndWriteConcernError();
+    assertCommitSentAndRespondWithSuccessAndWriteConcernError();
+    assertCommitSentAndRespondWithSuccess();
+
+    // The transaction should now be committed.
+    ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
+              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,

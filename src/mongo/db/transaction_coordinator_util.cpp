@@ -166,13 +166,16 @@ Action sendPrepare(OperationContext* opCtx,
 
         auto status = (!args.response.isOK()) ? args.response.status
                                               : getStatusFromCommandResult(args.response.data);
+        if (status.isOK()) {
+            status = getWriteConcernStatusFromCommandResult(args.response.data);
+        }
 
         boost::optional<Action> action;
 
         if (status.isOK()) {
             if (args.response.data["prepareTimestamp"].eoo() ||
                 args.response.data["prepareTimestamp"].timestamp().isNull()) {
-                LOG(0) << "Coordinator shard received an OK response to prepareTransaction without "
+                LOG(3) << "Coordinator shard received an OK response to prepareTransaction without "
                           "a prepareTimestamp from shard "
                        << shardId
                        << ", which is not expected behavior. Interpreting the response from "
@@ -211,7 +214,9 @@ Action sendCommit(OperationContext* opCtx,
     commitTransaction.setCommitTimestamp(commitTimestamp);
     commitTransaction.setDbName("admin");
     BSONObj commitObj = commitTransaction.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false));
+        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
+                    << WriteConcernOptions::kWriteConcernField
+                    << WriteConcernOptions::Majority));
 
     auto actionNotification = std::make_shared<Notification<Action>>();
     CallbackFn commitCallback;
@@ -221,11 +226,14 @@ Action sendCommit(OperationContext* opCtx,
                                               : getStatusFromCommandResult(args.response.data);
 
         if (status.isOK() || ErrorCodes::isVoteAbortError(status.code())) {
-            auto action = coordinator->recvCommitAck(shardId);
-            if (action != Action::kNone) {
-                actionNotification->set(action);
+            status = getWriteConcernStatusFromCommandResult(args.response.data);
+            if (status.isOK()) {
+                auto action = coordinator->recvCommitAck(shardId);
+                if (action != Action::kNone) {
+                    actionNotification->set(action);
+                }
+                return;
             }
-            return;
         }
 
         LOG(3) << "Coordinator shard retrying " << commandObj << " against " << shardId;
@@ -245,7 +253,9 @@ Action sendAbort(OperationContext* opCtx,
     BSONObj abortObj =
         BSON("abortTransaction" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << txnNumber
                                 << "autocommit"
-                                << false);
+                                << false
+                                << WriteConcernOptions::kWriteConcernField
+                                << WriteConcernOptions::Majority);
 
     auto actionNotification = std::make_shared<Notification<Action>>();
 
@@ -256,11 +266,14 @@ Action sendAbort(OperationContext* opCtx,
                                               : getStatusFromCommandResult(args.response.data);
 
         if (status.isOK() || ErrorCodes::isVoteAbortError(status.code())) {
-            auto action = coordinator->recvAbortAck(shardId);
-            if (action != Action::kNone) {
-                actionNotification->set(action);
+            status = getWriteConcernStatusFromCommandResult(args.response.data);
+            if (status.isOK()) {
+                auto action = coordinator->recvAbortAck(shardId);
+                if (action != Action::kNone) {
+                    actionNotification->set(action);
+                }
+                return;
             }
-            return;
         }
 
         LOG(3) << "Coordinator shard retrying " << commandObj << " against " << shardId;
