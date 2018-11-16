@@ -127,8 +127,9 @@ selector:
     # Expects that connections to all shards/config servers will never close
     - jstests/sharding/shard6.js
     # Stepping down the primary can make the balancer rerun a migration that was designed to fail
-    # earlier, but can potentially pass on the second try.
+    # earlier, but can potentially pass or have different side effects on the second try
     - jstests/sharding/migration_ignore_interrupts_1.js
+    - jstests/sharding/migration_sets_fromMigrate_flag.js
     # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
     - jstests/sharding/migration_ignore_interrupts_3.js
     - jstests/sharding/migration_ignore_interrupts_4.js
