@@ -2515,8 +2515,9 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 
     session.unstashTransactionResources(opCtx(), "commitTransaction");
 
-    serverGlobalParams.slowMS = 10;
-    sleepmillis(serverGlobalParams.slowMS + 1);
+    // Sleep generously longer than the slowMS value.
+    serverGlobalParams.slowMS = 1;
+    sleepmillis(5 * serverGlobalParams.slowMS);
 
     startCapturingLogMessages();
     session.commitTransaction(opCtx());
@@ -2553,8 +2554,9 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 
     session.unstashTransactionResources(opCtx(), "abortTransaction");
 
-    serverGlobalParams.slowMS = 10;
-    sleepmillis(serverGlobalParams.slowMS + 1);
+    // Sleep generously longer than the slowMS value.
+    serverGlobalParams.slowMS = 1;
+    sleepmillis(5 * serverGlobalParams.slowMS);
 
     startCapturingLogMessages();
     session.abortActiveTransaction(opCtx());
@@ -2596,8 +2598,9 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     ASSERT(txnResourceStashLocker);
     const auto lockerInfo = txnResourceStashLocker->getLockerInfo(boost::none);
 
-    serverGlobalParams.slowMS = 10;
-    sleepmillis(serverGlobalParams.slowMS + 1);
+    // Sleep generously longer than the slowMS value.
+    serverGlobalParams.slowMS = 1;
+    sleepmillis(5 * serverGlobalParams.slowMS);
 
     startCapturingLogMessages();
     session.abortArbitraryTransaction();
