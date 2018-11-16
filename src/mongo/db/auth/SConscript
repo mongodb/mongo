@@ -145,6 +145,10 @@ env.Library('authmongod',
                 '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 '$BUILD_DIR/mongo/db/server_parameters',
             ],
+            LIBDEPS_TAGS=[
+                # Depends on index rebuilder from serveronly
+                'incomplete'
+            ]
 )
 
 env.Library('authmongos',

@@ -51,16 +51,14 @@
 
 namespace mongo {
 
-using std::endl;
-using std::string;
-using std::vector;
-
 namespace {
-void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
+void checkNS(OperationContext* txn,
+             const std::list<std::string>& nsToCheck,
+             bool overrideNoIndexBuildRetry) {
     bool firstTime = true;
     for (std::list<std::string>::const_iterator it = nsToCheck.begin(); it != nsToCheck.end();
          ++it) {
-        string ns = *it;
+        std::string ns = *it;
 
         LOG(3) << "IndexRebuilder::checkNS: " << ns;
 
@@ -87,7 +85,7 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
 
         {
             WriteUnitOfWork wunit(txn);
-            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
+            std::vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
 
             // The indexes have now been removed from system.indexes, so the only record is
             // in-memory. If there is a journal commit between now and when insert() rewrites
@@ -104,12 +102,15 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
             log() << "found " << indexesToBuild.size() << " interrupted index build(s) on " << ns;
 
             if (firstTime) {
-                log() << "note: restart the server with --noIndexBuildRetry "
-                      << "to skip index rebuilds";
                 firstTime = false;
+
+                if (!overrideNoIndexBuildRetry) {
+                    log() << "note: restart the server with --noIndexBuildRetry "
+                          << "to skip index rebuilds";
+                }
             }
 
-            if (!serverGlobalParams.indexBuildRetry) {
+            if (!serverGlobalParams.indexBuildRetry && !overrideNoIndexBuildRetry) {
                 log() << "  not rebuilding interrupted indexes";
                 wunit.commit();
                 continue;
@@ -143,6 +144,11 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
 }
 }  // namespace
 
+void forceRestartInProgressIndexesOnCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    std::list<std::string> namespaces = {ns.ns()};
+    checkNS(opCtx, namespaces, true);
+}
+
 void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
     AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
 
@@ -162,7 +168,8 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
             Database* db = autoDb.getDb();
             db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
         }
-        checkNS(txn, collNames);
+
+        checkNS(txn, collNames, false);
     } catch (const DBException& e) {
         error() << "Index verification did not complete: " << redact(e);
         fassertFailedNoTrace(18643);
