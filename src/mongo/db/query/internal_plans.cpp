@@ -165,7 +165,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     invariant(collection);
     auto ws = stdx::make_unique<WorkingSet>();
 
-    auto idHackStage = stdx::make_unique<IDHackStage>(opCtx, collection, key, ws.get(), descriptor);
+    auto idHackStage = stdx::make_unique<IDHackStage>(opCtx, key, ws.get(), descriptor);
     auto root =
         stdx::make_unique<UpdateStage>(opCtx, params, ws.get(), collection, idHackStage.release());
 

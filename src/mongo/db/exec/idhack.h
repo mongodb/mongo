@@ -32,8 +32,7 @@
 
 #include <memory>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/record_id.h"
 
@@ -47,17 +46,15 @@ class RecordCursor;
  * the _id index always has the collection default collation, the IDHackStage can only be used when
  * the query's collation is equal to the collection default.
  */
-class IDHackStage final : public PlanStage {
+class IDHackStage final : public RequiresIndexStage {
 public:
     /** Takes ownership of all the arguments -collection. */
     IDHackStage(OperationContext* opCtx,
-                const Collection* collection,
                 CanonicalQuery* query,
                 WorkingSet* ws,
                 const IndexDescriptor* descriptor);
 
     IDHackStage(OperationContext* opCtx,
-                Collection* collection,
                 const BSONObj& key,
                 WorkingSet* ws,
                 const IndexDescriptor* descriptor);
@@ -67,8 +64,6 @@ public:
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
 
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -87,6 +82,11 @@ public:
 
     static const char* kStageType;
 
+protected:
+    void doSaveStateRequiresIndex() final;
+
+    void doRestoreStateRequiresIndex() final;
+
 private:
     /**
      * Marks this stage as done, optionally adds key metadata, and returns PlanStage::ADVANCED.
@@ -95,25 +95,19 @@ private:
      */
     StageState advance(WorkingSetID id, WorkingSetMember* member, WorkingSetID* out);
 
-    // Not owned here.
-    const Collection* _collection;
-
     std::unique_ptr<SeekableRecordCursor> _recordCursor;
 
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
-    // Not owned here.
-    const IndexAccessMethod* _accessMethod;
-
     // The value to match against the _id field.
     BSONObj _key;
 
     // Have we returned our one document?
-    bool _done;
+    bool _done = false;
 
     // Do we need to add index key metadata for returnKey?
-    bool _addKeyMetadata;
+    bool _addKeyMetadata = false;
 
     IDHackStats _specificStats;
 };

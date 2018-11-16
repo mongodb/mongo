@@ -342,7 +342,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     if (descriptor && IDHackStage::supportsQuery(collection, *canonicalQuery)) {
         LOG(2) << "Using idhack: " << redact(canonicalQuery->toStringShort());
 
-        root = make_unique<IDHackStage>(opCtx, collection, canonicalQuery.get(), ws, descriptor);
+        root = make_unique<IDHackStage>(opCtx, canonicalQuery.get(), ws, descriptor);
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
@@ -854,10 +854,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
             request->getProj().isEmpty() && hasCollectionDefaultCollation) {
             LOG(2) << "Using idhack: " << redact(unparsedQuery);
 
-            PlanStage* idHackStage = new IDHackStage(
-                opCtx, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
+            auto idHackStage = std::make_unique<IDHackStage>(
+                opCtx, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
             unique_ptr<DeleteStage> root = make_unique<DeleteStage>(
-                opCtx, deleteStageParams, ws.get(), collection, idHackStage);
+                opCtx, deleteStageParams, ws.get(), collection, idHackStage.release());
             return PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, policy);
         }
 

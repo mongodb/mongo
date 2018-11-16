@@ -59,16 +59,13 @@ TextOrStage::TextOrStage(OperationContext* opCtx,
                          const FTSSpec& ftsSpec,
                          WorkingSet* ws,
                          const MatchExpression* filter,
-                         IndexDescriptor* index)
-    : PlanStage(kStageType, opCtx),
+                         const Collection* collection)
+    : RequiresCollectionStage(kStageType, opCtx, collection),
       _ftsSpec(ftsSpec),
       _ws(ws),
       _scoreIterator(_scores.end()),
       _filter(filter),
-      _idRetrying(WorkingSet::INVALID_ID),
-      _index(index) {}
-
-TextOrStage::~TextOrStage() {}
+      _idRetrying(WorkingSet::INVALID_ID) {}
 
 void TextOrStage::addChild(unique_ptr<PlanStage> child) {
     _children.push_back(std::move(child));
@@ -84,13 +81,13 @@ bool TextOrStage::isEOF() {
     return _internalState == State::kDone;
 }
 
-void TextOrStage::doSaveState() {
+void TextOrStage::doSaveStateRequiresCollection() {
     if (_recordCursor) {
         _recordCursor->saveUnpositioned();
     }
 }
 
-void TextOrStage::doRestoreState() {
+void TextOrStage::doRestoreStateRequiresCollection() {
     if (_recordCursor) {
         invariant(_recordCursor->restore());
     }
@@ -158,7 +155,7 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
 PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
     *out = WorkingSet::INVALID_ID;
     try {
-        _recordCursor = _index->getCollection()->getCursor(getOpCtx());
+        _recordCursor = collection()->getCursor(getOpCtx());
         _internalState = State::kReadingTerms;
         return PlanStage::NEED_TIME;
     } catch (const WriteConflictException&) {

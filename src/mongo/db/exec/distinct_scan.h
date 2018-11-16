@@ -31,9 +31,8 @@
 #pragma once
 
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
@@ -45,48 +44,33 @@ class IndexDescriptor;
 class WorkingSet;
 
 struct DistinctParams {
-    DistinctParams(const IndexDescriptor& descriptor,
+    DistinctParams(const IndexDescriptor* descriptor,
                    std::string indexName,
                    BSONObj keyPattern,
                    MultikeyPaths multikeyPaths,
                    bool multikey)
-        : accessMethod(descriptor.getIndexCatalog()->getIndex(&descriptor)),
+        : indexDescriptor(descriptor),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
-          isMultiKey(multikey),
-          isSparse(descriptor.isSparse()),
-          isUnique(descriptor.unique()),
-          isPartial(descriptor.isPartial()),
-          version(descriptor.version()),
-          collation(descriptor.infoObj()
-                        .getObjectField(IndexDescriptor::kCollationFieldName)
-                        .getOwned()) {
-        invariant(accessMethod);
+          isMultiKey(multikey) {
+        invariant(indexDescriptor);
     }
 
-    DistinctParams(OperationContext* opCtx, const IndexDescriptor& descriptor)
+    DistinctParams(OperationContext* opCtx, const IndexDescriptor* descriptor)
         : DistinctParams(descriptor,
-                         descriptor.indexName(),
-                         descriptor.keyPattern(),
-                         descriptor.getMultikeyPaths(opCtx),
-                         descriptor.isMultikey(opCtx)) {}
+                         descriptor->indexName(),
+                         descriptor->keyPattern(),
+                         descriptor->getMultikeyPaths(opCtx),
+                         descriptor->isMultikey(opCtx)) {}
 
-    const IndexAccessMethod* accessMethod;
+    const IndexDescriptor* indexDescriptor;
     std::string name;
 
     BSONObj keyPattern;
 
     MultikeyPaths multikeyPaths;
     bool isMultiKey;
-
-    bool isSparse;
-    bool isUnique;
-    bool isPartial;
-
-    IndexDescriptor::IndexVersion version;
-
-    BSONObj collation;
 
     int scanDirection{1};
 
@@ -110,14 +94,12 @@ struct DistinctParams {
  *
  * Only created through the getExecutorDistinct path.  See db/query/get_executor.cpp
  */
-class DistinctScan final : public PlanStage {
+class DistinctScan final : public RequiresIndexStage {
 public:
     DistinctScan(OperationContext* opCtx, DistinctParams params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -131,14 +113,22 @@ public:
 
     static const char* kStageType;
 
-private:
-    // The parameters used to configure this DistinctScan stage.
-    DistinctParams _params;
+protected:
+    void doSaveStateRequiresIndex() final;
 
+    void doRestoreStateRequiresIndex() final;
+
+private:
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
-    const IndexAccessMethod* _iam;
+    const BSONObj _keyPattern;
+
+    const int _scanDirection = 1;
+
+    const IndexBounds _bounds;
+
+    const int _fieldNo = 0;
 
     // The cursor we use to navigate the tree.
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;

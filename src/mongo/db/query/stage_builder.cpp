@@ -318,7 +318,7 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
-            DistinctParams params{*descriptor,
+            DistinctParams params{descriptor,
                                   dn->index.identifier.catalogName,
                                   dn->index.keyPattern,
                                   dn->index.multikeyPaths,
@@ -343,7 +343,7 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
-            CountScanParams params{*descriptor,
+            CountScanParams params{descriptor,
                                    csn->index.identifier.catalogName,
                                    csn->index.keyPattern,
                                    csn->index.multikeyPaths,

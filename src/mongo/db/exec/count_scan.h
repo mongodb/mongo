@@ -30,10 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -44,48 +41,33 @@ namespace mongo {
 class WorkingSet;
 
 struct CountScanParams {
-    CountScanParams(const IndexDescriptor& descriptor,
+    CountScanParams(const IndexDescriptor* descriptor,
                     std::string indexName,
                     BSONObj keyPattern,
                     MultikeyPaths multikeyPaths,
                     bool multikey)
-        : accessMethod(descriptor.getIndexCatalog()->getIndex(&descriptor)),
+        : indexDescriptor(descriptor),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
-          isMultiKey(multikey),
-          isSparse(descriptor.isSparse()),
-          isUnique(descriptor.unique()),
-          isPartial(descriptor.isPartial()),
-          version(descriptor.version()),
-          collation(descriptor.infoObj()
-                        .getObjectField(IndexDescriptor::kCollationFieldName)
-                        .getOwned()) {
-        invariant(accessMethod);
+          isMultiKey(multikey) {
+        invariant(descriptor);
     }
 
-    CountScanParams(OperationContext* opCtx, const IndexDescriptor& descriptor)
+    CountScanParams(OperationContext* opCtx, const IndexDescriptor* descriptor)
         : CountScanParams(descriptor,
-                          descriptor.indexName(),
-                          descriptor.keyPattern(),
-                          descriptor.getMultikeyPaths(opCtx),
-                          descriptor.isMultikey(opCtx)) {}
+                          descriptor->indexName(),
+                          descriptor->keyPattern(),
+                          descriptor->getMultikeyPaths(opCtx),
+                          descriptor->isMultikey(opCtx)) {}
 
-    const IndexAccessMethod* accessMethod;
+    const IndexDescriptor* indexDescriptor;
     std::string name;
 
     BSONObj keyPattern;
 
     MultikeyPaths multikeyPaths;
     bool isMultiKey;
-
-    bool isSparse;
-    bool isUnique;
-    bool isPartial;
-
-    IndexDescriptor::IndexVersion version;
-
-    BSONObj collation;
 
     BSONObj startKey;
     bool startKeyInclusive{true};
@@ -103,14 +85,12 @@ struct CountScanParams {
  * Only created through the getExecutorCount() path, as count is the only operation that doesn't
  * care about its data.
  */
-class CountScan final : public PlanStage {
+class CountScan final : public RequiresIndexStage {
 public:
     CountScan(OperationContext* opCtx, CountScanParams params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -124,20 +104,30 @@ public:
 
     static const char* kStageType;
 
+protected:
+    void doSaveStateRequiresIndex() final;
+
+    void doRestoreStateRequiresIndex() final;
+
 private:
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
-    // Index access. The pointer below is owned by Collection -> IndexCatalog.
-    const IndexAccessMethod* _iam;
+    const BSONObj _keyPattern;
+
+    const bool _shouldDedup;
+
+    const BSONObj _startKey;
+    const bool _startKeyInclusive = true;
+
+    const BSONObj _endKey;
+    const bool _endKeyInclusive = true;
 
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
 
-    // Could our index have duplicates?  If so, we use _returned to dedup.
-    const bool _shouldDedup;
+    // The set of record ids we've returned so far. Used to avoid returning duplicates, if
+    // '_shouldDedup' is set to true.
     stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
-
-    CountScanParams _params;
 
     CountScanStats _specificStats;
 };
