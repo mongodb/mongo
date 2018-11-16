@@ -687,6 +687,7 @@ env.Library(
         'transaction_history_iterator.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
+        's/recover_transaction_decision_from_local_participant.cpp',
         env.Idlc('session_txn_record.idl')[0],
         env.Idlc('transaction_commit_decision.idl')[0],
         env.Idlc('transactions_stats.idl')[0],

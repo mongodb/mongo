@@ -50,6 +50,7 @@ selector:
   - jstests/sharding/transactions_implicit_abort.js
   - jstests/sharding/transactions_multi_writes.js
   - jstests/sharding/transactions_read_concerns.js
+  - jstests/sharding/transactions_recover_decision_from_local_participant.js
   - jstests/sharding/transactions_reject_writes_for_moved_chunks.js
   - jstests/sharding/transactions_snapshot_errors_first_statement.js
   - jstests/sharding/transactions_snapshot_errors_subsequent_statements.js

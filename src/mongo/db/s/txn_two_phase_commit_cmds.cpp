@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/recover_transaction_decision_from_local_participant.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_coordinator_service.h"
@@ -168,7 +169,6 @@ public:
     }
 } prepareTransactionCmd;
 
-// TODO (SERVER-37440): Make coordinateCommit idempotent.
 class CoordinateCommitTransactionCmd : public TypedCommand<CoordinateCommitTransactionCmd> {
 public:
     using Request = CoordinateCommitTransaction;
@@ -190,39 +190,67 @@ public:
 
             const auto& cmd = request();
 
-            // Convert the participant list array into a set, and assert that all participants in
-            // the list are unique.
-            // TODO (PM-564): Propagate the 'readOnly' flag down into the TransactionCoordinator.
-            std::set<ShardId> participantList;
-            StringBuilder ss;
-            ss << "[";
-            for (const auto& participant : cmd.getParticipants()) {
-                const auto shardId = participant.getShardId();
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "participant list contained duplicate shardId " << shardId,
-                        std::find(participantList.begin(), participantList.end(), shardId) ==
-                            participantList.end());
-                participantList.insert(shardId);
-                ss << shardId << " ";
+            boost::optional<Future<TransactionCoordinator::CommitDecision>> commitDecisionFuture;
+
+            if (!cmd.getParticipants().empty()) {
+                // Convert the participant list array into a set, and assert that all participants
+                // in the list are unique.
+                // TODO (PM-564): Propagate the 'readOnly' flag down into the
+                // TransactionCoordinator.
+                std::set<ShardId> participantList;
+                StringBuilder ss;
+                ss << "[";
+                for (const auto& participant : cmd.getParticipants()) {
+                    const auto shardId = participant.getShardId();
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream() << "participant list contained duplicate shardId "
+                                          << shardId,
+                            std::find(participantList.begin(), participantList.end(), shardId) ==
+                                participantList.end());
+                    participantList.insert(shardId);
+                    ss << shardId << " ";
+                }
+                ss << "]";
+                LOG(3) << "Coordinator shard received request to coordinate commit with "
+                          "participant list "
+                       << ss.str() << " for transaction " << opCtx->getTxnNumber() << " on session "
+                       << opCtx->getLogicalSessionId()->toBSON();
+
+                commitDecisionFuture = TransactionCoordinatorService::get(opCtx)->coordinateCommit(
+                    opCtx,
+                    opCtx->getLogicalSessionId().get(),
+                    opCtx->getTxnNumber().get(),
+                    participantList);
+            } else {
+                LOG(3) << "Coordinator shard received request to recover commit decision for "
+                          "transaction "
+                       << opCtx->getTxnNumber() << " on session "
+                       << opCtx->getLogicalSessionId()->toBSON();
+
+                commitDecisionFuture = TransactionCoordinatorService::get(opCtx)->recoverCommit(
+                    opCtx, opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get());
             }
-            ss << "]";
-            LOG(3) << "Coordinator shard received participant list with shards " << ss.str()
-                   << " for transaction " << opCtx->getTxnNumber() << " on session "
+
+            if (commitDecisionFuture) {
+                // The commit coordination is still ongoing. Block waiting for the decision.
+                auto commitDecision = commitDecisionFuture->get(opCtx);
+                switch (commitDecision) {
+                    case TransactionCoordinator::CommitDecision::kAbort:
+                        uasserted(ErrorCodes::NoSuchTransaction, "Transaction was aborted");
+                    case TransactionCoordinator::CommitDecision::kCommit:
+                        return;
+                }
+            }
+
+            // No coordinator was found in memory. Either the commit coordination already completed,
+            // the original primary on which the coordinator was created stepped down, or this
+            // coordinateCommit request was a byzantine message.
+
+            LOG(3) << "Coordinator shard going to attempt to recover decision from local "
+                      "participant for transaction "
+                   << opCtx->getTxnNumber() << " on session "
                    << opCtx->getLogicalSessionId()->toBSON();
-
-            auto commitDecisionFuture = TransactionCoordinatorService::get(opCtx)->coordinateCommit(
-                opCtx,
-                opCtx->getLogicalSessionId().get(),
-                opCtx->getTxnNumber().get(),
-                participantList);
-
-            // Block waiting for the commit decision.
-            auto commitDecision = commitDecisionFuture.get(opCtx);
-
-            // If the decision was abort, propagate NoSuchTransaction exception back to mongos.
-            uassert(ErrorCodes::NoSuchTransaction,
-                    "Transaction was aborted",
-                    commitDecision != TransactionCoordinator::CommitDecision::kAbort);
+            recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx);
         }
 
     private:

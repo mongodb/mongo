@@ -41,6 +41,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/recover_transaction_decision_from_local_participant.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -3814,6 +3815,385 @@ TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry
     ASSERT_EQ(nonMajorityCommittedOpTime, laterOpTime);
 }
 
+class RecoverDecisionFromLocalParticipantTest : public TxnParticipantTest {
+private:
+    void _putParticipantInProgressWithoutSessionCheckout() {
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->unstashTransactionResources(opCtx(), "insert");
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+        txnParticipant->stashTransactionResources(opCtx());
+    }
+
+    Timestamp _putParticipantInPrepareWithoutSessionCheckout() {
+        _putParticipantInProgressWithoutSessionCheckout();
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+        const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+        ASSERT(txnParticipant->transactionIsPrepared());
+        txnParticipant->stashTransactionResources(opCtx());
+        return prepareTimestamp;
+    }
+
+protected:
+    void putParticipantInProgress() {
+        auto sessionCheckout = checkOutSession();
+        _putParticipantInProgressWithoutSessionCheckout();
+    }
+
+    void putParticipantInAbortedWithoutPrepare() {
+        auto sessionCheckout = checkOutSession();
+
+        _putParticipantInProgressWithoutSessionCheckout();
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+        txnParticipant->abortActiveTransaction(opCtx());
+        ASSERT(txnParticipant->transactionIsAborted());
+        // No need to stash transaction resources after abort.
+    }
+
+    void putParticipantInCommittedWithoutPrepare() {
+        auto sessionCheckout = checkOutSession();
+
+        _putParticipantInProgressWithoutSessionCheckout();
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+        txnParticipant->commitUnpreparedTransaction(opCtx());
+        ASSERT(txnParticipant->transactionIsCommitted());
+        // No need to stash transaction resources after commit.
+    }
+
+    Timestamp putParticipantInPrepare() {
+        auto sessionCheckout = checkOutSession();
+        return _putParticipantInPrepareWithoutSessionCheckout();
+    }
+
+    void putParticipantInAbortedAfterPrepare() {
+        auto sessionCheckout = checkOutSession();
+
+        _putParticipantInPrepareWithoutSessionCheckout();
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+        txnParticipant->abortActiveTransaction(opCtx());
+        ASSERT(txnParticipant->transactionIsAborted());
+        // No need to stash transaction resources after abort.
+    }
+
+    void putParticipantInCommittedAfterPrepare() {
+        auto sessionCheckout = checkOutSession();
+
+        const auto prepareTimestamp = _putParticipantInPrepareWithoutSessionCheckout();
+        const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+        txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
+        ASSERT_TRUE(txnParticipant->transactionIsCommitted());
+        // No need to stash transaction resources after commit.
+    }
+
+    void putParticipantInRetryableWrite() {
+        MongoDOperationContextSession checkOutSession(opCtx());
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), boost::none, boost::none);
+        ASSERT(!txnParticipant->inMultiDocumentTransaction() &&
+               !txnParticipant->transactionIsCommitted() &&
+               !txnParticipant->transactionIsAborted() && !txnParticipant->transactionIsPrepared());
+    }
+
+    void assertParticipantIsInProgressWithTxnNumber(const TxnNumber expectedTxnNumber) {
+        MongoDOperationContextSession checkOutSession(opCtx());
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_EQUALS(expectedTxnNumber, txnParticipant->getActiveTxnNumber());
+        ASSERT(txnParticipant->inMultiDocumentTransaction() &&
+               !txnParticipant->transactionIsPrepared());
+    }
+
+    void assertParticipantIsPreparedWithTxnNumber(const TxnNumber expectedTxnNumber) {
+        MongoDOperationContextSession checkOutSession(opCtx());
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_EQUALS(expectedTxnNumber, txnParticipant->getActiveTxnNumber());
+        ASSERT(txnParticipant->transactionIsPrepared());
+    }
+
+    void assertParticipantIsAbortedWithTxnNumber(const TxnNumber expectedTxnNumber) {
+        MongoDOperationContextSession checkOutSession(opCtx());
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_EQUALS(expectedTxnNumber, txnParticipant->getActiveTxnNumber());
+        ASSERT(txnParticipant->transactionIsAborted());
+    }
+
+    void assertParticipantIsCommittedWithTxnNumber(const TxnNumber expectedTxnNumber) {
+        MongoDOperationContextSession checkOutSession(opCtx());
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_EQUALS(expectedTxnNumber, txnParticipant->getActiveTxnNumber());
+        ASSERT(txnParticipant->transactionIsCommitted());
+    }
+
+    void assertParticipantIsInRetryableWriteWithTxnNumber(const TxnNumber expectedTxnNumber) {
+        MongoDOperationContextSession checkOutSession(opCtx());
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_EQUALS(expectedTxnNumber, txnParticipant->getActiveTxnNumber());
+        ASSERT(!txnParticipant->inMultiDocumentTransaction() &&
+               !txnParticipant->transactionIsCommitted() &&
+               !txnParticipant->transactionIsAborted() && !txnParticipant->transactionIsPrepared());
+    }
+
+    void assertRecoverDecisionFromDifferentOpCtxThrowsTransactionTooOld(
+        const LogicalSessionId& lsid, const TxnNumber txnNumber) {
+        auto recoverDecisionThrowsTransactionTooOldFunc = [&](OperationContext* newOpCtx) {
+            newOpCtx->setLogicalSessionId(lsid);
+            newOpCtx->setTxnNumber(txnNumber);
+
+            ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(newOpCtx),
+                               AssertionException,
+                               ErrorCodes::TransactionTooOld);
+        };
+        runFunctionFromDifferentOpCtx(recoverDecisionThrowsTransactionTooOldFunc);
+    }
+
+    void assertRecoverDecisionFromDifferentOpCtxThrowsNoSuchTransaction(
+        const LogicalSessionId& lsid, const TxnNumber txnNumber) {
+        auto recoverDecisionThrowsNoSuchTransactionFunc = [&](OperationContext* newOpCtx) {
+            newOpCtx->setLogicalSessionId(lsid);
+            newOpCtx->setTxnNumber(txnNumber);
+
+            ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(newOpCtx),
+                               AssertionException,
+                               ErrorCodes::NoSuchTransaction);
+        };
+        runFunctionFromDifferentOpCtx(recoverDecisionThrowsNoSuchTransactionFunc);
+    }
+};
+
+//
+// Local TransactionParticipant has *same* TxnNumber as recoverCommit request.
+//
+
+TEST_F(
+    RecoverDecisionFromLocalParticipantTest,
+    AbortsActiveTransactionAndThrowsNoSuchTransactionIfParticipantIsInProgressWithSameTxnNumber) {
+    putParticipantInProgress();
+    ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+    assertParticipantIsAbortedWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsNoSuchTransactionIfParticipantIsAbortedWithoutPrepareWithSameTxnNumber) {
+    putParticipantInAbortedWithoutPrepare();
+    ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+    assertParticipantIsAbortedWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       DoesNotThrowIfParticipantIsCommittedWithoutPrepareWithSameTxnNumber) {
+    putParticipantInCommittedWithoutPrepare();
+    recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx());
+    assertParticipantIsCommittedWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsAnonymousErrorIfParticipantIsPreparedWithSameTxnNumber) {
+    putParticipantInPrepare();
+    ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx()),
+                       AssertionException,
+                       51021);
+    assertParticipantIsPreparedWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsNoSuchTransactionIfParticipantIsAbortedAfterPrepareWithSameTxnNumber) {
+    putParticipantInAbortedAfterPrepare();
+    ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+    assertParticipantIsAbortedWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       DoesNotThrowIfParticipantIsCommittedAfterPrepareWithSameTxnNumber) {
+    putParticipantInCommittedAfterPrepare();
+    recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx());
+    assertParticipantIsCommittedWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsNoSuchTransactionIfTxnNumberCorrespondsToRetryableWrite) {
+    putParticipantInRetryableWrite();
+    ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+    assertParticipantIsInRetryableWriteWithTxnNumber(*opCtx()->getTxnNumber());
+}
+
+//
+// Local TransactionParticipant has *higher* TxnNumber than recoverCommit request.
+//
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsTransactionTooOldIfTransactionParticipantInProgressHasHigherTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto oldTxnNumber = participantTxnNumber - 1;
+
+    putParticipantInProgress();
+    assertRecoverDecisionFromDifferentOpCtxThrowsTransactionTooOld(lsid, oldTxnNumber);
+    assertParticipantIsInProgressWithTxnNumber(participantTxnNumber);
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsTransactionTooOldIfTransactionParticipantInPrepareHasHigherTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto oldTxnNumber = participantTxnNumber - 1;
+
+    putParticipantInPrepare();
+    assertRecoverDecisionFromDifferentOpCtxThrowsTransactionTooOld(lsid, oldTxnNumber);
+    assertParticipantIsPreparedWithTxnNumber(participantTxnNumber);
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsTransactionTooOldIfTransactionParticipantInAbortedHasHigherTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto oldTxnNumber = participantTxnNumber - 1;
+
+    putParticipantInAbortedAfterPrepare();
+    assertRecoverDecisionFromDifferentOpCtxThrowsTransactionTooOld(lsid, oldTxnNumber);
+    assertParticipantIsAbortedWithTxnNumber(participantTxnNumber);
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsTransactionTooOldIfTransactionParticipantInCommittedHasHigherTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto oldTxnNumber = participantTxnNumber - 1;
+
+    putParticipantInCommittedAfterPrepare();
+    assertRecoverDecisionFromDifferentOpCtxThrowsTransactionTooOld(lsid, oldTxnNumber);
+    assertParticipantIsCommittedWithTxnNumber(participantTxnNumber);
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       ThrowsTransactionTooOldIfTransactionParticipantInRetryableWriteHasHigherTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto oldTxnNumber = participantTxnNumber - 1;
+
+    putParticipantInRetryableWrite();
+    assertRecoverDecisionFromDifferentOpCtxThrowsTransactionTooOld(lsid, oldTxnNumber);
+    assertParticipantIsInRetryableWriteWithTxnNumber(participantTxnNumber);
+}
+
+//
+// Local TransactionParticipant has *lower* TxnNumber than recoverCommit request.
+//
+
+TEST_F(
+    RecoverDecisionFromLocalParticipantTest,
+    AbortsOlderAndNewerTransactionAndThrowsNoSuchTransactionIfParticipantIsInProgressWithLowerTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto newTxnNumber = participantTxnNumber + 1;
+
+    putParticipantInProgress();
+    assertRecoverDecisionFromDifferentOpCtxThrowsNoSuchTransaction(lsid, newTxnNumber);
+    assertParticipantIsAbortedWithTxnNumber(newTxnNumber);
+}
+
+TEST_F(RecoverDecisionFromLocalParticipantTest, ThrowsIfParticipantIsInPrepareWithLowerTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto newTxnNumber = participantTxnNumber + 1;
+
+    putParticipantInPrepare();
+    auto recoverDecisionThrowsAnonymousErrorFunc = [&](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(lsid);
+        newOpCtx->setTxnNumber(newTxnNumber);
+
+        ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(newOpCtx),
+                           AssertionException,
+                           51021);
+    };
+    runFunctionFromDifferentOpCtx(recoverDecisionThrowsAnonymousErrorFunc);
+    assertParticipantIsPreparedWithTxnNumber(participantTxnNumber);
+}
+
+TEST_F(
+    RecoverDecisionFromLocalParticipantTest,
+    StartsAndAbortsNewerTransactionAndThrowsNoSuchTransactionIfParticipantIsAbortedWithLowerTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto newTxnNumber = participantTxnNumber + 1;
+
+    putParticipantInAbortedAfterPrepare();
+    assertRecoverDecisionFromDifferentOpCtxThrowsNoSuchTransaction(lsid, newTxnNumber);
+    assertParticipantIsAbortedWithTxnNumber(newTxnNumber);
+}
+
+TEST_F(
+    RecoverDecisionFromLocalParticipantTest,
+    StartsAndAbortsNewerTransactionAndThrowsNoSuchTransactionIfParticipantIsCommittedWithLowerTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto newTxnNumber = participantTxnNumber + 1;
+
+    putParticipantInCommittedAfterPrepare();
+    assertRecoverDecisionFromDifferentOpCtxThrowsNoSuchTransaction(lsid, newTxnNumber);
+    assertParticipantIsAbortedWithTxnNumber(newTxnNumber);
+}
+
+TEST_F(
+    RecoverDecisionFromLocalParticipantTest,
+    StartsAndAbortsNewerTransactionAndThrowsNoSuchTransactionIfParticipantIsInRetryableWriteWithLowerTxnNumber) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto newTxnNumber = participantTxnNumber + 1;
+
+    putParticipantInRetryableWrite();
+    assertRecoverDecisionFromDifferentOpCtxThrowsNoSuchTransaction(lsid, newTxnNumber);
+    assertParticipantIsAbortedWithTxnNumber(newTxnNumber);
+}
+
+//
+// Recovering the decision is retryable.
+//
+
+TEST_F(RecoverDecisionFromLocalParticipantTest,
+       RecoverDecisionCanBeRetriedIfFirstTryThrowsLockTimeout) {
+    const auto lsid = *opCtx()->getLogicalSessionId();
+    const auto participantTxnNumber = *opCtx()->getTxnNumber();
+    const auto newTxnNumber = participantTxnNumber + 1;
+
+    putParticipantInCommittedAfterPrepare();
+
+    // First recoverDecision attempt throws LockTimeout.
+    {
+        Lock::GlobalLock lk(opCtx(), MODE_X);
+        auto recoverDecisionThrowsLockTimeoutFunc = [&](OperationContext* newOpCtx) {
+            newOpCtx->setLogicalSessionId(lsid);
+            newOpCtx->setTxnNumber(newTxnNumber);
+
+            ASSERT_THROWS_CODE(recoverDecisionFromLocalParticipantOrAbortLocalParticipant(newOpCtx),
+                               AssertionException,
+                               ErrorCodes::LockTimeout);
+        };
+        runFunctionFromDifferentOpCtx(recoverDecisionThrowsLockTimeoutFunc);
+    }
+    assertParticipantIsInProgressWithTxnNumber(newTxnNumber);
+
+    // Retry recoverDecision.
+    assertRecoverDecisionFromDifferentOpCtxThrowsNoSuchTransaction(lsid, newTxnNumber);
+
+    assertParticipantIsAbortedWithTxnNumber(newTxnNumber);
+}
 
 }  // namespace
 }  // namespace mongo

@@ -181,21 +181,15 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
     // TODO (SERVER-37024): Schedule abort task on executor to execute at commitDeadline.
 }
 
-Future<TransactionCoordinator::CommitDecision> TransactionCoordinatorService::coordinateCommit(
-    OperationContext* opCtx,
-    LogicalSessionId lsid,
-    TxnNumber txnNumber,
-    const std::set<ShardId>& participantList) {
+boost::optional<Future<TransactionCoordinator::CommitDecision>>
+TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
+                                                LogicalSessionId lsid,
+                                                TxnNumber txnNumber,
+                                                const std::set<ShardId>& participantList) {
 
     auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
     if (!coordinator) {
-        // TODO (SERVER-37440): Return decision "kForgotten", which indicates that a decision was
-        // already made and forgotten. The caller can recover the decision from the local
-        // participant if a higher transaction has not been started on the session and the session
-        // has not been reaped.
-        // Currently is MONGO_UNREACHABLE because no tests should cause the router to re-send
-        // coordinateCommitTransaction.
-        MONGO_UNREACHABLE;
+        return boost::none;
     }
 
     Action initialAction = coordinator->recvCoordinateCommit(participantList);
@@ -203,7 +197,32 @@ Future<TransactionCoordinator::CommitDecision> TransactionCoordinatorService::co
         launchCoordinateCommitTask(_threadPool, coordinator, lsid, txnNumber, initialAction);
     }
 
-    return coordinator.get()->waitForCompletion().then([](auto finalState) {
+    return coordinator->waitForCompletion().then([](auto finalState) {
+        switch (finalState) {
+            case TransactionCoordinator::StateMachine::State::kAborted:
+                return TransactionCoordinator::CommitDecision::kAbort;
+            case TransactionCoordinator::StateMachine::State::kCommitted:
+                return TransactionCoordinator::CommitDecision::kCommit;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    });
+    // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
+    // is made durable. Currently the coordinator waits to hear acks because participants in prepare
+    // reject requests with a higher transaction number, causing tests to fail.
+    // return coordinator.get()->waitForDecision();
+}
+
+boost::optional<Future<TransactionCoordinator::CommitDecision>>
+TransactionCoordinatorService::recoverCommit(OperationContext* opCtx,
+                                             LogicalSessionId lsid,
+                                             TxnNumber txnNumber) {
+    auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
+    if (!coordinator) {
+        return boost::none;
+    }
+
+    return coordinator->waitForCompletion().then([](auto finalState) {
         switch (finalState) {
             case TransactionCoordinator::StateMachine::State::kAborted:
                 return TransactionCoordinator::CommitDecision::kAbort;
