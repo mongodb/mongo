@@ -1,6 +1,8 @@
 /*
  * This test makes sure that the log files created by the server correctly honor the server's umask
  * as set in SERVER-22829
+ *
+ * @tags: [ requires_wiredtiger ]
  */
 (function() {
     'use strict';
