@@ -31,14 +31,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/capped_utils.h"
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -47,55 +43,23 @@ namespace {
 
 using namespace mongo;
 
-class CollectionTest : public ServiceContextMongoDTest {
-private:
-    void setUp() override;
-    void tearDown() override;
-
+class CollectionTest : public CatalogTestFixture {
 protected:
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
-    // Use StorageInterface to access storage features below catalog interface.
-    std::unique_ptr<repl::StorageInterface> _storage;
-    ServiceContext::UniqueOperationContext _opCtxOwner;
-    OperationContext* _opCtx = nullptr;
 };
-
-void CollectionTest::setUp() {
-    // Set up mongod.
-    ServiceContextMongoDTest::setUp();
-
-    auto service = getServiceContext();
-
-    // Set up ReplicationCoordinator and ensure that we are primary.
-    auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(service);
-    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    repl::ReplicationCoordinator::set(service, std::move(replCoord));
-
-    _storage = stdx::make_unique<repl::StorageInterfaceImpl>();
-    _opCtxOwner = cc().makeOperationContext();
-    _opCtx = _opCtxOwner.get();
-}
-
-void CollectionTest::tearDown() {
-    _storage = {};
-    _opCtxOwner = {};
-
-    // Tear down mongod.
-    ServiceContextMongoDTest::tearDown();
-}
 
 void CollectionTest::makeCapped(NamespaceString nss, long long cappedSize) {
     CollectionOptions options;
     options.capped = true;
     options.cappedSize = cappedSize;  // Maximum size of capped collection in bytes.
-    ASSERT_OK(_storage->createCollection(_opCtx, nss, options));
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 }
 
 TEST_F(CollectionTest, CappedNotifierKillAndIsDead) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     ASSERT_FALSE(notifier->isDead());
@@ -107,7 +71,7 @@ TEST_F(CollectionTest, CappedNotifierTimeouts) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     ASSERT_EQ(notifier->getVersion(), 0u);
@@ -123,7 +87,7 @@ TEST_F(CollectionTest, CappedNotifierWaitAfterNotifyIsImmediate) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
 
@@ -142,7 +106,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
@@ -167,7 +131,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
@@ -191,7 +155,7 @@ TEST_F(CollectionTest, HaveCappedWaiters) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     ASSERT_FALSE(col->haveCappedWaiters());
     {
@@ -205,7 +169,7 @@ TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     col->notifyCappedWaitersIfNeeded();
     {
@@ -220,7 +184,7 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     NamespaceString nss("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(_opCtx, nss);
+    AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();

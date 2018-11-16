@@ -29,18 +29,28 @@ env.Library(
 env.CppUnitTest('collection_options_test', ['collection_options_test.cpp'],
                 LIBDEPS=['collection_options'])
 
-env.CppUnitTest(
-    target = 'collection_test',
-    source = 'collection_test.cpp',
+env.Library(
+    target = 'catalog_test_fixture',
+    source =[
+        'catalog_test_fixture.cpp',
+    ],
     LIBDEPS=[
         'catalog_helpers',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target = 'collection_test',
+    source = 'collection_test.cpp',
+    LIBDEPS=[
+        'catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/db_raii',
     ],
 )
 
