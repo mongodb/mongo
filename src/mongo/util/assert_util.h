@@ -52,11 +52,11 @@ public:
     void rollover();
     void condrollover(int newValue);
 
-    int regular;
-    int warning;
-    int msg;
-    int user;
-    int rollovers;
+    AtomicInt32 regular;
+    AtomicInt32 warning;
+    AtomicInt32 msg;
+    AtomicInt32 user;
+    AtomicInt32 rollovers;
 };
 
 extern AssertionCount assertionCount;

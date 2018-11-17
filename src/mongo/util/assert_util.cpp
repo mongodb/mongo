@@ -61,11 +61,11 @@ AssertionCount assertionCount;
 AssertionCount::AssertionCount() : regular(0), warning(0), msg(0), user(0), rollovers(0) {}
 
 void AssertionCount::rollover() {
-    rollovers++;
-    regular = 0;
-    warning = 0;
-    msg = 0;
-    user = 0;
+    rollovers.fetchAndAdd(1);
+    regular.store(0);
+    warning.store(0);
+    msg.store(0);
+    user.store(0);
 }
 
 void AssertionCount::condrollover(int newvalue) {
@@ -84,7 +84,7 @@ void DBException::traceIfNeeded(const DBException& e) {
 }
 
 NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned line) {
-    assertionCount.condrollover(++assertionCount.regular);
+    assertionCount.condrollover(assertionCount.regular.addAndFetch(1));
     error() << "Assertion failure " << expr << ' ' << file << ' ' << std::dec << line << std::endl;
     logContext();
     std::stringstream temp;
@@ -180,13 +180,13 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
 }
 
 NOINLINE_DECL void uassertedWithLocation(const Status& status, const char* file, unsigned line) {
-    assertionCount.condrollover(++assertionCount.user);
+    assertionCount.condrollover(assertionCount.user.addAndFetch(1));
     LOG(1) << "User Assertion: " << redact(status) << ' ' << file << ' ' << std::dec << line;
     error_details::throwExceptionForStatus(status);
 }
 
 NOINLINE_DECL void msgassertedWithLocation(const Status& status, const char* file, unsigned line) {
-    assertionCount.condrollover(++assertionCount.msg);
+    assertionCount.condrollover(assertionCount.msg.addAndFetch(1));
     error() << "Assertion: " << redact(status) << ' ' << file << ' ' << std::dec << line;
     error_details::throwExceptionForStatus(status);
 }

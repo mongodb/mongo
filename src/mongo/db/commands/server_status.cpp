@@ -255,11 +255,11 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
         BSONObjBuilder asserts;
-        asserts.append("regular", assertionCount.regular);
-        asserts.append("warning", assertionCount.warning);
-        asserts.append("msg", assertionCount.msg);
-        asserts.append("user", assertionCount.user);
-        asserts.append("rollovers", assertionCount.rollovers);
+        asserts.append("regular", assertionCount.regular.loadRelaxed());
+        asserts.append("warning", assertionCount.warning.loadRelaxed());
+        asserts.append("msg", assertionCount.msg.loadRelaxed());
+        asserts.append("user", assertionCount.user.loadRelaxed());
+        asserts.append("rollovers", assertionCount.rollovers.loadRelaxed());
         return asserts.obj();
     }
 
