@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/collection_info_cache_impl.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -49,15 +48,9 @@
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(CollectionInfoCache::makeImpl)
-(Collection* const collection, const NamespaceString& ns, PrivateTo<CollectionInfoCache>)
-    ->std::unique_ptr<CollectionInfoCache::Impl> {
-    return std::make_unique<CollectionInfoCacheImpl>(collection, ns);
-}
 
 CollectionInfoCacheImpl::CollectionInfoCacheImpl(Collection* collection, const NamespaceString& ns)
     : _collection(collection),

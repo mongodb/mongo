@@ -32,7 +32,6 @@
 
 #include "mongo/db/catalog/collection_info_cache.h"
 
-#include "mongo/base/shim.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_settings.h"
@@ -48,7 +47,7 @@ class OperationContext;
  * this is for storing things that you want to cache about a single collection
  * life cycle is managed for you from inside Collection
  */
-class CollectionInfoCacheImpl : public CollectionInfoCache::Impl {
+class CollectionInfoCacheImpl : public CollectionInfoCache {
 public:
     explicit CollectionInfoCacheImpl(Collection* collection, const NamespaceString& ns);
 

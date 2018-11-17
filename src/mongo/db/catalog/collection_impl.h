@@ -69,11 +69,11 @@ public:
     }
 
     CollectionInfoCache* infoCache() final {
-        return &_infoCache;
+        return _infoCache.get();
     }
 
     const CollectionInfoCache* infoCache() const final {
-        return &_infoCache;
+        return _infoCache.get();
     }
 
     const NamespaceString& ns() const final {
@@ -403,7 +403,7 @@ private:
     RecordStore* const _recordStore;
     DatabaseCatalogEntry* const _dbce;
     const bool _needCappedLock;
-    CollectionInfoCache _infoCache;
+    std::unique_ptr<CollectionInfoCache> _infoCache;
     std::unique_ptr<IndexCatalog> _indexCatalog;
 
 

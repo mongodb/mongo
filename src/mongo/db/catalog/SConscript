@@ -206,23 +206,12 @@ env.Library(
 )
 
 env.Library(
-    target='collection_info_cache',
-    source=[
-        'collection_info_cache.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='multi_index_block',
     source=[
         'multi_index_block_impl.cpp',
     ],
     LIBDEPS=[
         'collection',
-        'collection_info_cache',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/background',
@@ -315,7 +304,6 @@ env.Library(
     ],
     LIBDEPS=[
         'collection',
-        'collection_info_cache',
         'collection_options',
         'database',
         'database_holder',

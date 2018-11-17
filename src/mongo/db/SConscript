@@ -1102,7 +1102,6 @@ env.Library(
         'audit',
         'background',
         'bson/dotted_path_support',
-        'catalog/collection_info_cache',
         'catalog/collection',
         'catalog/database',
         'catalog/document_validation',
@@ -1985,7 +1984,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'catalog_raii',
-        'catalog/collection_info_cache',
         'concurrency/lock_manager',
         'introspect',
         'matcher/expressions_mongod_only',

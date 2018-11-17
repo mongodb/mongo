@@ -44,6 +44,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_info_cache_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -187,7 +188,7 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
       _recordStore(recordStore),
       _dbce(dbce),
       _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
-      _infoCache(_this_init, _ns),
+      _infoCache(std::make_unique<CollectionInfoCacheImpl>(_this_init, _ns)),
       _indexCatalog(std::make_unique<IndexCatalogImpl>(_this_init,
                                                        getCatalogEntry()->getMaxAllowedIndexes())),
       _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
@@ -209,7 +210,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
     if (isCapped())
         _recordStore->setCappedCallback(this);
 
-    _infoCache.init(opCtx);
+    _infoCache->init(opCtx);
 }
 
 CollectionImpl::~CollectionImpl() {
@@ -1323,7 +1324,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
 void CollectionImpl::setNs(NamespaceString nss) {
     _ns = std::move(nss);
     _indexCatalog->setNs(_ns);
-    _infoCache.setNs(_ns);
+    _infoCache->setNs(_ns);
     _recordStore->setNs(_ns);
 
     // Until the query layer is prepared for cursors to survive renames, all cursors are killed when
