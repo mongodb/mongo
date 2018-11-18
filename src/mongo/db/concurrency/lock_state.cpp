@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -614,7 +613,8 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() ||
-                  (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(it->mode)));
+                  (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(it->mode)) ||
+                  (resourceIdReplicationStateTransitionLock == resId && it->mode == MODE_IX));
 
         // And, stuff the info into the out parameter.
         OneLock info;
@@ -639,8 +639,15 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     invariant(_modeForTicket == MODE_NONE);
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
-    // If we locked the PBWM, it must be locked before the resourceIdGlobal resource.
+    // If we locked the PBWM, it must be locked before the resourceIdGlobal and
+    // resourceIdReplicationStateTransitionLock resources.
     if (it != state.locks.end() && it->resourceId == resourceIdParallelBatchWriterMode) {
+        invariant(LOCK_OK == lock(opCtx, it->resourceId, it->mode));
+        it++;
+    }
+
+    // If we locked the RSTL, it must be locked before the resourceIdGlobal resource.
+    if (it != state.locks.end() && it->resourceId == resourceIdReplicationStateTransitionLock) {
         invariant(LOCK_OK == lock(opCtx, it->resourceId, it->mode));
         it++;
     }
@@ -904,5 +911,7 @@ const ResourceId resourceIdOplog = ResourceId(RESOURCE_COLLECTION, StringData("l
 const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
 const ResourceId resourceIdParallelBatchWriterMode =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
+const ResourceId resourceIdReplicationStateTransitionLock =
+    ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_REPLICATION_STATE_TRANSITION_LOCK);
 
 }  // namespace mongo

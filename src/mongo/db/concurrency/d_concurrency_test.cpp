@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -255,6 +254,7 @@ TEST_F(DConcurrencyTestFixture, GlobalRead) {
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     Lock::GlobalRead globalRead(opCtx.get());
     ASSERT(opCtx->lockState()->isR());
+    ASSERT_EQ(opCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWrite) {
@@ -262,6 +262,7 @@ TEST_F(DConcurrencyTestFixture, GlobalWrite) {
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     Lock::GlobalWrite globalWrite(opCtx.get());
     ASSERT(opCtx->lockState()->isW());
+    ASSERT_EQ(opCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
@@ -278,6 +279,7 @@ TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
     }
 
     ASSERT(lockState->isW());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture,
@@ -292,6 +294,7 @@ TEST_F(DConcurrencyTestFixture,
     ASSERT(lockState->isW());
     ASSERT(MODE_X == lockState->getLockMode(globalId))
         << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
@@ -305,11 +308,14 @@ TEST_F(DConcurrencyTestFixture,
         // This test case illustrates non-recommended usage of the RAII types. See SERVER-30948.
         globalWrite = {};
         ASSERT(lockState->isW());
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
         lockState->downgrade(globalId, MODE_IX);
         ASSERT_FALSE(lockState->isW());
         ASSERT(lockState->isWriteLocked());
         ASSERT(MODE_IX == lockState->getLockMode(globalId))
             << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
 
@@ -317,6 +323,7 @@ TEST_F(DConcurrencyTestFixture,
     ASSERT_FALSE(lockState->isWriteLocked());
     ASSERT(MODE_NONE == lockState->getLockMode(globalId))
         << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
 }
 
 TEST_F(DConcurrencyTestFixture,
@@ -331,12 +338,14 @@ TEST_F(DConcurrencyTestFixture,
     ASSERT(lockState->isW());
     ASSERT(MODE_X == lockState->getLockMode(globalId))
         << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
         ASSERT(lockState->isW());
         ASSERT(MODE_X == lockState->getLockMode(globalId))
             << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
         // Downgrade global lock resource to MODE_IX to allow other write operations to make
         // progress.
@@ -345,16 +354,19 @@ TEST_F(DConcurrencyTestFixture,
         ASSERT(lockState->isWriteLocked());
         ASSERT(MODE_IX == lockState->getLockMode(globalId))
             << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
     ASSERT_FALSE(lockState->isW());
     ASSERT(lockState->isWriteLocked());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     globalWrite = {};
     ASSERT_FALSE(lockState->isW());
     ASSERT_FALSE(lockState->isWriteLocked());
     ASSERT(MODE_NONE == lockState->getLockMode(globalId))
         << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
 }
 
 TEST_F(DConcurrencyTestFixture,
@@ -367,12 +379,14 @@ TEST_F(DConcurrencyTestFixture,
 
     auto outerGlobalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
     auto innerGlobalWrite = stdx::make_unique<Lock::GlobalWrite>(opCtx.get());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::DBLock dbWrite(opCtx.get(), "db", MODE_IX);
         ASSERT(lockState->isW());
         ASSERT(MODE_X == lockState->getLockMode(globalId))
             << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
         // Downgrade global lock resource to MODE_IX to allow other write operations to make
         // progress.
@@ -381,22 +395,26 @@ TEST_F(DConcurrencyTestFixture,
         ASSERT(lockState->isWriteLocked());
         ASSERT(MODE_IX == lockState->getLockMode(globalId))
             << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
     ASSERT_FALSE(lockState->isW());
     ASSERT(lockState->isWriteLocked());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     innerGlobalWrite = {};
     ASSERT_FALSE(lockState->isW());
     ASSERT(lockState->isWriteLocked());
     ASSERT(MODE_IX == lockState->getLockMode(globalId))
         << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     outerGlobalWrite = {};
     ASSERT_FALSE(lockState->isW());
     ASSERT_FALSE(lockState->isWriteLocked());
     ASSERT(MODE_NONE == lockState->getLockMode(globalId))
         << "unexpected global lock mode " << modeName(lockState->getLockMode(globalId));
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockS_Timeout) {
@@ -424,6 +442,27 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_Timeout) {
                                     Date_t::now() + Milliseconds(1),
                                     Lock::InterruptBehavior::kThrow);
     ASSERT(!globalWriteTry.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
+    auto clients = makeKClientsWithLockers(2);
+    Lock::ResourceLock rstl(
+        clients[0].second.get()->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    ASSERT_EQ(
+        clients[0].second.get()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+        MODE_X);
+
+    Lock::GlobalLock globalWriteTry(clients[1].second.get(),
+                                    MODE_X,
+                                    Date_t::now() + Milliseconds(1),
+                                    Lock::InterruptBehavior::kThrow);
+    ASSERT(!globalWriteTry.isLocked());
+    ASSERT_EQ(
+        clients[0].second.get()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+        MODE_X);
+    ASSERT_EQ(
+        clients[1].second.get()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+        MODE_NONE);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalLockTakenOnOperationContext) {
@@ -561,13 +600,16 @@ TEST_F(DConcurrencyTestFixture, TempReleaseGlobalWrite) {
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     auto lockState = opCtx->lockState();
     Lock::GlobalWrite globalWrite(opCtx.get());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::TempRelease tempRelease(lockState);
         ASSERT(!lockState->isLocked());
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
     }
 
     ASSERT(lockState->isW());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
@@ -576,14 +618,17 @@ TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
     auto lockState = opCtx->lockState();
     Lock::GlobalWrite globalWrite(opCtx.get());
     Lock::DBLock lk(opCtx.get(), "SomeDBName", MODE_X);
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     {
         Lock::TempRelease tempRelease(lockState);
         ASSERT(lockState->isW());
         ASSERT(lockState->isDbLockedForMode("SomeDBName", MODE_X));
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
     }
 
     ASSERT(lockState->isW());
+    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
@@ -601,6 +646,29 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
     });
 
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleBlockedOnRSTL) {
+    auto clients = makeKClientsWithLockers(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+
+    auto result = runTaskAndKill(opCtx2, [&]() {
+        // Killing the lock wait should throw an exception.
+        Lock::GlobalLock g(opCtx2, MODE_S);
+    });
+
+    ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_X);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleMMAP) {
@@ -641,6 +709,35 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitNotInterruptedWithLeaveUnlockedBeh
     ASSERT(g1.isLocked());
     ASSERT(g2 != boost::none);
     ASSERT(!g2->isLocked());
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+    // Should not throw an exception.
+    result.get();
+}
+
+TEST_F(DConcurrencyTestFixture,
+       GlobalLockWaitNotInterruptedWithLeaveUnlockedBehaviorBlockedOnRSTL) {
+    auto clients = makeKClientsWithLockers(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    // Acquire this later to confirm that it stays unlocked.
+    boost::optional<Lock::GlobalLock> g2 = boost::none;
+
+    // Killing the lock wait should not interrupt it, but rather leave it lock unlocked.
+    auto result = runTaskAndKill(opCtx2, [&]() {
+        g2.emplace(opCtx2, MODE_S, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
+    });
+    ASSERT(g2 != boost::none);
+    ASSERT(!g2->isLocked());
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_X);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
 
     // Should not throw an exception.
     result.get();
@@ -706,6 +803,30 @@ TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndDoNotUsingWithInterrup
 
     ASSERT(g1.isLocked());
     ASSERT(!g2.isLocked());
+
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+}
+
+TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndNotUsingInterruptBehaviorBlockedOnRSTL) {
+    auto clients = makeKClientsWithLockers(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // Take the exclusive lock with the first caller.
+    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+
+    // Set a max timeout on the second caller that will override provided lock request deadlines.
+    // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown
+    // and then caught by the Lock::InterruptBehavior::kLeaveUnlocked setting.
+    opCtx2->lockState()->setMaxLockTimeout(Milliseconds(100));
+    Lock::GlobalLock g2(opCtx2, MODE_S, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
+
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_X);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+    ASSERT(!g2.isLocked());
 }
 
 TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndThrowUsingInterruptBehavior) {
@@ -726,6 +847,33 @@ TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndThrowUsingInterruptBeh
         ErrorCodes::LockTimeout);
 
     ASSERT(g1.isLocked());
+
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+}
+
+TEST_F(DConcurrencyTestFixture,
+       SetMaxLockTimeoutMillisAndThrowUsingInterruptBehaviorBlockedOnRSTL) {
+    auto clients = makeKClientsWithLockers(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // Take the exclusive lock with the first caller.
+    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+
+    // Set a max timeout on the second caller that will override provided lock request deadlines.
+    // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown.
+    opCtx2->lockState()->setMaxLockTimeout(Milliseconds(100));
+
+    ASSERT_THROWS_CODE(
+        Lock::GlobalLock(opCtx2, MODE_S, Date_t::max(), Lock::InterruptBehavior::kThrow),
+        DBException,
+        ErrorCodes::LockTimeout);
+
+    ASSERT_EQ(opCtx1->lockState()->getLockMode(resourceIdReplicationStateTransitionLock), MODE_X);
+    ASSERT_EQ(opCtx2->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptible) {

@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -159,6 +158,43 @@ TEST(LockerImpl, saveAndRestoreGlobal) {
 
     ASSERT(locker.isLocked());
     ASSERT(locker.unlockGlobal());
+}
+
+/**
+ * Test that saveLockerImpl can save and restore the RSTL.
+ */
+TEST(LockerImpl, saveAndRestoreRSTL) {
+    Locker::LockSnapshot lockInfo;
+
+    LockerImpl locker;
+
+    const ResourceId resIdDatabase(RESOURCE_DATABASE, "TestDB"_sd);
+
+    // Acquire locks.
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX));
+    locker.lockGlobal(MODE_IX);
+    ASSERT_EQUALS(LOCK_OK, locker.lock(resIdDatabase, MODE_IX));
+
+    // Save the lock state.
+    locker.saveLockStateAndUnlock(&lockInfo);
+    ASSERT(!locker.isLocked());
+    ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
+
+    // Check locks are unlocked.
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resourceIdReplicationStateTransitionLock));
+    ASSERT(!locker.isLocked());
+    ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+
+    // Restore the lock(s) we had.
+    locker.restoreLockState(lockInfo);
+
+    // Check locks are re-locked.
+    ASSERT(locker.isLocked());
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resourceIdReplicationStateTransitionLock));
+
+    ASSERT(locker.unlockGlobal());
+    ASSERT(locker.unlock(resourceIdReplicationStateTransitionLock));
 }
 
 /**

@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -231,6 +230,7 @@ public:
                 }
                 _unlock();
             }
+            _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
         }
 
         /**

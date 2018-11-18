@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -175,7 +174,25 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
             _pbwm.lock(MODE_IS);
         }
 
-        _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
+        _result = _opCtx->lockState()->lock(
+            _opCtx, resourceIdReplicationStateTransitionLock, MODE_IX, deadline);
+        if (_result != LOCK_OK) {
+            if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+                _pbwm.unlock();
+            }
+            return;
+        }
+
+        // At this point the RSTL is locked and must be unlocked if acquiring the GlobalLock fails.
+        // We only want to unlock the RSTL if we were interrupted acquiring the GlobalLock and not
+        // if we were interrupted acquiring the RSTL itself. If we were interrupted acquiring the
+        // RSTL then the RSTL will not be locked and we do not want to attempt to unlock it.
+        try {
+            _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
+        } catch (...) {
+            _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+            throw;
+        }
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         // The kLeaveUnlocked behavior suppresses this exception.
         if (_interruptBehavior == InterruptBehavior::kThrow)
@@ -189,11 +206,15 @@ void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
             _result = _opCtx->lockState()->lockGlobalComplete(_opCtx, deadline);
         }
 
-        if (_result != LOCK_OK &&
-            _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.unlock();
+        if (_result != LOCK_OK) {
+            _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+
+            if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+                _pbwm.unlock();
+            }
         }
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
         // The kLeaveUnlocked behavior suppresses this exception.
         if (_interruptBehavior == InterruptBehavior::kThrow)
             throw;
