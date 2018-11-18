@@ -108,7 +108,8 @@ var WriteConflictHelpers = (function() {
         // Make sure the collection is empty.
         assert.commandWorked(coll.remove({}, {writeConcern: {w: "majority"}}));
 
-        const conn = coll.getDB().getMongo();
+        const testDB = coll.getDB();
+        const conn = testDB.getMongo();
 
         // Initiate two sessions.
         const sessionOptions = {causalConsistency: false};
@@ -120,7 +121,19 @@ var WriteConflictHelpers = (function() {
                   tojson(txn2Op));
 
         // Run the specified write conflict test.
-        writeConflictTestCase(coll, session1, session2, txn1Op, txn2Op, initOp);
+        try {
+            writeConflictTestCase(coll, session1, session2, txn1Op, txn2Op, initOp);
+        } catch (e) {
+            jsTestLog("Write conflict test case '" + writeConflictTestCase.name + "' failed.");
+            // We make sure to abort any idle transactions.
+            let lsid1 = session1.getSessionId();
+            let lsid2 = session2.getSessionId();
+            print("Killing session with sessionID: " + tojson(lsid1));
+            assert.commandWorked(testDB.runCommand({killSessions: [lsid1]}));
+            print("Killing session with sessionID: " + tojson(lsid2));
+            assert.commandWorked(testDB.runCommand({killSessions: [lsid2]}));
+            throw e;
+        }
 
         // Check the final state of the collection.
         assert.docEq(expectedDocs, coll.find().toArray());
