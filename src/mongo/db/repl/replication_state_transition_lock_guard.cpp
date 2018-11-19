@@ -45,11 +45,8 @@ ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(Operati
 ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx,
                                                                          const Args& args)
     : _opCtx(opCtx), _args(args) {
-    _globalLock.emplace(opCtx,
-                        MODE_X,
-                        args.lockDeadline,
-                        Lock::InterruptBehavior::kThrow,
-                        Lock::GlobalLock::EnqueueOnly());
+    // Enqueue a lock request for the RSTL in mode X.
+    LockResult result = _opCtx->lockState()->lockRSTLBegin(_opCtx);
 
     if (args.killUserOperations) {
         ServiceContext* environment = opCtx->getServiceContext();
@@ -62,26 +59,33 @@ ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(Operati
             opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
     }
 
-    _globalLock->waitForLockUntil(args.lockDeadline);
+    // We can return early if the lock request was already satisfied.
+    if (result == LOCK_OK) {
+        return;
+    }
+
+    // Wait for the completion of the lock request for the RSTL in mode X.
+    _opCtx->lockState()->lockRSTLComplete(opCtx, args.lockDeadline);
     uassert(ErrorCodes::ExceededTimeLimit,
-            "Could not acquire the global lock before the deadline",
-            _globalLock->isLocked());
+            "Could not acquire the RSTL before the deadline",
+            opCtx->lockState()->isRSTLExclusive());
 }
 
 ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
-    invariant(_globalLock->isLocked());
+    invariant(_opCtx->lockState()->isRSTLExclusive());
+    _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
 }
 
-void ReplicationStateTransitionLockGuard::releaseGlobalLock() {
-    invariant(_globalLock->isLocked());
-    _globalLock.reset();
+void ReplicationStateTransitionLockGuard::releaseRSTL() {
+    invariant(_opCtx->lockState()->isRSTLExclusive());
+    _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
 }
 
-void ReplicationStateTransitionLockGuard::reacquireGlobalLock() {
-    invariant(!_globalLock);
+void ReplicationStateTransitionLockGuard::reacquireRSTL() {
+    invariant(!_opCtx->lockState()->isRSTLLocked());
 
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    _globalLock.emplace(_opCtx, MODE_X);
+    _opCtx->lockState()->lock(_opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
 }
 
 }  // namespace repl

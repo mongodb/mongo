@@ -40,30 +40,29 @@ namespace mongo {
 namespace repl {
 
 /**
- * This object handles acquiring the global exclusive lock for replication state transitions, as
- * well as any actions that need to happen in between enqueuing the global lock request and waiting
- * for it to be granted.
+ * This object handles acquiring the RSTL for replication state transitions, as well as any actions
+ * that need to happen in between enqueuing the RSTL request and waiting for it to be granted.
  */
 class ReplicationStateTransitionLockGuard {
     MONGO_DISALLOW_COPYING(ReplicationStateTransitionLockGuard);
 
 public:
     struct Args {
-        // How long to wait for the global X lock.
+        // How long to wait for the RSTL in mode X.
         Date_t lockDeadline = Date_t::max();
 
-        // If true, will kill all user operations in between enqueuing the global lock request and
-        // waiting for it to be granted.
+        // If true, will kill all user operations in between enqueuing the RSTL request and waiting
+        // for it to be granted.
         bool killUserOperations = false;
     };
 
     /**
-     * Acquires the global X lock.
+     * Acquires the RSTL in mode X.
      */
     ReplicationStateTransitionLockGuard(OperationContext* opCtx);
 
     /**
-     * Acquires the global X lock and performs any other required actions according to the Args
+     * Acquires the RSTL in mode X and performs any other required actions according to the Args
      * provided.
      */
     ReplicationStateTransitionLockGuard(OperationContext* opCtx, const Args& args);
@@ -71,20 +70,19 @@ public:
     ~ReplicationStateTransitionLockGuard();
 
     /**
-     * Temporarily releases the global X lock.  Must be followed by a call to reacquireGlobalLock().
+     * Temporarily releases the RSTL in mode X.  Must be followed by a call to reacquireRSTL().
      */
-    void releaseGlobalLock();
+    void releaseRSTL();
 
     /**
-     * Requires the global X lock after it was released via a call to releaseGlobalLock.  Ignores
+     * Re-acquires the RSTL in mode X after it was released via a call to releaseRSTL.  Ignores
      * the configured 'lockDeadline' and instead waits forever for the lock to be acquired.
      */
-    void reacquireGlobalLock();
+    void reacquireRSTL();
 
 private:
     OperationContext* const _opCtx;
     Args _args;
-    boost::optional<Lock::GlobalLock> _globalLock = boost::none;
 };
 
 }  // namespace repl

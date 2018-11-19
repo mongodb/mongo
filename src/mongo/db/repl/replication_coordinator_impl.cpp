@@ -926,7 +926,7 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
 Status ReplicationCoordinatorImpl::setFollowerModeStrict(OperationContext* opCtx,
                                                          const MemberState& newState) {
     invariant(opCtx);
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isRSTLExclusive());
     return _setFollowerMode(opCtx, newState);
 }
 
@@ -1736,7 +1736,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     transitionArgs.lockDeadline = force ? stepDownUntil : waitUntil;
 
     ReplicationStateTransitionLockGuard transitionGuard(opCtx, transitionArgs);
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isRSTLExclusive());
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -1759,7 +1759,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // Make sure that we leave _canAcceptNonLocalWrites in the proper state.
     auto updateMemberState = [&] {
         invariant(lk.owns_lock());
-        invariant(opCtx->lockState()->isW());
+        invariant(opCtx->lockState()->isRSTLExclusive());
 
         auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
         lk.unlock();
@@ -1802,28 +1802,26 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         while (!_topCoord->attemptStepDown(
             termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
 
-            // The stepdown attempt failed. We now release the global lock to allow secondaries
-            // to read the oplog, then wait until enough secondaries are caught up for us to
-            // finish stepdown.
-            transitionGuard.releaseGlobalLock();
+            // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
+            // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
+            transitionGuard.releaseRSTL();
             invariant(!opCtx->lockState()->isLocked());
 
-            // Make sure we re-acquire the global lock before returning so that we're always holding
-            // the global lock when the onExitGuard set up earlier runs.
+            // Make sure we re-acquire the RSTL before returning so that we're always holding the
+            // RSTL when the onExitGuard set up earlier runs.
             ON_BLOCK_EXIT([&] {
-                // Need to release _mutex before re-acquiring the global lock to preserve lock
-                // acquisition order rules.
+                // Need to release _mutex before re-acquiring the RSTL to preserve lock acquisition
+                // order rules.
                 lk.unlock();
 
-                // Need to re-acquire the global lock before re-attempting stepdown.
+                // Need to re-acquire the RSTL before re-attempting stepdown.
                 // We use no timeout here even though that means the lock acquisition could take
-                // longer than the stepdown window.  If that happens, the call to _tryToStepDown
-                // immediately after will error.  Since we'll need the global lock no matter what to
+                // longer than the stepdown window. Since we'll need the RSTL no matter what to
                 // clean up a failed stepdown attempt, we might as well spend whatever time we need
                 // to acquire it now.  For the same reason, we also disable lock acquisition
                 // interruption, to guarantee that we get the lock eventually.
-                transitionGuard.reacquireGlobalLock();
-                invariant(opCtx->lockState()->isW());
+                transitionGuard.reacquireRSTL();
+                invariant(opCtx->lockState()->isRSTLExclusive());
                 lk.lock();
             });
 
@@ -3633,9 +3631,9 @@ void ReplicationCoordinatorImpl::ReadWriteAbility::setCanAcceptNonLocalWrites(
         return;
     }
 
-    // We must be holding the global X lock to change _canAcceptNonLocalWrites.
+    // We must be holding the RSTL in mode X to change _canAcceptNonLocalWrites.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isRSTLExclusive());
     _canAcceptNonLocalWrites = canAcceptWrites;
 }
 
@@ -3649,9 +3647,9 @@ bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites_UNSAF
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canAcceptNonLocalWrites(
     OperationContext* opCtx) const {
-    // We must be holding the global lock.
+    // We must be holding the RSTL.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isLocked());
+    invariant(opCtx->lockState()->isRSTLLocked());
     return _canAcceptNonLocalWrites;
 }
 
@@ -3661,17 +3659,17 @@ bool ReplicationCoordinatorImpl::ReadWriteAbility::canServeNonLocalReads_UNSAFE(
 
 bool ReplicationCoordinatorImpl::ReadWriteAbility::canServeNonLocalReads(
     OperationContext* opCtx) const {
-    // We must be holding the global lock.
+    // We must be holding the RSTL.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isLocked());
+    invariant(opCtx->lockState()->isRSTLLocked());
     return _canServeNonLocalReads.loadRelaxed();
 }
 
 void ReplicationCoordinatorImpl::ReadWriteAbility::setCanServeNonLocalReads(OperationContext* opCtx,
                                                                             unsigned int newVal) {
-    // We must be holding the global X lock to change _canServeNonLocalReads.
+    // We must be holding the RSTL in mode X to change _canServeNonLocalReads.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isRSTLExclusive());
     _canServeNonLocalReads.store(newVal);
 }
 

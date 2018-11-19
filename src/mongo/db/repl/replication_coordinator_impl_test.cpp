@@ -1886,7 +1886,7 @@ TEST_F(StepDownTest,
     // Make sure stepDown cannot grab the RSTL in mode X. We need to use a different
     // locker to test this, or otherwise stepDown will be granted the lock automatically.
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
-    ASSERT_TRUE(opCtx->lockState()->isW());
+    ASSERT_TRUE(opCtx->lockState()->isRSTLExclusive());
     auto locker = opCtx.get()->swapLockState(stdx::make_unique<LockerImpl>());
 
     ASSERT_THROWS_CODE(
@@ -1895,8 +1895,8 @@ TEST_F(StepDownTest,
         ErrorCodes::ExceededTimeLimit);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    ASSERT_TRUE(locker->isW());
-    ASSERT_FALSE(opCtx->lockState()->isLocked());
+    ASSERT_TRUE(locker->isRSTLExclusive());
+    ASSERT_FALSE(opCtx->lockState()->isRSTLLocked());
 
     opCtx.get()->swapLockState(std::move(locker));
 }

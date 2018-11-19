@@ -479,7 +479,7 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
 }
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+    invariant(opCtx->lockState()->isRSTLExclusive());
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.

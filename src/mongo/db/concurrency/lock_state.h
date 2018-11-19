@@ -146,6 +146,9 @@ public:
 
     virtual bool unlockGlobal();
 
+    virtual LockResult lockRSTLBegin(OperationContext* opCtx);
+    virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline);
+
     virtual void beginWriteUnitOfWork();
     virtual void endWriteUnitOfWork();
 
@@ -348,6 +351,10 @@ public:
     virtual bool isLocked() const;
     virtual bool isWriteLocked() const;
     virtual bool isReadLocked() const;
+
+    virtual bool isRSTLExclusive() const;
+    virtual bool isRSTLLocked() const;
+
     bool isGlobalLockedRecursively() override;
 
     virtual bool hasLockPending() const {

@@ -191,6 +191,20 @@ public:
     virtual bool unlockGlobal() = 0;
 
     /**
+     * Requests the RSTL to be acquired in mode X. This should only be called inside
+     * ReplicationStateTransitionLockGuard.
+     *
+     * See the comments for lockBegin/Complete for more information on the semantics.
+     */
+    virtual LockResult lockRSTLBegin(OperationContext* opCtx) = 0;
+
+    /**
+     * Waits for the completion of acquiring the RSTL in mode X. This should only be called inside
+     * ReplicationStateTransitionLockGuard.
+     */
+    virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline) = 0;
+
+    /**
      * beginWriteUnitOfWork/endWriteUnitOfWork are called at the start and end of WriteUnitOfWorks.
      * They can be used to implement two-phase locking. Each call to begin should be matched with an
      * eventual call to end.
@@ -387,6 +401,10 @@ public:
     virtual bool isLocked() const = 0;
     virtual bool isWriteLocked() const = 0;
     virtual bool isReadLocked() const = 0;
+
+    virtual bool isRSTLExclusive() const = 0;
+    virtual bool isRSTLLocked() const = 0;
+
     virtual bool isGlobalLockedRecursively() = 0;
 
     /**

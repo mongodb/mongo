@@ -588,17 +588,17 @@ private:
     private:
         // Flag that indicates whether writes to databases other than "local" are allowed.  Used to
         // answer canAcceptWritesForDatabase() and canAcceptWritesFor() questions. In order to read
-        // it, must have either the RSTL in some intent mode or the replication coordinator mutex.
-        // To set it, must have both the RSTL in mode X and the replication coordinator mutex.
+        // it, must have either the RSTL or the replication coordinator mutex. To set it, must have
+        // both the RSTL in mode X and the replication coordinator mutex.
         // Always true for standalone nodes.
         bool _canAcceptNonLocalWrites;
 
         // Flag that indicates whether reads from databases other than "local" are allowed. Unlike
         // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries.
         // Accidentally providing the prior value for a limited period of time is acceptable, except
-        // during rollback. In order to read it, must have the RSTL in some intent mode. To set it
-        // when transitioning into RS_ROLLBACK, must have the RSTL in mode X. Otherwise, no lock or
-        // mutex is necessary to set it.
+        // during rollback. In order to read it, must have the RSTL. To set it when transitioning
+        // into RS_ROLLBACK, must have the RSTL in mode X. Otherwise, no lock or mutex is necessary
+        // to set it.
         AtomicUInt32 _canServeNonLocalReads;
     };
 

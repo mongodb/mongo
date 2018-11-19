@@ -168,6 +168,14 @@ bool LockerImpl::isReadLocked() const {
     return isLockHeldForMode(resourceIdGlobal, MODE_IS);
 }
 
+bool LockerImpl::isRSTLExclusive() const {
+    return getLockMode(resourceIdReplicationStateTransitionLock) == MODE_X;
+}
+
+bool LockerImpl::isRSTLLocked() const {
+    return getLockMode(resourceIdReplicationStateTransitionLock) != MODE_NONE;
+}
+
 void LockerImpl::dump() const {
     StringBuilder ss;
     ss << "Locker id " << _id << " status: ";
@@ -593,10 +601,12 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         return false;
     }
 
-    // If the global lock has been acquired more than once, we're probably somewhere in a
+    // If the global lock or RSTL has been acquired more than once, we're probably somewhere in a
     // DBDirectClient call.  It's not safe to release and reacquire locks -- the context using
     // the DBDirectClient is probably not prepared for lock release.
-    if (globalRequest->recursiveCount > 1) {
+    LockRequestsMap::Iterator rstlRequest =
+        _requests.find(resourceIdReplicationStateTransitionLock);
+    if (globalRequest->recursiveCount > 1 || (rstlRequest && rstlRequest->recursiveCount > 1)) {
         return false;
     }
 
@@ -823,6 +833,15 @@ LockResult LockerImpl::lockComplete(OperationContext* opCtx,
         unlockOnErrorGuard.Dismiss();
     }
     return result;
+}
+
+LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx) {
+    invariant(!opCtx->lockState()->isLocked());
+    return lockBegin(opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
+}
+
+LockResult LockerImpl::lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
+    return lockComplete(opCtx, resourceIdReplicationStateTransitionLock, MODE_X, deadline);
 }
 
 void LockerImpl::releaseTicket() {

@@ -119,6 +119,14 @@ public:
         return false;
     }
 
+    virtual LockResult lockRSTLBegin(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
+        MONGO_UNREACHABLE;
+    }
+
     virtual LockResult lock(OperationContext* opCtx,
                             ResourceId resId,
                             LockMode mode,
@@ -210,6 +218,14 @@ public:
     }
 
     virtual bool isReadLocked() const {
+        return true;
+    }
+
+    virtual bool isRSTLExclusive() const {
+        return true;
+    }
+
+    virtual bool isRSTLLocked() const {
         return true;
     }
 
