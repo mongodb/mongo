@@ -77,6 +77,13 @@ std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
     }
 }
 
+std::unique_ptr<RecordStore> EphemeralForTestEngine::makeTemporaryRecordStore(
+    OperationContext* opCtx, StringData ident) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _dataMap[ident] = {};
+    return stdx::make_unique<EphemeralForTestRecordStore>(ident, &_dataMap[ident]);
+}
+
 Status EphemeralForTestEngine::createSortedDataInterface(OperationContext* opCtx,
                                                          StringData ident,
                                                          const IndexDescriptor* desc) {

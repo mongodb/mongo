@@ -76,6 +76,9 @@ public:
         return _storageEngine->getCatalog()->getCollectionIdent(ns.ns());
     }
 
+    std::unique_ptr<RecordStore> makeTemporary(OperationContext* opCtx) {
+        return _storageEngine->makeTemporaryRecordStore(opCtx);
+    }
 
     /**
      * Create a collection table in the KVEngine not reflected in the KVCatalog.
@@ -221,6 +224,21 @@ TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
 
     ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
     ASSERT(!collectionExists(opCtx.get(), collNs));
+}
+
+TEST_F(KVStorageEngineTest, ReconcileDropsTemporary) {
+    auto opCtx = cc().makeOperationContext();
+
+    auto rs = makeTemporary(opCtx.get());
+    ASSERT(rs);
+    const std::string ident = rs->getIdent();
+
+    ASSERT(identExists(opCtx.get(), ident));
+
+    ASSERT_OK(reconcile(opCtx.get()).getStatus());
+
+    // The storage engine is responsible for dropping its temporary idents.
+    ASSERT(!identExists(opCtx.get(), ident));
 }
 
 TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphans) {

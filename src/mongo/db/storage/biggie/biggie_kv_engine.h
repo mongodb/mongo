@@ -64,6 +64,9 @@ public:
                                                                StringData ident,
                                                                const CollectionOptions& options);
 
+    virtual std::unique_ptr<mongo::RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                         StringData ident) override;
+
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
                                              const IndexDescriptor* desc);

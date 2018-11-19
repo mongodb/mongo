@@ -122,6 +122,8 @@ public:
 
     virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns);
 
+    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx) override;
+
     virtual void cleanShutdown();
 
     virtual void setStableTimestamp(Timestamp stableTimestamp,

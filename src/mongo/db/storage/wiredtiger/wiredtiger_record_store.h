@@ -88,6 +88,7 @@ public:
 
     /**
      * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
+     * It is possible for 'ns' to be an empty string, in the case of internal-only temporary tables.
      * Configuration string is constructed from:
      *     built-in defaults
      *     storageEngine.wiredTiger.configString in 'options'

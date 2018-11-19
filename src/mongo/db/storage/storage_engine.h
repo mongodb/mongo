@@ -45,6 +45,7 @@ namespace mongo {
 class DatabaseCatalogEntry;
 class JournalListener;
 class OperationContext;
+class RecordStore;
 class RecoveryUnit;
 class SnapshotManager;
 struct StorageGlobalParams;
@@ -285,6 +286,13 @@ public:
      * free function.
      */
     virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) = 0;
+
+    /**
+     * Creates a temporary RecordStore on the storage engine. This record store should be dropped by
+     * the caller when done being used. The storage engine will drop any remaining temporary record
+     * stores on startup.
+     */
+    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx) = 0;
 
     /**
      * This method will be called before there is a clean shutdown.  Storage engines should

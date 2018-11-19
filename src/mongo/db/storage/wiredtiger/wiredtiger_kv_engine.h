@@ -111,6 +111,9 @@ public:
         return getGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
     }
 
+    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                  StringData ident) override;
+
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
                                              const IndexDescriptor* desc) override {

@@ -103,7 +103,7 @@ public:
 
         const bool prefixed = true;
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-            kWiredTigerEngineName, ns, CollectionOptions(), "", prefixed);
+            kWiredTigerEngineName, StringData(ns), CollectionOptions(), "", prefixed);
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
@@ -149,7 +149,7 @@ public:
 
         KVPrefix prefix = KVPrefix::generateNextPrefix();
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-            kWiredTigerEngineName, ns, options, "", prefix.isPrefixed());
+            kWiredTigerEngineName, StringData(ns), options, "", prefix.isPrefixed());
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 

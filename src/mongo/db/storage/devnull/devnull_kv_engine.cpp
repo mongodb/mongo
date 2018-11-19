@@ -258,6 +258,11 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
     return stdx::make_unique<DevNullRecordStore>(ns, options);
 }
 
+std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                       StringData ident) {
+    return stdx::make_unique<DevNullRecordStore>("", CollectionOptions());
+}
+
 SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {

@@ -340,6 +340,13 @@ bool KVCatalog::_hasEntryCollidingWithRand() const {
     return false;
 }
 
+std::string KVCatalog::newTempIdent() {
+    StringBuilder buf;
+    buf << "temp-";
+    buf << _next.fetchAndAdd(1) << '-' << _rand;
+    return buf.str();
+}
+
 std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
     StringBuilder buf;
@@ -621,12 +628,17 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
 }
 
 bool KVCatalog::isUserDataIdent(StringData ident) const {
+    // Indexes, collections, and temporary RecordStore idents are all candidates for dropping when
+    // the storage engine's metadata does not align with the catalog metadata.
     return ident.find("index-") != std::string::npos || ident.find("index/") != std::string::npos ||
+        ident.find("temp-") != std::string::npos ||
         ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
 
 bool KVCatalog::isCollectionIdent(StringData ident) const {
+    // Temporary RecordStores idents prefixed "temp-" should not be considered collections, because
+    // they are not eligible for orphan recovery.
     return ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }

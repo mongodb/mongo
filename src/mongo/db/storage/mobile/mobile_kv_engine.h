@@ -58,6 +58,9 @@ public:
                                                 StringData ident,
                                                 const CollectionOptions& options) override;
 
+    std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                          StringData ident) override;
+
     Status createSortedDataInterface(OperationContext* opCtx,
                                      StringData ident,
                                      const IndexDescriptor* desc) override;

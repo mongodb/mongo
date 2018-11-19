@@ -627,6 +627,10 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::st
     return Status::OK();
 }
 
+std::unique_ptr<RecordStore> KVStorageEngine::makeTemporaryRecordStore(OperationContext* opCtx) {
+    return _engine->makeTemporaryRecordStore(opCtx, _catalog->newTempIdent());
+}
+
 void KVStorageEngine::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }

@@ -1124,6 +1124,47 @@ SortedDataInterface* WiredTigerKVEngine::getGroupedSortedDataInterface(Operation
     return new WiredTigerIndexStandard(opCtx, _uri(ident), desc, prefix, _readOnly);
 }
 
+std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                          StringData ident) {
+    invariant(!_readOnly);
+
+    _ensureIdentPath(ident);
+    WiredTigerSession wtSession(_conn);
+
+    CollectionOptions noOptions;
+    StatusWith<std::string> swConfig = WiredTigerRecordStore::generateCreateString(
+        _canonicalName, "" /* internal table */, noOptions, _rsOptions, false /* prefixed */);
+    uassertStatusOK(swConfig.getStatus());
+
+    std::string config = swConfig.getValue();
+
+    std::string uri = _uri(ident);
+    WT_SESSION* session = wtSession.getSession();
+    LOG(2) << "WiredTigerKVEngine::createTemporaryRecordStore uri: " << uri
+           << " config: " << config;
+    uassertStatusOK(wtRCToStatus(session->create(session, uri.c_str(), config.c_str())));
+
+    WiredTigerRecordStore::Params params;
+    params.ns = "";
+    params.uri = _uri(ident);
+    params.engineName = _canonicalName;
+    params.isCapped = false;
+    params.isEphemeral = _ephemeral;
+    params.cappedCallback = nullptr;
+    // Temporary collections do not need to persist size information to the size storer.
+    params.sizeStorer = nullptr;
+    params.isReadOnly = false;
+
+    params.cappedMaxSize = -1;
+    params.cappedMaxDocs = -1;
+
+    std::unique_ptr<WiredTigerRecordStore> rs;
+    rs = stdx::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
+    rs->postConstructorInit(opCtx);
+
+    return std::move(rs);
+}
+
 void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,
                                             StringData ident,
                                             const IndexDescriptor* desc) {

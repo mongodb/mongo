@@ -172,6 +172,43 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     }
 }
 
+TEST(KVEngineTestHarness, TemporaryRecordStoreSimple) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    ASSERT(engine);
+
+    string ident = "temptemp";
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        rs = engine->makeTemporaryRecordStore(&opCtx, ident);
+        ASSERT(rs);
+    }
+
+    RecordId loc;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        StatusWith<RecordId> res = rs->insertRecord(&opCtx, "abc", 4, Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc = res.getValue();
+        uow.commit();
+    }
+
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_EQUALS(string("abc"), rs->dataFor(&opCtx, loc).data());
+
+        std::vector<std::string> all = engine->getAllIdents(&opCtx);
+        ASSERT_EQUALS(1U, all.size());
+        ASSERT_EQUALS(ident, all[0]);
+
+        WriteUnitOfWork wuow(&opCtx);
+        ASSERT_OK(engine->dropIdent(&opCtx, ident));
+        wuow.commit();
+    }
+}
+
 TEST(KVCatalogTest, Coll1) {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
@@ -216,7 +253,6 @@ TEST(KVCatalogTest, Coll1) {
     }
     ASSERT_NOT_EQUALS(ident, catalog->getCollectionIdent("a.b"));
 }
-
 
 TEST(KVCatalogTest, Idx1) {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
