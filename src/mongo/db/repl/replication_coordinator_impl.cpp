@@ -1089,17 +1089,29 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opTime,
                                                                DataConsistency consistency) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    if (opTime > _getMyLastAppliedOpTime_inlock()) {
+    auto myLastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
+    if (opTime > myLastAppliedOpTime) {
         _setMyLastAppliedOpTime(lock, opTime, false, consistency);
         _reportUpstream_inlock(std::move(lock));
-    } else if ((consistency == DataConsistency::Consistent &&
-                _readWriteAbility->canAcceptNonLocalWrites(lock) &&
-                _rsConfig.getWriteMajority() == 1) ||
-               !serverGlobalParams.enableMajorityReadConcern) {
-        // Single vote primaries may have a lagged stable timestamp due to paring back the stable
-        // timestamp to the all committed timestamp. When majority read concern is disabled, the
-        // stable timestamp is set to lastApplied.
-        _setStableTimestampForStorage(lock);
+    } else {
+        if (opTime != myLastAppliedOpTime) {
+            // In pv1, oplog entries are ordered by non-decreasing term and strictly increasing
+            // timestamp. So, in pv1, its not possible for us to get opTime with lower term and
+            // timestamp higher than or equal to our current lastAppliedOptime.
+            invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
+                      myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
+                      opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp());
+        }
+
+        if ((consistency == DataConsistency::Consistent &&
+             _readWriteAbility->canAcceptNonLocalWrites(lock) &&
+             _rsConfig.getWriteMajority() == 1) ||
+            !serverGlobalParams.enableMajorityReadConcern) {
+            // Single vote primaries may have a lagged stable timestamp due to paring back the
+            // stable timestamp to the all committed timestamp. When majority read concern is
+            // disabled, the stable timestamp is set to lastApplied.
+            _setStableTimestampForStorage(lock);
+        }
     }
 }
 
