@@ -162,6 +162,7 @@ env.Library(
 env.Library(
     target='record_store_test_harness',
     source=[
+        'record_store_test_capped_delete.cpp',
         'record_store_test_capped_visibility.cpp',
         'record_store_test_datafor.cpp',
         'record_store_test_datasize.cpp',

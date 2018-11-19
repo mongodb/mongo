@@ -806,15 +806,6 @@ private:
             _sizeSubtreeElems = other._sizeSubtreeElems;
         }
 
-        friend void swap(Node& first, Node& second) {
-            std::swap(first.trieKey, second.trieKey);
-            std::swap(first.depth, second.depth);
-            std::swap(first.data, second.data);
-            std::swap(first.children, second.children);
-            std::swap(first._numSubtreeElems, second._numSubtreeElems);
-            std::swap(first._sizeSubtreeElems, second._sizeSubtreeElems);
-        }
-
         Node(Node&& other) {
             _depth = std::move(other._depth);
             _numSubtreeElems = std::move(other._numSubtreeElems);
@@ -822,6 +813,17 @@ private:
             _trieKey = std::move(other._trieKey);
             _data = std::move(other._data);
             _children = std::move(other._children);
+        }
+
+        virtual ~Node() = default;
+
+        friend void swap(Node& first, Node& second) {
+            std::swap(first.trieKey, second.trieKey);
+            std::swap(first.depth, second.depth);
+            std::swap(first.data, second.data);
+            std::swap(first.children, second.children);
+            std::swap(first._numSubtreeElems, second._numSubtreeElems);
+            std::swap(first._sizeSubtreeElems, second._sizeSubtreeElems);
         }
 
         Node& operator=(const Node other) {
