@@ -920,6 +920,7 @@ __log_server(void *arg)
 	 * pre-allocation.  Start it so that we run on the first time through.
 	 */
 	timediff = WT_THOUSAND;
+	time_start = __wt_clock(session);
 
 	/*
 	 * The log server thread does a variety of work.  It forces out any
@@ -1001,10 +1002,10 @@ __log_server(void *arg)
 					    "log_archive: Blocked due to open "
 					    "log cursor holding archive lock");
 			}
+			time_start = __wt_clock(session);
 		}
 
 		/* Wait until the next event. */
-		time_start = __wt_clock(session);
 		__wt_cond_auto_wait_signal(
 		    session, conn->log_cond, did_work, NULL, &signalled);
 		time_stop = __wt_clock(session);

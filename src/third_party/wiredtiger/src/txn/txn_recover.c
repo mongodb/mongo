@@ -639,6 +639,15 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		}
 		if (F_ISSET(conn, WT_CONN_SALVAGE))
 			ret = 0;
+		/*
+		 * If log scan couldn't find a file we expected to be around,
+		 * this indicates a corruption of some sort.
+		 */
+		if (ret == ENOENT) {
+			F_SET(conn, WT_CONN_DATA_CORRUPTION);
+			ret = WT_ERROR;
+		}
+
 		WT_ERR(ret);
 	}
 
