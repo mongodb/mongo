@@ -241,6 +241,12 @@ public:
                     !txnParticipant ||
                         !(txnParticipant->inMultiDocumentTransaction() && qr->isTailable()));
 
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    "The 'readOnce' option is not supported within a transaction.",
+                    !txnParticipant ||
+                        !txnParticipant->inActiveOrKilledMultiDocumentTransaction() ||
+                        !qr->isReadOnce());
+
             // Validate term before acquiring locks, if provided.
             if (auto term = qr->getReplicationTerm()) {
                 // Note: updateTerm returns ok if term stayed the same.
@@ -302,6 +308,12 @@ public:
             }
 
             Collection* const collection = ctx->getCollection();
+
+            if (cq->getQueryRequest().isReadOnce()) {
+                // The readOnce option causes any storage-layer cursors created during plan
+                // execution to assume read data will not be needed again and need not be cached.
+                opCtx->recoveryUnit()->setReadOnce(true);
+            }
 
             // Get the execution plan for the query.
             auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, nss, std::move(cq)));

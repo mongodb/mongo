@@ -170,5 +170,28 @@
         }));
     }
 
+    //
+    // Test that a find command with the read-once cursor option is not allowed in a transaction.
+    //
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        readOnce: true,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(++txnNumber),
+        stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
+    }),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
+
+    // The failed find should abort the transaction so a commit should fail.
+    assert.commandFailedWithCode(sessionDb.adminCommand({
+        commitTransaction: 1,
+        autocommit: false,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(1),
+    }),
+                                 ErrorCodes.NoSuchTransaction);
+
     session.endSession();
 }());

@@ -101,6 +101,7 @@ const char kAwaitDataField[] = "awaitData";
 const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
+const char kReadOnceField[] = "readOnce";
 
 // Field names for sorting options.
 const char kNaturalSortField[] = "$natural";
@@ -366,6 +367,13 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
             qr->_replicationTerm = el._numberLong();
+        } else if (fieldName == kReadOnceField) {
+            Status status = checkFieldType(el, Bool);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            qr->_readOnce = el.boolean();
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -525,6 +533,10 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (_replicationTerm) {
         cmdBuilder->append(kTermField, *_replicationTerm);
+    }
+
+    if (_readOnce) {
+        cmdBuilder->append(kReadOnceField, true);
     }
 }
 
@@ -1009,6 +1021,10 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kSingleBatchField
                               << " not supported in aggregation."};
+    }
+    if (_readOnce) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kReadOnceField << " not supported in aggregation."};
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.

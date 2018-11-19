@@ -104,4 +104,11 @@
                        [{_id: "New York", state: "NY", pop: 7}]);
     assert.eq(viewsDB.identityView.findOne({_id: "San Francisco"}),
               {_id: "San Francisco", state: "CA", pop: 4});
+
+    // The readOnce cursor option is not allowed on views.  But if we're in a transaction,
+    // the error code saying that it's not allowed in a transaction takes precedence.
+    const inTxnPassthrough = viewsDB.getMongo().hasOwnProperty('txnOverrideOptions');
+    assert.commandFailedWithCode(viewsDB.runCommand({find: "identityView", readOnce: true}),
+                                 inTxnPassthrough ? ErrorCodes.OperationNotSupportedInTransaction
+                                                  : ErrorCodes.InvalidPipelineOperator);
 }());

@@ -402,7 +402,8 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "oplogReplay: true,"
         "noCursorTimeout: true,"
         "awaitData: true,"
-        "allowPartialResults: true}");
+        "allowPartialResults: true,"
+        "readOnce: true}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
@@ -415,6 +416,16 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(qr->isNoCursorTimeout());
     ASSERT(qr->isTailableAndAwaitData());
     ASSERT(qr->isAllowPartialResults());
+    ASSERT(qr->isReadOnce());
+}
+
+TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
+    BSONObj cmdObj = fromjson("{find: 'testns'}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT(!qr->isReadOnce());
 }
 
 TEST(QueryRequestTest, ParseFromCommandCommentWithValidMinMax) {
@@ -764,6 +775,16 @@ TEST(QueryRequestTest, ParseFromCommandCollationWrongType) {
     bool isExplain = false;
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
     ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(QueryRequestTest, ParseFromCommandReadOnceWrongType) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "readOnce: 1}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_EQ(ErrorCodes::FailedToParse, result.getStatus());
 }
 //
 // Parsing errors where a field has the right type but a bad value.
@@ -1291,6 +1312,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSON("f" << 1));
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithReadOnceFails) {
+    QueryRequest qr(testns);
+    qr.setReadOnce(true);
+    const auto aggCmd = qr.asAggregationCommand();
+    ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
 }
 
 TEST(QueryRequestTest, ParseFromLegacyObjMetaOpComment) {

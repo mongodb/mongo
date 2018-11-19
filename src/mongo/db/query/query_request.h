@@ -378,6 +378,14 @@ public:
         _replicationTerm = replicationTerm;
     }
 
+    bool isReadOnce() const {
+        return _readOnce;
+    }
+
+    void setReadOnce(bool readOnce) {
+        _readOnce = readOnce;
+    }
+
     /**
      * Return options as a bit vector.
      */
@@ -502,6 +510,7 @@ private:
     bool _noCursorTimeout = false;
     bool _exhaust = false;
     bool _allowPartialResults = false;
+    bool _readOnce = false;
 
     boost::optional<long long> _replicationTerm;
 };

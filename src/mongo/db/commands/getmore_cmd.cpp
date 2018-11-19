@@ -406,6 +406,12 @@ public:
             }
 
             PlanExecutor* exec = cursor->getExecutor();
+            const auto* cq = exec->getCanonicalQuery();
+            if (cq && cq->getQueryRequest().isReadOnce()) {
+                // The readOnce option causes any storage-layer cursors created during plan
+                // execution to assume read data will not be needed again and need not be cached.
+                opCtx->recoveryUnit()->setReadOnce(true);
+            }
             exec->reattachToOperationContext(opCtx);
             exec->restoreState();
 
