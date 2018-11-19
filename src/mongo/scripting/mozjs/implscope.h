@@ -428,6 +428,8 @@ private:
     bool _requireOwnedObjects;
     bool _hasOutOfMemoryException;
 
+    bool _inReportError;
+
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;
     WrapType<CodeInfo> _codeProto;
