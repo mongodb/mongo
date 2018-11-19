@@ -7,6 +7,7 @@
     "use strict";
 
     load("jstests/libs/check_log.js");
+    load("jstests/replsets/rslib.js");
 
     // Set up replica set. Disallow chaining so nodes always sync from primary.
     const testName = "initial_sync_oplog_hole";
@@ -80,7 +81,7 @@
     }, primary.port);
 
     jsTestLog("Waiting for initial sync to complete.");
-    replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    waitForState(secondary, ReplSetTest.State.SECONDARY);
 
     jsTestLog("Joining hung write");
     joinDisableFailPoint();
