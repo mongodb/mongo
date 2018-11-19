@@ -7,9 +7,15 @@
     "use strict";
 
     load("jstests/libs/write_concern_util.js");
+    load("jstests/replsets/rslib.js");
 
     const rst = new ReplSetTest({nodes: 2});
-    rst.startSet();
+    if (!startSetIfSupportsReadMajority(rst)) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        rst.stopSet();
+        return;
+    }
+
     rst.initiate();
 
     const dbName = "test";
