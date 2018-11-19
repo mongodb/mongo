@@ -1313,7 +1313,17 @@ void TopologyCoordinator::setMyLastAppliedOpTime(OpTime opTime,
                                                  Date_t now,
                                                  bool isRollbackAllowed) {
     auto& myMemberData = _selfMemberData();
-    invariant(isRollbackAllowed || opTime >= myMemberData.getLastAppliedOpTime());
+    auto myLastAppliedOpTime = myMemberData.getLastAppliedOpTime();
+
+    if (!(isRollbackAllowed || opTime == myLastAppliedOpTime)) {
+        invariant(opTime > myLastAppliedOpTime);
+        // In pv1, oplog entries are ordered by non-decreasing term and strictly increasing
+        // timestamp. So, in pv1, its not possible for us to get opTime with higher term and
+        // timestamp lesser than or equal to our current lastAppliedOptime.
+        invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
+                  myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
+                  opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp());
+    }
     myMemberData.setLastAppliedOpTime(opTime, now);
 }
 
