@@ -122,6 +122,14 @@ struct MozJSImplScope::MozJSEntry {
 void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorReport* report) {
     auto scope = getScope(cx);
 
+    // If we are recursively calling _reportError because of ReportOverRecursed, lets just quit now
+    if (scope->_inReportError) {
+        return;
+    }
+
+    scope->_inReportError = true;
+    const auto guard = MakeGuard([&] { scope->_inReportError = false; });
+
     if (!JSREPORT_IS_WARNING(report->flags)) {
 
         std::string exceptionMsg;
@@ -395,6 +403,9 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             // stored on the stack which increases the stack pressure. It does not affects non-debug
             // builds.
             const decltype(available_stack_space) reserve_stack_space = 96 * 1024;
+#elif defined(_WIN32)
+            // Windows is greedy for stack space while processing exceptions.
+            const decltype(available_stack_space) reserve_stack_space = 96 * 1024;
 #else
             const decltype(available_stack_space) reserve_stack_space = 64 * 1024;
 #endif
@@ -434,6 +445,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _generation(0),
       _requireOwnedObjects(false),
       _hasOutOfMemoryException(false),
+      _inReportError(false),
       _binDataProto(_context),
       _bsonProto(_context),
       _codeProto(_context),
