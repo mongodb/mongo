@@ -47,7 +47,6 @@ using executor::RemoteCommandRequest;
 class TransactionRouterTest : public ShardingTestFixture {
 protected:
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
-    const TxnNumber kTxnNumber = 10;
 
     const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
@@ -58,6 +57,14 @@ protected:
     const HostAndPort hostAndPort2 = HostAndPort("shard2:1234");
 
     const ShardId shard3 = ShardId("shard3");
+
+    const StringMap<repl::ReadConcernLevel> supportedNonSnapshotRCLevels = {
+        {"local", repl::ReadConcernLevel::kLocalReadConcern},
+        {"majority", repl::ReadConcernLevel::kMajorityReadConcern}};
+
+    const std::vector<repl::ReadConcernLevel> unsupportedRCLevels = {
+        repl::ReadConcernLevel::kAvailableReadConcern,
+        repl::ReadConcernLevel::kLinearizableReadConcern};
 
     void setUp() override {
         ShardingTestFixture::setUp();
@@ -534,13 +541,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession,
-       CannotUpconvertIfLevelOtherThanSnapshotOrMajorityWasGiven) {
-    auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
-                              repl::ReadConcernLevel::kLinearizableReadConcern,
-                              repl::ReadConcernLevel::kAvailableReadConcern};
-
-    for (auto readConcernLevel : readConcernLevels) {
+TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedReadConcernLevels) {
+    for (auto readConcernLevel : unsupportedRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(readConcernLevel);
 
         TxnNumber txnNum{3};
@@ -552,13 +554,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     }
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession,
-       CannotUpconvertIfLevelOtherThanSnapshotOrMajorityWasGivenWithAfterClusterTime) {
-    auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
-                              repl::ReadConcernLevel::kLinearizableReadConcern,
-                              repl::ReadConcernLevel::kAvailableReadConcern};
-
-    for (auto readConcernLevel : readConcernLevels) {
+TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfterClusterTime) {
+    for (auto readConcernLevel : unsupportedRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), readConcernLevel);
 
@@ -571,12 +568,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     }
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, CannotUpconvertWithAfterOpTime) {
-    auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
-                              repl::ReadConcernLevel::kLinearizableReadConcern,
-                              repl::ReadConcernLevel::kAvailableReadConcern};
-
-    for (auto readConcernLevel : readConcernLevels) {
+TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfterOpTime) {
+    for (auto readConcernLevel : unsupportedRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), readConcernLevel);
 
@@ -1401,108 +1394,111 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, MajorityReadConcernHasNoAtClusterTime) {
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClusterTime) {
+    TxnNumber txnNum{3};
+    for (auto rcIt : supportedNonSnapshotRCLevels) {
+        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(rcIt.second);
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
-    txnRouter.beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        txnRouter.beginOrContinueTxn(operationContext(), txnNum++, true);
 
-    // No atClusterTime is placed on the router by default.
-    ASSERT_FALSE(txnRouter.getAtClusterTime());
+        // No atClusterTime is placed on the router by default.
+        ASSERT_FALSE(txnRouter.getAtClusterTime());
 
-    // Can't compute and set an atClusterTime.
-    txnRouter.setDefaultAtClusterTime(operationContext());
-    ASSERT_FALSE(txnRouter.getAtClusterTime());
+        // Can't compute and set an atClusterTime.
+        txnRouter.setDefaultAtClusterTime(operationContext());
+        ASSERT_FALSE(txnRouter.getAtClusterTime());
 
-    txnRouter.computeAndSetAtClusterTime(
-        operationContext(), true, {shard1}, NamespaceString("test.coll"), BSONObj(), BSONObj());
-    ASSERT_FALSE(txnRouter.getAtClusterTime());
+        txnRouter.computeAndSetAtClusterTime(
+            operationContext(), true, {shard1}, NamespaceString("test.coll"), BSONObj(), BSONObj());
+        ASSERT_FALSE(txnRouter.getAtClusterTime());
 
-    txnRouter.computeAndSetAtClusterTimeForUnsharded(operationContext(), shard1);
-    ASSERT_FALSE(txnRouter.getAtClusterTime());
+        txnRouter.computeAndSetAtClusterTimeForUnsharded(operationContext(), shard1);
+        ASSERT_FALSE(txnRouter.getAtClusterTime());
 
-    // Can't continue on snapshot errors.
-    ASSERT_THROWS_CODE(
-        txnRouter.onSnapshotError(), AssertionException, ErrorCodes::NoSuchTransaction);
-}
-
-TEST_F(TransactionRouterTestWithDefaultSession, AttachesMajorityReadConcernToNewParticipants) {
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
-    txnRouter.beginOrContinueTxn(operationContext(), kTxnNumber, true);
-
-    const BSONObj rcMajority = BSON("level"
-                                    << "majority");
-
-    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
-                                                    BSON("insert"
-                                                         << "test"));
-    ASSERT_BSONOBJ_EQ(rcMajority, newCmd["readConcern"].Obj());
-
-
-    // Only attached on first command to a participant.
-    newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
-                                               BSON("insert"
-                                                    << "test"));
-    ASSERT(newCmd["readConcern"].eoo());
-
-    // Attached for new participants after the first one.
-    newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
-                                               BSON("insert"
-                                                    << "test"));
-    ASSERT_BSONOBJ_EQ(rcMajority, newCmd["readConcern"].Obj());
+        // Can't continue on snapshot errors.
+        ASSERT_THROWS_CODE(
+            txnRouter.onSnapshotError(), AssertionException, ErrorCodes::NoSuchTransaction);
+    }
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
-       AttachingMajorityReadConcernPreservesAfterClusterTime) {
-    const auto clusterTime = LogicalTime(Timestamp(10, 1));
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(clusterTime, repl::ReadConcernLevel::kMajorityReadConcern);
+       SupportedNonSnapshotReadConcernLevelsArePassedThrough) {
+    TxnNumber txnNum{3};
+    for (auto rcIt : supportedNonSnapshotRCLevels) {
+        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(rcIt.second);
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
-    txnRouter.beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        txnRouter.beginOrContinueTxn(operationContext(), txnNum++, true /* startTransaction */);
+        txnRouter.setDefaultAtClusterTime(operationContext());
 
-    // Call setDefaultAtClusterTime to simulate real command execution.
-    txnRouter.setDefaultAtClusterTime(operationContext());
+        const BSONObj expectedRC = BSON("level" << rcIt.first);
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
+        ASSERT_BSONOBJ_EQ(expectedRC, newCmd["readConcern"].Obj());
 
-    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
-                                                    BSON("insert"
-                                                         << "test"));
-    ASSERT_BSONOBJ_EQ(BSON("level"
-                           << "majority"
-                           << "afterClusterTime"
-                           << clusterTime.asTimestamp()),
-                      newCmd["readConcern"].Obj());
+        // Only attached on first command to a participant.
+        newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                   BSON("insert"
+                                                        << "test"));
+        ASSERT(newCmd["readConcern"].eoo());
+
+        // Attached for new participants after the first one.
+        newCmd = txnRouter.attachTxnFieldsIfNeeded(shard2,
+                                                   BSON("insert"
+                                                        << "test"));
+        ASSERT_BSONOBJ_EQ(expectedRC, newCmd["readConcern"].Obj());
+    }
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, AttachingMajorityReadConcernPreservesAfterOpTime) {
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       NonSnapshotReadConcernLevelsPreserveAfterClusterTime) {
+    const auto clusterTime = LogicalTime(Timestamp(10, 1));
+    TxnNumber txnNum{3};
+    for (auto rcIt : supportedNonSnapshotRCLevels) {
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(clusterTime, rcIt.second);
+
+        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        txnRouter.beginOrContinueTxn(operationContext(), txnNum++, true /* startTransaction */);
+        txnRouter.setDefaultAtClusterTime(operationContext());
+
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
+        ASSERT_BSONOBJ_EQ(
+            BSON("level" << rcIt.first << "afterClusterTime" << clusterTime.asTimestamp()),
+            newCmd["readConcern"].Obj());
+    }
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernLevelsPreserveAfterOpTime) {
     const auto opTime = repl::OpTime(Timestamp(10, 1), 2);
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(opTime, repl::ReadConcernLevel::kMajorityReadConcern);
+    TxnNumber txnNum{3};
+    for (auto rcIt : supportedNonSnapshotRCLevels) {
+        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(opTime, rcIt.second);
 
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
-    txnRouter.beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        auto& txnRouter(*TransactionRouter::get(operationContext()));
+        txnRouter.beginOrContinueTxn(operationContext(), txnNum++, true /* startTransaction */);
 
-    // Call setDefaultAtClusterTime to simulate real command execution.
-    txnRouter.setDefaultAtClusterTime(operationContext());
+        // Call setDefaultAtClusterTime to simulate real command execution.
+        txnRouter.setDefaultAtClusterTime(operationContext());
 
-    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
-                                                    BSON("insert"
-                                                         << "test"));
-    ASSERT_BSONOBJ_EQ(BSON("level"
-                           << "majority"
-                           << "afterOpTime"
-                           << opTime),
-                      newCmd["readConcern"].Obj());
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
+                                                        BSON("insert"
+                                                             << "test"));
+        ASSERT_BSONOBJ_EQ(BSON("level" << rcIt.first << "afterOpTime" << opTime),
+                          newCmd["readConcern"].Obj());
+    }
 }
 
 // Begins a transaction with snapshot level read concern and sets a default cluster time.
 class TransactionRouterTestWithDefaultSessionAndStartedSnapshot
     : public TransactionRouterTestWithDefaultSession {
 protected:
+    const TxnNumber kTxnNumber = 10;
     const BSONObj rcLatestInMemoryAtClusterTime = BSON("level"
                                                        << "snapshot"
                                                        << "atClusterTime"

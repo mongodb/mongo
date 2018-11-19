@@ -1,4 +1,4 @@
-// Verifies basic sharded transaction behavior with read concern level majority and snapshot.
+// Verifies basic sharded transaction behavior with the supported read concern levels.
 //
 // @tags: [
 //   requires_find_command,
@@ -65,7 +65,7 @@
         assert.writeOK(sessionDB[collName].remove({_id: 5}));
     }
 
-    const kAllowedReadConcernLevels = ["majority", "snapshot"];
+    const kAllowedReadConcernLevels = ["local", "majority", "snapshot"];
     for (let readConcernLevel of kAllowedReadConcernLevels) {
         runTest(st, {level: readConcernLevel}, {causalConsistency: false});
         runTest(st, {level: readConcernLevel}, {causalConsistency: true});

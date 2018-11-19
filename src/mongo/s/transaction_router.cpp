@@ -146,6 +146,12 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
 const StringMap<int> alwaysRetryableCmds = {
     {"aggregate", 1}, {"distinct", 1}, {"find", 1}, {"getMore", 1}, {"killCursors", 1}};
 
+bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {
+    return readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern ||
+        readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+        readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern;
+}
+
 }  // unnamed namespace
 
 TransactionRouter::Participant::Participant(bool isCoordinator,
@@ -477,9 +483,8 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
         } else {
             uassert(ErrorCodes::InvalidOptions,
                     "The first command in a transaction cannot specify a readConcern level other "
-                    "than snapshot or majority",
-                    readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
-                        readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
+                    "than local, majority, or snapshot",
+                    isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel()));
         }
         _readConcernArgs = readConcernArgs;
     } else {
