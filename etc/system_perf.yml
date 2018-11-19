@@ -916,6 +916,7 @@ buildvariants:
     - name: change_streams_latency
     - name: snapshot_reads
     - name: secondary_reads
+    - name: tpcc
     - name: linkbench
 
 - name: linux-3-node-replSet-initialsync
