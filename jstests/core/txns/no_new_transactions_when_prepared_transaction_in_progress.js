@@ -38,22 +38,17 @@
     }),
                                  ErrorCodes.PreparedTransactionInProgress);
 
-    /*
-    TODO: SERVER-36057 uncomment after the session options validation refactor is complete.
-
     jsTestLog(
         "Test error precedence when executing a malformed command during a prepared transaction.");
     // The following command specifies txnNumber: 2 without startTransaction: true.
     assert.commandFailedWithCode(sessionDb.runCommand({
         insert: collName,
         documents: [{_id: "no_such_txn"}],
-        readConcern: {level: "snapshot"},
         txnNumber: NumberLong(2),
         stmtId: NumberInt(0),
         autocommit: false
     }),
                                  ErrorCodes.NoSuchTransaction);
-    */
     session.abortTransaction_forTesting();
 
     session.endSession();
