@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 
 namespace mongo {
 
@@ -39,7 +40,9 @@ namespace mongo {
  */
 class CollectionMock : virtual public Collection::Impl, virtual CappedCallback {
 public:
-    CollectionMock(const NamespaceString& ns) : _ns(ns) {}
+    CollectionMock(const NamespaceString& ns) : CollectionMock(ns, {}) {}
+    CollectionMock(const NamespaceString& ns, std::unique_ptr<IndexCatalog> indexCatalog)
+        : _ns(ns), _indexCatalog(std::move(indexCatalog)) {}
     ~CollectionMock() = default;
 
     void init(OperationContext* opCtx) {
@@ -58,8 +61,6 @@ private:
     Status aboutToDeleteCapped(OperationContext* opCtx, const RecordId& loc, RecordData data) {
         std::abort();
     }
-
-    NamespaceString _ns;
 
 public:
     const NamespaceString& ns() const {
@@ -88,10 +89,10 @@ public:
         std::abort();
     }
     const IndexCatalog* getIndexCatalog() const {
-        std::abort();
+        return _indexCatalog.get();
     }
     IndexCatalog* getIndexCatalog() {
-        std::abort();
+        return _indexCatalog.get();
     }
 
     const RecordStore* getRecordStore() const {
@@ -288,11 +289,15 @@ public:
     }
 
     OptionalCollectionUUID uuid() const {
-        std::abort();
+        return UUID::gen();
     }
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
         std::abort();
     }
+
+private:
+    NamespaceString _ns;
+    std::unique_ptr<IndexCatalog> _indexCatalog;
 };
 }  // namespace mongo
