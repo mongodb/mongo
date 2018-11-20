@@ -50,17 +50,6 @@ class BSONObj;
 class Collection;
 class OperationContext;
 
-/**
- * Builds one or more indexes.
- *
- * If any method other than insert() returns a not-ok Status, this MultiIndexBlock should be
- * considered failed and must be destroyed.
- *
- * If a MultiIndexBlock is destroyed before commit() or if commit() is rolled back, it will
- * clean up all traces of the indexes being constructed. MultiIndexBlocks should not be
- * destructed from inside of a WriteUnitOfWork as any cleanup needed should never be rolled back
- * (as it is itself essentially a form of rollback, you don't want to "rollback the rollback").
- */
 class MultiIndexBlockImpl : public MultiIndexBlock {
     MONGO_DISALLOW_COPYING(MultiIndexBlockImpl);
 
@@ -71,127 +60,36 @@ public:
     MultiIndexBlockImpl(OperationContext* opCtx, Collection* collection);
     ~MultiIndexBlockImpl() override;
 
-    /**
-     * By default we ignore the 'background' flag in specs when building an index. If this is
-     * called before init(), we will build the indexes in the background as long as *all* specs
-     * call for background indexing. If any spec calls for foreground indexing all indexes will
-     * be built in the foreground, as there is no concurrency benefit to building a subset of
-     * indexes in the background, but there is a performance benefit to building all in the
-     * foreground.
-     */
     void allowBackgroundBuilding() override {
         _buildInBackground = true;
     }
 
-    /**
-     * Call this before init() to allow the index build to be interrupted.
-     * This only affects builds using the insertAllDocumentsInCollection helper.
-     */
     void allowInterruption() override {
         _allowInterruption = true;
     }
 
-    /**
-     * By default we enforce the 'unique' flag in specs when building an index by failing.
-     * If this is called before init(), we will ignore unique violations. This has no effect if
-     * no specs are unique.
-     *
-     * If this is called, any dupsOut sets passed in will never be filled.
-     */
     void ignoreUniqueConstraint() override {
         _ignoreUnique = true;
     }
 
-    /**
-     * Removes pre-existing indexes from 'specs'. If this isn't done, init() may fail with
-     * IndexAlreadyExists.
-     */
     void removeExistingIndexes(std::vector<BSONObj>* specs) const override;
 
-    /**
-     * Prepares the index(es) for building and returns the canonicalized form of the requested index
-     * specifications.
-     *
-     * Does not need to be called inside of a WriteUnitOfWork (but can be due to nesting).
-     *
-     * Requires holding an exclusive database lock.
-     */
     StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) override;
     StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) override;
 
-    /**
-     * Inserts all documents in the Collection into the indexes and logs with timing info.
-     *
-     * This is a simplified replacement for insert and doneInserting. Do not call this if you
-     * are calling either of them.
-     *
-     * Will fail if violators of uniqueness constraints exist.
-     *
-     * Can throw an exception if interrupted.
-     *
-     * Must not be called inside of a WriteUnitOfWork.
-     */
     Status insertAllDocumentsInCollection() override;
 
-    /**
-     * Call this after init() for each document in the collection. Any duplicate keys inserted will
-     * be appended to 'dupKeysInserted' if it is not null.
-     *
-     * Do not call if you called insertAllDocumentsInCollection();
-     *
-     * Should be called inside of a WriteUnitOfWork.
-     */
     Status insert(const BSONObj& doc,
                   const RecordId& loc,
                   std::vector<BSONObj>* const dupKeysInserted = nullptr) override;
 
-    /**
-     * Call this after the last insert(). This gives the index builder a chance to do any
-     * long-running operations in separate units of work from commit().
-     *
-     * Do not call if you called insertAllDocumentsInCollection();
-     *
-     * If 'dupRecords' is passed as non-NULL and duplicates are not allowed for the index, violators
-     * of uniqueness constraints will be added to the set. Records added to this set are not
-     * indexed, so callers MUST either fail this index build or delete the documents from the
-     * collection.
-     *
-     * If 'dupKeysInserted' is passed as non-NULL and duplicates are allowed for the unique index,
-     * violators of uniqueness constraints will still be indexed, and the keys will be appended to
-     * the vector. No DuplicateKey errors will be returned.
-     *
-     * Should not be called inside of a WriteUnitOfWork.
-     */
     Status doneInserting() override;
     Status doneInserting(std::set<RecordId>* dupRecords) override;
     Status doneInserting(std::vector<BSONObj>* dupKeysInserted) override;
 
-    /**
-     * Marks the index ready for use. Should only be called as the last method after
-     * doneInserting() or insertAllDocumentsInCollection() return success.
-     *
-     * Should be called inside of a WriteUnitOfWork. If the index building is to be logOp'd,
-     * logOp() should be called from the same unit of work as commit().
-     *
-     * Requires holding an exclusive database lock.
-     */
     void commit() override;
     void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) override;
 
-    /**
-     * May be called at any time after construction but before a successful commit(). Suppresses
-     * the default behavior on destruction of removing all traces of uncommitted index builds.
-     *
-     * The most common use of this is if the indexes were already dropped via some other
-     * mechanism such as the whole collection being dropped. In that case, it would be invalid
-     * to try to remove the indexes again. Also, replication uses this to ensure that indexes
-     * that are being built on shutdown are resumed on startup.
-     *
-     * Do not use this unless you are really sure you need to.
-     *
-     * Does not matter whether it is called inside of a WriteUnitOfWork. Will not be rolled
-     * back.
-     */
     void abortWithoutCleanup() override;
 
     bool getBuildInBackground() const override {
