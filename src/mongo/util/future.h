@@ -943,11 +943,109 @@ public:
     }
 
     /**
+     * Callbacks passed to onCompletion() are called if the input Future completes with or without
+     * an error.
+     *
+     * The callback can either produce a replacement value (which must be a T), return a replacement
+     * Future<T> (such as by retrying), or return/throw a replacement error.
+     */
+    template <
+        // T -> Result, T -> StatusWith<Result>, Status -> Result or Status -> StatusWith<Result>
+        typename Func,
+        typename Result = NormalizedCallResult<Func, Status>,
+        typename = std::enable_if_t<!isFuture<Result>>>
+        Future<Result> onCompletion(Func&& func) && noexcept {
+        static_assert(std::is_same<Result, NormalizedCallResult<Func, T>>::value,
+                      "func passed to Future<T>::onCompletion must return the same type for "
+                      "arguments of Status and T");
+
+        return generalImpl(
+            // on ready success:
+            [&](T&& val) {
+                return Future<Result>::makeReady(
+                    statusCall(std::forward<Func>(func), std::move(val)));
+            },
+            // on ready failure:
+            [&](Status&& status) {
+                return Future<Result>::makeReady(
+                    statusCall(std::forward<Func>(func), std::move(status)));
+            },
+            // on not ready yet:
+            [&] {
+                return makeContinuation<Result>([func = std::forward<Func>(func)](
+                    SharedState<T> * input, SharedState<Result> * output) mutable noexcept {
+                    if (!input->status.isOK())
+                        return output->setFromStatusWith(
+                            statusCall(func, std::move(input->status)));
+
+                    output->setFromStatusWith(statusCall(func, std::move(*input->data)));
+                });
+            });
+    }
+
+    /**
+     * Same as above onCompletion() but for the case where func returns a Future that needs to be
+     * unwrapped.
+     */
+    template <typename Func,  // T -> Future<UnwrappedResult> or Status -> Future<UnwrappedResult>
+              typename RawResult = NormalizedCallResult<Func, Status>,
+              typename = std::enable_if_t<isFuture<RawResult>>,
+              typename UnwrappedResult = typename RawResult::value_type>
+        Future<UnwrappedResult> onCompletion(Func&& func) && noexcept {
+        static_assert(std::is_same<UnwrappedResult,
+                                   typename NormalizedCallResult<Func, T>::value_type>::value,
+                      "func passed to Future<T>::onCompletion must return the same type for "
+                      "arguments of Status and T");
+
+        return generalImpl(
+            // on ready success:
+            [&](T&& val) {
+                try {
+                    return Future<UnwrappedResult>(
+                        throwingCall(std::forward<Func>(func), std::move(val)));
+                } catch (const DBException& ex) {
+                    return Future<UnwrappedResult>::makeReady(ex.toStatus());
+                }
+            },
+            // on ready failure:
+            [&](Status&& status) {
+                try {
+                    return Future<UnwrappedResult>(
+                        throwingCall(std::forward<Func>(func), std::move(status)));
+                } catch (const DBException& ex) {
+                    return Future<UnwrappedResult>::makeReady(ex.toStatus());
+                }
+            },
+            // on not ready yet:
+            [&] {
+                return makeContinuation<UnwrappedResult>([func = std::forward<Func>(func)](
+                    SharedState<T> * input,
+                    SharedState<UnwrappedResult> * output) mutable noexcept {
+                    if (!input->status.isOK()) {
+                        try {
+                            throwingCall(func, std::move(input->status)).propagateResultTo(output);
+                        } catch (const DBException& ex) {
+                            output->setError(ex.toStatus());
+                        }
+
+                        return;
+                    }
+
+                    try {
+                        throwingCall(func, std::move(*input->data)).propagateResultTo(output);
+                    } catch (const DBException& ex) {
+                        output->setError(ex.toStatus());
+                    }
+                });
+            });
+    }
+
+    /**
      * Callbacks passed to onError() are only called if the input Future completes with an error.
      * Otherwise, the successful result propagates automatically, bypassing the callback.
      *
      * The callback can either produce a replacement value (which must be a T), return a replacement
-     * Future<T> (such as a by retrying), or return/throw a replacement error.
+     * Future<T> (such as by retrying), or return/throw a replacement error.
      *
      * Note that this will only catch errors produced by earlier stages; it is not registering a
      * general error handler for the entire chain.
@@ -1313,6 +1411,11 @@ public:
     template <typename Func>  // () -> T or StatusWith<T> or Future<T>
         auto then(Func&& func) && noexcept {
         return std::move(_inner).then(std::forward<Func>(func));
+    }
+
+    template <typename Func>  // Status -> T or StatusWith<T> or Future<T>
+        auto onCompletion(Func&& func) && noexcept {
+        return std::move(_inner).onCompletion(std::forward<Func>(func));
     }
 
     template <typename Func>  // Status -> T or StatusWith<T> or Future<T>
