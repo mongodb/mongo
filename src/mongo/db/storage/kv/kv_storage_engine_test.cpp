@@ -38,7 +38,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -199,59 +198,6 @@ TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
     reconcileStatus = reconcile(opCtx.get());
     ASSERT_NOT_OK(reconcileStatus.getStatus());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, reconcileStatus.getStatus());
-}
-
-TEST_F(KVStorageEngineTest, RecreateIndexes) {
-    repl::ReplicationCoordinator::set(
-        getGlobalServiceContext(),
-        std::unique_ptr<repl::ReplicationCoordinator>(
-            new repl::ReplicationCoordinatorMock(getGlobalServiceContext(), repl::ReplSettings())));
-
-    auto opCtx = cc().makeOperationContext();
-
-    // Create two indexes for `db.coll1` in the catalog named `foo` and `bar`. Verify the indexes
-    // appear as idents in the KVEngine.
-    ASSERT_OK(createCollection(opCtx.get(), NamespaceString("db.coll1")).getStatus());
-    ASSERT_OK(createIndex(opCtx.get(), NamespaceString("db.coll1"), "foo"));
-    ASSERT_OK(createIndex(opCtx.get(), NamespaceString("db.coll1"), "bar"));
-    auto kvIdents = getAllKVEngineIdents(opCtx.get());
-    ASSERT_EQUALS(2, std::count_if(kvIdents.begin(), kvIdents.end(), [](const std::string& str) {
-                      return str.find("index-") == 0;
-                  }));
-
-    // Use the `getIndexNameObjs` to find the `foo` index in the IndexCatalog.
-    DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx.get(), "db");
-    CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry("db.coll1");
-    auto swIndexNameObjs = getIndexNameObjs(
-        opCtx.get(), dbce, cce, [](const std::string& indexName) { return indexName == "foo"; });
-    ASSERT_OK(swIndexNameObjs.getStatus());
-    auto& indexNameObjs = swIndexNameObjs.getValue();
-    // There's one index that matched the name `foo`.
-    ASSERT_EQUALS(static_cast<const unsigned long>(1), indexNameObjs.first.size());
-    // Assert the parallel vectors have matching sizes.
-    ASSERT_EQUALS(static_cast<const unsigned long>(1), indexNameObjs.second.size());
-    // The index that matched should be named `foo`.
-    ASSERT_EQUALS("foo", indexNameObjs.first[0]);
-    ASSERT_EQUALS("db.coll1"_sd, indexNameObjs.second[0].getStringField("ns"));
-    ASSERT_EQUALS("foo"_sd, indexNameObjs.second[0].getStringField("name"));
-    ASSERT_EQUALS(2, indexNameObjs.second[0].getIntField("v"));
-    ASSERT_EQUALS(1, indexNameObjs.second[0].getObjectField("key").getIntField("foo"));
-
-    // Drop the `foo` index table. Count one remaining index ident according to the KVEngine.
-    ASSERT_OK(dropIndexTable(opCtx.get(), NamespaceString("db.coll1"), "foo"));
-    kvIdents = getAllKVEngineIdents(opCtx.get());
-    ASSERT_EQUALS(1, std::count_if(kvIdents.begin(), kvIdents.end(), [](const std::string& str) {
-                      return str.find("index-") == 0;
-                  }));
-
-    AutoGetCollection coll(opCtx.get(), NamespaceString("db.coll1"), LockMode::MODE_X);
-    // Find the `foo` index in the catalog. Rebuild it. Count two indexes in the KVEngine.
-    ASSERT_OK(rebuildIndexesOnCollection(opCtx.get(), dbce, cce, indexNameObjs));
-    ASSERT_TRUE(cce->isIndexReady(opCtx.get(), "foo"));
-    kvIdents = getAllKVEngineIdents(opCtx.get());
-    ASSERT_EQUALS(2, std::count_if(kvIdents.begin(), kvIdents.end(), [](const std::string& str) {
-                      return str.find("index-") == 0;
-                  }));
 }
 
 TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
