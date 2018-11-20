@@ -359,6 +359,12 @@ variables:
   - compile_unittests
   - unittests
 
+- &dbtest
+  name: dbtest!
+  execution_tasks:
+  - compile_dbtest
+  - dbtest
+
 - &compile_task_group_template
   name: compile_task_group_template
   max_hosts: 1
@@ -374,12 +380,14 @@ variables:
   - func: "save code coverage data"
   - func: "save mongo coredumps"
   - func: "save failed unittests"
+  - func: "save unstripped dbtest"
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
   - func: "remove files"
     vars:
       files: >-
+        src/resmoke_error_code
         src/build/scons/config.log
         src/*.gcda.gcov
         src/gcov-intermediate-files.tgz
@@ -429,6 +437,7 @@ variables:
   modules:
   - enterprise
   display_tasks:
+  - *dbtest
   - *replica_sets_auth
   - *replica_sets_ese
   - *sharding_auth
@@ -470,7 +479,6 @@ variables:
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
   - name: buildscripts_test
-  - name: dbtest
   - name: ese
   - name: external_auth
     distros:
@@ -1527,6 +1535,9 @@ functions:
           if [[ $resmoke_exit_code = 74 || $resmoke_exit_code = 75 ]]; then
             echo $resmoke_exit_code > run_tests_infrastructure_failure
             exit 0
+          elif [ $resmoke_exit_code != 0 ]; then
+            # On failure save the resmoke exit code.
+            echo $resmoke_exit_code > resmoke_error_code
           fi
           exit $resmoke_exit_code
           fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]
@@ -3134,6 +3145,33 @@ functions:
   - *tar_failed_unittests
   - *archive_failed_unittests
 
+  "detect failed dbtest": &detect_failed_dbtest
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        if [ -f resmoke_error_code ] && [ -f ../dbtest_unstripped.tgz ]; then
+          echo "Task dbtest failed with error $(cat resmoke_error_code), archiving the unstripped binary"
+          mv ../dbtest_unstripped.tgz ../dbtest.tgz
+        fi
+
+  "archive unstripped dbtest": &archive_unstripped_dbtest
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: dbtest.tgz
+      remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/tar
+      display_name: Unstripped dbtest binary - Execution ${execution}
+      optional: true
+
+  "save unstripped dbtest":
+  - *detect_failed_dbtest
+  - *archive_unstripped_dbtest
+
   ### Process & archive artifacts from hung processes ###
   "run hang analyzer":
     command: shell.exec
@@ -3404,6 +3442,25 @@ tasks:
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
 
+    # Tar unstripped dbtest, to be archived in case of failure
+    - command: archive.targz_pack
+      params:
+        target: "dbtest_unstripped.tgz"
+        source_dir: "src"
+        include:
+          - "./dbtest*"
+
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+           if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
+            exit 0
+          fi
+
           # If strip is on the path (everywhere except windows) then we should strip the test binaries
           # before tarring them up
           if [ -x ${strip_path|/usr/bin/strip} ]; then
@@ -3577,6 +3634,34 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=unittests
+        run_multiple_jobs: true
+
+## compile_dbtest ##
+- name: compile_dbtest
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: dbtest
+        task_compile_flags: >-
+          --detect-odr-violations
+
+     # Tar unstripped dbtest, to be archived in case of failure
+    - command: archive.targz_pack
+      params:
+        target: "dbtest_unstripped.tgz"
+        source_dir: "src"
+        include:
+          - "./dbtest*"
+
+ ## dbtest ##
+- name: dbtest
+  commands:
+    - func: "run diskstats"
+    - func: "monitor process threads"
+    - func: "collect system resource info"
+    - func: "run tests"
+      vars:
+        resmoke_args: --suites=dbtest --storageEngine=wiredTiger
         run_multiple_jobs: true
 
 ## embedded_sdk_build_and_test_* - build the embedded-dev and embedded-test targets only ##
@@ -5184,15 +5269,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_cluster_sharded_collections_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: dbtest
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=dbtest --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -8175,11 +8251,18 @@ task_groups:
   tasks:
   - compile
 - <<: *compile_task_group_template
+  name: dbtest_TG
+  tasks:
+  - compile_dbtest
+  - dbtest
+- <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
   tasks:
   - compile
   - compile_unittests
   - unittests
+  - compile_dbtest
+  - dbtest
   - compile_all
 - name: embedded_sdk_build_and_test
   setup_group:
@@ -8246,6 +8329,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -8271,7 +8355,6 @@ buildvariants:
   - name: change_streams_whole_cluster_mongos_passthrough
   - name: change_streams_whole_cluster_secondary_reads_passthrough
   - name: change_streams_whole_cluster_sharded_collections_passthrough
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8354,12 +8437,12 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
-  - name: dbtest
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: integration_tests_sharded
@@ -8415,6 +8498,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *replica_sets_auth
   - *sharding
   - *sharding_auth
@@ -8453,7 +8537,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8575,6 +8658,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -8586,7 +8670,6 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8635,6 +8718,7 @@ buildvariants:
     tooltags: "-tags ssl"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -8643,7 +8727,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8734,6 +8817,7 @@ buildvariants:
     tooltags: "-tags ssl"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -8742,7 +8826,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8826,13 +8909,13 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1804-build
   - name: audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -8887,6 +8970,7 @@ buildvariants:
     tooltags: "-tags ssl"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -8895,7 +8979,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -9003,13 +9086,13 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_edition: enterprise
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -9086,10 +9169,10 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_edition: targeted
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
-  - name: dbtest
   - name: free_monitoring
   - name: jsCore
   - name: push
@@ -9123,6 +9206,7 @@ buildvariants:
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9131,7 +9215,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -9210,6 +9293,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9231,7 +9315,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: ese
   - name: failpoints
   - name: failpoints_auth
@@ -9319,6 +9402,7 @@ buildvariants:
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9329,7 +9413,6 @@ buildvariants:
   - name: audit
   - name: auth
   - name: auth_audit
-  - name: dbtest
   - name: ese
   - name: failpoints_auth
   - name: jsCore
@@ -9398,6 +9481,7 @@ buildvariants:
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9406,7 +9490,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -9498,6 +9581,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9508,7 +9592,6 @@ buildvariants:
   - name: audit
   - name: auth
   - name: auth_audit
-  - name: dbtest
   - name: ese
   - name: failpoints_auth
   - name: jsCore
@@ -9580,6 +9663,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9588,7 +9672,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -9675,6 +9758,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: false
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9700,7 +9784,6 @@ buildvariants:
   - name: change_streams_whole_cluster_passthrough
   - name: change_streams_whole_cluster_mongos_passthrough
   - name: change_streams_whole_cluster_sharded_collections_passthrough
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: free_monitoring
@@ -9838,6 +9921,7 @@ buildvariants:
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
   display_tasks:
+  - *dbtest
   - *replica_sets_auth
   - *replica_sets_ese
   - *sharding_auth
@@ -9858,7 +9942,7 @@ buildvariants:
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
   - name: buildscripts_test
-  - name: dbtest
+  - name: dbtest_TG
   - name: ese
   - name: external_auth
     distros:
@@ -10092,6 +10176,7 @@ buildvariants:
   name: enterprise-windows-64-2k8-compile-all
   display_name: "* Enterprise Windows 2008R2 compile_all"
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10167,6 +10252,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: false
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10174,7 +10260,6 @@ buildvariants:
     - windows-64-vs2015-large
   - name: audit
   - name: auth_audit
-  - name: dbtest
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
@@ -10238,6 +10323,7 @@ buildvariants:
     tooltags: "-tags ssl"
     build_mongoreplay: false
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10258,7 +10344,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: free_monitoring
@@ -10387,6 +10472,7 @@ buildvariants:
     tooltags: "-tags 'ssl openssl_pre_1.0'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10421,7 +10507,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: free_monitoring
@@ -10494,12 +10579,12 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: jsCore
@@ -10531,12 +10616,12 @@ buildvariants:
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: audit
   - name: auth_audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -10582,12 +10667,12 @@ buildvariants:
     openssl_config_flags: "-mmacosx-version-min=10.11"
     openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
   - name: audit
   - name: auth_audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -11061,7 +11146,7 @@ buildvariants:
     build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
   display_tasks:
-  - *unittests
+  - *dbtest
   - *replica_sets_auth
   - *replica_sets_ese
   - *sharding
@@ -11070,6 +11155,7 @@ buildvariants:
   - *sharding_ese
   - *sharding_last_stable_mongos_and_mixed_shards
   - *sharding_op_query
+  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     requires:
@@ -11135,7 +11221,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: ese
   - name: failpoints
@@ -11646,7 +11731,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
-  - *unittests
+  - *dbtest
   - *replica_sets_auth
   - *replica_sets_ese
   - *sharding
@@ -11655,6 +11740,7 @@ buildvariants:
   - *sharding_ese
   - *sharding_last_stable_mongos_and_mixed_shards
   - *sharding_op_query
+  - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -11688,7 +11774,6 @@ buildvariants:
   - name: concurrency_sharded_causal_consistency
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: ese
   - name: failpoints
@@ -12174,6 +12259,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12215,7 +12301,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: ese
   - name: failpoints
@@ -12312,6 +12397,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12325,7 +12411,6 @@ buildvariants:
   - name: auth_audit
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -12421,6 +12506,7 @@ buildvariants:
     tooltags: "-tags ssl"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12429,7 +12515,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -12526,6 +12611,7 @@ buildvariants:
     tooltags: "-tags ssl"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12534,7 +12620,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -12635,6 +12720,7 @@ buildvariants:
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12656,7 +12742,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: ese
   - name: failpoints
   - name: failpoints_auth
@@ -12747,6 +12832,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12768,7 +12854,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: ese
   - name: failpoints
   - name: failpoints_auth
@@ -12856,6 +12941,7 @@ buildvariants:
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12877,7 +12963,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: ese
   - name: failpoints
   - name: failpoints_auth
@@ -12957,6 +13042,7 @@ buildvariants:
     build_mongoreplay: true
     tooltags: "-tags ssl"
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12997,13 +13083,13 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1404-build
   - name: audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -13056,13 +13142,13 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
   - name: audit
-  - name: dbtest
   - name: ese
   - name: jepsen_register_findAndModify_WT
     distros:
@@ -13128,6 +13214,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13148,6 +13235,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13184,13 +13272,13 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - suse12-build
   - name: audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -13245,6 +13333,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13266,7 +13355,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: ese
   - name: failpoints
   - name: failpoints_auth
@@ -13356,6 +13444,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13364,7 +13453,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -13451,13 +13539,13 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - debian81-build
   - name: audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -13509,6 +13597,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13517,7 +13606,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -13606,13 +13694,13 @@ buildvariants:
     scons_cache_scope: shared
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
     - debian92-build
   - name: audit
-  - name: dbtest
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -13667,6 +13755,7 @@ buildvariants:
     shared_scons_pruning: true
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13675,7 +13764,6 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
-  - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -13759,6 +13847,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13801,7 +13890,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -13909,6 +13997,7 @@ buildvariants:
     additional_targets: mongoebench mongoed
   display_tasks:
   - *benchrun_embedded
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13943,7 +14032,6 @@ buildvariants:
   - name: benchrun_embedded_update
     distros:
     - centos6-perf
-  - name: dbtest
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
@@ -13990,6 +14078,7 @@ buildvariants:
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13998,7 +14087,6 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough
   - name: auth
   - name: concurrency
-  - name: dbtest
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
@@ -14069,6 +14157,7 @@ buildvariants:
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14077,7 +14166,6 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough
   - name: auth
   - name: concurrency
-  - name: dbtest
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
@@ -14112,6 +14200,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14130,7 +14219,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -14198,6 +14286,7 @@ buildvariants:
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14217,7 +14306,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -14282,6 +14370,7 @@ buildvariants:
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14315,7 +14404,6 @@ buildvariants:
   - name: concurrency_simultaneous
     distros:
     - rhel72-zseries-build
-  - name: dbtest
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -14393,6 +14481,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14438,7 +14527,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: ese
   - name: failpoints
@@ -14541,6 +14629,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14585,6 +14674,7 @@ buildvariants:
     build_mongoreplay: true
     scons_cache_scope: shared
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14631,7 +14721,6 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: ese
   - name: failpoints
@@ -14727,10 +14816,10 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
-  - name: dbtest
   - name: jsCore
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
@@ -14761,6 +14850,7 @@ buildvariants:
     test_flags: --serviceExecutor=adaptive --excludeWithAnyTags=requires_mmapv1
     scons_cache_scope: shared
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14784,7 +14874,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_wiredtiger
   - name: ese
   - name: failpoints
@@ -14865,6 +14954,7 @@ buildvariants:
     build_mongoreplay: true
     build_mongoreplay: true
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -14912,6 +15002,8 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: -tags 'ssl sasl'
     build_mongoreplay: true
+  display_tasks:
+  - *dbtest
   tasks:
   - name: compile_TG
   - name: aggregation
@@ -14929,7 +15021,7 @@ buildvariants:
   - name: concurrency_sharded_causal_consistency
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
+  - name: dbtest_TG
   - name: disk_mmapv1
   - name: dur_jscore_passthrough
   - name: durability
@@ -15033,6 +15125,8 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
+  display_tasks:
+  - *dbtest
   tasks:
   - name: compile_TG
   - name: aggregation
@@ -15064,7 +15158,7 @@ buildvariants:
   - name: concurrency_simultaneous
     distros:
     - windows-64-vs2015-large
-  - name: dbtest
+  - name: dbtest_TG
   - name: disk_mmapv1
   - name: dur_jscore_passthrough
   - name: durability
@@ -15153,6 +15247,8 @@ buildvariants:
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
+  display_tasks:
+  - *dbtest
   tasks:
   - name: compile_TG
   - name: aggregation
@@ -15168,7 +15264,7 @@ buildvariants:
   - name: concurrency_sharded_causal_consistency
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
+  - name: dbtest_TG
   - name: disk_mmapv1
   - name: dur_jscore_passthrough
   - name: durability
@@ -15241,6 +15337,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: false
   display_tasks:
+  - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
@@ -15258,7 +15355,6 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: dbtest
   - name: disk_mmapv1
   - name: durability
   - name: dur_jscore_passthrough
