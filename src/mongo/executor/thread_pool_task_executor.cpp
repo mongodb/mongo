@@ -54,6 +54,9 @@
 namespace mongo {
 namespace executor {
 
+MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint1);
+MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint2);
+
 namespace {
 MONGO_FAIL_POINT_DEFINE(scheduleIntoPoolSpinsUntilThreadPoolShutsDown);
 }
@@ -393,12 +396,39 @@ void remoteCommandFailedEarly(const TaskExecutor::CallbackArgs& cbData,
     cb(TaskExecutor::RemoteCommandCallbackArgs(
         cbData.executor, cbData.myHandle, request, {cbData.status}));
 }
+
+// The command names that the initial sync test fixture pauses on during the collection cloning
+// stage of initial sync.
+const auto initialSyncPauseCmds =
+    std::vector<std::string>{"listCollections", "listIndexes", "listDatabases"};
+
 }  // namespace
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
     const transport::BatonHandle& baton) {
+
+    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
+        // We are only going to pause on these failpoints if the command issued is for the
+        // collection cloning part of initial sync.
+        const auto cmdName = request.cmdObj.firstElementFieldName();
+        if (std::find(initialSyncPauseCmds.begin(), initialSyncPauseCmds.end(), cmdName) !=
+            initialSyncPauseCmds.end()) {
+            // These failpoints are set and unset by the InitialSyncTest fixture to cause initial
+            // sync to pause so that the Initial Sync Fuzzer can run commands on the sync source.
+            log() << "Collection Cloner scheduled a remote command on the " << request.dbname
+                  << " db: " << request.cmdObj;
+            log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
+
+            if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
+                log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
+            }
+        }
+    }
+
     RemoteCommandRequest scheduledRequest = request;
     if (request.timeout == RemoteCommandRequest::kNoTimeout) {
         scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;

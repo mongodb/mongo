@@ -660,6 +660,15 @@ assert = (function() {
         return res;
     }
 
+    assert.commandWorkedOrFailedWithCode = function commandWorkedOrFailedWithCode(
+        res, errorCodeSet, msg) {
+        if (!res.ok) {
+            return assert.commandFailedWithCode(res, errorCodeSet, msg);
+        } else {
+            return assert.commandWorked(res, msg);
+        }
+    };
+
     assert.commandWorked = function(res, msg) {
         return _assertCommandWorked(res, msg, {ignoreWriteErrors: false});
     };

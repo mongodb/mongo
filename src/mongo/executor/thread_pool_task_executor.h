@@ -39,12 +39,15 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
 class ThreadPoolInterface;
 
 namespace executor {
+MONGO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint1);
+MONGO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint2);
 
 struct ConnectionPoolStats;
 class NetworkInterface;

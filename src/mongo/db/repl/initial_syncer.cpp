@@ -60,6 +60,7 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -988,6 +989,20 @@ void InitialSyncer::_getNextApplierBatchCallback(
         warning() << "Failure creating next apply batch: " << redact(batchResult.getStatus());
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, batchResult.getStatus());
         return;
+    }
+
+    // Set and unset by the InitialSyncTest fixture to cause initial sync to pause so that the
+    // Initial Sync Fuzzer can run commands on the sync source.
+    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
+        log() << "Initial Syncer is about to apply the next oplog batch of size: "
+              << batchResult.getValue().size();
+        log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
+    }
+
+    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
+        log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
     }
 
     // Schedule MultiApplier if we have operations to apply.
