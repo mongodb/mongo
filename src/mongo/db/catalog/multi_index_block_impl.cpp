@@ -327,7 +327,7 @@ void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& do
 }
 
 Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
-    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(_opCtx->lockState()->isNoop() || !_opCtx->lockState()->inAWriteUnitOfWork());
 
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
     // accumulate them in the `MultikeyPathTracker` and do the write as part of the update that
@@ -519,7 +519,7 @@ Status MultiIndexBlockImpl::doneInserting(std::vector<BSONObj>* dupKeysInserted)
 
 Status MultiIndexBlockImpl::_doneInserting(std::set<RecordId>* dupRecords,
                                            std::vector<BSONObj>* dupKeysInserted) {
-    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(_opCtx->lockState()->isNoop() || !_opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == NULL)
             continue;
