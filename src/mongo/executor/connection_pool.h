@@ -153,6 +153,8 @@ public:
     Future<ConnectionHandle> get(const HostAndPort& hostAndPort, Milliseconds timeout);
     void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
 
+    boost::optional<ConnectionHandle> tryGet(const HostAndPort& hostAndPort);
+
     void appendConnectionStats(ConnectionPoolStats* stats) const;
 
     size_t getNumConnectionsPerHost(const HostAndPort& hostAndPort) const;

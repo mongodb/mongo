@@ -222,20 +222,29 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     // return on the reactor thread.
     //
     // TODO: get rid of this cruft once we have a connection pool that's executor aware.
-    auto connFuture = _reactor->execute([this, state, request, baton] {
-        return makeReadyFutureWith(
-                   [this, request] { return _pool->get(request.target, request.timeout); })
+
+    auto connFuture = [&] {
+        auto conn = _pool->tryGet(request.target);
+
+        if (conn) {
+            return Future<ConnectionPool::ConnectionHandle>(std::move(*conn));
+        }
+
+        return _reactor
+            ->execute([this, state, request, baton] {
+                return makeReadyFutureWith(
+                    [this, request] { return _pool->get(request.target, request.timeout); });
+            })
             .tapError([state](Status error) {
                 LOG(2) << "Failed to get connection from pool for request " << state->request.id
                        << ": " << error;
-            })
-            .then([this, baton](ConnectionPool::ConnectionHandle conn) {
-                auto deleter = conn.get_deleter();
-
-                // TODO: drop out this shared_ptr once we have a unique_function capable future
-                return std::make_shared<CommandState::ConnHandle>(
-                    conn.release(), CommandState::Deleter{deleter, _reactor});
             });
+    }().then([this, baton](ConnectionPool::ConnectionHandle conn) {
+        auto deleter = conn.get_deleter();
+
+        // TODO: drop out this shared_ptr once we have a unique_function capable future
+        return std::make_shared<CommandState::ConnHandle>(conn.release(),
+                                                          CommandState::Deleter{deleter, _reactor});
     });
 
     auto remainingWork =
