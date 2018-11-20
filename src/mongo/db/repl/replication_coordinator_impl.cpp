@@ -578,7 +578,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
               << startupWarningsLog;
         log() << "**          for this node. This is not a recommended configuration. Please see "
               << startupWarningsLog;
-        log() << "**          https://dochub.mongodb.org/core/psa-disable-rc-majority"
+        log() << "**          https://dochub.mongodb.org/core/psa-disable-rc-majority-4.0"
               << startupWarningsLog;
         log() << startupWarningsLog;
     }
