@@ -13135,6 +13135,25 @@ buildvariants:
     - rhel70
   - name: jsCore
 
+- <<: *enterprise-rhel-70-64-bit-template
+  name: hot_backups-rhel-70-64-bit
+  display_name: "hot_backups RHEL 7.0"
+  batchtime: 1440 # 1 day
+  expansions:
+    <<: *enterprise-rhel-70-64-bit-expansions-template
+    compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enterprise-features=hot_backups
+    has_packages: false
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel70
+  - name: jsCore
+    distros:
+    - rhel70
+  - name: noPassthrough
+    distros:
+    - rhel70
+
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
   run_on:

@@ -111,10 +111,17 @@ def configure_modules(modules, conf):
 
     The configure() function should prepare the Mongo build system for building the module.
     """
+    env = conf.env
+    env['MONGO_MODULES'] = []
     for module in modules:
         name = module.name
         print("configuring module: %s" % (name))
-        module.configure(conf, conf.env)
+        modules_configured = module.configure(conf, env)
+        if modules_configured:
+            for module_name in modules_configured:
+                env['MONGO_MODULES'].append(module_name)
+        else:
+            env['MONGO_MODULES'].append(name)
 
 
 def get_module_sconscripts(modules):

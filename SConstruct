@@ -1917,7 +1917,6 @@ if get_option("system-boost-lib-search-suffixes") is not None:
 
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
-env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 # --- check system ---
 ssl_provider = None
@@ -3187,32 +3186,6 @@ def doConfigure(myenv):
 
         return False
 
-    # Resolve --enable-free-mon
-    if free_monitoring == "auto":
-        if "enterprise" not in env['MONGO_MODULES']:
-            free_monitoring = "on"
-        else:
-            free_monitoring = "off"
-
-    if free_monitoring == "on":
-        checkHTTPLib(required=True)
-
-    # Resolve --enable-http-client
-    if http_client == "auto":
-        if checkHTTPLib():
-            http_client = "on"
-        else:
-            print("Disabling http-client as libcurl was not found")
-            http_client = "off"
-    elif http_client == "on":
-        checkHTTPLib(required=True)
-
-    # Sanity check.
-    # We know that http_client was explicitly disabled here,
-    # because the free_monitoring check would have failed if no http lib were available.
-    if (free_monitoring == "on") and (http_client == "off"):
-        env.ConfError("FreeMonitoring requires an HTTP client which has been explicitly disabled")
-
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
         conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
@@ -3482,6 +3455,32 @@ def doConfigure(myenv):
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
+
+    # Resolve --enable-free-mon
+    if free_monitoring == "auto":
+        if 'enterprise' not in env['MONGO_MODULES']:
+            free_monitoring = "on"
+        else:
+            free_monitoring = "off"
+
+    if free_monitoring == "on":
+        checkHTTPLib(required=True)
+
+    # Resolve --enable-http-client
+    if http_client == "auto":
+        if checkHTTPLib():
+            http_client = "on"
+        else:
+            print("Disabling http-client as libcurl was not found")
+            http_client = "off"
+    elif http_client == "on":
+        checkHTTPLib(required=True)
+
+    # Sanity check.
+    # We know that http_client was explicitly disabled here,
+    # because the free_monitoring check would have failed if no http lib were available.
+    if (free_monitoring == "on") and (http_client == "off"):
+        env.ConfError("FreeMonitoring requires an HTTP client which has been explicitly disabled")
 
     if env['TARGET_ARCH'] == "ppc64le":
         # This checks for an altivec optimization we use in full text search.

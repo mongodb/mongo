@@ -30,7 +30,7 @@
 
 #include "mongo/db/audit.h"
 
-#if !MONGO_ENTERPRISE_VERSION
+#if !MONGO_ENTERPRISE_AUDIT
 
 void mongo::audit::logAuthentication(Client* client,
                                      StringData mechanism,

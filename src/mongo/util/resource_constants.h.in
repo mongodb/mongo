@@ -58,7 +58,7 @@
 #endif  // NTDDI_VERSION
 
 #ifdef MONGO_ENTERPRISE_VERSION
-#define MONGO_PRODUCT_EDITION_STR "Enterprise"
+#define MONGO_PRODUCT_EDITION_STR @buildinfo_modules@
 #elif MONGO_CONFIG_SSL
 #define MONGO_PRODUCT_EDITION_STR "SSL"
 #else
