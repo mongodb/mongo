@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "boost/optional.hpp"
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -147,6 +148,29 @@ private:
 struct IndexKeyDatum {
     IndexKeyDatum(const BSONObj& keyPattern, const BSONObj& key, const IndexAccessMethod* index)
         : indexKeyPattern(keyPattern), keyData(key), index(index) {}
+
+    /**
+     * getFieldDotted produces the field with the provided name based on index keyData. The return
+     * object is populated if the element is in a provided index key.  Returns none otherwise.
+     * Returning none indicates a query planning error.
+     */
+    static boost::optional<BSONElement> getFieldDotted(const std::vector<IndexKeyDatum>& keyData,
+                                                       const std::string& field) {
+        for (size_t i = 0; i < keyData.size(); ++i) {
+            BSONObjIterator keyPatternIt(keyData[i].indexKeyPattern);
+            BSONObjIterator keyDataIt(keyData[i].keyData);
+
+            while (keyPatternIt.more()) {
+                BSONElement keyPatternElt = keyPatternIt.next();
+                verify(keyDataIt.more());
+                BSONElement keyDataElt = keyDataIt.next();
+
+                if (field == keyPatternElt.fieldName())
+                    return boost::make_optional(keyDataElt);
+            }
+        }
+        return boost::none;
+    }
 
     // This is not owned and points into the IndexDescriptor's data.
     BSONObj indexKeyPattern;

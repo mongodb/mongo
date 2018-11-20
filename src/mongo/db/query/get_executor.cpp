@@ -377,10 +377,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         // There might be a projection. The idhack stage will always fetch the full
         // document, so we don't support covered projections. However, we might use the
         // simple inclusion fast path.
-        if (NULL != canonicalQuery->getProj()) {
-            ProjectionStageParams params;
-            params.projObj = canonicalQuery->getProj()->getProjObj();
-            params.collator = canonicalQuery->getCollator();
+        if (nullptr != canonicalQuery->getProj()) {
 
             // Add a SortKeyGeneratorStage if there is a $meta sortKey projection.
             if (canonicalQuery->getProj()->wantSortKey()) {
@@ -397,13 +394,16 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 canonicalQuery->getProj()->wantIndexKey() ||
                 canonicalQuery->getProj()->wantSortKey() ||
                 canonicalQuery->getProj()->hasDottedFieldPath()) {
-                params.fullExpression = canonicalQuery->root();
-                params.projImpl = ProjectionStageParams::NO_FAST_PATH;
+                root = make_unique<ProjectionStageDefault>(opCtx,
+                                                           canonicalQuery->getProj()->getProjObj(),
+                                                           ws,
+                                                           std::move(root),
+                                                           canonicalQuery->root(),
+                                                           canonicalQuery->getCollator());
             } else {
-                params.projImpl = ProjectionStageParams::SIMPLE_DOC;
+                root = make_unique<ProjectionStageSimple>(
+                    opCtx, canonicalQuery->getProj()->getProjObj(), ws, std::move(root));
             }
-
-            root = make_unique<ProjectionStage>(opCtx, params, ws, root.release());
         }
 
         return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
@@ -788,11 +788,12 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
-    ProjectionStageParams params;
-    params.projObj = proj;
-    params.collator = cq->getCollator();
-    params.fullExpression = cq->root();
-    return {make_unique<ProjectionStage>(opCtx, params, ws, root.release())};
+    return {make_unique<ProjectionStageDefault>(opCtx,
+                                                proj,
+                                                ws,
+                                                std::unique_ptr<PlanStage>(root.release()),
+                                                cq->root(),
+                                                cq->getCollator())};
 }
 
 }  // namespace

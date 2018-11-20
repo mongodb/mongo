@@ -109,6 +109,17 @@ public:
     PlanStage(const char* typeName, OperationContext* opCtx)
         : _commonStats(typeName), _opCtx(opCtx) {}
 
+protected:
+    /**
+     * Obtain a PlanStage given a child stage. Called during the construction of derived
+     * PlanStage types with a single direct descendant.
+     */
+    PlanStage(OperationContext* opCtx, std::unique_ptr<PlanStage> child, const char* typeName)
+        : PlanStage(typeName, opCtx) {
+        _children.push_back(std::move(child));
+    }
+
+public:
     virtual ~PlanStage() {}
 
     using Children = std::vector<std::unique_ptr<PlanStage>>;

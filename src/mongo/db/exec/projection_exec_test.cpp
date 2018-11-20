@@ -32,6 +32,10 @@
  * This file contains tests for mongo/db/exec/projection_exec.cpp
  */
 
+#include "boost/optional.hpp"
+#include "boost/optional/optional_io.hpp"
+#include <memory>
+
 #include "mongo/db/exec/projection_exec.h"
 
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -39,159 +43,56 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/unittest/unittest.h"
-#include <memory>
 
 using namespace mongo;
+using namespace std::string_literals;
 
 namespace {
 
-using std::unique_ptr;
-
 /**
- * Utility function to create MatchExpression
+ * Utility function to create a MatchExpression.
  */
-unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
+std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj, std::move(expCtx));
     ASSERT_TRUE(status.isOK());
     return std::move(status.getValue());
 }
 
-//
-// transform tests
-//
-
 /**
- * test function to verify results of transform()
- * on a working set member.
- *
- * specStr - projection specification
- * queryStr - query
- * objStr - object to run projection on
- * data - computed data. Owned by working set member created in this function if not null.
- * expectedStatusOK - expected status of transformation
- * expectedObjStr - expected object after successful projection.
- *                  Ignored if expectedStatusOK is false.
+ * Test encapsulation for single call to ProjectionExec::project() or
+ * ProjectionExec::projectCovered().
  */
-
-void testTransform(const char* specStr,
-                   const char* queryStr,
-                   const char* objStr,
-                   WorkingSetComputedData* data,
-                   const CollatorInterface* collator,
-                   bool expectedStatusOK,
-                   const char* expectedObjStr) {
+boost::optional<std::string> project(
+    const char* specStr,
+    const char* queryStr,
+    const stdx::variant<const char*, const IndexKeyDatum> objStrOrDatum,
+    const boost::optional<const CollatorInterface&> collator = boost::none,
+    const BSONObj& sortKey = BSONObj(),
+    const double textScore = 0.0) {
     // Create projection exec object.
     BSONObj spec = fromjson(specStr);
     BSONObj query = fromjson(queryStr);
-    unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
+    std::unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
-    ProjectionExec exec(opCtx.get(), spec, queryExpression.get(), collator);
+    ProjectionExec exec(opCtx.get(), spec, queryExpression.get(), collator.get_ptr());
 
-    // Create working set member.
-    WorkingSetMember wsm;
-    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(objStr));
-    if (data) {
-        wsm.addComputed(data);
-    }
-    wsm.transitionToOwnedObj();
+    auto objStr = stdx::get_if<const char*>(&objStrOrDatum);
+    auto projected = objStr
+        ? exec.project(fromjson(*objStr), boost::none, BSONObj(), sortKey, textScore)
+        : exec.projectCovered({stdx::get<const IndexKeyDatum>(objStrOrDatum)},
+                              boost::none,
+                              BSONObj(),
+                              sortKey,
+                              textScore);
 
-    // Transform object
-    Status status = exec.transform(&wsm);
-
-    // There are fewer checks to perform if we are expected a failed status.
-    if (!expectedStatusOK) {
-        if (status.isOK()) {
-            mongoutils::str::stream ss;
-            ss << "expected transform() to fail but got success instead."
-               << "\nprojection spec: " << specStr << "\nquery: " << queryStr
-               << "\nobject before projection: " << objStr;
-            FAIL(ss);
-        }
-        return;
-    }
-
-    // If we are expecting a successful transformation but got a failed status instead,
-    // print out status message in assertion message.
-    if (!status.isOK()) {
-        mongoutils::str::stream ss;
-        ss << "transform() test failed: unexpected failed status: " << status.toString()
-           << "\nprojection spec: " << specStr << "\nquery: " << queryStr
-           << "\nobject before projection: " << objStr
-           << "\nexpected object after projection: " << expectedObjStr;
-        FAIL(ss);
-    }
-
-    // Finally, we compare the projected object.
-    const BSONObj& obj = wsm.obj.value();
-    BSONObj expectedObj = fromjson(expectedObjStr);
-    if (SimpleBSONObjComparator::kInstance.evaluate(obj != expectedObj)) {
-        mongoutils::str::stream ss;
-        ss << "transform() test failed: unexpected projected object."
-           << "\nprojection spec: " << specStr << "\nquery: " << queryStr
-           << "\nobject before projection: " << objStr
-           << "\nexpected object after projection: " << expectedObjStr
-           << "\nactual object after projection: " << obj.toString();
-        FAIL(ss);
-    }
-}
-
-/**
- * testTransform without computed data or collator arguments.
- */
-void testTransform(const char* specStr,
-                   const char* queryStr,
-                   const char* objStr,
-                   bool expectedStatusOK,
-                   const char* expectedObjStr) {
-    testTransform(specStr, queryStr, objStr, nullptr, nullptr, expectedStatusOK, expectedObjStr);
-}
-
-/**
- * Test function to verify the results of projecting the $meta sortKey while under a covered
- * projection. In particular, it tests that ProjectionExec can take a WorkingSetMember in
- * RID_AND_IDX state and use the sortKey along with the index data to generate the final output
- * document. For SERVER-20117.
- *
- * sortKey - The sort key in BSONObj form.
- * projSpec - The JSON representation of the proj spec BSONObj.
- * ikd - The data stored in the index.
- *
- * Returns the BSON representation of the actual output, to be checked against the expected output.
- */
-BSONObj transformMetaSortKeyCovered(const BSONObj& sortKey,
-                                    const char* projSpec,
-                                    const IndexKeyDatum& ikd) {
-    WorkingSet ws;
-    WorkingSetID wsid = ws.allocate();
-    WorkingSetMember* wsm = ws.get(wsid);
-    wsm->keyData.push_back(ikd);
-    wsm->addComputed(new SortKeyComputedData(sortKey));
-    ws.transitionToRecordIdAndIdx(wsid);
-
-    QueryTestServiceContext serviceCtx;
-    auto opCtx = serviceCtx.makeOperationContext();
-    ProjectionExec projExec(opCtx.get(), fromjson(projSpec), nullptr, nullptr);
-    ASSERT_OK(projExec.transform(wsm));
-
-    return wsm->obj.value();
-}
-
-BSONObj transformCovered(BSONObj projSpec, const IndexKeyDatum& ikd) {
-    WorkingSet ws;
-    WorkingSetID wsid = ws.allocate();
-    WorkingSetMember* wsm = ws.get(wsid);
-    wsm->keyData.push_back(ikd);
-    ws.transitionToRecordIdAndIdx(wsid);
-
-    QueryTestServiceContext serviceCtx;
-    auto opCtx = serviceCtx.makeOperationContext();
-    ProjectionExec projExec(opCtx.get(), projSpec, nullptr, nullptr);
-    ASSERT_OK(projExec.transform(wsm));
-
-    return wsm->obj.value();
+    if (!projected.isOK())
+        return boost::none;
+    else
+        return boost::make_optional(projected.getValue().toString());
 }
 
 //
@@ -200,13 +101,15 @@ BSONObj transformCovered(BSONObj projSpec, const IndexKeyDatum& ikd) {
 
 TEST(ProjectionExecTest, TransformPositionalDollar) {
     // Valid position $ projections.
-    testTransform("{'a.$': 1}", "{a: 10}", "{a: [10, 20, 30]}", true, "{a: [10]}");
-    testTransform("{'a.$': 1}", "{a: 20}", "{a: [10, 20, 30]}", true, "{a: [20]}");
-    testTransform("{'a.$': 1}", "{a: 30}", "{a: [10, 20, 30]}", true, "{a: [30]}");
-    testTransform("{'a.$': 1}", "{a: {$gt: 4}}", "{a: [5]}", true, "{a: [5]}");
+    ASSERT_EQ(boost::make_optional("{ a: [ 10 ] }"s),
+              project("{'a.$': 1}", "{a: 10}", "{a: [10, 20, 30]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 20 ] }"s),
+              project("{'a.$': 1}", "{a: 20}", "{a: [10, 20, 30]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 5 ] }"s),
+              project("{'a.$': 1}", "{a: {$gt: 4}}", "{a: [5]}"));
 
     // Invalid position $ projections.
-    testTransform("{'a.$': 1}", "{a: {$size: 1}}", "{a: [5]}", false, "");
+    ASSERT_EQ(boost::none, project("{'a.$': 1}", "{a: {$size: 1}}", "{a: [5]}"));
 }
 
 //
@@ -217,24 +120,25 @@ TEST(ProjectionExecTest, TransformElemMatch) {
     const char* s = "{a: [{x: 1, y: 10}, {x: 1, y: 20}, {x: 2, y: 10}]}";
 
     // Valid $elemMatch projections.
-    testTransform("{a: {$elemMatch: {x: 1}}}", "{}", s, true, "{a: [{x: 1, y: 10}]}");
-    testTransform("{a: {$elemMatch: {x: 1, y: 20}}}", "{}", s, true, "{a: [{x: 1, y: 20}]}");
-    testTransform("{a: {$elemMatch: {x: 2}}}", "{}", s, true, "{a: [{x: 2, y: 10}]}");
-    testTransform("{a: {$elemMatch: {x: 3}}}", "{}", s, true, "{}");
+    ASSERT_EQ(boost::make_optional("{ a: [ { x: 1, y: 10 } ] }"s),
+              project("{a: {$elemMatch: {x: 1}}}", "{}", s));
+    ASSERT_EQ(boost::make_optional("{ a: [ { x: 1, y: 20 } ] }"s),
+              project("{a: {$elemMatch: {x: 1, y: 20}}}", "{}", s));
+    ASSERT_EQ(boost::make_optional("{ a: [ { x: 2, y: 10 } ] }"s),
+              project("{a: {$elemMatch: {x: 2}}}", "{}", s));
+    ASSERT_EQ(boost::make_optional("{}"s), project("{a: {$elemMatch: {x: 3}}}", "{}", s));
 
     // $elemMatch on unknown field z
-    testTransform("{a: {$elemMatch: {z: 1}}}", "{}", s, true, "{}");
+    ASSERT_EQ(boost::make_optional("{}"s), project("{a: {$elemMatch: {z: 1}}}", "{}", s));
 }
 
 TEST(ProjectionExecTest, ElemMatchProjectionRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    testTransform("{a: {$elemMatch: {$gte: 'abc'}}}",
-                  "{}",
-                  "{a: ['zaa', 'zbb', 'zdd', 'zee']}",
-                  nullptr,  // WSM computed data
-                  &collator,
-                  true,
-                  "{a: ['zdd']}");
+    ASSERT_EQ(boost::make_optional("{ a: [ \"zdd\" ] }"s),
+              project("{a: {$elemMatch: {$gte: 'abc'}}}",
+                      "{}",
+                      "{a: ['zaa', 'zbb', 'zdd', 'zee']}",
+                      collator));
 }
 
 //
@@ -243,27 +147,42 @@ TEST(ProjectionExecTest, ElemMatchProjectionRespectsCollator) {
 
 TEST(ProjectionExecTest, TransformSliceCount) {
     // Valid $slice projections using format {$slice: count}.
-    testTransform("{a: {$slice: -10}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
-    testTransform("{a: {$slice: -3}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
-    testTransform("{a: {$slice: -1}}", "{}", "{a: [4, 6, 8]}", true, "{a: [8]}");
-    testTransform("{a: {$slice: 0}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
-    testTransform("{a: {$slice: 1}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4]}");
-    testTransform("{a: {$slice: 3}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
-    testTransform("{a: {$slice: 10}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6, 8 ] }"s),
+              project("{a: {$slice: -10}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6, 8 ] }"s),
+              project("{a: {$slice: -3}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 8 ] }"s),
+              project("{a: {$slice: -1}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [] }"s),
+              project("{a: {$slice: 0}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4 ] }"s),
+              project("{a: {$slice: 1}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6, 8 ] }"s),
+              project("{a: {$slice: 3}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6, 8 ] }"s),
+              project("{a: {$slice: 10}}", "{}", "{a: [4, 6, 8]}"));
 }
 
 TEST(ProjectionExecTest, TransformSliceSkipLimit) {
     // Valid $slice projections using format {$slice: [skip, limit]}.
     // Non-positive limits are rejected at the query parser and therefore not handled by
     // the projection execution stage. In fact, it will abort on an invalid limit.
-    testTransform("{a: {$slice: [-10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
-    testTransform("{a: {$slice: [-3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6, 8]}");
-    testTransform("{a: {$slice: [-1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [8]}");
-    testTransform("{a: {$slice: [0, 2]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4, 6]}");
-    testTransform("{a: {$slice: [0, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [4]}");
-    testTransform("{a: {$slice: [1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [6]}");
-    testTransform("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
-    testTransform("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6, 8 ] }"s),
+              project("{a: {$slice: [-10, 10]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6, 8 ] }"s),
+              project("{a: {$slice: [-3, 5]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 8 ] }"s),
+              project("{a: {$slice: [-1, 1]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4, 6 ] }"s),
+              project("{a: {$slice: [0, 2]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 4 ] }"s),
+              project("{a: {$slice: [0, 1]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [ 6 ] }"s),
+              project("{a: {$slice: [1, 1]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [] }"s),
+              project("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}"));
+    ASSERT_EQ(boost::make_optional("{ a: [] }"s),
+              project("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}"));
 }
 
 //
@@ -271,19 +190,19 @@ TEST(ProjectionExecTest, TransformSliceSkipLimit) {
 //
 
 TEST(ProjectionExecTest, TransformCoveredDottedProjection) {
-    BSONObj projection = fromjson("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}");
     BSONObj keyPattern = fromjson("{a: 1, 'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}");
     BSONObj keyData = fromjson("{'': 1, '': 2, '': 3, '': 4, '': 5}");
-    BSONObj result = transformCovered(projection, IndexKeyDatum(keyPattern, keyData, nullptr));
-    ASSERT_BSONOBJ_EQ(result, fromjson("{b: {c: 2, d: 3, f: {g: 4, h: 5}}}"));
+    ASSERT_EQ(boost::make_optional("{ b: { c: 2, d: 3, f: { g: 4, h: 5 } } }"s),
+              project("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}",
+                      "{}",
+                      IndexKeyDatum(keyPattern, keyData, nullptr)));
 }
 
 TEST(ProjectionExecTest, TransformNonCoveredDottedProjection) {
-    testTransform("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}",
-                  "{}",
-                  "{a: 1, b: {c: 2, d: 3, f: {g: 4, h: 5}}}",
-                  true,
-                  "{b: {c: 2, d: 3, f: {g: 4, h: 5}}}");
+    ASSERT_EQ(boost::make_optional("{ b: { c: 2, d: 3, f: { g: 4, h: 5 } } }"s),
+              project("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}",
+                      "{}",
+                      "{a: 1, b: {c: 2, d: 3, f: {g: 4, h: 5}}}"));
 }
 
 //
@@ -293,97 +212,97 @@ TEST(ProjectionExecTest, TransformNonCoveredDottedProjection) {
 
 TEST(ProjectionExecTest, TransformMetaTextScore) {
     // Query {} is ignored.
-    testTransform("{b: {$meta: 'textScore'}}",
-                  "{}",
-                  "{a: 'hello'}",
-                  new mongo::TextScoreComputedData(100),
-                  nullptr,  // collator
-                  true,
-                  "{a: 'hello', b: 100}");
+    ASSERT_EQ(boost::make_optional("{ a: \"hello\", b: 100.0 }"s),
+              project("{b: {$meta: 'textScore'}}",
+                      "{}",
+                      "{a: 'hello'}",
+                      boost::none,  // collator
+                      BSONObj(),    // sortKey
+                      100.0));      // textScore
     // Projected meta field should overwrite existing field.
-    testTransform("{b: {$meta: 'textScore'}}",
-                  "{}",
-                  "{a: 'hello', b: -1}",
-                  new mongo::TextScoreComputedData(100),
-                  nullptr,  // collator
-                  true,
-                  "{a: 'hello', b: 100}");
+    ASSERT_EQ(boost::make_optional("{ a: \"hello\", b: 100.0 }"s),
+              project("{b: {$meta: 'textScore'}}",
+                      "{}",
+                      "{a: 'hello', b: -1}",
+                      boost::none,  // collator
+                      BSONObj(),    // sortKey
+                      100.0));      // textScore
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKey) {
-    testTransform("{b: {$meta: 'sortKey'}}",
-                  "{}",
-                  "{a: 'hello'}",
-                  new mongo::SortKeyComputedData(BSON("" << 99)),
-                  nullptr,  // collator
-                  true,
-                  "{a: 'hello', b: {'': 99}}");
+    // Query {} is ignored.
+    ASSERT_EQ(boost::make_optional("{ a: \"hello\", b: { : 99 } }"s),
+              project("{b: {$meta: 'sortKey'}}",
+                      "{}",
+                      "{a: 'hello'}",
+                      boost::none,       // collator
+                      BSON("" << 99)));  // sortKey
 
     // Projected meta field should overwrite existing field.
-    testTransform("{a: {$meta: 'sortKey'}}",
-                  "{}",
-                  "{a: 'hello'}",
-                  new mongo::SortKeyComputedData(BSON("" << 99)),
-                  nullptr,  // collator
-                  true,
-                  "{a: {'': 99}}");
+    ASSERT_EQ(boost::make_optional("{ a: { : 99 } }"s),
+              project("{a: {$meta: 'sortKey'}}",
+                      "{}",
+                      "{a: 'hello'}",
+                      boost::none,       // collator
+                      BSON("" << 99)));  // sortKey
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredNormal) {
-    BSONObj actualOut =
-        transformMetaSortKeyCovered(BSON("" << 5),
-                                    "{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
-                                    IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr));
-    BSONObj expectedOut = BSON("a" << 5 << "b" << BSON("" << 5));
-    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
+    ASSERT_EQ(boost::make_optional("{ a: 5, b: { : 5 } }"s),
+              project("{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
+                      "{}",
+                      IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr),
+                      boost::none,      // collator
+                      BSON("" << 5)));  // sortKey
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredOverwrite) {
-    BSONObj actualOut =
-        transformMetaSortKeyCovered(BSON("" << 5),
-                                    "{_id: 0, a: 1, a: {$meta: 'sortKey'}}",
-                                    IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr));
-    BSONObj expectedOut = BSON("a" << BSON("" << 5));
-    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
+    ASSERT_EQ(boost::make_optional("{ a: { : 5 } }"s),
+              project("{_id: 0, a: 1, a: {$meta: 'sortKey'}}",
+                      "{}",
+                      IndexKeyDatum(BSON("a" << 1), BSON("" << 5), nullptr),
+                      boost::none,      // collator
+                      BSON("" << 5)));  // sortKey
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredAdditionalData) {
-    BSONObj actualOut = transformMetaSortKeyCovered(
-        BSON("" << 5),
-        "{_id: 0, a: 1, b: {$meta: 'sortKey'}, c: 1}",
-        IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr));
-    BSONObj expectedOut = BSON("a" << 5 << "c" << 6 << "b" << BSON("" << 5));
-    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
+    ASSERT_EQ(boost::make_optional("{ a: 5, c: 6, b: { : 5 } }"s),
+              project("{_id: 0, a: 1, b: {$meta: 'sortKey'}, c: 1}",
+                      "{}",
+                      IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr),
+                      boost::none,      // collator
+                      BSON("" << 5)));  // sortKey
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound) {
-    BSONObj actualOut = transformMetaSortKeyCovered(
-        BSON("" << 5 << "" << 6),
-        "{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
-        IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr));
-    BSONObj expectedOut = BSON("a" << 5 << "b" << BSON("" << 5 << "" << 6));
-    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
+    ASSERT_EQ(boost::make_optional("{ a: 5, b: { : 5, : 6 } }"s),
+              project("{_id: 0, a: 1, b: {$meta: 'sortKey'}}",
+                      "{}",
+                      IndexKeyDatum(BSON("a" << 1 << "c" << 1), BSON("" << 5 << "" << 6), nullptr),
+                      boost::none,                 // collator
+                      BSON("" << 5 << "" << 6)));  // sortKey
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound2) {
-    BSONObj actualOut = transformMetaSortKeyCovered(
-        BSON("" << 5 << "" << 6),
-        "{_id: 0, a: 1, c: 1, b: {$meta: 'sortKey'}}",
-        IndexKeyDatum(
-            BSON("a" << 1 << "b" << 1 << "c" << 1), BSON("" << 5 << "" << 6 << "" << 4), nullptr));
-    BSONObj expectedOut = BSON("a" << 5 << "c" << 4 << "b" << BSON("" << 5 << "" << 6));
-    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
+    ASSERT_EQ(boost::make_optional("{ a: 5, c: 4, b: { : 5, : 6 } }"s),
+              project("{_id: 0, a: 1, c: 1, b: {$meta: 'sortKey'}}",
+                      "{}",
+                      IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                    BSON("" << 5 << "" << 6 << "" << 4),
+                                    nullptr),
+                      boost::none,                 // collator
+                      BSON("" << 5 << "" << 6)));  // sortKey
 }
 
 TEST(ProjectionExecTest, TransformMetaSortKeyCoveredCompound3) {
-    BSONObj actualOut = transformMetaSortKeyCovered(
-        BSON("" << 6 << "" << 4),
-        "{_id: 0, c: 1, d: 1, b: {$meta: 'sortKey'}}",
-        IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1),
-                      BSON("" << 5 << "" << 6 << "" << 4 << "" << 9000),
-                      nullptr));
-    BSONObj expectedOut = BSON("c" << 4 << "d" << 9000 << "b" << BSON("" << 6 << "" << 4));
-    ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
+    ASSERT_EQ(boost::make_optional("{ c: 4, d: 9000, b: { : 6, : 4 } }"s),
+              project("{_id: 0, c: 1, d: 1, b: {$meta: 'sortKey'}}",
+                      "{}",
+                      IndexKeyDatum(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1),
+                                    BSON("" << 5 << "" << 6 << "" << 4 << "" << 9000),
+                                    nullptr),
+                      boost::none,                 // collator
+                      BSON("" << 6 << "" << 4)));  // sortKey
 }
 
 }  // namespace

@@ -41,46 +41,19 @@ namespace mongo {
 
 class CollatorInterface;
 
-struct ProjectionStageParams {
-    enum ProjectionImplementation {
-        // The default case.  Will handle every projection.
-        NO_FAST_PATH,
-
-        // The projection is simple inclusion and is totally covered by one index.
-        COVERED_ONE_INDEX,
-
-        // The projection is simple inclusion and we expect an object.
-        SIMPLE_DOC
-    };
-
-    ProjectionImplementation projImpl = NO_FAST_PATH;
-
-    // The projection object.  We lack a ProjectionExpression or similar so we use a BSONObj.
-    BSONObj projObj;
-
-    // If we have a positional or elemMatch projection we need a MatchExpression to pull out the
-    // right data.
-    // Not owned here, we do not take ownership.
-    const MatchExpression* fullExpression = nullptr;
-
-    // If (COVERED_ONE_INDEX == projObj) this is the key pattern we're extracting covered data
-    // from.  Otherwise, this field is ignored.
-    BSONObj coveredKeyObj;
-
-    // The collator this operation should use to compare strings. If null, the collation is a simple
-    // binary compare.
-    const CollatorInterface* collator = nullptr;
-};
-
 /**
- * This stage computes a projection.
+ * This stage computes a projection. This is an abstract base class for various projection
+ * implementations.
  */
-class ProjectionStage final : public PlanStage {
-public:
+class ProjectionStage : public PlanStage {
+protected:
     ProjectionStage(OperationContext* opCtx,
-                    const ProjectionStageParams& params,
+                    const BSONObj& projObj,
                     WorkingSet* ws,
-                    PlanStage* child);
+                    std::unique_ptr<PlanStage> child);
+
+public:
+    static constexpr const char* kStageType = "PROJECTION";
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
@@ -89,10 +62,13 @@ public:
         return STAGE_PROJECTION;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() final;
 
-    const SpecificStats* getSpecificStats() const final;
+    const SpecificStats* getSpecificStats() const final {
+        return &_specificStats;
+    }
 
+protected:
     using FieldSet = StringMap<bool>;  // Value is unused.
 
     /**
@@ -102,42 +78,74 @@ public:
      */
     static void getSimpleInclusionFields(const BSONObj& projObj, FieldSet* includedFields);
 
-    /**
-     * Applies a simple inclusion projection to 'in', including
-     * only the fields specified by 'includedFields'.
-     *
-     * The resulting document is constructed using 'bob'.
-     */
-    static void transformSimpleInclusion(const BSONObj& in,
-                                         const FieldSet& includedFields,
-                                         BSONObjBuilder& bob);
+    bool projObjHasOwnedData() {
+        return _projObj.isOwned() && !_projObj.isEmpty();
+    }
 
-    static const char* kStageType;
-
-private:
-    Status transform(WorkingSetMember* member);
-
-    std::unique_ptr<ProjectionExec> _exec;
-
-    // _ws is not owned by us.
-    WorkingSet* _ws;
-
-    // Stats
-    ProjectionStats _specificStats;
-
-    // Fast paths:
-    ProjectionStageParams::ProjectionImplementation _projImpl;
-
-    // Used by all projection implementations.
+    // The projection object used by all projection implementations. We lack a ProjectionExpression
+    // or similar so we use a BSONObj.
     BSONObj _projObj;
 
-    // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
+private:
+    /**
+     * Runs either the default complete implementation or a fast path depending on how this was
+     * constructed.
+     */
+    virtual Status transform(WorkingSetMember* member) const = 0;
+
+    // Used to retrieve a WorkingSetMember as part of 'doWork()'.
+    WorkingSet& _ws;
+
+    // Populated by 'getStats()'.
+    ProjectionStats _specificStats;
+};
+
+/**
+ * The default case. Can handle every projection.
+ */
+class ProjectionStageDefault final : public ProjectionStage {
+public:
+    /**
+     * ProjectionNode::DEFAULT should use this for construction.
+     */
+    ProjectionStageDefault(OperationContext* opCtx,
+                           const BSONObj& projObj,
+                           WorkingSet* ws,
+                           std::unique_ptr<PlanStage> child,
+                           const MatchExpression* fullExpression,
+                           const CollatorInterface* collator);
+
+private:
+    Status transform(WorkingSetMember* member) const final;
+
+    // Fully-general heavy execution object.
+    ProjectionExec _exec;
+};
+
+/**
+ * This class is used when the projection is totally covered by one index and the following rules
+ * are met: the projection consists only of inclusions e.g. '{field: 1}', it has no $meta
+ * projections, it is not a returnKey projection and it has no dotted fields.
+ */
+class ProjectionStageCovered final : public ProjectionStage {
+public:
+    /**
+     * ProjectionNode::COVERED_ONE_INDEX should obtain a fast-path object through this constructor.
+     */
+    ProjectionStageCovered(OperationContext* opCtx,
+                           const BSONObj& projObj,
+                           WorkingSet* ws,
+                           std::unique_ptr<PlanStage> child,
+                           const BSONObj& coveredKeyObj);
+
+private:
+    Status transform(WorkingSetMember* member) const final;
+
     // Has the field names present in the simple projection.
     FieldSet _includedFields;
 
-    //
-    // Used for the COVERED_ONE_INDEX path.
-    //
+    // This is the key pattern we're extracting covered data from. It is maintained here since
+    // strings derived from it depend on its lifetime.
     BSONObj _coveredKeyObj;
 
     // Field names can be empty in 2.4 and before so we can't use them as a sentinel value.
@@ -146,6 +154,28 @@ private:
 
     // If the i-th entry of _includeKey is true this is the field name for the i-th key field.
     std::vector<StringData> _keyFieldNames;
+};
+
+/**
+ * This class is used when we expect an object and the following rules are met: the projection
+ * consists only of inclusions e.g. '{field: 1}', it has no $meta projections, it is not a returnKey
+ * projection and it has no dotted fields.
+ */
+class ProjectionStageSimple final : public ProjectionStage {
+public:
+    /**
+     * ProjectionNode::SIMPLE_DOC should obtain a fast-path object through this constructor.
+     */
+    ProjectionStageSimple(OperationContext* opCtx,
+                          const BSONObj& projObj,
+                          WorkingSet* ws,
+                          std::unique_ptr<PlanStage> child);
+
+private:
+    Status transform(WorkingSetMember* member) const final;
+
+    // Has the field names present in the simple projection.
+    FieldSet _includedFields;
 };
 
 }  // namespace mongo

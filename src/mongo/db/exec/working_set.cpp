@@ -186,23 +186,12 @@ bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) con
     }
 
     // Our state should be such that we have index data/are covered.
-    for (size_t i = 0; i < keyData.size(); ++i) {
-        BSONObjIterator keyPatternIt(keyData[i].indexKeyPattern);
-        BSONObjIterator keyDataIt(keyData[i].keyData);
-
-        while (keyPatternIt.more()) {
-            BSONElement keyPatternElt = keyPatternIt.next();
-            verify(keyDataIt.more());
-            BSONElement keyDataElt = keyDataIt.next();
-
-            if (field == keyPatternElt.fieldName()) {
-                *out = keyDataElt;
-                return true;
-            }
-        }
+    if (auto outOpt = IndexKeyDatum::getFieldDotted(keyData, field)) {
+        *out = outOpt.get();
+        return true;
+    } else {
+        return false;
     }
-
-    return false;
 }
 
 size_t WorkingSetMember::getMemUsage() const {

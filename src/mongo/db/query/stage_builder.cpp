@@ -140,29 +140,28 @@ PlanStage* buildStages(OperationContext* opCtx,
         }
         case STAGE_PROJECTION: {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
-            PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
+            unique_ptr<PlanStage> childStage{
+                buildStages(opCtx, collection, cq, qsol, pn->children[0], ws)};
             if (nullptr == childStage) {
                 return nullptr;
             }
 
-            ProjectionStageParams params;
-            params.projObj = pn->projection;
-            params.collator = cq.getCollator();
-
-            // Stuff the right data into the params depending on what proj impl we use.
-            if (ProjectionNode::DEFAULT == pn->projType) {
-                params.fullExpression = pn->fullExpression;
-                params.projImpl = ProjectionStageParams::NO_FAST_PATH;
-            } else if (ProjectionNode::COVERED_ONE_INDEX == pn->projType) {
-                params.projImpl = ProjectionStageParams::COVERED_ONE_INDEX;
-                params.coveredKeyObj = pn->coveredKeyObj;
-                invariant(!pn->coveredKeyObj.isEmpty());
-            } else {
-                invariant(ProjectionNode::SIMPLE_DOC == pn->projType);
-                params.projImpl = ProjectionStageParams::SIMPLE_DOC;
+            switch (pn->projType) {
+                case ProjectionNode::DEFAULT:
+                    return new ProjectionStageDefault(opCtx,
+                                                      pn->projection,
+                                                      ws,
+                                                      std::move(childStage),
+                                                      pn->fullExpression,
+                                                      cq.getCollator());
+                case ProjectionNode::COVERED_ONE_INDEX:
+                    invariant(!pn->coveredKeyObj.isEmpty());
+                    return new ProjectionStageCovered(
+                        opCtx, pn->projection, ws, std::move(childStage), pn->coveredKeyObj);
+                case ProjectionNode::SIMPLE_DOC:
+                    return new ProjectionStageSimple(
+                        opCtx, pn->projection, ws, std::move(childStage));
             }
-
-            return new ProjectionStage(opCtx, params, ws, childStage);
         }
         case STAGE_LIMIT: {
             const LimitNode* ln = static_cast<const LimitNode*>(root);

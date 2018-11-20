@@ -31,7 +31,6 @@
 #include "mongo/db/exec/projection_exec.h"
 
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -41,58 +40,15 @@
 
 namespace mongo {
 
-using std::max;
 using std::string;
 
 namespace mmb = mongo::mutablebson;
-
-namespace {
-
-/**
- * Adds sort key metadata inside 'member' to 'builder' with field name 'fieldName'.
- *
- * Returns a non-OK status if sort key metadata is missing from 'member'.
- */
-Status addSortKeyMetaProj(StringData fieldName,
-                          const WorkingSetMember& member,
-                          BSONObjBuilder* builder) {
-    if (!member.hasComputed(WSM_SORT_KEY)) {
-        return Status(ErrorCodes::InternalError,
-                      "sortKey meta-projection requested but no data available");
-    }
-
-    const SortKeyComputedData* sortKeyData =
-        static_cast<const SortKeyComputedData*>(member.getComputed(WSM_SORT_KEY));
-    builder->append(fieldName, sortKeyData->getSortKey());
-    return Status::OK();
-}
-
-}  // namespace
-
-ProjectionExec::ProjectionExec()
-    : _include(true),
-      _special(false),
-      _includeID(true),
-      _skip(0),
-      _limit(-1),
-      _arrayOpType(ARRAY_OP_NORMAL),
-      _queryExpression(NULL),
-      _hasReturnKey(false) {}
 
 ProjectionExec::ProjectionExec(OperationContext* opCtx,
                                const BSONObj& spec,
                                const MatchExpression* queryExpression,
                                const CollatorInterface* collator)
-    : _include(true),
-      _special(false),
-      _source(spec),
-      _includeID(true),
-      _skip(0),
-      _limit(-1),
-      _arrayOpType(ARRAY_OP_NORMAL),
-      _queryExpression(queryExpression),
-      _hasReturnKey(false),
-      _collator(collator) {
+    : _source(spec), _queryExpression(queryExpression), _collator(collator) {
     // Whether we're including or excluding fields.
     enum class IncludeExclude { kUninitialized, kInclude, kExclude };
     IncludeExclude includeExclude = IncludeExclude::kUninitialized;
@@ -103,7 +59,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
 
         if (Object == e.type()) {
             BSONObj obj = e.embeddedObject();
-            verify(1 == obj.nFields());
+            invariant(1 == obj.nFields());
 
             BSONElement e2 = obj.firstElement();
             if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
@@ -115,15 +71,15 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                         add(e.fieldName(), 0, i);
                     }
                 } else {
-                    verify(e2.type() == Array);
+                    invariant(e2.type() == Array);
                     BSONObj arr = e2.embeddedObject();
-                    verify(2 == arr.nFields());
+                    invariant(2 == arr.nFields());
 
                     BSONObjIterator it(arr);
                     int skip = it.next().numberInt();
                     int limit = it.next().numberInt();
 
-                    verify(limit > 0);
+                    invariant(limit > 0);
 
                     add(e.fieldName(), skip, limit);
                 }
@@ -132,39 +88,43 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
 
                 // Create a MatchExpression for the elemMatch.
                 BSONObj elemMatchObj = e.wrap();
-                verify(elemMatchObj.isOwned());
+                invariant(elemMatchObj.isOwned());
                 _elemMatchObjs.push_back(elemMatchObj);
                 boost::intrusive_ptr<ExpressionContext> expCtx(
                     new ExpressionContext(opCtx, _collator));
                 StatusWithMatchExpression statusWithMatcher =
                     MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
-                verify(statusWithMatcher.isOK());
+                invariant(statusWithMatcher.isOK());
                 // And store it in _matchers.
                 _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =
                     statusWithMatcher.getValue().release();
 
                 add(e.fieldName(), true);
             } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
-                verify(String == e2.type());
+                invariant(String == e2.type());
                 if (e2.valuestr() == QueryRequest::metaTextScore) {
                     _meta[e.fieldName()] = META_TEXT_SCORE;
+                    _needsTextScore = true;
                 } else if (e2.valuestr() == QueryRequest::metaSortKey) {
                     _sortKeyMetaFields.push_back(e.fieldName());
                     _meta[_sortKeyMetaFields.back()] = META_SORT_KEY;
+                    _needsSortKey = true;
                 } else if (e2.valuestr() == QueryRequest::metaRecordId) {
                     _meta[e.fieldName()] = META_RECORDID;
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearPoint) {
                     _meta[e.fieldName()] = META_GEONEAR_POINT;
+                    _needsGeoNearPoint = true;
                 } else if (e2.valuestr() == QueryRequest::metaGeoNearDistance) {
                     _meta[e.fieldName()] = META_GEONEAR_DIST;
+                    _needsGeoNearDistance = true;
                 } else if (e2.valuestr() == QueryRequest::metaIndexKey) {
                     _hasReturnKey = true;
                 } else {
                     // This shouldn't happen, should be caught by parsing.
-                    verify(0);
+                    MONGO_UNREACHABLE;
                 }
             } else {
-                verify(0);
+                MONGO_UNREACHABLE;
             }
         } else if (mongoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
             _includeID = false;
@@ -240,147 +200,140 @@ void ProjectionExec::add(const string& field, int skip, int limit) {
 // Execution
 //
 
-Status ProjectionExec::transform(WorkingSetMember* member) const {
-    if (_hasReturnKey) {
-        BSONObjBuilder builder;
-
-        if (member->hasComputed(WSM_INDEX_KEY)) {
-            const IndexKeyComputedData* key =
-                static_cast<const IndexKeyComputedData*>(member->getComputed(WSM_INDEX_KEY));
-            builder.appendElements(key->getKey());
-        }
-
-        // Must be possible to do both returnKey meta-projection and sortKey meta-projection so that
-        // mongos can support returnKey.
-        for (auto fieldName : _sortKeyMetaFields) {
-            auto sortKeyMetaStatus = addSortKeyMetaProj(fieldName, *member, &builder);
-            if (!sortKeyMetaStatus.isOK()) {
-                return sortKeyMetaStatus;
-            }
-        }
-
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), builder.obj());
-        member->keyData.clear();
-        member->recordId = RecordId();
-        member->transitionToOwnedObj();
-        return Status::OK();
-    }
-
+StatusWith<BSONObj> ProjectionExec::computeReturnKeyProjection(const BSONObj& indexKey,
+                                                               const BSONObj& sortKey) const {
     BSONObjBuilder bob;
-    if (member->hasObj()) {
-        MatchDetails matchDetails;
 
-        // If it's a positional projection we need a MatchDetails.
-        if (transformRequiresDetails()) {
-            matchDetails.requestElemMatchKey();
-            verify(NULL != _queryExpression);
-            verify(_queryExpression->matchesBSON(member->obj.value(), &matchDetails));
-        }
-
-        Status projStatus = transform(member->obj.value(), &bob, &matchDetails);
-        if (!projStatus.isOK()) {
-            return projStatus;
-        }
-    } else {
-        invariant(!_include);
-        // Go field by field.
-        if (_includeID) {
-            BSONElement elt;
-            // Sometimes the _id field doesn't exist...
-            if (member->getFieldDotted("_id", &elt) && !elt.eoo()) {
-                bob.appendAs(elt, "_id");
-            }
-        }
-
-        mmb::Document projectedDoc;
-
-        for (auto&& specElt : _source) {
-            if (mongoutils::str::equals("_id", specElt.fieldName())) {
-                continue;
-            }
-
-            // $meta sortKey is the only meta-projection which is allowed to operate on index keys
-            // rather than the full document.
-            auto metaIt = _meta.find(specElt.fieldName());
-            if (metaIt != _meta.end()) {
-                invariant(metaIt->second == META_SORT_KEY);
-                continue;
-            }
-
-            // $meta sortKey is also the only element with an Object value in the projection spec
-            // that can operate on index keys rather than the full document.
-            invariant(BSONType::Object != specElt.type());
-
-            BSONElement keyElt;
-            // We can project a field that doesn't exist.  We just ignore it.
-            if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
-                FieldRef projectedFieldPath{specElt.fieldNameStringData()};
-                auto setElementStatus =
-                    pathsupport::setElementAtPath(projectedFieldPath, keyElt, &projectedDoc);
-                if (!setElementStatus.isOK()) {
-                    return setElementStatus;
-                }
-            }
-        }
-
-        bob.appendElements(projectedDoc.getObject());
+    if (!indexKey.isEmpty()) {
+        bob.appendElements(indexKey);
     }
 
-    for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
-        if (META_GEONEAR_DIST == it->second) {
-            if (member->hasComputed(WSM_COMPUTED_GEO_DISTANCE)) {
-                const GeoDistanceComputedData* dist = static_cast<const GeoDistanceComputedData*>(
-                    member->getComputed(WSM_COMPUTED_GEO_DISTANCE));
-                bob.append(it->first, dist->getDist());
-            } else {
-                return Status(ErrorCodes::InternalError,
-                              "near loc dist requested but no data available");
+    // Must be possible to do both returnKey meta-projection and sortKey meta-projection so that
+    // mongos can support returnKey.
+    for (auto fieldName : _sortKeyMetaFields)
+        bob.append(fieldName, sortKey);
+
+    return bob.obj();
+}
+
+StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
+                                            const boost::optional<const double> geoDistance,
+                                            const BSONObj& geoNearPoint,
+                                            const BSONObj& sortKey,
+                                            const boost::optional<const double> textScore,
+                                            const int64_t recordId) const {
+    BSONObjBuilder bob;
+    MatchDetails matchDetails;
+
+    // If it's a positional projection we need a MatchDetails.
+    if (transformRequiresDetails()) {
+        matchDetails.requestElemMatchKey();
+        invariant(nullptr != _queryExpression);
+        invariant(_queryExpression->matchesBSON(in, &matchDetails));
+    }
+
+    Status projStatus = projectHelper(in, &bob, &matchDetails);
+    if (!projStatus.isOK())
+        return projStatus;
+    else
+        return {addMeta(std::move(bob), geoDistance, geoNearPoint, sortKey, textScore, recordId)};
+}
+
+StatusWith<BSONObj> ProjectionExec::projectCovered(const std::vector<IndexKeyDatum>& keyData,
+                                                   const boost::optional<const double> geoDistance,
+                                                   const BSONObj& geoNearPoint,
+                                                   const BSONObj& sortKey,
+                                                   const boost::optional<const double> textScore,
+                                                   const int64_t recordId) const {
+    invariant(!_include);
+    BSONObjBuilder bob;
+    // Go field by field.
+    if (_includeID) {
+        boost::optional<BSONElement> elt;
+        // Sometimes the _id field doesn't exist...
+        if ((elt = IndexKeyDatum::getFieldDotted(keyData, "_id")) && !elt->eoo()) {
+            bob.appendAs(elt.get(), "_id");
+        }
+    }
+
+    mmb::Document projectedDoc;
+
+    for (auto&& specElt : _source) {
+        if (mongoutils::str::equals("_id", specElt.fieldName())) {
+            continue;
+        }
+
+        // $meta sortKey is the only meta-projection which is allowed to operate on index keys
+        // rather than the full document.
+        auto metaIt = _meta.find(specElt.fieldName());
+        if (metaIt != _meta.end()) {
+            invariant(metaIt->second == META_SORT_KEY);
+            continue;
+        }
+
+        // $meta sortKey is also the only element with an Object value in the projection spec
+        // that can operate on index keys rather than the full document.
+        invariant(BSONType::Object != specElt.type());
+
+        boost::optional<BSONElement> keyElt;
+        // We can project a field that doesn't exist.  We just ignore it.
+        if ((keyElt = IndexKeyDatum::getFieldDotted(keyData, specElt.fieldName())) &&
+            !keyElt->eoo()) {
+            FieldRef projectedFieldPath{specElt.fieldNameStringData()};
+            auto setElementStatus =
+                pathsupport::setElementAtPath(projectedFieldPath, keyElt.get(), &projectedDoc);
+            if (!setElementStatus.isOK()) {
+                return setElementStatus;
             }
-        } else if (META_GEONEAR_POINT == it->second) {
-            if (member->hasComputed(WSM_GEO_NEAR_POINT)) {
-                const GeoNearPointComputedData* point =
-                    static_cast<const GeoNearPointComputedData*>(
-                        member->getComputed(WSM_GEO_NEAR_POINT));
-                BSONObj ptObj = point->getPoint();
+        }
+    }
+
+    bob.appendElements(projectedDoc.getObject());
+    return {addMeta(std::move(bob), geoDistance, geoNearPoint, sortKey, textScore, recordId)};
+}
+
+BSONObj ProjectionExec::addMeta(BSONObjBuilder bob,
+                                const boost::optional<const double> geoDistance,
+                                const BSONObj& geoNearPoint,
+                                const BSONObj& sortKey,
+                                const boost::optional<const double> textScore,
+                                const int64_t recordId) const {
+    for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {
+        switch (it->second) {
+            case META_GEONEAR_DIST:
+                invariant(geoDistance);
+                bob.append(it->first, geoDistance.get());
+                break;
+            case META_GEONEAR_POINT: {
+                invariant(!geoNearPoint.isEmpty());
+                auto& ptObj = geoNearPoint;
                 if (ptObj.couldBeArray()) {
                     bob.appendArray(it->first, ptObj);
                 } else {
                     bob.append(it->first, ptObj);
                 }
-            } else {
-                return Status(ErrorCodes::InternalError,
-                              "near loc proj requested but no data available");
+                break;
             }
-        } else if (META_TEXT_SCORE == it->second) {
-            if (member->hasComputed(WSM_COMPUTED_TEXT_SCORE)) {
-                const TextScoreComputedData* score = static_cast<const TextScoreComputedData*>(
-                    member->getComputed(WSM_COMPUTED_TEXT_SCORE));
-                bob.append(it->first, score->getScore());
-            } else {
-                bob.append(it->first, 0.0);
+            case META_TEXT_SCORE:
+                invariant(textScore);
+                bob.append(it->first, textScore.get());
+                break;
+            case META_SORT_KEY: {
+                invariant(!sortKey.isEmpty());
+                bob.append(it->first, sortKey);
+                break;
             }
-        } else if (META_SORT_KEY == it->second) {
-            auto sortKeyMetaStatus = addSortKeyMetaProj(it->first, *member, &bob);
-            if (!sortKeyMetaStatus.isOK()) {
-                return sortKeyMetaStatus;
-            }
-        } else if (META_RECORDID == it->second) {
-            bob.append(it->first, static_cast<long long>(member->recordId.repr()));
+            case META_RECORDID:
+                invariant(recordId != 0);
+                bob.append(it->first, recordId);
         }
     }
-
-    BSONObj newObj = bob.obj();
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
-    member->keyData.clear();
-    member->recordId = RecordId();
-    member->transitionToOwnedObj();
-
-    return Status::OK();
+    return bob.obj();
 }
 
-Status ProjectionExec::transform(const BSONObj& in,
-                                 BSONObjBuilder* bob,
-                                 const MatchDetails* details) const {
+Status ProjectionExec::projectHelper(const BSONObj& in,
+                                     BSONObjBuilder* bob,
+                                     const MatchDetails* details) const {
     const ArrayOpType& arrayOpType = _arrayOpType;
 
     BSONObjIterator it(in);
@@ -451,7 +404,7 @@ void ProjectionExec::appendArray(BSONObjBuilder* bob, const BSONObj& array, bool
     int limit = nested ? -1 : _limit;
 
     if (skip < 0) {
-        skip = max(0, skip + array.nFields());
+        skip = std::max(0, skip + array.nFields());
     }
 
     int index = 0;
