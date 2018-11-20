@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -166,6 +167,83 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
     }
+}
+
+void testBoundaries(bool unique, bool forward, bool inclusive) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(unique));
+
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ASSERT(sorted->isEmpty(opCtx.get()));
+
+    int nToInsert = 10;
+    for (int i = 0; i < nToInsert; i++) {
+        WriteUnitOfWork uow(opCtx.get());
+        BSONObj key = BSON("" << i);
+        RecordId loc(42 + i * 2);
+        ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
+        uow.commit();
+    }
+
+    {
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), forward));
+        int startVal = 2;
+        int endVal = 6;
+        if (!forward)
+            std::swap(startVal, endVal);
+
+        auto startKey = BSON("" << startVal);
+        auto endKey = BSON("" << endVal);
+        cursor->setEndPosition(endKey, inclusive);
+
+        auto entry = cursor->seek(startKey, inclusive);
+
+        // Check that the cursor returns the expected values in range.
+        int step = forward ? 1 : -1;
+        for (int i = startVal + (inclusive ? 0 : step); i != endVal + (inclusive ? step : 0);
+             i += step) {
+            ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42 + i * 2)));
+            entry = cursor->next();
+        }
+        ASSERT(!entry);
+
+        // Cursor at EOF should remain at EOF when advanced
+        ASSERT(!cursor->next());
+    }
+}
+
+TEST(SortedDataInterfaceBoundaryTest, UniqueForwardWithNonInclusiveBoundaries) {
+    testBoundaries(/*unique*/ true, /*forward*/ true, /*inclusive*/ false);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, NonUniqueForwardWithNonInclusiveBoundaries) {
+    testBoundaries(/*unique*/ false, /*forward*/ true, /*inclusive*/ false);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, UniqueForwardWithInclusiveBoundaries) {
+    testBoundaries(/*unique*/ true, /*forward*/ true, /*inclusive*/ true);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, NonUniqueForwardWithInclusiveBoundaries) {
+    testBoundaries(/*unique*/ false, /*forward*/ true, /*inclusive*/ true);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, UniqueBackwardWithNonInclusiveBoundaries) {
+    testBoundaries(/*unique*/ true, /*forward*/ false, /*inclusive*/ false);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, NonUniqueBackwardWithNonInclusiveBoundaries) {
+    testBoundaries(/*unique*/ false, /*forward*/ false, /*inclusive*/ false);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, UniqueBackwardWithInclusiveBoundaries) {
+    testBoundaries(/*unique*/ true, /*forward*/ false, /*inclusive*/ true);
+}
+
+TEST(SortedDataInterfaceBoundaryTest, NonUniqueBackwardWithInclusiveBoundaries) {
+    testBoundaries(/*unique*/ false, /*forward*/ false, /*inclusive*/ true);
 }
 
 }  // namespace

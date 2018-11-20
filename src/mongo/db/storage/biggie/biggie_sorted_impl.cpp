@@ -94,12 +94,11 @@ std::string createKeyString(const BSONObj& key,
     b.append("", prefixToUse);                                // prefix
     b.append("", std::string(ks.getBuffer(), ks.getSize()));  // key
 
-    std::unique_ptr<KeyString> retKs;
     if (isUnique)
-        retKs = std::make_unique<KeyString>(version, b.obj(), allAscending);
+        ks.resetToKey(b.obj(), allAscending);
     else
-        retKs = std::make_unique<KeyString>(version, b.obj(), allAscending, loc);
-    return std::string(retKs->getBuffer(), retKs->getSize());
+        ks.resetToKey(b.obj(), allAscending, loc);
+    return std::string(ks.getBuffer(), ks.getSize());
 }
 
 bool keysAreIdentical(std::string ks1, std::string ks2, bool isUnique) {
@@ -688,13 +687,20 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(
     } else {
         // Otherwise, we seek to the nearest element to our key, but only to the right.
         if (_forward) {
-            _forwardIt = _workingCopy->lower_bound(workingCopyBound);
+            if (inclusive)
+                _forwardIt = _workingCopy->lower_bound(workingCopyBound);
+            else
+                _forwardIt = _workingCopy->upper_bound(workingCopyBound);
         } else {
             // Reverse iterators work with upper bound since upper bound will return the first
             // element past the argument, so when it becomes a reverse iterator, it goes
             // backwards one, (according to the C++ standard) and we end up in the right place.
-            _reverseIt =
-                StringStore::const_reverse_iterator(_workingCopy->upper_bound(workingCopyBound));
+            if (inclusive)
+                _reverseIt = StringStore::const_reverse_iterator(
+                    _workingCopy->upper_bound(workingCopyBound));
+            else
+                _reverseIt = StringStore::const_reverse_iterator(
+                    _workingCopy->lower_bound(workingCopyBound));
         }
         // Once again, we check to make sure the iterator didn't fall off the data structure and
         // still is in the ident.
