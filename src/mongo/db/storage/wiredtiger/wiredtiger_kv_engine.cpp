@@ -302,7 +302,10 @@ public:
 
                     // Now that the checkpoint is durable, publish the oplog needed to recover
                     // from it.
-                    _oplogNeededForCrashRecovery.store(oplogNeededForRollback.asULL());
+                    {
+                        stdx::lock_guard<stdx::mutex> lk(_oplogNeededForCrashRecoveryMutex);
+                        _oplogNeededForCrashRecovery.store(oplogNeededForRollback.asULL());
+                    }
                 }
             } catch (const WriteConflictException&) {
                 // Temporary: remove this after WT-3483
@@ -348,6 +351,15 @@ public:
         return _oplogNeededForCrashRecovery.load();
     }
 
+    /*
+     * Atomically assign _oplogNeededForCrashRecovery to a variable.
+     * _oplogNeededForCrashRecovery will not change during assignment.
+     */
+    void assignOplogNeededForCrashRecoveryTo(boost::optional<Timestamp>* timestamp) {
+        stdx::lock_guard<stdx::mutex> lk(_oplogNeededForCrashRecoveryMutex);
+        *timestamp = Timestamp(_oplogNeededForCrashRecovery.load());
+    }
+
     void shutdown() {
         _shuttingDown.store(true);
         {
@@ -372,6 +384,7 @@ private:
 
     bool _hasTriggeredFirstStableCheckpoint = false;
 
+    stdx::mutex _oplogNeededForCrashRecoveryMutex;
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
 };
 
@@ -877,6 +890,12 @@ void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
 
 StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx) {
+
+    // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
+    stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+    _checkpointThread->assignOplogNeededForCrashRecoveryTo(&_oplogPinnedByBackup);
+    auto pinOplogGuard = MakeGuard([&] { _oplogPinnedByBackup = boost::none; });
+
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto sessionRaii = stdx::make_unique<WiredTigerSession>(_conn);
     WT_CURSOR* cursor = NULL;
@@ -910,11 +929,15 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     }
 
     _backupSession = std::move(sessionRaii);
+    pinOplogGuard.Dismiss();
     return filesToCopy;
 }
 
 void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     _backupSession.reset();
+    // Oplog truncation thread can now remove the pinned oplog.
+    stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+    _oplogPinnedByBackup = boost::none;
 }
 
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
@@ -1740,6 +1763,11 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
     if (!_keepDataHistory) {
         // We use rollbackViaRefetch and take full checkpoints, so there is no need to pin oplog.
         return Timestamp::max();
+    }
+    stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+    if (_oplogPinnedByBackup) {
+        // All the oplog since `_oplogPinnedByBackup` should remain intact during the backup.
+        return _oplogPinnedByBackup.get();
     }
     return getOplogNeededForCrashRecovery().value_or(getOplogNeededForRollback());
 }
