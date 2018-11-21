@@ -85,6 +85,15 @@ public:
 
     void dispose(OperationContext* opCtx, size_t consumerId);
 
+    /**
+     * Unblocks the loading thread (a producer) if the loading is blocked by a consumer identified
+     * by consumerId. Note that there is no such thing as being blocked by multiple consumers. It is
+     * always one consumer that blocks the loading (i.e. the consumer's buffer is full and we can
+     * not append new documents). The unblocking happens when a consumer consumes some documents
+     * from its buffer (i.e. making room for appends) or when a consumer is disposed.
+     */
+    void unblockLoading(size_t consumerId);
+
 private:
     size_t loadNextBatch();
 
@@ -97,10 +106,22 @@ private:
         bool isEmpty() const {
             return _buffer.empty();
         }
+        /**
+         * Mark the buffer associated with a consumer as disposed. After calling this method,
+         * subsequent results that are appended to this buffer are instead discarded to prevent this
+         * unused buffer from filling up and blocking progress on other threads.
+         */
+        void dispose() {
+            invariant(!_disposed);
+            _disposed = true;
+            _buffer.clear();
+            _bytesInBuffer = 0;
+        }
 
     private:
         size_t _bytesInBuffer{0};
         std::deque<DocumentSource::GetNextResult> _buffer;
+        bool _disposed{false};
     };
 
     // Keep a copy of the spec for serialization purposes.

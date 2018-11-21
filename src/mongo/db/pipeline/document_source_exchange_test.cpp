@@ -182,6 +182,62 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumer) {
         _executor->wait(h);
 }
 
+TEST_F(DocumentSourceExchangeTest, ExchangeNConsumerEarlyout) {
+    const size_t nDocs = 500;
+    auto source = getMockSource(500);
+
+    const size_t nConsumers = 2;
+
+    ASSERT_EQ(nDocs % nConsumers, 0u);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(nConsumers);
+    spec.setBufferSize(1024);
+
+    boost::intrusive_ptr<Exchange> ex =
+        new Exchange(spec, unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+
+    std::vector<boost::intrusive_ptr<DocumentSourceExchange>> prods;
+
+    for (size_t idx = 0; idx < nConsumers; ++idx) {
+        prods.push_back(new DocumentSourceExchange(getExpCtx(), ex, idx));
+    }
+
+    std::vector<executor::TaskExecutor::CallbackHandle> handles;
+
+    for (size_t id = 0; id < nConsumers; ++id) {
+        auto handle = _executor->scheduleWork(
+            [prods, id, nDocs, nConsumers](const executor::TaskExecutor::CallbackArgs& cb) {
+                PseudoRandom prng(getNewSeed());
+
+                auto input = prods[id]->getNext();
+
+                size_t docs = 0;
+
+                for (; input.isAdvanced(); input = prods[id]->getNext()) {
+                    sleepmillis(prng.nextInt32() % 20 + 1);
+                    ++docs;
+
+                    // The consumer 1 bails out early wihout consuming all its documents.
+                    if (id == 1 && docs == 100) {
+                        // Pretend we have seen all docs.
+                        docs = nDocs / nConsumers;
+
+                        prods[id]->dispose();
+                        break;
+                    }
+                }
+                ASSERT_EQ(docs, nDocs / nConsumers);
+            });
+
+        handles.emplace_back(std::move(handle.getValue()));
+    }
+
+    for (auto& h : handles)
+        _executor->wait(h);
+}
+
 TEST_F(DocumentSourceExchangeTest, BroadcastExchangeNConsumer) {
     const size_t nDocs = 500;
     auto source = getMockSource(nDocs);
