@@ -235,6 +235,8 @@ env.CppUnitTest(
         'collection',
         'multi_index_block',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
     ],
 )
 

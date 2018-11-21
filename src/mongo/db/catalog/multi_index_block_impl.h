@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/multi_index_block.h"
 
+#include <iosfwd>
 #include <memory>
 #include <set>
 #include <string>
@@ -42,6 +43,7 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -90,11 +92,36 @@ public:
     Status commit() override;
     Status commit(stdx::function<void(const BSONObj& spec)> onCreateFn) override;
 
+    bool isCommitted() const override;
+
+    void abort(StringData reason) override;
+
     void abortWithoutCleanup() override;
 
     bool getBuildInBackground() const override {
         return _buildInBackground;
     }
+
+    /**
+     * State transitions:
+     *
+     * Uninitialized --> Running --> PreCommit --> Committed
+     *       |              |            |            ^
+     *       |              |            |            |
+     *       \--------------+------------+-------> Aborted
+     *
+     * It is possible for abort() to skip intermediate states. For example, calling abort() when the
+     * index build has not been initialized will transition from Uninitialized directly to Aborted.
+     *
+     * In the case where we are in the midst of committing the WUOW for a successful commit() call,
+     * we may transition temporarily to Aborted before finally ending at Committed. See comments for
+     * MultiIndexBlock::abort().
+     *
+     * Not part of MultiIndexBlock interface. Callers should not have to query the state of the
+     * MultiIndexBlock directly.
+     */
+    enum class State { kUninitialized, kRunning, kPreCommit, kCommitted, kAborted };
+    State getState_forTest() const;
 
 private:
     class SetNeedToCleanupOnRollback;
@@ -112,6 +139,21 @@ private:
 
     Status _doneInserting(std::set<RecordId>* dupRecords, std::vector<BSONObj>* dupKeysInserted);
 
+    /**
+     * Returns the current state.
+     */
+    State _getState() const;
+
+    /**
+     * Updates the current state to a non-Aborted state.
+     */
+    void _setState(State newState);
+
+    /**
+     * Updates the current state to Aborted with the given reason.
+     */
+    void _setStateToAbortedIfNotCommitted(StringData reason);
+
     std::vector<IndexToBuild> _indexes;
 
     std::unique_ptr<BackgroundOperation> _backgroundOperation;
@@ -125,6 +167,16 @@ private:
     bool _ignoreUnique;
 
     bool _needToCleanup;
+
+    // Protects member variables of this class declared below.
+    mutable stdx::mutex _mutex;
+
+    State _state = State::kUninitialized;
+    std::string _abortReason;
 };
+
+// For unit tests that need to check MultiIndexBlock states.
+// The ASSERT_*() macros use this function to print the value of 'state' when the predicate fails.
+std::ostream& operator<<(std::ostream& os, const MultiIndexBlockImpl::State& state);
 
 }  // namespace mongo

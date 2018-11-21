@@ -37,6 +37,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
@@ -169,6 +170,31 @@ public:
     virtual Status commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
 
     /**
+     * Returns true if this index builder was added to the index catalog successfully.
+     * In addition to having commit() return without errors, the enclosing WUOW has to be committed
+     * for the indexes to show up in the index catalog.
+     */
+    virtual bool isCommitted() const = 0;
+
+    /**
+     * Signals the index build to abort.
+     *
+     * In-progress inserts and commits will still run to completion. However, subsequent index build
+     * operations will fail an IndexBuildAborted error.
+     *
+     * Aborts the uncommitted index build and prevents further inserts or commit attempts from
+     * proceeding. On destruction, all traces of uncommitted index builds will be removed.
+     *
+     * If the index build has already been aborted (using abort() or abortWithoutCleanup()),
+     * this function does nothing.
+     *
+     * If this index build has been committed successfully, this function has no effect.
+     *
+     * May be called from any thread.
+     */
+    virtual void abort(StringData reason) = 0;
+
+    /**
      * May be called at any time after construction but before a successful commit(). Suppresses
      * the default behavior on destruction of removing all traces of uncommitted index builds.
      *
@@ -181,6 +207,8 @@ public:
      *
      * Does not matter whether it is called inside of a WriteUnitOfWork. Will not be rolled
      * back.
+     *
+     * Must be called from owning thread.
      */
     virtual void abortWithoutCleanup() = 0;
 
