@@ -2231,6 +2231,8 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		session_ret->optrackbuf_ptr = 0;
 	}
 
+       __wt_stat_session_init_single(&session_ret->stats);
+
 	/* Set the default value for session flags. */
 	if (F_ISSET(conn, WT_CONN_CACHE_CURSORS))
 		F_SET(session_ret, WT_SESSION_CACHE_CURSORS);

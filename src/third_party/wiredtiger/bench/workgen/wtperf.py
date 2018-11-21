@@ -214,23 +214,23 @@ class Translator:
 
     # Wtperf's throttle is based on the number of regular operations,
     # not including log_like operations.  Workgen counts all operations,
-    # it doesn't treat log operations any differently.  Adjust the throttle
-    # number to account for the difference.
+    # it doesn't treat log operations any differently.
     def calc_throttle(self, thread_opts, log_like_table):
         throttle = thread_opts.throttle
-        if not log_like_table:
-            return (throttle, '')
-        modify = thread_opts.inserts + thread_opts.updates
-        regular = modify + thread_opts.reads
-        total = regular + modify
-        factor = (total + 0.0) / regular
-        new_throttle = int(throttle * factor)
-        if new_throttle == throttle:
-            comment = ''
-        else:
-            comment = '# wtperf throttle=' + str(throttle) + ' adjusted by ' + \
-                      str(factor) + ' to compensate for log_like operations.\n'
-        return (new_throttle, comment)
+        comment = ''
+        factor = 1.0
+        if log_like_table:
+            modify = thread_opts.inserts + thread_opts.updates
+            regular = modify + thread_opts.reads
+            total = regular + modify
+            factor = (total + 0.0) / regular
+        if factor != 1.0:
+            comment = \
+                '# These operations include log_like operations, which ' + \
+                'will increase the number\n# of insert/update operations ' + \
+                'by a factor of ' + str(factor) + '. This may cause the\n' + \
+                '# actual operations performed to be above the throttle.\n'
+        return (throttle, comment)
 
     def parse_threads(self, threads_config, checkpoint_threads):
         opts = self.options

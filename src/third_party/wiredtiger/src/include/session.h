@@ -268,4 +268,6 @@ struct __wt_session_impl {
 	u_int optrackbuf_ptr;
 	uint64_t optrack_offset;
 	WT_FH *optrack_fh;
+
+	WT_SESSION_STATS stats;
 };

@@ -351,6 +351,7 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_image;
 	int64_t cache_bytes_lookaside;
 	int64_t cache_bytes_inuse;
+	int64_t cache_bytes_dirty_total;
 	int64_t cache_bytes_other;
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
@@ -727,6 +728,7 @@ struct __wt_dsrc_stats {
 	int64_t btree_row_internal;
 	int64_t btree_row_leaf;
 	int64_t cache_bytes_inuse;
+	int64_t cache_bytes_dirty_total;
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
 	int64_t cache_eviction_checkpoint;
@@ -841,6 +843,20 @@ struct __wt_join_stats {
 	int64_t membership_check;
 	int64_t bloom_insert;
 	int64_t iterated;
+};
+
+/*
+ * Statistics entries for session.
+ */
+#define	WT_SESSION_STATS_BASE	4000
+struct __wt_session_stats {
+	int64_t bytes_read;
+	int64_t bytes_written;
+	int64_t handle_lock_wait;
+	int64_t read_time;
+	int64_t write_time;
+	int64_t schema_lock_wait;
+	int64_t cache_full_wait;
 };
 
 /* Statistics section: END */

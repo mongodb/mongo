@@ -715,10 +715,15 @@ int ThreadRunner::op_run(Operation *op) {
     retry_op = true;
     range = op->_table.options.range;
     if (_throttle != NULL) {
-        if (_throttle_ops >= _throttle_limit && !_in_transaction) {
-            WT_ERR(_throttle->throttle(_throttle_ops,
-              &_throttle_limit));
+        while (_throttle_ops >= _throttle_limit && !_in_transaction && !_stop) {
+            // Calling throttle causes a sleep until the next time division,
+            // and we are given a new batch of operations to do before calling
+            // throttle again.  If the number of operations in the batch is
+            // zero, we'll need to go around and throttle again.
+            WT_ERR(_throttle->throttle(_throttle_ops, &_throttle_limit));
             _throttle_ops = 0;
+            if (_throttle_limit != 0)
+                break;
         }
         if (op->is_table_op())
             ++_throttle_ops;
@@ -901,9 +906,18 @@ float ThreadRunner::random_signed() {
 Throttle::Throttle(ThreadRunner &runner, double throttle,
     double throttle_burst) : _runner(runner), _throttle(throttle),
     _burst(throttle_burst), _next_div(), _ops_delta(0), _ops_prev(0),
-    _ops_per_div(0), _ms_per_div(0), _started(false) {
+    _ops_per_div(0), _ms_per_div(0), _ops_left_this_second(throttle),
+    _div_pos(0), _started(false) {
+
+    // Our throttling is done by dividing each second into THROTTLE_PER_SEC
+    // parts (we call the parts divisions). In each division, we perform
+    // a certain number of operations. This number is approximately
+    // throttle/THROTTLE_PER_SEC, except that throttle is not necessarily
+    // a multiple of THROTTLE_PER_SEC, nor is it even necessarily an integer.
+    // (That way we can have 1000 threads each inserting 0.5 a second).
     ts_clear(_next_div);
-    _ms_per_div = (uint64_t)ceill(1000.0 / THROTTLE_PER_SEC);
+    ASSERT(1000 % THROTTLE_PER_SEC == 0);    // must evenly divide
+    _ms_per_div = 1000 / THROTTLE_PER_SEC;
     _ops_per_div = (uint64_t)ceill(_throttle / THROTTLE_PER_SEC);
 }
 
@@ -914,8 +928,9 @@ Throttle::~Throttle() {}
 // initially to the current time + 1/THROTTLE_PER_SEC.  Each call to throttle
 // advances _next_div by 1/THROTTLE_PER_SEC, and if _next_div is in the future,
 // we sleep for the difference between the _next_div and the current_time.  We
-// always return (Thread.options.throttle / THROTTLE_PER_SEC) as the number of
-// operations.
+// we return (Thread.options.throttle / THROTTLE_PER_SEC) as the number of
+// operations, if it does not divide evenly, we'll make sure to not exceed
+// the number of operations requested per second.
 //
 // The only variation is that the amount of individual sleeps is modified by a
 // random amount (which varies more widely as Thread.options.throttle_burst is
@@ -934,6 +949,8 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
         _started = true;
     } else {
         _ops_delta += (op_count - _ops_prev);
+
+        // Sleep until the next division, but potentially with some randomness.
         if (now < _next_div) {
             sleep_ms = ts_ms(_next_div - now);
             sleep_ms += (_ms_per_div * _burst * _runner.random_signed());
@@ -952,8 +969,21 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
         _ops_delta -= ops;
         ops = 0;
     }
+
+    // Enforce that we haven't exceeded the number of operations this second.
+    // Note that _ops_left_this_second may be fractional.
+    if (ops > _ops_left_this_second)
+        ops = (uint64_t)floorl(_ops_left_this_second);
+    _ops_left_this_second -= ops;
+    ASSERT(_ops_left_this_second >= 0.0);
     *op_limit = ops;
     _ops_prev = ops;
+
+    // Advance the division, and if we pass into a new second, allocate
+    // more operations into the count of operations left this second.
+    _div_pos = (_div_pos + 1) % THROTTLE_PER_SEC;
+    if (_div_pos == 0)
+        _ops_left_this_second += _throttle;
     DEBUG_CAPTURE(_runner, ", return=" << ops << std::endl);
     return (0);
 }

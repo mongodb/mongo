@@ -191,6 +191,7 @@ struct __wt_btree {
 	uint64_t    bytes_inmem;        /* Cache bytes in memory. */
 	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
 	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
+	uint64_t    bytes_dirty_total;	/* Bytes ever dirtied in cache. */
 
 	/*
 	 * We flush pages from the tree (in order to make checkpoint faster),
