@@ -160,6 +160,7 @@ IndexKeyEntry keyStringToIndexKeyEntry(const std::string keyString,
 }  // namespace
 
 SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
+                                                       bool unique,
                                                        bool dupsAllowed,
                                                        Ordering order,
                                                        const std::string& prefix,
@@ -168,6 +169,7 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
                                                        const std::string& indexName,
                                                        const BSONObj& keyPattern)
     : _opCtx(opCtx),
+      _unique(unique),
       _dupsAllowed(dupsAllowed),
       _order(order),
       _prefix(prefix),
@@ -222,7 +224,7 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
     std::memcpy(&data[0] + sizeof(int64_t), internalTbString.data(), internalTbString.length());
 
     std::string workingCopyInsertKey =
-        createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
+        createKeyString(key, loc, _prefix, _order, /* isUnique */ _unique);
     workingCopy->insert(StringStore::value_type(workingCopyInsertKey, data));
 
     _hasLast = true;
@@ -236,6 +238,7 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
 SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext* opCtx,
                                                                 bool dupsAllowed) {
     return new SortedDataBuilderInterface(opCtx,
+                                          _isUnique,
                                           dupsAllowed,
                                           _order,
                                           _prefix,

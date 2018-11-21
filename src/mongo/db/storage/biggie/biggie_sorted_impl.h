@@ -38,6 +38,7 @@ namespace biggie {
 class SortedDataBuilderInterface : public ::mongo::SortedDataBuilderInterface {
 public:
     SortedDataBuilderInterface(OperationContext* opCtx,
+                               bool unique,
                                bool dupsAllowed,
                                Ordering order,
                                const std::string& prefix,
@@ -50,6 +51,7 @@ public:
 
 private:
     OperationContext* _opCtx;
+    bool _unique;
     bool _dupsAllowed;
     // Order of the keys.
     Ordering _order;
