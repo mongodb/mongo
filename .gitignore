@@ -151,8 +151,9 @@ CMakeLists.txt
 # XCode projects
 .xcworkspace
 
-# VSCode projects
+# Visual Studio and VSCode projects
 .vscode/
+.vs/
 
 # Windows MSI builder artifacts
 *.msi
