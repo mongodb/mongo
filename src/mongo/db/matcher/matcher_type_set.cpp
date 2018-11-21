@@ -116,11 +116,11 @@ Status parseSingleType(BSONElement elt,
 constexpr StringData MatcherTypeSet::kMatchesAllNumbersAlias;
 
 const StringMap<BSONType> MatcherTypeSet::kJsonSchemaTypeAliasMap = {
-    {JSONSchemaParser::kSchemaTypeArray, BSONType::Array},
-    {JSONSchemaParser::kSchemaTypeBoolean, BSONType::Bool},
-    {JSONSchemaParser::kSchemaTypeNull, BSONType::jstNULL},
-    {JSONSchemaParser::kSchemaTypeObject, BSONType::Object},
-    {JSONSchemaParser::kSchemaTypeString, BSONType::String},
+    {std::string(JSONSchemaParser::kSchemaTypeArray), BSONType::Array},
+    {std::string(JSONSchemaParser::kSchemaTypeBoolean), BSONType::Bool},
+    {std::string(JSONSchemaParser::kSchemaTypeNull), BSONType::jstNULL},
+    {std::string(JSONSchemaParser::kSchemaTypeObject), BSONType::Object},
+    {std::string(JSONSchemaParser::kSchemaTypeString), BSONType::String},
 };
 
 StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(std::set<StringData> typeAliases,

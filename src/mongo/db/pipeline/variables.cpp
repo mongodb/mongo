@@ -38,8 +38,8 @@ namespace mongo {
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
 
-const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT"_sd, kRootId},
-                                                                 {"REMOVE"_sd, kRemoveId}};
+const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT", kRootId},
+                                                                 {"REMOVE", kRemoveId}};
 
 void Variables::uassertValidNameForUserWrite(StringData varName) {
     // System variables users allowed to write to (currently just one)

@@ -97,18 +97,18 @@ void BgInfo::awaitNoBgOps(stdx::unique_lock<stdx::mutex>& lk) {
         _noOpsInProg.wait(lk);
 }
 
-void recordBeginAndInsert(BgInfoMap* bgiMap, StringData key) {
-    std::shared_ptr<BgInfo>& bgInfo = bgiMap->get(key);
+void recordBeginAndInsert(BgInfoMap& bgiMap, StringData key) {
+    std::shared_ptr<BgInfo>& bgInfo = bgiMap[key];
     if (!bgInfo)
         bgInfo.reset(new BgInfo);
     bgInfo->recordBegin();
 }
 
-void recordEndAndRemove(BgInfoMap* bgiMap, StringData key) {
-    BgInfoMapIterator iter = bgiMap->find(key);
-    fassert(17431, iter != bgiMap->end());
+void recordEndAndRemove(BgInfoMap& bgiMap, StringData key) {
+    BgInfoMapIterator iter = bgiMap.find(key);
+    fassert(17431, iter != bgiMap.end());
     if (0 == iter->second->recordEnd()) {
-        bgiMap->erase(iter);
+        bgiMap.erase(iter);
     }
 }
 
@@ -169,14 +169,14 @@ void BackgroundOperation::awaitNoBgOpInProgForNs(StringData ns) {
 
 BackgroundOperation::BackgroundOperation(StringData ns) : _ns(ns) {
     stdx::lock_guard<stdx::mutex> lk(m);
-    recordBeginAndInsert(&dbsInProg, _ns.db());
-    recordBeginAndInsert(&nsInProg, _ns.ns());
+    recordBeginAndInsert(dbsInProg, _ns.db());
+    recordBeginAndInsert(nsInProg, _ns.ns());
 }
 
 BackgroundOperation::~BackgroundOperation() {
     stdx::lock_guard<stdx::mutex> lk(m);
-    recordEndAndRemove(&dbsInProg, _ns.db());
-    recordEndAndRemove(&nsInProg, _ns.ns());
+    recordEndAndRemove(dbsInProg, _ns.db());
+    recordEndAndRemove(nsInProg, _ns.ns());
 }
 
 void BackgroundOperation::dump(std::ostream& ss) {

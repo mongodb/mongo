@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/string_map.h"
-#include "mongo/util/unordered_fast_key_table.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/node_hash_map.h>
@@ -51,70 +50,14 @@ constexpr uint32_t kMaxContainerSize = 1000000;
 constexpr uint32_t kDefaultSeed = 34862;
 constexpr uint32_t kOtherSeed = 76453;
 
-template <typename K_L, typename K_S>
-struct UnorderedFastKeyTableAbslTraits {
-    static uint32_t hash(K_L key) {
-        return static_cast<uint32_t>(absl::Hash<K_L>{}(key));
-    }
-
-    static bool equals(K_L a, K_L b) {
-        return a == b;
-    }
-
-    static K_S toStorage(K_L lookup) {
-        return static_cast<K_S>(lookup);
-    }
-
-    static K_L toLookup(K_S const& storage) {
-        return static_cast<K_L>(storage);
-    }
-
-    class HashedKey {
-    public:
-        explicit HashedKey(K_L key)
-            : _key(std::move(key)), _hash(UnorderedFastKeyTableAbslTraits<K_L, K_S>::hash(_key)) {}
-
-        HashedKey(K_L key, uint32_t hash) : _key(std::move(key)), _hash(hash) {}
-
-        K_L key() const {
-            return _key;
-        }
-
-        uint32_t hash() const {
-            return _hash;
-        }
-
-    private:
-        K_L _key;
-        uint32_t _hash;
-    };
-};
-
 using StdUnorderedInt = std::unordered_map<uint32_t, bool>;        // NOLINT
 using StdUnorderedString = std::unordered_map<std::string, bool>;  // NOLINT
-
-using MongoUnorderedFastKeyTableInt =
-    UnorderedFastKeyTable<uint32_t,
-                          uint32_t,
-                          bool,
-                          UnorderedFastKeyTableAbslTraits<uint32_t, uint32_t>>;
-using MongoUnorderedFastKeyTableString =
-    UnorderedFastKeyTable<absl::string_view,
-                          std::string,
-                          bool,
-                          UnorderedFastKeyTableAbslTraits<absl::string_view, std::string>>;
 
 using AbslFlatHashMapInt = absl::flat_hash_map<uint32_t, bool>;
 using AbslFlatHashMapString = absl::flat_hash_map<std::string, bool>;
 
 using AbslNodeHashMapInt = absl::node_hash_map<uint32_t, bool>;
 using AbslNodeHashMapString = absl::node_hash_map<std::string, bool>;
-
-template <typename>
-struct IsUnorderedFastKeyTable : std::false_type {};
-
-template <typename K_L, typename K_S, typename V, typename Traits>
-struct IsUnorderedFastKeyTable<UnorderedFastKeyTable<K_L, K_S, V, Traits>> : std::true_type {};
 
 template <typename>
 struct IsAbslHashMap : std::false_type {};
@@ -134,16 +77,6 @@ struct LookupType {
         std::conditional_t<IsAbslHashMap<Container>::value, absl::string_view, std::string>,
         typename Container::key_type>;
 };
-
-template <class T>
-std::enable_if_t<!IsUnorderedFastKeyTable<T>::value, float> getLoadFactor(const T& container) {
-    return container.load_factor();
-}
-
-template <class T>
-std::enable_if_t<IsUnorderedFastKeyTable<T>::value, float> getLoadFactor(const T& container) {
-    return container.empty() ? 0.0f : (float)container.size() / container.capacity();
-}
 
 class BaseGenerator {
 public:
@@ -245,7 +178,7 @@ void LookupTest(benchmark::State& state) {
     }
 
     state.counters["size"] = state.range(0);
-    state.counters["load_factor"] = getLoadFactor(container);
+    state.counters["load_factor"] = container.load_factor();
 }
 
 template <class Container, class LookupKey, class StorageGenerator>
@@ -316,42 +249,34 @@ static void Range(benchmark::internal::Benchmark* b) {
 
 // Integer key tests
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, StdUnorderedInt)->Apply(Range);
-BENCHMARK_TEMPLATE(BM_SuccessfulLookup, MongoUnorderedFastKeyTableInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, AbslFlatHashMapInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, AbslNodeHashMapInt)->Apply(Range);
 
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, StdUnorderedInt)->Apply(Range);
-BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, MongoUnorderedFastKeyTableInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, AbslFlatHashMapInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, AbslNodeHashMapInt)->Apply(Range);
 
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, StdUnorderedInt)->Apply(Range);
-BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, MongoUnorderedFastKeyTableInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, AbslFlatHashMapInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, AbslNodeHashMapInt)->Apply(Range);
 
 BENCHMARK_TEMPLATE(BM_Insert, StdUnorderedInt)->Apply(Range<1>);
-BENCHMARK_TEMPLATE(BM_Insert, MongoUnorderedFastKeyTableInt)->Apply(Range<1>);
 BENCHMARK_TEMPLATE(BM_Insert, AbslFlatHashMapInt)->Apply(Range<1>);
 BENCHMARK_TEMPLATE(BM_Insert, AbslNodeHashMapInt)->Apply(Range<1>);
 
 // String key tests
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, StdUnorderedString)->Apply(Range);
-BENCHMARK_TEMPLATE(BM_SuccessfulLookup, MongoUnorderedFastKeyTableString)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, AbslFlatHashMapString)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, AbslNodeHashMapString)->Apply(Range);
 
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, StdUnorderedString)->Apply(Range);
-BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, MongoUnorderedFastKeyTableString)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, AbslFlatHashMapString)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookup, AbslNodeHashMapString)->Apply(Range);
 
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, StdUnorderedString)->Apply(Range);
-BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, MongoUnorderedFastKeyTableString)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_UnsuccessfulLookupSeq, AbslNodeHashMapString)->Apply(Range);
 
 BENCHMARK_TEMPLATE(BM_Insert, StdUnorderedString)->Apply(Range<1>);
-BENCHMARK_TEMPLATE(BM_Insert, MongoUnorderedFastKeyTableString)->Apply(Range<1>);
 BENCHMARK_TEMPLATE(BM_Insert, AbslFlatHashMapString)->Apply(Range<1>);
 BENCHMARK_TEMPLATE(BM_Insert, AbslNodeHashMapString)->Apply(Range<1>);
 

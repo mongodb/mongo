@@ -683,10 +683,9 @@ void CommandRegistry::registerCommand(Command* command, StringData name, StringD
         if (key.empty()) {
             continue;
         }
-        auto hashedKey = CommandMap::HashedKey(key);
-        auto iter = _commands.find(hashedKey);
-        invariant(iter == _commands.end(), str::stream() << "command name collision: " << key);
-        _commands[hashedKey] = command;
+
+        auto result = _commands.try_emplace(key, command);
+        invariant(result.second, str::stream() << "command name collision: " << key);
     }
 }
 

@@ -84,7 +84,7 @@ void Top::record(OperationContext* opCtx,
     if (ns[0] == '?')
         return;
 
-    auto hashedNs = UsageMap::HashedKey(ns);
+    auto hashedNs = UsageMap::hasher().hashed_key(ns);
     stdx::lock_guard<SimpleMutex> lk(_lock);
 
     if ((command || logicalOp == LogicalOp::opQuery) &&
@@ -202,7 +202,7 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
 }
 
 void Top::appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder) {
-    auto hashedNs = UsageMap::HashedKey(ns);
+    auto hashedNs = UsageMap::hasher().hashed_key(ns);
     stdx::lock_guard<SimpleMutex> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, &latencyStatsBuilder);
