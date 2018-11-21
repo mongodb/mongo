@@ -104,18 +104,20 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         // pending catalog changes. Instead, we must return an error in such situations. We ignore
         // this restriction for the oplog, since it never has pending catalog changes.
         auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
-        auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
-        if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern && mySnapshot &&
+        if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
             _resolvedNss != NamespaceString::kRsOplogNamespace) {
-            auto minSnapshot = _coll->getMinimumVisibleSnapshot();
-            uassert(
-                ErrorCodes::SnapshotUnavailable,
-                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
-                                 "changes; please retry the operation. Snapshot timestamp is "
-                              << mySnapshot->toString()
-                              << ". Collection minimum is "
-                              << minSnapshot->toString(),
-                !minSnapshot || *mySnapshot >= *minSnapshot);
+            auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+            if (mySnapshot) {
+                auto minSnapshot = _coll->getMinimumVisibleSnapshot();
+                uassert(ErrorCodes::SnapshotUnavailable,
+                        str::stream()
+                            << "Unable to read from a snapshot due to pending collection catalog "
+                               "changes; please retry the operation. Snapshot timestamp is "
+                            << mySnapshot->toString()
+                            << ". Collection minimum is "
+                            << minSnapshot->toString(),
+                        !minSnapshot || *mySnapshot >= *minSnapshot);
+            }
         }
 
         // If the collection exists, there is no need to check for views.
