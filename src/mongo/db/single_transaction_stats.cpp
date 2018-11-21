@@ -55,13 +55,16 @@ Microseconds SingleTransactionStats::getDuration(TickSource* tickSource,
 Microseconds SingleTransactionStats::getPreparedDuration(TickSource* tickSource,
                                                          TickSource::Tick curTick) const {
     invariant(_startTime > 0);
-    invariant(_preparedStartTime > 0);
-
-    // If the transaction hasn't ended yet, we return how long it has currently been running for.
-    if (_endTime == 0) {
-        return tickSource->ticksTo<Microseconds>(curTick - _preparedStartTime);
+    if (_preparedStartTime != boost::none) {
+        // If the transaction hasn't ended yet, we return how long it has currently been running
+        // for.
+        invariant(_preparedStartTime.get() > 0);
+        if (_endTime == 0) {
+            return tickSource->ticksTo<Microseconds>(curTick - _preparedStartTime.get());
+        }
+        return tickSource->ticksTo<Microseconds>(_endTime - _preparedStartTime.get());
     }
-    return tickSource->ticksTo<Microseconds>(_endTime - _preparedStartTime);
+    return Microseconds(0);
 }
 
 void SingleTransactionStats::setPreparedStartTime(TickSource::Tick time) {
@@ -140,7 +143,7 @@ void SingleTransactionStats::report(BSONObjBuilder* builder,
     builder->append("timeActiveMicros", timeActive);
     builder->append("timeInactiveMicros", timeInactive);
 
-    if (_preparedStartTime > 0) {
+    if (_preparedStartTime != boost::none) {
         auto timePrepared = durationCount<Microseconds>(getPreparedDuration(tickSource, curTick));
         builder->append("timePreparedMicros", timePrepared);
     }

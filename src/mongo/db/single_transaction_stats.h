@@ -259,8 +259,10 @@ private:
     // Holds information about the last client to run a transaction operation.
     LastClientInfo _lastClientInfo;
 
-    // The time at which a transaction enters the prepared state.
-    TickSource::Tick _preparedStartTime{0};
+    // The time at which a transaction becomes prepared. It is possible for _preparedStartTime to
+    // not be set in a transaction that is in state kPrepared if an exception is thrown after the
+    // transaction transitions to the prepared state but before setPreparedStartTime is called.
+    boost::optional<TickSource::Tick> _preparedStartTime{boost::none};
 };
 
 }  // namespace mongo

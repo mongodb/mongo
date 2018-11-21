@@ -1434,8 +1434,7 @@ void TransactionParticipant::_reportTransactionStats(WithLock wl,
 std::string TransactionParticipant::_transactionInfoForLog(
     const SingleThreadedLockStats* lockStats,
     TransactionState::StateFlag terminationCause,
-    repl::ReadConcernArgs readConcernArgs,
-    bool wasPrepared) {
+    repl::ReadConcernArgs readConcernArgs) {
     invariant(lockStats);
     invariant(terminationCause == TransactionState::kCommitted ||
               terminationCause == TransactionState::kAborted);
@@ -1488,11 +1487,14 @@ std::string TransactionParticipant::_transactionInfoForLog(
     s << " "
       << duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick));
 
-    s << " wasPrepared:" << wasPrepared;
-    if (wasPrepared) {
-        s << " totalPreparedDurationMicros:"
-          << durationCount<Microseconds>(
-                 singleTransactionStats.getPreparedDuration(tickSource, curTick));
+    // It is possible for a slow transaction to have aborted in the prepared state if an
+    // exception was thrown before prepareTransaction succeeds.
+    const auto totalPreparedDuration = durationCount<Microseconds>(
+        singleTransactionStats.getPreparedDuration(tickSource, curTick));
+    const bool txnWasPrepared = totalPreparedDuration > 0;
+    s << " wasPrepared:" << txnWasPrepared;
+    if (txnWasPrepared) {
+        s << " totalPreparedDurationMicros:" << totalPreparedDuration;
     }
 
     return s.str();
@@ -1508,10 +1510,9 @@ void TransactionParticipant::_logSlowTransaction(WithLock wl,
         // Log the transaction if its duration is longer than the slowMS command threshold.
         if (_transactionMetricsObserver.getSingleTransactionStats().getDuration(
                 tickSource, tickSource->getTicks()) > Milliseconds(serverGlobalParams.slowMS)) {
-            bool wasPrepared = !_prepareOpTime.isNull();
             log(logger::LogComponent::kTransaction)
-                << "transaction " << _transactionInfoForLog(
-                                         lockStats, terminationCause, readConcernArgs, wasPrepared);
+                << "transaction "
+                << _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
         }
     }
 }
