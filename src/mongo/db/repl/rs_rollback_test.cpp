@@ -180,7 +180,7 @@ int createIndexForColl(OperationContext* opCtx,
     MultiIndexBlockImpl indexer(opCtx, coll);
     ASSERT_OK(indexer.init(indexSpec).getStatus());
     WriteUnitOfWork wunit(opCtx);
-    indexer.commit();
+    ASSERT_OK(indexer.commit());
     wunit.commit();
     auto indexCatalog = coll->getIndexCatalog();
     ASSERT(indexCatalog);

@@ -142,7 +142,7 @@ int createIndexForColl(OperationContext* opCtx, NamespaceString nss, BSONObj ind
     ASSERT_OK(indexer.init(indexSpec).getStatus());
 
     WriteUnitOfWork wunit(opCtx);
-    indexer.commit();
+    ASSERT_OK(indexer.commit());
     wunit.commit();
 
     auto indexCatalog = coll->getIndexCatalog();

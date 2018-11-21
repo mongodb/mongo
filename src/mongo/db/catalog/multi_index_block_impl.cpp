@@ -544,11 +544,11 @@ void MultiIndexBlockImpl::abortWithoutCleanup() {
     _needToCleanup = false;
 }
 
-void MultiIndexBlockImpl::commit() {
-    commit({});
+Status MultiIndexBlockImpl::commit() {
+    return commit({});
 }
 
-void MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onCreateFn) {
+Status MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onCreateFn) {
     // Do not interfere with writing multikey information when committing index builds.
     auto restartTracker =
         MakeGuard([this] { MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo(); });
@@ -584,5 +584,8 @@ void MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onCre
 
     _opCtx->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));
     _needToCleanup = false;
+
+    return Status::OK();
 }
+
 }  // namespace mongo

@@ -187,7 +187,7 @@ TEST_F(DuplicateKeyTrackerTest, IndexBuild) {
         AutoGetCollection tempColl(opCtx(), tracker->nss(), MODE_IX);
         ASSERT_OK(tracker->recordDuplicates(opCtx(), tempColl.getCollection(), dupsInserted));
 
-        indexer.commit();
+        ASSERT_OK(indexer.commit());
         wunit.commit();
     }
 
@@ -298,7 +298,7 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
         AutoGetCollection tempColl(opCtx(), tracker->nss(), MODE_IX);
         ASSERT_OK(tracker->recordDuplicates(opCtx(), tempColl.getCollection(), dupsInserted));
 
-        indexer.commit();
+        ASSERT_OK(indexer.commit());
         wunit.commit();
     }
 

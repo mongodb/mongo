@@ -204,7 +204,7 @@ protected:
         ASSERT_OK(indexer.insertAllDocumentsInCollection());
 
         WriteUnitOfWork wunit(opCtx());
-        indexer.commit();
+        ASSERT_OK(indexer.commit());
         wunit.commit();
     }
 

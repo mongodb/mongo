@@ -150,7 +150,10 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
 
     {
         WriteUnitOfWork wunit(opCtx);
-        indexer.commit();
+        status = indexer.commit();
+        if (!status.isOK()) {
+            return StatusWith<CompactStats>(status);
+        }
         wunit.commit();
     }
 

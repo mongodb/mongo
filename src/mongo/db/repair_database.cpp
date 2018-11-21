@@ -219,7 +219,10 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
 
     {
         WriteUnitOfWork wunit(opCtx);
-        indexer->commit();
+        status = indexer->commit();
+        if (!status.isOK()) {
+            return status;
+        }
         rs->updateStatsAfterRepair(opCtx, numRecords, dataSize);
         wunit.commit();
     }

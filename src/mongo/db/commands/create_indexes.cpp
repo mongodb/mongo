@@ -425,10 +425,10 @@ public:
         writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
-            indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
+            uassertStatusOK(indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
                 opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                     opCtx, ns, *(collection->uuid()), spec, false);
-            });
+            }));
 
             wunit.commit();
         });

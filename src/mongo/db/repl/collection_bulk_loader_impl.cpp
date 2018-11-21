@@ -175,11 +175,19 @@ Status CollectionBulkLoaderImpl::commit() {
                                             << " duplicates on secondary index(es) even though "
                                                "MultiIndexBlock::ignoreUniqueConstraint set."};
             }
-            writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
-                WriteUnitOfWork wunit(_opCtx.get());
-                _secondaryIndexesBlock->commit();
-                wunit.commit();
-            });
+            status = writeConflictRetry(
+                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
+                    WriteUnitOfWork wunit(_opCtx.get());
+                    auto status = _secondaryIndexesBlock->commit();
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                    wunit.commit();
+                    return Status::OK();
+                });
+            if (!status.isOK()) {
+                return status;
+            }
         }
 
         if (_idIndexBlock) {
@@ -206,11 +214,19 @@ Status CollectionBulkLoaderImpl::commit() {
             }
 
             // Commit _id index, without dups.
-            writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
-                WriteUnitOfWork wunit(_opCtx.get());
-                _idIndexBlock->commit();
-                wunit.commit();
-            });
+            status = writeConflictRetry(
+                _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
+                    WriteUnitOfWork wunit(_opCtx.get());
+                    auto status = _idIndexBlock->commit();
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                    wunit.commit();
+                    return Status::OK();
+                });
+            if (!status.isOK()) {
+                return status;
+            }
         }
         _stats.endBuildingIndexes = Date_t::now();
         LOG(2) << "Done creating indexes for ns: " << _nss.ns() << ", stats: " << _stats.toString();

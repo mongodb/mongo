@@ -467,14 +467,21 @@ Status renameCollectionCommon(OperationContext* opCtx,
             return status;
         }
 
-        writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
+        status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            indexer.commit([opCtx, &tmpName, tmpColl](const BSONObj& spec) {
+            auto status = indexer.commit([opCtx, &tmpName, tmpColl](const BSONObj& spec) {
                 opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                     opCtx, tmpName, *(tmpColl->uuid()), spec, false);
             });
+            if (!status.isOK()) {
+                return status;
+            }
             wunit.commit();
+            return Status::OK();
         });
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     {

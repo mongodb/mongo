@@ -420,7 +420,7 @@ void _createIndex(OperationContext* opCtx,
         MultiIndexBlockImpl indexer(opCtx, collection);
         ASSERT_OK(indexer.init(indexInfoObj).getStatus());
         WriteUnitOfWork wuow(opCtx);
-        indexer.commit();
+        ASSERT_OK(indexer.commit());
         wuow.commit();
     });
 

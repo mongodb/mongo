@@ -118,7 +118,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         return status;
     }
     WriteUnitOfWork wunit(opCtx);
-    indexer.commit();
+    ASSERT_OK(indexer.commit());
     wunit.commit();
     return Status::OK();
 }

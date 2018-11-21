@@ -303,7 +303,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
         MultiIndexBlockImpl indexer(opCtx, collection);
         ON_BLOCK_EXIT([&indexer, opCtx] {
             WriteUnitOfWork wuow(opCtx);
-            indexer.commit();
+            ASSERT_OK(indexer.commit());
             wuow.commit();
         });
 

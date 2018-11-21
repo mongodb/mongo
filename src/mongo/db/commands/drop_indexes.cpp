@@ -215,7 +215,7 @@ public:
 
         {
             WriteUnitOfWork wunit(opCtx);
-            indexer->commit();
+            uassertStatusOK(indexer->commit());
             wunit.commit();
         }
 

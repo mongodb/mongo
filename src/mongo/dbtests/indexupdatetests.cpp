@@ -84,7 +84,7 @@ protected:
             uassertStatusOK(indexer.init(key));
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
             WriteUnitOfWork wunit(&_opCtx);
-            indexer.commit();
+            ASSERT_OK(indexer.commit());
             wunit.commit();
         } catch (const DBException& e) {
             if (ErrorCodes::isInterruption(e.code()))
@@ -152,7 +152,7 @@ public:
         ASSERT_OK(indexer.insertAllDocumentsInCollection());
 
         WriteUnitOfWork wunit(&_opCtx);
-        indexer.commit();
+        ASSERT_OK(indexer.commit());
         wunit.commit();
     }
 };
@@ -385,7 +385,7 @@ Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& ind
         return status;
     }
     WriteUnitOfWork wunit(&_opCtx);
-    indexer.commit();
+    ASSERT_OK(indexer.commit());
     wunit.commit();
     return Status::OK();
 }

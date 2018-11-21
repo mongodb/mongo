@@ -87,8 +87,8 @@ public:
     Status doneInserting(std::set<RecordId>* dupRecords) override;
     Status doneInserting(std::vector<BSONObj>* dupKeysInserted) override;
 
-    void commit() override;
-    void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) override;
+    Status commit() override;
+    Status commit(stdx::function<void(const BSONObj& spec)> onCreateFn) override;
 
     void abortWithoutCleanup() override;
 

@@ -660,7 +660,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                     indexInfoObjs.isOK());
 
             WriteUnitOfWork wunit(opCtx);
-            indexer.commit();
+            uassertStatusOK(indexer.commit());
 
             for (auto&& infoObj : indexInfoObjs.getValue()) {
                 // make sure to create index on secondaries as well

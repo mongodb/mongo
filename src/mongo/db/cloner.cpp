@@ -405,7 +405,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
     WriteUnitOfWork wunit(opCtx);
-    indexer.commit();
+    uassertStatusOK(indexer.commit());
     if (opCtx->writesAreReplicated()) {
         for (auto&& infoObj : indexInfoObjs) {
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(

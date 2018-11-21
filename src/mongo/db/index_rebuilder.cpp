@@ -123,7 +123,7 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
             WriteUnitOfWork wunit(opCtx);
-            indexer.commit();
+            uassertStatusOK(indexer.commit());
             wunit.commit();
         } catch (const DBException& e) {
             error() << "Index rebuilding did not complete: " << redact(e);

@@ -136,10 +136,10 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         writeConflictRetry(opCtx, "authorization index regeneration", ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
-            indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
+            fassert(51015, indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
                 opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                     opCtx, ns, *(collection->uuid()), spec, false /* fromMigrate */);
-            });
+            }));
 
             wunit.commit();
         });

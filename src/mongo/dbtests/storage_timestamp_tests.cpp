@@ -245,7 +245,7 @@ public:
         {
             WriteUnitOfWork wuow(_opCtx);
             // Timestamping index completion. Primaries write an oplog entry.
-            indexer.commit();
+            ASSERT_OK(indexer.commit());
             // The op observer is not called from the index builder, but rather the
             // `createIndexes` command.
             _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
@@ -1835,7 +1835,7 @@ public:
             // All callers of `MultiIndexBlock::commit` are responsible for timestamping index
             // completion.  Primaries write an oplog entry. Secondaries explicitly set a
             // timestamp.
-            indexer.commit();
+            ASSERT_OK(indexer.commit());
             if (SimulatePrimary) {
                 // The op observer is not called from the index builder, but rather the
                 // `createIndexes` command.

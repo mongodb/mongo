@@ -165,8 +165,8 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    virtual void commit() = 0;
-    virtual void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
+    virtual Status commit() = 0;
+    virtual Status commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
