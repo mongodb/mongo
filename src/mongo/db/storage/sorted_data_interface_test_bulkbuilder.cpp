@@ -65,6 +65,33 @@ TEST(SortedDataInterface, BuilderAddKey) {
     }
 }
 
+// Add a reserved RecordId using a bulk builder.
+TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        const std::unique_ptr<SortedDataBuilderInterface> builder(
+            sorted->getBulkBuilder(opCtx.get(), true));
+
+        RecordId reservedLoc(RecordId::ReservedId::kWildcardMultikeyMetadataId);
+        ASSERT(reservedLoc.isReserved());
+
+        ASSERT_OK(builder->addKey(key1, reservedLoc));
+        ASSERT_EQUALS(SpecialFormatInserted::NoSpecialFormatInserted, builder->commit(false));
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+}
+
 // Add a compound key using a bulk builder.
 TEST(SortedDataInterface, BuilderAddCompoundKey) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());

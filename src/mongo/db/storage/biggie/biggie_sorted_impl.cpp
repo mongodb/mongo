@@ -190,7 +190,7 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
                                                                      const RecordId& loc) {
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
 
-    invariant(loc.isNormal());
+    invariant(loc.isNormal() || loc.isReserved());
     invariant(!hasFieldNames(key));
 
     std::unique_ptr<KeyString> newKS = keyToKeyString(key, _order);

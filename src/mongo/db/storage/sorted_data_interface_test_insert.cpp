@@ -367,5 +367,18 @@ TEST(SortedDataInterface, InsertMultipleCompoundKeys) {
     }
 }
 
+TEST(SortedDataInterface, InsertReservedRecordId) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ASSERT(sorted->isEmpty(opCtx.get()));
+    WriteUnitOfWork uow(opCtx.get());
+    RecordId reservedLoc(RecordId::ReservedId::kWildcardMultikeyMetadataId);
+    ASSERT(reservedLoc.isReserved());
+    ASSERT_OK(sorted->insert(opCtx.get(), key1, reservedLoc, /*dupsAllowed*/ true));
+    uow.commit();
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo
