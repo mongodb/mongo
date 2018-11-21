@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/config.h"
 
 namespace mongo {
@@ -91,7 +92,7 @@ struct SSLParams {
         sslMode.store(SSLMode_disabled);
     }
 
-    enum SSLModes {
+    enum SSLModes : AtomicInt32::WordType {
         /**
         * Make unencrypted outgoing connections and do not accept incoming SSL-connections.
         */
@@ -112,6 +113,11 @@ struct SSLParams {
         */
         SSLMode_requireSSL
     };
+
+    static StatusWith<SSLModes> sslModeParse(StringData strMode);
+    static StatusWith<SSLModes> tlsModeParse(StringData strMode);
+    static std::string sslModeFormat(AtomicInt32::WordType mode);
+    static std::string tlsModeFormat(AtomicInt32::WordType mode);
 };
 
 extern SSLParams sslGlobalParams;

@@ -3,14 +3,35 @@
 var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
 
-function testSSLTransition(oldMode, newMode, shouldSucceed) {
+class TransportMode {
+    constructor(sslName, tlsName) {
+        this.sslName = sslName;
+        this.tlsName = tlsName;
+    }
+
+    get sslMode() {
+        return this.sslName;
+    }
+
+    get tlsMode() {
+        return this.tlsName;
+    }
+}
+
+const invalid = new TransportMode("invalid", "invalid");
+const disabled = new TransportMode("disabled", "disabled");
+const allowed = new TransportMode("allowSSL", "allowTLS");
+const prefered = new TransportMode("preferSSL", "preferTLS");
+const required = new TransportMode("requireSSL", "requireTLS");
+
+function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
     var conn =
         MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
 
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
     adminDB.auth("root", "pwd");
-    var res = adminDB.runCommand({"setParameter": 1, "sslMode": newMode});
+    var res = adminDB.runCommand({"setParameter": 1, [scheme]: newMode[scheme]});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
     if (!shouldSucceed) {
@@ -46,21 +67,26 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
     MongoRunner.stopMongod(conn);
 }
 
-testSSLTransition("allowSSL", "invalid", false);
-testSSLTransition("allowSSL", "disabled", false);
-testSSLTransition("allowSSL", "allowSSL", false);
-testSSLTransition("allowSSL", "preferSSL", true);
-testSSLTransition("allowSSL", "requireSSL", false);
-testSSLTransition("preferSSL", "invalid", false);
-testSSLTransition("preferSSL", "disabled", false);
-testSSLTransition("preferSSL", "allowSSL", false);
-testSSLTransition("preferSSL", "preferSSL", false);
-testSSLTransition("preferSSL", "requireSSL", true);
-testSSLTransition("requireSSL", "invalid", false);
-testSSLTransition("requireSSL", "disabled", false);
-testSSLTransition("requireSSL", "allowSSL", false);
-testSSLTransition("requireSSL", "preferSSL", false);
-testSSLTransition("requireSSL", "requireSSL", false);
+function testTransportTransitions(scheme) {
+    testTransportTransition(scheme, "allowSSL", invalid, false);
+    testTransportTransition(scheme, "allowSSL", disabled, false);
+    testTransportTransition(scheme, "allowSSL", allowed, false);
+    testTransportTransition(scheme, "allowSSL", prefered, true);
+    testTransportTransition(scheme, "allowSSL", required, false);
+    testTransportTransition(scheme, "preferSSL", invalid, false);
+    testTransportTransition(scheme, "preferSSL", disabled, false);
+    testTransportTransition(scheme, "preferSSL", allowed, false);
+    testTransportTransition(scheme, "preferSSL", prefered, false);
+    testTransportTransition(scheme, "preferSSL", required, true);
+    testTransportTransition(scheme, "requireSSL", invalid, false);
+    testTransportTransition(scheme, "requireSSL", disabled, false);
+    testTransportTransition(scheme, "requireSSL", allowed, false);
+    testTransportTransition(scheme, "requireSSL", prefered, false);
+    testTransportTransition(scheme, "requireSSL", required, false);
+}
+
+testTransportTransitions("sslMode");
+testTransportTransitions("tlsMode");
 
 testAuthModeTransition("sendKeyFile", "invalid", "requireSSL", false);
 testAuthModeTransition("sendKeyFile", "keyFile", "requireSSL", false);

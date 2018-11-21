@@ -162,4 +162,76 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
     return Status::OK();
 }
 
+StatusWith<SSLParams::SSLModes> SSLParams::sslModeParse(StringData strMode) {
+    if (strMode == "disabled") {
+        return SSLParams::SSLMode_disabled;
+    } else if (strMode == "allowSSL") {
+        return SSLParams::SSLMode_allowSSL;
+    } else if (strMode == "preferSSL") {
+        return SSLParams::SSLMode_preferSSL;
+    } else if (strMode == "requireSSL") {
+        return SSLParams::SSLMode_requireSSL;
+    } else {
+        return Status(
+            ErrorCodes::BadValue,
+            str::stream()
+                << "Invalid sslMode setting '"
+                << strMode
+                << "', expected one of: 'disabled', 'allowSSL', 'preferSSL', or 'requireSSL'");
+    }
+}
+
+StatusWith<SSLParams::SSLModes> SSLParams::tlsModeParse(StringData strMode) {
+    if (strMode == "disabled") {
+        return SSLParams::SSLMode_disabled;
+    } else if (strMode == "allowTLS") {
+        return SSLParams::SSLMode_allowSSL;
+    } else if (strMode == "preferTLS") {
+        return SSLParams::SSLMode_preferSSL;
+    } else if (strMode == "requireTLS") {
+        return SSLParams::SSLMode_requireSSL;
+    } else {
+        return Status(
+            ErrorCodes::BadValue,
+            str::stream()
+                << "Invalid tlsMode setting '"
+                << strMode
+                << "', expected one of: 'disabled', 'allowTLS', 'preferTLS', or 'requireTLS'");
+    }
+}
+
+
+std::string SSLParams::sslModeFormat(AtomicInt32::WordType mode) {
+    switch (mode) {
+        case SSLParams::SSLMode_disabled:
+            return "disabled";
+        case SSLParams::SSLMode_allowSSL:
+            return "allowSSL";
+        case SSLParams::SSLMode_preferSSL:
+            return "preferSSL";
+        case SSLParams::SSLMode_requireSSL:
+            return "requireSSL";
+        default:
+            // Default case because sslMode is an AtomicInt32 and not bound by enum rules.
+            return "unknown";
+    }
+}
+
+std::string SSLParams::tlsModeFormat(AtomicInt32::WordType mode) {
+    switch (mode) {
+        case SSLParams::SSLMode_disabled:
+            return "disabled";
+        case SSLParams::SSLMode_allowSSL:
+            return "allowTLS";
+        case SSLParams::SSLMode_preferSSL:
+            return "preferTLS";
+        case SSLParams::SSLMode_requireSSL:
+            return "requireTLS";
+        default:
+            // Default case because sslMode is an AtomicInt32 and not bound by enum rules.
+            return "unknown";
+    }
+}
+
+
 }  // namespace mongo

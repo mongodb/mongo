@@ -248,27 +248,17 @@ Status storeTLSLogVersion(const std::string& loggedProtocols) {
 Status storeSSLServerOptions(const moe::Environment& params) {
     if (params.count("net.tls.mode")) {
         std::string sslModeParam = params["net.tls.mode"].as<string>();
-        if (sslModeParam == "disabled") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_disabled);
-        } else if (sslModeParam == "allowTLS") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_allowSSL);
-        } else if (sslModeParam == "preferTLS") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_preferSSL);
-        } else if (sslModeParam == "requireTLS") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_requireSSL);
+        auto swMode = SSLParams::tlsModeParse(sslModeParam);
+        if (swMode.isOK()) {
+            sslGlobalParams.sslMode.store(swMode.getValue());
         } else {
             return {ErrorCodes::BadValue, "unsupported value for tlsMode " + sslModeParam};
         }
     } else if (params.count("net.ssl.mode")) {
         std::string sslModeParam = params["net.ssl.mode"].as<string>();
-        if (sslModeParam == "disabled") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_disabled);
-        } else if (sslModeParam == "allowSSL") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_allowSSL);
-        } else if (sslModeParam == "preferSSL") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_preferSSL);
-        } else if (sslModeParam == "requireSSL") {
-            sslGlobalParams.sslMode.store(SSLParams::SSLMode_requireSSL);
+        auto swMode = SSLParams::sslModeParse(sslModeParam);
+        if (swMode.isOK()) {
+            sslGlobalParams.sslMode.store(swMode.getValue());
         } else {
             return {ErrorCodes::BadValue, "unsupported value for sslMode " + sslModeParam};
         }

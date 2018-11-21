@@ -72,6 +72,12 @@ server_parameters:
     append_bson: "appendSSLModeToBSON"
     from_string: "setSSLModeFromString"
 
+  tlsMode:
+    description: "Transition from allowTLS to preferTLS, or from preferTLS to requireTLS"
+    set_at: runtime
+    append_bson: "appendTLSModeToBSON"
+    from_string: "setTLSModeFromString"
+
   clusterAuthMode:
     description: "Transition from sendKeyFile to sendX509, or sendX509 to x509 clusterAuthModes"
     set_at: runtime

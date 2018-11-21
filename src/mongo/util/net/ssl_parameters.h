@@ -57,7 +57,9 @@ Status onUpdateDisableNonTLSConnectionLogging(const bool&);
  * Callbacks for setParameter 'sslMode'
  */
 void appendSSLModeToBSON(OperationContext*, BSONObjBuilder*, StringData);
+void appendTLSModeToBSON(OperationContext*, BSONObjBuilder*, StringData);
 Status setSSLModeFromString(StringData);
+Status setTLSModeFromString(StringData);
 
 /**
  * Callbacks for setParameter 'clusterAuthMode'

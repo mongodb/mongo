@@ -28,53 +28,22 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters.h"
 
 namespace mongo {
 namespace {
-std::string sslModeStr() {
-    switch (sslGlobalParams.sslMode.load()) {
-        case SSLParams::SSLMode_disabled:
-            return "disabled";
-        case SSLParams::SSLMode_allowSSL:
-            return "allowSSL";
-        case SSLParams::SSLMode_preferSSL:
-            return "preferSSL";
-        case SSLParams::SSLMode_requireSSL:
-            return "requireSSL";
-        default:
-            // Default case because sslMode is an AtomicInt32 and not bound by enum rules.
-            return "unknown";
-    }
-}
 
-StatusWith<SSLParams::SSLModes> sslModeParse(StringData strMode) {
-    if (strMode == "disabled") {
-        return SSLParams::SSLMode_disabled;
-    } else if (strMode == "allowSSL") {
-        return SSLParams::SSLMode_allowSSL;
-    } else if (strMode == "preferSSL") {
-        return SSLParams::SSLMode_preferSSL;
-    } else if (strMode == "requireSSL") {
-        return SSLParams::SSLMode_requireSSL;
-    } else {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream()
-                << "Invalid sslMode setting '"
-                << strMode
-                << "', expected one of: 'disabled', 'allowSSL', 'preferSSL', or 'requireSSL'");
-    }
-}
-
-std::string clusterAuthModeStr() {
+std::string clusterAuthModeFormat() {
     switch (serverGlobalParams.clusterAuthMode.load()) {
         case ServerGlobalParams::ClusterAuthMode_keyFile:
             return "keyFile";
@@ -104,6 +73,32 @@ StatusWith<ServerGlobalParams::ClusterAuthModes> clusterAuthModeParse(StringData
             ErrorCodes::BadValue,
             str::stream() << "Invalid clusterAuthMode '" << strMode
                           << "', expected one of: 'keyFile', 'sendKeyFile', 'sendX509', or 'x509'");
+    }
+}
+
+
+template <typename T, typename U>
+StatusWith<SSLParams::SSLModes> checkTLSModeTransition(T modeToString,
+                                                       U stringToMode,
+                                                       StringData parameterName,
+                                                       StringData strMode) {
+    auto mode = stringToMode(strMode);
+    if (!mode.isOK()) {
+        return mode.getStatus();
+    }
+    auto oldMode = sslGlobalParams.sslMode.load();
+    if ((mode == SSLParams::SSLMode_preferSSL) && (oldMode == SSLParams::SSLMode_allowSSL)) {
+        return mode;
+    } else if ((mode == SSLParams::SSLMode_requireSSL) &&
+               (oldMode == SSLParams::SSLMode_preferSSL)) {
+        return mode;
+    } else {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Illegal state transition for " << parameterName
+                              << ", attempt to change from "
+                              << modeToString(static_cast<SSLParams::SSLModes>(oldMode))
+                              << " to "
+                              << strMode};
     }
 }
 
@@ -143,7 +138,14 @@ mongo::Status mongo::onUpdateDisableNonTLSConnectionLogging(const bool&) {
 }
 
 void mongo::appendSSLModeToBSON(OperationContext*, BSONObjBuilder* builder, StringData fieldName) {
-    builder->append(fieldName, sslModeStr());
+    warning() << "Use of deprecared server parameter 'sslMode', please use 'tlsMode' instead.";
+    builder->append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
+}
+
+void mongo::appendTLSModeToBSON(OperationContext*, BSONObjBuilder* builder, StringData fieldName) {
+    builder->append(
+        fieldName,
+        SSLParams::tlsModeFormat(static_cast<SSLParams::SSLModes>(sslGlobalParams.sslMode.load())));
 }
 
 mongo::Status mongo::setSSLModeFromString(StringData strMode) {
@@ -152,33 +154,36 @@ mongo::Status mongo::setSSLModeFromString(StringData strMode) {
             "Unable to set sslMode, SSL support is not compiled into server"};
 #endif
 
-    auto swMode = sslModeParse(strMode);
-    if (!swMode.isOK()) {
-        return swMode.getStatus();
-    }
+    warning() << "Use of deprecared server parameter 'sslMode', please use 'tlsMode' instead.";
 
-    auto mode = swMode.getValue();
-    auto oldMode = sslGlobalParams.sslMode.load();
-    if ((mode == SSLParams::SSLMode_preferSSL) && (oldMode == SSLParams::SSLMode_allowSSL)) {
-        sslGlobalParams.sslMode.store(mode);
-    } else if ((mode == SSLParams::SSLMode_requireSSL) &&
-               (oldMode == SSLParams::SSLMode_preferSSL)) {
-        sslGlobalParams.sslMode.store(mode);
-    } else {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Illegal state transition for sslMode, attempt to change from "
-                              << sslModeStr()
-                              << " to "
-                              << strMode};
+    auto swNewMode = checkTLSModeTransition(
+        SSLParams::sslModeFormat, SSLParams::sslModeParse, "sslMode", strMode);
+    if (!swNewMode.isOK()) {
+        return swNewMode.getStatus();
     }
-
+    sslGlobalParams.sslMode.store(swNewMode.getValue());
     return Status::OK();
 }
+
+mongo::Status mongo::setTLSModeFromString(StringData strMode) {
+#ifndef MONGO_CONFIG_SSL
+    return {ErrorCodes::IllegalOperation,
+            "Unable to set tlsMode, TLS support is not compiled into server"};
+#endif
+    auto swNewMode = checkTLSModeTransition(
+        SSLParams::tlsModeFormat, SSLParams::tlsModeParse, "tlsMode", strMode);
+    if (!swNewMode.isOK()) {
+        return swNewMode.getStatus();
+    }
+    sslGlobalParams.sslMode.store(swNewMode.getValue());
+    return Status::OK();
+}
+
 
 void mongo::appendClusterAuthModeToBSON(OperationContext*,
                                         BSONObjBuilder* builder,
                                         StringData fieldName) {
-    builder->append(fieldName, clusterAuthModeStr());
+    builder->append(fieldName, clusterAuthModeFormat());
 }
 
 mongo::Status mongo::setClusterAuthModeFromString(StringData strMode) {
@@ -214,7 +219,7 @@ mongo::Status mongo::setClusterAuthModeFromString(StringData strMode) {
     } else {
         return {ErrorCodes::BadValue,
                 str::stream() << "Illegal state transition for clusterAuthMode, change from "
-                              << clusterAuthModeStr()
+                              << clusterAuthModeFormat()
                               << " to "
                               << strMode};
     }
