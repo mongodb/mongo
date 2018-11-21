@@ -1,6 +1,6 @@
 // Tests that a change stream's resume token format will adapt as the server's feature compatibility
 // version changes.
-// @tags: [requires_replication]
+// @tags: [requires_replication, requires_majority_read_concern]
 (function() {
     "use strict";
 
