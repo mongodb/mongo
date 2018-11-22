@@ -287,6 +287,10 @@ public:
     Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
+    double perc_val;
+    double digest_size;
+    double chunk_size;
+    void _add_to_tdigest(std::vector<double>&);
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -303,6 +307,7 @@ private:
     Decimal128 _decimalTotal;
     long long _count;
 };
+
 
 
 // Adding a new accumulator as 'percentile'
@@ -325,14 +330,20 @@ private:
      */
     Decimal128 _getDecimalTotal() const;
 
-    // to feed TDigest
+    // to be digested by TDigest algorithm
     std::vector<double> values;
 
+    // process inputs will be sorted and added to this object
+    mongo::TDigest digest;
+
+    short percentile;  // Integer between 0 to 100
     bool _isDecimal;
     DoubleDoubleSummation _nonDecimalTotal;
     Decimal128 _decimalTotal;
     long long _count;
 };
+
+
 
 
 class AccumulatorStdDev : public Accumulator {

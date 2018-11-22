@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2011 10gen Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
@@ -37,15 +37,18 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/platform/decimal128.h"
 
+#include "mongo/db/pipeline/TDigest.h"
+
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(avg, AccumulatorAvg::create);
-REGISTER_EXPRESSION(avg, ExpressionFromAccumulator<AccumulatorAvg>::parse);
+REGISTER_ACCUMULATOR(percentile, AccumulatorPercentile::create);
+REGISTER_EXPRESSION(percentile, ExpressionFromAccumulator<AccumulatorPercentile>::parse);
 
-const char* AccumulatorAvg::getOpName() const {
-    return "$avg";
+
+const char* AccumulatorPercentile::getOpName() const {
+    return "$percentile";
 }
 
 namespace {
@@ -54,17 +57,50 @@ const char subTotalErrorName[] = "subTotalError";  // Used for extra precision
 const char countName[] = "count";
 }  // namespace
 
-void AccumulatorAvg::processInternal(const Value& input, bool merging) {
+void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
+
+    // Determining 'digest_size'
+    // ToDo: Try to find a better evaluation
+    // ToDo: Check how to pass the default value. From configurations?
+    if (input.getDocument()["digest_size"].missing())
+        this->digest_size = 1000;
+    else
+        this->digest_size = input.getDocument()["digest_size"].getDouble();
+
+
+    // // Determining 'chunk_size' used in TDigest
+    // ToDo: Try to find a better evaluation
+    // ToDo: Check how to pass the default value. From configurations?
+    if (input.getDocument()["chunk_size"].missing())
+        this->chunk_size = 1000;
+    else
+        this->digest_size = input.getDocument()["digest_size"].getDouble();
+
+    // ToDo: error codes are not accurate. Set better numbers later
+    // ToDo: It might be better evaluations for this part.
+    uassert(6677, "The 'perc' should be present in the input document.",
+    !input.getDocument()["perc"].missing());
+
+    uassert(6678, "The 'value' should be present in the input document.",
+    !input.getDocument()["value"].missing());
+
+    this->perc_val = input.getDocument()["perc"].getDouble() / 100;  // Converting Percentile to Quantile - [0:100] to [0:1]
+    this->digest_size = input.getDocument()["digest_size"].getDouble();
+
+    // ToDo: Choose a better name for perc_input and refactor later
+    Value perc_input = input.getDocument()["value"];
+
+
     if (merging) {
         // We expect an object that contains both a subtotal and a count. Additionally there may
         // be an error value, that allows for additional precision.
         // 'input' is what getValue(true) produced below.
-        verify(input.getType() == Object);
+        verify(perc_input.getType() == Object);
         // We're recursively adding the subtotal to get the proper type treatment, but this only
         // increments the count by one, so adjust the count afterwards. Similarly for 'error'.
-        processInternal(input[subTotalName], false);
-        _count += input[countName].getLong() - 1;
-        Value error = input[subTotalErrorName];
+        processInternal(perc_input[subTotalName], false);
+        _count += perc_input[countName].getLong() - 1;
+        Value error = perc_input[subTotalErrorName];
         if (!error.missing()) {
             processInternal(error, false);
             _count--;  // The error correction only adjusts the total, not the number of items.
@@ -72,36 +108,47 @@ void AccumulatorAvg::processInternal(const Value& input, bool merging) {
         return;
     }
 
-    switch (input.getType()) {
+    // ToDo: Not sure 1) Is it important for TDigest to distinguish?  2) Is it important for MongoDB to distinguish?
+    // ToDo: Going to cover all Decimal, Long and Double as a temporary, need to decide on this.
+    switch (perc_input.getType()) {
         case NumberDecimal:
-            _decimalTotal = _decimalTotal.add(input.getDecimal());
-            _isDecimal = true;
+            values.push_back(perc_input.getDouble()); // ToDo: need to discuss
             break;
         case NumberLong:
-            // Avoid summation using double as that loses precision.
-            _nonDecimalTotal.addLong(input.getLong());
+            values.push_back(perc_input.getDouble()); // ToDo: need to discuss
             break;
         case NumberInt:
         case NumberDouble:
-            _nonDecimalTotal.addDouble(input.getDouble());
+            values.push_back(perc_input.getDouble());
             break;
         default:
-            dassert(!input.numeric());
+            dassert(!perc_input.numeric());
             return;
     }
     _count++;
+
+    if (values.size() == this->chunk_size)
+        _add_to_tdigest(values);
+    else
+        return;
 }
 
-intrusive_ptr<Accumulator> AccumulatorAvg::create(
+intrusive_ptr<Accumulator> AccumulatorPercentile::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new AccumulatorAvg(expCtx);
+    return new AccumulatorPercentile(expCtx);
 }
 
-Decimal128 AccumulatorAvg::_getDecimalTotal() const {
+Decimal128 AccumulatorPercentile::_getDecimalTotal() const {
     return _decimalTotal.add(_nonDecimalTotal.getDecimal());
 }
 
-Value AccumulatorAvg::getValue(bool toBeMerged) {
+Value AccumulatorPercentile::getValue(bool toBeMerged) {
+
+    // To add remainders left over a chunk
+    if (values.size() > 0)
+        _add_to_tdigest(values);
+
+    // ToDo: Unchanged copy from 'avg' module, need to change this for Percentile
     if (toBeMerged) {
         if (_isDecimal)
             return Value(Document{{subTotalName, _getDecimalTotal()}, {countName, _count}});
@@ -115,19 +162,28 @@ Value AccumulatorAvg::getValue(bool toBeMerged) {
     if (_count == 0)
         return Value(BSONNULL);
 
-    if (_isDecimal)
-        return Value(_getDecimalTotal().divide(Decimal128(static_cast<int64_t>(_count))));
-
-    return Value(_nonDecimalTotal.getDouble() / static_cast<double>(_count));
+    return Value(this->digest.estimateQuantile(this->perc_val));
 }
 
-AccumulatorAvg::AccumulatorAvg(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+AccumulatorPercentile::AccumulatorPercentile(const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : Accumulator(expCtx), _isDecimal(false), _count(0) {
+
+    // Higher 'digest_size' results in higher memory consumption
+    mongo::TDigest digest(this->digest_size);
+
     // This is a fixed size Accumulator so we never need to update this
     _memUsageBytes = sizeof(*this);
 }
 
-void AccumulatorAvg::reset() {
+void AccumulatorPercentile::_add_to_tdigest(std::vector<double> & values){
+
+    // Sort, Push and Clear the "values" vector in each chunk
+    std::sort(values.begin(), values.end());
+    digest = digest.merge(values);
+    values.clear();
+}
+
+void AccumulatorPercentile::reset() {
     _isDecimal = false;
     _nonDecimalTotal = {};
     _decimalTotal = {};
