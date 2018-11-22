@@ -3,7 +3,7 @@
  * capable of yielding.
  *
  * @tags: [assumes_read_concern_unchanged, do_not_wrap_aggregations_in_facets, requires_journaling,
- * requires_sharding]
+ * requires_sharding, requires_wiredtiger]
  */
 (function() {
     "use strict";
