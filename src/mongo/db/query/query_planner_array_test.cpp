@@ -882,8 +882,7 @@ TEST_F(QueryPlannerTest, MultikeyComplexDoubleDotted2) {
         " 'a.e.d':[['MinKey','MaxKey',true,true]]}}}}}");
 }
 
-// SERVER-13422: check that we plan $elemMatch object correctly with
-// index intersection.
+// SERVER-13422: check that we plan $elemMatch object correctly with index intersection.
 TEST_F(QueryPlannerTest, ElemMatchIndexIntersection) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("shortId" << 1));
@@ -2054,6 +2053,173 @@ TEST_F(QueryPlannerTest, ContainedOrPathLevelMultikeyCannotCompoundTrailingOutsi
         "{ixscan: {pattern: {e: 1}, bounds: {e: [[8, 8, true, true]]}}}"
         "]}}}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanHoistNegatedPredFromElemMatchIntoSiblingOr) {
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1 << "c" << 1 << "d" << 1));
+
+    auto queryStr =
+        "{arr: {$elemMatch: {a: {$ne:1}, $or: [{b:2}, {b:3}]}}, $or: [{c:4, d:5}, {c:6, d:7}]}";
+    runQuery(fromjson(queryStr));
+
+    assertNumSolutions(4U);
+
+    // Solution 1: {'arr.a': {$ne: 1}} is hoisted by $elemMatch and pushed into the top-level $or.
+    assertSolutionExists(
+        "{fetch: {filter: {arr: {$elemMatch: {a: {$ne: 1}, $or: [{b: 2}, {b: 3}]}}}, node: {or: "
+        "{nodes: [{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, d: 1}, bounds: {'arr.a': "
+        "[['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' :[['MinKey', 'MaxKey', "
+        "true, true]], c: [[4, 4, true, true]], d: [[5, 5, true, true]]}}},{ixscan: {pattern: "
+        "{'arr.a': 1, 'arr.b': 1, c: 1, d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, "
+        "'MaxKey', false, true]], 'arr.b' :[['MinKey', 'MaxKey', true, true]], c: [[6, 6, true, "
+        "true]], d: [[7, 7, true, true]]}}}]}}}}");
+
+    // Solution 2: {'arr.a': {$ne: 1}} is pushed down into its sibling $or within $elemMatch.
+    assertSolutionExists(
+        "{fetch: {filter: {arr: {$elemMatch: {a: {$ne:1}, $or: [{a: {$ne:1}, b:2}, {a: {$ne:1}, "
+        "b:3}]}}, $or: [{c:4, d:5}, {c:6, d:7}]}, node: {or: {nodes: [{ixscan: {pattern: {'arr.a': "
+        "1, 'arr.b': 1, c: 1, d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', "
+        "false, true]], 'arr.b' :[[2, 2, true, true]], c: [['MinKey', 'MaxKey', true, true]], d: "
+        "[['MinKey', 'MaxKey', true, true]]}}},{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, "
+        "d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], "
+        "'arr.b' :[[3, 3, true, true]], c: [['MinKey', 'MaxKey', true, true]], d: [['MinKey', "
+        "'MaxKey', true, true]]}}}]}}}}");
+
+    // Solution 3: no pushdowns; {'arr.a': {$ne: 1}} is indexed directly, without any other fields.
+    assertSolutionExists(
+        "{fetch: {filter: {arr: {$elemMatch: {a: {$ne:1}, $or: [{b:2}, {b:3}]}}, $or: [{c:4, d:5}, "
+        "{c:6, d:7}]}, node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, d: 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b': [['MinKey', "
+        "'MaxKey', true, true]], c: [['MinKey', 'MaxKey', true, true]], d: [['MinKey', 'MaxKey', "
+        "true, true]]}}}}}");
+
+    // Solution 4: COLLSCAN.
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanHoistNegatedPredFromElemMatchIntoSiblingOrWithMultikeyPaths) {
+    MultikeyPaths multikeyPaths{{0U}, {0U}, {}, {}};
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1 << "c" << 1 << "d" << 1), multikeyPaths);
+
+    auto queryStr =
+        "{arr: {$elemMatch: {a: {$ne:1}, $or: [{b:2}, {b:3}]}}, $or: [{c:4, d:5}, {c:6, d:7}]}";
+    runQuery(fromjson(queryStr));
+
+    assertNumSolutions(4U);
+
+    // Solution 1: {'arr.a': {$ne: 1}} is hoisted by $elemMatch and pushed into the top-level $or.
+    assertSolutionExists(
+        "{fetch: {filter: {arr: {$elemMatch: {a: {$ne: 1}, $or: [{b: 2}, {b: 3}]}}}, node: {or: "
+        "{nodes: [{fetch: {filter: {a: {$ne: 1}}, node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': "
+        "1, c: 1, d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, "
+        "true]], 'arr.b' :[['MinKey', 'MaxKey', true, true]], c: [[4, 4, true, true]], d: [[5, 5, "
+        "true, true]]}}}}}, {fetch: {filter: {a: {$ne: 1}}, node: {ixscan: {pattern: {'arr.a': 1, "
+        "'arr.b': 1, c: 1, d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', "
+        "false, true]], 'arr.b' :[['MinKey', 'MaxKey', true, true]], c: [[6, 6, true, true]], d: "
+        "[[7, 7, true, true]]}}}}}]}}}}");
+
+    // Solution 2: {'arr.a': {$ne: 1}} is pushed down into its sibling $or within $elemMatch.
+    assertSolutionExists(
+        "{fetch: {filter: {arr: {$elemMatch: {a: {$ne:1}, $or: [{a: {$ne:1}, b:2}, {a: {$ne:1}, "
+        "b:3}]}}, $or: [{c:4, d:5}, {c:6, d:7}]}, node: {or: {nodes: [{ixscan: {pattern: {'arr.a': "
+        "1, 'arr.b': 1, c: 1, d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', "
+        "false, true]], 'arr.b' :[[2, 2, true, true]], c: [['MinKey', 'MaxKey', true, true]], d: "
+        "[['MinKey', 'MaxKey', true, true]]}}},{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, "
+        "d: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], "
+        "'arr.b' :[[3, 3, true, true]], c: [['MinKey', 'MaxKey', true, true]], d: [['MinKey', "
+        "'MaxKey', true, true]]}}}]}}}}");
+
+    // Solution 3: no pushdowns; {'arr.a': {$ne: 1}} is indexed directly, without any other fields.
+    assertSolutionExists(
+        "{fetch: {filter: {arr: {$elemMatch: {a: {$ne:1}, $or: [{b:2}, {b:3}]}}, $or: [{c:4, d:5}, "
+        "{c:6, d:7}]}, node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, d: 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b': [['MinKey', "
+        "'MaxKey', true, true]], c: [['MinKey', 'MaxKey', true, true]], d: [['MinKey', 'MaxKey', "
+        "true, true]]}}}}}");
+
+    // Solution 4: COLLSCAN.
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, MultipleNegatedElemMatchPredOrPushdownsDoNotSelfIntersect) {
+    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("arr.a" << 1 << "arr.b" << 1));
+    addIndex(BSON("arr.a" << 1 << "c" << 1));
+
+    auto queryStr = "{arr: {$elemMatch: {a: {$ne:1}, $or: [{b:2}, {b:3}]}}, $or: [{c:4}, {c:6}]}";
+    runQuery(fromjson(queryStr));
+
+    assertNumSolutions(9U);
+
+    // Solution 1: no pushdowns; {'arr.a': {$ne: 1}} is indexed directly by {arr.a: 1, arr.b: 1}.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: {'arr.a': [['MinKey', "
+        "1, true, false], [1, 'MaxKey', false, true]], 'arr.b': [['MinKey', 'MaxKey', true, "
+        "true]]}}}}}");
+
+    // Solution 2: no pushdowns; {'arr.a': {$ne: 1}} is indexed directly by {arr.a: 1, c: 1}.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': [['MinKey', 1, "
+        "true, false], [1, 'MaxKey', false, true]], c: [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+    // Solution 3: {'arr.a': {$ne: 1}} pushed into sibling $or and indexed by {arr.a: 1, arr.b: 1}.
+    assertSolutionExists(
+        "{fetch: {node: {or: {nodes: [{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: "
+        "{'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' :[[2, 2, "
+        "true, true]]}}},{ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: {'arr.a': "
+        "[['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' :[[3, 3, true, "
+        "true]]}}}]}}}}");
+
+    // Solution 4: {'arr.a': {$ne: 1}} pushed into top-level $or and indexed by {arr.a: 1, c: 1}.
+    assertSolutionExists(
+        "{fetch: {node: {or: {nodes: [{ixscan: {pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': "
+        "[['MinKey', 1, true, false], [1, 'MaxKey', false, true]], c: [[4, 4, true, "
+        "true]]}}},{ixscan: {pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': [['MinKey', 1, true, "
+        "false], [1, 'MaxKey', false, true]], c: [[6, 6, true, true]]}}}]}}}}");
+
+    // Solution 5: COLLSCAN.
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+
+    // Verify that we do not produce a plan which intersects BOTH $ors to which the $ne predicate
+    // has been pushed down. That is, we do not intersect the candidate plans outlined in solution 3
+    // and 4 above with one another, but only with non-pushdown plans 1 and 2.
+
+    // Solution 6: AND_HASH Solutions 1 and 3.
+    assertSolutionExists(
+        "{fetch: {node: {andHash: {nodes: [{or: {nodes: [{ixscan: {pattern: {'arr.a': 1, 'arr.b': "
+        "1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' "
+        ":[[2, 2, true, true]]}}}, {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: {'arr.a': "
+        "[['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' :[[3, 3, true, "
+        "true]]}}}]}}, {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: {'arr.a': [['MinKey', "
+        "1, true, false], [1, 'MaxKey', false, true]], 'arr.b' :[['MinKey', 'MaxKey', true, "
+        "true]]}}}]}}}}");
+
+    // Solution 7: AND_HASH Solutions 1 and 4.
+    assertSolutionExists(
+        "{fetch: {node: {andHash: {nodes: [{or: {nodes: [{ixscan: {pattern: {'arr.a': 1, c: 1}, "
+        "bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], c :[[4, 4, "
+        "true, true]]}}}, {ixscan: {pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': [['MinKey', 1, "
+        "true, false], [1, 'MaxKey', false, true]], c :[[6, 6, true, true]]}}}]}}, {ixscan: "
+        "{pattern: {'arr.a': 1, 'arr.b': 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, "
+        "'MaxKey', false, true]], 'arr.b' :[['MinKey', 'MaxKey', true, true]]}}}]}}}}");
+
+    // Solution 8: AND_HASH Solutions 2 and 3.
+    assertSolutionExists(
+        "{fetch: {node: {andHash: {nodes: [{or: {nodes: [{ixscan: {pattern: {'arr.a': 1, 'arr.b': "
+        "1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' "
+        ":[[2, 2, true, true]]}}}, {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1}, bounds: {'arr.a': "
+        "[['MinKey', 1, true, false], [1, 'MaxKey', false, true]], 'arr.b' :[[3, 3, true, "
+        "true]]}}}]}}, {ixscan: {pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': [['MinKey', 1, "
+        "true, false], [1, 'MaxKey', false, true]], c: [['MinKey', 'MaxKey', true, true]]}}}]}}}}");
+
+    // Solution 9: AND_HASH Solutions 2 and 4.
+    assertSolutionExists(
+        "{fetch: {node: {andHash: {nodes: [{or: {nodes: [{ixscan: {pattern: {'arr.a': 1, c: 1}, "
+        "bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]], c :[[4, 4, "
+        "true, true]]}}}, {ixscan: {pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': [['MinKey', 1, "
+        "true, false], [1, 'MaxKey', false, true]], c :[[6, 6, true, true]]}}}]}}, {ixscan: "
+        "{pattern: {'arr.a': 1, c: 1}, bounds: {'arr.a': [['MinKey', 1, true, false], [1, "
+        "'MaxKey', false, true]], c :[['MinKey', 'MaxKey', true, true]]}}}]}}}}");
 }
 
 TEST_F(QueryPlannerTest, ContainedOrCannotPushdownThroughElemMatchObj) {
