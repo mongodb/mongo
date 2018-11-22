@@ -219,7 +219,40 @@ void getElemMatchOrPushdownDescendants(MatchExpression* node, std::vector<MatchE
         for (size_t i = 0; i < node->numChildren(); ++i) {
             getElemMatchOrPushdownDescendants(node->getChild(i), out);
         }
+    } else if (node->matchType() == MatchExpression::NOT) {
+        // The immediate child of NOT may be tagged, but there should be no tags deeper than this.
+        auto* childNode = node->getChild(0);
+        if (childNode->getTag() && childNode->getTag()->getType() == TagType::OrPushdownTag) {
+            out->push_back(node);
+        }
     }
+}
+
+// Attempts to push the given node down into the 'indexedOr' subtree. Returns true if the predicate
+// can subsequently be trimmed from the MatchExpression tree, false otherwise.
+bool processOrPushdownNode(MatchExpression* node, MatchExpression* indexedOr) {
+    // If the node is a negation, then its child is the predicate node that may be tagged.
+    auto* predNode = node->matchType() == MatchExpression::NOT ? node->getChild(0) : node;
+
+    // If the predicate node is not tagged for pushdown, return false immediately.
+    if (!predNode->getTag() || predNode->getTag()->getType() != TagType::OrPushdownTag) {
+        return false;
+    }
+    invariant(indexedOr);
+
+    // Predicate node is tagged for pushdown. Extract its route through the $or and its index tag.
+    auto* orPushdownTag = static_cast<OrPushdownTag*>(predNode->getTag());
+    auto destinations = orPushdownTag->releaseDestinations();
+    auto indexTag = orPushdownTag->releaseIndexTag();
+    predNode->setTag(nullptr);
+
+    // Attempt to push the node into the indexedOr, then re-set its tag to the indexTag.
+    const bool pushedDown = pushdownNode(node, indexedOr, std::move(destinations));
+    predNode->setTag(indexTag.release());
+
+    // Return true if we can trim the predicate. We could trim the node even if it had an index tag
+    // for this position, but that could make the index tagging of the tree wrong.
+    return pushedDown && !predNode->getTag();
 }
 
 // Finds all the nodes in the tree with OrPushdownTags and copies them to the Destinations specified
@@ -235,66 +268,19 @@ void resolveOrPushdowns(MatchExpression* tree) {
 
         for (size_t i = 0; i < andNode->numChildren(); ++i) {
             auto child = andNode->getChild(i);
-            if (child->getTag() && child->getTag()->getType() == TagType::OrPushdownTag) {
-                invariant(indexedOr);
-                OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(child->getTag());
-                auto destinations = orPushdownTag->releaseDestinations();
-                auto indexTag = orPushdownTag->releaseIndexTag();
-                child->setTag(nullptr);
-                if (pushdownNode(child, indexedOr, std::move(destinations)) && !indexTag) {
 
-                    // indexedOr can completely satisfy the predicate specified in child, so we can
-                    // trim it. We could remove the child even if it had an index tag for this
-                    // position, but that could make the index tagging of the tree wrong.
-                    auto ownedChild = andNode->removeChild(i);
-
-                    // We removed child i, so decrement the child index.
-                    --i;
-                } else {
-                    child->setTag(indexTag.release());
-                }
-            } else if (child->matchType() == MatchExpression::NOT && child->getChild(0)->getTag() &&
-                       child->getChild(0)->getTag()->getType() == TagType::OrPushdownTag) {
-                invariant(indexedOr);
-                OrPushdownTag* orPushdownTag =
-                    static_cast<OrPushdownTag*>(child->getChild(0)->getTag());
-                auto destinations = orPushdownTag->releaseDestinations();
-                auto indexTag = orPushdownTag->releaseIndexTag();
-                child->getChild(0)->setTag(nullptr);
-
-                // Push down the NOT and its child.
-                if (pushdownNode(child, indexedOr, std::move(destinations)) && !indexTag) {
-
-                    // indexedOr can completely satisfy the predicate specified in child, so we can
-                    // trim it. We could remove the child even if it had an index tag for this
-                    // position, but that could make the index tagging of the tree wrong.
-                    auto ownedChild = andNode->removeChild(i);
-
-                    // We removed child i, so decrement the child index.
-                    --i;
-                } else {
-                    child->getChild(0)->setTag(indexTag.release());
-                }
-            } else if (child->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
-
-                // Push down all descendants of child with OrPushdownTags.
+            // For ELEM_MATCH_OBJECT, we push down all tagged descendants. However, we cannot trim
+            // any of these predicates, since the $elemMatch filter must be applied in its entirety.
+            if (child->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
                 std::vector<MatchExpression*> orPushdownDescendants;
                 getElemMatchOrPushdownDescendants(child, &orPushdownDescendants);
-                if (!orPushdownDescendants.empty()) {
-                    invariant(indexedOr);
-                }
                 for (auto descendant : orPushdownDescendants) {
-                    OrPushdownTag* orPushdownTag =
-                        static_cast<OrPushdownTag*>(descendant->getTag());
-                    auto destinations = orPushdownTag->releaseDestinations();
-                    auto indexTag = orPushdownTag->releaseIndexTag();
-                    descendant->setTag(nullptr);
-                    pushdownNode(descendant, indexedOr, std::move(destinations));
-                    descendant->setTag(indexTag.release());
-
-                    // We cannot trim descendants of an $elemMatch object, since the filter must
-                    // be applied in its entirety.
+                    processOrPushdownNode(descendant, indexedOr);
                 }
+            } else if (processOrPushdownNode(child, indexedOr)) {
+                // The indexed $or can completely satisfy the child predicate, so we trim it.
+                auto ownedChild = andNode->removeChild(i);
+                --i;
             }
         }
     }
