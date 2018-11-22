@@ -19,9 +19,6 @@
 #include <cmath>
 #include <vector>
 
-struct presorted_t {};
-constexpr presorted_t presorted{};
-
 namespace mongo {
 
 /*
@@ -93,8 +90,7 @@ class TDigest {
    * Returns a new TDigest constructed with values merged from the current
    * digest and the given sortedValues.
    */
-  TDigest merge(presorted_t, const std::vector<double> & sortedValues) const;
-  TDigest merge(const std::vector<double> & unsortedValues) const;
+  TDigest merge(const std::vector<double> & sortedValues) const;
 
   /*
    * Returns a new TDigest constructed with values merged from the given

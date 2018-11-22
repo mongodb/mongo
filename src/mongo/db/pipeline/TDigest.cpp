@@ -15,7 +15,6 @@
  */
 
 #include "TDigest.h"
-#include "DoubleRadixSort.h"
 
 #include <algorithm>
 #include <limits>
@@ -103,7 +102,7 @@ TDigest::TDigest(
     *this = this->merge(digests);
   }
 }
-
+/*
 // Merge unsorted values by first sorting them.  Use radix sort if
 // possible.  This implementation puts all additional memory in the
 // heap, so that if called from fiber context we do not smash the
@@ -124,8 +123,9 @@ TDigest TDigest::merge(const std::vector<double> & unsortedValues) const {
 
   return merge(presorted, std::vector<double>(in, in + n));
 }
+*/
 
-TDigest TDigest::merge(presorted_t, const std::vector<double> & sortedValues) const {
+TDigest TDigest::merge(const std::vector<double> & sortedValues) const {
   if (sortedValues.empty()) {
     return *this;
   }
