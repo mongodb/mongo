@@ -47,6 +47,7 @@ const char kNsField[] = "ns";
 const char kBatchField[] = "nextBatch";
 const char kBatchFieldInitial[] = "firstBatch";
 const char kInternalLatestOplogTimestampField[] = "$_internalLatestOplogTimestamp";
+const char kPostBatchResumeTokenField[] = "postBatchResumeToken";
 
 }  // namespace
 
@@ -60,6 +61,9 @@ CursorResponseBuilder::CursorResponseBuilder(bool isInitialResponse,
 void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) {
     invariant(_active);
     _batch.doneFast();
+    if (!_postBatchResumeToken.isEmpty()) {
+        _cursorObject.append(kPostBatchResumeTokenField, _postBatchResumeToken);
+    }
     _cursorObject.append(kIdField, cursorId);
     _cursorObject.append(kNsField, cursorNamespace);
     _cursorObject.doneFast();
@@ -105,12 +109,14 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                std::vector<BSONObj> batch,
                                boost::optional<long long> numReturnedSoFar,
                                boost::optional<Timestamp> latestOplogTimestamp,
+                               boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError)
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
       _numReturnedSoFar(numReturnedSoFar),
       _latestOplogTimestamp(latestOplogTimestamp),
+      _postBatchResumeToken(std::move(postBatchResumeToken)),
       _writeConcernError(std::move(writeConcernError)) {}
 
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
@@ -176,6 +182,14 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         doc.shareOwnershipWith(cmdResponse);
     }
 
+    auto postBatchResumeTokenElem = cursorObj[kPostBatchResumeTokenField];
+    if (postBatchResumeTokenElem && postBatchResumeTokenElem.type() != BSONType::Object) {
+        return {ErrorCodes::BadValue,
+                str::stream() << kPostBatchResumeTokenField
+                              << " format is invalid; expected Object, but found: "
+                              << postBatchResumeTokenElem.type()};
+    }
+
     auto latestOplogTimestampElem = cmdResponse[kInternalLatestOplogTimestampField];
     if (latestOplogTimestampElem && latestOplogTimestampElem.type() != BSONType::bsonTimestamp) {
         return {
@@ -199,6 +213,8 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
              boost::none,
              latestOplogTimestampElem ? latestOplogTimestampElem.timestamp()
                                       : boost::optional<Timestamp>{},
+             postBatchResumeTokenElem ? postBatchResumeTokenElem.Obj().getOwned()
+                                      : boost::optional<BSONObj>{},
              writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{}}};
 }
 
@@ -216,6 +232,11 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
         batchBuilder.append(obj);
     }
     batchBuilder.doneFast();
+
+    if (_postBatchResumeToken) {
+        invariant(!_postBatchResumeToken->isEmpty());
+        cursorBuilder.append(kPostBatchResumeTokenField, *_postBatchResumeToken);
+    }
 
     cursorBuilder.doneFast();
 

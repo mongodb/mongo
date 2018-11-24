@@ -947,6 +947,7 @@ env.Library(
         'exec/and_hash.cpp',
         'exec/and_sorted.cpp',
         'exec/cached_plan.cpp',
+        'exec/change_stream_proxy.cpp',
         'exec/collection_scan.cpp',
         'exec/count.cpp',
         'exec/count_scan.cpp',

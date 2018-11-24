@@ -46,11 +46,13 @@ namespace mongo {
 /**
  * Stage for pulling results out from an aggregation pipeline.
  */
-class PipelineProxyStage final : public PlanStage {
+class PipelineProxyStage : public PlanStage {
 public:
     PipelineProxyStage(OperationContext* opCtx,
                        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                        WorkingSet* ws);
+
+    virtual ~PipelineProxyStage() = default;
 
     PlanStage::StageState doWork(WorkingSetID* out) final;
 
@@ -63,7 +65,7 @@ public:
     void doReattachToOperationContext() final;
 
     // Returns empty PlanStageStats object
-    std::unique_ptr<PlanStageStats> getStats() final;
+    std::unique_ptr<PlanStageStats> getStats() override;
 
     // Not used.
     SpecificStats* getSpecificStats() const final {
@@ -76,15 +78,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    /**
-     * Pass through the last oplog timestamp from the proxied pipeline.
-     */
-    Timestamp getLatestOplogTimestamp() const;
-
     std::string getPlanSummaryStr() const;
     void getPlanSummaryStats(PlanSummaryStats* statsOut) const;
 
-    StageType stageType() const final {
+    StageType stageType() const override {
         return STAGE_PIPELINE_PROXY;
     }
 
@@ -97,17 +94,20 @@ public:
     static const char* kStageType;
 
 protected:
+    PipelineProxyStage(OperationContext* opCtx,
+                       std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                       WorkingSet* ws,
+                       const char* stageTypeName);
+
+    virtual boost::optional<BSONObj> getNextBson();
     void doDispose() final;
 
-private:
-    boost::optional<BSONObj> getNextBson();
-
-    // Things in the _stash should be returned before pulling items from _pipeline.
+    // Items in the _stash should be returned before pulling items from _pipeline.
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-    std::vector<BSONObj> _stash;
     const bool _includeMetaData;
 
-    // Not owned by us.
+private:
+    std::vector<BSONObj> _stash;
     WorkingSet* _ws;
 };
 

@@ -340,13 +340,19 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // UUID should always be present except for invalidate and dropDatabase entries.  It will not be
     // under FCV 3.4, so we should close the stream as invalid.
     if (operationType != DocumentSourceChangeStream::kInvalidateOpType &&
-        operationType != DocumentSourceChangeStream::kDropDatabaseOpType && uuid.missing()) {
-        warning() << "Saw a CRUD op without a UUID.  Did Feature Compatibility Version get "
-                     "downgraded after opening the stream?";
-        operationType = DocumentSourceChangeStream::kInvalidateOpType;
-        fullDocument = Value();
-        updateDescription = Value();
-        documentKey = Value();
+        operationType != DocumentSourceChangeStream::kDropDatabaseOpType) {
+        if (uuid.missing()) {
+            warning() << "Saw a CRUD op without a UUID.  Did Feature Compatibility Version get "
+                         "downgraded after opening the stream?";
+            operationType = DocumentSourceChangeStream::kInvalidateOpType;
+            fullDocument = Value();
+            updateDescription = Value();
+            documentKey = Value();
+        }
+    } else {
+        // Fill in a dummy UUID for invalidate and dropDatabase, to ensure that they sort after
+        // high-water-mark tokens. Their sorting relative to other events remains unchanged.
+        uuid = Value(UUID::makeDefaultForChangeStream());
     }
 
     // Note that 'documentKey' and/or 'uuid' might be missing, in which case they will not appear

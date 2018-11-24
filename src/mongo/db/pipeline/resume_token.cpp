@@ -79,6 +79,14 @@ std::pair<Value, Value> encodeInBinDataFormat(const ResumeTokenData& data) {
         : Value(BSONBinData(typeBits.getBuffer(), typeBits.getSize(), BinDataType::BinDataGeneral));
     return {Value(rawBinary), typeBitsValue};
 }
+
+// Helper function for makeHighWaterMarkResumeToken and isHighWaterMarkResumeToken.
+ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime) {
+    invariant(!clusterTime.isNull());
+    ResumeTokenData tokenData;
+    tokenData.clusterTime = clusterTime;
+    return tokenData;
+}
 }  // namespace
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
@@ -291,6 +299,14 @@ Document ResumeToken::toDocument(SerializationFormat format) const {
 
 ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
+}
+
+ResumeToken ResumeToken::makeHighWaterMarkResumeToken(Timestamp clusterTime) {
+    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime));
+}
+
+bool ResumeToken::isHighWaterMarkResumeToken(const ResumeTokenData& tokenData) {
+    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime);
 }
 
 }  // namespace mongo

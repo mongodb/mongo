@@ -41,7 +41,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/pipeline_proxy.h"
+#include "mongo/db/exec/change_stream_proxy.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -115,8 +115,11 @@ bool handleCursorCommand(OperationContext* opCtx,
         }
 
         if (state == PlanExecutor::IS_EOF) {
+            // Set both the latestOplogTimestamp and the postBatchResumeToken on the response.
             responseBuilder.setLatestOplogTimestamp(
                 cursor->getExecutor()->getLatestOplogTimestamp());
+            responseBuilder.setPostBatchResumeToken(
+                cursor->getExecutor()->getPostBatchResumeToken());
             if (!cursor->isTailable()) {
                 // make it an obvious error to use cursor or executor after this point
                 cursor = nullptr;
@@ -136,7 +139,9 @@ bool handleCursorCommand(OperationContext* opCtx,
             break;
         }
 
+        // Set both the latestOplogTimestamp and the postBatchResumeToken on the response.
         responseBuilder.setLatestOplogTimestamp(cursor->getExecutor()->getLatestOplogTimestamp());
+        responseBuilder.setPostBatchResumeToken(cursor->getExecutor()->getPostBatchResumeToken());
         responseBuilder.append(next);
     }
 
@@ -508,7 +513,9 @@ Status runAggregate(OperationContext* opCtx,
         // Transfer ownership of the Pipeline to the PipelineProxyStage.
         unownedPipeline = pipeline.get();
         auto ws = make_unique<WorkingSet>();
-        auto proxy = make_unique<PipelineProxyStage>(opCtx, std::move(pipeline), ws.get());
+        auto proxy = liteParsedPipeline.hasChangeStream()
+            ? make_unique<ChangeStreamProxyStage>(opCtx, std::move(pipeline), ws.get())
+            : make_unique<PipelineProxyStage>(opCtx, std::move(pipeline), ws.get());
 
         // This PlanExecutor will simply forward requests to the Pipeline, so does not need to
         // yield or to be registered with any collection's CursorManager to receive invalidations.

@@ -467,7 +467,13 @@ public:
      * If the last oplog timestamp is being tracked for this PlanExecutor, return it.
      * Otherwise return a null timestamp.
      */
-    Timestamp getLatestOplogTimestamp();
+    Timestamp getLatestOplogTimestamp() const;
+
+    /**
+     * If this PlanExecutor is tracking change stream resume tokens, return the most recent token
+     * for the batch that is currently being built. Otherwise, return an empty object.
+     */
+    BSONObj getPostBatchResumeToken() const;
 
 private:
     /**

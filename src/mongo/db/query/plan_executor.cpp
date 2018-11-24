@@ -41,9 +41,9 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/change_stream_proxy.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/subplan.h"
@@ -715,12 +715,18 @@ void PlanExecutor::enqueue(const BSONObj& obj) {
     _stash.push(obj.getOwned());
 }
 
-Timestamp PlanExecutor::getLatestOplogTimestamp() {
-    if (auto pipelineProxy = getStageByType(_root.get(), STAGE_PIPELINE_PROXY))
-        return static_cast<PipelineProxyStage*>(pipelineProxy)->getLatestOplogTimestamp();
+Timestamp PlanExecutor::getLatestOplogTimestamp() const {
+    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY))
+        return static_cast<ChangeStreamProxyStage*>(changeStreamProxy)->getLatestOplogTimestamp();
     if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN))
         return static_cast<CollectionScan*>(collectionScan)->getLatestOplogTimestamp();
     return Timestamp();
+}
+
+BSONObj PlanExecutor::getPostBatchResumeToken() const {
+    if (auto changeStreamProxy = getStageByType(_root.get(), STAGE_CHANGE_STREAM_PROXY))
+        return static_cast<ChangeStreamProxyStage*>(changeStreamProxy)->getPostBatchResumeToken();
+    return {};
 }
 
 //

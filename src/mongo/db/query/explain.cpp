@@ -127,7 +127,8 @@ MultiPlanStage* getMultiPlanStage(PlanStage* root) {
  * there is no PPS that is root.
  */
 PipelineProxyStage* getPipelineProxyStage(PlanStage* root) {
-    if (root->stageType() == STAGE_PIPELINE_PROXY) {
+    if (root->stageType() == STAGE_PIPELINE_PROXY ||
+        root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
         return static_cast<PipelineProxyStage*>(root);
     }
 
@@ -884,7 +885,8 @@ std::string Explain::getPlanSummary(const PlanExecutor* exec) {
 
 // static
 std::string Explain::getPlanSummary(const PlanStage* root) {
-    if (root->stageType() == STAGE_PIPELINE_PROXY) {
+    if (root->stageType() == STAGE_PIPELINE_PROXY ||
+        root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
         auto pipelineProxy = static_cast<const PipelineProxyStage*>(root);
         return pipelineProxy->getPlanSummaryStr();
     }
@@ -918,7 +920,8 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
 
     PlanStage* root = exec.getRootStage();
 
-    if (root->stageType() == STAGE_PIPELINE_PROXY) {
+    if (root->stageType() == STAGE_PIPELINE_PROXY ||
+        root->stageType() == STAGE_CHANGE_STREAM_PROXY) {
         auto pipelineProxy = static_cast<PipelineProxyStage*>(root);
         pipelineProxy->getPlanSummaryStats(statsOut);
         return;

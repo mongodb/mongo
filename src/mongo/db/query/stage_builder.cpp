@@ -358,6 +358,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             return new EnsureSortedStage(opCtx, esn->pattern, ws, childStage);
         }
         case STAGE_CACHED_PLAN:
+        case STAGE_CHANGE_STREAM_PROXY:
         case STAGE_COUNT:
         case STAGE_DELETE:
         case STAGE_NOTIFY_DELETE:

@@ -539,8 +539,9 @@ public:
 
                 // As soon as we get a result, this operation no longer waits.
                 awaitDataState(opCtx).shouldWaitForInserts = false;
-                // Add result to output buffer.
+                // Add result to output buffer, set latestOplogTimestamp and postBatchResumeToken.
                 nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+                nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
                 nextBatch->append(obj);
                 (*numResults)++;
             }
@@ -563,9 +564,10 @@ public:
                 return status;
             }
             case PlanExecutor::IS_EOF:
-                // This causes the reported latest oplog timestamp to advance even when there are
-                // no results for this particular query.
+                // This causes the reported latest oplog timestamp and postBatchResumeToken to
+                // advance even when there are no results for this particular query.
                 nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+                nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
             default:
                 return Status::OK();
         }

@@ -51,7 +51,13 @@ const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
                                        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                        WorkingSet* ws)
-    : PlanStage(kStageType, opCtx),
+    : PipelineProxyStage(opCtx, std::move(pipeline), ws, kStageType) {}
+
+PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
+                                       std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                       WorkingSet* ws,
+                                       const char* stageTypeName)
+    : PlanStage(stageTypeName, opCtx),
       _pipeline(std::move(pipeline)),
       _includeMetaData(_pipeline->getContext()->needsMerge),  // send metadata to merger
       _ws(ws) {
@@ -126,10 +132,6 @@ boost::optional<BSONObj> PipelineProxyStage::getNextBson() {
     }
 
     return boost::none;
-}
-
-Timestamp PipelineProxyStage::getLatestOplogTimestamp() const {
-    return PipelineD::getLatestOplogTimestamp(_pipeline.get());
 }
 
 std::string PipelineProxyStage::getPlanSummaryStr() const {

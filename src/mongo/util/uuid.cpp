@@ -89,6 +89,10 @@ UUID UUID::parse(const BSONObj& obj) {
     return res.getValue();
 }
 
+UUID UUID::makeDefaultForChangeStream() {
+    return UUID{};
+}
+
 bool UUID::isUUIDString(const std::string& s) {
     return std::regex_match(s, uuidRegex);
 }

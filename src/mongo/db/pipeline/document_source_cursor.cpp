@@ -105,9 +105,9 @@ void DocumentSourceCursor::loadBatch() {
                 // As long as we're waiting for inserts, we shouldn't do any batching at this level
                 // we need the whole pipeline to see each document to see if we should stop waiting.
                 // Furthermore, if we need to return the latest oplog time (in the tailable and
-                // needs-merge case), batching will result in a wrong time.
-                if (awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
-                    (pExpCtx->isTailableAwaitData() && pExpCtx->needsMerge) ||
+                // awaitData case), batching will result in a wrong time.
+                if (pExpCtx->isTailableAwaitData() ||
+                    awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
                     memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
                     // End this batch and prepare PlanExecutor for yielding.
                     _exec->saveState();
