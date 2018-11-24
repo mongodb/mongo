@@ -46,6 +46,16 @@ namespace mongo {
 constexpr StringData ResumeToken::kDataFieldName;
 constexpr StringData ResumeToken::kTypeBitsFieldName;
 
+namespace {
+// Helper function for makeHighWaterMarkResumeToken and isHighWaterMarkResumeToken.
+ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime) {
+    invariant(!clusterTime.isNull());
+    ResumeTokenData tokenData;
+    tokenData.clusterTime = clusterTime;
+    return tokenData;
+}
+}  // namespace
+
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
     return clusterTime == other.clusterTime && version == other.version &&
         fromInvalidate == other.fromInvalidate &&
@@ -192,6 +202,14 @@ Document ResumeToken::toDocument() const {
 
 ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
+}
+
+ResumeToken ResumeToken::makeHighWaterMarkResumeToken(Timestamp clusterTime) {
+    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime));
+}
+
+bool ResumeToken::isHighWaterMarkResumeToken(const ResumeTokenData& tokenData) {
+    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime);
 }
 
 }  // namespace mongo

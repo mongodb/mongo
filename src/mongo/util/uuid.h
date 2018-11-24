@@ -102,6 +102,11 @@ public:
     static StatusWith<UUID> parse(BSONElement from);
 
     /**
+     * Returns the nil UUID; that is, a UUID composed entirely of zeroes.
+     */
+    static UUID nil();
+
+    /**
      * Parses a BSON document of the form { uuid: BinData(4, "...") }.
      *
      * For IDL.

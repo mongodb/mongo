@@ -78,7 +78,8 @@ public:
     Status getKillStatus() final;
     bool isDisposed() const final;
     bool isDetached() const final;
-    Timestamp getLatestOplogTimestamp() final;
+    Timestamp getLatestOplogTimestamp() const final;
+    BSONObj getPostBatchResumeToken() const final;
     Status getMemberObjectStatus(const BSONObj& memberObj) const final;
 
 private:

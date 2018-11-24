@@ -452,7 +452,13 @@ public:
      * If the last oplog timestamp is being tracked for this PlanExecutor, return it.
      * Otherwise return a null timestamp.
      */
-    virtual Timestamp getLatestOplogTimestamp() = 0;
+    virtual Timestamp getLatestOplogTimestamp() const = 0;
+
+    /**
+     * If this PlanExecutor is tracking change stream resume tokens, return the most recent token
+     * for the batch that is currently being built. Otherwise, return an empty object.
+     */
+    virtual BSONObj getPostBatchResumeToken() const = 0;
 
     /**
      * Turns a BSONObj representing an error status produced by getNext() into a Status.

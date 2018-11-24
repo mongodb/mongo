@@ -574,7 +574,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::IS_COUNT;
     }
 
-    if (expCtx->needsMerge && expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+    if (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) {
+        invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
         plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
     }
 

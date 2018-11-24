@@ -34,6 +34,7 @@
 
 #include "mongo/rpc/op_msg_rpc_impls.h"
 
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -332,6 +333,35 @@ TEST(CursorResponseTest, serializeLatestOplogEntry) {
     ASSERT_EQ(reparsedResponse.getNSS().ns(), "db.coll");
     ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
     ASSERT_EQ(*reparsedResponse.getLastOplogTimestamp(), Timestamp(1, 2));
+}
+
+TEST(CursorResponseTest, serializePostBatchResumeToken) {
+    std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
+    auto postBatchResumeToken =
+        ResumeToken::makeHighWaterMarkResumeToken(Timestamp(1, 2)).toDocument().toBson();
+    CursorResponse response(NamespaceString("db.coll"),
+                            CursorId(123),
+                            batch,
+                            boost::none,
+                            boost::none,
+                            postBatchResumeToken);
+    auto serialized = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    ASSERT_BSONOBJ_EQ(serialized,
+                      BSON("cursor" << BSON("id" << CursorId(123) << "ns"
+                                                 << "db.coll"
+                                                 << "nextBatch"
+                                                 << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2))
+                                                 << "postBatchResumeToken"
+                                                 << postBatchResumeToken)
+                                    << "ok"
+                                    << 1));
+    auto reparsed = CursorResponse::parseFromBSON(serialized);
+    ASSERT_OK(reparsed.getStatus());
+    CursorResponse reparsedResponse = std::move(reparsed.getValue());
+    ASSERT_EQ(reparsedResponse.getCursorId(), CursorId(123));
+    ASSERT_EQ(reparsedResponse.getNSS().ns(), "db.coll");
+    ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
+    ASSERT_BSONOBJ_EQ(*reparsedResponse.getPostBatchResumeToken(), postBatchResumeToken);
 }
 
 TEST(CursorResponseTest, cursorReturnDocumentSequences) {
