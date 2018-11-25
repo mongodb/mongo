@@ -70,13 +70,21 @@ void GlobalInfo::Functions::print::call(JSContext* cx, JS::CallArgs args) {
     logger::LogstreamBuilder builder(jsPrintLogDomain, getThreadName(), logger::LogSeverity::Log());
     std::ostream& ss = builder.stream();
 
-    bool first = true;
+    // bool first = true;
     for (size_t i = 0; i < args.length(); i++) {
+        /*
         if (first)
             first = false;
         else
             ss << " ";
-
+            
+         First will be false only once when i == 0
+         So no need to take another variable. We can simply do same thing using "if" when i != 0
+         Since First won't be updated after first iteration. So ignoring that variable.
+        */
+        if ( i != 0 ) {
+            ss << " ";
+        }
         if (args.get(i).isNullOrUndefined()) {
             // failed to get object to convert
             ss << "[unknown type]";
