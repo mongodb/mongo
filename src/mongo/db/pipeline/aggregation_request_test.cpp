@@ -59,14 +59,15 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromMongos: true, "
-        "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
-        "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
-        "$queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment'}}");
+        "needsMerge: true, mergeByPBRT: true, bypassDocumentValidation: true, collation: {locale: "
+        "'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: "
+        "'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment'}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
     ASSERT_TRUE(request.isFromMongos());
     ASSERT_TRUE(request.needsMerge());
+    ASSERT_TRUE(request.mergeByPBRT());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_EQ(request.getBatchSize(), 10);
     ASSERT_BSONOBJ_EQ(request.getHint(), BSON("a" << 1));
@@ -153,6 +154,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setAllowDiskUse(false);
     request.setFromMongos(false);
     request.setNeedsMerge(false);
+    request.setMergeByPBRT(false);
     request.setBypassDocumentValidation(false);
     request.setCollation(BSONObj());
     request.setHint(BSONObj());
@@ -174,6 +176,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setAllowDiskUse(true);
     request.setFromMongos(true);
     request.setNeedsMerge(true);
+    request.setMergeByPBRT(true);
     request.setBypassDocumentValidation(true);
     request.setBatchSize(10);
     request.setMaxTimeMS(10u);
@@ -197,6 +200,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kAllowDiskUseName, true},
                  {AggregationRequest::kFromMongosName, true},
                  {AggregationRequest::kNeedsMergeName, true},
+                 {AggregationRequest::kMergeByPBRTName, true},
                  {bypassDocumentValidationCommandOption(), true},
                  {AggregationRequest::kCollationName, collationObj},
                  {AggregationRequest::kCursorName,
@@ -372,6 +376,13 @@ TEST(AggregationRequestTest, ShouldRejectFromMongosIfNeedsMerge34AlsoPresent) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: true, fromRouter: true}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonBoolMergeByPBRT) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson(
+        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, mergeByPBRT: 1, fromMongos: true}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

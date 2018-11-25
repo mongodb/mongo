@@ -196,6 +196,7 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
 BSONObj createCommandForTargetedShards(
     OperationContext* opCtx,
     const AggregationRequest& request,
+    const LiteParsedPipeline& litePipe,
     const BSONObj originalCmdObj,
     const std::unique_ptr<Pipeline, PipelineDeleter>& pipelineForTargetedShards,
     const BSONObj collationObj,
@@ -212,6 +213,9 @@ BSONObj createCommandForTargetedShards(
 
         if (pipelineForTargetedShards->isSplitForShards()) {
             targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
+            // If this is a change stream, set the 'mergeByPBRT' flag on the command. This notifies
+            // the shards that the mongoS is capable of merging streams based on resume token.
+            targetedCmd[AggregationRequest::kMergeByPBRTName] = Value(litePipe.hasChangeStream());
             targetedCmd[AggregationRequest::kCursorName] =
                 Value(DOC(AggregationRequest::kBatchSizeName << 0));
         }
@@ -421,8 +425,13 @@ DispatchShardPipelineResults dispatchShardPipeline(
     }
 
     // Generate the command object for the targeted shards.
-    BSONObj targetedCommand = createCommandForTargetedShards(
-        opCtx, aggRequest, originalCmdObj, pipelineForTargetedShards, collationObj, atClusterTime);
+    BSONObj targetedCommand = createCommandForTargetedShards(opCtx,
+                                                             aggRequest,
+                                                             liteParsedPipeline,
+                                                             originalCmdObj,
+                                                             pipelineForTargetedShards,
+                                                             collationObj,
+                                                             atClusterTime);
 
     // Refresh the shard registry if we're targeting all shards.  We need the shard registry
     // to be at least as current as the logical time used when creating the command for
@@ -1043,7 +1052,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     cmdObj = CommandHelpers::filterCommandRequestForPassthrough(createCommandForTargetedShards(
-        opCtx, aggRequest, cmdObj, nullptr, BSONObj(), atClusterTime));
+        opCtx, aggRequest, liteParsedPipeline, cmdObj, nullptr, BSONObj(), atClusterTime));
 
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,

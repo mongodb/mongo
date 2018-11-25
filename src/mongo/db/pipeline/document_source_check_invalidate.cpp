@@ -97,9 +97,16 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
                                         {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
                                         {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]}});
 
-        // If we're in a sharded environment, we'll need to merge the results by their sort key, so
-        // add that as metadata.
+        // We set the resume token as the document's sort key in both the sharded and non-sharded
+        // cases, since we will later rely upon it to generate a correct postBatchResumeToken. We
+        // must therefore update the sort key to match the new resume token that we generated above.
+        // When returning results for merging, we check whether 'mergeByPBRT' has been set. If not,
+        // then the request was sent from an older mongoS which cannot merge by raw resume tokens,
+        // and the sort key should therefore be left alone.
         result.copyMetaDataFrom(doc);
+        if (!pExpCtx->needsMerge || pExpCtx->mergeByPBRT) {
+            result.setSortKeyMetaField(resumeToken.toBson());
+        }
 
         _queuedInvalidate = result.freeze();
     }

@@ -36,8 +36,7 @@
 namespace mongo {
 namespace change_stream_constants {
 
-const BSONObj kSortSpec =
-    BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
+const BSONObj kSortSpec = BSON("_id._data" << 1);
 
 }  // namespace change_stream_constants
 }  // namespace mongo

@@ -1240,6 +1240,81 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
                        ErrorCodes::InvalidResumeToken);
 }
 
+TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
+                                 nss,                           // namespace
+                                 BSON("x" << 2 << "_id" << 1),  // o
+                                 testUuid(),                    // uuid
+                                 boost::none,                   // fromMigrate
+                                 boost::none);                  // o2
+
+    auto stages = makeStages(insert.toBSON(), kDefaultSpec);
+
+    getExpCtx()->mongoProcessInterface =
+        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+
+    getExpCtx()->mergeByPBRT = false;
+    getExpCtx()->needsMerge = false;
+
+    auto next = stages.back()->getNext();
+
+    auto expectedSortKey =
+        makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1)).toBson();
+
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_BSONOBJ_EQ(next.releaseDocument().getSortKeyMetaField(), expectedSortKey);
+}
+
+TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfMergeByPBRTIsTrue) {
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
+                                 nss,                           // namespace
+                                 BSON("x" << 2 << "_id" << 1),  // o
+                                 testUuid(),                    // uuid
+                                 boost::none,                   // fromMigrate
+                                 boost::none);                  // o2
+
+    auto stages = makeStages(insert.toBSON(), kDefaultSpec);
+
+    getExpCtx()->mongoProcessInterface =
+        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+
+    getExpCtx()->mergeByPBRT = true;
+    getExpCtx()->needsMerge = true;
+
+    auto next = stages.back()->getNext();
+
+    auto expectedSortKey =
+        makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1)).toBson();
+
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_BSONOBJ_EQ(next.releaseDocument().getSortKeyMetaField(), expectedSortKey);
+}
+
+TEST_F(ChangeStreamStageTest, UsesOldSortKeyFormatIfMergeByPBRTIsFalse) {
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
+                                 nss,                           // namespace
+                                 BSON("x" << 2 << "_id" << 1),  // o
+                                 testUuid(),                    // uuid
+                                 boost::none,                   // fromMigrate
+                                 boost::none);                  // o2
+
+    auto stages = makeStages(insert.toBSON(), kDefaultSpec);
+
+    getExpCtx()->mongoProcessInterface =
+        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+
+    getExpCtx()->mergeByPBRT = false;
+    getExpCtx()->needsMerge = true;
+
+    auto next = stages.back()->getNext();
+
+    auto expectedSortKey =
+        BSON("" << kDefaultTs << "" << testUuid() << "" << BSON("x" << 2 << "_id" << 1));
+
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_BSONOBJ_EQ(next.releaseDocument().getSortKeyMetaField(), expectedSortKey);
+}
+
 //
 // Test class for change stream of a single database.
 //

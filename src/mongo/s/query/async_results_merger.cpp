@@ -485,43 +485,31 @@ void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
                                               const CursorResponse& response) {
     // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
     remote->cursorId = response.getCursorId();
-    if (response.getLastOplogTimestamp() && !response.getLastOplogTimestamp()->isNull()) {
+    if (response.getPostBatchResumeToken()) {
         // We only expect to see this for change streams.
         invariant(_params.getSort());
         invariant(SimpleBSONObjComparator::kInstance.evaluate(*_params.getSort() ==
                                                               change_stream_constants::kSortSpec));
 
-        auto newLatestTimestamp = *response.getLastOplogTimestamp();
-        if (remote->promisedMinSortKey) {
-            auto existingLatestTimestamp = remote->promisedMinSortKey->firstElement().timestamp();
-            if (existingLatestTimestamp == newLatestTimestamp) {
-                // Nothing to update.
-                return;
-            }
-            // The most recent oplog timestamp should never be smaller than the timestamp field of
-            // the previous min sort key for this remote, if one exists.
-            invariant(existingLatestTimestamp < newLatestTimestamp);
+        // The postBatchResumeToken should never be empty.
+        invariant(!response.getPostBatchResumeToken()->isEmpty());
+
+        // The most recent minimum sort key should never be smaller than the previous promised
+        // minimum sort key for this remote, if one exists.
+        auto newMinSortKey = *response.getPostBatchResumeToken();
+        if (auto& oldMinSortKey = remote->promisedMinSortKey) {
+            invariant(compareSortKeys(newMinSortKey, *oldMinSortKey, *_params.getSort()) >= 0);
         }
-
-        // Our new minimum promised sort key is the first key whose timestamp matches the most
-        // recent reported oplog timestamp.
-        auto newPromisedMin =
-            BSON("" << *response.getLastOplogTimestamp() << "" << MINKEY << "" << MINKEY);
-
-        // The promised min sort key should never be smaller than any results returned. If the
-        // last entry in the batch is also the most recent entry in the oplog, then its sort key
-        // of {lastOplogTimestamp, uuid, docID} will be greater than the artificial promised min
-        // sort key of {lastOplogTimestamp, MINKEY, MINKEY}.
-        auto maxSortKeyFromResponse =
-            (response.getBatch().empty()
-                 ? BSONObj()
-                 : extractSortKey(response.getBatch().back(), _params.getCompareWholeSortKey()));
-
-        remote->promisedMinSortKey =
-            (compareSortKeys(
-                 newPromisedMin, maxSortKeyFromResponse, change_stream_constants::kSortSpec) < 0
-                 ? maxSortKeyFromResponse.getOwned()
-                 : newPromisedMin.getOwned());
+        remote->promisedMinSortKey = newMinSortKey;
+    } else {
+        // If we don't have a postBatchResumeToken, then we should never have an oplog timestamp.
+        uassert(ErrorCodes::InternalErrorNotSupported,
+                str::stream() << "Host " << remote->shardHostAndPort
+                              << " returned a cursor which has an oplog timestamp but does not "
+                                 "have a postBatchResumeToken, suggesting that one or more shards"
+                                 " are running an older version of MongoDB. This configuration "
+                                 "is not supported.",
+                !response.getLastOplogTimestamp());
     }
 }
 

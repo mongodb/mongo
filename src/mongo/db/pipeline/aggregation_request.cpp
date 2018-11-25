@@ -55,6 +55,7 @@ constexpr StringData AggregationRequest::kCursorName;
 constexpr StringData AggregationRequest::kBatchSizeName;
 constexpr StringData AggregationRequest::kFromMongosName;
 constexpr StringData AggregationRequest::kNeedsMergeName;
+constexpr StringData AggregationRequest::kMergeByPBRTName;
 constexpr StringData AggregationRequest::kPipelineName;
 constexpr StringData AggregationRequest::kCollationName;
 constexpr StringData AggregationRequest::kExplainName;
@@ -204,6 +205,14 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
             hasNeedsMergeElem = true;
             request.setNeedsMerge(elem.Bool());
+        } else if (kMergeByPBRTName == fieldName) {
+            if (elem.type() != BSONType::Bool) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kMergeByPBRTName << " must be a boolean, not a "
+                                      << typeName(elem.type())};
+            }
+
+            request.setMergeByPBRT(elem.Bool());
         } else if (kAllowDiskUseName == fieldName) {
             if (storageGlobalParams.readOnly) {
                 return {ErrorCodes::IllegalOperation,
@@ -296,6 +305,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
         {kFromMongosName, _fromMongos ? Value(true) : Value()},
         {kNeedsMergeName, _needsMerge ? Value(true) : Value()},
+        {kMergeByPBRTName, _mergeByPBRT ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),
          _bypassDocumentValidation ? Value(true) : Value()},
         // Only serialize a collation if one was specified.

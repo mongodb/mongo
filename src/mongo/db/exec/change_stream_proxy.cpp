@@ -52,12 +52,10 @@ ChangeStreamProxyStage::ChangeStreamProxyStage(OperationContext* opCtx,
 boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
     if (auto next = _pipeline->getNext()) {
         // While we have more results to return, we track both the timestamp and the resume token of
-        // the latest event observed in the oplog, the latter via its _id field.
+        // the latest event observed in the oplog, the latter via its sort key metadata field.
         auto nextBSON = (_includeMetaData ? next->toBsonWithMetaData() : next->toBson());
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
-        if (next->getField("_id").getType() == BSONType::Object) {
-            _postBatchResumeToken = next->getField("_id").getDocument().toBson();
-        }
+        _postBatchResumeToken = next->getSortKeyMetaField();
         return nextBSON;
     }
 
