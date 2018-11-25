@@ -1,15 +1,14 @@
-MongoDB README
+# Welcome to MongoDB!
 
-Welcome to MongoDB!
-
-COMPONENTS
-
+## COMPONENTS
+```
   mongod - The database server.
   mongos - Sharding router.
   mongo  - The database shell (uses interactive javascript).
+```
 
-UTILITIES
-
+## UTILITIES
+```
   mongodump         - Create a binary dump of the contents of a database.
   mongorestore      - Restore data from the output created by mongodump.
   mongoexport       - Export the contents of a collection to JSON or CSV.
@@ -20,12 +19,13 @@ UTILITIES
   mongoreplay       - Traffic capture and replay tool.
   mongotop          - Track time spent reading and writing data.
   install_compass   - Installs MongoDB Compass for your platform.
+```
 
-BUILDING
+## BUILDING
 
   See docs/building.md.
 
-RUNNING
+## RUNNING
 
   For command line options invoke:
 
@@ -40,7 +40,7 @@ RUNNING
     $ ./mongo
     > help
 
-INSTALLING COMPASS
+## INSTALLING COMPASS
 
   You can install compass using the install_compass script packaged with MongoDB:
 
@@ -49,44 +49,40 @@ INSTALLING COMPASS
   This will download the appropriate MongoDB Compass package for your platform
   and install it.
 
-DRIVERS
+## DRIVERS
 
-  Client drivers for most programming languages are available at
-  https://docs.mongodb.com/manual/applications/drivers/. Use the shell
-  ("mongo") for administrative tasks.
+  Client drivers for most programming languages are available at [ This Link ](https://docs.mongodb.com/manual/applications/drivers/). 
+  Use the shell ("mongo") for administrative tasks.
 
-BUG REPORTS
+## BUG REPORTS
 
-  See https://github.com/mongodb/mongo/wiki/Submit-Bug-Reports.
+  See [Bug Reports Here](https://github.com/mongodb/mongo/wiki/Submit-Bug-Reports).
 
-PACKAGING
+## PACKAGING
 
   Packages are created dynamically by the package.py script located in the
   buildscripts directory. This will generate RPM and Debian packages.
 
-DOCUMENTATION
+## DOCUMENTATION
 
-  https://docs.mongodb.com/manual/
+  [Documentation Link](https://docs.mongodb.com/manual/)
 
-CLOUD HOSTED MONGODB
+## CLOUD HOSTED MONGODB
 
-  https://www.mongodb.com/cloud/atlas
+  [Cloud Hosted MongoDB Link](https://www.mongodb.com/cloud/atlas)
 
-MAIL LISTS
+## MAIL LISTS
 
-  https://groups.google.com/forum/#!forum/mongodb-user
+  [A forum for technical questions about using MongoDB.](https://groups.google.com/forum/#!forum/mongodb-user)
 
-    A forum for technical questions about using MongoDB.
 
-  https://groups.google.com/forum/#!forum/mongodb-dev
+  [A forum for technical questions about building and developing MongoDB.](https://groups.google.com/forum/#!forum/mongodb-dev)
 
-    A forum for technical questions about building and developing MongoDB.
+## LEARN MONGODB
 
-LEARN MONGODB
+  [Start With MongoDB](https://university.mongodb.com/)
 
-  https://university.mongodb.com/
-
-LICENSE
+## LICENSE
 
   MongoDB is free and open-source. Versions released prior to October 16,
   2018 are published under the AGPL. All versions released after October
