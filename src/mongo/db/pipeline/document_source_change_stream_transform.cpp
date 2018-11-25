@@ -355,7 +355,8 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 
     // Note that 'documentKey' and/or 'uuid' might be missing, in which case they will not appear
     // in the output.
-    ResumeTokenData resumeTokenData = getResumeToken(ts, uuid, documentKey);
+    auto resumeTokenData = getResumeToken(ts, uuid, documentKey);
+    auto resumeToken = ResumeToken(resumeTokenData).toDocument();
 
     // Add some additional fields only relevant to transactions.
     if (_txnContext) {
@@ -364,15 +365,20 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         doc.addField(DocumentSourceChangeStream::kLsidField, Value(_txnContext->lsid));
     }
 
-    doc.addField(DocumentSourceChangeStream::kIdField,
-                 Value(ResumeToken(resumeTokenData).toDocument()));
+    doc.addField(DocumentSourceChangeStream::kIdField, Value(resumeToken));
     doc.addField(DocumentSourceChangeStream::kOperationTypeField, Value(operationType));
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
-    // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
-    // that as metadata.
-    if (pExpCtx->needsMerge) {
+    // We set the resume token as the document's sort key in both the sharded and non-sharded cases,
+    // since we will subsequently rely upon it to generate a correct postBatchResumeToken.
+    // TODO SERVER-38539: when returning results for merging, we first check whether 'mergeByPBRT'
+    // has been set. If not, then the request was sent from an older mongoS which cannot merge by
+    // raw resume tokens, and we must use the old sort key format. This check, and the 'mergeByPBRT'
+    // flag, are no longer necessary in 4.4; all change streams will be merged by resume token.
+    if (pExpCtx->needsMerge && !pExpCtx->mergeByPBRT) {
         doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
+    } else {
+        doc.setSortKeyMetaField(resumeToken.toBson());
     }
 
     // "invalidate" and "newShardDetected" entries have fewer fields.

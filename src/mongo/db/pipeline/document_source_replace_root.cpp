@@ -73,7 +73,9 @@ public:
                 newRoot.getType() == Object);
 
         // Turn the value into a document.
-        return newRoot.getDocument();
+        MutableDocument newDoc(newRoot.getDocument());
+        newDoc.copyMetaDataFrom(input);
+        return newDoc.freeze();
     }
 
     // Optimize the newRoot expression.

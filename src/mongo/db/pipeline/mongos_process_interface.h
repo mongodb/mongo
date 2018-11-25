@@ -95,6 +95,7 @@ public:
     static BSONObj createCommandForTargetedShards(
         OperationContext* opCtx,
         const AggregationRequest& request,
+        const LiteParsedPipeline& litePipe,
         const cluster_aggregation_planner::SplitPipeline& splitPipeline,
         const BSONObj collationObj,
         const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
@@ -116,7 +117,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& executionNss,
         const AggregationRequest& aggRequest,
-        const LiteParsedPipeline& liteParsedPipeline,
+        const LiteParsedPipeline& litePipe,
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
         BSONObj collationObj);
 

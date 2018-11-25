@@ -275,6 +275,7 @@ BSONObj MongoSInterface::genericTransformForShards(MutableDocument&& cmdForShard
 BSONObj MongoSInterface::createCommandForTargetedShards(
     OperationContext* opCtx,
     const AggregationRequest& request,
+    const LiteParsedPipeline& litePipe,
     const cluster_aggregation_planner::SplitPipeline& splitPipeline,
     const BSONObj collationObj,
     const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
@@ -292,6 +293,11 @@ BSONObj MongoSInterface::createCommandForTargetedShards(
     // When running on many shards with the exchange we may not need merging.
     if (needsMerge) {
         targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
+
+        // If this is a change stream aggregation, set the 'mergeByPBRT' flag on the command. This
+        // notifies the shards that the mongoS is capable of merging streams based on resume token.
+        // TODO SERVER-38539: the 'mergeByPBRT' flag is no longer necessary in 4.4.
+        targetedCmd[AggregationRequest::kMergeByPBRTName] = Value(litePipe.hasChangeStream());
 
         // For split pipelines which need merging, do *not* propagate the writeConcern to the shards
         // part. Otherwise this is part of an exchange and in that case we should include the
@@ -364,7 +370,7 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& executionNss,
     const AggregationRequest& aggRequest,
-    const LiteParsedPipeline& liteParsedPipeline,
+    const LiteParsedPipeline& litePipe,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     BSONObj collationObj) {
     // The process is as follows:
@@ -388,7 +394,7 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
 
     // If this is a $changeStream, we swallow NamespaceNotFound exceptions and continue.
     // Otherwise, uassert on all exceptions here.
-    if (!(liteParsedPipeline.hasChangeStream() &&
+    if (!(litePipe.hasChangeStream() &&
           executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
         uassertStatusOK(executionNsRoutingInfoStatus);
     }
@@ -398,7 +404,7 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
         : boost::optional<CachedCollectionRoutingInfo>{};
 
     // Determine whether we can run the entire aggregation on a single shard.
-    const bool mustRunOnAll = mustRunOnAllShards(executionNss, liteParsedPipeline);
+    const bool mustRunOnAll = mustRunOnAllShards(executionNss, litePipe);
     std::set<ShardId> shardIds = getTargetedShards(
         opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
 
@@ -423,7 +429,7 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
     // Generate the command object for the targeted shards.
     BSONObj targetedCommand = splitPipeline
         ? createCommandForTargetedShards(
-              opCtx, aggRequest, *splitPipeline, collationObj, exchangeSpec, true)
+              opCtx, aggRequest, litePipe, *splitPipeline, collationObj, exchangeSpec, true)
         : createPassthroughCommandForShard(
               opCtx, aggRequest, boost::none, pipeline.get(), collationObj);
 
@@ -466,7 +472,7 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
     } else {
         cursors = establishShardCursors(opCtx,
                                         executionNss,
-                                        liteParsedPipeline,
+                                        litePipe,
                                         executionNsRoutingInfo,
                                         targetedCommand,
                                         aggRequest,

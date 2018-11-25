@@ -143,11 +143,11 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
 MongoSInterface::DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& executionNss,
-    const AggregationRequest& aggRequest,
-    const LiteParsedPipeline& liteParsedPipeline,
+    const AggregationRequest& request,
+    const LiteParsedPipeline& litePipe,
     BSONObj collationObj,
     MongoSInterface::DispatchShardPipelineResults* shardDispatchResults) {
-    invariant(!liteParsedPipeline.hasChangeStream());
+    invariant(!litePipe.hasChangeStream());
     auto opCtx = expCtx->opCtx;
 
     if (MONGO_FAIL_POINT(clusterAggregateFailToDispatchExchangeConsumerPipeline)) {
@@ -174,7 +174,7 @@ MongoSInterface::DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
 
         cluster_aggregation_planner::addMergeCursorsSource(
             consumerPipeline.get(),
-            liteParsedPipeline,
+            litePipe,
             BSONObj(),
             std::move(producers),
             {},
@@ -184,7 +184,7 @@ MongoSInterface::DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
         consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
 
         auto consumerCmdObj = MongoSInterface::createCommandForTargetedShards(
-            opCtx, aggRequest, consumerPipelines.back(), collationObj, boost::none, false);
+            opCtx, request, litePipe, consumerPipelines.back(), collationObj, boost::none, false);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
                               consumerCmdObj);
