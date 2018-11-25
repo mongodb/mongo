@@ -546,6 +546,21 @@ def _bind_validator(ctxt, validator):
     return ast_validator
 
 
+def _bind_condition(condition):
+    # type: (syntax.Condition) -> ast.Condition
+    """Bind a condition from the idl.syntax tree."""
+
+    if not condition:
+        return None
+
+    ast_condition = ast.Condition(condition.file_name, condition.line, condition.column)
+    ast_condition.expr = condition.expr
+    ast_condition.constexpr = condition.constexpr
+    ast_condition.preprocessor = condition.preprocessor
+
+    return ast_condition
+
+
 def _bind_field(ctxt, parsed_spec, field):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Field) -> ast.Field
     """
@@ -834,6 +849,7 @@ def _bind_server_parameter(ctxt, param):
     ast_param.description = param.description
     ast_param.cpp_vartype = param.cpp_vartype
     ast_param.cpp_varname = param.cpp_varname
+    ast_param.condition = _bind_condition(param.condition)
     ast_param.deprecated_name = param.deprecated_name
 
     custom_required_fields = ["from_string", "append_bson"]
@@ -968,6 +984,7 @@ def _bind_config_option(ctxt, globals_spec, option):
     node.arg_vartype = option.arg_vartype
     node.cpp_vartype = option.cpp_vartype
     node.cpp_varname = option.cpp_varname
+    node.condition = _bind_condition(option.condition)
 
     node.requires = option.requires
     node.conflicts = option.conflicts

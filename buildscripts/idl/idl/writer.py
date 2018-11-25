@@ -178,7 +178,21 @@ class TemplateContext(object):
         self._writer.clear_template_mapping()
 
 
-class EmptyBlock(object):
+class WriterBlock(object):
+    """Interface for block types below."""
+
+    def __enter__(self):
+        # type: () -> None
+        """Open a block."""
+        pass
+
+    def __exit__(self, *args):
+        # type: (*str) -> None
+        """Close the block."""
+        pass
+
+
+class EmptyBlock(WriterBlock):
     """Do not generate an indented block."""
 
     def __init__(self):
@@ -197,7 +211,7 @@ class EmptyBlock(object):
         pass
 
 
-class IndentedScopedBlock(object):
+class IndentedScopedBlock(WriterBlock):
     """Generate a block, template the parameters, and indent the contents."""
 
     def __init__(self, writer, opening, closing):
@@ -220,7 +234,7 @@ class IndentedScopedBlock(object):
         self._writer.write_template(self._closing)
 
 
-class NamespaceScopeBlock(object):
+class NamespaceScopeBlock(WriterBlock):
     """Generate an unindented blocks for a list of namespaces, and do not indent the contents."""
 
     def __init__(self, indented_writer, namespaces):
@@ -242,3 +256,45 @@ class NamespaceScopeBlock(object):
 
         for namespace in self._namespaces:
             self._writer.write_unindented_line('}  // namespace %s' % (namespace))
+
+
+class UnindentedBlock(WriterBlock):
+    """Generate a block without indentation."""
+
+    def __init__(self, writer, opening, closing):
+        # type: (IndentedTextWriter, unicode, unicode) -> None
+        """Create a block."""
+        self._writer = writer
+        self._opening = opening
+        self._closing = closing
+
+    def __enter__(self):
+        # type: () -> None
+        """Write the beginning of the block."""
+        self._writer.write_unindented_line(self._opening)
+
+    def __exit__(self, *args):
+        # type: (*str) -> None
+        """Write the ending of the block."""
+        self._writer.write_unindented_line(self._closing)
+
+
+class MultiBlock(WriterBlock):
+    """Proxy container for a list of WriterBlocks."""
+
+    def __init__(self, blocks):
+        # type: (MultiBlock, List[WriterBlock]) -> None
+        """Create a multi-block."""
+        self._blocks = blocks
+
+    def __enter__(self):
+        # type: () -> None
+        """Enter each block forwards."""
+        for i in self._blocks:
+            i.__enter__()
+
+    def __exit__(self, *args):
+        # type: (*str) -> None
+        """And leave each block in reverse."""
+        for i in reversed(self._blocks):
+            i.__exit__(*args)

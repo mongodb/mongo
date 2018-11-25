@@ -108,7 +108,7 @@ protected:
 /**
  * Proxy instance for deprecated aliases of set parameters.
  */
-class IDLServerParameterDeprecatedAlias : ServerParameter {
+class IDLServerParameterDeprecatedAlias : public ServerParameter {
 public:
     IDLServerParameterDeprecatedAlias(StringData name, ServerParameter* sp);
 

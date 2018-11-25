@@ -383,11 +383,14 @@ class _CppFileWriterBase(object):
 
         return writer.NamespaceScopeBlock(self._writer, namespace_list)
 
-    def get_initializer_lambda(self, decl, unused=False):
-        # type: (unicode, bool) -> writer.IndentedScopedBlock
+    def get_initializer_lambda(self, decl, unused=False, return_type=None):
+        # type: (unicode, bool, unicode) -> writer.IndentedScopedBlock
         """Generate an indented block lambda initializing an outer scope variable."""
         prefix = 'MONGO_COMPILER_VARIABLE_UNUSED ' if unused else ''
-        return writer.IndentedScopedBlock(self._writer, prefix + decl + ' = ([] {', '})();')
+        prefix = prefix + decl + ' = ([]'
+        if return_type:
+            prefix = prefix + '() -> ' + return_type
+        return writer.IndentedScopedBlock(self._writer, prefix + ' {', '})();')
 
     def gen_description_comment(self, description):
         # type: (unicode) -> None
@@ -411,8 +414,8 @@ class _CppFileWriterBase(object):
 
         return writer.IndentedScopedBlock(self._writer, opening, closing)
 
-    def _predicate(self, check_str, use_else_if=False):
-        # type: (unicode, bool) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
+    def _predicate(self, check_str, use_else_if=False, constexpr=False):
+        # type: (unicode, bool, bool) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
         """
         Generate an if block if the condition is not-empty.
 
@@ -425,7 +428,36 @@ class _CppFileWriterBase(object):
         if use_else_if:
             conditional = 'else if'
 
+        if constexpr:
+            conditional = conditional + ' constexpr'
+
         return writer.IndentedScopedBlock(self._writer, '%s (%s) {' % (conditional, check_str), '}')
+
+    def _condition(self, condition, preprocessor_only=False):
+        # type: (ast.Condition, bool) -> writer.WriterBlock
+        """Generate one or more blocks for multiple conditional types."""
+
+        if not condition:
+            return writer.EmptyBlock()
+
+        blocks = []  # type: List[writer.WriterBlock]
+        if condition.preprocessor:
+            blocks.append(
+                writer.UnindentedBlock(self._writer, '#if ' + condition.preprocessor, '#endif'))
+
+        if not preprocessor_only:
+            if condition.constexpr:
+                blocks.append(self._predicate(condition.constexpr, constexpr=True))
+            if condition.expr:
+                blocks.append(self._predicate(condition.expr))
+
+        if not blocks:
+            return writer.EmptyBlock()
+
+        if len(blocks) == 1:
+            return blocks[0]
+
+        return writer.MultiBlock(blocks)
 
 
 class _CppHeaderFileWriter(_CppFileWriterBase):
@@ -696,21 +728,22 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-    def gen_extern_declaration(self, vartype, varname):
-        # type: (unicode, unicode) -> None
+    def gen_extern_declaration(self, vartype, varname, condition):
+        # type: (unicode, unicode, ast.Condition) -> None
         """Generate externs for storage declaration."""
         if (vartype is None) or (varname is None):
             return
 
-        idents = varname.split('::')
-        decl = idents.pop()
-        for ns in idents:
-            self._writer.write_line('namespace %s {' % (ns))
+        with self._condition(condition, preprocessor_only=True):
+            idents = varname.split('::')
+            decl = idents.pop()
+            for ns in idents:
+                self._writer.write_line('namespace %s {' % (ns))
 
-        self._writer.write_line('extern %s %s;' % (vartype, decl))
+            self._writer.write_line('extern %s %s;' % (vartype, decl))
 
-        for ns in reversed(idents):
-            self._writer.write_line('}  // namespace ' + ns)
+            for ns in reversed(idents):
+                self._writer.write_line('}  // namespace ' + ns)
 
         if idents:
             self.write_empty_line()
@@ -838,9 +871,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
             for scp in spec.server_parameters:
-                self.gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname)
+                self.gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
             for opt in spec.configs:
-                self.gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname)
+                self.gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
@@ -1688,15 +1721,73 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 common.template_args('${class_name}::kCommandName,', class_name=common.title_case(
                     struct.cpp_name)))
 
-    def gen_server_parameter(self, params):
+    def gen_server_parameter(self, param):
+        # type: (ast.ServerParameter) -> None
+        """Generate a single IDLServerParameter(WithStorage)."""
+        with self._condition(param.condition):
+            if param.cpp_varname is not None:
+                self._writer.write_line(
+                    common.template_args(
+                        'auto* ret = makeIDLServerParameterWithStorage(${name}, ${storage}, ${spt});',
+                        storage=param.cpp_varname, spt=param.set_at, name=_encaps(param.name)))
+
+                if param.on_update is not None:
+                    self._writer.write_line('ret->setOnUpdate(%s);' % (param.on_update))
+                if param.validator is not None:
+                    if param.validator.callback is not None:
+                        self._writer.write_line('ret->addValidator(%s);' %
+                                                (param.validator.callback))
+
+                    for pred in ['lt', 'gt', 'lte', 'gte']:
+                        bound = getattr(param.validator, pred)
+                        if bound is not None:
+                            self._writer.write_line(
+                                'ret->addBound<idl_server_parameter_detail::%s>(%s);' %
+                                (pred.upper(), bound))
+            else:
+                self._writer.write_line(
+                    common.template_args('auto* ret = new IDLServerParameter(${name}, ${spt});',
+                                         spt=param.set_at, name=_encaps(param.name)))
+                if param.from_bson:
+                    self._writer.write_line('ret->setFromBSON(%s);' % (param.from_bson))
+                self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
+                self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
+
+            if param.default is not None:
+                self._writer.write_line('uassertStatusOK(ret->setFromString(%s));' %
+                                        (_encaps(param.default)))
+
+            self._writer.write_line('return ret;')
+
+        if param.condition:
+            # Fallback in case any of the provided conditions are false.
+            self._writer.write_line('return nullptr;')
+
+    def gen_server_parameter_deprecated_aliases(self, param_no, param):
+        # type: (int, ast.ServerParameter) -> None
+        """Generate IDLServerParamterDeprecatedAlias instance."""
+
+        for alias_no, alias in enumerate(param.deprecated_name):
+            with self.get_initializer_lambda('auto* scp_%d_%d' % (param_no, alias_no), unused=True,
+                                             return_type='ServerParameter*'):
+                with self._condition(param.condition):
+                    with self._predicate('scp_%d != nullptr' % (param_no)):
+                        self._writer.write_line(
+                            'return new IDLServerParameterDeprecatedAlias(%s, scp_%d);' %
+                            (_encaps(alias), param_no))
+
+                # Fallthrough in case any predicate above fails.
+                self._writer.write_line('return nullptr;')
+
+    def gen_server_parameters(self, params):
         # type: (List[ast.ServerParameter]) -> None
         """Generate IDLServerParameter instances."""
-        # pylint: disable=too-many-branches
 
         for param in params:
             # Optional storage declarations.
             if (param.cpp_vartype is not None) and (param.cpp_varname is not None):
-                self._writer.write_line('%s %s;' % (param.cpp_vartype, param.cpp_varname))
+                with self._condition(param.condition):
+                    self._writer.write_line('%s %s;' % (param.cpp_vartype, param.cpp_varname))
 
         with self.gen_namespace_block(''):
             # ServerParameter instances.
@@ -1704,51 +1795,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.gen_description_comment(param.description)
 
                 with self.get_initializer_lambda('auto* scp_%d' % (param_no), unused=(len(
-                        param.deprecated_name) == 0)):
-                    if param.cpp_varname is not None:
-                        self._writer.write_line(
-                            common.template_args(
-                                'auto* ret = makeIDLServerParameterWithStorage(${name}, ${storage}, ${spt});',
-                                storage=param.cpp_varname, spt=param.set_at, name=_encaps(
-                                    param.name)))
+                        param.deprecated_name) == 0), return_type='ServerParameter*'):
+                    self.gen_server_parameter(param)
 
-                        if param.on_update is not None:
-                            self._writer.write_line('ret->setOnUpdate(%s);' % (param.on_update))
-                        if param.validator is not None:
-                            if param.validator.callback is not None:
-                                self._writer.write_line('ret->addValidator(%s);' %
-                                                        (param.validator.callback))
-                            for pred in ['lt', 'gt', 'lte', 'gte']:
-                                bound = getattr(param.validator, pred)
-                                if bound is not None:
-                                    self._writer.write_line(
-                                        'ret->addBound<idl_server_parameter_detail::%s>(%s);' %
-                                        (pred.upper(), bound))
-                    else:
-                        self._writer.write_line(
-                            common.template_args(
-                                'auto* ret = new IDLServerParameter(${name}, ${spt});',
-                                spt=param.set_at, name=_encaps(param.name)))
-                        if param.from_bson:
-                            self._writer.write_line('ret->setFromBSON(%s);' % (param.from_bson))
-                        self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
-                        self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
-
-                    if param.default is not None:
-                        self._writer.write_line('uassertStatusOK(ret->setFromString(%s));' %
-                                                (_encaps(param.default)))
-
-                    self._writer.write_line('return ret;')
-
-                # Deprecated aliases...
-                for alias_no, alias in enumerate(param.deprecated_name):
-                    self._writer.write_line(
-                        common.template_args(
-                            'MONGO_COMPILER_VARIABLE_UNUSED auto* scp_${param_no}_${alias_no} = ' +
-                            'new IDLServerParameterDeprecatedAlias(${alias}, scp_${param_no});',
-                            param_no=unicode(param_no), alias_no=unicode(alias_no),
-                            alias=_encaps(alias)))
-
+                self.gen_server_parameter_deprecated_aliases(param_no, param)
                 self.write_empty_line()
 
     def gen_config_option(self, opt, section):
@@ -1759,53 +1809,54 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         vartype = ("moe::OptionTypeMap<moe::%s>::type" %
                    (opt.arg_vartype)) if opt.cpp_vartype is None else opt.cpp_vartype
 
-        with self._block(section, ';'):
-            self._writer.write_line(
-                common.template_args(
-                    '.addOptionChaining(${name}, ${short}, moe::${argtype}, ${desc}, ${deprname}, ${deprshortname})',
-                    name=_encaps(opt.name), short=_encaps(opt.short_name),
-                    argtype=opt.arg_vartype, desc=_encaps(opt.description), deprname=_encaps_list(
-                        opt.deprecated_name), deprshortname=_encaps_list(
+        with self._condition(opt.condition):
+            with self._block(section, ';'):
+                self._writer.write_line(
+                    common.template_args(
+                        '.addOptionChaining(${name}, ${short}, moe::${argtype}, ${desc}, ${deprname}, ${deprshortname})',
+                        name=_encaps(opt.name), short=_encaps(
+                            opt.short_name), argtype=opt.arg_vartype, desc=_encaps(opt.description),
+                        deprname=_encaps_list(opt.deprecated_name), deprshortname=_encaps_list(
                             opt.deprecated_short_name)))
-            self._writer.write_line('.setSources(moe::%s)' % (opt.source))
-            if opt.hidden:
-                self._writer.write_line('.hidden()')
-            for requires in opt.requires:
-                self._writer.write_line('.requires(%s)' % (_encaps(requires)))
-            for conflicts in opt.conflicts:
-                self._writer.write_line('.incompatibleWith(%s)' % (_encaps(conflicts)))
-            if opt.default is not None:
-                dflt = _encaps(opt.default) if opt.arg_vartype == "String" else opt.default
-                self._writer.write_line('.setDefault(moe::Value(%s))' % (dflt))
-            if opt.implicit is not None:
-                impl = _encaps(opt.implicit) if opt.arg_vartype == "String" else opt.implicit
-                self._writer.write_line('.setImplicit(moe::Value(%s))' % (impl))
-            if opt.duplicates_append:
-                self._writer.write_line('.composing()')
-            if (opt.positional_start is not None) and (opt.positional_end is not None):
-                self._writer.write_line('.positional(%d, %d)' % (opt.positional_start,
-                                                                 opt.positional_end))
+                self._writer.write_line('.setSources(moe::%s)' % (opt.source))
+                if opt.hidden:
+                    self._writer.write_line('.hidden()')
+                for requires in opt.requires:
+                    self._writer.write_line('.requires(%s)' % (_encaps(requires)))
+                for conflicts in opt.conflicts:
+                    self._writer.write_line('.incompatibleWith(%s)' % (_encaps(conflicts)))
+                if opt.default is not None:
+                    dflt = _encaps(opt.default) if opt.arg_vartype == "String" else opt.default
+                    self._writer.write_line('.setDefault(moe::Value(%s))' % (dflt))
+                if opt.implicit is not None:
+                    impl = _encaps(opt.implicit) if opt.arg_vartype == "String" else opt.implicit
+                    self._writer.write_line('.setImplicit(moe::Value(%s))' % (impl))
+                if opt.duplicates_append:
+                    self._writer.write_line('.composing()')
+                if (opt.positional_start is not None) and (opt.positional_end is not None):
+                    self._writer.write_line('.positional(%d, %d)' % (opt.positional_start,
+                                                                     opt.positional_end))
 
-            if opt.validator:
-                if opt.validator.callback:
-                    self._writer.write_line(
-                        common.template_args(
-                            '.addConstraint(new moe::CallbackKeyConstraint<${argtype}>(${key}, ${callback}))',
-                            argtype=vartype, key=_encaps(
-                                opt.name), callback=opt.validator.callback))
+                if opt.validator:
+                    if opt.validator.callback:
+                        self._writer.write_line(
+                            common.template_args(
+                                '.addConstraint(new moe::CallbackKeyConstraint<${argtype}>(${key}, ${callback}))',
+                                argtype=vartype, key=_encaps(
+                                    opt.name), callback=opt.validator.callback))
 
-                if (opt.validator.gt is not None) or (opt.validator.lt is not None) or (
-                        opt.validator.gte is not None) or (opt.validator.lte is not None):
-                    self._writer.write_line(
-                        common.template_args(
-                            '.addConstraint(new moe::BoundaryKeyConstraint<${argtype}>(${key}, ${gt}, ${lt}, ${gte}, ${lte}))',
-                            argtype=vartype, key=_encaps(opt.name), gt='boost::none'
-                            if opt.validator.gt is None else unicode(opt.validator.gt),
-                            lt='boost::none' if opt.validator.lt is None else unicode(
-                                opt.validator.lt), gte='boost::none'
-                            if opt.validator.gte is None else unicode(
-                                opt.validator.gte), lte='boost::none'
-                            if opt.validator.lte is None else unicode(opt.validator.lte)))
+                    if (opt.validator.gt is not None) or (opt.validator.lt is not None) or (
+                            opt.validator.gte is not None) or (opt.validator.lte is not None):
+                        self._writer.write_line(
+                            common.template_args(
+                                '.addConstraint(new moe::BoundaryKeyConstraint<${argtype}>(${key}, ${gt}, ${lt}, ${gte}, ${lte}))',
+                                argtype=vartype, key=_encaps(opt.name), gt='boost::none'
+                                if opt.validator.gt is None else unicode(opt.validator.gt),
+                                lt='boost::none' if opt.validator.lt is None else unicode(
+                                    opt.validator.lt), gte='boost::none'
+                                if opt.validator.gte is None else unicode(
+                                    opt.validator.gte), lte='boost::none'
+                                if opt.validator.lte is None else unicode(opt.validator.lte)))
 
         self.write_empty_line()
 
@@ -1813,14 +1864,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.IDLAST) -> None
         """Generate Config Option instances."""
 
-        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-branches,too-many-statements
 
         has_storage_targets = False
         for opt in spec.configs:
             if opt.cpp_varname is not None:
                 has_storage_targets = True
                 if opt.cpp_vartype is not None:
-                    self._writer.write_line('%s %s;' % (opt.cpp_vartype, opt.cpp_varname))
+                    with self._condition(opt.condition, preprocessor_only=True):
+                        self._writer.write_line('%s %s;' % (opt.cpp_vartype, opt.cpp_varname))
+
         self.write_empty_line()
 
         root_opts = []  # type: List[ast.ConfigOption]
@@ -1881,9 +1934,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                         vartype = ("moe::OptionTypeMap<moe::%s>::type" % (
                             opt.arg_vartype)) if opt.cpp_vartype is None else opt.cpp_vartype
-                        with self._block('if (params.count(%s)) {' % (_encaps(opt.name)), '}'):
-                            self._writer.write_line('%s = params[%s].as<%s>();' %
-                                                    (opt.cpp_varname, _encaps(opt.name), vartype))
+                        with self._condition(opt.condition):
+                            with self._block('if (params.count(%s)) {' % (_encaps(opt.name)), '}'):
+                                self._writer.write_line('%s = params[%s].as<%s>();' %
+                                                        (opt.cpp_varname, _encaps(opt.name),
+                                                         vartype))
                         self.write_empty_line()
 
                     self._writer.write_line('return Status::OK();')
@@ -1983,7 +2038,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
             if spec.server_parameters:
-                self.gen_server_parameter(spec.server_parameters)
+                self.gen_server_parameters(spec.server_parameters)
             if spec.configs:
                 self.gen_config_options(spec)
 

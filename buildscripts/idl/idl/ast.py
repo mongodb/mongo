@@ -237,6 +237,19 @@ class Enum(common.SourceLocation):
         super(Enum, self).__init__(file_name, line, column)
 
 
+class Condition(common.SourceLocation):
+    """Condition(s) for a ServerParameter or ConfigOption."""
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a Condition."""
+        self.expr = None  # type: unicode
+        self.constexpr = None  # type: unicode
+        self.preprocessor = None  # type: unicode
+
+        super(Condition, self).__init__(file_name, line, column)
+
+
 class ServerParameter(common.SourceLocation):
     """IDL ServerParameter setting."""
 
@@ -250,6 +263,7 @@ class ServerParameter(common.SourceLocation):
         self.description = None  # type: unicode
         self.cpp_vartype = None  # type: unicode
         self.cpp_varname = None  # type: unicode
+        self.condition = None  # type: Condition
         self.deprecated_name = []  # type: List[unicode]
 
         # Only valid if cpp_varname is specified.
@@ -296,6 +310,7 @@ class ConfigOption(common.SourceLocation):
         self.arg_vartype = None  # type: unicode
         self.cpp_vartype = None  # type: unicode
         self.cpp_varname = None  # type: unicode
+        self.condition = None  # type: Condition
 
         self.conflicts = []  # type: List[unicode]
         self.requires = []  # type: List[unicode]

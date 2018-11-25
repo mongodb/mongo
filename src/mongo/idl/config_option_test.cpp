@@ -42,6 +42,8 @@ namespace mongo {
 namespace test {
 
 namespace moe = ::mongo::optionenvironment;
+bool gEnableTestConfigOpt14 = true;
+bool gEnableTestConfigOpt15 = false;
 
 namespace {
 
@@ -89,6 +91,8 @@ MONGO_STARTUP_OPTIONS_PARSE(ConfigOption)(InitializerContext*) {
         "8",
         "--testConfigOpt12",
         "command-line option",
+        "--testConfigOpt14",
+        "set14",
     };
     return parseArgv(argv, &moe::startupOptionsParsed);
 }
@@ -363,6 +367,22 @@ TEST(ConfigOption, Opt13) {
     moe::Environment parsedShort;
     ASSERT_OK(parseArgv({"mongod", "--testConfigOpt13", "short"}, &parsedShort));
     ASSERT_OPTION_SET<std::string>(parsedShort, "test.config.opt13", "short");
+}
+
+TEST(ConfigOption, Opt14) {
+    ASSERT_OPTION_SET<std::string>(moe::startupOptionsParsed, "test.config.opt14", "set14");
+    ASSERT_EQ(gTestConfigOpt14, "set14");
+}
+
+TEST(ConfigOption, Opt15) {
+    ASSERT_OPTION_NOT_SET<std::string>(moe::startupOptionsParsed, "test.config.opt15");
+
+    // Fails because the option was never declared.
+    moe::Environment parseFail;
+    ASSERT_NOT_OK(parseArgv({"mongod", "--testConfigOpt15", "set15"}, &parseFail));
+
+    // Variable is declared.
+    ASSERT_EQ(gTestConfigOpt15, "");
 }
 
 }  // namespace

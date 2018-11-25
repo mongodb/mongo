@@ -48,3 +48,21 @@ server_parameters:
     description: "Basic test using default fromBSON callback."
     append_bson: "customSettingAppendBSON"
     from_string: "customSettingFromString"
+
+  customSettingWithPositiveConditions:
+    set_at: startup
+    description: "Testing that conditions are created."
+    append_bson: "customSettingAppendBSON"
+    from_string: "customSettingFromString"
+    condition:
+      expr: "true"
+      preprocessor: "1 == 1"
+
+  customSettingWithNegativeConditions:
+    set_at: startup
+    description: "Testing that conditions are created."
+    append_bson: "customSettingAppendBSON"
+    from_string: "customSettingFromString"
+    condition:
+      expr: "false"
+      preprocessor: "1 == 0"

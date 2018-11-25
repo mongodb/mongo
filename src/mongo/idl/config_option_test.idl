@@ -30,6 +30,7 @@ global:
   cpp_namespace: "mongo::test"
   cpp_includes:
   - "mongo/idl/server_parameter_with_storage_test.h"
+  - "mongo/idl/config_option_test.h"
   configs:
     initializer_name: TestConfigs
 
@@ -152,3 +153,24 @@ configs:
     single_name: o
     arg_vartype: String
     source: cli
+
+  "test.config.opt14":
+    description: "Test with preprocessor and runtime conditions positive"
+    short_name: testConfigOpt14
+    arg_vartype: String
+    source: cli
+    cpp_vartype: std::string
+    cpp_varname: gTestConfigOpt14
+    condition:
+      preprocessor: "1 == 1"
+      expr: gEnableTestConfigOpt14
+
+  "test.config.opt15":
+    description: "Test with runtime condition negative"
+    short_name: testConfigOpt15
+    arg_vartype: String
+    source: cli
+    cpp_vartype: std::string
+    cpp_varname: gTestConfigOpt15
+    condition:
+      expr: gEnableTestConfigOpt15

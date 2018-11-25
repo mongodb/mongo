@@ -237,6 +237,21 @@ def _parse_validator(ctxt, node):
     return validator
 
 
+def _parse_condition(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.Condition
+    """Parse a condition."""
+    condition = syntax.Condition(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+
+    _generic_parser(
+        ctxt, node, "condition", condition, {
+            "preprocessor": _RuleDesc("scalar"),
+            "constexpr": _RuleDesc("scalar"),
+            "expr": _RuleDesc("scalar"),
+        })
+
+    return condition
+
+
 def _parse_field(ctxt, name, node):
     # type: (errors.ParserContext, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> syntax.Field
     """Parse a field in a struct/command in the IDL file."""
@@ -519,6 +534,7 @@ def _parse_server_parameter(ctxt, spec, name, node):
             "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
             "cpp_vartype": _RuleDesc('scalar'),
             "cpp_varname": _RuleDesc('scalar'),
+            "condition": _RuleDesc('mapping', mapping_parser_func=_parse_condition),
             "default": _RuleDesc('scalar'),
             "deprecated_name": _RuleDesc('scalar_or_sequence'),
             "from_bson": _RuleDesc('scalar'),
@@ -551,6 +567,7 @@ def _parse_config_option(ctxt, spec, name, node):
             "arg_vartype": _RuleDesc('scalar', _RuleDesc.REQUIRED),
             "cpp_vartype": _RuleDesc('scalar'),
             "cpp_varname": _RuleDesc('scalar'),
+            "condition": _RuleDesc('mapping', mapping_parser_func=_parse_condition),
             "conflicts": _RuleDesc('scalar_or_sequence'),
             "requires": _RuleDesc('scalar_or_sequence'),
             "hidden": _RuleDesc('bool_scalar'),
