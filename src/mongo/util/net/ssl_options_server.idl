@@ -1,0 +1,187 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/config.h"
+    - "mongo/util/net/ssl_options.h"
+  configs:
+    section: "TLS Options"
+    source: [ yaml, cli, ini ]
+    # Name these initializers so they can be invoked from ssl_options_test.cpp
+    initializer_name: SSLServerOptionsIDL
+
+imports:
+  - "mongo/idl/basic_types.idl"
+
+configs:
+  "net.tls.tlsOnNormalPorts":
+    description: "Use TLS on configured ports"
+    short_name: tlsOnNormalPorts
+    deprecated_name: "net.ssl.sslOnNormalPorts"
+    deprecated_short_name: sslOnNormalPorts
+    arg_vartype: Switch
+    source: [ cli, ini ]
+    conflicts: [ "net.tls.mode", "net.ssl.mode" ]
+
+  "net.tls.mode":
+    description: "Set the TLS operation mode (disabled|allowTLS|preferTLS|requireTLS)"
+    short_name: tlsMode
+    arg_vartype: String
+    conflicts: "net.ssl.mode"
+  "net.ssl.mode":
+    description: "Set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)"
+    short_name: sslMode
+    arg_vartype: String
+    conflicts: "net.tls.mode"
+    hidden: true
+
+  "net.tls.PEMKeyFile":
+    description: "PEM file for TLS"
+    short_name: tlsPEMKeyFile
+    deprecated_name: "net.ssl.PEMKeyFile"
+    deprecated_short_name: sslPEMKeyFile
+    arg_vartype: String
+  "net.tls.PEMKeyPassword":
+    description: "PEM file password"
+    short_name: tlsPEMKeyPassword
+    deprecated_name: "net.ssl.PEMKeyPassword"
+    deprecated_short_name: sslPEMKeyPassword
+    arg_vartype: String
+    cpp_varname: sslGlobalParams.sslPEMKeyPassword
+    implicit: ''
+
+  "net.tls.clusterFile":
+    description: "Key file for internal TLS authentication"
+    short_name: tlsClusterFile
+    deprecated_name: "net.ssl.clusterFile"
+    deprecated_short_name: sslClusterFile
+    arg_vartype: String
+  "net.tls.clusterPassword":
+    description: "Internal authentication key file password"
+    short_name: tlsClusterPassword
+    deprecated_name: "net.ssl.clusterPassword"
+    deprecated_short_name: sslClusterPassword
+    arg_vartype: String
+    cpp_varname: sslGlobalParams.sslClusterPassword
+    implicit: ''
+
+  "net.tls.CAFile":
+    description: "Certificate Authority file for TLS"
+    short_name: tlsCAFile
+    deprecated_name: "net.ssl.CAFile"
+    deprecated_short_name: sslCAFile
+    arg_vartype: String
+  "net.tls.clusterCAFile":
+    description: "CA used for verifying remotes during inbound connections"
+    short_name: tlsClusterCAFile
+    deprecated_name: "net.ssl.clusterCAFile"
+    deprecated_short_name: sslClusterCAFile
+    arg_vartype: String
+  "net.tls.CRLFile":
+    description: "Certificate Revocation List file for TLS"
+    short_name: tlsCRLFile
+    deprecated_name: "net.ssl.CRLFile"
+    deprecated_short_name: sslCRLFile
+    arg_vartype: String
+
+  "net.tls.tlsCipherConfig":
+    description: "OpenSSL cipher configuration string"
+    short_name: tlsCipherConfig
+    deprecated_name: "net.ssl.sslCipherConfig"
+    deprecated_short_name: sslCipherConfig
+    arg_vartype: String
+    hidden: true
+  "net.tls.disabledProtocols":
+    description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]"
+    short_name: tlsDisabledProtocols
+    deprecated_name: "net.ssl.disabledProtocols"
+    deprecated_short_name: sslDisabledProtocols
+    arg_vartype: String
+  "net.tls.allowConnectionsWithoutCertificates":
+    # Alias for --tlsWeakCertificateValidation.
+    description: "Allow client to connect without presenting a certificate"
+    short_name: tlsAllowConnectionsWithoutCertificates
+    deprecated_name:
+    - "net.tls.weakCertificateValidation"
+    - "net.ssl.weakCertificateValidation"
+    - "net.ssl.allowConnectionsWithoutCertificates"
+    deprecated_short_name:
+    - tlsWeakCertificateValidation
+    - sslWeakCertificateValidation
+    - sslAllowConnectionsWithoutCertificates
+    arg_vartype: Switch
+    cpp_varname: sslGlobalParams.sslWeakCertificateValidation
+  "net.tls.allowInvalidHostnames":
+    description: "Allow server certificates to provide non-matching hostnames"
+    short_name: tlsAllowInvalidHostnames
+    deprecated_name: "net.ssl.allowInvalidHostnames"
+    deprecated_short_name: sslAllowInvalidHostnames
+    arg_vartype: Switch
+    cpp_varname: sslGlobalParams.sslAllowInvalidHostnames
+  "net.tls.allowInvalidCertificates":
+    description: "Allow connections to servers with invalid certificates"
+    short_name: tlsAllowInvalidCertificates
+    deprecated_name: "net.ssl.allowInvalidCertificates"
+    deprecated_short_name: sslAllowInvalidCertificates
+    arg_vartype: Switch
+    cpp_varname: sslGlobalParams.sslAllowInvalidCertificates
+  "net.tls.FIPSMode":
+    description: "Activate FIPS 140-2 mode at startup"
+    short_name: tlsFIPSMode
+    deprecated_name: "net.ssl.FIPSMode"
+    deprecated_short_name: sslFIPSMode
+    arg_vartype: Switch
+    cpp_varname: sslGlobalParams.sslFIPSMode
+
+  # Certificate Selectors are only available on OSX/Windows with --ssl-provider=native (or auto)
+  "net.tls.certificateSelector":
+    description: "TLS Certificate in system store"
+    short_name: tlsCertificateSelector
+    deprecated_name: "net.ssl.certificateSelector"
+    deprecated_short_name: sslCertificateSelector
+    arg_vartype: String
+    conflicts: [ "net.tls.PEMKeyFile", "net.tls.PEMKeyPassword" ]
+    condition:
+      preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
+  "net.tls.clusterCertificateSelector":
+    description: "SSL/TLS Certificate in system store for internal TLS authentication"
+    short_name: tlsClusterCertificateSelector
+    deprecated_name: "tls.ssl.clusterCertificateSelector"
+    deprecated_short_name: sslClusterCertificateSelector
+    arg_vartype: String
+    conflicts: [ "net.tls.clusterFile", "net.tls.clusterFilePassword" ]
+    condition:
+      preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
+
+  "net.tls.logVersions":
+    description: "Comma separated list of TLS protocols to log on connect [TLS1_0,TLS1_1,TLS1_2]"
+    short_name: tlsLogVersions
+    arg_vartype: String
+

@@ -46,6 +46,7 @@ env.Library(
     target='ssl_options_client',
     source=[
         'ssl_options_client.cpp',
+        env.Idlc('ssl_options_client.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -60,6 +61,7 @@ env.Library(
     target='ssl_options_server',
     source=[
         'ssl_options_server.cpp',
+        env.Idlc('ssl_options_server.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
