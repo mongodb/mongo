@@ -6,6 +6,11 @@
 
 (function() {
 
+    if (_isWindows()) {
+        jsTestLog("Skipping test on Windows");
+        return;
+    }
+
     load('jstests/disk/libs/wt_file_helper.js');
 
     const baseName = "wt_repair_corrupt_metadata";
@@ -77,15 +82,21 @@
         // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
         // invalid.
         if (mongodOptions.hasOwnProperty('journal')) {
+            // TODO: This return can be removed once WT-4310 is completed.
+            if (isDebug) {
+                jsTestLog("Skipping log file corruption because this is a debug build.");
+                return;
+            }
+
             jsTestLog("Corrupting log file metadata");
 
-            let data = cat(turtleFile, true /* useBinaryMode */);
+            let data = cat(turtleFile);
             let re = /checkpoint_lsn=\(([0-9,]+)\)/g;
             let newData = data.replace(re, "checkpoint_lsn=(1,2)");
 
             print('writing data to new turtle file: \n' + newData);
             removeFile(turtleFile);
-            writeFile(turtleFile, newData, true /* useBinaryMode */);
+            writeFile(turtleFile, newData);
 
             assertRepairSucceeds(dbpath, mongod.port, mongodOptions);
 
