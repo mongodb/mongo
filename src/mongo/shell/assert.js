@@ -204,7 +204,7 @@ assert = (function() {
         }
 
         doassert(_buildAssertionMessage(
-            msg, "[" + tojson(aSorted) + "] != [" + tojson(bSorted) + "] are not equal"));
+            msg, "[" + tojson(a) + "] != [" + tojson(b) + "] are not equal"));
     };
 
     assert.setEq = function(aSet, bSet, msg) {
