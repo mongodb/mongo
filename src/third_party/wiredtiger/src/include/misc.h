@@ -273,30 +273,6 @@
 	(dst).size = (src).size;					\
 } while (0)
 
-/* Timestamp type and helper macros. */
-#if WT_TIMESTAMP_SIZE > 0
-#define	HAVE_TIMESTAMPS
-#else
-#undef	HAVE_TIMESTAMPS
-#endif
-
-#ifdef HAVE_TIMESTAMPS
-struct __wt_timestamp_t {
-#if WT_TIMESTAMP_SIZE == 8
-	uint64_t val;
-#else
-	uint8_t ts[WT_TIMESTAMP_SIZE];
-#endif
-};
-typedef struct __wt_timestamp_t wt_timestamp_t;
-#define	WT_DECL_TIMESTAMP(x)	wt_timestamp_t x;
-#define	WT_TIMESTAMP_NULL(x)	(x)
-#else
-typedef void wt_timestamp_t;
-#define	WT_DECL_TIMESTAMP(x)
-#define	WT_TIMESTAMP_NULL(x)	(NULL)
-#endif
-
 /*
  * In diagnostic mode we track the locations from which hazard pointers and
  * scratch buffers were acquired.

@@ -55,7 +55,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
         return 'statistics=(%s)' % self.data_config
 
     # For each database/cursor configuration, confirm the right combinations
-    # succeed or fail.
+    # succeed or fail. Traverse the statistics cursor and fetch the statistics.
     def test_stat_cursor_config(self):
         self.dataset(self, self.uri, 100).populate()
         config = 'statistics=('
@@ -63,7 +63,18 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             config = config + self.cursor_config
         config = config + ')'
         if self.ok and self.cursor_config in self.ok:
-            self.session.open_cursor('statistics:session', None, config)
+            found = False
+            stat_cur = self.session.open_cursor('statistics:session', None, config)
+
+            # A reset on session should reset the statistics values to zero.
+            self.session.reset()
+            stat_cur.reset()
+            while stat_cur.next() == 0:
+                [desc, pvalue, value] = stat_cur.get_values()
+                self.assertEquals(value, 0)
+                found = True
+            self.assertEquals(found, True)
+
         else:
             msg = '/database statistics configuration/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:

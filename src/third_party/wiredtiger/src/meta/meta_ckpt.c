@@ -502,20 +502,19 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 2];
+	char hex_timestamp[2 * sizeof(wt_timestamp_t) + 2];
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	hex_timestamp[0] = '0';
 	hex_timestamp[1] = '\0';
-#ifdef HAVE_TIMESTAMPS
+
 	/*
 	 * We need to record the timestamp of the checkpoint in the metadata.
 	 * The timestamp value is set at a higher level, either in checkpoint
 	 * or in recovery.
 	 */
-	WT_ERR(__wt_timestamp_to_hex_string(session, hex_timestamp,
-	    &S2C(session)->txn_global.meta_ckpt_timestamp));
-#endif
+	__wt_timestamp_to_hex_string(
+	    hex_timestamp, S2C(session)->txn_global.meta_ckpt_timestamp);
 
 	/*
 	 * Don't leave a zero entry in the metadata: remove it.  This avoids

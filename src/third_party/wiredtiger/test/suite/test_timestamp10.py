@@ -126,9 +126,6 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertTimestampsEqual(q, timestamp_str(expected_rec_ts))
 
     def test_timestamp_recovery(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         # Add some data and checkpoint at a stable timestamp.
         last_stable = self.data_and_checkpoint()
 

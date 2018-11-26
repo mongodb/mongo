@@ -4,6 +4,14 @@
 @section version_311 Upgrading to Version 3.1.1
 <dl>
 
+<dt>WiredTiger timestamps</dt>
+<dd>
+In previous releases of WiredTiger, it was possible to disable timestamp
+support as well as to configure a timestamp size different from the 64-bit
+default, using the <code>--with-timestamp-size=X</code> configuration option.
+That is no longer the case, in the 3.1.1 release, timestamps are always
+configured, and are always 64-bit unsigned integers.
+
 <dt>WT_CURSOR::modify transaction requirements</dt>
 <dd>
 In previous releases of WiredTiger, it was possible to use implicit

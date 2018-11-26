@@ -264,19 +264,17 @@ bool
 __wt_lsm_chunk_visible_all(
     WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
 {
+	WT_TXN_GLOBAL *txn_global;
+
+	txn_global = &S2C(session)->txn_global;
+
 	/* Once a chunk has been flushed it's contents must be visible */
 	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK | WT_LSM_CHUNK_STABLE))
 		return (true);
 
 	if (chunk->switch_txn == WT_TXN_NONE ||
-	    !__wt_txn_visible_all(session, chunk->switch_txn, NULL))
+	    !__wt_txn_visible_all(session, chunk->switch_txn, WT_TS_NONE))
 		return (false);
-
-#ifdef HAVE_TIMESTAMPS
-	{
-	WT_TXN_GLOBAL *txn_global;
-
-	txn_global = &S2C(session)->txn_global;
 
 	/*
 	 * Once all transactions with updates in the chunk are visible all
@@ -290,15 +288,15 @@ __wt_lsm_chunk_visible_all(
 			/* Set the timestamp if we won the race */
 			if (!F_ISSET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP)) {
 				__wt_readlock(session, &txn_global->rwlock);
-				__wt_timestamp_set(&chunk->switch_timestamp,
-				    &txn_global->commit_timestamp);
+				chunk->switch_timestamp =
+				    txn_global->commit_timestamp;
 				__wt_readunlock(session, &txn_global->rwlock);
 				F_SET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP);
 			}
 			__wt_spin_unlock(session, &chunk->timestamp_spinlock);
 		}
 		if (!__wt_txn_visible_all(
-		    session, chunk->switch_txn, &chunk->switch_timestamp))
+		    session, chunk->switch_txn, chunk->switch_timestamp))
 			return (false);
 	} else
 		/*
@@ -307,8 +305,7 @@ __wt_lsm_chunk_visible_all(
 		 * there could be confusion if timestamps start being used.
 		 */
 		F_SET(chunk, WT_LSM_CHUNK_HAS_TIMESTAMP);
-	}
-#endif
+
 	return (true);
 }
 

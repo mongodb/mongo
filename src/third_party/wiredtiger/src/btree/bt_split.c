@@ -1531,15 +1531,12 @@ __split_multi_inmem(
 	 */
 	mod->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
 	mod->last_eviction_id = orig->modify->last_eviction_id;
-	__wt_timestamp_set(&mod->last_eviction_timestamp,
-	    &orig->modify->last_eviction_timestamp);
+	mod->last_eviction_timestamp = orig->modify->last_eviction_timestamp;
 
 	/* Add the update/restore flag to any previous state. */
-	__wt_timestamp_set(&mod->last_stable_timestamp,
-	    &orig->modify->last_stable_timestamp);
+	mod->last_stable_timestamp = orig->modify->last_stable_timestamp;
 	mod->rec_max_txn = orig->modify->rec_max_txn;
-	__wt_timestamp_set(&mod->rec_max_timestamp,
-	    &orig->modify->rec_max_timestamp);
+	mod->rec_max_timestamp = orig->modify->rec_max_timestamp;
 	mod->restore_state = orig->modify->restore_state;
 	FLD_SET(mod->restore_state, WT_PAGE_RS_RESTORED);
 

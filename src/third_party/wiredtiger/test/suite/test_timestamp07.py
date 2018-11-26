@@ -173,9 +173,6 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             check_value, valcnt, valcnt2, valcnt)
 
     def test_timestamp07(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         uri = self.uri + self.tablename
         uri2 = self.uri + self.tablename2
         uri3 = self.uri + self.tablename3

@@ -41,9 +41,6 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
 
     def test_timestamp_api(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri, 'key_format=i,value_format=i')
         c = self.session.open_cursor(self.uri)
 

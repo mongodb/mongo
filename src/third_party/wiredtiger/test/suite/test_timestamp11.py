@@ -38,9 +38,6 @@ def timestamp_str(t):
 
 class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
     def test_timestamp_range(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         base = 'timestamp11'
         uri = 'file:' + base
         self.session.create(uri, 'key_format=S,value_format=S')

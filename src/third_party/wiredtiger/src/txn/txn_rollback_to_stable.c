@@ -8,7 +8,6 @@
 
 #include "wt_internal.h"
 
-#ifdef HAVE_TIMESTAMPS
 /*
  * __txn_rollback_to_stable_lookaside_fixup --
  *	Remove any updates that need to be rolled back from the lookaside file.
@@ -19,10 +18,9 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_DECL_TIMESTAMP(rollback_timestamp)
-	WT_DECL_TIMESTAMP(upd_timestamp)
-	WT_ITEM las_key, las_timestamp, las_value;
+	WT_ITEM las_key, las_value;
 	WT_TXN_GLOBAL *txn_global;
+	wt_timestamp_t las_timestamp, rollback_timestamp;
 	uint64_t las_counter, las_pageid, las_total, las_txnid;
 	uint32_t las_id, session_flags;
 	uint8_t prepare_state, upd_type;
@@ -31,7 +29,6 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	cursor = NULL;
 	las_total = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
-	WT_CLEAR(las_timestamp);
 
 	/*
 	 * Copy the stable timestamp, otherwise we'd need to lock it each time
@@ -40,9 +37,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	 * violate protocol.
 	 */
 	txn_global = &conn->txn_global;
-	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-	    __wt_timestamp_set(
-	    &rollback_timestamp, &txn_global->stable_timestamp));
+	WT_ORDERED_READ(rollback_timestamp, txn_global->stable_timestamp);
 
 	__wt_las_cursor(session, &cursor, &session_flags);
 
@@ -66,16 +61,13 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 
 		WT_ERR(cursor->get_value(cursor, &las_txnid,
 		    &las_timestamp, &prepare_state, &upd_type, &las_value));
-		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
-		memcpy(&upd_timestamp, las_timestamp.data, las_timestamp.size);
 
 		/*
 		 * Entries with no timestamp will have a timestamp of zero,
 		 * which will fail the following check and cause them to never
 		 * be removed.
 		 */
-		if (__wt_timestamp_cmp(
-		    &rollback_timestamp, &upd_timestamp) < 0) {
+		if (rollback_timestamp < las_timestamp) {
 			WT_ERR(cursor->remove(cursor));
 			WT_STAT_CONN_INCR(session, txn_rollback_las_removed);
 			--las_total;
@@ -101,7 +93,7 @@ err:	if (ret == 0) {
  */
 static void
 __txn_abort_newer_update(WT_SESSION_IMPL *session,
-    WT_UPDATE *first_upd, wt_timestamp_t *rollback_timestamp)
+    WT_UPDATE *first_upd, wt_timestamp_t rollback_timestamp)
 {
 	WT_UPDATE *upd;
 
@@ -112,12 +104,10 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		 * strict timestamp checking, assert that all more recent
 		 * updates were also rolled back.
 		 */
-		if (upd->txnid == WT_TXN_ABORTED ||
-		    __wt_timestamp_iszero(&upd->timestamp)) {
+		if (upd->txnid == WT_TXN_ABORTED || upd->timestamp == 0) {
 			if (upd == first_upd)
 				first_upd = upd->next;
-		} else if (__wt_timestamp_cmp(
-		    rollback_timestamp, &upd->timestamp) < 0) {
+		} else if (rollback_timestamp < upd->timestamp) {
 			/*
 			 * If any updates are aborted, all newer updates
 			 * better be aborted as well.
@@ -135,7 +125,7 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 
 			upd->txnid = WT_TXN_ABORTED;
 			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
-			__wt_timestamp_set_zero(&upd->timestamp);
+			upd->timestamp = 0;
 		}
 	}
 }
@@ -146,7 +136,7 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
  */
 static void
 __txn_abort_newer_insert(WT_SESSION_IMPL *session,
-    WT_INSERT_HEAD *head, wt_timestamp_t *rollback_timestamp)
+    WT_INSERT_HEAD *head, wt_timestamp_t rollback_timestamp)
 {
 	WT_INSERT *ins;
 
@@ -161,7 +151,7 @@ __txn_abort_newer_insert(WT_SESSION_IMPL *session,
  */
 static void
 __txn_abort_newer_col_var(
-    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t *rollback_timestamp)
+    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t rollback_timestamp)
 {
 	WT_COL *cip;
 	WT_INSERT_HEAD *ins;
@@ -185,7 +175,7 @@ __txn_abort_newer_col_var(
  */
 static void
 __txn_abort_newer_col_fix(
-    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t *rollback_timestamp)
+    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t rollback_timestamp)
 {
 	WT_INSERT_HEAD *ins;
 
@@ -205,7 +195,7 @@ __txn_abort_newer_col_fix(
  */
 static void
 __txn_abort_newer_row_leaf(
-    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t *rollback_timestamp)
+    WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t rollback_timestamp)
 {
 	WT_INSERT_HEAD *insert;
 	WT_ROW *rip;
@@ -240,7 +230,7 @@ __txn_abort_newer_row_leaf(
  */
 static int
 __txn_abort_newer_updates(
-    WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t *rollback_timestamp)
+    WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -257,8 +247,7 @@ __txn_abort_newer_updates(
 	local_read = false;
 	read_flags = WT_READ_WONT_NEED;
 	if (ref->page_las != NULL && ref->page_las->skew_newest &&
-	    __wt_timestamp_cmp(rollback_timestamp,
-	    &ref->page_las->unstable_timestamp) < 0) {
+	    rollback_timestamp < ref->page_las->unstable_timestamp) {
 		/* Make sure get back a page with history, not limbo page */
 		WT_ASSERT(session,
 		    !F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT));
@@ -269,8 +258,8 @@ __txn_abort_newer_updates(
 	}
 
 	/* Review deleted page saved to the ref */
-	if (ref->page_del != NULL && __wt_timestamp_cmp(
-	    rollback_timestamp, &ref->page_del->timestamp) < 0)
+	if (ref->page_del != NULL &&
+	    rollback_timestamp < ref->page_del->timestamp)
 		WT_ERR(__wt_delete_page_rollback(session, ref));
 
 	/*
@@ -323,7 +312,7 @@ err:	if (local_read)
  */
 static int
 __txn_rollback_to_stable_btree_walk(
-    WT_SESSION_IMPL *session, wt_timestamp_t *rollback_timestamp)
+    WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
 	WT_DECL_RET;
 	WT_REF *child_ref, *ref;
@@ -369,8 +358,8 @@ __txn_rollback_to_stable_btree(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_DECL_TIMESTAMP(rollback_timestamp)
 	WT_TXN_GLOBAL *txn_global;
+	wt_timestamp_t rollback_timestamp;
 
 	WT_UNUSED(cfg);
 
@@ -413,9 +402,7 @@ __txn_rollback_to_stable_btree(WT_SESSION_IMPL *session, const char *cfg[])
 	 * updated while rolling back, accessing it without a lock would
 	 * violate protocol.
 	 */
-	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-	    __wt_timestamp_set(
-	    &rollback_timestamp, &txn_global->stable_timestamp));
+	WT_ORDERED_READ(rollback_timestamp, txn_global->stable_timestamp);
 
 	/*
 	 * Ensure the eviction server is out of the file - we don't
@@ -424,8 +411,8 @@ __txn_rollback_to_stable_btree(WT_SESSION_IMPL *session, const char *cfg[])
 	 * be in.
 	 */
 	WT_RET(__wt_evict_file_exclusive_on(session));
-	WT_WITH_PAGE_INDEX(session, ret = __txn_rollback_to_stable_btree_walk(
-	    session, &rollback_timestamp));
+	WT_WITH_PAGE_INDEX(session, ret =
+	    __txn_rollback_to_stable_btree_walk(session, rollback_timestamp));
 	__wt_evict_file_exclusive_off(session);
 
 	return (ret);
@@ -465,7 +452,6 @@ __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 
 	return (ret);
 }
-#endif
 
 /*
  * __wt_txn_rollback_to_stable --
@@ -475,12 +461,6 @@ __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 int
 __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 {
-#ifndef HAVE_TIMESTAMPS
-	WT_UNUSED(cfg);
-
-	WT_RET_MSG(session, ENOTSUP, "rollback_to_stable "
-	    "requires a version of WiredTiger built with timestamp support");
-#else
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
@@ -529,5 +509,4 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 err:	F_CLR(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 	__wt_free(session, conn->stable_rollback_bitstring);
 	return (ret);
-#endif
 }

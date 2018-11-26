@@ -1902,8 +1902,7 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param[out] hex_timestamp a buffer that will be set to the
 	 * hexadecimal encoding of the timestamp being queried.  Must be large
-	 * enough to hold a hex-encoded timestamp (i.e., double the timestamp
-	 * size plus one byte for NUL termination).
+	 * enough to hold a NUL terminated, hex-encoded 8B timestamp (17 bytes).
 	 * @configstart{WT_SESSION.query_timestamp, see dist/api_data.py}
 	 * @config{get, specify which timestamp to query: \c commit returns the
 	 * most recently set commit_timestamp.  \c first_commit returns the
@@ -2481,8 +2480,7 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param[out] hex_timestamp a buffer that will be set to the
 	 * hexadecimal encoding of the timestamp being queried.  Must be large
-	 * enough to hold a hex-encoded timestamp (i.e., double the timestamp
-	 * size plus one byte for NUL termination).
+	 * enough to hold a NUL terminated, hex-encoded 8B timestamp (17 bytes).
 	 * @configstart{WT_CONNECTION.query_timestamp, see dist/api_data.py}
 	 * @config{get, specify which timestamp to query: \c all_committed
 	 * returns the largest timestamp such that all timestamps up to that
@@ -6207,17 +6205,17 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! session: bytes read into cache */
 #define	WT_STAT_SESSION_BYTES_READ			4000
 /*! session: bytes written from cache */
-#define	WT_STAT_SESSION_BYTES_WRITTEN			4001
-/*! session: handle lock wait time (usecs) */
-#define	WT_STAT_SESSION_HANDLE_LOCK_WAIT		4002
+#define	WT_STAT_SESSION_BYTES_WRITE			4001
+/*! session: dhandle lock wait time (usecs) */
+#define	WT_STAT_SESSION_LOCK_DHANDLE_WAIT		4002
 /*! session: page read from disk to cache time (usecs) */
 #define	WT_STAT_SESSION_READ_TIME			4003
 /*! session: page write from cache to disk time (usecs) */
 #define	WT_STAT_SESSION_WRITE_TIME			4004
 /*! session: schema lock wait time (usecs) */
-#define	WT_STAT_SESSION_SCHEMA_LOCK_WAIT		4005
+#define	WT_STAT_SESSION_LOCK_SCHEMA_WAIT		4005
 /*! session: time waiting for cache (usecs) */
-#define	WT_STAT_SESSION_CACHE_FULL_WAIT			4006
+#define	WT_STAT_SESSION_CACHE_TIME			4006
 /*! @} */
 /*
  * Statistics section: END

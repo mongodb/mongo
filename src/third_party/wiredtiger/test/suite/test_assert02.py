@@ -38,10 +38,8 @@ def timestamp_str(t):
 
 class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
     def test_read_timestamp(self):
-        #if not wiredtiger.timestamp_build() or not wiredtiger.diagnostic_build():
-        #    self.skipTest('requires a timestamp and diagnostic build')
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
+        #if not wiredtiger.diagnostic_build():
+        #    self.skipTest('requires a diagnostic build')
 
         base = 'assert02.'
         base_uri = 'file:' + base

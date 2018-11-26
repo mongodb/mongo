@@ -120,9 +120,10 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_CURSOR_BTREE cbt;
 	WT_DECL_ITEM(current_key);
 	WT_DECL_RET;
-	WT_ITEM las_key, las_timestamp, las_value;
+	WT_ITEM las_key, las_value;
 	WT_PAGE *page;
 	WT_UPDATE *first_upd, *last_upd, *upd;
+	wt_timestamp_t las_timestamp;
 	size_t incr, total_incr;
 	uint64_t current_recno, las_counter, las_pageid, las_txnid, recno;
 	uint32_t las_id, session_flags;
@@ -187,11 +188,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		    session, &las_value, &upd, &incr, upd_type));
 		total_incr += incr;
 		upd->txnid = las_txnid;
+		upd->timestamp = las_timestamp;
 		upd->prepare_state = prepare_state;
-#ifdef HAVE_TIMESTAMPS
-		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
-		memcpy(&upd->timestamp, las_timestamp.data, las_timestamp.size);
-#endif
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
@@ -284,10 +282,10 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		    !ref->page_las->has_prepares &&
 		    !S2C(session)->txn_global.has_stable_timestamp &&
 		    __wt_txn_visible_all(session, ref->page_las->unstable_txn,
-		    WT_TIMESTAMP_NULL(&ref->page_las->unstable_timestamp))) {
+		    ref->page_las->unstable_timestamp)) {
 			page->modify->rec_max_txn = ref->page_las->max_txn;
-			__wt_timestamp_set(&page->modify->rec_max_timestamp,
-			    &ref->page_las->max_timestamp);
+			page->modify->rec_max_timestamp =
+			    ref->page_las->max_timestamp;
 			__wt_page_modify_clear(session, page);
 		}
 	}

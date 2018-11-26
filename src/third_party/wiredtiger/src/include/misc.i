@@ -195,14 +195,10 @@ __wt_snprintf_len_incr(
 static inline int
 __wt_txn_context_prepare_check(WT_SESSION_IMPL *session)
 {
-#ifdef HAVE_TIMESTAMPS
 	if (F_ISSET(&session->txn, WT_TXN_PREPARE))
 		WT_RET_MSG(session, EINVAL,
 		    "%s: not permitted in a prepared transaction",
 		    session->name);
-#else
-	WT_UNUSED(session);
-#endif
 	return (0);
 }
 

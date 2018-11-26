@@ -93,10 +93,8 @@ class test_assert01(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
     def test_commit_timestamp(self):
-        #if not wiredtiger.timestamp_build() or not wiredtiger.diagnostic_build():
-        #    self.skipTest('requires a timestamp and diagnostic build')
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
+        #if not wiredtiger.diagnostic_build():
+        #    self.skipTest('requires a diagnostic build')
 
         # Create a data item at a timestamp
         self.session.create(self.uri_always, self.cfg + self.cfg_always)

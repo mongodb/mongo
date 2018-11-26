@@ -66,9 +66,6 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
             session.commit_transaction()
 
     def test_basic(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
         c = self.session.open_cursor(self.uri)
@@ -136,9 +133,6 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
                 dict((k, 2) for k in orig_keys[i+1:]))
 
     def test_read_your_writes(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
         c = self.session.open_cursor(self.uri)

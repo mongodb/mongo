@@ -240,7 +240,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 						break;
 					WT_ASSERT(session,
 					    !__wt_txn_visible_all(
-					    session, switch_txn, NULL));
+					    session, switch_txn, WT_TS_NONE));
 				}
 			}
 		}
@@ -1500,7 +1500,7 @@ __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm,
 	for (i = 0, slot = clsm->nchunks - 1; i < clsm->nupdates; i++, slot--) {
 		/* Check if we need to keep updating old chunks. */
 		if (i > 0 && __wt_txn_visible(
-		    session, clsm->chunks[slot]->switch_txn, NULL)) {
+		    session, clsm->chunks[slot]->switch_txn, WT_TS_NONE)) {
 			clsm->nupdates = i;
 			break;
 		}

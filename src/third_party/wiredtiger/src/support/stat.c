@@ -2160,7 +2160,7 @@ __wt_stat_join_aggregate(
 static const char * const __stats_session_desc[] = {
 	"session: bytes read into cache",
 	"session: bytes written from cache",
-	"session: handle lock wait time (usecs)",
+	"session: dhandle lock wait time (usecs)",
 	"session: page read from disk to cache time (usecs)",
 	"session: page write from cache to disk time (usecs)",
 	"session: schema lock wait time (usecs)",
@@ -2185,10 +2185,10 @@ void
 __wt_stat_session_clear_single(WT_SESSION_STATS *stats)
 {
 	stats->bytes_read = 0;
-	stats->bytes_written = 0;
-	stats->handle_lock_wait = 0;
+	stats->bytes_write = 0;
+	stats->lock_dhandle_wait = 0;
 	stats->read_time = 0;
 	stats->write_time = 0;
-	stats->schema_lock_wait = 0;
-	stats->cache_full_wait = 0;
+	stats->lock_schema_wait = 0;
+	stats->cache_time = 0;
 }

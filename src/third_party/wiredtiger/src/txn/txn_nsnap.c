@@ -43,13 +43,13 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 	/* Bump the global ID if we are removing the first entry */
 	if (found == TAILQ_FIRST(&txn_global->nsnaph)) {
 		WT_ASSERT(session, !__wt_txn_visible_all(
-		    session, txn_global->nsnap_oldest_id, NULL));
+		    session, txn_global->nsnap_oldest_id, WT_TS_NONE));
 		txn_global->nsnap_oldest_id = (TAILQ_NEXT(found, q) != NULL) ?
 		    TAILQ_NEXT(found, q)->pinned_id : WT_TXN_NONE;
 		WT_DIAGNOSTIC_YIELD;
 		WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE ||
 		    !__wt_txn_visible_all(
-		    session, txn_global->nsnap_oldest_id, NULL));
+		    session, txn_global->nsnap_oldest_id, WT_TS_NONE));
 	}
 	TAILQ_REMOVE(&txn_global->nsnaph, found, q);
 	__nsnap_destroy(session, found);
@@ -123,14 +123,14 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
 
 	/* Now that the queue of named snapshots is updated, update the ID */
 	WT_ASSERT(session, !__wt_txn_visible_all(
-	    session, txn_global->nsnap_oldest_id, NULL) &&
+	    session, txn_global->nsnap_oldest_id, WT_TS_NONE) &&
 	    (new_nsnap_oldest == WT_TXN_NONE ||
 	    WT_TXNID_LE(txn_global->nsnap_oldest_id, new_nsnap_oldest)));
 	txn_global->nsnap_oldest_id = new_nsnap_oldest;
 	WT_DIAGNOSTIC_YIELD;
 	WT_ASSERT(session,
 	    new_nsnap_oldest == WT_TXN_NONE ||
-	    !__wt_txn_visible_all(session, new_nsnap_oldest, NULL));
+	    !__wt_txn_visible_all(session, new_nsnap_oldest, WT_TS_NONE));
 
 	return (0);
 }
@@ -210,7 +210,8 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (TAILQ_EMPTY(&txn_global->nsnaph)) {
 		WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE &&
-		    !__wt_txn_visible_all(session, nsnap_new->pinned_id, NULL));
+		    !__wt_txn_visible_all(
+		    session, nsnap_new->pinned_id, WT_TS_NONE));
 		__wt_readlock(session, &txn_global->rwlock);
 		txn_global->nsnap_oldest_id = nsnap_new->pinned_id;
 		__wt_readunlock(session, &txn_global->rwlock);
@@ -226,7 +227,7 @@ err:	if (started_txn) {
 		WT_TRET(__wt_txn_rollback(session, NULL));
 		WT_DIAGNOSTIC_YIELD;
 		WT_ASSERT(session,
-		    !__wt_txn_visible_all(session, pinned_id, NULL));
+		    !__wt_txn_visible_all(session, pinned_id, WT_TS_NONE));
 	}
 
 	if (nsnap_new != NULL)
@@ -310,7 +311,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 			__wt_readunlock(session, &txn_global->rwlock);
 
 			WT_ASSERT(session, !__wt_txn_visible_all(
-			    session, txn_state->pinned_id, NULL) &&
+			    session, txn_state->pinned_id, WT_TS_NONE) &&
 			    txn_global->nsnap_oldest_id != WT_TXN_NONE &&
 			    WT_TXNID_LE(txn_global->nsnap_oldest_id,
 			    txn_state->pinned_id));

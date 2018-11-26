@@ -98,7 +98,7 @@ struct __wt_lsm_chunk {
 					 * out, or by compact to get the most
 					 * recent chunk flushed.
 					 */
-	WT_DECL_TIMESTAMP(switch_timestamp)/*
+	wt_timestamp_t switch_timestamp;/*
 					 * The timestamp used to decide when
 					 * updates need to detect conflicts.
 					 */

@@ -515,19 +515,19 @@ __curstat_join_init(WT_SESSION_IMPL *session,
 
 /*
  * __curstat_session_init --
- *	Initialize the statistics for a session operation.
+ *	Initialize the statistics for a session.
  */
 static void
 __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 {
 	/* This is a stub at the moment, initialize the session stats to 0. */
 	session->stats.bytes_read = 0;
-	session->stats.bytes_written = 0;
+	session->stats.bytes_write = 0;
+	session->stats.cache_time = 0;
+	session->stats.lock_dhandle_wait = 0;
+	session->stats.lock_schema_wait = 0;
 	session->stats.read_time = 0;
 	session->stats.write_time = 0;
-	session->stats.cache_full_wait = 0;
-	session->stats.schema_lock_wait = 0;
-	session->stats.handle_lock_wait = 0;
 
 	/*
 	 * Copy stats from the session to the cursor. Optionally clear the

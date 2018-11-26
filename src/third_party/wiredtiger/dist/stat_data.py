@@ -87,7 +87,7 @@ class LSMStat(Stat):
 class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
+        Stat.__init__(self, name, SessionStat.prefix, desc, flags)
 class PerfHistStat(Stat):
     prefix = 'perf'
     def __init__(self, name, desc, flags=''):
@@ -787,13 +787,13 @@ join_stats = sorted(join_stats, key=attrgetter('desc'))
 # Session statistics
 ##########################################
 session_stats = [
-    SessionStat('cache_full_wait', 'time waiting for cache (usecs)'),
     SessionStat('bytes_read', 'bytes read into cache'),
-    SessionStat('bytes_written', 'bytes written from cache'),
-    SessionStat('handle_lock_wait', 'handle lock wait time (usecs)'),
+    SessionStat('bytes_write', 'bytes written from cache'),
+    SessionStat('cache_time', 'time waiting for cache (usecs)'),
+    SessionStat('lock_dhandle_wait', 'dhandle lock wait time (usecs)'),
+    SessionStat('lock_schema_wait', 'schema lock wait time (usecs)'),
     SessionStat('read_time', 'page read from disk to cache time (usecs)'),
     SessionStat('write_time', 'page write from cache to disk time (usecs)'),
-    SessionStat('schema_lock_wait', 'schema lock wait time (usecs)'),
 ]
 
 session_stats = sorted(session_stats, key=attrgetter('desc'))

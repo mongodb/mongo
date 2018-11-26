@@ -64,9 +64,6 @@ class test_timestamp12(wttest.WiredTigerTestCase):
         self.assertTrue(coll_actual == coll_exp)
 
     def test_timestamp_recovery(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         #
         # Create several collection-like tables that are checkpoint durability.
         # Add data to each of them separately and checkpoint so that each one

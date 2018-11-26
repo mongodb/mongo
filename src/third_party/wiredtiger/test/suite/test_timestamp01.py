@@ -38,9 +38,6 @@ def timestamp_str(t):
 
 class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
     def test_timestamp_range(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         # Cannot set a timestamp on a non-running transaction
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
