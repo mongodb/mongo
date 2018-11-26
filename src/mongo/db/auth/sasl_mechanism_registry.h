@@ -162,23 +162,21 @@ public:
     StatusWith<std::string> step(OperationContext* opCtx, StringData input) {
         auto result = stepImpl(opCtx, input);
         if (result.isOK()) {
-            bool isDone;
+            bool isSuccess;
             std::string responseMessage;
-            std::tie(isDone, responseMessage) = result.getValue();
+            std::tie(isSuccess, responseMessage) = result.getValue();
 
-            _done = isDone;
+            _success = isSuccess;
             return responseMessage;
         }
         return result.getStatus();
     }
 
     /**
-     * Returns true if the conversation has completed.
-     * Note that this does not mean authentication succeeded!
-     * An error may have occurred.
+     * Returns true if the conversation has completed successfully.
      */
-    bool isDone() const {
-        return _done;
+    bool isSuccess() const {
+        return _success;
     }
 
     /** Returns which database contains the user which authentication is being performed against. */
@@ -204,7 +202,7 @@ protected:
     virtual StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
                                                                StringData input) = 0;
 
-    bool _done = false;
+    bool _success = false;
     std::string _principalName;
     std::string _authenticationDatabase;
 };
