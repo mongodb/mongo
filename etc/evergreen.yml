@@ -7711,6 +7711,9 @@ buildvariants:
     - rhel62-large
   - name: rlp_WT
   - name: sasl
+  - name: secondary_reads_passthrough
+    distros:
+    - rhel62-large
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
@@ -8132,7 +8135,6 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   # - name: sharding TODO SERVER-32037: Replace sharding with sharding_WT.
   - name: sharding_auth
-  - name: secondary_reads_passthrough
 
 - name: rhel62
   display_name: SSL RHEL 6.2
@@ -8223,7 +8225,6 @@ buildvariants:
   - name: serial_run_WT
   - name: sharding_jscore_passthrough_WT
   - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: secondary_reads_passthrough
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
@@ -8320,7 +8321,6 @@ buildvariants:
   - name: serial_run_WT
   - name: sharding_jscore_passthrough_WT
   - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: secondary_reads_passthrough
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
@@ -8418,6 +8418,7 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
   - name: sharding_WT_ese
@@ -8529,6 +8530,7 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
   - name: sharding_WT_ese
@@ -8660,6 +8662,7 @@ buildvariants:
   # - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   # - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   # - name: sharding
@@ -9003,6 +9006,7 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
   - name: sharding_WT_ese
@@ -9706,6 +9710,7 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding
   - name: sharding_auth
@@ -9723,7 +9728,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough_WT
-  - name: secondary_reads_passthrough
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -9800,6 +9804,7 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding
   - name: sharding_auth
@@ -9817,7 +9822,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough_WT
-  - name: secondary_reads_passthrough
 
 ###########################################
 #     Experimental buildvariants          #
@@ -9936,6 +9940,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_WT
   - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
@@ -9958,7 +9963,6 @@ buildvariants:
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
   - name: write_concern_majority_passthrough_WT
-  - name: secondary_reads_passthrough
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -10099,6 +10103,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_WT
   - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
@@ -10121,7 +10126,6 @@ buildvariants:
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
   - name: write_concern_majority_passthrough_WT
-  - name: secondary_reads_passthrough
 
 - name: ubuntu1604-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
@@ -10243,6 +10247,7 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
   - name: sasl
+  - name: secondary_reads_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_WT
   - name: sharding_WT_ese
@@ -10372,7 +10377,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: write_concern_majority_passthrough_WT
-  - name: secondary_reads_passthrough
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
