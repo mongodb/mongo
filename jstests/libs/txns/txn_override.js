@@ -1,4 +1,3 @@
-
 /**
  * Override to run consecutive operations inside the same transaction. When an operation that
  * cannot be run inside of a transaction is encountered, the active transaction is committed
@@ -194,7 +193,7 @@
             let readConcernLevel;
             if (commandObj.startTransaction === true) {
                 readConcernLevel = "snapshot";
-            } else {
+            } else if (jsTest.options().enableMajorityReadConcern !== false) {
                 readConcernLevel = "majority";
             }
 
@@ -202,7 +201,7 @@
                 throw new Error("refusing to override existing readConcern " +
                                 commandObj.readConcern.level + " with readConcern " +
                                 readConcernLevel);
-            } else {
+            } else if (readConcernLevel) {
                 commandObj.readConcern = {level: readConcernLevel};
 
                 const driverSession = conn.getDB(dbName).getSession();
