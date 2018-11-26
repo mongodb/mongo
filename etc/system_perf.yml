@@ -59,6 +59,17 @@ post:
           fi
 
 functions:
+  "git get project": &git_get_project
+    command: git.get_project
+    params:
+      directory: src
+      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+        dsi: ${dsi_rev}
+        enterprise: ${enterprise_rev}
+        linkbench: ${linkbench_rev}
+        workloads: ${workloads_rev}
+        wtdevelop: ${wtdevelop_rev}
+
   "compile mongodb":
     - command: shell.exec
       params:
@@ -149,7 +160,6 @@ functions:
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
 
-  # NOTE: Unlike evergreen.yml, there's no conditional here. If called, this is never a noop!
   "use WiredTiger develop" :
     command: shell.exec
     params:
@@ -157,11 +167,13 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-        cd src/third_party
-        for wtdir in api dist examples ext lang src test tools ; do
-          rm -rf wiredtiger/$wtdir
-          mv wtdevelop/$wtdir wiredtiger/
-        done
+        if [ "${compile-variant|}" = "-wtdevelop" ]; then
+          cd src/third_party
+          for wtdir in api dist examples ext lang src test tools ; do
+            rm -rf wiredtiger/$wtdir
+            mv wtdevelop/$wtdir wiredtiger/
+          done
+        fi
 
   "prepare environment":
     - command: shell.exec
@@ -171,14 +183,9 @@ functions:
           mkdir src
           mkdir work
     - command: manifest.load
-    - command: git.get_project
-      params:
-        directory: src
-        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-          dsi: ${dsi_rev}
-          workloads: ${workloads_rev}
-          linkbench: ${linkbench_rev}
-          enterprise: ${enterprise_rev}
+    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
+    # the repositories defined in the build variant's "modules" section.
+    - *git_get_project
     - command: shell.exec
       params:
         working_dir: work
@@ -309,38 +316,9 @@ tasks:
 - name: compile
   commands:
     - command: manifest.load
-    - command: git.get_project
-      params:
-        directory: src
+    - func: "git get project"
+    - func: "use WiredTiger develop" # noop if ${compile-variant|} is not "-wtdevelop"
     - func: "compile mongodb"
-
-- name: compile_enterprise
-  commands:
-    - command: manifest.load
-    - command: git.get_project
-      # In addition to mongo repo, checkout enterprise as module
-      params:
-        revisions:
-          enterprise: ${enterprise_rev}
-        directory: src
-    - func: "compile mongodb"
-      vars:
-        compile-variant: -enterprise
-
-- name: compile_wtdevelop
-  commands:
-    - command: manifest.load
-    - command: git.get_project
-      # In addition to mongo repo, checkout wtdevelop as module
-      params:
-        revisions:
-          wtdevelop: ${wtdevelop_rev}
-      params:
-        directory: src
-    - func: "use WiredTiger develop"
-    - func: "compile mongodb"
-      vars:
-        compile-variant: -wtdevelop
 
 - name: linkbench
   priority: 5
@@ -692,13 +670,17 @@ buildvariants:
 
 # We are explicitly tracking the Linux 64 Amazon variant compile options from evergreen.yml.  If we can get
 # proper artifacts directly from that project, we should do that and remove these tasks.
-- name: compile-linux-64-amzn
+- &compile-linux-64-amzn
+  name: compile-linux-64-amzn
   display_name: Compile on Linux64 Amazon
   batchtime: 1440 # 24 hours
-  modules:
-    - wtdevelop
-  expansions:
-    compile_flags: --ssl MONGO_DISTMOD=linux-64-amzn-build -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+  expansions: &compile-linux-64-amzn-expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=linux-64-amzn-build
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --release
+      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     platform: linux
     project_dir: &project_dir dsi
@@ -708,23 +690,34 @@ buildvariants:
       - "linux-64-amzn-build"
   tasks:
     - name: compile
-    - name: compile_wtdevelop
+
+- <<: *compile-linux-64-amzn
+  name: wtdevelop-compile-linux-64-amzn
+  display_name: WT Develop Compile on Linux64 Amazon
+  modules:
+    - wtdevelop
+  expansions:
+    <<: *compile-linux-64-amzn-expansions
+    compile-variant: -wtdevelop
 
 - name: compile-amazon2
   display_name: Compile on Amazon Linux 2
   modules:
     - enterprise
+  batchtime: 1440 # 24 hours
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    platform: linux
-    project_dir: &project_dir dsi
-    tooltags: ""
-    use_scons_cache: true
+    <<: *compile-linux-64-amzn-expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --release
+      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile-variant: -enterprise
   run_on:
       - "amazon2-build"
   tasks:
-    - name: compile_enterprise
+    - name: compile
 
 #######################################
 #         Linux Buildvariants         #
@@ -811,7 +804,7 @@ buildvariants:
   run_on:
       - "rhel70-perf-single"
   depends_on:
-      - name: compile_enterprise
+      - name: compile
         variant: compile-amazon2
   tasks:
     - name: industry_benchmarks
@@ -974,8 +967,8 @@ buildvariants:
   run_on:
       - "rhel70-perf-single"
   depends_on:
-      - name: compile_wtdevelop
-        variant: compile-linux-64-amzn
+      - name: compile
+        variant: wtdevelop-compile-linux-64-amzn
   tasks: *1nodetasks
 
 - name: wtdevelop-standalone
@@ -993,8 +986,8 @@ buildvariants:
   run_on:
       - "rhel70-perf-single"
   depends_on:
-      - name: compile_wtdevelop
-        variant: compile-linux-64-amzn
+      - name: compile
+        variant: wtdevelop-compile-linux-64-amzn
   tasks: *standalonetasks
 
 - name: wtdevelop-3-node-replSet
@@ -1012,8 +1005,8 @@ buildvariants:
   run_on:
       - "rhel70-perf-replset"
   depends_on:
-      - name: compile_wtdevelop
-        variant: compile-linux-64-amzn
+      - name: compile
+        variant: wtdevelop-compile-linux-64-amzn
   tasks: *3nodetasks
 
 # Disabled: SERVER-35586
@@ -1032,6 +1025,6 @@ buildvariants:
 #  run_on:
 #      - "rhel70-perf-shard-lite"
 #  depends_on:
-#      - name: compile_wtdevelop
-#        variant: compile-linux-64-amzn
+#      - name: compile
+#        variant: wtdevelop-compile-linux-64-amzn
 #  tasks: *shardlitetasks
