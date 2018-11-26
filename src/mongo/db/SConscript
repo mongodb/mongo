@@ -2,7 +2,6 @@
 
 Import("env")
 Import("has_option")
-Import("wiredtiger")
 
 env = env.Clone()
 
@@ -1134,89 +1133,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'commands/server_status_core',
         'kill_sessions',
-    ],
-)
-
-env.Library(
-    target="serveronly",
-    source=[
-        # DO NOT ADD ADDITIONAL FILES TO THIS LIST.
-        # See the additional comments in instance.cpp for details.
-        'instance.cpp'
-    ],
-    LIBDEPS_PRIVATE=[
-        # DO NOT ADD ADDITIONAL FILES TO THIS LIST.
-        # This list should be gradually becoming empty.
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
-        "$BUILD_DIR/mongo/db/ttl_collection_cache",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
-        "$BUILD_DIR/mongo/scripting/scripting_server",
-        "$BUILD_DIR/mongo/util/clock_sources",
-        "$BUILD_DIR/mongo/util/elapsed_tracker",
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/third_party/shim_snappy",
-        "background",
-        "catalog/catalog_impl",
-        "catalog/collection_options",
-        "catalog/document_validation",
-        "catalog/index_key_validate",
-        "cloner",
-        "collection_index_usage_tracker",
-        "common",
-        "concurrency/lock_manager",
-        "concurrency/write_conflict_exception",
-        "curop",
-        "curop_metrics",
-        "db_raii",
-        "dbdirectclient",
-        "dbhelpers",
-        "exec/working_set",
-        "ftdc/ftdc_mongod",
-        "fts/ftsmongod",
-        "index/index_access_method",
-        "index/index_descriptor",
-        "index_d",
-        "introspect",
-        "matcher/expressions_mongod_only",
-        "ops/write_ops_parsers",
-        "pipeline/aggregation",
-        "query_exec",
-        "repl/bgsync",
-        "repl/oplog_buffer_blocking_queue",
-        "repl/oplog_buffer_collection",
-        "repl/oplog_buffer_proxy",
-        "repl/repl_coordinator_interface",
-        "repl/repl_coordinator_impl",
-        "repl/repl_settings",
-        "repl/rs_rollback",
-        "repl/rslog",
-        "repl/serveronly_repl",
-        "repl/storage_interface",
-        "repl/oplog_application",
-        "repl/topology_coordinator",
-        "rw_concern_d",
-        "s/commands_db_s",
-        "s/op_observer_sharding_impl",
-        "s/sharding_runtime_d",
-        "startup_warnings_mongod",
-        "stats/counters",
-        "stats/serveronly_stats",
-        "stats/top",
-        "storage/biggie/storage_biggie",
-        "storage/devnull/storage_devnull",
-        "storage/ephemeral_for_test/storage_ephemeral_for_test",
-        "storage/storage_engine_lock_file",
-        "storage/storage_engine_metadata",
-        "storage/storage_init_d",
-        "storage/storage_options",
-        "storage/wiredtiger/storage_wiredtiger" if wiredtiger else [],
-        "ttl_d",
-        "update/update_driver",
-        "update_index_data",
-        "views/views_mongod",
-        'keys_collection_client_direct',
     ],
 )
 
