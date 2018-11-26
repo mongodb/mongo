@@ -662,7 +662,8 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     return Status::OK();
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL"))(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "LoadICUData"))
+(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerOpenSSL(sslGlobalParams, isSSLServer);
@@ -846,12 +847,15 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
             uasserted(16562, "ssl initialization problem");
         }
 
+        SSLX509Name serverSubjectName;
         if (!_parseAndValidateCertificate(params.sslPEMKeyFile,
                                           &_serverPEMPassword,
-                                          &_sslConfiguration.serverSubjectName,
+                                          &serverSubjectName,
                                           &_sslConfiguration.serverCertificateExpirationDate)) {
             uasserted(16942, "ssl initialization problem");
         }
+
+        uassertStatusOK(_sslConfiguration.setServerSubjectName(std::move(serverSubjectName)));
 
         static CertificateExpirationMonitor task =
             CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);

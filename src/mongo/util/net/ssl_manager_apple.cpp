@@ -1153,8 +1153,9 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     if (isServer) {
         uassertStatusOK(initSSLContext(&_serverCtx, params, ConnectionDirection::kIncoming));
         if (_serverCtx.certs) {
-            _sslConfiguration.serverSubjectName = uassertStatusOK(certificateGetSubject(
-                _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate));
+            uassertStatusOK(
+                _sslConfiguration.setServerSubjectName(uassertStatusOK(certificateGetSubject(
+                    _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate))));
             static auto task =
                 CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
         }
@@ -1558,7 +1559,7 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
     return stdx::make_unique<SSLManagerApple>(params, isServer);
 }
 
-MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("LoadICUData"))(InitializerContext*) {
     kMongoDBRolesOID = ::CFStringCreateWithCString(
         nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 

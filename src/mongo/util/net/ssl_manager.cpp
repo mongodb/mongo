@@ -47,6 +47,7 @@
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/icu.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
@@ -54,101 +55,411 @@
 
 namespace mongo {
 namespace {
+
+// Some of these duplicate the std::isalpha/std::isxdigit because we don't want them to be
+// affected by the current locale.
+inline bool isAlpha(char ch) {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
+inline bool isDigit(char ch) {
+    return (ch >= '0' && ch <= '9');
+}
+
+inline bool isHex(char ch) {
+    return isDigit(ch) || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
+}
+
+// This function returns true if the character is supposed to be escaped according to the rules
+// in RFC4514. The exception to the RFC the space character ' ' and the '#', because we've not
+// required users to escape spaces or sharps in DNs in the past.
+inline bool isEscaped(char ch) {
+    switch (ch) {
+        case '"':
+        case '+':
+        case ',':
+        case ';':
+        case '<':
+        case '>':
+        case '\\':
+            return true;
+        default:
+            return false;
+    }
+}
+
+// These characters may appear escaped in a string or not, but must not appear as the first
+// character.
+inline bool isMayBeEscaped(char ch) {
+    switch (ch) {
+        case ' ':
+        case '#':
+        case '=':
+            return true;
+        default:
+            return false;
+    }
+}
+
+/*
+ * This class parses out the components of a DN according to RFC4514.
+ *
+ * It takes in a StringData to the DN to be parsed, the buffer containing the StringData
+ * must remain in scope for the duration that it is being parsed.
+ */
+class RFC4514Parser {
+public:
+    explicit RFC4514Parser(StringData sd) : _str(sd), _it(_str.begin()) {}
+
+    std::string extractAttributeName();
+
+    enum ValueTerminator {
+        NewRDN,      // The value ended in ','
+        MultiValue,  // The value ended in '+'
+        Done         // The value ended with the end of the string
+    };
+
+    // Returns a decoded string representing one value in an RDN, and the way the value was
+    // terminated.
+    std::pair<std::string, ValueTerminator> extractValue();
+
+    bool done() const {
+        return _it == _str.end();
+    }
+
+    void skipSpaces() {
+        while (!done() && _cur() == ' ') {
+            _advance();
+        }
+    }
+
+private:
+    char _cur() const {
+        uassert(51036, "Overflowed string while parsing DN string", !done());
+        return *_it;
+    }
+
+    char _advance() {
+        invariant(!done());
+        ++_it;
+        return done() ? '\0' : _cur();
+    }
+
+    StringData _str;
+    StringData::const_iterator _it;
+};
+
+// Parses an attribute name according to the rules for the "descr" type defined in
+// https://tools.ietf.org/html/rfc4512
+std::string RFC4514Parser::extractAttributeName() {
+    StringBuilder sb;
+
+    auto ch = _cur();
+    stdx::function<bool(char ch)> characterCheck;
+    // If the first character is a digit, then this is an OID and can only contain
+    // numbers and '.'
+    if (isDigit(ch)) {
+        characterCheck = [](char ch) { return (isDigit(ch) || ch == '.'); };
+        // If the first character is an alpha, then this is a short name and can only
+        // contain alpha/digit/hyphen characters.
+    } else if (isAlpha(ch)) {
+        characterCheck = [](char ch) { return (isAlpha(ch) || isDigit(ch) || ch == '-'); };
+        // Otherwise this is an invalid attribute name
+    } else {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "DN attribute names must begin with either a digit or an alpha"
+                                << " not \'"
+                                << ch
+                                << "\'");
+    }
+
+    for (; ch != '=' && !done(); ch = _advance()) {
+        if (ch == ' ') {
+            continue;
+        }
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "DN attribute name contains an invalid character \'" << ch << "\'",
+                characterCheck(ch));
+        sb << ch;
+    }
+
+    if (!done()) {
+        _advance();
+    }
+
+    return sb.str();
+}
+
+std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractValue() {
+    StringBuilder sb;
+
+    // The RFC states the spaces at the beginning and end of the value must be escaped, which
+    // means we should skip any leading unescaped spaces.
+    skipSpaces();
+
+    // Every time we see an escaped space ("\ "), we increment this counter. Every time we see
+    // anything non-space character we reset this counter to zero. That way we'll know the number
+    // of consecutive escaped spaces at the end of the string there are.
+    int trailingSpaces = 0;
+
+    char ch = _cur();
+    uassert(ErrorCodes::BadValue, "Raw DER sequences are not supported in DN strings", ch != '#');
+    for (; ch != ',' && ch != '+' && !done(); ch = _advance()) {
+        if (ch == '\\') {
+            ch = _advance();
+            if (isEscaped(ch)) {
+                sb << ch;
+                trailingSpaces = 0;
+            } else if (isHex(ch)) {
+                const std::array<char, 2> hexValStr = {ch, _advance()};
+
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "Escaped hex value contains invalid character \'"
+                                      << hexValStr[1]
+                                      << "\'",
+                        isHex(hexValStr[1]));
+                const char hexVal = uassertStatusOK(fromHex(StringData(hexValStr.data(), 2)));
+                sb << hexVal;
+                if (hexVal != ' ') {
+                    trailingSpaces = 0;
+                } else {
+                    trailingSpaces++;
+                }
+            } else if (isMayBeEscaped(ch)) {
+                // It is legal to escape whitespace, but we don't count it as an "escaped"
+                // character because we don't require it to be escaped within the value, that is
+                // "C=New York" is legal, and so is "C=New\ York"
+                //
+                // The exception is that leading and trailing whitespace must be escaped or else
+                // it will be trimmed.
+                sb << ch;
+                if (ch == ' ') {
+                    trailingSpaces++;
+                } else {
+                    trailingSpaces = 0;
+                }
+            } else {
+                uasserted(ErrorCodes::BadValue,
+                          str::stream() << "Invalid escaped character \'" << ch << "\'");
+            }
+        } else if (isEscaped(ch)) {
+            uasserted(ErrorCodes::BadValue,
+                      str::stream() << "Found unescaped character that should be escaped: \'" << ch
+                                    << "\'");
+        } else {
+            if (ch != ' ') {
+                trailingSpaces = 0;
+            }
+            sb << ch;
+        }
+    }
+
+    std::string val = sb.str();
+    // It's legal to have trailing spaces as long as they are escaped, so if we have some trailing
+    // escaped spaces, trim the size of the string to the last non-space character + the number of
+    // escaped trailing spaces.
+    if (trailingSpaces > 0) {
+        auto lastNonSpace = val.find_last_not_of(' ');
+        lastNonSpace += trailingSpaces + 1;
+        val.erase(lastNonSpace);
+    }
+
+    // Consume the + or , character
+    if (!done()) {
+        _advance();
+    }
+
+    switch (ch) {
+        case '+':
+            return {std::move(val), MultiValue};
+        case ',':
+            return {std::move(val), NewRDN};
+        default:
+            invariant(done());
+            return {std::move(val), Done};
+    }
+}
+
+const auto getTLSVersionCounts = ServiceContext::declareDecoration<TLSVersionCounts>();
+
+// These represent the ASN.1 type bytes for strings used in an X509 DirectoryString
+constexpr int kASN1UTF8String = 12;
+constexpr int kASN1PrintableString = 19;
+constexpr int kASN1TeletexString = 20;
+constexpr int kASN1UniversalString = 28;
+constexpr int kASN1BMPString = 30;
+constexpr int kASN1OctetString = 4;
+}  // namespace
+
+StatusWith<SSLX509Name> parseDN(StringData sd) try {
+    uassert(ErrorCodes::BadValue, "DN strings must be valid UTF-8 strings", isValidUTF8(sd));
+    RFC4514Parser parser(sd);
+
+    std::vector<std::vector<SSLX509Name::Entry>> entries;
+    auto curRDN = entries.emplace(entries.end());
+    while (!parser.done()) {
+        // Allow spaces to separate RDNs for readability, e.g. "CN=foo, OU=bar, DC=bizz"
+        parser.skipSpaces();
+        auto attributeName = parser.extractAttributeName();
+        auto oid = x509ShortNameToOid(attributeName);
+        uassert(ErrorCodes::BadValue, str::stream() << "DN contained an unknown OID " << oid, oid);
+        std::string value;
+        char terminator;
+        std::tie(value, terminator) = parser.extractValue();
+        curRDN->emplace_back(std::move(*oid), kASN1UTF8String, std::move(value));
+        if (terminator == RFC4514Parser::NewRDN) {
+            curRDN = entries.emplace(entries.end());
+        }
+    }
+
+    uassert(ErrorCodes::BadValue,
+            "Cannot parse empty DN",
+            entries.size() > 1 || !entries.front().empty());
+
+    return SSLX509Name(std::move(entries));
+} catch (const DBException& e) {
+    return e.toStatus();
+}
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 // OpenSSL has a more complete library of OID to SN mappings.
-std::string x509OidToShortName(const std::string& name) {
-    const auto nid = OBJ_txt2nid(name.c_str());
+std::string x509OidToShortName(StringData name) {
+    const auto nid = OBJ_txt2nid(name.rawData());
     if (nid == 0) {
-        return name;
+        return name.toString();
     }
 
     const auto* sn = OBJ_nid2sn(nid);
     if (!sn) {
-        return name;
+        return name.toString();
     }
 
     return sn;
+}
+
+boost::optional<std::string> x509ShortNameToOid(StringData name) {
+    // Converts the OID to an ASN1_OBJECT
+    const auto obj = OBJ_txt2obj(name.rawData(), 0);
+    if (!obj) {
+        return boost::none;
+    }
+
+    // OBJ_obj2txt doesn't let you pass in a NULL buffer and a negative size to discover how
+    // big the buffer should be, but the man page gives 80 as a good guess for buffer size.
+    constexpr auto kDefaultBufferSize = 80;
+    std::vector<char> buffer(kDefaultBufferSize);
+    size_t realSize = OBJ_obj2txt(buffer.data(), buffer.size(), obj, 1);
+
+    // Resize the buffer down or up to the real size.
+    buffer.resize(realSize);
+
+    // If the real size is greater than the default buffer size we picked, then just call
+    // OBJ_obj2txt again now that the buffer is correctly sized.
+    if (realSize > kDefaultBufferSize) {
+        OBJ_obj2txt(buffer.data(), buffer.size(), obj, 1);
+    }
+
+    return std::string(buffer.data(), buffer.size());
 }
 #else
 // On Apple/Windows we have to provide our own mapping.
 // Generate the 2.5.4.* portions of this list from OpenSSL sources with:
 // grep -E '^X509 ' "$OPENSSL/crypto/objects/objects.txt" | tr -d '\t' |
 //   sed -e 's/^X509 *\([0-9]\+\) *\(: *\)\+\([[:alnum:]]\+\).*/{"2.5.4.\1", "\3"},/g'
-std::string x509OidToShortName(const std::string& name) {
-    static const StringMap<std::string> kX509OidToShortNameMappings = {
-        {"0.9.2342.19200300.100.1.1", "UID"},
-        {"0.9.2342.19200300.100.1.25", "DC"},
-        {"1.2.840.113549.1.9.1", "emailAddress"},
-        {"2.5.29.17", "subjectAltName"},
+static const std::initializer_list<std::pair<StringData, StringData>> kX509OidToShortNameMappings =
+    {
+        {"0.9.2342.19200300.100.1.1"_sd, "UID"_sd},
+        {"0.9.2342.19200300.100.1.25"_sd, "DC"_sd},
+        {"1.2.840.113549.1.9.1"_sd, "emailAddress"_sd},
+        {"2.5.29.17"_sd, "subjectAltName"_sd},
 
         // X509 OIDs Generated from objects.txt
-        {"2.5.4.3", "CN"},
-        {"2.5.4.4", "SN"},
-        {"2.5.4.5", "serialNumber"},
-        {"2.5.4.6", "C"},
-        {"2.5.4.7", "L"},
-        {"2.5.4.8", "ST"},
-        {"2.5.4.9", "street"},
-        {"2.5.4.10", "O"},
-        {"2.5.4.11", "OU"},
-        {"2.5.4.12", "title"},
-        {"2.5.4.13", "description"},
-        {"2.5.4.14", "searchGuide"},
-        {"2.5.4.15", "businessCategory"},
-        {"2.5.4.16", "postalAddress"},
-        {"2.5.4.17", "postalCode"},
-        {"2.5.4.18", "postOfficeBox"},
-        {"2.5.4.19", "physicalDeliveryOfficeName"},
-        {"2.5.4.20", "telephoneNumber"},
-        {"2.5.4.21", "telexNumber"},
-        {"2.5.4.22", "teletexTerminalIdentifier"},
-        {"2.5.4.23", "facsimileTelephoneNumber"},
-        {"2.5.4.24", "x121Address"},
-        {"2.5.4.25", "internationaliSDNNumber"},
-        {"2.5.4.26", "registeredAddress"},
-        {"2.5.4.27", "destinationIndicator"},
-        {"2.5.4.28", "preferredDeliveryMethod"},
-        {"2.5.4.29", "presentationAddress"},
-        {"2.5.4.30", "supportedApplicationContext"},
-        {"2.5.4.31", "member"},
-        {"2.5.4.32", "owner"},
-        {"2.5.4.33", "roleOccupant"},
-        {"2.5.4.34", "seeAlso"},
-        {"2.5.4.35", "userPassword"},
-        {"2.5.4.36", "userCertificate"},
-        {"2.5.4.37", "cACertificate"},
-        {"2.5.4.38", "authorityRevocationList"},
-        {"2.5.4.39", "certificateRevocationList"},
-        {"2.5.4.40", "crossCertificatePair"},
-        {"2.5.4.41", "name"},
-        {"2.5.4.42", "GN"},
-        {"2.5.4.43", "initials"},
-        {"2.5.4.44", "generationQualifier"},
-        {"2.5.4.45", "x500UniqueIdentifier"},
-        {"2.5.4.46", "dnQualifier"},
-        {"2.5.4.47", "enhancedSearchGuide"},
-        {"2.5.4.48", "protocolInformation"},
-        {"2.5.4.49", "distinguishedName"},
-        {"2.5.4.50", "uniqueMember"},
-        {"2.5.4.51", "houseIdentifier"},
-        {"2.5.4.52", "supportedAlgorithms"},
-        {"2.5.4.53", "deltaRevocationList"},
-        {"2.5.4.54", "dmdName"},
-        {"2.5.4.65", "pseudonym"},
-        {"2.5.4.72", "role"},
-    };
+        {"2.5.4.3"_sd, "CN"_sd},
+        {"2.5.4.4"_sd, "SN"_sd},
+        {"2.5.4.5"_sd, "serialNumber"_sd},
+        {"2.5.4.6"_sd, "C"_sd},
+        {"2.5.4.7"_sd, "L"_sd},
+        {"2.5.4.8"_sd, "ST"_sd},
+        {"2.5.4.9"_sd, "street"_sd},
+        {"2.5.4.10"_sd, "O"_sd},
+        {"2.5.4.11"_sd, "OU"_sd},
+        {"2.5.4.12"_sd, "title"_sd},
+        {"2.5.4.13"_sd, "description"_sd},
+        {"2.5.4.14"_sd, "searchGuide"_sd},
+        {"2.5.4.15"_sd, "businessCategory"_sd},
+        {"2.5.4.16"_sd, "postalAddress"_sd},
+        {"2.5.4.17"_sd, "postalCode"_sd},
+        {"2.5.4.18"_sd, "postOfficeBox"_sd},
+        {"2.5.4.19"_sd, "physicalDeliveryOfficeName"_sd},
+        {"2.5.4.20"_sd, "telephoneNumber"_sd},
+        {"2.5.4.21"_sd, "telexNumber"_sd},
+        {"2.5.4.22"_sd, "teletexTerminalIdentifier"_sd},
+        {"2.5.4.23"_sd, "facsimileTelephoneNumber"_sd},
+        {"2.5.4.24"_sd, "x121Address"_sd},
+        {"2.5.4.25"_sd, "internationaliSDNNumber"_sd},
+        {"2.5.4.26"_sd, "registeredAddress"_sd},
+        {"2.5.4.27"_sd, "destinationIndicator"_sd},
+        {"2.5.4.28"_sd, "preferredDeliveryMethod"_sd},
+        {"2.5.4.29"_sd, "presentationAddress"_sd},
+        {"2.5.4.30"_sd, "supportedApplicationContext"_sd},
+        {"2.5.4.31"_sd, "member"_sd},
+        {"2.5.4.32"_sd, "owner"_sd},
+        {"2.5.4.33"_sd, "roleOccupant"_sd},
+        {"2.5.4.34"_sd, "seeAlso"_sd},
+        {"2.5.4.35"_sd, "userPassword"_sd},
+        {"2.5.4.36"_sd, "userCertificate"_sd},
+        {"2.5.4.37"_sd, "cACertificate"_sd},
+        {"2.5.4.38"_sd, "authorityRevocationList"_sd},
+        {"2.5.4.39"_sd, "certificateRevocationList"_sd},
+        {"2.5.4.40"_sd, "crossCertificatePair"_sd},
+        {"2.5.4.41"_sd, "name"_sd},
+        {"2.5.4.42"_sd, "GN"_sd},
+        {"2.5.4.43"_sd, "initials"_sd},
+        {"2.5.4.44"_sd, "generationQualifier"_sd},
+        {"2.5.4.45"_sd, "x500UniqueIdentifier"_sd},
+        {"2.5.4.46"_sd, "dnQualifier"_sd},
+        {"2.5.4.47"_sd, "enhancedSearchGuide"_sd},
+        {"2.5.4.48"_sd, "protocolInformation"_sd},
+        {"2.5.4.49"_sd, "distinguishedName"_sd},
+        {"2.5.4.50"_sd, "uniqueMember"_sd},
+        {"2.5.4.51"_sd, "houseIdentifier"_sd},
+        {"2.5.4.52"_sd, "supportedAlgorithms"_sd},
+        {"2.5.4.53"_sd, "deltaRevocationList"_sd},
+        {"2.5.4.54"_sd, "dmdName"_sd},
+        {"2.5.4.65"_sd, "pseudonym"_sd},
+        {"2.5.4.72"_sd, "role"_sd},
+};
 
-    auto it = kX509OidToShortNameMappings.find(name);
+std::string x509OidToShortName(StringData oid) {
+    auto it = std::find_if(
+        kX509OidToShortNameMappings.begin(),
+        kX509OidToShortNameMappings.end(),
+        [&](const std::pair<StringData, StringData>& entry) { return entry.first == oid; });
+
     if (it == kX509OidToShortNameMappings.end()) {
-        return name;
+        return oid.toString();
     }
-    return it->second;
+    return it->second.toString();
+}
+
+boost::optional<std::string> x509ShortNameToOid(StringData name) {
+    auto it = std::find_if(
+        kX509OidToShortNameMappings.begin(),
+        kX509OidToShortNameMappings.end(),
+        [&](const std::pair<StringData, StringData>& entry) { return entry.second == name; });
+
+    if (it == kX509OidToShortNameMappings.end()) {
+        // If the name is a known oid in our mapping list then just return it.
+        if (std::find_if(kX509OidToShortNameMappings.begin(),
+                         kX509OidToShortNameMappings.end(),
+                         [&](const auto& entry) { return entry.first == name; }) !=
+            kX509OidToShortNameMappings.end()) {
+            return name.toString();
+        }
+        return boost::none;
+    }
+    return it->first.toString();
 }
 #endif
-
-const auto getTLSVersionCounts = ServiceContext::declareDecoration<TLSVersionCounts>();
-
-}  // namespace
 
 TLSVersionCounts& TLSVersionCounts::get(ServiceContext* serviceContext) {
     return getTLSVersionCounts(serviceContext);
@@ -161,9 +472,35 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLog
         if (!config.clientSubjectName.empty()) {
             LOG(1) << "Client Certificate Name: " << config.clientSubjectName;
         }
-        if (!config.serverSubjectName.empty()) {
-            LOG(1) << "Server Certificate Name: " << config.serverSubjectName;
+        if (!config.serverSubjectName().empty()) {
+            LOG(1) << "Server Certificate Name: " << config.serverSubjectName();
             LOG(1) << "Server Certificate Expiration: " << config.serverCertificateExpirationDate;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status SSLX509Name::normalizeStrings() {
+    for (auto& rdn : _entries) {
+        for (auto& entry : rdn) {
+            switch (entry.type) {
+                // For each type of valid DirectoryString, do the string prep algorithm.
+                case kASN1UTF8String:
+                case kASN1PrintableString:
+                case kASN1TeletexString:
+                case kASN1UniversalString:
+                case kASN1BMPString:
+                case kASN1OctetString: {
+                    auto res = icuX509DNPrep(entry.value);
+                    if (!res.isOK()) {
+                        return res.getStatus();
+                    }
+                    entry.value = std::move(res.getValue());
+                    entry.type = kASN1UTF8String;
+                    break;
+                }
+            }
         }
     }
 
@@ -238,40 +575,58 @@ std::vector<SSLX509Name::Entry> canonicalizeClusterDN(
 }
 }  // namespace
 
+Status SSLConfiguration::setServerSubjectName(SSLX509Name name) {
+    auto status = name.normalizeStrings();
+    if (!status.isOK()) {
+        return status;
+    }
+    _serverSubjectName = std::move(name);
+    _canonicalServerSubjectName = canonicalizeClusterDN(_serverSubjectName.entries());
+    return Status::OK();
+}
+
 /**
  * The behavior of isClusterMember() is subtly different when passed
  * an SSLX509Name versus a StringData.
  *
  * The SSLX509Name version (immediately below) compares distinguished
- * names in their raw, unescaped forms and provides a more reliable match.
+ * names in their normalized, unescaped forms and provides a more reliable match.
  *
- * The StringData version attempts to do a simplified string compare
- * with the serialized version of the server subject name.
- *
- * Because escaping is not checked in the StringData version,
- * some not-strictly matching RDNs will appear to share O/OU/DC with the
- * server subject name.  Therefore, that variant should be called with care.
+ * The StringData version attempts to canonicalize the stringified subject name
+ * according to RFC4514 and compare that to the normalized/unescaped version of
+ * the server's distinguished name.
  */
-bool SSLConfiguration::isClusterMember(const SSLX509Name& subject) const {
-    auto client = canonicalizeClusterDN(subject._entries);
-    auto server = canonicalizeClusterDN(serverSubjectName._entries);
+bool SSLConfiguration::isClusterMember(SSLX509Name subject) const {
+    if (!subject.normalizeStrings().isOK()) {
+        return false;
+    }
 
-    return !client.empty() && (client == server);
+    auto client = canonicalizeClusterDN(subject.entries());
+
+    return !client.empty() && (client == _canonicalServerSubjectName);
 }
 
 bool SSLConfiguration::isClusterMember(StringData subjectName) const {
-    std::vector<std::string> clientRDN = StringSplitter::split(subjectName.toString(), ",");
-    std::vector<std::string> serverRDN = StringSplitter::split(serverSubjectName.toString(), ",");
+    auto swClient = parseDN(subjectName);
+    if (!swClient.isOK()) {
+        warning() << "Unable to parse client subject name: " << swClient.getStatus();
+        return false;
+    }
+    auto& client = swClient.getValue();
+    auto status = client.normalizeStrings();
+    if (!status.isOK()) {
+        warning() << "Unable to normalize client subject name: " << status;
+        return false;
+    }
 
-    canonicalizeClusterDN(&clientRDN);
-    canonicalizeClusterDN(&serverRDN);
+    auto canonicalClient = canonicalizeClusterDN(client.entries());
 
-    return !clientRDN.empty() && (clientRDN == serverRDN);
+    return !canonicalClient.empty() && (canonicalClient == _canonicalServerSubjectName);
 }
 
 BSONObj SSLConfiguration::getServerStatusBSON() const {
     BSONObjBuilder security;
-    security.append("SSLServerSubjectName", serverSubjectName.toString());
+    security.append("SSLServerSubjectName", _serverSubjectName.toString());
     security.appendBool("SSLServerHasCertificateAuthority", hasCA);
     security.appendDate("SSLServerCertificateExpirationDate", serverCertificateExpirationDate);
     return security.obj();

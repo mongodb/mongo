@@ -344,7 +344,7 @@ private:
     UniqueCertificate _sslClusterCertificate;
 };
 
-MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("LoadICUData"))(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerWindows(sslGlobalParams, isSSLServer);
@@ -417,10 +417,12 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
         uassertStatusOK(initSSLContext(&_serverCred, params, ConnectionDirection::kIncoming));
 
         if (_serverCertificates[0] != nullptr) {
+            SSLX509Name subjectName;
             uassertStatusOK(
                 _validateCertificate(_serverCertificates[0],
-                                     &_sslConfiguration.serverSubjectName,
+                                     &subjectName,
                                      &_sslConfiguration.serverCertificateExpirationDate));
+            uassertStatusOK(_sslConfiguration.setServerSubjectName(std::move(subjectName)));
         }
 
         // Monitor the server certificate's expiration

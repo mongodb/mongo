@@ -76,7 +76,7 @@ public:
             return boost::none;
         }
 
-        auto swSaslPassword = saslPrep(password);
+        auto swSaslPassword = icuSaslPrep(password);
         if (!swSaslPassword.isOK()) {
             error() << "Could not prep security key file for SCRAM-SHA-256: "
                     << swSaslPassword.getStatus();

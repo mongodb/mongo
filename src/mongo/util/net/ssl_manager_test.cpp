@@ -46,7 +46,6 @@
 namespace mongo {
 namespace {
 TEST(SSLManager, matchHostname) {
-#ifdef MONGO_CONFIG_SSL
     enum Expected : bool { match = true, mismatch = false };
     const struct {
         Expected expected;
@@ -87,11 +86,7 @@ TEST(SSLManager, matchHostname) {
         }
     }
     ASSERT_FALSE(failure);
-#endif
 }
-}
-
-#ifdef MONGO_CONFIG_SSL
 
 std::vector<RoleName> getSortedRoles(const stdx::unordered_set<RoleName>& roles) {
     std::vector<RoleName> vec;
@@ -273,7 +268,115 @@ TEST(SSLManager, DHCheckRFC7919) {
 }
 #endif
 
-#endif
+struct FlattenedX509Name {
+    using EntryVector = std::vector<std::pair<std::string, std::string>>;
 
-//  // namespace
+    FlattenedX509Name(std::initializer_list<EntryVector::value_type> forVector)
+        : value(forVector) {}
+
+    FlattenedX509Name() = default;
+
+    void addPair(std::string oid, std::string val) {
+        value.emplace_back(std::move(oid), std::move(val));
+    }
+
+    std::string toString() const {
+        bool first = true;
+        StringBuilder sb;
+        for (const auto& entry : value) {
+            sb << (first ? "\"" : ",\"") << entry.first << "\"=\"" << entry.second << "\"";
+            first = false;
+        }
+
+        return sb.str();
+    }
+
+    EntryVector value;
+
+    bool operator==(const FlattenedX509Name& other) const {
+        return value == other.value;
+    }
+};
+
+std::ostream& operator<<(std::ostream& o, const FlattenedX509Name& name) {
+    o << name.toString();
+    return o;
+}
+
+FlattenedX509Name flattenX509Name(const SSLX509Name& name) {
+    FlattenedX509Name ret;
+    for (const auto& entry : name.entries()) {
+        for (const auto& rdn : entry) {
+            ret.addPair(rdn.oid, rdn.value);
+        }
+    }
+
+    return ret;
+}
+
+TEST(SSLManager, DNParsingAndNormalization) {
+    std::vector<std::pair<std::string, FlattenedX509Name>> tests = {
+        // Basic DN parsing
+        {"UID=jsmith,DC=example,DC=net",
+         {{"0.9.2342.19200300.100.1.1", "jsmith"},
+          {"0.9.2342.19200300.100.1.25", "example"},
+          {"0.9.2342.19200300.100.1.25", "net"}}},
+        {"OU=Sales+CN=J.  Smith,DC=example,DC=net",
+         {{"2.5.4.11", "Sales"},
+          {"2.5.4.3", "J.  Smith"},
+          {"0.9.2342.19200300.100.1.25", "example"},
+          {"0.9.2342.19200300.100.1.25", "net"}}},
+        {R"(CN=James \"Jim\" Smith\, III,DC=example,DC=net)",
+         {{"2.5.4.3", R"(James "Jim" Smith, III)"},
+          {"0.9.2342.19200300.100.1.25", "example"},
+          {"0.9.2342.19200300.100.1.25", "net"}}},
+        // Per RFC4518, control sequences are mapped to nothing and whitepace is mapped to ' '
+        {"CN=Before\\0aAfter,O=tabs\tare\tspaces\u200B,DC=\\07\\08example,DC=net",
+         {{"2.5.4.3", "Before After"},
+          {"2.5.4.10", "tabs are spaces"},
+          {"0.9.2342.19200300.100.1.25", "example"},
+          {"0.9.2342.19200300.100.1.25", "net"}}},
+        // Check that you can't fake a cluster dn with poor comma escaping
+        {R"(CN=evil\,OU\=Kernel,O=MongoDB Inc.,L=New York City,ST=New York,C=US)",
+         {{"2.5.4.3", "evil,OU=Kernel"},
+          {"2.5.4.10", "MongoDB Inc."},
+          {"2.5.4.7", "New York City"},
+          {"2.5.4.8", "New York"},
+          {"2.5.4.6", "US"}}},
+        // check space handling (must be escaped at the beginning and end of strings)
+        {R"(CN= \ escaped spaces\20\  )", {{"2.5.4.3", " escaped spaces  "}}},
+        {"CN=server, O=MongoDB Inc.", {{"2.5.4.3", "server"}, {"2.5.4.10", "MongoDB Inc."}}},
+        // Check that escaped #'s work correctly at the beginning of the string and throughout.
+        {R"(CN=\#1 = \\#1)", {{"2.5.4.3", "#1 = \\#1"}}},
+        {R"(CN== \#1)", {{"2.5.4.3", "= #1"}}},
+        // check that escaped utf8 string properly parse to utf8
+        {R"(CN=Lu\C4\8Di\C4\87)", {{"2.5.4.3", "Lučić"}}},
+        // check that unescaped utf8 strings round trip correctly
+        {"CN = Калоян, O=مُنظّمة الدُّول المُصدِّرة للنّفْط, L=大田区\\, 東京都",
+         {{"2.5.4.3", "Калоян"},
+          {"2.5.4.10", "مُنظّمة الدُّول المُصدِّرة للنّفْط"},
+          {"2.5.4.7", "大田区, 東京都"}}}};
+
+    for (const auto& test : tests) {
+        log() << "Testing DN \"" << test.first << "\"";
+        auto swDN = parseDN(test.first);
+        ASSERT_OK(swDN.getStatus());
+        ASSERT_OK(swDN.getValue().normalizeStrings());
+        auto decoded = flattenX509Name(swDN.getValue());
+        ASSERT_EQ(decoded, test.second);
+    }
+}
+
+TEST(SSLManager, BadDNParsing) {
+    std::vector<std::string> tests = {"CN=#12345",
+                                      R"(CN=\B)",
+                                      R"(CN=<", "\)"};
+    for (const auto& test : tests) {
+        log() << "Testing bad DN: \"" << test << "\"";
+        auto swDN = parseDN(test);
+        ASSERT_NOT_OK(swDN.getStatus());
+    }
+}
+
+}  // namespace
 }  // namespace mongo

@@ -704,7 +704,7 @@ Status buildCredentials(BSONObjBuilder* builder, const auth::CreateOrUpdateUserA
         if (!args.digestPassword) {
             return {ErrorCodes::BadValue, "Use of SCRAM-SHA-256 requires undigested passwords"};
         }
-        const auto swPwd = saslPrep(args.password);
+        const auto swPwd = icuSaslPrep(args.password);
         if (!swPwd.isOK()) {
             return swPwd.getStatus();
         }

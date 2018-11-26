@@ -172,11 +172,18 @@ private:
 };
 
 }  // namespace
-}  // namespace mongo
 
-mongo::StatusWith<std::string> mongo::saslPrep(StringData str, UStringPrepOptions options) try {
+StatusWith<std::string> icuSaslPrep(StringData str, UStringPrepOptions options) try {
     const auto opts = (options == kUStringPrepDefault) ? USPREP_DEFAULT : USPREP_ALLOW_UNASSIGNED;
     return USPrep(USPREP_RFC4013_SASLPREP).prepare(UString::fromUTF8(str), opts).toUTF8();
 } catch (const DBException& e) {
     return e.toStatus();
 }
+
+StatusWith<std::string> icuX509DNPrep(StringData str) try {
+    return USPrep(USPREP_RFC4518_LDAP).prepare(UString::fromUTF8(str), USPREP_DEFAULT).toUTF8();
+} catch (const DBException& e) {
+    return e.toStatus();
+}
+
+}  // namespace mongo

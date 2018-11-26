@@ -64,7 +64,7 @@ public:
         if (std::is_same<SHA1Block, HashBlock>::value) {
             return str.toString();
         } else {
-            return mongo::saslPrep(str);
+            return icuSaslPrep(str);
         }
     }
 

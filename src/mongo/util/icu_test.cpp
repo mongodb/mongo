@@ -42,7 +42,7 @@ struct testCases {
     bool success;
 };
 
-TEST(ICUTest, saslPrep) {
+TEST(ICUTest, icuSaslPrep) {
     const testCases tests[] = {
         // U+0065 LATIN SMALL LETTER E + U+0301 COMBINING ACUTE ACCENT
         // U+00E9 LATIN SMALL LETTER E WITH ACUTE
@@ -66,7 +66,7 @@ TEST(ICUTest, saslPrep) {
     };
 
     for (const auto test : tests) {
-        auto ret = saslPrep(test.original);
+        auto ret = icuSaslPrep(test.original);
         ASSERT_EQ(ret.isOK(), test.success);
         if (test.success) {
             ASSERT_OK(ret);

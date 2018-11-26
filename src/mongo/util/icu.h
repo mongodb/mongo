@@ -52,6 +52,12 @@ enum UStringPrepOptions {
  * Attempt to apply RFC4013 saslPrep to the target string.
  * Normalizes unicode sequences for SCRAM authentication.
  */
-StatusWith<std::string> saslPrep(StringData str, UStringPrepOptions = kUStringPrepDefault);
+StatusWith<std::string> icuSaslPrep(StringData str, UStringPrepOptions = kUStringPrepDefault);
+
+/**
+ * Attempt to apply RFC4518 string prep to the target string, this normalizes an X509 DN
+ * so it can be compared against other X509 DNs
+ */
+StatusWith<std::string> icuX509DNPrep(StringData str);
 
 }  // namespace mongo

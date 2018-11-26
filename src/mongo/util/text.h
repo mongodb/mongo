@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/config.h"
 
 namespace mongo {
@@ -72,8 +73,7 @@ private:
  * std::string can be converted to sequence of codepoints. However, it doesn't
  * guarantee that the codepoints are valid.
  */
-bool isValidUTF8(const char* s);
-bool isValidUTF8(const std::string& s);
+bool isValidUTF8(StringData s);
 
 #if defined(_WIN32)
 

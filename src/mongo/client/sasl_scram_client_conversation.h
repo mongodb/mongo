@@ -140,7 +140,7 @@ public:
         if (std::is_same<SHA1Block, HashBlock>::value) {
             return val.toString();
         } else {
-            return mongo::saslPrep(val);
+            return icuSaslPrep(val);
         }
     }
 

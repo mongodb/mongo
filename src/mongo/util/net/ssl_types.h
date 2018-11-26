@@ -87,8 +87,19 @@ public:
         return !(lhs._entries == rhs._entries);
     }
 
+    const std::vector<std::vector<Entry>>& entries() const {
+        return _entries;
+    }
+
+    /*
+     * This will go through every entry, verify that it's type is a valid DirectoryString
+     * according to https://tools.ietf.org/html/rfc5280#section-4.1.2.4, and perform
+     * the RFC 4518 string prep algorithm on it to normalize the values so they can be
+     * directly compared. After this, all entries should have the type 12 (utf8String).
+     */
+    Status normalizeStrings();
+
 private:
-    friend struct SSLConfiguration;
     std::vector<std::vector<Entry>> _entries;
 };
 
