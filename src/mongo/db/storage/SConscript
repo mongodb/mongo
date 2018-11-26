@@ -97,10 +97,8 @@ env.Library(
         ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
-    LIBDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongodmain',
-    ],
     PROGDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod',
         '$BUILD_DIR/mongo/mongos',
         ],
     )
@@ -114,8 +112,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
     ],
-    LIBDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongodmain',
+    PROGDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod',
     ],
 )
 

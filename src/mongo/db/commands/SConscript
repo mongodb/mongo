@@ -494,7 +494,7 @@ if has_option('use-cpu-profiler'):
             '$BUILD_DIR/mongo/db/commands',
             '$BUILD_DIR/mongo/db/db_raii',
         ],
-        LIBDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/mongodmain',
+        PROGDEPS_DEPENDENTS=[
+            '$BUILD_DIR/mongo/mongod',
         ],
     )

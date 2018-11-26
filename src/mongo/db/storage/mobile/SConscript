@@ -34,11 +34,11 @@ env.Library(
         ]
     )
 
-serveronlyLibDepsDependents = []
+serveronlyProgDepsDependents = []
 if mobile_se:
-    serveronlyLibDepsDependents = [
-        '$BUILD_DIR/mongo/mongodmain',
-        '$BUILD_DIR/mongo/dbtests/testframework',
+    serveronlyProgDepsDependents = [
+        '$BUILD_DIR/mongo/mongod',
+        '$BUILD_DIR/mongo/dbtests/dbtest',
         ]
 
 env.Library(
@@ -46,7 +46,7 @@ env.Library(
     source=[
         'mobile_init.cpp',
         ],
-    LIBDEPS_DEPENDENTS=serveronlyLibDepsDependents,
+    PROGDEPS_DEPENDENTS=serveronlyProgDepsDependents,
     LIBDEPS=[
         'storage_mobile_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine'

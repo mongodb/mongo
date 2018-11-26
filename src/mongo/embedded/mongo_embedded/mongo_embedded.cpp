@@ -39,7 +39,6 @@
 #include <vector>
 
 #include "mongo/db/client.h"
-#include "mongo/db/dbmain.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
 #include "mongo/embedded/embedded_log_appender.h"

@@ -377,10 +377,8 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
             '$BUILD_DIR/mongo/db/commands/server_status',
             'processinfo',
         ],
-        LIBDEPS_DEPENDENTS=[
-            '$BUILD_DIR/mongo/mongodmain',
-        ],
         PROGDEPS_DEPENDENTS=[
+            '$BUILD_DIR/mongo/mongod',
             '$BUILD_DIR/mongo/mongos',
         ],
     )
