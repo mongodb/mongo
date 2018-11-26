@@ -50,16 +50,16 @@ public:
 
     virtual Status step(StringData inputData, std::string* outputData);
 
-    virtual bool isDone() const {
-        return _done;
+    bool isSuccess() const override {
+        return _success;
     }
 
 private:
     /// Number of successfully completed conversation steps.
     int _step;
 
-    /// See isDone().
-    bool _done;
+    /// See isSuccess().
+    bool _success;
 
     /// The client side of a SASL authentication conversation.
     std::unique_ptr<SaslClientConversation> _saslConversation;

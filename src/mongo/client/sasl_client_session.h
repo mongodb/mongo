@@ -122,16 +122,16 @@ public:
      * authentication, though the specific return value may provide insight into the cause of
      * the failure (e.g., ProtocolError, AuthenticationFailed).
      *
-     * In the event that this method returns Status::OK(), consult the value of isDone() to
-     * determine if the conversation has completed.  When step() returns Status::OK() and
-     * isDone() returns true, authentication has completed successfully.
+     * In the event that this method does not return Status::OK(), authentication has failed.
+     * When step() returns Status::OK() and isSuccess() returns true,
+     * authentication has completed successfully.
      */
     virtual Status step(StringData inputData, std::string* outputData) = 0;
 
     /**
      * Returns true if the authentication completed successfully.
      */
-    virtual bool isDone() const = 0;
+    virtual bool isSuccess() const = 0;
 
 private:
     /**

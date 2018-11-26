@@ -240,8 +240,8 @@ protected:
         std::string serverOutput = "";
 
         for (size_t step = 1; step <= 3; step++) {
-            ASSERT_FALSE(saslClientSession->isDone());
-            ASSERT_FALSE(saslServerSession->isDone());
+            ASSERT_FALSE(saslClientSession->isSuccess());
+            ASSERT_FALSE(saslServerSession->isSuccess());
 
             // Client step
             result.status = saslClientSession->step(serverOutput, &clientOutput);
@@ -265,8 +265,8 @@ protected:
             std::cout << result.outcome.toString() << ": " << serverOutput << std::endl;
             result.outcome.next();
         }
-        ASSERT_TRUE(saslClientSession->isDone());
-        ASSERT_TRUE(saslServerSession->isDone());
+        ASSERT_TRUE(saslClientSession->isSuccess());
+        ASSERT_TRUE(saslServerSession->isSuccess());
 
         return result;
     }

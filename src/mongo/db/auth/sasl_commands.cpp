@@ -126,7 +126,7 @@ Status buildResponse(const AuthenticationSession* session,
                      BSONType responsePayloadType,
                      BSONObjBuilder* result) {
     result->appendIntOrLL(saslCommandConversationIdFieldName, 1);
-    result->appendBool(saslCommandDoneFieldName, session->getMechanism().isDone());
+    result->appendBool(saslCommandDoneFieldName, session->getMechanism().isSuccess());
 
     if (responsePayload.size() > size_t(std::numeric_limits<int>::max())) {
         return Status(ErrorCodes::InvalidLength, "Response payload too long");
@@ -195,7 +195,7 @@ Status doSaslStep(OperationContext* opCtx,
         return status;
     }
 
-    if (mechanism.isDone()) {
+    if (mechanism.isSuccess()) {
         UserName userName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase());
         status =
             AuthorizationSession::get(opCtx->getClient())->addAndAuthorizeUser(opCtx, userName);
@@ -289,7 +289,7 @@ bool CmdSaslStart::run(OperationContext* opCtx,
     auto session = std::move(swSession.getValue());
 
     auto& mechanism = session->getMechanism();
-    if (mechanism.isDone()) {
+    if (mechanism.isSuccess() || !swSession.isOK()) {
         audit::logAuthentication(client,
                                  mechanismName,
                                  UserName(mechanism.getPrincipalName(), db),
@@ -332,7 +332,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     Status status = doSaslContinue(opCtx, session, cmdObj, &result);
     CommandHelpers::appendCommandStatusNoThrow(result, status);
 
-    if (mechanism.isDone()) {
+    if (mechanism.isSuccess() || !status.isOK()) {
         audit::logAuthentication(
             client,
             mechanism.mechanismName(),

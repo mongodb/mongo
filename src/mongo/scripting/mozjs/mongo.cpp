@@ -585,7 +585,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
     bool isServerDone = false;
 
-    while (!session->isDone()) {
+    while (!session->isSuccess()) {
         std::string payload;
         BSONType type;
 
