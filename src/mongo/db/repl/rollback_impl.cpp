@@ -43,7 +43,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -899,7 +898,7 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
     for (const auto& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
         Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
-        checkForIdIndexesAndDropPendingCollections(opCtx, db);
+        db->checkForIdIndexesAndDropPendingCollections(opCtx);
     }
 }
 

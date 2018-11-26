@@ -229,6 +229,8 @@ public:
     StatusWith<NamespaceString> makeUniqueCollectionNamespace(OperationContext* opCtx,
                                                               StringData collectionNameModel) final;
 
+    void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) final;
+
     inline CollectionMap& collections() final {
         return _collections;
     }

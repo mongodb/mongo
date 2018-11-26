@@ -122,6 +122,8 @@ public:
         virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
             OperationContext* opCtx, StringData collectionNameModel) = 0;
 
+        virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) = 0;
+
         virtual CollectionMap& collections() = 0;
         virtual const CollectionMap& collections() const = 0;
     };
@@ -370,6 +372,15 @@ public:
     inline StatusWith<NamespaceString> makeUniqueCollectionNamespace(
         OperationContext* opCtx, StringData collectionNameModel) {
         return this->_impl().makeUniqueCollectionNamespace(opCtx, collectionNameModel);
+    }
+
+    /**
+     * If we are in a replset, every replicated collection must have an _id index.  As we scan each
+     * database, we also gather a list of drop-pending collection namespaces for the
+     * DropPendingCollectionReaper to clean up eventually.
+     */
+    inline void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) {
+        return this->_impl().checkForIdIndexesAndDropPendingCollections(opCtx);
     }
 
 private:
