@@ -60,6 +60,10 @@ using std::string;
 using std::stringstream;
 using std::endl;
 
+/**
+ * The cloneCollection command is deprecated.
+ * See http://dochub.mongodb.org/core/clonecollection-deprecation.
+ */
 class CmdCloneCollection : public ErrmsgCommandDeprecated {
 public:
     CmdCloneCollection() : ErrmsgCommandDeprecated("cloneCollection") {}
@@ -108,6 +112,12 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
+        const char* deprecationWarning =
+            "Support for the cloneCollection command has been deprecated. See "
+            "http://dochub.mongodb.org/core/clonecollection-deprecation";
+        warning() << deprecationWarning;
+        result.append("note", deprecationWarning);
+
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);

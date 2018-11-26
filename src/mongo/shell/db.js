@@ -505,6 +505,8 @@ var DB;
      * See also: db.cloneDatabase()
      */
     DB.prototype.cloneCollection = function(from, collection, query) {
+        print(
+            "WARNING: db.cloneCollection is deprecated. See http://dochub.mongodb.org/core/clonecollection-deprecation");
         assert(isString(from) && from.length);
         assert(isString(collection) && collection.length);
         collection = this._name + "." + collection;
