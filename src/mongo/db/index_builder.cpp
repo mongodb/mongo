@@ -44,6 +44,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -110,10 +111,14 @@ void _setBgIndexStarting() {
 }
 }  // namespace
 
-IndexBuilder::IndexBuilder(const BSONObj& index, bool relaxConstraints, Timestamp initIndexTs)
+IndexBuilder::IndexBuilder(const BSONObj& index,
+                           IndexConstraints indexConstraints,
+                           ReplicatedWrites replicatedWrites,
+                           Timestamp initIndexTs)
     : BackgroundJob(true /* self-delete */),
       _index(index.getOwned()),
-      _relaxConstraints(relaxConstraints),
+      _indexConstraints(indexConstraints),
+      _replicatedWrites(replicatedWrites),
       _initIndexTs(initIndexTs),
       _name(str::stream() << "repl index builder " << _indexBuildCount.addAndFetch(1)) {}
 
@@ -129,6 +134,12 @@ void IndexBuilder::run() {
 
     auto opCtx = cc().makeOperationContext();
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
+
+    // If the calling thread is not replicating writes, neither should this thread.
+    boost::optional<repl::UnreplicatedWritesBlock> unreplicatedWrites;
+    if (_replicatedWrites == ReplicatedWrites::kUnreplicated) {
+        unreplicatedWrites.emplace(opCtx.get());
+    }
 
     AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
 
@@ -238,7 +249,8 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     }
 
     if (status == ErrorCodes::IndexAlreadyExists ||
-        (status == ErrorCodes::IndexOptionsConflict && _relaxConstraints)) {
+        (status == ErrorCodes::IndexOptionsConflict &&
+         _indexConstraints == IndexConstraints::kRelax)) {
         LOG(1) << "Ignoring indexing error: " << redact(status);
         if (allowBackgroundBuilding) {
             // Must set this in case anyone is waiting for this build.
@@ -295,9 +307,12 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
     }
 
-    status = writeConflictRetry(opCtx, "Commit index build", ns.ns(), [this, opCtx, &indexer, &ns] {
+    status = writeConflictRetry(opCtx, "Commit index build", ns.ns(), [opCtx, coll, &indexer, &ns] {
         WriteUnitOfWork wunit(opCtx);
-        auto status = indexer.commit();
+        auto status = indexer.commit([opCtx, coll, &ns](const BSONObj& indexSpec) {
+            opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                opCtx, ns, *(coll->uuid()), indexSpec, false);
+        });
         if (!status.isOK()) {
             return status;
         }

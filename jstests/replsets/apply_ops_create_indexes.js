@@ -84,16 +84,38 @@
     rst.awaitReplication();
     ensureIndexExists(primaryTestDB, collName, cmdFormatIndexNameB, 3);
 
+    // Test with a background index.
+    let cmdFormatIndexNameC = "c_1";
+    cmd = {
+        applyOps: [{
+            op: "c",
+            ns: dbName + "." + collName,
+            ui: uuid,
+            o: {
+                createIndexes: collName,
+                v: 2,
+                key: {c: 1},
+                name: cmdFormatIndexNameC,
+                background: true
+            }
+        }]
+    };
+    assert.commandWorked(primaryTestDB.runCommand(cmd));
+    rst.awaitReplication();
+    ensureIndexExists(primaryTestDB, collName, cmdFormatIndexNameC, 4);
+
     let localDB = rst.getPrimary().getDB("local");
     ensureOplogEntryExists(localDB, cmdFormatIndexNameA);
     ensureOplogEntryExists(localDB, cmdFormatIndexNameB);
+    ensureOplogEntryExists(localDB, cmdFormatIndexNameC);
 
     // Make sure the indexes were replicated to the secondaries.
     let secondaries = rst.getSecondaries();
     for (let j = 0; j < secondaries.length; j++) {
         let secondaryTestDB = secondaries[j].getDB(dbName);
-        ensureIndexExists(secondaryTestDB, collName, cmdFormatIndexNameA, 3);
-        ensureIndexExists(secondaryTestDB, collName, cmdFormatIndexNameB, 3);
+        ensureIndexExists(secondaryTestDB, collName, cmdFormatIndexNameA, 4);
+        ensureIndexExists(secondaryTestDB, collName, cmdFormatIndexNameB, 4);
+        ensureIndexExists(secondaryTestDB, collName, cmdFormatIndexNameC, 4);
     }
 
     rst.stopSet();
