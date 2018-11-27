@@ -40,12 +40,17 @@ if __name__ == '__main__':
     parser.add_argument('--cert', type=str, help='Path to client certificate')
     args = parser.parse_args()
 
+    # MacOS version of the toolchain does not have python linked with OpenSSL 1.1.1 yet, so we monkey patch this in here
+    if not hasattr(ssl, 'OP_NO_TLSv1_3'):
+        ssl.OP_NO_TLSv1_3 = 0
+
     exclude_ops = {
         ssl.OP_NO_SSLv2,
         ssl.OP_NO_SSLv3,
         ssl.OP_NO_TLSv1,
         ssl.OP_NO_TLSv1_1,
         ssl.OP_NO_TLSv1_2,
+        ssl.OP_NO_TLSv1_3,
     }
 
     def exclude_except(op):
