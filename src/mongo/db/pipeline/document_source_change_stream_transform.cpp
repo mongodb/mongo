@@ -347,10 +347,15 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     if (operationType != DocumentSourceChangeStream::kInvalidateOpType &&
         operationType != DocumentSourceChangeStream::kDropDatabaseOpType) {
         invariant(!uuid.missing(), "Saw a CRUD op without a UUID");
-    } else {
-        // Fill in a dummy UUID for invalidate and dropDatabase, to ensure that they sort after
-        // high-water-mark tokens. Their sorting relative to other events remains unchanged.
-        uuid = Value(UUID::makeDefaultForChangeStream());
+    }
+
+    // If the collection did not exist when the change stream was opened, then the UUID will not
+    // have been obtained from the catalog. In this case, we set the UUID on the ExpressionContext
+    // after obtaining it from the first relevant oplog entry, so that the UUID can be included in
+    // high water mark tokens for change streams watching a single collection. The UUID is needed
+    // for resumability against a single collection due to collation semantics.
+    if (!pExpCtx->uuid && !uuid.missing() && pExpCtx->isSingleNamespaceAggregation()) {
+        pExpCtx->uuid = uuid.getUuid();
     }
 
     // Note that 'documentKey' and/or 'uuid' might be missing, in which case they will not appear

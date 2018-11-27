@@ -50,32 +50,41 @@ struct ResumeTokenData {
         kNotFromInvalidate = false,
     };
 
+    /**
+     * Flag to indicate the type of resume token we are generating.
+     */
+    enum TokenType : int {
+        kHighWaterMarkToken = 0,  // Token refers to a point in time, not an event.
+        kEventToken = 128,        // Token refers to an actual event in the stream.
+    };
+
     ResumeTokenData(){};
     ResumeTokenData(Timestamp clusterTimeIn,
                     int versionIn,
                     size_t applyOpsIndexIn,
-                    Value documentKeyIn,
-                    const boost::optional<UUID>& uuidIn)
+                    const boost::optional<UUID>& uuidIn,
+                    Value documentKeyIn)
         : clusterTime(clusterTimeIn),
           version(versionIn),
           applyOpsIndex(applyOpsIndexIn),
-          documentKey(std::move(documentKeyIn)),
-          uuid(uuidIn){};
+          uuid(uuidIn),
+          documentKey(std::move(documentKeyIn)){};
 
     bool operator==(const ResumeTokenData& other) const;
     bool operator!=(const ResumeTokenData& other) const {
         return !(*this == other);
-    };
+    }
 
     Timestamp clusterTime;
     int version = 1;
+    TokenType tokenType = TokenType::kEventToken;
     size_t applyOpsIndex = 0;
-    Value documentKey;
-    boost::optional<UUID> uuid;
     // Flag to indicate that this resume token is from an "invalidate" entry. This will not be set
     // on a token from a command that *would* invalidate a change stream, but rather the invalidate
     // notification itself.
     FromInvalidate fromInvalidate = FromInvalidate::kNotFromInvalidate;
+    boost::optional<UUID> uuid;
+    Value documentKey;
 };
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
@@ -109,16 +118,16 @@ public:
     static ResumeToken parse(const Document& document);
 
     /**
-     * Generate a high-water-mark pseudo-token for 'clusterTime', with no UUID or documentKey.
+     * Generate a high-water-mark token for 'clusterTime', with an optional UUID and no documentKey.
      */
-    static ResumeToken makeHighWaterMarkResumeToken(Timestamp clusterTime);
+    static ResumeToken makeHighWaterMarkToken(Timestamp clusterTime, boost::optional<UUID> uuid);
 
     /**
      * Returns true if the given token data represents a valid high-water-mark resume token; that
      * is, it does not refer to a specific operation, but instead specifies a clusterTime after
      * which the stream should resume.
      */
-    static bool isHighWaterMarkResumeToken(const ResumeTokenData& tokenData);
+    static bool isHighWaterMarkToken(const ResumeTokenData& tokenData);
 
     /**
      * The default no-argument constructor is required by the IDL for types used as non-optional

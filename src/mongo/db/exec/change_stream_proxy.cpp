@@ -70,7 +70,8 @@ boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
     // at the current clusterTime.
     auto highWaterMark = PipelineD::getLatestOplogTimestamp(_pipeline.get());
     if (highWaterMark > _latestOplogTimestamp) {
-        auto token = ResumeToken::makeHighWaterMarkResumeToken(highWaterMark);
+        auto token =
+            ResumeToken::makeHighWaterMarkToken(highWaterMark, _pipeline->getContext()->uuid);
         _postBatchResumeToken = token.toDocument().toBson();
         _latestOplogTimestamp = highWaterMark;
         _setSpeculativeReadOpTime();

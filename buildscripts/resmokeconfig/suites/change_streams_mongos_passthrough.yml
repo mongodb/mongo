@@ -7,6 +7,8 @@ selector:
   # This test exercises an internal detail of mongos<->mongod communication and is not expected
   # to work against a mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
+  # TODO SERVER-38975: unblacklist when high water mark tokens can resume on unsharded collections.
+  - jstests/change_streams/resume_from_high_water_mark_token.js
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the

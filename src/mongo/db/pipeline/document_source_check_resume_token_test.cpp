@@ -70,7 +70,7 @@ protected:
         Timestamp ts, int version, std::size_t applyOpsIndex, Document docKey, UUID uuid) {
         _mock->queue.push_back(
             Document{{"_id",
-                      ResumeToken(ResumeTokenData(ts, version, applyOpsIndex, Value(docKey), uuid))
+                      ResumeToken(ResumeTokenData(ts, version, applyOpsIndex, uuid, Value(docKey)))
                           .toDocument()}});
     }
 
@@ -104,7 +104,7 @@ protected:
         boost::optional<Document> docKey,
         UUID uuid) {
         ResumeToken token(
-            ResumeTokenData(ts, version, applyOpsIndex, docKey ? Value(*docKey) : Value(), uuid));
+            ResumeTokenData(ts, version, applyOpsIndex, uuid, docKey ? Value(*docKey) : Value()));
         auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), token);
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
