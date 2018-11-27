@@ -116,15 +116,15 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) override {
         MONGO_UNREACHABLE;
     }
 
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) override {
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override {
         MONGO_UNREACHABLE;
     }
 

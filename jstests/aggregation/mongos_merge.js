@@ -286,6 +286,45 @@
             allowDiskUse: allowDiskUse,
             expectedCount: 400
         });
+
+        // Test that $lookup is merged on the primary shard when the foreign collection is
+        // unsharded.
+        assertMergeOnMongoD({
+            testName: "agg_mongos_merge_lookup_unsharded_disk_use_" + allowDiskUse,
+            pipeline: [
+                {$match: {_id: {$gte: -200, $lte: 200}}},
+                {
+                  $lookup: {
+                      from: unshardedColl.getName(),
+                      localField: "_id",
+                      foreignField: "_id",
+                      as: "lookupField"
+                  }
+                }
+            ],
+            mergeType: "primaryShard",
+            allowDiskUse: allowDiskUse,
+            expectedCount: 400
+        });
+
+        // Test that $lookup is merged on mongoS when the foreign collection is sharded.
+        assertMergeOnMongoS({
+            testName: "agg_mongos_merge_lookup_sharded_disk_use_" + allowDiskUse,
+            pipeline: [
+                {$match: {_id: {$gte: -200, $lte: 200}}},
+                {
+                  $lookup: {
+                      from: mongosColl.getName(),
+                      localField: "_id",
+                      foreignField: "_id",
+                      as: "lookupField"
+                  }
+                }
+            ],
+            mergeType: "mongos",
+            allowDiskUse: allowDiskUse,
+            expectedCount: 400
+        });
     }
 
     /**

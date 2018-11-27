@@ -85,34 +85,31 @@ public:
     MockMongoInterface(deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
-    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) final {
+    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
         return false;
     }
 
-    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{}) final {
-        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-        if (!pipeline.isOK()) {
-            return pipeline.getStatus();
-        }
+        auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
 
         if (opts.optimize) {
-            pipeline.getValue()->optimizePipeline();
+            pipeline->optimizePipeline();
         }
 
         if (opts.attachCursorSource) {
-            uassertStatusOK(attachCursorSourceToPipeline(expCtx, pipeline.getValue().get()));
+            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
         }
 
         return pipeline;
     }
 
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) final {
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
-        return Status::OK();
+        return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
     }
 
     boost::optional<Document> lookupSingleDocument(
@@ -125,11 +122,12 @@ public:
         // case of a change stream on a whole database so we need to make a copy of the
         // ExpressionContext with the new namespace.
         auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID, boost::none);
-        auto swPipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
-        if (swPipeline == ErrorCodes::NamespaceNotFound) {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        try {
+            pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
+        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             return boost::none;
         }
-        auto pipeline = uassertStatusOK(std::move(swPipeline));
 
         auto lookedUpDocument = pipeline->getNext();
         if (auto next = pipeline->getNext()) {

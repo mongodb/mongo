@@ -184,20 +184,24 @@ public:
      * - If opts.attachCursorSource is false, the pipeline will be returned without attempting to
      *   add an initial cursor source.
      *
-     * This function returns a non-OK status if parsing the pipeline failed.
+     * This function throws if parsing the pipeline failed.
      */
-    virtual StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{}) = 0;
 
     /**
-     * Attaches a cursor source to the start of a pipeline. Performs no further optimization. This
-     * function asserts if the collection to be aggregated is sharded. NamespaceNotFound will be
-     * returned if ExpressionContext has a UUID and that UUID doesn't exist anymore. That should be
+     * Accepts a pipeline and returns a new one which will draw input from the underlying
+     * collection. Performs no further optimization of the pipeline. NamespaceNotFound will be
+     * thrown if ExpressionContext has a UUID and that UUID doesn't exist anymore. That should be
      * the only case where NamespaceNotFound is returned.
+     *
+     * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
+     * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
+     * compiler expects to find an implementation of PipelineDeleter.
      */
-    virtual Status attachCursorSourceToPipeline(
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) = 0;
 
     /**

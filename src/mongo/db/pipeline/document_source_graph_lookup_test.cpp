@@ -63,30 +63,27 @@ public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> results)
         : _results(std::move(results)) {}
 
-    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) final {
-        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-        if (!pipeline.isOK()) {
-            return pipeline.getStatus();
-        }
+        auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
 
         if (opts.optimize) {
-            pipeline.getValue()->optimizePipeline();
+            pipeline->optimizePipeline();
         }
 
         if (opts.attachCursorSource) {
-            uassertStatusOK(attachCursorSourceToPipeline(expCtx, pipeline.getValue().get()));
+            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
         }
 
         return pipeline;
     }
 
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) final {
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         pipeline->addInitialSource(DocumentSourceMock::create(_results));
-        return Status::OK();
+        return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
     }
 
 private:

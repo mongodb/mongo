@@ -87,12 +87,12 @@ public:
                                                  const NamespaceString& targetNs,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes) final;
-    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{}) final;
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) final;
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext* opCtx, const NamespaceString&, UUID) const override;

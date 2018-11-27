@@ -32,6 +32,10 @@
 
 #include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/query/cluster_aggregation_planner.h"
+#include "mongo/s/query/owned_remote_cursor.h"
 
 namespace mongo {
 
@@ -41,6 +45,81 @@ namespace mongo {
  */
 class MongoSInterface final : public MongoProcessCommon {
 public:
+    struct DispatchShardPipelineResults {
+        // True if this pipeline was split, and the second half of the pipeline needs to be run on
+        // the primary shard for the database.
+        bool needsPrimaryShardMerge;
+
+        // Populated if this *is not* an explain, this vector represents the cursors on the remote
+        // shards.
+        std::vector<OwnedRemoteCursor> remoteCursors;
+
+        // Populated if this *is* an explain, this vector represents the results from each shard.
+        std::vector<AsyncRequestsSender::Response> remoteExplainOutput;
+
+        // The split version of the pipeline if more than one shard was targeted, otherwise
+        // boost::none.
+        boost::optional<cluster_aggregation_planner::SplitPipeline> splitPipeline;
+
+        // If the pipeline targeted a single shard, this is the pipeline to run on that shard.
+        std::unique_ptr<Pipeline, PipelineDeleter> pipelineForSingleShard;
+
+        // The command object to send to the targeted shards.
+        BSONObj commandForTargetedShards;
+
+        // How many exchange producers are running the shard part of splitPipeline.
+        size_t numProducers;
+
+        // The exchange specification if the query can run with the exchange otherwise boost::none.
+        boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec;
+    };
+
+    static Shard::RetryPolicy getDesiredRetryPolicy(const AggregationRequest& req);
+
+    static BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
+                                                    const AggregationRequest& request,
+                                                    const boost::optional<ShardId>& shardId,
+                                                    Pipeline* pipeline,
+                                                    BSONObj collationObj);
+
+    /**
+     * Appends information to the command sent to the shards which should be appended both if this
+     * is a passthrough sent to a single shard and if this is a split pipeline.
+     */
+    static BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
+                                             OperationContext* opCtx,
+                                             const boost::optional<ShardId>& shardId,
+                                             const AggregationRequest& request,
+                                             BSONObj collationObj);
+
+    static BSONObj createCommandForTargetedShards(
+        OperationContext* opCtx,
+        const AggregationRequest& request,
+        const cluster_aggregation_planner::SplitPipeline& splitPipeline,
+        const BSONObj collationObj,
+        const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
+        bool needsMerge);
+
+    static std::set<ShardId> getTargetedShards(
+        OperationContext* opCtx,
+        bool mustRunOnAllShards,
+        const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
+        const BSONObj shardQuery,
+        const BSONObj collation);
+
+    static bool mustRunOnAllShards(const NamespaceString& nss, const LiteParsedPipeline& litePipe);
+
+    static StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(
+        OperationContext* opCtx, const NamespaceString& execNss);
+
+    static DispatchShardPipelineResults dispatchShardPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& executionNss,
+        const AggregationRequest& aggRequest,
+        const LiteParsedPipeline& liteParsedPipeline,
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+        BSONObj collationObj);
+
     MongoSInterface() = default;
 
     virtual ~MongoSInterface() = default;
@@ -119,10 +198,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) final {
-        MONGO_UNREACHABLE;
-    }
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
 
     std::string getShardName(OperationContext* opCtx) const final {
         MONGO_UNREACHABLE;
@@ -133,12 +210,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MakePipelineOptions pipelineOptions) final {
-        MONGO_UNREACHABLE;
-    }
+        const MakePipelineOptions pipelineOptions) final;
 
     /**
      * The following methods only make sense for data-bearing nodes and should never be called on

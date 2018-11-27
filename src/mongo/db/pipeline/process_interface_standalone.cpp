@@ -274,45 +274,35 @@ void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
             _client.runCommand("admin", renameCommandObj, info));
 }
 
-StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> MongoInterfaceStandalone::makePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-    if (!pipeline.isOK()) {
-        return pipeline.getStatus();
-    }
+    auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
 
     if (opts.optimize) {
-        pipeline.getValue()->optimizePipeline();
+        pipeline->optimizePipeline();
     }
-
-    Status cursorStatus = Status::OK();
 
     if (opts.attachCursorSource) {
-        cursorStatus = attachCursorSourceToPipeline(expCtx, pipeline.getValue().get());
+        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.release());
     }
 
-    return cursorStatus.isOK() ? std::move(pipeline) : cursorStatus;
+    return pipeline;
 }
 
-Status MongoInterfaceStandalone::attachCursorSourceToPipeline(
+unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) {
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
 
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     if (expCtx->uuid) {
-        try {
-            autoColl.emplace(expCtx->opCtx,
-                             NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid},
-                             AutoGetCollection::ViewMode::kViewsForbidden,
-                             Date_t::max(),
-                             AutoStatsTracker::LogMode::kUpdateTop);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-            // The UUID doesn't exist anymore
-            return ex.toStatus();
-        }
+        autoColl.emplace(expCtx->opCtx,
+                         NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid},
+                         AutoGetCollection::ViewMode::kViewsForbidden,
+                         Date_t::max(),
+                         AutoStatsTracker::LogMode::kUpdateTop);
     } else {
         autoColl.emplace(expCtx->opCtx,
                          expCtx->ns,
@@ -337,7 +327,7 @@ Status MongoInterfaceStandalone::attachCursorSourceToPipeline(
     // the initial cursor stage.
     pipeline->optimizePipeline();
 
-    return Status::OK();
+    return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
 }
 
 std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) const {
@@ -381,7 +371,7 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
             nss,
             collectionUUID,
             _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
-        pipeline = uassertStatusOK(makePipeline({BSON("$match" << documentKey)}, foreignExpCtx));
+        pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
     }

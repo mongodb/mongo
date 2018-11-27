@@ -320,7 +320,10 @@ env.Library(
         'mongos_process_interface.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/s/query/async_results_merger',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
+        '$BUILD_DIR/mongo/s/query/cluster_query',
         'mongo_process_common',
     ]
 )

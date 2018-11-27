@@ -26,13 +26,23 @@ env.Library(
     target='cluster_aggregate',
     source=[
         'cluster_aggregate.cpp',
-        'cluster_aggregation_planner.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         '$BUILD_DIR/mongo/db/pipeline/mongos_process_interface',
         '$BUILD_DIR/mongo/db/views/views',
+        'cluster_query',
+    ]
+)
+
+env.Library(
+    target='cluster_aggregation_planner',
+    source=[
+        'cluster_aggregation_planner.cpp',
+    ],
+    LIBDEPS=[
         'cluster_query',
     ]
 )

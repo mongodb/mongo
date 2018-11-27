@@ -196,9 +196,16 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
         txnRequirement = resolvedRequirements.second;
     }
 
+    // If executing on mongos and the foreign collection is sharded, then this stage can run on
+    // mongos.
+    HostTypeRequirement hostRequirement =
+        (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
+        ? HostTypeRequirement::kMongoS
+        : HostTypeRequirement::kPrimaryShard;
+
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
-                                 HostTypeRequirement::kPrimaryShard,
+                                 hostRequirement,
                                  diskRequirement,
                                  FacetRequirement::kAllowed,
                                  txnRequirement);
@@ -289,8 +296,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     // If we don't have a cache, build and return the pipeline immediately.
     if (!_cache || _cache->isAbandoned()) {
-        return uassertStatusOK(
-            pExpCtx->mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx));
+        return pExpCtx->mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx);
     }
 
     // Tailor the pipeline construction for our needs. We want a non-optimized pipeline without a
@@ -300,8 +306,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     pipelineOpts.attachCursorSource = false;
 
     // Construct the basic pipeline without a cache stage.
-    auto pipeline = uassertStatusOK(
-        pExpCtx->mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts));
+    auto pipeline =
+        pExpCtx->mongoProcessInterface->makePipeline(_resolvedPipeline, _fromExpCtx, pipelineOpts);
 
     // Add the cache stage at the end and optimize. During the optimization process, the cache will
     // either move itself to the correct position in the pipeline, or will abandon itself if no
@@ -313,8 +319,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
-        uassertStatusOK(pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            _fromExpCtx, pipeline.get()));
+        pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_fromExpCtx,
+                                                                                pipeline.release());
     }
 
     // If the cache has been abandoned, release it.

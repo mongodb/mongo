@@ -246,8 +246,7 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
     // with the resume token.
     auto firstEntryExpCtx = pExpCtx->copyWith(NamespaceString::kRsOplogNamespace);
     auto matchSpec = BSON("$match" << BSONObj());
-    auto pipeline = uassertStatusOK(
-        pExpCtx->mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx));
+    auto pipeline = pExpCtx->mongoProcessInterface->makePipeline({matchSpec}, firstEntryExpCtx);
     if (auto first = pipeline->getNext()) {
         auto firstOplogEntry = Value(*first);
         uassert(40576,
