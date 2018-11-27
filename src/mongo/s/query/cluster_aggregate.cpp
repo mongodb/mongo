@@ -35,7 +35,6 @@
 #include "mongo/s/query/cluster_aggregate.h"
 
 #include <boost/intrusive_ptr.hpp>
-#include <mongo/rpc/op_msg_rpc_impls.h>
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -326,6 +326,7 @@ BSONObj establishMergingMongosCursor(
     options.isInitialResponse = true;
 
     CursorResponseBuilder responseBuilder(&replyBuilder, options);
+    bool stashedResult = false;
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
         ClusterQueryResult next;
@@ -357,10 +358,19 @@ BSONObj establishMergingMongosCursor(
 
         if (!FindCommon::haveSpaceForNext(nextObj, objCount, responseBuilder.bytesUsed())) {
             ccc->queueResult(nextObj);
+            stashedResult = true;
             break;
         }
 
+        // Set the postBatchResumeToken. For non-$changeStream aggregations, this will be empty.
+        responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
         responseBuilder.append(nextObj);
+    }
+
+    // For empty batches, or in the case where the final result was added to the batch rather than
+    // being stashed, we update the PBRT here to ensure that it is the most recent available.
+    if (!stashedResult) {
+        responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
     }
 
     ccc->detachFromOperationContext();

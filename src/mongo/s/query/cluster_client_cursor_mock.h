@@ -74,6 +74,8 @@ public:
 
     std::size_t getNumRemotes() const final;
 
+    BSONObj getPostBatchResumeToken() const final;
+
     long long getNumReturnedSoFar() const final;
 
     void queueResult(const ClusterQueryResult& result) final;

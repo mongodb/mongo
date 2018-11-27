@@ -99,6 +99,13 @@ public:
 
     std::size_t getNumRemotes() const;
 
+    /**
+     * Returns the high water mark sort key for the given cursor, if it exists; otherwise, returns
+     * an empty BSONObj. Calling this method causes the underlying BlockingResultsMerger to be
+     * populated and assumes ownership of the remote cursors.
+     */
+    BSONObj getHighWaterMark();
+
     bool remotesExhausted() const;
 
     void setExecContext(RouterExecStage::ExecContext execContext) {

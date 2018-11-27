@@ -71,6 +71,10 @@ public:
         return _arm.getNumRemotes();
     }
 
+    BSONObj getHighWaterMark() {
+        return _arm.getHighWaterMark();
+    }
+
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
         _arm.addNewShardCursors(std::move(newCursors));
     }

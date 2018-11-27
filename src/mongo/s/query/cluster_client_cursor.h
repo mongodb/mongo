@@ -118,6 +118,12 @@ public:
     virtual std::size_t getNumRemotes() const = 0;
 
     /**
+     * Returns the current most-recent resume token for this cursor, or an empty object if this is
+     * not a $changeStream cursor.
+     */
+    virtual BSONObj getPostBatchResumeToken() const = 0;
+
+    /**
      * Returns the number of result documents returned so far by this cursor via the next() method.
      */
     virtual long long getNumReturnedSoFar() const = 0;

@@ -75,6 +75,10 @@ std::size_t ClusterClientCursorMock::getNumRemotes() const {
     MONGO_UNREACHABLE;
 }
 
+BSONObj ClusterClientCursorMock::getPostBatchResumeToken() const {
+    MONGO_UNREACHABLE;
+}
+
 long long ClusterClientCursorMock::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }

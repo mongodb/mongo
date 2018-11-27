@@ -63,6 +63,13 @@ std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
     return _blockingResultsMerger->getNumRemotes();
 }
 
+BSONObj DocumentSourceMergeCursors::getHighWaterMark() {
+    if (!_blockingResultsMerger) {
+        populateMerger();
+    }
+    return _blockingResultsMerger->getHighWaterMark();
+}
+
 bool DocumentSourceMergeCursors::remotesExhausted() const {
     if (_armParams) {
         // We haven't started iteration yet.

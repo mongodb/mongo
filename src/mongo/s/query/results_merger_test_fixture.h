@@ -153,6 +153,15 @@ protected:
     }
 
     /**
+     * Schedules a single cursor response to be returned by the mock network.
+     */
+    void scheduleNetworkResponse(CursorResponse&& response) {
+        std::vector<CursorResponse> responses;
+        responses.push_back(std::move(response));
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    /**
      * Schedules a list of raw BSON command responses to be returned by the mock network.
      */
     void scheduleNetworkResponseObjs(std::vector<BSONObj> objs) {

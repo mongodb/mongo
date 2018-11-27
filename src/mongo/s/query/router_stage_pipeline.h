@@ -54,6 +54,8 @@ public:
 
     std::size_t getNumRemotes() const final;
 
+    BSONObj getPostBatchResumeToken() const final;
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 

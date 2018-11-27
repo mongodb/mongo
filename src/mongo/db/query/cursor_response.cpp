@@ -277,8 +277,7 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
     }
     batchBuilder.doneFast();
 
-    if (_postBatchResumeToken) {
-        invariant(!_postBatchResumeToken->isEmpty());
+    if (_postBatchResumeToken && !_postBatchResumeToken->isEmpty()) {
         cursorBuilder.append(kPostBatchResumeTokenField, *_postBatchResumeToken);
     }
 
