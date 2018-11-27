@@ -75,6 +75,12 @@ public:
                                                                StringData ident,
                                                                const IndexDescriptor* desc);
 
+    virtual Status beginBackup(OperationContext* opCtx) {
+        return Status::OK();
+    }
+
+    virtual void endBackup(OperationContext* opCtx) {}
+
     virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 
     virtual bool supportsDocLocking() const {

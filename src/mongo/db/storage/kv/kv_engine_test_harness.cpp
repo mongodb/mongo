@@ -532,6 +532,18 @@ TEST(KVCatalogTest, RestartForPrefixes) {
     }
 }
 
+TEST(KVCatalogTest, BackupImplemented) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    ASSERT(engine);
+
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_OK(engine->beginBackup(&opCtx));
+        engine->endBackup(&opCtx);
+    }
+}
+
 DEATH_TEST(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 50942") {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
