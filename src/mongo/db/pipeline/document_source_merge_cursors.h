@@ -97,6 +97,13 @@ public:
 
     GetNextResult getNext() final;
 
+    /**
+     * Returns the high water mark sort key for the given cursor, if it exists; otherwise, returns
+     * an empty BSONObj. Calling this method causes the underlying ARM to be populated and assumes
+     * ownership of the remote cursors.
+     */
+    BSONObj getHighWaterMark();
+
 protected:
     void doDispose() final;
 

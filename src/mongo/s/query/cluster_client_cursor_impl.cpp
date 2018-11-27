@@ -153,6 +153,10 @@ std::size_t ClusterClientCursorImpl::getNumRemotes() const {
     return _root->getNumRemotes();
 }
 
+BSONObj ClusterClientCursorImpl::getPostBatchResumeToken() const {
+    return _root->getPostBatchResumeToken();
+}
+
 long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }

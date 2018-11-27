@@ -67,6 +67,14 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
     return Document::fromBsonWithMetaData(*next.getResult());
 }
 
+BSONObj DocumentSourceMergeCursors::getHighWaterMark() {
+    if (!_arm) {
+        _arm.emplace(pExpCtx->opCtx, _executor, std::move(*_armParams));
+        _armParams = boost::none;
+    }
+    return _arm->getHighWaterMark();
+}
+
 Value DocumentSourceMergeCursors::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     invariant(!_arm);

@@ -560,6 +560,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     BSONObjBuilder cursorResponse;
 
     CursorResponseBuilder responseBuilder(true, &cursorResponse);
+    bool stashedResult = false;
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
         ClusterQueryResult next;
@@ -591,10 +592,19 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
         if (!FindCommon::haveSpaceForNext(nextObj, objCount, responseBuilder.bytesUsed())) {
             ccc->queueResult(nextObj);
+            stashedResult = true;
             break;
         }
 
+        // Set the postBatchResumeToken. For non-$changeStream aggregations, this will be empty.
+        responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
         responseBuilder.append(nextObj);
+    }
+
+    // For empty batches, or in the case where the final result was added to the batch rather than
+    // being stashed, we update the PBRT here to ensure that it is the most recent available.
+    if (!stashedResult) {
+        responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
     }
 
     ccc->detachFromOperationContext();

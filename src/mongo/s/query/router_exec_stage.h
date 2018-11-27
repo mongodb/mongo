@@ -124,6 +124,14 @@ public:
     }
 
     /**
+     * Returns the postBatchResumeToken if this RouterExecStage tree is executing a $changeStream;
+     * otherwise, returns an empty BSONObj. Default implementation forwards to the stage's child.
+     */
+    virtual BSONObj getPostBatchResumeToken() {
+        return _child ? _child->getPostBatchResumeToken() : BSONObj();
+    }
+
+    /**
      * Sets the current operation context to be used by the router stage.
      */
     void reattachToOperationContext(OperationContext* opCtx) {
@@ -181,7 +189,7 @@ protected:
     /**
      * Returns an unowned pointer to the child stage, or nullptr if there is no child.
      */
-    RouterExecStage* getChildStage() {
+    RouterExecStage* getChildStage() const {
         return _child.get();
     }
 

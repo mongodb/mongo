@@ -222,6 +222,14 @@ public:
     }
 
     /**
+     * For sorted tailable cursors, returns the most recent available sort key. This guarantees that
+     * we will never return any future results which precede this key. If no results are ready to be
+     * returned, this method may cause the high water mark to advance to the lowest promised sortkey
+     * received from the shards. Returns an empty BSONObj if no such sort key is available.
+     */
+    BSONObj getHighWaterMark();
+
+    /**
      * Starts shutting down this ARM by canceling all pending requests and scheduling killCursors
      * on all of the unexhausted remotes. Returns a handle to an event that is signaled when this
      * ARM is safe to destroy.
@@ -325,6 +333,18 @@ private:
         const bool _compareWholeSortKey;
     };
 
+    using MinSortKeyRemoteIdPair = std::pair<BSONObj, size_t>;
+
+    class PromisedMinSortKeyComparator {
+    public:
+        PromisedMinSortKeyComparator(BSONObj sort) : _sort(std::move(sort)) {}
+
+        bool operator()(const MinSortKeyRemoteIdPair& lhs, const MinSortKeyRemoteIdPair& rhs) const;
+
+    private:
+        BSONObj _sort;
+    };
+
     enum LifecycleState { kAlive, kKillStarted, kKillComplete };
 
     /**
@@ -413,6 +433,11 @@ private:
      */
     bool _haveOutstandingBatchRequests(WithLock);
 
+    /**
+     * If a promisedMinSortKey has been obtained from all remotes, returns the lowest such key.
+     * Otherwise, returns an empty BSONObj.
+     */
+    BSONObj _getMinPromisedSortKey(WithLock);
 
     /**
      * Schedules a getMore on any remote hosts which we need another batch from.
@@ -425,9 +450,9 @@ private:
     void _scheduleKillCursors(WithLock, OperationContext* opCtx);
 
     /**
-     * Updates 'remote's metadata (e.g. the cursor id) based on information in 'response'.
+     * Updates the given remote's metadata (e.g. the cursor id) based on information in 'response'.
      */
-    void updateRemoteMetadata(RemoteCursorData* remote, const CursorResponse& response);
+    void _updateRemoteMetadata(WithLock, size_t remoteIndex, const CursorResponse& response);
 
     OperationContext* _opCtx;
     executor::TaskExecutor* _executor;
@@ -457,6 +482,13 @@ private:
     bool _eofNext = false;
 
     boost::optional<Milliseconds> _awaitDataTimeout;
+
+    // An ordered set of (promisedMinSortKey, remoteIndex) pairs received from the shards. The first
+    // element in the set will be the lowest sort key across all shards.
+    std::set<MinSortKeyRemoteIdPair, PromisedMinSortKeyComparator> _promisedMinSortKeys;
+
+    // For sorted tailable cursors, records the current high-water-mark sort key. Empty otherwise.
+    BSONObj _highWaterMark;
 
     //
     // Killing

@@ -93,9 +93,9 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
       _tailableMode(params.getTailableMode() ? *params.getTailableMode()
                                              : TailableModeEnum::kNormal),
       _params(std::move(params)),
-      _mergeQueue(MergingComparator(_remotes,
-                                    _params.getSort() ? *_params.getSort() : BSONObj(),
-                                    _params.getCompareWholeSortKey())) {
+      _mergeQueue(MergingComparator(
+          _remotes, _params.getSort().value_or(BSONObj()), _params.getCompareWholeSortKey())),
+      _promisedMinSortKeys(PromisedMinSortKeyComparator(_params.getSort().value_or(BSONObj()))) {
     if (params.getTxnNumber()) {
         invariant(params.getSessionId());
     }
@@ -111,6 +111,9 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         _addBatchToBuffer(WithLock::withoutLock(), remoteIndex, remote.getCursorResponse());
         ++remoteIndex;
     }
+    // If this is a change stream, then we expect to have already received PBRTs from every shard.
+    invariant(_promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == _remotes.size());
+    _highWaterMark = _promisedMinSortKeys.empty() ? BSONObj() : _promisedMinSortKeys.begin()->first;
 }
 
 AsyncResultsMerger::~AsyncResultsMerger() {
@@ -176,11 +179,30 @@ void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
 
 void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // Create a new entry in the '_remotes' list for each new shard, and add the first cursor batch
+    // to its buffer. This ensures the shard's initial high water mark is respected, if it exists.
     for (auto&& remote : newCursors) {
+        const auto newIndex = _remotes.size();
         _remotes.emplace_back(remote.getHostAndPort(),
                               remote.getCursorResponse().getNSS(),
                               remote.getCursorResponse().getCursorId());
+        _addBatchToBuffer(lk, newIndex, remote.getCursorResponse());
     }
+}
+
+BSONObj AsyncResultsMerger::getHighWaterMark() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto minPromisedSortKey = _getMinPromisedSortKey(lk);
+    if (!minPromisedSortKey.isEmpty() && !_ready(lk)) {
+        _highWaterMark = minPromisedSortKey;
+    }
+    return _highWaterMark;
+}
+
+BSONObj AsyncResultsMerger::_getMinPromisedSortKey(WithLock) {
+    // We cannot return the minimum promised sort key unless all shards have reported one.
+    return _promisedMinSortKeys.size() < _remotes.size() ? BSONObj()
+                                                         : _promisedMinSortKeys.begin()->first;
 }
 
 bool AsyncResultsMerger::_ready(WithLock lk) {
@@ -221,7 +243,7 @@ bool AsyncResultsMerger::_readySorted(WithLock lk) {
     return true;
 }
 
-bool AsyncResultsMerger::_readySortedTailable(WithLock) {
+bool AsyncResultsMerger::_readySortedTailable(WithLock lk) {
     if (_mergeQueue.empty()) {
         return false;
     }
@@ -230,19 +252,10 @@ bool AsyncResultsMerger::_readySortedTailable(WithLock) {
     auto smallestResult = _remotes[smallestRemote].docBuffer.front();
     auto keyWeWantToReturn =
         extractSortKey(*smallestResult.getResult(), _params.getCompareWholeSortKey());
-    for (const auto& remote : _remotes) {
-        if (!remote.promisedMinSortKey) {
-            // In order to merge sorted tailable cursors, we need this value to be populated.
-            return false;
-        }
-        if (compareSortKeys(keyWeWantToReturn, *remote.promisedMinSortKey, *_params.getSort()) >
-            0) {
-            // The key we want to return is not guaranteed to be smaller than future results from
-            // this remote, so we can't yet return it.
-            return false;
-        }
-    }
-    return true;
+    // We should always have a minPromisedSortKey from every shard in the sorted tailable case.
+    auto minPromisedSortKey = _getMinPromisedSortKey(lk);
+    invariant(!minPromisedSortKey.isEmpty());
+    return compareSortKeys(keyWeWantToReturn, minPromisedSortKey, *_params.getSort()) <= 0;
 }
 
 bool AsyncResultsMerger::_readyUnsorted(WithLock) {
@@ -300,6 +313,12 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
     // next result.
     if (!_remotes[smallestRemote].docBuffer.empty()) {
         _mergeQueue.push(smallestRemote);
+    }
+
+    // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
+    if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+        _highWaterMark =
+            extractSortKey(*front.getResult(), _params.getCompareWholeSortKey()).getOwned();
     }
 
     return front;
@@ -481,10 +500,12 @@ StatusWith<CursorResponse> AsyncResultsMerger::_parseCursorResponse(
     return std::move(cursorResponse);
 }
 
-void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
-                                              const CursorResponse& response) {
+void AsyncResultsMerger::_updateRemoteMetadata(WithLock,
+                                               size_t remoteIndex,
+                                               const CursorResponse& response) {
     // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
-    remote->cursorId = response.getCursorId();
+    auto& remote = _remotes[remoteIndex];
+    remote.cursorId = response.getCursorId();
     if (response.getPostBatchResumeToken()) {
         // We only expect to see this for change streams.
         invariant(_params.getSort());
@@ -497,14 +518,17 @@ void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
         // The most recent minimum sort key should never be smaller than the previous promised
         // minimum sort key for this remote, if one exists.
         auto newMinSortKey = *response.getPostBatchResumeToken();
-        if (auto& oldMinSortKey = remote->promisedMinSortKey) {
+        if (auto& oldMinSortKey = remote.promisedMinSortKey) {
             invariant(compareSortKeys(newMinSortKey, *oldMinSortKey, *_params.getSort()) >= 0);
+            invariant(_promisedMinSortKeys.size() <= _remotes.size());
+            _promisedMinSortKeys.erase({*oldMinSortKey, remoteIndex});
         }
-        remote->promisedMinSortKey = newMinSortKey;
+        _promisedMinSortKeys.insert({newMinSortKey, remoteIndex});
+        remote.promisedMinSortKey = newMinSortKey;
     } else {
         // If we don't have a postBatchResumeToken, then we should never have an oplog timestamp.
         uassert(ErrorCodes::InternalErrorNotSupported,
-                str::stream() << "Host " << remote->shardHostAndPort
+                str::stream() << "Host " << remote.shardHostAndPort
                               << " returned a cursor which has an oplog timestamp but does not "
                                  "have a postBatchResumeToken, suggesting that one or more shards"
                                  " are running an older version of MongoDB. This configuration "
@@ -609,7 +633,7 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
                                            size_t remoteIndex,
                                            const CursorResponse& response) {
     auto& remote = _remotes[remoteIndex];
-    updateRemoteMetadata(&remote, response);
+    _updateRemoteMetadata(lk, remoteIndex, response);
     for (const auto& obj : response.getBatch()) {
         // If there's a sort, we're expecting the remote node to have given us back a sort key.
         if (_params.getSort()) {
@@ -789,6 +813,12 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::blockingNext() {
     }
 
     return nextReady();
+}
+
+bool AsyncResultsMerger::PromisedMinSortKeyComparator::operator()(
+    const MinSortKeyRemoteIdPair& lhs, const MinSortKeyRemoteIdPair& rhs) const {
+    auto sortKeyComp = compareSortKeys(lhs.first, rhs.first, _sort);
+    return sortKeyComp < 0 || (sortKeyComp == 0 && lhs.second < rhs.second);
 }
 
 }  // namespace mongo

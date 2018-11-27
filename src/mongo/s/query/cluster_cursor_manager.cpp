@@ -154,6 +154,11 @@ std::size_t ClusterCursorManager::PinnedCursor::getNumRemotes() const {
     return _cursor->getNumRemotes();
 }
 
+BSONObj ClusterCursorManager::PinnedCursor::getPostBatchResumeToken() const {
+    invariant(_cursor);
+    return _cursor->getPostBatchResumeToken();
+}
+
 CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {
     return _cursorId;
 }

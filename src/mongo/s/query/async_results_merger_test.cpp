@@ -183,6 +183,15 @@ protected:
     }
 
     /**
+     * Schedules a single cursor response to be returned by the mock network.
+     */
+    void scheduleNetworkResponse(CursorResponse&& response) {
+        std::vector<CursorResponse> responses;
+        responses.push_back(std::move(response));
+        scheduleNetworkResponses(std::move(responses));
+    }
+
+    /**
      * Schedules a list of raw BSON command responses to be returned by the mock network.
      */
     void scheduleNetworkResponseObjs(std::vector<BSONObj> objs) {
@@ -1544,14 +1553,28 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     scheduleNetworkResponses(std::move(responses));
 }
 
-TEST_F(AsyncResultsMergerTest,
-       SortedTailableCursorNotReadyIfOneOrMoreRemotesHasNoPostBatchResumeToken) {
+DEATH_TEST_F(AsyncResultsMergerTest,
+             SortedTailableInvariantsIfInitialBatchHasNoPostBatchResumeToken,
+             "Invariant failure _promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == "
+             "_remotes.size()") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();
     std::vector<RemoteCursor> cursors;
-    cursors.push_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 123, {})));
+    // Create one cursor whose initial response has a postBatchResumeToken.
+    auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
+    auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
+    auto firstCursorResponse = fromjson(
+        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
+                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
+                      << firstDocSortKey.firstElement().String()
+                      << "'}}");
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[0],
+        kTestShardHosts[0],
+        CursorResponse(
+            kTestNss, 123, {firstCursorResponse}, boost::none, boost::none, pbrtFirstCursor)));
+    // Create a second cursor whose initial batch has no PBRT.
     cursors.push_back(
         makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 456, {})));
     params.setRemotes(std::move(cursors));
@@ -1561,57 +1584,10 @@ TEST_F(AsyncResultsMergerTest,
         stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
-
     ASSERT_FALSE(arm->ready());
 
-    // Schedule one response with a postBatchResumeToken in it.
-    auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 6));
-    auto firstDocSortKey = makeResumeToken(Timestamp(1, 4), uuid, BSON("_id" << 1));
-    std::vector<CursorResponse> responses;
-    auto firstCursorResult = fromjson(
-        str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: '" << uuid.toString()
-                      << "', documentKey: {_id: 1}}, $sortKey: {'': '"
-                      << firstDocSortKey.firstElement().String()
-                      << "'}}");
-    std::vector<BSONObj> batch1{firstCursorResult};
-    responses.emplace_back(
-        kTestNss, CursorId(123), std::move(batch1), boost::none, boost::none, pbrtFirstCursor);
-    scheduleNetworkResponses(std::move(responses));
-
-    // Still shouldn't be ready, we don't have a guarantee from each shard.
-    ASSERT_FALSE(arm->ready());
-
-    // Schedule another response from the other shard with a later postBatchResumeToken.
-    responses.clear();
-    auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 7));
-    auto secondDocSortKey = makeResumeToken(Timestamp(1, 5), uuid, BSON("_id" << 2));
-    auto secondCursorResult =
-        fromjson(str::stream() << "{_id: {clusterTime: {ts: Timestamp(1, 5)}, uuid: '"
-                               << uuid.toString() + "', documentKey: {_id: 2}}, $sortKey: {'': '"
-                               << secondDocSortKey.firstElement().String()
-                               << "'}}");
-    std::vector<BSONObj> batch2{secondCursorResult};
-    responses.emplace_back(
-        kTestNss, CursorId(456), std::move(batch2), boost::none, boost::none, pbrtSecondCursor);
-    scheduleNetworkResponses(std::move(responses));
-    executor()->waitForEvent(readyEvent);
-    ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(firstCursorResult, *unittest::assertGet(arm->nextReady()).getResult());
-    ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(secondCursorResult, *unittest::assertGet(arm->nextReady()).getResult());
-    ASSERT_FALSE(arm->ready());
-
-    readyEvent = unittest::assertGet(arm->nextEvent());
-
-    // Clean up the cursors.
-    responses.clear();
-    std::vector<BSONObj> batch3 = {};
-    responses.emplace_back(kTestNss, CursorId(0), batch3);
-    scheduleNetworkResponses(std::move(responses));
-    responses.clear();
-    std::vector<BSONObj> batch4 = {};
-    responses.emplace_back(kTestNss, CursorId(0), batch4);
-    scheduleNetworkResponses(std::move(responses));
+    // We should be dead by now.
+    MONGO_UNREACHABLE;
 }
 
 DEATH_TEST_F(AsyncResultsMergerTest,
@@ -1920,6 +1896,82 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     std::vector<BSONObj> batch4 = {};
     responses.emplace_back(kTestNss, CursorId(0), batch4);
     scheduleNetworkResponses(std::move(responses));
+}
+
+TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) {
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    std::vector<RemoteCursor> cursors;
+    // Create three cursors with empty initial batches. Each batch has a PBRT.
+    auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[0],
+        kTestShardHosts[0],
+        CursorResponse(kTestNss, 123, {}, boost::none, boost::none, pbrtFirstCursor)));
+    auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 1));
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[1],
+        kTestShardHosts[1],
+        CursorResponse(kTestNss, 456, {}, boost::none, boost::none, pbrtSecondCursor)));
+    auto pbrtThirdCursor = makePostBatchResumeToken(Timestamp(1, 4));
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[2],
+        kTestShardHosts[2],
+        CursorResponse(kTestNss, 789, {}, boost::none, boost::none, pbrtThirdCursor)));
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+    auto arm =
+        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+
+    // We have no results to return, so the ARM is not ready.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // The high water mark should be the second cursor's PBRT, since it is the lowest of the three.
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtSecondCursor);
+
+    // Advance the PBRT of the second cursor. It should still be the lowest. The fixture expects
+    // each cursor to be updated in-order, so we keep the first and third PBRTs constant.
+    pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 3));
+    std::vector<BSONObj> emptyBatch = {};
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), emptyBatch, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), emptyBatch, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtSecondCursor);
+    ASSERT_FALSE(arm->ready());
+
+    // Advance the second cursor again, so that it surpasses the other two. The third cursor becomes
+    // the new high water mark.
+    pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 6));
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), emptyBatch, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), emptyBatch, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtThirdCursor);
+    ASSERT_FALSE(arm->ready());
+
+    // Advance the third cursor such that the first cursor becomes the high water mark.
+    pbrtThirdCursor = makePostBatchResumeToken(Timestamp(1, 7));
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(123), emptyBatch, boost::none, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(456), emptyBatch, boost::none, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse(
+        {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
+    ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtFirstCursor);
+    ASSERT_FALSE(arm->ready());
+
+    // Clean up the cursors.
+    std::vector<BSONObj> cleanupBatch = {};
+    scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
+    scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
+    scheduleNetworkResponse({kTestNss, CursorId(0), cleanupBatch});
 }
 
 TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {

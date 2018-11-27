@@ -66,6 +66,10 @@ public:
      */
     void addNewShardCursors(std::vector<RemoteCursor>&& newShards);
 
+    BSONObj getPostBatchResumeToken() final {
+        return _arm.getHighWaterMark();
+    }
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 

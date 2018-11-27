@@ -47,6 +47,9 @@ RouterStagePipeline::RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
       _mergePipeline(std::move(mergePipeline)),
       _mongosOnlyPipeline(!_mergePipeline->isSplitForMerge()) {
     if (!_mongosOnlyPipeline) {
+        // Save a pointer to the child RouterExecStage before it is absorbed into the pipeline. This
+        // is either a merge stage, or an ancestor that can forward calls to the RouterStageMerge.
+        _mergeCursorsStage = child.get();
         // Add an adapter to the front of the pipeline to draw results from 'child'.
         _routerAdapter =
             DocumentSourceRouterAdapter::create(_mergePipeline->getContext(), std::move(child)),
@@ -88,6 +91,10 @@ void RouterStagePipeline::kill(OperationContext* opCtx) {
 
 std::size_t RouterStagePipeline::getNumRemotes() const {
     return _mongosOnlyPipeline ? 0 : _routerAdapter->getNumRemotes();
+}
+
+BSONObj RouterStagePipeline::getPostBatchResumeToken() {
+    return _mergeCursorsStage ? _mergeCursorsStage->getPostBatchResumeToken() : BSONObj();
 }
 
 bool RouterStagePipeline::remotesExhausted() {

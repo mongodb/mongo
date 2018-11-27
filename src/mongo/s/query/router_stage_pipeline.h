@@ -55,6 +55,8 @@ public:
 
     std::size_t getNumRemotes() const final;
 
+    BSONObj getPostBatchResumeToken() final;
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
@@ -65,6 +67,7 @@ protected:
 private:
     boost::intrusive_ptr<DocumentSourceRouterAdapter> _routerAdapter;
     std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
-    bool _mongosOnlyPipeline;
+    RouterExecStage* _mergeCursorsStage = nullptr;
+    bool _mongosOnlyPipeline = false;
 };
 }  // namespace mongo
