@@ -79,6 +79,8 @@ public:
     static RecoveryUnit* get(OperationContext* opCtx);
 
 private:
+    void _abort();
+
     stdx::function<void()> _waitUntilDurableCallback;
     // Official master is kept by KVEngine
     KVEngine* _KVEngine;
@@ -89,8 +91,7 @@ private:
     bool _dirty = false;  // Whether or not we have written to this _workingCopy.
     bool _inUnitOfWork = false;
 
-    typedef std::shared_ptr<Change> ChangePtr;
-    typedef std::vector<ChangePtr> Changes;
+    typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
 };
 

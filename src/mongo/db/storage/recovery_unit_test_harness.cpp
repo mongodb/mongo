@@ -52,6 +52,22 @@ public:
     RecoveryUnit* ru;
 };
 
+class TestChange final : public RecoveryUnit::Change {
+public:
+    TestChange(int* count) : _count(count) {}
+
+    void commit(boost::optional<Timestamp>) override {
+        *_count = *_count + 1;
+    }
+
+    void rollback() override {
+        *_count = *_count - 1;
+    }
+
+private:
+    int* _count;
+};
+
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx.get());
@@ -73,12 +89,38 @@ TEST_F(RecoveryUnitTestHarness, AbortUnitOfWork) {
     ASSERT_FALSE(rs->findRecord(opCtx.get(), s.getValue(), nullptr));
 }
 
+TEST_F(RecoveryUnitTestHarness, CommitAndRollbackChanges) {
+    int count = 0;
+    const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
+
+    ru->beginUnitOfWork(opCtx.get());
+    ru->registerChange(new TestChange(&count));
+    ASSERT_EQUALS(count, 0);
+    ru->commitUnitOfWork();
+    ASSERT_EQUALS(count, 1);
+
+    ru->beginUnitOfWork(opCtx.get());
+    ru->registerChange(new TestChange(&count));
+    ASSERT_EQUALS(count, 1);
+    ru->abortUnitOfWork();
+    ASSERT_EQUALS(count, 0);
+}
+
+DEATH_TEST_F(RecoveryUnitTestHarness, RegisterChangeMustBeInUnitOfWork, "invariant") {
+    int count = 0;
+    opCtx->recoveryUnit()->registerChange(new TestChange(&count));
+}
+
 DEATH_TEST_F(RecoveryUnitTestHarness, CommitMustBeInUnitOfWork, "invariant") {
     opCtx->recoveryUnit()->commitUnitOfWork();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, AbortMustBeInUnitOfWork, "invariant") {
     opCtx->recoveryUnit()->abortUnitOfWork();
+}
+
+DEATH_TEST_F(RecoveryUnitTestHarness, CannotHaveUnfinishedUnitOfWorkOnExit, "invariant") {
+    opCtx->recoveryUnit()->beginUnitOfWork(opCtx.get());
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarness, PrepareMustBeInUnitOfWork, "invariant") {

@@ -46,6 +46,7 @@ RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, stdx::function<void()> cb)
 
 RecoveryUnit::~RecoveryUnit() {
     invariant(!_inUnitOfWork);
+    _abort();
 }
 
 void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
@@ -82,34 +83,21 @@ void RecoveryUnit::commitUnitOfWork() {
         }
     }
 
-    _inUnitOfWork = false;
-
     try {
-        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit(boost::none);
-        }
+        for (auto& change : _changes)
+            change->commit(boost::none);
         _changes.clear();
     } catch (...) {
         std::terminate();
     }
+
+    _inUnitOfWork = false;
 }
 
 void RecoveryUnit::abortUnitOfWork() {
     invariant(_inUnitOfWork);
     _inUnitOfWork = false;
-    _forked = false;
-    _dirty = false;
-    try {
-        for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
-             ++it) {
-            ChangePtr change = *it;
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
-            change->rollback();
-        }
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
-    }
+    _abort();
 }
 
 bool RecoveryUnit::waitUntilDurable() {
@@ -124,7 +112,8 @@ void RecoveryUnit::abandonSnapshot() {
 }
 
 void RecoveryUnit::registerChange(Change* change) {
-    _changes.push_back(ChangePtr(change));
+    invariant(_inUnitOfWork);
+    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 SnapshotId RecoveryUnit::getSnapshotId() const {
@@ -148,6 +137,23 @@ bool RecoveryUnit::forkIfNeeded() {
 }
 
 void RecoveryUnit::setOrderedCommit(bool orderedCommit) {}
+
+void RecoveryUnit::_abort() {
+    _forked = false;
+    _dirty = false;
+    try {
+        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+             it != end;
+             ++it) {
+            Change* change = it->get();
+            LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
+            change->rollback();
+        }
+        _changes.clear();
+    } catch (...) {
+        std::terminate();
+    }
+}
 
 RecoveryUnit* RecoveryUnit::get(OperationContext* opCtx) {
     return checked_cast<biggie::RecoveryUnit*>(opCtx->recoveryUnit());
