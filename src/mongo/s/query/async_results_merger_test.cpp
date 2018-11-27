@@ -274,8 +274,9 @@ RemoteCursor makeRemoteCursor(ShardId shardId, HostAndPort host, CursorResponse 
 static const auto kTokenFormat = ResumeToken::SerializationFormat::kHexString;
 
 BSONObj makePostBatchResumeToken(Timestamp clusterTime) {
-    auto pbrt =
-        ResumeToken::makeHighWaterMarkResumeToken(clusterTime).toDocument(kTokenFormat).toBson();
+    auto pbrt = ResumeToken::makeHighWaterMarkToken(clusterTime, boost::none)
+                    .toDocument(kTokenFormat)
+                    .toBson();
     invariant(pbrt.firstElement().type() == BSONType::String);
     return pbrt;
 }

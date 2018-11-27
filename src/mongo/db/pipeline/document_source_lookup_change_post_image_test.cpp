@@ -72,7 +72,7 @@ public:
             tokenData.clusterTime = ts;
             return ResumeToken(tokenData).toDocument(ResumeToken::SerializationFormat::kHexString);
         }
-        return ResumeToken(ResumeTokenData(ts, 0, 0, Value(Document{{"_id", id}}), testUuid()))
+        return ResumeToken(ResumeTokenData(ts, 0, 0, testUuid(), Value(Document{{"_id", id}})))
             .toDocument(ResumeToken::SerializationFormat::kHexString);
     }
 };

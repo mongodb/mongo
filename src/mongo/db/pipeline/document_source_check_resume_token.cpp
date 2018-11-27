@@ -70,6 +70,13 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
         return ResumeStatus::kSurpassedToken;
     }
 
+    // If the tokenType exceeds the client token's type, then we have passed the resume token point.
+    // This can happen if the client resumes from a synthetic 'high water mark' token from another
+    // shard which happens to have the same clusterTime as an actual change on this shard.
+    if (tokenDataFromResumedStream.tokenType > tokenDataFromClient.tokenType) {
+        return ResumeStatus::kSurpassedToken;
+    }
+
     if (tokenDataFromResumedStream.applyOpsIndex < tokenDataFromClient.applyOpsIndex) {
         return ResumeStatus::kCheckNextDoc;
     } else if (tokenDataFromResumedStream.applyOpsIndex > tokenDataFromClient.applyOpsIndex) {
@@ -216,7 +223,7 @@ Value DocumentSourceShardCheckResumability::serialize(
 intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(
     const intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts) {
     // We are resuming from a point in time, not an event. Seed the stage with a high water mark.
-    return create(expCtx, ResumeToken::makeHighWaterMarkResumeToken(ts).getData());
+    return create(expCtx, ResumeToken::makeHighWaterMarkToken(ts, expCtx->uuid).getData());
 }
 
 intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(

@@ -335,7 +335,7 @@ TEST(CursorResponseTest, serializeLatestOplogEntry) {
 
 TEST(CursorResponseTest, serializePostBatchResumeToken) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    auto postBatchResumeToken = ResumeToken::makeHighWaterMarkResumeToken(Timestamp(1, 2))
+    auto postBatchResumeToken = ResumeToken::makeHighWaterMarkToken(Timestamp(1, 2), boost::none)
                                     .toDocument(ResumeToken::SerializationFormat::kHexString)
                                     .toBson();
     CursorResponse response(NamespaceString("db.coll"),

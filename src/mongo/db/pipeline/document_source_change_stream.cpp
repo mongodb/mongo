@@ -306,7 +306,7 @@ namespace {
  *        figure out its default collation.
  */
 void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx,
-                         ResumeTokenData tokenData) {
+                         const ResumeTokenData& tokenData) {
     if (!expCtx->collation.isEmpty()) {
         // Explicit collation has been set, it's okay to resume.
         return;
@@ -368,8 +368,12 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
         expCtx->initialPostBatchResumeToken =
             token.toDocument(ResumeToken::SerializationFormat::kHexString).toBson();
 
+        // For a regular resume token, we must ensure that (1) all shards are capable of resuming
+        // from the given clusterTime, and (2) that we observe the resume token event in the stream
+        // before any event that would sort after it. High water mark tokens, however, do not refer
+        // to a specific event; we thus only need to check (1), similar to 'startAtOperationTime'.
         startFrom = tokenData.clusterTime;
-        if (expCtx->needsMerge) {
+        if (expCtx->needsMerge || ResumeToken::isHighWaterMarkToken(tokenData)) {
             resumeStage = DocumentSourceShardCheckResumability::create(expCtx, tokenData);
         } else {
             resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, tokenData);
@@ -426,9 +430,9 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
         // If we haven't already populated the initial PBRT, then we are starting from a specific
         // timestamp rather than a resume token. Initialize the PBRT to a high water mark token.
         if (expCtx->initialPostBatchResumeToken.isEmpty()) {
-            auto format = ResumeToken::SerializationFormat::kHexString;
+            const auto resumeToken = ResumeToken::makeHighWaterMarkToken(*startFrom, expCtx->uuid);
             expCtx->initialPostBatchResumeToken =
-                ResumeToken::makeHighWaterMarkResumeToken(*startFrom).toDocument(format).toBson();
+                resumeToken.toDocument(ResumeToken::SerializationFormat::kHexString).toBson();
         }
     }
 

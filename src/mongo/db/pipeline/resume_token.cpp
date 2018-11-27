@@ -80,24 +80,31 @@ std::pair<Value, Value> encodeInBinDataFormat(const ResumeTokenData& data) {
     return {Value(rawBinary), typeBitsValue};
 }
 
-// Helper function for makeHighWaterMarkResumeToken and isHighWaterMarkResumeToken.
-ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime) {
+// Helper function for makeHighWaterMarkToken and isHighWaterMarkToken.
+ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime,
+                                                 boost::optional<UUID> uuid) {
     ResumeTokenData tokenData;
     tokenData.clusterTime = clusterTime;
+    tokenData.tokenType = ResumeTokenData::kHighWaterMarkToken;
+    tokenData.uuid = uuid;
     return tokenData;
 }
 }  // namespace
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
     return clusterTime == other.clusterTime && version == other.version &&
-        applyOpsIndex == other.applyOpsIndex && fromInvalidate == other.fromInvalidate &&
-        uuid == other.uuid && (Value::compare(this->documentKey, other.documentKey, nullptr) == 0);
+        tokenType == other.tokenType && applyOpsIndex == other.applyOpsIndex &&
+        fromInvalidate == other.fromInvalidate && uuid == other.uuid &&
+        (Value::compare(this->documentKey, other.documentKey, nullptr) == 0);
 }
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
     out << "{clusterTime: " << tokenData.clusterTime.toString();
     out << ", version: " << tokenData.version;
-    out << ", applyOpsIndex: " << tokenData.applyOpsIndex;
+    if (tokenData.version > 0) {
+        out << ", tokenType: " << tokenData.tokenType;
+    }
+    out << ", applyOpsIndex" << tokenData.applyOpsIndex;
     if (tokenData.version > 0) {
         out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
     }
@@ -128,6 +135,9 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     BSONObjBuilder builder;
     builder.append("", data.clusterTime);
     builder.append("", data.version);
+    if (data.version >= 1) {
+        builder.appendNumber("", data.tokenType);
+    }
     builder.appendNumber("", data.applyOpsIndex);
     if (data.version >= 1) {
         builder.appendBool("", data.fromInvalidate);
@@ -224,6 +234,21 @@ ResumeTokenData ResumeToken::getData() const {
                     "Invalid Resume Token: only supports version 0 or 1",
                     result.version == 0 || result.version == 1);
 
+            if (result.version >= 1) {
+                // The 'tokenType' field was added in version 1 and is not present in v0 tokens.
+                uassert(51055, "Resume Token does not contain tokenType", i.more());
+                auto tokenType = i.next();
+                uassert(51056,
+                        "Resume Token tokenType is not an int.",
+                        tokenType.type() == BSONType::NumberInt);
+                auto typeInt = tokenType.numberInt();
+                uassert(51057,
+                        str::stream() << "Token type " << typeInt << " not recognized",
+                        typeInt == ResumeTokenData::TokenType::kEventToken ||
+                            typeInt == ResumeTokenData::TokenType::kHighWaterMarkToken);
+                result.tokenType = static_cast<ResumeTokenData::TokenType>(typeInt);
+            }
+
             // Next comes the applyOps index.
             uassert(50793, "Resume Token does not contain applyOpsIndex", i.more());
             auto applyOpsElt = i.next();
@@ -300,12 +325,12 @@ ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
 }
 
-ResumeToken ResumeToken::makeHighWaterMarkResumeToken(Timestamp clusterTime) {
-    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime));
+ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime, boost::optional<UUID> uuid) {
+    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, uuid));
 }
 
-bool ResumeToken::isHighWaterMarkResumeToken(const ResumeTokenData& tokenData) {
-    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime);
+bool ResumeToken::isHighWaterMarkToken(const ResumeTokenData& tokenData) {
+    return tokenData == makeHighWaterMarkResumeTokenData(tokenData.clusterTime, tokenData.uuid);
 }
 
 }  // namespace mongo

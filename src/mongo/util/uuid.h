@@ -100,12 +100,6 @@ public:
     static StatusWith<UUID> parse(BSONElement from);
 
     /**
-     * Returns the nil UUID; that is, a UUID composed entirely of zeroes.
-     * Used in change streams only.
-     */
-    static UUID makeDefaultForChangeStream();
-
-    /**
      * Parses a BSON document of the form { uuid: BinData(4, "...") }.
      *
      * For IDL.

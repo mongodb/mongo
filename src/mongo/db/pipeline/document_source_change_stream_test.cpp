@@ -1548,19 +1548,17 @@ TEST_F(ChangeStreamStageDBTest, TransformRename) {
 TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
 
-    // Drop database entry has a nil UUID.
+    // Drop database entry doesn't have a UUID.
     Document expectedDropDatabase{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, UUID::makeDefaultForChangeStream())},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs,
-                         UUID::makeDefaultForChangeStream(),
-                         Value(),
-                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(
+             kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -1751,7 +1749,7 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabaseShouldReturn
     UUIDCatalog::get(getExpCtx()->opCtx).onCreateCollection(getExpCtx()->opCtx, &collection, uuid);
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
-    auto dropDBResumeToken = makeResumeToken(kDefaultTs, UUID::makeDefaultForChangeStream());
+    auto dropDBResumeToken = makeResumeToken(kDefaultTs);
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
 
     Document expectedDropDatabase{
@@ -1761,11 +1759,8 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabaseShouldReturn
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
     };
 
-    auto fromInvalidateResumeToken =
-        makeResumeToken(kDefaultTs,
-                        UUID::makeDefaultForChangeStream(),
-                        Value(),
-                        ResumeTokenData::FromInvalidate::kFromInvalidate);
+    auto fromInvalidateResumeToken = makeResumeToken(
+        kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate);
     Document expectedInvalidate{
         {DSChangeStream::kIdField, fromInvalidateResumeToken},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
