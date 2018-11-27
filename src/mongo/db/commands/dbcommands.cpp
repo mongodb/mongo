@@ -1039,10 +1039,7 @@ public:
             CurOp::get(opCtx)->setNS_inlock(dbname);
         }
 
-        // We lock the entire database in S-mode in order to ensure that the contents will not
-        // change for the stats snapshot. This might be unnecessary and if it becomes a
-        // performance issue, we can take IS lock and then lock collection-by-collection.
-        AutoGetDb autoDb(opCtx, ns, MODE_S);
+        AutoGetDb autoDb(opCtx, ns, MODE_IS);
 
         result.append("db", ns);
 
