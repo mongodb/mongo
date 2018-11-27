@@ -76,14 +76,14 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* o
                                                              const CollectionOptions& options) {
     std::unique_ptr<mongo::RecordStore> recordStore;
     if (options.capped) {
-        recordStore = stdx::make_unique<RecordStore>(
+        recordStore = std::make_unique<RecordStore>(
             ns,
             ident,
             true,
             options.cappedSize ? options.cappedSize : kDefaultCappedSizeBytes,
             options.cappedMaxDocs ? options.cappedMaxDocs : -1);
     } else {
-        recordStore = stdx::make_unique<RecordStore>(ns, ident, false);
+        recordStore = std::make_unique<RecordStore>(ns, ident, false);
     }
     _idents[ident.toString()] = true;
     return recordStore;
@@ -111,7 +111,7 @@ mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* o
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {
     _idents[ident.toString()] = false;
-    return new SortedDataInterface(Ordering::make(desc->keyPattern()), desc->unique(), ident);
+    return new SortedDataInterface(opCtx, ident, desc);
 }
 
 Status KVEngine::dropIdent(OperationContext* opCtx, StringData ident) {

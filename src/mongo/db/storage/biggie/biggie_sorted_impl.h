@@ -1,6 +1,3 @@
-// biggie_sorted_impl.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -76,6 +73,7 @@ public:
     // Truncate is not required at the time of writing but will be when the truncate command is
     // created
     Status truncate(OperationContext* opCtx);
+    SortedDataInterface(OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
     SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident);
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
                                                        bool dupsAllowed) override;

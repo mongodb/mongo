@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/biggie/biggie_sorted_impl.h"
 #include "mongo/db/storage/biggie/store.h"
@@ -247,20 +248,35 @@ SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext
 // We append \1 to all idents we get, and therefore the KeyString with ident + \0 will only be
 // before elements in this ident, and the KeyString with ident + \2 will only be after elements in
 // this ident.
-SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident)
-    : _order(ordering),
+SortedDataInterface::SortedDataInterface(OperationContext* opCtx,
+                                         StringData ident,
+                                         const IndexDescriptor* desc)
+    : _order(Ordering::make(desc->keyPattern())),
       // All entries in this ident will have a prefix of ident + \1.
       _prefix(ident.toString().append(1, '\1')),
       // Therefore, the string ident + \2 will be greater than all elements in this ident.
       _identEnd(ident.toString().append(1, '\2')),
-      _isUnique(isUnique) {
+      _collectionNamespace(desc->parentNS()),
+      _indexName(desc->indexName()),
+      _keyPattern(desc->keyPattern()),
+      _isUnique(desc->unique()) {
     // This is the string representation of the KeyString before elements in this ident, which is
     // ident + \0. This is before all elements in this ident.
     _KSForIdentStart = createKeyString(
-        BSONObj(), RecordId::min(), ident.toString().append(1, '\0'), ordering, _isUnique);
+        BSONObj(), RecordId::min(), ident.toString().append(1, '\0'), _order, _isUnique);
     // Similarly, this is the string representation of the KeyString for something greater than
     // all other elements in this ident.
-    _KSForIdentEnd = createKeyString(BSONObj(), RecordId::min(), _identEnd, ordering, _isUnique);
+    _KSForIdentEnd = createKeyString(BSONObj(), RecordId::min(), _identEnd, _order, _isUnique);
+}
+
+SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident)
+    : _order(ordering),
+      _prefix(ident.toString().append(1, '\1')),
+      _identEnd(ident.toString().append(1, '\2')),
+      _isUnique(isUnique) {
+    _KSForIdentStart = createKeyString(
+        BSONObj(), RecordId::min(), ident.toString().append(1, '\0'), _order, _isUnique);
+    _KSForIdentEnd = createKeyString(BSONObj(), RecordId::min(), _identEnd, _order, _isUnique);
 }
 
 StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* opCtx,
