@@ -297,8 +297,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
     list<string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
 
-    for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
-        const string ns = *it;
+    for (auto ns : collections) {
         NamespaceString nss(ns);
         _collections[ns] = _getOrCreateCollectionInstance(opCtx, nss);
     }
@@ -323,8 +322,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
     list<string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
 
-    for (list<string>::iterator i = collections.begin(); i != collections.end(); ++i) {
-        string ns = *i;
+    for (auto ns : collections) {
         invariant(NamespaceString::normal(ns));
 
         CollectionCatalogEntry* coll = _dbEntry->getCollectionCatalogEntry(ns);
@@ -401,8 +399,6 @@ bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
 }
 
 void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) {
-    list<string> collections;
-    _dbEntry->getCollectionNamespaces(&collections);
 
     long long nCollections = 0;
     long long nViews = 0;
@@ -413,9 +409,13 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     long long indexes = 0;
     long long indexSize = 0;
 
-    for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
-        const string ns = *it;
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
+    list<string> collections;
+    _dbEntry->getCollectionNamespaces(&collections);
 
+
+    for (auto ns : collections) {
+        Lock::CollectionLock colLock(opCtx->lockState(), ns, MODE_IS);
         Collection* collection = getCollection(opCtx, ns);
 
         if (!collection)
