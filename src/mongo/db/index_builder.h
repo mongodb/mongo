@@ -60,16 +60,28 @@ class OperationContext;
  * parent thread, waitForBgIndexStarting() must be called by the same parent thread,
  * before any other thread calls go() on any other IndexBuilder instance.  This is
  * ensured by the replication system, since commands are effectively run single-threaded
- * by the replication applier, and index builds are treated as commands even though they look
- * like inserts on system.indexes.
- * The argument "relaxConstraints" specifies whether we should honor or ignore index constraints,
+ * by the replication applier.
+ * The argument "constraints" specifies whether we should honor or ignore index constraints,
  * The ignoring of constraints is for replication due to idempotency reasons.
+ * The argument "replicatedWrites" specifies whether or not this operation should replicate
+ * oplog entries associated with this index build.
  * The argument "initIndexTs" specifies the timestamp to be used to make the initial catalog write.
  */
 class IndexBuilder : public BackgroundJob {
 public:
+    /**
+     * Indicates whether or not to ignore indexing errors.
+     */
+    enum class IndexConstraints { kEnforce, kRelax };
+
+    /**
+     * Indicates whether or not to replicate writes.
+     */
+    enum class ReplicatedWrites { kReplicated, kUnreplicated };
+
     IndexBuilder(const BSONObj& index,
-                 bool relaxConstraints,
+                 IndexConstraints constraints,
+                 ReplicatedWrites replicatedWrites,
                  Timestamp initIndexTs = Timestamp::min());
     virtual ~IndexBuilder();
 
@@ -96,7 +108,8 @@ private:
                   Lock::DBLock* dbLock) const;
 
     const BSONObj _index;
-    const bool _relaxConstraints;
+    const IndexConstraints _indexConstraints;
+    const ReplicatedWrites _replicatedWrites;
     const Timestamp _initIndexTs;
     std::string _name;  // name of this builder, not related to the index
     static AtomicUInt32 _indexBuildCount;
