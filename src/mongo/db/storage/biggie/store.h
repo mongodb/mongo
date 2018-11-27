@@ -86,50 +86,48 @@ public:
         ~radix_iterator() = default;
 
         radix_iterator& operator++() {
-            _restoreIfChanged();
+            repositionIfChanged();
             _findNext();
             return *this;
         }
 
         radix_iterator operator++(int) {
-            _restoreIfChanged();
+            repositionIfChanged();
             radix_iterator old = *this;
             ++*this;
             return old;
         }
 
         bool operator==(const radix_iterator& other) {
-            _restoreIfChanged();
-            return this->_current == other._current;
+            repositionIfChanged();
+            return _current == other._current;
         }
 
         bool operator!=(const radix_iterator& other) {
-            _restoreIfChanged();
-            return this->_current != other._current;
+            repositionIfChanged();
+            return _current != other._current;
         }
 
         reference operator*() {
-            _restoreIfChanged();
+            repositionIfChanged();
             return *(_current->_data);
         }
 
         const_pointer operator->() {
-            _restoreIfChanged();
+            repositionIfChanged();
             return &*(_current->_data);
         }
 
-    private:
-        radix_iterator(const std::shared_ptr<Head>& root) : _root(root), _current(nullptr) {}
-
-        radix_iterator(const std::shared_ptr<Head>& root, Node* current)
-            : _root(root), _current(current) {}
-
         /**
-         * Tries to restore the iterator if the working tree experienced a change, if it isn't
-         * possible to restore the iterator, it invalidates it instead.
+         * Attempts to restore the iterator on its former position in the updated tree if the tree
+         * has changed.
+         *
+         * If the former position has been erased, the iterator finds the next node. It is
+         * possible that no next node is available, so at that point the cursor is exhausted and
+         * points to the end.
          */
-        void _restoreIfChanged() {
-            if (!_root->_nextVersion)
+        void repositionIfChanged() {
+            if (!_current || !_root->_nextVersion)
                 return;
 
             invariant(_current->_data);
@@ -146,6 +144,12 @@ public:
             // Find the same or next node in the updated tree.
             _current = store.lower_bound(key)._current;
         }
+
+    private:
+        radix_iterator(const std::shared_ptr<Head>& root) : _root(root), _current(nullptr) {}
+
+        radix_iterator(const std::shared_ptr<Head>& root, Node* current)
+            : _root(root), _current(current) {}
 
         /**
         * This function traverses the tree to find the next left-most node with data. Modifies
@@ -278,52 +282,48 @@ public:
         ~reverse_radix_iterator() = default;
 
         reverse_radix_iterator& operator++() {
-            _restoreIfChanged();
+            repositionIfChanged();
             _findNextReverse();
             return *this;
         }
 
         reverse_radix_iterator operator++(int) {
-            _restoreIfChanged();
+            repositionIfChanged();
             reverse_radix_iterator old = *this;
             ++*this;
             return old;
         }
 
         bool operator==(const reverse_radix_iterator& other) {
-            _restoreIfChanged();
-            return this->_current == other._current;
+            repositionIfChanged();
+            return _current == other._current;
         }
 
         bool operator!=(const reverse_radix_iterator& other) {
-            _restoreIfChanged();
-            return this->_current != other._current;
+            repositionIfChanged();
+            return _current != other._current;
         }
 
         reference operator*() {
-            _restoreIfChanged();
+            repositionIfChanged();
             return *(_current->_data);
         }
 
         const_pointer operator->() {
-            _restoreIfChanged();
+            repositionIfChanged();
             return &*(_current->_data);
         }
 
-
-    private:
-        reverse_radix_iterator(const std::shared_ptr<Head>& root)
-            : _root(root), _current(nullptr) {}
-
-        reverse_radix_iterator(const std::shared_ptr<Head>& root, Node* current)
-            : _root(root), _current(current) {}
-
         /**
-         * Tries to restore the iterator if the working tree experienced a change, if it isn't
-         * possible to restore the iterator, it invalidates it instead.
+         * Attempts to restore the iterator on its former position in the updated tree if the tree
+         * has changed.
+         *
+         * If the former position has been erased, the iterator finds the next node. It is
+         * possible that no next node is available, so at that point the cursor is exhausted and
+         * points to the end.
          */
-        void _restoreIfChanged() {
-            if (!_root->_nextVersion)
+        void repositionIfChanged() {
+            if (!_current || !_root->_nextVersion)
                 return;
 
             invariant(_current->_data);
@@ -353,6 +353,13 @@ public:
                     _findNextReverse();
             }
         }
+
+    private:
+        reverse_radix_iterator(const std::shared_ptr<Head>& root)
+            : _root(root), _current(nullptr) {}
+
+        reverse_radix_iterator(const std::shared_ptr<Head>& root, Node* current)
+            : _root(root), _current(current) {}
 
         void _findNextReverse() {
             // Reverse find iterates through the tree to find the "next" node containing data,

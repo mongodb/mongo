@@ -2280,6 +2280,58 @@ TEST_F(RadixStoreTest, SubtreeSizeTest) {
     ASSERT_TRUE(thisStore.subtreeDataSize("<collection-") == 5);
 }
 
+TEST_F(RadixStoreTest, CannotRevalidateExhaustedCursor) {
+    value_type value1 = std::make_pair("a", "1");
+    value_type value2 = std::make_pair("b", "2");
+
+    thisStore.insert(value_type(value1));
+
+    auto it = thisStore.begin();
+    it++;
+
+    // 'it' should be exhausted.
+    ASSERT_TRUE(it == thisStore.end());
+
+    thisStore.insert(value_type(value2));
+
+    // 'it' should still be exhausted even though we have a new tree version available.
+    ASSERT_TRUE(it == thisStore.end());
+}
+
+TEST_F(RadixStoreTest, AvoidComparingDifferentTreeVersions) {
+    value_type value = std::make_pair("a", "1");
+    value_type value2 = std::make_pair("b", "2");
+    value_type updated = std::make_pair("a", "10");
+
+    thisStore.insert(value_type(value));
+    thisStore.insert(value_type(value2));
+
+    {
+        auto it = thisStore.begin();
+
+        // Updating value1 causes a new tree to be made since it's shared with the cursor.
+        thisStore.update(value_type(updated));
+
+        auto it2 = thisStore.begin();
+
+        it.repositionIfChanged();
+        ASSERT_TRUE(it2 == it);
+    }
+
+    {
+        auto it = thisStore.begin();
+
+        // Updating value1 causes a new tree to be made since it's shared with the cursor.
+        thisStore.erase("a");
+
+        auto it2 = thisStore.begin();
+
+        it.repositionIfChanged();
+        ASSERT_TRUE(it2->first == "b");
+        ASSERT_TRUE(it2 == it);
+    }
+}
+
 }  // namespace
 }  // mongo namespace
 }  // biggie namespace

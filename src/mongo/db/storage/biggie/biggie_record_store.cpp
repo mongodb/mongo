@@ -295,6 +295,9 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
         // on the next item after the erase.
         workingCopy->erase(recordIt->first);
         RecoveryUnit::get(opCtx)->makeDirty();
+
+        // Tree modifications are bound to happen here so we need to reposition our end cursor.
+        endIt.repositionIfChanged();
     }
 
     wuow.commit();
