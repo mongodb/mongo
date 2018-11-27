@@ -35,12 +35,23 @@
 
 namespace mongo {
 namespace biggie {
-namespace {
 
-using StringStore = RadixStore<std::string, std::string>;
 using value_type = StringStore::value_type;
 
 class RadixStoreTest : public unittest::Test {
+public:
+    StringStore::Head* getRootAddress() const {
+        return thisStore._root.get();
+    }
+
+    int getRootCount() const {
+        return thisStore._root.use_count();
+    }
+
+    bool hasPreviousVersion() const {
+        return thisStore._root->hasPreviousVersion();
+    }
+
 protected:
     StringStore thisStore;
     StringStore parallelStore;
@@ -2311,6 +2322,115 @@ TEST_F(RadixStoreTest, AvoidComparingDifferentTreeVersions) {
     }
 }
 
-}  // namespace
-}  // mongo namespace
+TEST_F(RadixStoreTest, TreeUniqueness) {
+    value_type value1 = std::make_pair("a", "1");
+    value_type value2 = std::make_pair("b", "2");
+    value_type value3 = std::make_pair("c", "3");
+    value_type value4 = std::make_pair("d", "4");
+
+    auto rootAddr = getRootAddress();
+    thisStore.insert(value_type(value1));
+
+    // Neither the address or count should change.
+    ASSERT_EQUALS(rootAddr, getRootAddress());
+    ASSERT_EQUALS(1, getRootCount());
+
+    thisStore.insert(value_type(value2));
+    ASSERT_EQUALS(rootAddr, getRootAddress());
+    ASSERT_EQUALS(1, getRootCount());
+
+    {
+        // Make the tree shared.
+        auto it = thisStore.begin();
+        ASSERT_EQUALS(rootAddr, getRootAddress());
+        ASSERT_EQUALS(2, getRootCount());
+
+        // Inserting should make a copy of the tree.
+        thisStore.insert(value_type(value3));
+
+        // The root's address should change.
+        ASSERT_NOT_EQUALS(rootAddr, getRootAddress());
+        rootAddr = getRootAddress();
+
+        // Count should remain 2 because of _nextVersion
+        ASSERT_EQUALS(2, getRootCount());
+
+        // Inserting again shouldn't make a copy because the cursor hasn't been updated
+        thisStore.insert(value_type(value4));
+        ASSERT_EQUALS(rootAddr, getRootAddress());
+        ASSERT_EQUALS(2, getRootCount());
+
+        // Use the pointer to reposition it on the new tree.
+        *it;
+        ASSERT_EQUALS(rootAddr, getRootAddress());
+        ASSERT_EQUALS(2, getRootCount());
+
+        thisStore.erase("d");
+        ASSERT_NOT_EQUALS(rootAddr, getRootAddress());
+        rootAddr = getRootAddress();
+        ASSERT_EQUALS(2, getRootCount());
+    }
+
+    ASSERT_EQUALS(rootAddr, getRootAddress());
+    ASSERT_EQUALS(1, getRootCount());
+
+    thisStore.erase("c");
+    thisStore.erase("b");
+    thisStore.erase("a");
+
+    ASSERT_EQUALS(rootAddr, getRootAddress());
+    ASSERT_EQUALS(1, getRootCount());
+}
+
+TEST_F(RadixStoreTest, HasPreviousVersionFlagTest) {
+    value_type value1 = std::make_pair("a", "1");
+    value_type value2 = std::make_pair("b", "2");
+    value_type value3 = std::make_pair("c", "3");
+
+    ASSERT_FALSE(hasPreviousVersion());
+    thisStore.insert(value_type(value1));
+
+    {
+        auto it = thisStore.begin();
+        ASSERT_FALSE(hasPreviousVersion());
+    }
+
+    ASSERT_FALSE(hasPreviousVersion());
+
+    {
+        auto it = thisStore.begin();
+        ASSERT_FALSE(hasPreviousVersion());
+
+        thisStore.insert(value_type(value2));
+        ASSERT_TRUE(hasPreviousVersion());
+    }
+
+    ASSERT_FALSE(hasPreviousVersion());
+    thisStore.erase("b");
+
+    // Use multiple cursors
+    {
+        auto it = thisStore.begin();
+        auto it2 = thisStore.begin();
+        ASSERT_FALSE(hasPreviousVersion());
+
+        thisStore.insert(value_type(value2));
+        ASSERT_TRUE(hasPreviousVersion());
+
+        *it;  // Change to repositionIfChanged when merging (SERVER-38262 in master);
+        ASSERT_TRUE(hasPreviousVersion());
+
+        *it2;
+        ASSERT_FALSE(hasPreviousVersion());
+
+        thisStore.insert(value_type(value3));
+        ASSERT_TRUE(hasPreviousVersion());
+
+        *it;
+    }
+
+    ASSERT_FALSE(hasPreviousVersion());
+}
+
 }  // biggie namespace
+}  // mongo namespace

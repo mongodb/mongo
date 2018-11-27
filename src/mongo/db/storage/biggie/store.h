@@ -61,6 +61,8 @@ class RadixStore {
     class Node;
     class Head;
 
+    friend class RadixStoreTest;
+
 public:
     using mapped_type = T;
     using value_type = std::pair<const Key, mapped_type>;
@@ -83,7 +85,9 @@ public:
 
         radix_iterator() : _root(nullptr), _current(nullptr) {}
 
-        ~radix_iterator() = default;
+        ~radix_iterator() {
+            updateTreeView(/*stopIfMultipleCursors=*/true);
+        }
 
         radix_iterator& operator++() {
             repositionIfChanged();
@@ -135,10 +139,7 @@ public:
             // Copy the key from _current before we move our _root reference.
             auto key = _current->_data->first;
 
-            do {
-                _root = _root->_nextVersion;
-            } while (_root->_nextVersion);
-
+            updateTreeView();
             RadixStore store(*_root);
 
             // Find the same or next node in the updated tree.
@@ -228,6 +229,18 @@ public:
             } while (!_current->_data);
         }
 
+        void updateTreeView(bool stopIfMultipleCursors = false) {
+            while (_root && _root->_nextVersion) {
+                if (stopIfMultipleCursors && _root.use_count() > 1)
+                    return;
+
+                bool clearPreviousFlag = _root.use_count() == 1;
+                _root = _root->_nextVersion;
+                if (clearPreviousFlag)
+                    _root->_hasPreviousVersion = false;
+            }
+        }
+
         // "_root" is a pointer to the root of the tree over which this is iterating.
         std::shared_ptr<Head> _root;
 
@@ -279,7 +292,9 @@ public:
             }
         }
 
-        ~reverse_radix_iterator() = default;
+        ~reverse_radix_iterator() {
+            updateTreeView(/*stopIfMultipleCursors=*/true);
+        }
 
         reverse_radix_iterator& operator++() {
             repositionIfChanged();
@@ -331,10 +346,7 @@ public:
             // Copy the key from _current before we move our _root reference.
             auto key = _current->_data->first;
 
-            do {
-                _root = _root->_nextVersion;
-            } while (_root->_nextVersion);
-
+            updateTreeView();
             RadixStore store(*_root);
 
             // Find the same or next node in the updated tree.
@@ -418,6 +430,18 @@ public:
                     }
                 }
             } while (!_current->isLeaf());
+        }
+
+        void updateTreeView(bool stopIfMultipleCursors = false) {
+            while (_root && _root->_nextVersion) {
+                if (stopIfMultipleCursors && _root.use_count() > 1)
+                    return;
+
+                bool clearPreviousFlag = _root.use_count() == 1;
+                _root = _root->_nextVersion;
+                if (clearPreviousFlag)
+                    _root->_hasPreviousVersion = false;
+            }
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
@@ -520,7 +544,8 @@ public:
         std::vector<std::pair<Node*, bool>> context;
 
         Node* prev = _root.get();
-        bool isUniquelyOwned = _root.use_count() == 1;
+        int rootUseCount = _root->_hasPreviousVersion ? 2 : 1;
+        bool isUniquelyOwned = _root.use_count() == rootUseCount;
         context.push_back(std::make_pair(prev, isUniquelyOwned));
 
         Node* node = nullptr;
@@ -564,6 +589,7 @@ public:
             invariant(!_root->_nextVersion);
             _root->_nextVersion = std::make_shared<Head>(*_root);
             _root = _root->_nextVersion;
+            _root->_hasPreviousVersion = true;
             parent = _root.get();
         }
 
@@ -851,16 +877,19 @@ private:
         Head(std::vector<uint8_t> key) : Node(key) {}
         Head(const Node& other) : Node(other) {}
         Head(const Head& other) : Node(other) {
-            _nextVersion = other._nextVersion;
+            _nextVersion = nullptr;
+            _hasPreviousVersion = false;
         }
 
         friend void swap(Head& first, Head& second) {
             Node::swap(first, second);
             std::swap(first._nextVersion, second._nextVersion);
+            std::swap(first._hasPreviousVersion, second._hasPreviousVersion);
         }
 
         Head(Head&& other) : Node(std::move(other)) {
-            _nextVersion = std::move(other._nextVersion);
+            _nextVersion = nullptr;
+            _hasPreviousVersion = false;
         }
 
         Head& operator=(const Head other) {
@@ -868,8 +897,19 @@ private:
             return *this;
         }
 
+        bool hasPreviousVersion() const {
+            return _hasPreviousVersion;
+        }
+
     protected:
+        // Forms a singly linked list of versions that is needed to reposition cursors after
+        // modifications have been made.
         std::shared_ptr<Head> _nextVersion;
+
+        // While we have cursors that haven't been repositioned to the latest tree, this will be
+        // true to help us understand when to copy on modifications due to the extra shared pointer
+        // _nextVersion.
+        bool _hasPreviousVersion = false;
     };
 
     /**
@@ -949,6 +989,31 @@ private:
     }
 
     /**
+     * Makes a copy of the _root node if it isn't uniquely owned during an operation that will
+     * modify the tree.
+     *
+     * The _root node wouldn't be uniquely owned only when there are cursors positioned on the
+     * latest version of the tree. Cursors that are not yet repositioned onto the latest version of
+     * the tree are not considered to be sharing the _root for modifying operations.
+     */
+    void _makeRootUnique() {
+        int rootUseCount = _root->_hasPreviousVersion ? 2 : 1;
+
+        if (_root.use_count() == rootUseCount)
+            return;
+
+        invariant(_root.use_count() > rootUseCount);
+        // Copy the node on a modifying operation when the root isn't unique.
+
+        // There should not be any _nextVersion set in the _root otherwise our tree would have
+        // multiple HEADs.
+        invariant(!_root->_nextVersion);
+        _root->_nextVersion = std::make_shared<Head>(*_root);
+        _root = _root->_nextVersion;
+        _root->_hasPreviousVersion = true;
+    }
+
+    /**
      * _upsertWithCopyOnSharedNodes is a helper function to help manage copy on modification for the
      * tree. This function follows the path for the to-be modified node using the keystring. If at
      * any point, the path is no longer uniquely owned, the following nodes are copied to prevent
@@ -984,16 +1049,7 @@ private:
         int depth = _root->_depth + _root->_trieKey.size();
         uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
 
-        if (_root.use_count() > 1) {
-            // Copy the node on a modifying operation when the root isn't unique.
-
-            // There should not be any _nextVersion set in the _root otherwise our tree would have
-            // multiple HEADs.
-            invariant(!_root->_nextVersion);
-            _root->_nextVersion = std::make_shared<Head>(*_root);
-            _root = _root->_nextVersion;
-        }
-
+        _makeRootUnique();
         _root->_numSubtreeElems += elemNum;
         _root->_sizeSubtreeElems += elemSize;
 
@@ -1217,11 +1273,7 @@ private:
             return nullptr;
 
         // The first node should always be the root node.
-        if (_root.use_count() > 1) {
-            invariant(!_root->_nextVersion);
-            _root->_nextVersion = std::make_shared<Head>(*_root);
-            _root = _root->_nextVersion;
-        }
+        _makeRootUnique();
         context[0] = _root.get();
 
         // If the context only contains the root, and it was copied, return the new root.
