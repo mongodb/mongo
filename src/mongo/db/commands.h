@@ -304,14 +304,6 @@ public:
     }
 
     /**
-     * Return true for "user management commands", a distinction that affects
-     * backward compatible output formatting.
-     */
-    virtual bool isUserManagementCommand() const {
-        return false;
-    }
-
-    /**
      * Return true if only the admin ns has privileges to run this command.
      */
     virtual bool adminOnly() const {

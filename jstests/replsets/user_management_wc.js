@@ -105,9 +105,8 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     });
 
     function assertUserManagementWriteConcernError(res) {
-        assert(!res.ok);
-        assert(res.errmsg);
-        assert(res.code);
+        assert.commandFailed(res);
+        assert.commandWorkedIgnoringWriteConcernErrors(res);
         assertWriteConcernError(res);
     }
 
