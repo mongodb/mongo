@@ -314,7 +314,8 @@ static void Range(benchmark::internal::Benchmark* b) {
 }
 
 
-// Integer key tests BENCHMARK_TEMPLATE(BM_SuccessfulLookup, StdUnorderedInt)->Apply(Range);
+// Integer key tests
+BENCHMARK_TEMPLATE(BM_SuccessfulLookup, StdUnorderedInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, MongoUnorderedFastKeyTableInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, AbslFlatHashMapInt)->Apply(Range);
 BENCHMARK_TEMPLATE(BM_SuccessfulLookup, AbslNodeHashMapInt)->Apply(Range);

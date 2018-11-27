@@ -8,6 +8,9 @@ selector:
   exclude_files:
   # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
   - build/**/mongo/s/**/*
+  # Hash table benchmark is really slow, don't run on evergreen
+  - build/**/mongo/util/hash_table_bm*
+
 
 executor:
   config: {}
