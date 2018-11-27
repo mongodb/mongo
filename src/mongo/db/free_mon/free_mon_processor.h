@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <boost/thread/synchronized_value.hpp>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -50,11 +49,13 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 using FreeMonCollectorInterface = FTDCCollectorInterface;
 using FreeMonCollectorCollection = FTDCCollectorCollection;
+
 
 /**
  * Reponsible for tracking when to send the next retry after errors are encountered.
@@ -470,10 +471,10 @@ private:
     PseudoRandom _random;
 
     // Registration Retry logic
-    boost::synchronized_value<RegistrationRetryCounter> _registrationRetry;
+    synchronized_value<RegistrationRetryCounter> _registrationRetry;
 
     // Metrics Retry logic
-    boost::synchronized_value<MetricsRetryCounter> _metricsRetry;
+    synchronized_value<MetricsRetryCounter> _metricsRetry;
 
     // Interval for gathering metrics
     Seconds _metricsGatherInterval;
@@ -482,7 +483,7 @@ private:
     MetricsBuffer _metricsBuffer;
 
     // When did we last send a metrics batch?
-    boost::synchronized_value<boost::optional<Date_t>> _lastMetricsSend;
+    synchronized_value<boost::optional<Date_t>> _lastMetricsSend;
 
     // List of tags from server configuration registration
     std::vector<std::string> _tags;
@@ -494,13 +495,13 @@ private:
     std::vector<std::shared_ptr<FreeMonMessage>> _pendingRegisters;
 
     // Last read storage state
-    boost::synchronized_value<boost::optional<FreeMonStorageState>> _lastReadState;
+    synchronized_value<boost::optional<FreeMonStorageState>> _lastReadState;
 
     // When we change to primary, do we register?
     RegistrationType _registerOnTransitionToPrimary{RegistrationType::DoNotRegister};
 
     // Pending update to disk
-    boost::synchronized_value<FreeMonStorageState> _state;
+    synchronized_value<FreeMonStorageState> _state;
 
     // In-memory registration status
     FreeMonRegistrationStatus _registrationStatus{FreeMonRegistrationStatus::kDisabled};

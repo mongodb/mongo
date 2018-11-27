@@ -64,6 +64,6 @@ server_parameters:
   runtimeBoostDouble:
     set_at: runtime
     description: "Create a runtime-only string, using boost::synchronized_value"
-    cpp_vartype: "boost::synchronized_value<double>"
+    cpp_vartype: "synchronized_value<double>"
     cpp_varname: gRuntimeBoostDouble
 

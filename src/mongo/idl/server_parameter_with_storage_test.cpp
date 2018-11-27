@@ -123,11 +123,11 @@ template <typename T>
 void doStorageTestByType(const std::string& name,
                          const std::vector<std::string>& valid,
                          const std::vector<std::string>& invalid) {
-    using BSV = boost::synchronized_value<T>;
+    using SV = synchronized_value<T>;
     doStorageTest<T, SPT::kStartupOnly>("Startup" + name, valid, invalid);
-    doStorageTest<BSV, SPT::kStartupOnly>("BoostStartup" + name, valid, invalid);
-    doStorageTest<BSV, SPT::kRuntimeOnly>("Runtime" + name, valid, invalid);
-    doStorageTest<BSV, SPT::kStartupAndRuntime>("StartupAndRuntime" + name, valid, invalid);
+    doStorageTest<SV, SPT::kStartupOnly>("BoostStartup" + name, valid, invalid);
+    doStorageTest<SV, SPT::kRuntimeOnly>("Runtime" + name, valid, invalid);
+    doStorageTest<SV, SPT::kStartupAndRuntime>("StartupAndRuntime" + name, valid, invalid);
 }
 
 template <typename T>

@@ -734,9 +734,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'vector',
         ]
 
-        if spec.server_parameters:
-            header_list.append('boost/thread/synchronized_value.hpp')
-
         header_list.sort()
 
         for include in header_list:
@@ -756,6 +753,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         if spec.configs:
             header_list.append('mongo/util/options_parser/option_description.h')
+
+        if spec.server_parameters:
+            header_list.append('mongo/util/synchronized_value.h')
 
         header_list.sort()
 

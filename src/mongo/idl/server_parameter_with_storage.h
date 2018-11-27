@@ -35,7 +35,6 @@
  * rather parameters should be defined in .idl files.
  */
 
-#include <boost/thread/synchronized_value.hpp>
 #include <functional>
 #include <string>
 
@@ -44,6 +43,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace idl_server_parameter_detail {
@@ -146,13 +146,13 @@ struct storage_wrapper<AtomicProxy<U, P>> {
 };
 
 template <typename U>
-struct storage_wrapper<boost::synchronized_value<U>> {
+struct storage_wrapper<synchronized_value<U>> {
     static constexpr bool thread_safe = true;
     using type = U;
-    static void store(boost::synchronized_value<U>& storage, const U& value) {
+    static void store(synchronized_value<U>& storage, const U& value) {
         *storage = value;
     }
-    static U load(const boost::synchronized_value<U>& storage) {
+    static U load(const synchronized_value<U>& storage) {
         return *storage;
     }
 };
