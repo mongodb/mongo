@@ -2259,27 +2259,6 @@ TEST_F(RadixStoreTest, SizeTest) {
     ASSERT_TRUE(thisStore.dataSize() == 10);
 }
 
-TEST_F(RadixStoreTest, SubtreeSizeTest) {
-    value_type value1 = std::make_pair("<index", ".");
-    value_type value2 = std::make_pair("<collection-1", "..");
-    value_type value3 = std::make_pair("<collection-2", "...");
-
-    thisStore.insert(value_type(value1));
-    thisStore.insert(value_type(value2));
-    ASSERT_TRUE(thisStore.size() == 2);
-    ASSERT_TRUE(thisStore.dataSize() == 3);
-
-    ASSERT_TRUE(thisStore.subtreeSize("<collection-") == 1);
-    ASSERT_TRUE(thisStore.subtreeDataSize("<collection-") == 2);
-
-    thisStore.insert(value_type(value3));
-    ASSERT_TRUE(thisStore.size() == 3);
-    ASSERT_TRUE(thisStore.dataSize() == 6);
-
-    ASSERT_TRUE(thisStore.subtreeSize("<collection-") == 2);
-    ASSERT_TRUE(thisStore.subtreeDataSize("<collection-") == 5);
-}
-
 TEST_F(RadixStoreTest, CannotRevalidateExhaustedCursor) {
     value_type value1 = std::make_pair("a", "1");
     value_type value2 = std::make_pair("b", "2");

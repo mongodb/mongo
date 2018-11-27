@@ -62,11 +62,6 @@ std::string createKey(StringData ident, int64_t recordId) {
     return std::string(ks.getBuffer(), ks.getSize());
 }
 
-std::string createKey(StringData ident) {
-    KeyString ks(version, BSON("" << ident), allAscending);
-    return std::string(ks.getBuffer(), ks.getSize());
-}
-
 int64_t extractRecordId(const std::string& keyStr) {
     KeyString ks(version, sample, allAscending);
     ks.resetFromBuffer(keyStr.c_str(), keyStr.size());
@@ -253,23 +248,35 @@ std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* o
 }
 
 Status RecordStore::truncate(OperationContext* opCtx) {
+    StatusWith<int64_t> s = truncateWithoutUpdatingCount(opCtx);
+    if (!s.isOK())
+        return s.getStatus();
 
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
+    // TODO: SERVER-38225
+
+    return Status::OK();
+}
+
+StatusWith<int64_t> RecordStore::truncateWithoutUpdatingCount(OperationContext* opCtx) {
+    auto ru = RecoveryUnit::get(opCtx);
+    StringStore* workingCopy(ru->getHead());
     StringStore::const_iterator end = workingCopy->upper_bound(_postfix);
     std::vector<std::string> toDelete;
+
     for (auto it = workingCopy->lower_bound(_prefix); it != end; ++it) {
         toDelete.push_back(it->first);
     }
+
+    size_t numErased = 0;
     if (!toDelete.empty()) {
-        size_t numErased = 0;
         for (const auto& key : toDelete) {
             numErased += workingCopy->erase(key);
         }
         invariant(numErased == toDelete.size());
-        RecoveryUnit::get(opCtx)->makeDirty();
+        ru->makeDirty();
     }
 
-    return Status::OK();
+    return static_cast<int64_t>(numErased);
 }
 
 void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
@@ -362,20 +369,15 @@ bool RecordStore::cappedAndNeedDelete(OperationContext* opCtx, StringStore* work
     if (!_isCapped)
         return false;
 
-    const auto subTreeKey = createKey(_ident);
-
-    if (workingCopy->subtreeDataSize(subTreeKey) > static_cast<size_t>(_cappedMaxSize))
+    if (dataSize(opCtx) > _cappedMaxSize)
         return true;
 
-    if ((_cappedMaxDocs != -1) &&
-        workingCopy->subtreeSize(subTreeKey) > static_cast<size_t>(_cappedMaxDocs))
+    if ((_cappedMaxDocs != -1) && numRecords(opCtx) > _cappedMaxDocs)
         return true;
     return false;
 }
 
 void RecordStore::cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* workingCopy) {
-
-    const auto subTreeKey = createKey(_ident);
 
     // Create the lowest key for this identifier and use lower_bound() to get to the first one.
     auto recordIt = workingCopy->lower_bound(_prefix);
@@ -384,7 +386,7 @@ void RecordStore::cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* wor
     stdx::lock_guard<stdx::mutex> cappedDeleterLock(_cappedDeleterMutex);
 
     while (cappedAndNeedDelete(opCtx, workingCopy)) {
-        DEV invariant(workingCopy->subtreeSize(subTreeKey) > 0);
+        invariant(numRecords(opCtx) > 0);
 
         stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
         if (_cappedCallback) {

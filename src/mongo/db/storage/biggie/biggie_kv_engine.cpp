@@ -122,7 +122,9 @@ Status KVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
         if (_idents[ident.toString()] == true) {  // ident is RecordStore.
             CollectionOptions s;
             auto rs = getRecordStore(opCtx, ""_sd, ident, s);
-            dropStatus = rs->truncate(opCtx);
+            dropStatus = checked_cast<RecordStore*>(rs.get())
+                             ->truncateWithoutUpdatingCount(opCtx)
+                             .getStatus();
         } else {  // ident is SortedDataInterface.
             auto sdi =
                 std::make_unique<SortedDataInterface>(Ordering::make(BSONObj()), true, ident);
