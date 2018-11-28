@@ -1191,7 +1191,9 @@ var ReplSetTest = function(opts) {
 
     /**
      * Waits for the last oplog entry on the primary to be visible in the committed snapshop view
-     * of the oplog on *all* secondaries.
+     * of the oplog on *all* secondaries. When majority read concern is disabled, there is no
+     * committed snapshot view, so this function waits for the knowledge of the majority commit
+     * point on each node to advance to the optime of the last oplog entry on the primary.
      * Returns last oplog entry.
      */
     this.awaitLastOpCommitted = function(timeout) {

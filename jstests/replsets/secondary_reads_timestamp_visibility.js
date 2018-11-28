@@ -79,7 +79,14 @@
     // Disable the failpoint and let the batch complete.
     secondaryReadsTest.resumeSecondaryBatchApplication();
 
+    // Wait for the last op to appear in the majority committed snapshot on each node. This ensures
+    // that the op will be visible to a "majority" read.
     replSet.awaitLastOpCommitted();
+
+    // Wait for the last op to be replicated to all nodes. This is needed because when majority read
+    // concern is disabled, awaitLastOpCommitted() just checks the node's knowledge of the majority
+    // commit point and does not ensure the node has applied the operations.
+    replSet.awaitReplication();
 
     for (let i in levels) {
         print("Checking that new updates are visible for readConcern: " + levels[i]);

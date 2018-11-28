@@ -1092,11 +1092,13 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
     if (opTime > _getMyLastAppliedOpTime_inlock()) {
         _setMyLastAppliedOpTime(lock, opTime, false, consistency);
         _reportUpstream_inlock(std::move(lock));
-    } else if (consistency == DataConsistency::Consistent &&
-               _readWriteAbility->canAcceptNonLocalWrites(lock) &&
-               _rsConfig.getWriteMajority() == 1) {
+    } else if ((consistency == DataConsistency::Consistent &&
+                _readWriteAbility->canAcceptNonLocalWrites(lock) &&
+                _rsConfig.getWriteMajority() == 1) ||
+               !serverGlobalParams.enableMajorityReadConcern) {
         // Single vote primaries may have a lagged stable timestamp due to paring back the stable
-        // timestamp to the all committed timestamp.
+        // timestamp to the all committed timestamp. When majority read concern is disabled, the
+        // stable timestamp is set to lastApplied.
         _setStableTimestampForStorage(lock);
     }
 }
@@ -3081,14 +3083,14 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime(WithLock lk) {
 }
 
 boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
-    WithLock lk, const std::set<OpTime>& candidates, const OpTime& commitPoint) {
+    WithLock lk, const std::set<OpTime>& candidates, OpTime maximumStableOpTime) {
 
     // No optime candidates.
     if (candidates.empty()) {
         return boost::none;
     }
 
-    auto maximumStableTimestamp = commitPoint.getTimestamp();
+    auto maximumStableTimestamp = maximumStableOpTime.getTimestamp();
     if (_readWriteAbility->canAcceptNonLocalWrites(lk) && _storage->supportsDocLocking(_service)) {
         // If the storage engine supports document level locking, then it is possible for oplog
         // writes to commit out of order. In that case, we don't want to set the stable timestamp
@@ -3097,15 +3099,22 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
         // be behind. During oplog application the all committed timestamp can jump around since
         // we first write oplog entries to the oplog and then go back and apply them.
         //
-        // If the all committed timestamp is less than the commit point, then we are guaranteed that
-        // there are no stable timestamp candidates with a greater timestamp than the all committed
-        // timestamp and a lower term than the commit point. Thus we can consider the all committed
-        // timestamp to have the same term as the commit point. When a primary enters a new term, it
-        // first storage-commits a 'new primary' oplog entry in the new term before accepting any
-        // new writes. This will ensure that the all committed timestamp is in the new term before
-        // any writes in the new term are replication committed.
-        maximumStableTimestamp =
-            std::min(_storage->getAllCommittedTimestamp(_service), commitPoint.getTimestamp());
+        // We must construct an upper bound for the stable optime candidates such that the upper
+        // bound is at most 'maximumStableOpTime' and any candidate with a timestamp higher than the
+        // all committed is greater than the upper bound. If the timestamp of 'maximumStableOpTime'
+        // is <= the all committed, then we use 'maximumStableOpTime'. Otherwise, we construct an
+        // optime using the all committed and the term of 'maximumStableOpTime'. We must argue that
+        // there are no stable optime candidates with a timestamp greater than the all committed and
+        // a term less than that of 'maximumStableOpTime'. Suppose there were. The
+        // 'maximumStableOpTime' is either the commit point or the lastApplied, so the all committed
+        // can only be behind 'maximumStableOpTime' on a primary. If there is a candidate with a
+        // higher timestamp than the all committed but a lower term than 'maximumStableOpTime', then
+        // the all committed corresponds to a write in an earlier term than the current one. But
+        // this is not possible on a primary, since on step-up, the primary storage commits a 'new
+        // primary' oplog entry in the new term before accepting any new writes, so the all
+        // committed must be in the current term.
+        maximumStableTimestamp = std::min(_storage->getAllCommittedTimestamp(_service),
+                                          maximumStableOpTime.getTimestamp());
     }
 
     MONGO_FAIL_POINT_BLOCK(holdStableTimestampAtSpecificTimestamp, data) {
@@ -3114,7 +3123,7 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
         maximumStableTimestamp = std::min(maximumStableTimestamp, holdStableTimestamp);
     }
 
-    auto maximumStableOpTime = OpTime(maximumStableTimestamp, commitPoint.getTerm());
+    maximumStableOpTime = OpTime(maximumStableTimestamp, maximumStableOpTime.getTerm());
 
     // When calculating the stable optime, compare it to the oldest oplog entry timestamp across
     // transactions whose corresponding commit/abort oplog entries have not been majority committed.
@@ -3132,11 +3141,11 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
         }
     }
 
-    // Find the greatest optime candidate that is less than or equal to the commit point.
-    // To do this we first find the upper bound of 'commitPoint', which points to the smallest
-    // element in 'candidates' that is greater than 'commitPoint'. We then step back one element,
-    // which should give us the largest element in 'candidates' that is less than or equal to the
-    // 'commitPoint'.
+    // Find the greatest optime candidate that is less than or equal to 'maximumStableOpTime'. To do
+    // this we first find the upper bound of 'maximumStableOpTime', which points to the smallest
+    // element in 'candidates' that is greater than 'maximumStableOpTime'. We then step back one
+    // element, which should give us the largest element in 'candidates' that is less than or equal
+    // to the 'maximumStableOpTime'.
     auto upperBoundIter = candidates.upper_bound(maximumStableOpTime);
 
     // All optime candidates are greater than the commit point.
@@ -3145,7 +3154,9 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
     }
     // There is a valid stable optime.
     else {
-        return *std::prev(upperBoundIter);
+        auto stableOpTime = *std::prev(upperBoundIter);
+        invariant(stableOpTime.getTimestamp() <= maximumStableTimestamp);
+        return stableOpTime;
     }
 }
 
@@ -3162,9 +3173,9 @@ void ReplicationCoordinatorImpl::_cleanupStableOpTimeCandidates(std::set<OpTime>
 }
 
 boost::optional<OpTime> ReplicationCoordinatorImpl::calculateStableOpTime_forTest(
-    const std::set<OpTime>& candidates, const OpTime& commitPoint) {
+    const std::set<OpTime>& candidates, const OpTime& maximumStableOpTime) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _calculateStableOpTime(lk, candidates, commitPoint);
+    return _calculateStableOpTime(lk, candidates, maximumStableOpTime);
 }
 void ReplicationCoordinatorImpl::cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates,
                                                                        OpTime stableOpTime) {
@@ -3198,12 +3209,18 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime(WithLock lk
     auto txnMetrics = ServerTransactionsMetrics::get(getGlobalServiceContext());
     txnMetrics->removeOpTimesLessThanOrEqToCommittedOpTime(commitPoint);
 
+    // When majority read concern is disabled, the stable opTime is set to the lastApplied, rather
+    // than the commit point.
+    auto maximumStableOpTime = serverGlobalParams.enableMajorityReadConcern
+        ? commitPoint
+        : _topCoord->getMyLastAppliedOpTime();
+
     // Compute the current stable optime.
-    auto stableOpTime = _calculateStableOpTime(lk, _stableOpTimeCandidates, commitPoint);
+    auto stableOpTime = _calculateStableOpTime(lk, _stableOpTimeCandidates, maximumStableOpTime);
     if (stableOpTime) {
-        // By definition, the stable optime should never be greater than the commit point.
-        invariant(stableOpTime->getTimestamp() <= commitPoint.getTimestamp());
-        invariant(*stableOpTime <= commitPoint);
+        // Check that the selected stable optime does not exceed our maximum.
+        invariant(stableOpTime->getTimestamp() <= maximumStableOpTime.getTimestamp());
+        invariant(*stableOpTime <= maximumStableOpTime);
     }
 
     return stableOpTime;
@@ -3220,9 +3237,18 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 
         if (!testingSnapshotBehaviorInIsolation) {
             // Update committed snapshot and wake up any threads waiting on read concern or
-            // write concern.
-            if (_updateCommittedSnapshot_inlock(stableOpTime.get())) {
-                // Update the stable timestamp for the storage engine.
+            // write concern. When majority read concern is enabled, the committed snapshot is set
+            // to the new stable optime. When majority read concern is disabled, the stable optime
+            // is ahead of the commit point, so we set the committed snapshot to the commit point.
+            auto committedSnapshot = serverGlobalParams.enableMajorityReadConcern
+                ? stableOpTime.value()
+                : _topCoord->getLastCommittedOpTime();
+            const bool updatedCommittedSnapshot =
+                _updateCommittedSnapshot_inlock(committedSnapshot);
+            if (updatedCommittedSnapshot || !serverGlobalParams.enableMajorityReadConcern) {
+                // Update the stable timestamp for the storage engine. When majority read concern is
+                // disabled, set the stable timestamp regardless of whether the majority commit
+                // point moved forward.
                 _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
             }
         }

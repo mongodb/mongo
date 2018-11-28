@@ -3968,6 +3968,7 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
     ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
+    getStorageInterface()->allCommittedTimestamp = Timestamp(1, 1);
     getReplCoord()->setMyLastAppliedOpTime(OpTimeWithTermOne(1, 1));
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermOne(1, 1));
     simulateSuccessfulV1Election();
@@ -3976,7 +3977,6 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
     ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());
 
     // Check that the stable timestamp is not updated if the all-committed timestamp is behind.
-    getStorageInterface()->allCommittedTimestamp = Timestamp(1, 1);
     repl->setMyLastAppliedOpTime(OpTime({1, 2}, term));
     stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());

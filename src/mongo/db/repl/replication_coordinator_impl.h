@@ -362,7 +362,7 @@ public:
      * Simple test wrappers that expose private methods.
      */
     boost::optional<OpTime> calculateStableOpTime_forTest(const std::set<OpTime>& candidates,
-                                                          const OpTime& commitPoint);
+                                                          const OpTime& maximumStableOpTime);
     void cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates, OpTime stableOpTime);
     std::set<OpTime> getStableOpTimeCandidates_forTest();
     boost::optional<OpTime> getStableOpTime_forTest();
@@ -1020,13 +1020,13 @@ private:
     boost::optional<OpTime> _getStableOpTime(WithLock lk);
 
     /**
-     * Calculates the 'stable' replication optime given a set of optime candidates and the
-     * current commit point. The stable optime is the greatest optime in 'candidates' that is
-     * also less than or equal to 'commitPoint'.
+     * Calculates the 'stable' replication optime given a set of optime candidates and a maximum
+     * stable optime. The stable optime is the greatest optime in 'candidates' that is also less
+     * than or equal to 'maximumStableOpTime'.
      */
     boost::optional<OpTime> _calculateStableOpTime(WithLock lk,
                                                    const std::set<OpTime>& candidates,
-                                                   const OpTime& commitPoint);
+                                                   OpTime maximumStableOpTime);
 
     /**
      * Removes any optimes from the optime set 'candidates' that are less than

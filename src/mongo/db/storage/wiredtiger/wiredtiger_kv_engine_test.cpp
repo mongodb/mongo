@@ -265,16 +265,16 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         FAIL("");
     };
 
-    _engine->setStableTimestamp(Timestamp(10, 1), boost::none);
+    _engine->setStableTimestamp(Timestamp(10, 1), boost::none, false);
     assertPinnedMovesSoon(Timestamp(10, 1));
 
-    _engine->setStableTimestamp(Timestamp(20, 1), Timestamp(15, 1));
+    _engine->setStableTimestamp(Timestamp(20, 1), Timestamp(15, 1), false);
     assertPinnedMovesSoon(Timestamp(15, 1));
 
-    _engine->setStableTimestamp(Timestamp(30, 1), Timestamp(19, 1));
+    _engine->setStableTimestamp(Timestamp(30, 1), Timestamp(19, 1), false);
     assertPinnedMovesSoon(Timestamp(19, 1));
 
-    _engine->setStableTimestamp(Timestamp(30, 1), boost::none);
+    _engine->setStableTimestamp(Timestamp(30, 1), boost::none, false);
     assertPinnedMovesSoon(Timestamp(30, 1));
 }
 

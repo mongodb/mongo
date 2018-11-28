@@ -393,8 +393,9 @@ public:
     }
 
     /**
-     * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
-     * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
+     * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This
+     * timestamp must not decrease unless force=true is set, in which case we force the stable
+     * timestamp, the oldest timestamp, and the commit timestamp backward.
      *
      * The maximumTruncationTimestamp (and newer) must not be truncated from the oplog in order to
      * recover from the `stableTimestamp`.  `boost::none` implies there are no additional
@@ -406,7 +407,8 @@ public:
      * before a call to this method protects it.
      */
     virtual void setStableTimestamp(Timestamp stableTimestamp,
-                                    boost::optional<Timestamp> maximumTruncationTimestamp) {}
+                                    boost::optional<Timestamp> maximumTruncationTimestamp,
+                                    bool force = false) {}
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because

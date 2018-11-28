@@ -74,7 +74,6 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
@@ -1315,35 +1314,9 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
 
-        const bool pinOldestTimestamp = !serverGlobalParams.enableMajorityReadConcern;
-        std::unique_ptr<RecoveryUnit> pinningTransaction;
-        if (pinOldestTimestamp) {
-            // If `enableMajorityReadConcern` is false, storage aggressively trims
-            // history. Documents may not be inserted before the cutoff point. This piece will pin
-            // the "oldest timestamp" until after the batch is fully applied.
-            //
-            // When `enableMajorityReadConcern` is false, storage sets the "oldest timestamp" to
-            // the "get all committed" timestamp. Opening a transaction and setting its timestamp
-            // to first oplog entry's timestamp will prevent the "get all committed" timestamp
-            // from advancing.
-            //
-            // This transaction will be aborted after all writes from the batch of operations are
-            // complete. Aborting the transaction allows the "get all committed" point to be
-            // move forward.
-            pinningTransaction = std::unique_ptr<RecoveryUnit>(
-                opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit());
-            pinningTransaction->beginUnitOfWork(opCtx);
-            fassert(40677, pinningTransaction->setTimestamp(ops.front().getTimestamp()));
-        }
-
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
-        ON_BLOCK_EXIT([&] {
-            _writerPool->waitForIdle();
-            if (pinOldestTimestamp) {
-                pinningTransaction->abortUnitOfWork();
-            }
-        });
+        ON_BLOCK_EXIT([&] { _writerPool->waitForIdle(); });
 
         // Write batch of ops into oplog.
         if (!_options.skipWritesToOplog) {

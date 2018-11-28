@@ -195,7 +195,8 @@ public:
     void setJournalListener(JournalListener* jl) final;
 
     virtual void setStableTimestamp(Timestamp stableTimestamp,
-                                    boost::optional<Timestamp> maximumTruncationTimestamp) override;
+                                    boost::optional<Timestamp> maximumTruncationTimestamp,
+                                    bool force) override;
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 

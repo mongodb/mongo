@@ -1405,6 +1405,21 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     log() << "Rollback deleted " << deletes << " documents and updated " << updates
           << " documents.";
 
+    // When majority read concern is disabled, the stable timestamp may be ahead of the common
+    // point. Force the stable timestamp back to the common point.
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        const bool force = true;
+        log() << "Forcing the stable timestamp to " << fixUpInfo.commonPoint.getTimestamp();
+        opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(
+            fixUpInfo.commonPoint.getTimestamp(), boost::none, force);
+
+        // We must wait for a checkpoint before truncating oplog, so that if we crash after
+        // truncating oplog, we are guaranteed to recover from a checkpoint that includes all of the
+        // writes performed during the rollback.
+        log() << "Waiting for a stable checkpoint";
+        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable();
+    }
+
     log() << "Truncating the oplog at " << fixUpInfo.commonPoint.toString() << " ("
           << fixUpInfo.commonPointOurDiskloc << "), non-inclusive";
 
