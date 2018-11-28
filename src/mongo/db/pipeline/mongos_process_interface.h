@@ -254,6 +254,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::unique_ptr<ResourceYielder> getResourceYielder() const override {
+        return nullptr;
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

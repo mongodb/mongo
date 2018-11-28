@@ -393,6 +393,7 @@ selector:
   - jstests/sharding/txn_writes_during_movechunk.js
   - jstests/sharding/update_sharded.js
   - jstests/sharding/wildcard_index_banned_for_shard_key.js
+  - jstests/sharding/unsharded_lookup_in_txn.js
 # Enable if SERVER-20865 is backported or 4.2 becomes last-stable
   - jstests/sharding/sharding_statistics_server_status.js
   # Enable if SERVER-36966 is backported or 4.2 becomes last-stable

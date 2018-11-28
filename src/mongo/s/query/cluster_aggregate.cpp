@@ -105,6 +105,7 @@ Status appendCursorResponseToCommandResult(const ShardId& shardId,
 BSONObj createCommandForMergingShard(const AggregationRequest& request,
                                      const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
                                      const ShardId& shardId,
+                                     bool mergingShardContributesData,
                                      const Pipeline* pipelineForMerging) {
     MutableDocument mergeCmd(request.serializeToCommandObj());
 
@@ -119,9 +120,19 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
             : Value(Document{CollationSpec::kSimpleSpec});
     }
 
+    const auto txnRouter = TransactionRouter::get(mergeCtx->opCtx);
+    if (txnRouter && mergingShardContributesData) {
+        // Don't include a readConcern since we can only include read concerns on the _first_
+        // command sent to a participant per transaction. Assuming the merging shard is a
+        // participant, it will already have received another 'aggregate' command earlier which
+        // contained a readConcern.
+
+        mergeCmd.remove("readConcern");
+    }
+
     auto aggCmd = mergeCmd.freeze().toBson();
 
-    if (auto txnRouter = TransactionRouter::get(mergeCtx->opCtx)) {
+    if (txnRouter) {
         aggCmd = txnRouter->attachTxnFieldsIfNeeded(shardId, aggCmd);
     }
 
@@ -609,19 +620,16 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // therefore must have a valid routing table.
     invariant(routingInfo);
 
-    // TODO SERVER-33683 allowing an aggregation within a transaction can lead to a deadlock in the
-    // SessionCatalog when a pipeline with a $mergeCursors sends a getMore to itself.
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            "Cannot specify a transaction number in combination with an aggregation on mongos when "
-            "merging on a shard",
-            !opCtx->getTxnNumber());
+    const ShardId mergingShardId = pickMergingShard(opCtx,
+                                                    shardDispatchResults.needsPrimaryShardMerge,
+                                                    targetedShards,
+                                                    routingInfo->db().primaryId());
+    const bool mergingShardContributesData =
+        std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
+        targetedShards.end();
 
-    ShardId mergingShardId = pickMergingShard(opCtx,
-                                              shardDispatchResults.needsPrimaryShardMerge,
-                                              targetedShards,
-                                              routingInfo->db().primaryId());
-
-    auto mergeCmdObj = createCommandForMergingShard(request, expCtx, mergingShardId, mergePipeline);
+    auto mergeCmdObj = createCommandForMergingShard(
+        request, expCtx, mergingShardId, mergingShardContributesData, mergePipeline);
 
     // Dispatch $mergeCursors to the chosen shard, store the resulting cursor, and return.
     auto mergeResponse = establishMergingShardCursor(

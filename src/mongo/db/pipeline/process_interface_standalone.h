@@ -126,6 +126,8 @@ public:
         uasserted(51020, "unexpected request to consult sharding catalog on non-shardsvr");
     }
 
+    std::unique_ptr<ResourceYielder> getResourceYielder() const override;
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

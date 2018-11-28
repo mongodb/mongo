@@ -200,6 +200,22 @@ MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* o
 
 MongoDOperationContextSession::~MongoDOperationContextSession() = default;
 
+void MongoDOperationContextSession::checkIn(OperationContext* opCtx) {
+
+    if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
+        txnParticipant->stashTransactionResources(opCtx);
+    }
+
+    OperationContextSession::checkIn(opCtx);
+}
+
+void MongoDOperationContextSession::checkOut(OperationContext* opCtx, const std::string& cmdName) {
+    OperationContextSession::checkOut(opCtx);
+
+    if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
+        txnParticipant->unstashTransactionResources(opCtx, cmdName);
+    }
+}
 
 MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
     OperationContext* opCtx)

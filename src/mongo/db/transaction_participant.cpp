@@ -702,10 +702,6 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         if (_txnResourceStash) {
             // Transaction resources already exist for this transaction.  Transfer them from the
             // stash to the operation context.
-            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            uassert(ErrorCodes::InvalidOptions,
-                    "Only the first command in a transaction may specify a readConcern",
-                    readConcernArgs.isEmpty());
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
             stdx::lock_guard<stdx::mutex> lm(_metricsMutex);

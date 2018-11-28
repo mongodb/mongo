@@ -317,7 +317,7 @@ public:
     void abortArbitraryTransaction();
 
     /**
-     * Returns whether the transaction has exceedet its expiration time.
+     * Returns whether the transaction has exceeded its expiration time.
      */
     bool expired() const;
 

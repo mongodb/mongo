@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/s/chunk_version.h"
 
@@ -316,6 +317,8 @@ public:
     virtual void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const NamespaceString& nss,
                                               ChunkVersion targetCollectionVersion) const = 0;
+
+    virtual std::unique_ptr<ResourceYielder> getResourceYielder() const = 0;
 };
 
 }  // namespace mongo

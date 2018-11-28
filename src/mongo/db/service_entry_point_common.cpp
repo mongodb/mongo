@@ -371,6 +371,13 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
                 createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
             }
         }
+
+        if (txnParticipant->inMultiDocumentTransaction() && !sessionOptions.getStartTransaction()) {
+            const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            uassert(ErrorCodes::InvalidOptions,
+                    "Only the first command in a transaction may specify a readConcern",
+                    readConcernArgs.isEmpty());
+        }
     }
 
     txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());

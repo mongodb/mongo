@@ -31,16 +31,51 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/s/query/blocking_results_merger.h"
 
 namespace mongo {
 
 BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
                                              AsyncResultsMergerParams&& armParams,
-                                             executor::TaskExecutor* executor)
+                                             executor::TaskExecutor* executor,
+                                             std::unique_ptr<ResourceYielder> resourceYielder)
     : _tailableMode(armParams.getTailableMode().value_or(TailableModeEnum::kNormal)),
       _executor(executor),
-      _arm(opCtx, executor, std::move(armParams)) {}
+      _arm(opCtx, executor, std::move(armParams)),
+      _resourceYielder(std::move(resourceYielder)) {}
+
+StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
+    OperationContext* opCtx, const std::function<StatusWith<stdx::cv_status>()>& waitFn) noexcept {
+
+    if (_resourceYielder) {
+        try {
+            // The BRM interface returns Statuses. Be sure we respect that here.
+            _resourceYielder->yield(opCtx);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+    boost::optional<StatusWith<stdx::cv_status>> result;
+    try {
+        // This shouldn't throw, but we cannot enforce that.
+        result = waitFn();
+    } catch (const DBException&) {
+        MONGO_UNREACHABLE;
+    }
+
+    if (_resourceYielder) {
+        try {
+            _resourceYielder->unyield(opCtx);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+    return *result;
+}
 
 StatusWith<ClusterQueryResult> BlockingResultsMerger::awaitNextWithTimeout(
     OperationContext* opCtx, RouterExecStage::ExecContext execCtx) {
@@ -54,9 +89,10 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::awaitNextWithTimeout(
         }
         auto event = nextEventStatus.getValue();
 
-        // Block until there are further results to return, or our time limit is exceeded.
-        auto waitStatus =
-            _executor->waitForEvent(opCtx, event, awaitDataState(opCtx).waitForInsertsDeadline);
+        const auto waitStatus = doWaiting(opCtx, [this, opCtx, &event]() {
+            return _executor->waitForEvent(
+                opCtx, event, awaitDataState(opCtx).waitForInsertsDeadline);
+        });
 
         if (!waitStatus.isOK()) {
             return waitStatus.getStatus();
@@ -84,7 +120,8 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::blockUntilNext(OperationCo
         auto event = nextEventStatus.getValue();
 
         // Block until there are further results to return.
-        auto status = _executor->waitForEvent(opCtx, event);
+        auto status = doWaiting(
+            opCtx, [this, opCtx, &event]() { return _executor->waitForEvent(opCtx, event); });
 
         if (!status.isOK()) {
             return status.getStatus();

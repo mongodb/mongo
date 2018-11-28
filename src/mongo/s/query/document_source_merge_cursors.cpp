@@ -74,7 +74,11 @@ bool DocumentSourceMergeCursors::remotesExhausted() const {
 void DocumentSourceMergeCursors::populateMerger() {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
-    _blockingResultsMerger.emplace(pExpCtx->opCtx, std::move(*_armParams), _executor);
+
+    _blockingResultsMerger.emplace(pExpCtx->opCtx,
+                                   std::move(*_armParams),
+                                   _executor,
+                                   pExpCtx->mongoProcessInterface->getResourceYielder());
     _armParams = boost::none;
     // '_blockingResultsMerger' now owns the cursors.
     _ownCursors = false;

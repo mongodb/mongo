@@ -75,6 +75,20 @@ public:
     MongoDOperationContextSession(OperationContext* opCtx);
     ~MongoDOperationContextSession();
 
+    /**
+     * This method takes an operation context with a checked-out session and allows it to be
+     * temporarily or permanently checked back in, in order to allow other operations to use it.
+     *
+     * May only be called if the session has actually been checked out previously.
+     */
+    static void checkIn(OperationContext* opCtx);
+
+    /**
+     * May only be called if the session is not checked out already. 'cmdType' is used to validate
+     * that the expected transaction flow control is being obeyed.
+     */
+    static void checkOut(OperationContext* opCtx, const std::string& cmdName);
+
 private:
     OperationContextSession _operationContextSession;
 };

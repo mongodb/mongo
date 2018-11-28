@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -47,6 +46,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
@@ -64,6 +64,42 @@ using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
 namespace {
+
+class MongoDResourceYielder : public ResourceYielder {
+public:
+    void yield(OperationContext* opCtx) override {
+        // We're about to block. Check back in the session so that it's available to other
+        // threads. Note that we may block on a request to _ourselves_, meaning that we may have to
+        // wait for another thread which will use the same session. This step is necessary
+        // to prevent deadlocks.
+
+        Session* const session = OperationContextSession::get(opCtx);
+        if (session) {
+            MongoDOperationContextSession::checkIn(opCtx);
+        }
+        _yielded = (session != nullptr);
+    }
+
+    void unyield(OperationContext* opCtx) override {
+        if (_yielded) {
+            // This may block on a sub-operation on this node finishing. It's possible that while
+            // blocked on the network layer, another shard could have responded, theoretically
+            // unblocking this thread of execution. However, we must wait until the child operation
+            // on this shard finishes so we can get the session back. This may limit the throughput
+            // of the operation, but it's correct.
+            MongoDOperationContextSession::checkOut(opCtx,
+                                                    // Assumes this is only called from the
+                                                    // 'aggregate' or 'getMore' commands.  The code
+                                                    // which relies on this parameter does not
+                                                    // distinguish/care about the difference so we
+                                                    // simply always pass 'aggregate'.
+                                                    "aggregate");
+        }
+    }
+
+private:
+    bool _yielded = false;
+};
 
 // Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and each
 // of the elements of 'keyPattern' is numeric, i.e. not "text", "$**", or any other special type of
@@ -547,6 +583,10 @@ std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefau
 
     auto& collator = it->second;
     return collator ? collator->clone() : nullptr;
+}
+
+std::unique_ptr<ResourceYielder> MongoInterfaceStandalone::getResourceYielder() const {
+    return std::make_unique<MongoDResourceYielder>();
 }
 
 }  // namespace mongo

@@ -89,9 +89,7 @@ public:
                                      HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
-                                     // TODO SERVER-33683: Permit $mergeCursors with readConcern
-                                     // level "snapshot".
-                                     TransactionRequirement::kNotAllowed);
+                                     TransactionRequirement::kAllowed);
 
         constraints.requiresInputDocSource = false;
         return constraints;

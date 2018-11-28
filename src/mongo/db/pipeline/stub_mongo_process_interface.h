@@ -200,5 +200,9 @@ public:
                                       ChunkVersion) const override {
         uasserted(51019, "Unexpected check of routing table");
     }
+
+    std::unique_ptr<ResourceYielder> getResourceYielder() const override {
+        return nullptr;
+    }
 };
 }  // namespace mongo

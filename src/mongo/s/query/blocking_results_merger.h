@@ -43,7 +43,8 @@ class BlockingResultsMerger {
 public:
     BlockingResultsMerger(OperationContext* opCtx,
                           AsyncResultsMergerParams&& arm,
-                          executor::TaskExecutor*);
+                          executor::TaskExecutor*,
+                          std::unique_ptr<ResourceYielder> resourceYielder);
 
     /**
      * Blocks until the next result is available or an error is detected.
@@ -100,6 +101,14 @@ private:
      */
     StatusWith<executor::TaskExecutor::EventHandle> getNextEvent();
 
+    /**
+     * Call the waitFn and return the result, yielding resources while waiting if necessary.
+     * 'waitFn' may not throw.
+     */
+    StatusWith<stdx::cv_status> doWaiting(
+        OperationContext* opCtx,
+        const std::function<StatusWith<stdx::cv_status>()>& waitFn) noexcept;
+
     TailableModeEnum _tailableMode;
     executor::TaskExecutor* _executor;
 
@@ -110,6 +119,10 @@ private:
     // and pick back up waiting for it on the next call to 'next()'.
     executor::TaskExecutor::EventHandle _leftoverEventFromLastTimeout;
     AsyncResultsMerger _arm;
+
+    // Provides interface for yielding and "unyielding" resources while waiting for results from
+    // the network. A value of nullptr implies that no such yielding or unyielding is necessary.
+    std::unique_ptr<ResourceYielder> _resourceYielder;
 };
 
 }  // namespace mongo

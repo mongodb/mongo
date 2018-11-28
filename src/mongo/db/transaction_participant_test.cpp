@@ -2281,44 +2281,6 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilCommit) {
               Microseconds(200));
 }
 
-TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetIfUnstashHasBadReadConcernArgs) {
-    auto tickSource = initMockTickSource();
-
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Initialize bad read concern args (!readConcernArgs.isEmpty()).
-    repl::ReadConcernArgs readConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
-
-    // Transaction resources do not exist yet.
-    txnParticipant->unstashTransactionResources(opCtx(), "find");
-
-    tickSource->advance(Microseconds(100));
-
-    // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
-    txnParticipant->stashTransactionResources(opCtx());
-
-    // Time active should have increased.
-    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getTimeActiveMicros(
-                  tickSource, tickSource->getTicks()),
-              Microseconds{100});
-
-    // Transaction resources already exist here and should throw an exception due to bad read
-    // concern arguments.
-    ASSERT_THROWS_CODE(txnParticipant->unstashTransactionResources(opCtx(), "find"),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-
-    tickSource->advance(Microseconds(100));
-
-    // Time active should not have increased.
-    ASSERT_EQ(txnParticipant->getSingleTransactionStats().getTimeActiveMicros(
-                  tickSource, tickSource->getTicks()),
-              Microseconds{100});
-}
-
 TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponStash) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
