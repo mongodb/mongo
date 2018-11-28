@@ -9,7 +9,11 @@
                 DiskId ="1" KeyPath="yes" />
         </Component>
         <Component Id="c_Thirdparty" Guid="C45662A7-5C18-4A53-8D14-7C92DB38F13E">
-          <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.EnterpriseBase)\distsrc\THIRD-PARTY-NOTICES.windows"
+          <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.LicenseSource)\THIRD-PARTY-NOTICES"
+                DiskId ="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_ThirdpartyEnterprise" Guid="4D53FF2F-DB47-41F3-8C5C-4C397736724E">
+          <File Id="f_ThirdpartyEnterprise" Name="THIRD-PARTY-NOTICES.windows" Source="$(var.EnterpriseBase)\distsrc\THIRD-PARTY-NOTICES.windows"
                 DiskId ="1" KeyPath="yes" />
         </Component>
 
@@ -20,7 +24,7 @@
         </Component>
         <Component Id="c_Thirdparty" Guid="D6098364-6DE8-48EA-A955-7D1060752132">
           <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.LicenseSource)\THIRD-PARTY-NOTICES"
-                DiskId ="1" />
+                DiskId ="1" KeyPath="yes" />
         </Component>
       <?endif?>
 
@@ -43,6 +47,9 @@
     <ComponentGroup Id="cg_License">
       <ComponentRef Id="c_Readme"/>
       <ComponentRef Id="c_Thirdparty"/>
+      <?if $(var.Edition) = Enterprise ?>
+      <ComponentRef Id="c_ThirdpartyEnterprise"/>
+      <?endif?>
       <ComponentRef Id="c_License"/>
       <ComponentRef Id="c_InstallKey"/>
       <ComponentRef Id="c_MPL2"/>
