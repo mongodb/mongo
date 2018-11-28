@@ -329,7 +329,10 @@ selector:
 executor:
   config:
     shell_options:
-      eval: var testingReplication = true;
+      eval:  >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/enable_sessions.js');
+        load('jstests/libs/txns/txn_override.js');
       global_vars:
         TestData:
           sessionOptions:
