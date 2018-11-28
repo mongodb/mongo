@@ -931,6 +931,20 @@ functions:
         build_phase='${task_name}_${execution}'
         END_OF_CREDS
 
+  "set up notary client credentials" : &set_up_notary_client_credentials
+    command: shell.exec
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        set -o errexit
+
+        cat <<EOF > notary_env.sh
+        export NOTARY_TOKEN=${signing_auth_token_42}
+        EOF
+
+        echo "${signing_auth_token_42}" > signing_auth_token
+
   "set up remote credentials": &set_up_remote_credentials
     command: shell.exec
     params:
@@ -7907,6 +7921,39 @@ tasks:
         aws_secret_remote: ${kitchen_aws_secret}
     - func: "run kitchen"
 
+- name: publish_packages
+  # This should prevent this task from running in patch builds, where we
+  # don't want to publish packages.
+  patchable: false
+  stepback: false
+  # Same dependencies as "push" below
+  depends_on:
+  - name: compile
+  - name: jsCore
+  - name: dbtest
+  - name: replica_sets_jscore_passthrough
+  commands:
+    - func: "fetch artifacts"
+    - func: "apply compile expansions"
+    - func: "set up remote credentials"
+      vars:
+        aws_key_remote: ${repo_aws_key}
+        aws_secret_remote: ${repo_aws_secret}
+    - func: "set up notary client credentials"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          . ./notary_env.sh
+
+          set -o errexit
+          set -o verbose
+
+          CURATOR_RELEASE=${curator_release|"latest"}
+          curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
+          tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
+          ./curator repo --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages repo
+
 - name: push
   patchable: false
   depends_on:
@@ -7917,6 +7964,7 @@ tasks:
   commands:
     - func: "fetch artifacts"
     - func: "fetch binaries"
+    # Fetch the shell
     - command: s3.get
       params:
         aws_key: ${aws_key}
@@ -7924,6 +7972,7 @@ tasks:
         remote_file: ${mongo_shell}
         bucket: mciuploads
         local_file: src/mongo-shell.tgz
+    # Fetch the sources (on relevant variants only)
     - command: s3.get
       params:
         aws_key: ${aws_key}
@@ -7938,19 +7987,7 @@ tasks:
       vars:
         aws_key_remote: ${repo_aws_key}
         aws_secret_remote: ${repo_aws_secret}
-    - command: shell.exec
-      params:
-        working_dir: src
-        silent: true
-        script: |
-          set -o errexit
-
-          cat <<EOF > notary_env.sh
-          export NOTARY_TOKEN=${signing_auth_token_42}
-          EOF
-
-          echo "${signing_auth_token_42}" > signing_auth_token
-
+    - func: "set up notary client credentials"
     - command: shell.exec
       params:
         working_dir: src
@@ -7967,13 +8004,6 @@ tasks:
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
 
           /usr/local/bin/notary-client.py --key-name "server-4.2" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
-
-          if [ "${has_packages|}" = "true" ]; then
-             CURATOR_RELEASE=${curator_release|"latest"}
-             curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
-             tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
-             ./curator repo --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages repo
-          fi
 
     # Put the binaries tarball/zipfile
     - command: s3.put
@@ -8620,6 +8650,7 @@ buildvariants:
   - name: sharding_last_stable_mongos_and_mixed_shards
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: publish_packages
   - name: push
 
 - name: linux-64-repeated-execution
@@ -9043,6 +9074,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: ubuntu1804
@@ -9138,6 +9170,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-ubuntu1804-64
@@ -9201,6 +9234,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-ubuntu1804-64-gcc-cxx17
@@ -9404,6 +9438,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-ubuntu1604-arm64
@@ -9491,6 +9526,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: publish_packages
+    distros:
+    - ubuntu1604-test
   - name: push
     distros:
     - ubuntu1604-test
@@ -9526,6 +9564,9 @@ buildvariants:
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
+  - name: publish_packages
+    distros:
+    - ubuntu1604-test
   - name: push
     distros:
     - ubuntu1604-test
@@ -9617,6 +9658,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: publish_packages
+    distros:
+    - ubuntu1604-test
   - name: push
     distros:
     - ubuntu1604-test
@@ -9731,6 +9775,9 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: publish_packages
+    distros:
+    - ubuntu1604-test
   - name: push
     distros:
     - ubuntu1604-test
@@ -9816,6 +9863,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: amazon
@@ -9917,6 +9965,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-amazon2
@@ -10003,6 +10052,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: amazon2
@@ -10108,6 +10158,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 ###########################################
@@ -12264,6 +12315,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-rhel-62-64-bit-majority-read-concern-off
@@ -13035,6 +13087,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 # This variant is to intentionally test uncommon features nightly
@@ -13185,6 +13238,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: rhel70
@@ -13294,6 +13348,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-rhel-71-ppc64le
@@ -13410,6 +13465,9 @@ buildvariants:
   - name: tool
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
+  - name: publish_packages
+    distros:
+    - rhel70-small
   - name: push
     distros:
     - rhel70-small
@@ -13525,6 +13583,9 @@ buildvariants:
   - name: tool
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
+  - name: publish_packages
+    distros:
+    - rhel70-small
   - name: push
     distros:
     - rhel70-small
@@ -13632,6 +13693,9 @@ buildvariants:
   - name: tool
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
+  - name: publish_packages
+    distros:
+    - rhel62-large
   - name: push
     distros:
     - rhel62-large
@@ -13666,6 +13730,9 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: ssl
+  - name: publish_packages
+    distros:
+    - rhel62-large
   - name: push
     distros:
     - rhel62-large
@@ -13731,6 +13798,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 
@@ -13809,6 +13877,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 
@@ -13915,6 +13984,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 
@@ -14029,6 +14099,9 @@ buildvariants:
   - name: tool
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
+  - name: publish_packages
+    distros:
+    - suse12-test
   - name: push
     distros:
     - suse12-test
@@ -14128,6 +14201,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 ###########################################
@@ -14191,6 +14265,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: debian81
@@ -14287,6 +14362,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: enterprise-debian92-64
@@ -14349,6 +14425,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 - name: debian92
@@ -14451,6 +14528,7 @@ buildvariants:
   - name: package
     distros:
     - ubuntu1604-packer
+  - name: publish_packages
   - name: push
 
 ################################
