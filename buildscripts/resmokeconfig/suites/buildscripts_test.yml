@@ -10,6 +10,7 @@ selector:
   - buildscripts/tests/resmokelib/testing/hooks/test_combine_benchmark_results.py # Requires mock.
   - buildscripts/tests/test_aws_ec2.py # Requires boto3.
   - buildscripts/tests/test_generate_resmoke_suites.py # Requires mock.
+  - buildscripts/tests/test_evergreen_gen_fuzzer_test.py # Requires mock.
   - buildscripts/tests/test_remote_operations.py # Requires ssh to be enabled locally.
   - buildscripts/tests/test_update_test_lifecycle.py # Test assumes POSIX path.
 
