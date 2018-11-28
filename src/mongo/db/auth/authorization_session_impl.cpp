@@ -414,8 +414,6 @@ Status AuthorizationSessionImpl::checkAuthForKillCursors(const NamespaceString& 
     ResourcePattern target;
     if (ns.isListCollectionsCursorNS()) {
         target = ResourcePattern::forDatabaseName(ns.db());
-    } else if (ns.isListIndexesCursorNS()) {
-        target = ResourcePattern::forExactNamespace(ns.getTargetNSForListIndexes());
     } else {
         target = ResourcePattern::forExactNamespace(ns);
     }

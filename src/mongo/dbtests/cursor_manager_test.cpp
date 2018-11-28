@@ -114,7 +114,8 @@ public:
                 kTestNss,
                 {},
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                BSONObj()};
+                BSONObj(),
+                ClientCursorParams::LockPolicy::kLocksInternally};
     }
 
     ClientCursorPin makeCursor(OperationContext* opCtx) {
@@ -135,7 +136,7 @@ protected:
 
 private:
     ClockSourceMock* _clock;
-    CursorManager _cursorManager{kTestNss};
+    CursorManager _cursorManager{NamespaceString{}};
 };
 
 class CursorManagerTestCustomOpCtx : public CursorManagerTest {
@@ -156,49 +157,9 @@ TEST_F(CursorManagerTest, GlobalCursorManagerShouldReportOwnershipOfCursorsItCre
              NamespaceString{"test.collection"},
              {},
              repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-             BSONObj()});
+             BSONObj(),
+             ClientCursorParams::LockPolicy::kLocksInternally});
         ASSERT_TRUE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
-    }
-}
-
-TEST_F(CursorManagerTest,
-       CursorsFromCollectionCursorManagerShouldNotReportBeingManagedByGlobalCursorManager) {
-    CursorManager* cursorManager = useCursorManager();
-    auto opCtx = cc().makeOperationContext();
-    for (int i = 0; i < 1000; i++) {
-        auto cursorPin = cursorManager->registerCursor(
-            _opCtx.get(),
-            {makeFakePlanExecutor(),
-             kTestNss,
-             {},
-             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-             BSONObj()});
-        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
-    }
-}
-
-uint32_t extractLeading32Bits(CursorId cursorId) {
-    return static_cast<uint32_t>((cursorId & 0xFFFFFFFF00000000) >> 32);
-}
-
-TEST_F(CursorManagerTest,
-       AllCursorsFromCollectionCursorManagerShouldContainIdentical32BitPrefixes) {
-    CursorManager* cursorManager = useCursorManager();
-    boost::optional<uint32_t> prefix;
-    for (int i = 0; i < 1000; i++) {
-        auto cursorPin = cursorManager->registerCursor(
-            _opCtx.get(),
-            {makeFakePlanExecutor(),
-             kTestNss,
-             {},
-             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-             BSONObj()});
-        auto cursorId = cursorPin.getCursor()->cursorid();
-        if (prefix) {
-            ASSERT_EQ(*prefix, extractLeading32Bits(cursorId));
-        } else {
-            prefix = extractLeading32Bits(cursorId);
-        }
     }
 }
 
@@ -216,7 +177,8 @@ TEST_F(CursorManagerTest, InvalidateCursor) {
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
     cursorPin.release();
@@ -247,7 +209,8 @@ TEST_F(CursorManagerTest, InvalidateCursorWithDrop) {
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
     cursorPin.release();
@@ -275,7 +238,8 @@ TEST_F(CursorManagerTest, InvalidatePinnedCursor) {
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     // If the cursor is pinned, it sticks around, even after invalidation.
     ASSERT_EQUALS(1U, cursorManager->numCursors());
@@ -308,7 +272,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
     ASSERT_OK(cursorManager->killCursor(_opCtx.get(), cursorId, shouldAudit));
@@ -332,7 +297,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
 
@@ -366,7 +332,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
                                    NamespaceString{"test.collection"},
                                    {},
                                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                                   BSONObj()});
+                                   BSONObj(),
+                                   ClientCursorParams::LockPolicy::kLocksInternally});
 
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
 
@@ -379,7 +346,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
                                    NamespaceString{"test.collection"},
                                    {},
                                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                                   BSONObj()});
+                                   BSONObj(),
+                                   ClientCursorParams::LockPolicy::kLocksInternally});
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t::max()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 }
@@ -397,7 +365,8 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
          NamespaceString{"test.collection"},
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     // The pin is still in scope, so it should not time out.
     clock->advance(getDefaultCursorTimeoutMillis());
@@ -418,7 +387,8 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
          NamespaceString{"test.collection"},
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
     cursorPin.release();
     const bool collectionGoingAway = false;
     cursorManager->invalidateAll(
@@ -445,7 +415,8 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsThatAreStillPinnedShouldNotTimeou
          NamespaceString{"test.collection"},
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
     const bool collectionGoingAway = false;
     cursorManager->invalidateAll(
         _opCtx.get(), collectionGoingAway, "KilledCursorsShouldTimeoutTest");
@@ -471,7 +442,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
     auto usedCursorId = cursorPin.getCursor()->cursorid();
     cursorPin.release();
 
@@ -482,7 +454,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
                                    kTestNss,
                                    {},
                                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                                   BSONObj()});
+                                   BSONObj(),
+                                   ClientCursorParams::LockPolicy::kLocksInternally});
 
     // Advance the clock to simulate time passing.
     clock->advance(Milliseconds(1));
@@ -517,7 +490,8 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
          kTestNss,
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj()});
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
 
     // Advance the clock to simulate time passing.
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));

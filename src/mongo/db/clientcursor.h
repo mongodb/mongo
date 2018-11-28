@@ -55,18 +55,40 @@ class RecoveryUnit;
  * using a CursorManager. See cursor_manager.h for more details.
  */
 struct ClientCursorParams {
+    // Describes whether callers should acquire locks when using a ClientCursor. Not all cursors
+    // have the same locking behavior. In particular, find cursors require the caller to lock the
+    // collection in MODE_IS before calling methods on the underlying plan executor. Aggregate
+    // cursors, on the other hand, may access multiple collections and acquire their own locks on
+    // any involved collections while producing query results. Therefore, the caller need not
+    // explicitly acquire any locks when using a ClientCursor which houses execution machinery for
+    // an aggregate.
+    //
+    // The policy is consulted on getMore in order to determine locking behavior, since during
+    // getMore we otherwise could not easily know what flavor of cursor we're using.
+    enum class LockPolicy {
+        // The caller is responsible for locking the collection over which this ClientCursor
+        // executes.
+        kLockExternally,
+
+        // The caller need not hold no locks; this ClientCursor's plan executor acquires any
+        // necessary locks itself.
+        kLocksInternally,
+    };
+
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
                        repl::ReadConcernArgs readConcernArgs,
-                       BSONObj originatingCommandObj)
+                       BSONObj originatingCommandObj,
+                       LockPolicy lockPolicy)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
           readConcernArgs(readConcernArgs),
           queryOptions(exec->getCanonicalQuery()
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
-          originatingCommandObj(originatingCommandObj.getOwned()) {
+          originatingCommandObj(originatingCommandObj.getOwned()),
+          lockPolicy(lockPolicy) {
         while (authenticatedUsersIter.more()) {
             authenticatedUsers.emplace_back(authenticatedUsersIter.next());
         }
@@ -92,6 +114,7 @@ struct ClientCursorParams {
     const repl::ReadConcernArgs readConcernArgs;
     int queryOptions = 0;
     BSONObj originatingCommandObj;
+    const LockPolicy lockPolicy;
 };
 
 /**
@@ -217,6 +240,10 @@ public:
 
     StringData getPlanSummary() const {
         return StringData(_planSummary);
+    }
+
+    ClientCursorParams::LockPolicy lockPolicy() const {
+        return _lockPolicy;
     }
 
     /**
@@ -348,6 +375,8 @@ private:
     // See the QueryOptions enum in dbclientinterface.h.
     const int _queryOptions = 0;
 
+    const ClientCursorParams::LockPolicy _lockPolicy;
+
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
@@ -466,6 +495,10 @@ public:
      * Returns a pointer to the pinned cursor.
      */
     ClientCursor* getCursor() const;
+
+    ClientCursor* operator->() {
+        return _cursor;
+    }
 
 private:
     friend class CursorManager;

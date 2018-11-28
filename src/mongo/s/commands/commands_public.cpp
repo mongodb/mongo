@@ -498,12 +498,7 @@ public:
         const auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-        return cursorCommandPassthrough(opCtx,
-                                        nss.db(),
-                                        routingInfo.db(),
-                                        cmdObj,
-                                        NamespaceString::makeListIndexesNSS(nss.db(), nss.coll()),
-                                        &result);
+        return cursorCommandPassthrough(opCtx, nss.db(), routingInfo.db(), cmdObj, nss, &result);
     }
 
 } cmdListIndexes;

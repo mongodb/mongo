@@ -41,7 +41,6 @@ namespace mongo {
 namespace {
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
-constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
 constexpr auto collectionlessAggregateCursorCol = "$cmd.aggregate"_sd;
 constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
@@ -77,11 +76,6 @@ const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocal
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
-}
-
-bool NamespaceString::isListIndexesCursorNS() const {
-    return coll().size() > listIndexesCursorNSPrefix.size() &&
-        coll().startsWith(listIndexesCursorNSPrefix);
 }
 
 bool NamespaceString::isCollectionlessAggregateNS() const {
@@ -126,13 +120,6 @@ NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {
     return nss;
 }
 
-NamespaceString NamespaceString::makeListIndexesNSS(StringData dbName, StringData collectionName) {
-    NamespaceString nss(dbName, str::stream() << listIndexesCursorNSPrefix << collectionName);
-    dassert(nss.isValid());
-    dassert(nss.isListIndexesCursorNS());
-    return nss;
-}
-
 NamespaceString NamespaceString::makeCollectionlessAggregateNSS(StringData dbname) {
     NamespaceString nss(dbname, collectionlessAggregateCursorCol);
     dassert(nss.isValid());
@@ -140,25 +127,9 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(StringData dbnam
     return nss;
 }
 
-NamespaceString NamespaceString::getTargetNSForListIndexes() const {
-    dassert(isListIndexesCursorNS());
-    return NamespaceString(db(), coll().substr(listIndexesCursorNSPrefix.size()));
-}
-
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
-}
-
-boost::optional<NamespaceString> NamespaceString::getTargetNSForGloballyManagedNamespace() const {
-    // Globally managed namespaces are of the form '$cmd.commandName.<targetNs>' or simply
-    // '$cmd.commandName'.
-    dassert(isGloballyManagedNamespace());
-    const size_t indexOfNextDot = coll().find('.', 5);
-    if (indexOfNextDot == std::string::npos) {
-        return boost::none;
-    }
-    return NamespaceString{db(), coll().substr(indexOfNextDot + 1)};
 }
 
 bool NamespaceString::isDropPendingNamespace() const {

@@ -574,10 +574,14 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
                                                                   << _sourceNss.ns());
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         if (queryStatus.code() == ErrorCodes::OperationFailed ||
-            queryStatus.code() == ErrorCodes::CursorNotFound) {
+            queryStatus.code() == ErrorCodes::CursorNotFound ||
+            queryStatus.code() == ErrorCodes::QueryPlanKilled) {
             // With these errors, it's possible the collection was dropped while we were
             // cloning.  If so, we'll execute the drop during oplog application, so it's OK to
             // just stop cloning.
+            //
+            // A 4.2 node should only ever raise QueryPlanKilled, but an older node could raise
+            // OperationFailed or CursorNotFound.
             _verifyCollectionWasDropped(lock, queryStatus, onCompletionGuard);
             return;
         } else if (queryStatus.code() != ErrorCodes::NamespaceNotFound) {

@@ -119,6 +119,12 @@ public:
         return _ctx->db()->getCollection(&_opCtx, nss);
     }
 
+    void truncateCollection(Collection* collection) const {
+        WriteUnitOfWork wunit(&_opCtx);
+        ASSERT_OK(collection->truncate(&_opCtx));
+        wunit.commit();
+    }
+
     // Order of these is important for initialization
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
@@ -398,6 +404,46 @@ TEST_F(PlanExecutorInvalidationTest, CollScanDiesOnRestartCatalog) {
     BSONObj info;
     ASSERT_TRUE(_client.runCommand("admin", BSON("restartCatalog" << 1), info));
     ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(PlanExecutorInvalidationTest, IxscanDiesWhenTruncateCollectionDropsAllIndices) {
+    BSONObj keyPattern = BSON("foo" << 1);
+    ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), keyPattern));
+
+    auto exec = makeIxscanPlan(keyPattern, BSON("foo" << 0), BSON("foo" << N()));
+
+    // Partially scan the index.
+    BSONObj obj;
+    for (int i = 0; i < 10; ++i) {
+        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
+        ASSERT_EQUALS(i, obj.firstElement().numberInt());
+    }
+
+    // Call truncate() on the Collection during yield, and verify that yield recovery throws the
+    // expected error code.
+    exec->saveState();
+    truncateCollection(collection());
+    ASSERT_THROWS_CODE(exec->restoreState(), DBException, ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(PlanExecutorInvalidationTest, CollScanExecutorSurvivesCollectionTruncate) {
+    auto exec = getCollscan();
+
+    // Partially scan the collection.
+    BSONObj obj;
+    for (int i = 0; i < 10; ++i) {
+        ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
+        ASSERT_EQUALS(i, obj["foo"].numberInt());
+    }
+
+    // Call truncate() on the Collection during yield. The PlanExecutor should be restored
+    // successfully.
+    exec->saveState();
+    truncateCollection(collection());
+    exec->restoreState();
+
+    // Since all documents in the collection have been deleted, the PlanExecutor should issue EOF.
+    ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&obj, NULL));
 }
 
 }  // namespace mongo

@@ -45,6 +45,7 @@
     assert.eq(profileObj.originatingCommand.filter, {a: {$gt: 0}});
     assert.eq(profileObj.originatingCommand.sort, {a: 1});
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
+    assert(profileObj.hasOwnProperty("execStats"), tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));

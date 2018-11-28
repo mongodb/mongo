@@ -933,13 +933,11 @@ TEST_F(DBsClonerTest, SingleDatabaseCopiesCompletely) {
         // count:a
         {"count", BSON("n" << 1 << "ok" << 1)},
         // listIndexes:a
-        {
-            "listIndexes",
-            fromjson(str::stream()
-                     << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
-                        "{v:"
-                     << OplogEntry::kOplogVersion
-                     << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+        {"listIndexes",
+         fromjson(str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                                   "{v:"
+                                << OplogEntry::kOplogVersion
+                                << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
         // Clone Done
     };
     runCompleteClone(resps);
@@ -952,48 +950,45 @@ TEST_F(DBsClonerTest, TwoDatabasesCopiesCompletely) {
     options2.uuid = UUID::gen();
     _mockServer->assignCollectionUuid("a.a", *options1.uuid);
     _mockServer->assignCollectionUuid("b.b", *options1.uuid);
-    const Responses resps =
-        {
-            // Clone Start
-            // listDatabases
-            {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}, {name:'b'}]}")},
-            // listCollections for "a"
-            {"listCollections",
-             BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
-                                                     << "a.$cmd.listCollections"
-                                                     << "firstBatch"
-                                                     << BSON_ARRAY(BSON("name"
-                                                                        << "a"
-                                                                        << "options"
-                                                                        << options1.toBSON()))))},
-            // count:a
-            {"count", BSON("n" << 1 << "ok" << 1)},
-            // listIndexes:a
-            {"listIndexes",
-             fromjson(str::stream()
-                      << "{ok:1, cursor:{id:NumberLong(0), ns:'a.$cmd.listIndexes.a', firstBatch:["
-                         "{v:"
-                      << OplogEntry::kOplogVersion
-                      << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
-            // listCollections for "b"
-            {"listCollections",
-             BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
-                                                     << "b.$cmd.listCollections"
-                                                     << "firstBatch"
-                                                     << BSON_ARRAY(BSON("name"
-                                                                        << "b"
-                                                                        << "options"
-                                                                        << options2.toBSON()))))},
-            // count:b
-            {"count", BSON("n" << 2 << "ok" << 1)},
-            // listIndexes:b
-            {"listIndexes",
-             fromjson(str::stream()
-                      << "{ok:1, cursor:{id:NumberLong(0), ns:'b.$cmd.listIndexes.b', firstBatch:["
-                         "{v:"
-                      << OplogEntry::kOplogVersion
-                      << ", key:{_id:1}, name:'_id_', ns:'b.b'}]}}")},
-        };
+    const Responses resps = {
+        // Clone Start
+        // listDatabases
+        {"listDatabases", fromjson("{ok:1, databases:[{name:'a'}, {name:'b'}]}")},
+        // listCollections for "a"
+        {"listCollections",
+         BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
+                                                 << "a.$cmd.listCollections"
+                                                 << "firstBatch"
+                                                 << BSON_ARRAY(BSON("name"
+                                                                    << "a"
+                                                                    << "options"
+                                                                    << options1.toBSON()))))},
+        // count:a
+        {"count", BSON("n" << 1 << "ok" << 1)},
+        // listIndexes:a
+        {"listIndexes",
+         fromjson(str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'a.a', firstBatch:["
+                                   "{v:"
+                                << OplogEntry::kOplogVersion
+                                << ", key:{_id:1}, name:'_id_', ns:'a.a'}]}}")},
+        // listCollections for "b"
+        {"listCollections",
+         BSON("ok" << 1 << "cursor" << BSON("id" << 0ll << "ns"
+                                                 << "b.$cmd.listCollections"
+                                                 << "firstBatch"
+                                                 << BSON_ARRAY(BSON("name"
+                                                                    << "b"
+                                                                    << "options"
+                                                                    << options2.toBSON()))))},
+        // count:b
+        {"count", BSON("n" << 2 << "ok" << 1)},
+        // listIndexes:b
+        {"listIndexes",
+         fromjson(str::stream() << "{ok:1, cursor:{id:NumberLong(0), ns:'b.b', firstBatch:["
+                                   "{v:"
+                                << OplogEntry::kOplogVersion
+                                << ", key:{_id:1}, name:'_id_', ns:'b.b'}]}}")},
+    };
     runCompleteClone(resps);
 }
 

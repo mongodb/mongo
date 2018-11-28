@@ -181,7 +181,7 @@ void GlobalCursorIdCache::deregisterCursorManager(uint32_t id, const NamespaceSt
 bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool checkAuth) {
     // Figure out what the namespace of this cursor is.
     NamespaceString nss;
-    if (CursorManager::isGloballyManagedCursor(id)) {
+    {
         auto pin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
         if (!pin.isOK()) {
             // Either the cursor doesn't exist, or it was killed during the last time it was being
@@ -189,17 +189,18 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
             return false;
         }
         nss = pin.getValue().getCursor()->nss();
-    } else {
-        stdx::lock_guard<SimpleMutex> lk(_mutex);
-        uint32_t nsid = idFromCursorId(id);
-        IdToNssMap::const_iterator it = _idToNss.find(nsid);
-        if (it == _idToNss.end()) {
-            // No namespace corresponding to this cursor id prefix.
-            return false;
-        }
-        nss = it->second;
     }
     invariant(nss.isValid());
+
+    boost::optional<AutoStatsTracker> statsTracker;
+    if (!nss.isCollectionlessCursorNamespace()) {
+        const boost::optional<int> dbProfilingLevel = boost::none;
+        statsTracker.emplace(opCtx,
+                             nss,
+                             Top::LockType::NotLocked,
+                             AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                             dbProfilingLevel);
+    }
 
     // Check if we are authorized to kill this cursor.
     if (checkAuth) {
@@ -219,33 +220,11 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
         }
     }
 
-    // If this cursor is owned by the global cursor manager, ask it to kill the cursor for us.
-    if (CursorManager::isGloballyManagedCursor(id)) {
-        Status killStatus = globalCursorManager->killCursor(opCtx, id, checkAuth);
-        massert(28697,
-                killStatus.reason(),
-                killStatus.code() == ErrorCodes::OK ||
-                    killStatus.code() == ErrorCodes::CursorNotFound);
-        return killStatus.isOK();
-    }
-
-    // If not, then the cursor must be owned by a collection. Kill the cursor under the
-    // collection lock (to prevent the collection from going away during the erase).
-    AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    Collection* collection = ctx.getCollection();
-    if (!collection) {
-        if (checkAuth)
-            audit::logKillCursorsAuthzCheck(
-                opCtx->getClient(), nss, id, ErrorCodes::CursorNotFound);
-        return false;
-    }
-
-    Status eraseStatus = collection->getCursorManager()->killCursor(opCtx, id, checkAuth);
-    uassert(16089,
-            eraseStatus.reason(),
-            eraseStatus.code() == ErrorCodes::OK ||
-                eraseStatus.code() == ErrorCodes::CursorNotFound);
-    return eraseStatus.isOK();
+    Status killStatus = globalCursorManager->killCursor(opCtx, id, checkAuth);
+    massert(28697,
+            killStatus.reason(),
+            killStatus.code() == ErrorCodes::OK || killStatus.code() == ErrorCodes::CursorNotFound);
+    return killStatus.isOK();
 }
 
 std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t now) {
@@ -427,8 +406,7 @@ CursorManager::~CursorManager() {
 void CursorManager::invalidateAll(OperationContext* opCtx,
                                   bool collectionGoingAway,
                                   const std::string& reason) {
-    invariant(!isGlobalManager());  // The global cursor manager should never need to kill cursors.
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    dassert(isGlobalManager() || opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
     fassert(28819, !BackgroundOperation::inProgForNs(_nss));
 
     // Mark all cursors as killed, but keep around those we can in order to provide a useful error
@@ -656,6 +634,11 @@ CursorId CursorManager::allocateCursorId_inlock() {
 
 ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
                                               ClientCursorParams&& cursorParams) {
+    // TODO SERVER-37455: Cursors should only ever be registered against the global cursor manager.
+    // Follow-up work is required to actually delete the concept of a per-collection cursor manager
+    // from the code base.
+    invariant(isGlobalManager());
+
     // Avoid computing the current time within the critical section.
     auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
 

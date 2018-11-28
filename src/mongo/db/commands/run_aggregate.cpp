@@ -634,7 +634,8 @@ Status runAggregate(OperationContext* opCtx,
             origNss,
             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
             repl::ReadConcernArgs::get(opCtx),
-            cmdObj);
+            cmdObj,
+            ClientCursorParams::LockPolicy::kLocksInternally);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);
         } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {

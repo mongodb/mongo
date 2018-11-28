@@ -91,10 +91,9 @@
         cursorId = res.cursor.id;
         testDB.logout();
         assert.eq(1, testDB.auth("Mallory", "pwd"));
-        assert.commandFailedWithCode(
-            testDB.runCommand({getMore: cursorId, collection: "$cmd.listIndexes.foo"}),
-            ErrorCodes.Unauthorized,
-            "read from another user's listIndexes cursor");
+        assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
+                                     ErrorCodes.Unauthorized,
+                                     "read from another user's listIndexes cursor");
         testDB.logout();
 
         //

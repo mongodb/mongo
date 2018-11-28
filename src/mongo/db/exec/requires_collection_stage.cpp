@@ -50,7 +50,7 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     const UUIDCatalog& catalog = UUIDCatalog::get(getOpCtx());
     _collection = catalog.lookupCollectionByUUID(_collectionUUID);
     uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "Collection dropped. UUID " << _collectionUUID << " no longer exists.",
+            str::stream() << "collection dropped. UUID " << _collectionUUID,
             _collection);
 
     uassert(ErrorCodes::QueryPlanKilled,
@@ -61,10 +61,10 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
     // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing here when
     // a rename has happened during yield.
     uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "Collection with UUID " << _collectionUUID << " was renamed from '"
-                          << _nss.ns()
-                          << "' to '"
-                          << _collection->ns().ns(),
+            str::stream() << "collection renamed from '" << _nss.ns() << "' to '"
+                          << _collection->ns().ns()
+                          << "'. UUID "
+                          << _collectionUUID,
             _nss == _collection->ns());
 
     doRestoreStateRequiresCollection();

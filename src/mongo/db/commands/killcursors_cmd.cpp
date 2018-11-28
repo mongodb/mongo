@@ -78,17 +78,13 @@ private:
                        const NamespaceString& nss,
                        CursorId id) const final {
         boost::optional<AutoStatsTracker> statsTracker;
-        if (CursorManager::isGloballyManagedCursor(id)) {
-            if (auto nssForCurOp = nss.isGloballyManagedNamespace()
-                    ? nss.getTargetNSForGloballyManagedNamespace()
-                    : nss) {
-                const boost::optional<int> dbProfilingLevel = boost::none;
-                statsTracker.emplace(opCtx,
-                                     *nssForCurOp,
-                                     Top::LockType::NotLocked,
-                                     AutoStatsTracker::LogMode::kUpdateTopAndCurop,
-                                     dbProfilingLevel);
-            }
+        if (!nss.isCollectionlessCursorNamespace()) {
+            const boost::optional<int> dbProfilingLevel = boost::none;
+            statsTracker.emplace(opCtx,
+                                 nss,
+                                 Top::LockType::NotLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                 dbProfilingLevel);
         }
 
         return CursorManager::withCursorManager(

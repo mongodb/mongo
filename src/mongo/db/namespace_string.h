@@ -151,12 +151,6 @@ public:
     static NamespaceString makeListCollectionsNSS(StringData dbName);
 
     /**
-     * Constructs a NamespaceString representing a listIndexes namespace. The format for this
-     * namespace is "<dbName>.$cmd.listIndexes.<collectionName>".
-     */
-    static NamespaceString makeListIndexesNSS(StringData dbName, StringData collectionName);
-
-    /**
      * Note that these values are derived from the mmap_v1 implementation and that is the only
      * reason they are constrained as such.
      */
@@ -279,28 +273,22 @@ public:
     bool isReplicated() const;
 
     /**
-     * Returns true if cursors for this namespace are registered with the global cursor manager.
+     * The namespace associated with some ClientCursors does not correspond to a particular
+     * namespace. For example, this is true for listCollections cursors and $currentOp agg cursors.
+     * Returns true if the namespace string is for a "collectionless" cursor.
      */
-    bool isGloballyManagedNamespace() const {
+    bool isCollectionlessCursorNamespace() const {
         return coll().startsWith("$cmd."_sd);
     }
 
     bool isCollectionlessAggregateNS() const;
     bool isListCollectionsCursorNS() const;
-    bool isListIndexesCursorNS() const;
 
     /**
      * Returns true if a client can modify this namespace even though it is under ".system."
      * For example <dbname>.system.users is ok for regular clients to update.
      */
     bool isLegalClientSystemNS() const;
-
-    /**
-     * Given a NamespaceString for which isGloballyManagedNamespace() returns true, returns the
-     * namespace the command targets, or boost::none for commands like 'listCollections' which
-     * do not target a collection.
-     */
-    boost::optional<NamespaceString> getTargetNSForGloballyManagedNamespace() const;
 
     /**
      * Returns true if this namespace refers to a drop-pending collection.
@@ -329,12 +317,6 @@ public:
      * the length of the longest index name in the source collection.
      */
     Status checkLengthForRename(const std::string::size_type longestIndexNameLength) const;
-
-    /**
-     * Given a NamespaceString for which isListIndexesCursorNS() returns true, returns the
-     * NamespaceString for the collection that the "listIndexes" targets.
-     */
-    NamespaceString getTargetNSForListIndexes() const;
 
     /**
      * Returns true if the namespace is valid. Special namespaces for internal use are considered as

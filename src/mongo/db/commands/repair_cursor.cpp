@@ -100,13 +100,14 @@ public:
         exec->saveState();
         exec->detachFromOperationContext();
 
-        auto pinnedCursor = collection->getCursorManager()->registerCursor(
+        auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
             opCtx,
             {std::move(exec),
              ns,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              repl::ReadConcernArgs::get(opCtx),
-             cmdObj});
+             cmdObj,
+             ClientCursorParams::LockPolicy::kLockExternally});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &result);

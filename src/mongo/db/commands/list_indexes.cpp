@@ -131,8 +131,8 @@ public:
 
         auto includeIndexBuilds = cmdObj["includeIndexBuilds"].trueValue();
 
+        NamespaceString nss;
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-        NamespaceString cursorNss;
         BSONArrayBuilder firstBatch;
         {
             AutoGetCollectionForReadCommand ctx(opCtx,
@@ -145,7 +145,7 @@ public:
             const CollectionCatalogEntry* cce = collection->getCatalogEntry();
             invariant(cce);
 
-            const auto nss = ctx.getNss();
+            nss = ctx.getNss();
 
             vector<string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
@@ -182,11 +182,8 @@ public:
                 root->pushBack(id);
             }
 
-            cursorNss = NamespaceString::makeListIndexesNSS(dbname, nss.coll());
-            invariant(nss == cursorNss.getTargetNSForListIndexes());
-
             exec = uassertStatusOK(PlanExecutor::make(
-                opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD));
+                opCtx, std::move(ws), std::move(root), nss, PlanExecutor::NO_YIELD));
 
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 BSONObj next;
@@ -206,7 +203,7 @@ public:
             }
 
             if (exec->isEOF()) {
-                appendCursorResponseObject(0LL, cursorNss.ns(), firstBatch.arr(), &result);
+                appendCursorResponseObject(0LL, nss.ns(), firstBatch.arr(), &result);
                 return true;
             }
 
@@ -218,13 +215,14 @@ public:
         const auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
             opCtx,
             {std::move(exec),
-             cursorNss,
+             nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              repl::ReadConcernArgs::get(opCtx),
-             cmdObj});
+             cmdObj,
+             ClientCursorParams::LockPolicy::kLocksInternally});
 
         appendCursorResponseObject(
-            pinnedCursor.getCursor()->cursorid(), cursorNss.ns(), firstBatch.arr(), &result);
+            pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

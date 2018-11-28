@@ -374,7 +374,8 @@ public:
              cursorNss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              repl::ReadConcernArgs::get(opCtx),
-             jsobj});
+             jsobj,
+             ClientCursorParams::LockPolicy::kLocksInternally});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), cursorNss.ns(), firstBatch.arr(), &result);

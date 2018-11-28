@@ -282,10 +282,10 @@ public:
         cursor.reset();
 
         {
-            // Check internal server handoff to getmore.
-            dbtests::WriteContextForTests ctx(&_opCtx, ns);
+            // Check that a cursor has been registered with the global cursor manager, and has
+            // already returned its first batch of results.
             auto pinnedCursor = unittest::assertGet(
-                ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId));
+                CursorManager::getGlobalCursorManager()->pinCursor(&_opCtx, cursorId));
             ASSERT_EQUALS(std::uint64_t(2), pinnedCursor.getCursor()->nReturnedSoFar());
         }
 
@@ -348,6 +348,8 @@ public:
         _client.dropCollection("unittests.querytests.GetMoreInvalidRequest");
     }
     void run() {
+        auto startNumCursors = CursorManager::getGlobalCursorManager()->numCursors();
+
         // Create a collection with some data.
         const char* ns = "unittests.querytests.GetMoreInvalidRequest";
         for (int i = 0; i < 1000; ++i) {
@@ -366,20 +368,16 @@ public:
             ++count;
         }
 
-        // Send a get more with a namespace that is incorrect ('spoofed') for this cursor id.
-        // This is the invalaid get more request described in the comment preceding this class.
+        // Send a getMore with a namespace that is incorrect ('spoofed') for this cursor id.
         ASSERT_THROWS(
             _client.getMore("unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR",
                             cursor->getCursorId()),
             AssertionException);
 
-        // Check that the cursor still exists
-        {
-            AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns));
-            ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
-            ASSERT_OK(
-                ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
-        }
+        // Check that the cursor still exists.
+        ASSERT_EQ(startNumCursors + 1, CursorManager::getGlobalCursorManager()->numCursors());
+        ASSERT_OK(
+            CursorManager::getGlobalCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
 
         // Check that the cursor can be iterated until all documents are returned.
         while (cursor->more()) {
@@ -387,6 +385,9 @@ public:
             ++count;
         }
         ASSERT_EQUALS(1000, count);
+
+        // The cursor should no longer exist, since we exhausted it.
+        ASSERT_EQ(startNumCursors, CursorManager::getGlobalCursorManager()->numCursors());
     }
 };
 

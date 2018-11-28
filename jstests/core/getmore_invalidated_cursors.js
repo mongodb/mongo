@@ -45,7 +45,7 @@
         // The cursor will be invalidated on mongos, and we won't be able to find it.
         assert.neq(-1, error.message.indexOf('didn\'t exist on server'), error.message);
     } else {
-        assert.eq(error.code, ErrorCodes.OperationFailed, tojson(error));
+        assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
         assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
     }
 
@@ -56,29 +56,31 @@
     cursor.next();  // Send the query to the server.
 
     coll.drop();
-
     error = assert.throws(() => cursor.itcount());
-    if (isShardedCollection) {
-        // The cursor will be invalidated on mongos, and we won't be able to find it.
-        if (shellReadMode == 'legacy') {
-            assert.neq(-1, error.message.indexOf('didn\'t exist on server'), error.message);
-        } else {
-            assert.eq(error.code, ErrorCodes.CursorNotFound, tojson(error));
-            assert.neq(-1, error.message.indexOf('not found'), error.message);
-        }
-    } else {
-        assert.eq(error.code, ErrorCodes.OperationFailed, tojson(error));
-        assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
-    }
+    assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
+    // In replica sets, collection drops are done in two phases, first renaming the collection to a
+    // "drop pending" namespace, and then later reaping the collection. Therefore, we expect to
+    // either see an error message related to a collection drop, or one related to a collection
+    // rename.
+    const droppedMsg = 'collection dropped';
+    const renamedMsg = 'collection renamed';
+    assert(-1 !== error.message.indexOf(droppedMsg) || -1 !== error.message.indexOf(renamedMsg),
+           error.message);
 
-    // Test that dropping an index between a find and a getMore will return an appropriate error
-    // code and message.
+    // Test that dropping an index between a find and a getMore has no effect on the query if the
+    // query is not using the index.
     setupCollection();
     cursor = coll.find().batchSize(batchSize);
     cursor.next();  // Send the query to the server.
-
     assert.commandWorked(testDB.runCommand({dropIndexes: coll.getName(), index: {x: 1}}));
+    assert.eq(cursor.itcount(), nDocs - 1);
 
+    // Test that dropping the index being scanned by a cursor between a find and a getMore kills the
+    // query with the appropriate code and message.
+    setupCollection();
+    cursor = coll.find().hint({x: 1}).batchSize(batchSize);
+    cursor.next();  // Send the query to the server.
+    assert.commandWorked(testDB.runCommand({dropIndexes: coll.getName(), index: {x: 1}}));
     error = assert.throws(() => cursor.itcount());
     assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
     assert.neq(-1, error.message.indexOf('index \'x_1\' dropped'), error.message);
@@ -111,8 +113,8 @@
 
         // Ensure getMore fails with an appropriate error code and message.
         error = assert.throws(() => cursor.itcount());
-        assert.eq(error.code, ErrorCodes.OperationFailed, tojson(error));
-        assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
+        assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
+        assert.neq(-1, error.message.indexOf('collection renamed'), error.message);
     }
 
 }());

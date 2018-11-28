@@ -152,62 +152,20 @@ TEST(NamespaceStringTest, ListCollectionsCursorNS) {
     ASSERT(!NamespaceString("test.$cmd.listIndexes.foo").isListCollectionsCursorNS());
 }
 
-TEST(NamespaceStringTest, ListIndexesCursorNS) {
-    NamespaceString ns1("test.$cmd.listIndexes.f");
-    ASSERT(ns1.isListIndexesCursorNS());
-    ASSERT("test.f" == ns1.getTargetNSForListIndexes().ns());
+TEST(NamespaceStringTest, IsCollectionlessCursorNamespace) {
+    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate.foo"}.isCollectionlessCursorNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes.foo"}.isCollectionlessCursorNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand.foo"}.isCollectionlessCursorNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listCollections"}.isCollectionlessCursorNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand"}.isCollectionlessCursorNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate"}.isCollectionlessCursorNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes"}.isCollectionlessCursorNamespace());
 
-    NamespaceString ns2("test.$cmd.listIndexes.foo");
-    ASSERT(ns2.isListIndexesCursorNS());
-    ASSERT("test.foo" == ns2.getTargetNSForListIndexes().ns());
+    ASSERT_FALSE(NamespaceString{"test.foo"}.isCollectionlessCursorNamespace());
+    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isCollectionlessCursorNamespace());
 
-    NamespaceString ns3("test.$cmd.listIndexes.foo.bar");
-    ASSERT(ns3.isListIndexesCursorNS());
-    ASSERT("test.foo.bar" == ns3.getTargetNSForListIndexes().ns());
-
-    ASSERT(!NamespaceString("test.foo").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.foo.$cmd.listIndexes").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.foo.").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes.").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listCollections").isListIndexesCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listCollections.foo").isListIndexesCursorNS());
-}
-
-TEST(NamespaceStringTest, IsGloballyManagedNamespace) {
-    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate.foo"}.isGloballyManagedNamespace());
-    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes.foo"}.isGloballyManagedNamespace());
-    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand.foo"}.isGloballyManagedNamespace());
-    ASSERT_TRUE(NamespaceString{"test.$cmd.listCollections"}.isGloballyManagedNamespace());
-    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand"}.isGloballyManagedNamespace());
-    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate"}.isGloballyManagedNamespace());
-    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes"}.isGloballyManagedNamespace());
-
-    ASSERT_FALSE(NamespaceString{"test.foo"}.isGloballyManagedNamespace());
-    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isGloballyManagedNamespace());
-
-    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isGloballyManagedNamespace());
-    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isGloballyManagedNamespace());
-}
-
-TEST(NamespaceStringTest, GetTargetNSForGloballyManagedNamespace) {
-    ASSERT_EQ(
-        (NamespaceString{"test", "foo"}),
-        NamespaceString{"test.$cmd.aggregate.foo"}.getTargetNSForGloballyManagedNamespace().get());
-    ASSERT_EQ((NamespaceString{"test", "foo"}),
-              NamespaceString{"test.$cmd.listIndexes.foo"}
-                  .getTargetNSForGloballyManagedNamespace()
-                  .get());
-    ASSERT_EQ((NamespaceString{"test", "foo"}),
-              NamespaceString{"test.$cmd.otherCommand.foo"}
-                  .getTargetNSForGloballyManagedNamespace()
-                  .get());
-
-    ASSERT_FALSE(
-        NamespaceString{"test.$cmd.listCollections"}.getTargetNSForGloballyManagedNamespace());
-    ASSERT_FALSE(
-        NamespaceString{"test.$cmd.otherCommand"}.getTargetNSForGloballyManagedNamespace());
+    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isCollectionlessCursorNamespace());
+    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isCollectionlessCursorNamespace());
 }
 
 TEST(NamespaceStringTest, IsDropPendingNamespace) {
@@ -353,15 +311,6 @@ TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
     ASSERT_EQUALS("$cmd.listCollections", ns.coll());
     ASSERT(ns.isValid());
     ASSERT(ns.isListCollectionsCursorNS());
-}
-
-TEST(NamespaceStringTest, makeListIndexesNSIsCorrect) {
-    NamespaceString ns = NamespaceString::makeListIndexesNSS("DB", "COLL");
-    ASSERT_EQUALS("DB", ns.db());
-    ASSERT_EQUALS("$cmd.listIndexes.COLL", ns.coll());
-    ASSERT(ns.isValid());
-    ASSERT(ns.isListIndexesCursorNS());
-    ASSERT_EQUALS(NamespaceString("DB.COLL"), ns.getTargetNSForListIndexes());
 }
 
 TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyColl) {

@@ -134,5 +134,5 @@
     assert.commandFailedWithCode(
         secondTestDB.runCommand(
             {getMore: cursorResponse.cursor.id, collection: foodColl.getName()}),
-        ErrorCodes.CursorNotFound);
+        ErrorCodes.QueryPlanKilled);
 }());

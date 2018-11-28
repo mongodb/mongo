@@ -87,8 +87,8 @@
         // These are commands that will cause all running PlanExecutors to be invalidated, and the
         // error messages that should be propagated when that happens.
         const invalidatingCommands = [
-            {command: {dropDatabase: 1}, message: 'Collection dropped'},
-            {command: {drop: collName}, message: 'Collection dropped'},
+            {command: {dropDatabase: 1}, message: 'collection dropped'},
+            {command: {drop: collName}, message: 'collection dropped'},
         ];
 
         if (options.usesIndex) {
