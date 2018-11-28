@@ -5,6 +5,8 @@
  *
  * Bulk inserts documents in batches of 100, uses the touch command on "data" and "index",
  * and queries to verify the number of documents inserted by the thread.
+ *
+ * @tags: [requires_touch]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload

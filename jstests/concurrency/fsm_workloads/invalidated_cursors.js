@@ -7,7 +7,7 @@
  * cursor manager. Threads perform find, getMore and explain commands while the database,
  * collection, or an index is dropped.
  *
- * @tags: [uses_curop_agg_stage]
+ * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos

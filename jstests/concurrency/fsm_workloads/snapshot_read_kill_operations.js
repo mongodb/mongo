@@ -4,7 +4,7 @@
  * Test a snapshot read spanning a find and getmore that runs concurrently with killSessions,
  * killOp, killCursors, and txnNumber change.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, state_functions_share_transaction]
  */
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
 var $config = (function() {

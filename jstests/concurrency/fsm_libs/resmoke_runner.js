@@ -105,6 +105,13 @@
                 cluster.awaitReplication();
             }
 
+            // Synchronize the cluster times across all routers if the tests will be overriden to
+            // use transactions, so the earliest global snapshots chosen by each router will include
+            // the effects of each setup function.
+            if (cluster.isSharded() && TestData.runInsideTransaction) {
+                cluster.synchronizeMongosClusterTimes();
+            }
+
             // After the $config.setup() function has been called, it is safe for the stepdown
             // thread to start running. The main thread won't attempt to interact with the cluster
             // until all of the spawned worker threads have finished.

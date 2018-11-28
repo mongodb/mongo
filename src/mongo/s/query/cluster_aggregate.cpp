@@ -611,7 +611,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 
     // TODO SERVER-33683 allowing an aggregation within a transaction can lead to a deadlock in the
     // SessionCatalog when a pipeline with a $mergeCursors sends a getMore to itself.
-    uassert(50732,
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "Cannot specify a transaction number in combination with an aggregation on mongos when "
             "merging on a shard",
             !opCtx->getTxnNumber());

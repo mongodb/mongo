@@ -104,7 +104,9 @@ var fsm = (function() {
                     v = deepCopyObject([], v);
                 }
             }
-            dst[k] = v;
+            var desc = Object.getOwnPropertyDescriptor(src, k);
+            desc.value = v;
+            Object.defineProperty(dst, k, desc);
         }
         return dst;
     }

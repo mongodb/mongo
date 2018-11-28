@@ -5,7 +5,7 @@
  * designed to reproduce SERVER-33959.
  *
  * The "grandparent test," invalidated_cursors.js, uses $currentOp.
- * @tags: [uses_curop_agg_stage]
+ * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js');  // for $config

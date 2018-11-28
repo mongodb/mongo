@@ -4,7 +4,7 @@
  * Runs update, findAndModify, delete, find, and getMore in a transaction with all threads using the
  * same session.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, state_functions_share_transaction]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

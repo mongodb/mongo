@@ -6,7 +6,7 @@
 
  * TODO: SERVER-35567 - Delete this workload.
 
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, state_functions_share_transaction]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');                     // for extendWorkload
