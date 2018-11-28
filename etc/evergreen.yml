@@ -14694,13 +14694,24 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-62-64-bit-inmem-expansions
     burn_in_tests_build_variant: enterprise-rhel-62-64-bit-inmem
+  display_tasks:
+  - *dbtest
   tasks:
   # This build variant exists specifically to test that newly added or modified JavaScript tests
   # properly tag non-persistent storage tests using "requires_persistence", "requires_journaling" or
   # "uses_transactions".
+  #
   # It uses the task list from the enterprise-rhel-62-64-bit-inmem build variant to
   # determine the resmoke.py YAML suite configurations to run the tests under. Do not add more tasks
   # to this list.
+  #
+  # It also runs dbtest, since at least one time we have broken the
+  # connection bewteen the in-mem storage engine and the dbtest, but
+  # didn't notice since no other required builders tested that
+  # combination.
+  - name: dbtest_TG
+    distros:
+    - rhel62-large
   - name: compile_TG
     requires:
     - name: burn_in_tests
