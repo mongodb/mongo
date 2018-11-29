@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class DocumentSourceLimit final : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceLimit final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$limit"_sd;
 
@@ -81,21 +81,14 @@ public:
     }
 
     /**
-     * Returns the current DocumentSourceLimit for use in the shards pipeline. Running this stage on
-     * the shards is an optimization, but is not strictly necessary in order to produce correct
-     * pipeline output.
+     * Returns a MergingLogic with two identical $limit stages; one for the shards pipeline and one
+     * for the merging pipeline.
      */
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return this;
-    }
-
-    /**
-     * Returns a new DocumentSourceLimit with the same limit as the current stage, for use in the
-     * merge pipeline. Unlike the shards source, it is necessary for this stage to run on the
-     * merging host in order to produce correct pipeline output.
-     */
-    MergingLogic mergingLogic() final {
-        return {DocumentSourceLimit::create(pExpCtx, _limit)};
+    boost::optional<MergingLogic> mergingLogic() final {
+        // Running this stage on the shards is an optimization, but is not strictly necessary in
+        // order to produce correct pipeline output.
+        // {shardsStage, mergingStage, sortPattern}
+        return MergingLogic{this, DocumentSourceLimit::create(pExpCtx, _limit), boost::none};
     }
 
     long long getLimit() const {

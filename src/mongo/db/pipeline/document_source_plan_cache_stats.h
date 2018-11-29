@@ -105,6 +105,10 @@ public:
         return constraints;
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     const char* getSourceName() const override {
         return kStageName;
     }

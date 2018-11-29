@@ -113,10 +113,14 @@
         }));
 
         // Run an aggregation which is eligible for $exchange. This should assert because of
-        // the failpoint.
+        // the failpoint. Add a $group stage to force an exchange-eligible split of the pipeline
+        // before the $out. Without the $group we won't use the exchange optimization and instead
+        // will send the $out to each shard.
         st.shardColl(mongosDB.target, {_id: 1}, {_id: 0}, {_id: 1}, kDBName, false);
         assertErrorCode(
-            coll, [{$out: {to: "target", mode: "replaceDocuments"}}], ErrorCodes.FailPointEnabled);
+            coll,
+            [{$group: {_id: "$fakeShardKey"}}, {$out: {to: "target", mode: "replaceDocuments"}}],
+            ErrorCodes.FailPointEnabled);
 
         // Neither mongos or the shards should leave cursors open.
         assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);

@@ -95,6 +95,10 @@ public:
         return constraints;
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     GetNextResult getNext() final;
 
     std::size_t getNumRemotes() const;

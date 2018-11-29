@@ -42,7 +42,7 @@ namespace mongo {
  * "invalidate" entries.
  * It is not intended to be created by the user.
  */
-class DocumentSourceCloseCursor final : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceCloseCursor final : public DocumentSource {
 public:
     GetNextResult getNext() final;
 
@@ -76,14 +76,11 @@ public:
         return new DocumentSourceCloseCursor(expCtx);
     }
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
-    }
-
-    MergingLogic mergingLogic() final {
+    boost::optional<MergingLogic> mergingLogic() final {
         // This stage must run on mongos to ensure it sees any invalidation in the correct order,
         // and to ensure that all remote cursors are cleaned up properly.
-        return {this, change_stream_constants::kSortSpec};
+        // {shardsStage, mergingStage, sortPattern}
+        return MergingLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 
 private:

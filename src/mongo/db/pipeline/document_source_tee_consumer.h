@@ -64,6 +64,10 @@ public:
                 TransactionRequirement::kAllowed};
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     GetNextResult getNext() final;
 
     /**

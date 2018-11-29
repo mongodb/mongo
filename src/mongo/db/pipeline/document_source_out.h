@@ -65,7 +65,7 @@ public:
 /**
  * Abstract class for the $out aggregation stage.
  */
-class DocumentSourceOut : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceOut : public DocumentSource {
 public:
     /**
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
@@ -121,12 +121,22 @@ public:
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        // A $out to an unsharded collection should merge on the primary shard to perform local
+        // writes. A $out to a sharded collection has no requirement, since each shard can perform
+        // its own portion of the write. We use 'kAnyShard' to direct it to execute on one of the
+        // shards in case some of the writes happen to end up being local.
+        //
+        // Note that this decision is inherently racy and subject to become stale. This is okay
+        // because either choice will work correctly, we are simply applying a heuristic
+        // optimization.
+        auto hostTypeRequirement = HostTypeRequirement::kPrimaryShard;
+        if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs) &&
+            _mode != WriteModeEnum::kModeReplaceCollection) {
+            hostTypeRequirement = HostTypeRequirement::kAnyShard;
+        }
         return {StreamType::kStreaming,
                 PositionRequirement::kLast,
-                // A $out to an unsharded collection should merge on the primary shard to perform
-                // local writes. A $out to a sharded collection has no requirement, since each shard
-                // can perform its own portion of the write.
-                HostTypeRequirement::kPrimaryShard,
+                hostTypeRequirement,
                 DiskUseRequirement::kWritesPersistentData,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed};
@@ -140,12 +150,21 @@ public:
         return _mode;
     }
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
+    boost::optional<MergingLogic> mergingLogic() final {
+        // It should always be faster to avoid splitting the pipeline if the output collection is
+        // sharded. If we avoid splitting the pipeline then each shard can perform the writes to the
+        // target collection in parallel.
+        //
+        // Note that this decision is inherently racy and subject to become stale. This is okay
+        // because either choice will work correctly, we are simply applying a heuristic
+        // optimization.
+        if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _outputNs)) {
+            return boost::none;
+        }
+        // {shardsStage, mergingStage, sortPattern}
+        return MergingLogic{nullptr, this, boost::none};
     }
-    MergingLogic mergingLogic() final {
-        return {this};
-    }
+
     virtual bool canRunInParallelBeforeOut(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final {
         // If someone is asking the question, this must be the $out stage in question, so yes!

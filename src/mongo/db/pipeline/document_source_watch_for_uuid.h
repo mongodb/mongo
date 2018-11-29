@@ -63,6 +63,10 @@ public:
         return Value();
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     static boost::intrusive_ptr<DocumentSourceWatchForUUID> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         // Only created for a single-collection stream where the UUID does not exist.

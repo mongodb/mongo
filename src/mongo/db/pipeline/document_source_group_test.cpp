@@ -582,13 +582,12 @@ protected:
     intrusive_ptr<DocumentSource> createMerger() {
         // Set up a group merger to simulate merging results in the router.  In this
         // case only one shard is in use.
-        NeedsMergerDocumentSource* splittable = dynamic_cast<NeedsMergerDocumentSource*>(group());
-        ASSERT(splittable);
-        auto mergeLogic = splittable->mergingLogic();
-        ASSERT(mergeLogic.mergingStage);
-        ASSERT_NOT_EQUALS(group(), mergeLogic.mergingStage);
-        ASSERT_FALSE(static_cast<bool>(mergeLogic.inputSortPattern));
-        return mergeLogic.mergingStage;
+        auto mergeLogic = group()->mergingLogic();
+        ASSERT(mergeLogic);
+        ASSERT(mergeLogic->mergingStage);
+        ASSERT_NOT_EQUALS(group(), mergeLogic->mergingStage);
+        ASSERT_FALSE(static_cast<bool>(mergeLogic->inputSortPattern));
+        return mergeLogic->mergingStage;
     }
     void checkResultSet(const intrusive_ptr<DocumentSource>& sink) {
         // Load the results from the DocumentSourceGroup and sort them by _id.

@@ -73,6 +73,10 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
@@ -93,8 +97,7 @@ private:
  * This stage is used internally for change streams to ensure that the resume token is in the
  * stream.  It is not intended to be created by the user.
  */
-class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource,
-                                                     public NeedsMergerDocumentSource {
+class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource {
 public:
     // Used to record the results of comparing the token data extracted from documents in the
     // resumed stream against the client's resume token.
@@ -119,21 +122,18 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    /**
-     * NeedsMergerDocumentSource methods; this has to run on the merger, since the resume point
-     * could be at any shard. Also add a DocumentSourceShardCheckResumability stage on the shards
-     * pipeline to ensure that each shard has enough oplog history to resume the change stream.
-     */
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return DocumentSourceShardCheckResumability::create(pExpCtx,
-                                                            _tokenFromClient.getClusterTime());
-    };
-
-    MergingLogic mergingLogic() final {
+    boost::optional<MergingLogic> mergingLogic() final {
+        MergingLogic logic;
         // This stage must run on mongos to ensure it sees the resume token, which could have come
         // from any shard.  We also must include a mergingPresorted $sort stage to communicate to
         // the AsyncResultsMerger that we need to merge the streams in a particular order.
-        return {this, change_stream_constants::kSortSpec};
+        logic.mergingStage = this;
+        // Also add logic to the shards to ensure that each shard has enough oplog history to resume
+        // the change stream.
+        logic.shardsStage = DocumentSourceShardCheckResumability::create(
+            pExpCtx, _tokenFromClient.getClusterTime());
+        logic.inputSortPattern = change_stream_constants::kSortSpec;
+        return logic;
     };
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

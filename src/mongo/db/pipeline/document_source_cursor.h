@@ -70,6 +70,10 @@ public:
         return constraints;
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     void detachFromOperationContext() final;
 
     void reattachToOperationContext(OperationContext* opCtx) final;

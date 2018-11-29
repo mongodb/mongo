@@ -132,8 +132,9 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
         sort()->serializeToArray(arr);
         ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
 
-        ASSERT(sort()->getShardSource() != nullptr);
-        ASSERT(sort()->mergingLogic().mergingStage == nullptr);
+        ASSERT(sort()->mergingLogic());
+        ASSERT(sort()->mergingLogic()->shardsStage != nullptr);
+        ASSERT(sort()->mergingLogic()->mergingStage == nullptr);
     }
 
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
@@ -159,9 +160,10 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
         Value(arr),
         DOC_ARRAY(DOC("$sort" << DOC("a" << 1)) << DOC("$limit" << sort()->getLimit())));
 
-    ASSERT(sort()->getShardSource() != nullptr);
-    ASSERT(sort()->mergingLogic().mergingStage != nullptr);
-    ASSERT(dynamic_cast<DocumentSourceLimit*>(sort()->mergingLogic().mergingStage.get()));
+    ASSERT(sort()->mergingLogic());
+    ASSERT(sort()->mergingLogic()->shardsStage != nullptr);
+    ASSERT(sort()->mergingLogic()->mergingStage != nullptr);
+    ASSERT(dynamic_cast<DocumentSourceLimit*>(sort()->mergingLogic()->mergingStage.get()));
 }
 
 TEST_F(DocumentSourceSortTest, Dependencies) {
