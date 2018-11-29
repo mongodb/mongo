@@ -10,6 +10,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
     'use strict';
 
+    // Set the refresh period to 10 min to rule out races
+    _setShellFailPoint({
+        configureFailPoint: "modifyReplicaSetMonitorDefaultRefreshPeriod",
+        mode: "alwaysOn",
+        data: {
+            period: 10 * 60,
+        },
+    });
+
     var dbName = "test";
     var collName = jsTest.name();
 

@@ -105,7 +105,7 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
                               ReadPreference rp,
                               const std::vector<std::string> hostNames) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
-    ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
     bool secondaryOk = (rp != ReadPreference::PrimaryOnly);
     auto tagSet = secondaryOk ? TagSet() : TagSet::primaryOnly();
     // We need the command to be a "SecOk command"
@@ -162,7 +162,7 @@ TEST_F(BasicRS, QueryPrimaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     // Need up-to-date view, since either host is valid if view is stale.
-    ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     Query query;
     query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
@@ -182,7 +182,7 @@ TEST_F(BasicRS, QuerySecondaryPreferred) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
 
     // Need up-to-date view, since either host is valid if view is stale.
-    ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     Query query;
     query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
@@ -716,7 +716,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffMode) {
     DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
 
     // Need up-to-date view to ensure there are multiple valid choices.
-    ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     string dest;
     {
@@ -748,7 +748,7 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffTag) {
     DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
 
     // Need up-to-date view to ensure there are multiple valid choices.
-    ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     string dest;
     {
@@ -785,7 +785,7 @@ TEST_F(TaggedFiveMemberRS, SlaveConnReturnsSecConn) {
 
     // Need up-to-date view since slaveConn() uses SecondaryPreferred, and this test assumes it
     // knows about at least one secondary.
-    ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+    ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     string dest;
     mongo::DBClientConnection& secConn = replConn.slaveConn();

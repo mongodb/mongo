@@ -98,7 +98,7 @@ TEST_F(ReplicaSetMonitorTest, SeedWithPriOnlySecDown) {
     replSet->kill(replSet->getPrimary());
 
     // Trigger calls to Node::getConnWithRefresh
-    monitor->startOrContinueRefresh().refreshAll();
+    monitor->runScanForMockReplicaSet();
     monitor.reset();
 }
 
@@ -155,7 +155,7 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
     for (size_t idxToRemove = 0; idxToRemove < NODE_COUNT; idxToRemove++) {
         replSet.setConfig(origConfig);
         // Make sure the monitor sees the change
-        replMonitor->startOrContinueRefresh().refreshAll();
+        replMonitor->runScanForMockReplicaSet();
 
         string hostToRemove;
         {
@@ -170,14 +170,14 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
 
         replSet.setPrimary(hostToRemove);
         // Make sure the monitor sees the new primary
-        replMonitor->startOrContinueRefresh().refreshAll();
+        replMonitor->runScanForMockReplicaSet();
 
         repl::ReplSetConfig newConfig =
             _getConfigWithMemberRemoved(origConfig, HostAndPort(hostToRemove));
         replSet.setConfig(newConfig);
         replSet.setPrimary(newConfig.getMemberAt(0).getHostAndPort().toString());
         // Force refresh -> should not crash
-        replMonitor->startOrContinueRefresh().refreshAll();
+        replMonitor->runScanForMockReplicaSet();
     }
 
     replMonitor.reset();
@@ -265,7 +265,7 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
     replSet->kill(secHost);
 
     // Make sure monitor sees the dead secondary
-    monitor->startOrContinueRefresh().refreshAll();
+    monitor->runScanForMockReplicaSet();
 
     replSet->restore(secHost);
 
@@ -294,7 +294,7 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
     replSet->kill(secHost);
 
     // Make sure monitor sees the dead secondary
-    monitor->startOrContinueRefresh().refreshAll();
+    monitor->runScanForMockReplicaSet();
 
     replSet->restore(secHost);
 

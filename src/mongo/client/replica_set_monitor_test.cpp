@@ -661,15 +661,15 @@ TEST(ReplicaSetMonitor, SlavesUsableEvenIfNoMaster) {
                                     << "ok"
                                     << true));
 
-    // Check intended conditions for entry to refreshUntilMatches.
+    // Check intended conditions for entry to getNextStep().
     ASSERT(state->currentScan->hostsToScan.empty());
     ASSERT(state->currentScan->waitingFor.empty());
     ASSERT(state->currentScan->possibleNodes == state->currentScan->triedHosts);
     ASSERT(state->getMatchingHost(secondary).empty());
 
-    // This calls getNextStep after not finding a matching host. We want to ensure that it checks
-    // again after being told that there are no more hosts to contact.
-    ASSERT(!refresher.refreshUntilMatches(secondary).empty());
+    // getNextStep() should add the possible nodes to the replica set provisionally after being told
+    // that there are no more hosts to contact. That is the final act of the scan.
+    ASSERT_EQ(refresher.getNextStep().step, Refresher::NextStep::DONE);
 
     // Future calls should be able to return directly from the cached data.
     ASSERT(!state->getMatchingHost(secondary).empty());
@@ -934,7 +934,7 @@ TEST(ReplicaSetMonitor, GetMatchingDuringScan) {
 TEST(ReplicaSetMonitor, OutOfBandFailedHost) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     ReplicaSetMonitorPtr rsm = std::make_shared<ReplicaSetMonitor>(state);
-    Refresher refresher = rsm->startOrContinueRefresh();
+    Refresher refresher(state);
 
     for (size_t i = 0; i != basicSeeds.size(); ++i) {
         NextStep ns = refresher.getNextStep();
