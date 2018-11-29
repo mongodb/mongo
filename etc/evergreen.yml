@@ -1919,7 +1919,7 @@ functions:
 
           echo "jstestfuzz self-tests are starting"
           set +o errexit
-          npm test > npm_test-${task_id}.log 2>&1
+          npm test > npm_test.log 2>&1
           if [ $? -ne 0 ]; then
             echo "jstestfuzz self-tests failure"
             branch=$(git symbolic-ref --short HEAD)
@@ -1929,10 +1929,10 @@ functions:
             node --version
             which npm
             npm --version
-            cat npm_test-${task_id}.log
+            cat npm_test.log
             exit 1
           fi
-          rm -f npm_test-${task_id}.log
+          rm -f npm_test.log
           set -o errexit
           echo "jstestfuzz self-tests finished"
 
