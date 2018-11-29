@@ -36,6 +36,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transactions_stats_gen.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
@@ -147,7 +148,15 @@ private:
      * Returns the first and oldest optime in the ordered set of active oplog entry optimes.
      * Returns boost::none if there are no transaction oplog entry optimes stored.
      */
-    boost::optional<repl::OpTime> _calculateOldestActiveOpTime() const;
+    boost::optional<repl::OpTime> _calculateOldestActiveOpTime(WithLock) const;
+
+    //
+    // Member variables, excluding atomic variables, are labeled with the following code to
+    // indicate the synchronization rules for accessing them.
+    //
+    // (M)  Reads and writes guarded by _mutex
+    //
+    mutable stdx::mutex _mutex;
 
     // The number of multi-document transactions currently active.
     AtomicUInt64 _currentActive{0};
@@ -180,12 +189,12 @@ private:
     AtomicUInt64 _currentPrepared{0};
 
     // The optime of the oldest oplog entry for any active transaction.
-    boost::optional<repl::OpTime> _oldestActiveOplogEntryOpTime;
+    boost::optional<repl::OpTime> _oldestActiveOplogEntryOpTime;  // (M)
 
     // Maintain the oldest oplog entry OpTime across all active transactions. Currently, we only
     // write an oplog entry for an ongoing transaction if it is in the `prepare` state. By
     // maintaining an ordered set of OpTimes, the OpTime at the beginning will be the oldest.
-    std::set<repl::OpTime> _oldestActiveOplogEntryOpTimes;
+    std::set<repl::OpTime> _oldestActiveOplogEntryOpTimes;  // (M)
 
     // Maintain the oldest oplog entry OpTime across transactions whose corresponding abort/commit
     // oplog entries have not been majority committed. Since this is an ordered set, the first
@@ -196,7 +205,7 @@ private:
     // 'finishOpTime': The commit/abort oplog entry OpTime.
     // Once the corresponding abort/commit entry has been majority committed, remove the pair from
     // this set.
-    std::set<std::pair<repl::OpTime, repl::OpTime>> _oldestNonMajorityCommittedOpTimes;
+    std::set<std::pair<repl::OpTime, repl::OpTime>> _oldestNonMajorityCommittedOpTimes;  // (M)
 };
 
 }  // namespace mongo

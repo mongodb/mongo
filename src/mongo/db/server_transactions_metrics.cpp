@@ -149,7 +149,8 @@ void ServerTransactionsMetrics::decrementCurrentPrepared() {
     _currentPrepared.fetchAndSubtract(1);
 }
 
-boost::optional<repl::OpTime> ServerTransactionsMetrics::_calculateOldestActiveOpTime() const {
+boost::optional<repl::OpTime> ServerTransactionsMetrics::_calculateOldestActiveOpTime(
+    WithLock) const {
     if (_oldestActiveOplogEntryOpTimes.empty()) {
         return boost::none;
     }
@@ -157,6 +158,7 @@ boost::optional<repl::OpTime> ServerTransactionsMetrics::_calculateOldestActiveO
 }
 
 void ServerTransactionsMetrics::addActiveOpTime(repl::OpTime oldestOplogEntryOpTime) {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     auto ret = _oldestActiveOplogEntryOpTimes.insert(oldestOplogEntryOpTime);
     // If ret.second is false, the OpTime we tried to insert already existed.
     invariant(ret.second,
@@ -176,11 +178,12 @@ void ServerTransactionsMetrics::addActiveOpTime(repl::OpTime oldestOplogEntryOpT
                             << "oldestNonMajorityCommittedOpTimes."
                             << "oldestOplogEntryOpTime: "
                             << oldestOplogEntryOpTime.toString());
-    _oldestActiveOplogEntryOpTime = _calculateOldestActiveOpTime();
+    _oldestActiveOplogEntryOpTime = _calculateOldestActiveOpTime(lm);
 }
 
 void ServerTransactionsMetrics::removeActiveOpTime(repl::OpTime oldestOplogEntryOpTime,
                                                    boost::optional<repl::OpTime> finishOpTime) {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     auto it = _oldestActiveOplogEntryOpTimes.find(oldestOplogEntryOpTime);
     invariant(it != _oldestActiveOplogEntryOpTimes.end(),
               str::stream() << "This oplog entry OpTime does not exist in or has already been "
@@ -220,11 +223,12 @@ void ServerTransactionsMetrics::removeActiveOpTime(repl::OpTime oldestOplogEntry
                             << oldestOplogEntryOpTime.toString()
                             << "finishOpTime: "
                             << finishOpTime->toString());
-    _oldestActiveOplogEntryOpTime = _calculateOldestActiveOpTime();
+    _oldestActiveOplogEntryOpTime = _calculateOldestActiveOpTime(lm);
 }
 
 boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestNonMajorityCommittedOpTime()
     const {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     if (_oldestNonMajorityCommittedOpTimes.empty()) {
         return boost::none;
     }
@@ -235,6 +239,7 @@ boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestNonMajorityCom
 
 void ServerTransactionsMetrics::removeOpTimesLessThanOrEqToCommittedOpTime(
     repl::OpTime committedOpTime) {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     // Iterate through oldestNonMajorityCommittedOpTimes and remove all pairs whose "finishOpTime"
     // is now less than or equal to the commit point.
     for (auto it = _oldestNonMajorityCommittedOpTimes.begin();
@@ -249,6 +254,7 @@ void ServerTransactionsMetrics::removeOpTimesLessThanOrEqToCommittedOpTime(
 
 boost::optional<repl::OpTime>
 ServerTransactionsMetrics::getFinishOpTimeOfOldestNonMajCommitted_forTest() const {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     if (_oldestNonMajorityCommittedOpTimes.empty()) {
         return boost::none;
     }
@@ -258,10 +264,12 @@ ServerTransactionsMetrics::getFinishOpTimeOfOldestNonMajCommitted_forTest() cons
 }
 
 boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestActiveOpTime() const {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     return _oldestActiveOplogEntryOpTime;
 }
 
 unsigned int ServerTransactionsMetrics::getTotalActiveOpTimes() const {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     return _oldestActiveOplogEntryOpTimes.size();
 }
 
@@ -276,6 +284,8 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
     stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
     stats->setCurrentPrepared(_currentPrepared.load());
+    // Acquire _mutex before reading _oldestActiveOplogEntryOpTime.
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
     // To avoid compression loss, we have Timestamp(0, 0) be the default value if no oldest active
     // transaction optime is stored.
     Timestamp oldestActiveOplogEntryTimestamp = (_oldestActiveOplogEntryOpTime != boost::none)
