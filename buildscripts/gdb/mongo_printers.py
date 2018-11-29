@@ -121,9 +121,9 @@ class BSONObjPrinter(object):
             return
 
         inferior = gdb.selected_inferior()
-        buf = bytes(inferior.read_memory(self.ptr, self.size))
+        buf = bson.BSON(bytes(inferior.read_memory(self.ptr, self.size)))
         options = CodecOptions(document_class=collections.OrderedDict)
-        bsondoc = bson.BSON.decode(buf, codec_options=options)
+        bsondoc = buf.decode(codec_options=options)
 
         for key, val in bsondoc.items():
             yield 'key', key
