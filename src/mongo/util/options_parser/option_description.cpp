@@ -116,6 +116,11 @@ OptionDescription& OptionDescription::hidden() {
     return *this;
 }
 
+OptionDescription& OptionDescription::redact() {
+    _redact = true;
+    return *this;
+}
+
 OptionDescription& OptionDescription::setDefault(Value defaultValue) {
     // Disallow registering a default for a composing option since the interaction between the
     // two is unclear (for example, should we override or compose the default)

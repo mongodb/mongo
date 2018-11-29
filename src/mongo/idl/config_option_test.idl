@@ -174,3 +174,17 @@ configs:
     cpp_varname: gTestConfigOpt15
     condition:
       expr: gEnableTestConfigOpt15
+
+  "test.config.opt16":
+    description: "Test redacted configurations"
+    short_name: testConfigOpt16
+    deprecated_name:
+    - test.config.opt16depr
+    - test.config.opt16depr2
+    deprecated_short_name:
+    - testConfigOpt16depr
+    - testConfigOpt16depr2
+    arg_vartype: String
+    source: cli
+    redact: true
+

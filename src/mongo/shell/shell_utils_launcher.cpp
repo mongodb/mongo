@@ -62,6 +62,7 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
@@ -776,7 +777,7 @@ BSONObj WaitProgram(const BSONObj& a, void* data) {
 // an array with all commandline tokens. The Object may have a field named "env" which contains an
 // object of Key Value pairs which will be loaded into the environment of the spawned process.
 BSONObj StartMongoProgram(const BSONObj& a, void* data) {
-    _nokillop = true;
+    shellGlobalParams.nokillop = true;
     BSONObj args = a;
     BSONObj env{};
     BSONElement firstElement = args.firstElement();

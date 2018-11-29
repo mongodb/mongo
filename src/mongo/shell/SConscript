@@ -77,12 +77,40 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='shell_options_storage',
+    source=[
+        'shell_options_storage.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+    ],
+)
+
+env.Library(
+    target='shell_options_register',
+    source=[
+        env.Idlc('shell_options.idl')[0],
+    ],
+    LIBDEPS=[
+        'shell_options_storage',
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+)
+
 env.CppUnitTest(
     target='shell_options_test',
     source=[
         "shell_options_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/shell_core",
+        'shell_options_register',
     ],
 )

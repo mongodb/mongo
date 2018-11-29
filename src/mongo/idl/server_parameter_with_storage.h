@@ -228,7 +228,11 @@ public:
      * of SCP settings.
      */
     void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {
-        b.append(name, getValue());
+        if (_redact) {
+            b.append(name, "###");
+        } else {
+            b.append(name, getValue());
+        }
     }
 
     /**
@@ -300,11 +304,16 @@ public:
         });
     }
 
+    void setRedact() {
+        _redact = true;
+    }
+
 private:
     T& _storage;
 
     std::vector<std::function<validator_t>> _validators;
     std::function<onUpdate_t> _onUpdate;
+    bool _redact = false;
 };
 
 // MSVC has trouble resolving T=decltype(param) through the above class template.

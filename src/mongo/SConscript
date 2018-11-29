@@ -535,6 +535,7 @@ if not has_option('noshell') and usemozjs:
                     'scripting/scripting',
                     'shell/benchrun',
                     'shell/mongojs',
+                    'shell/shell_options_storage',
                     'transport/message_compressor',
                     'transport/transport_layer_manager',
                     'util/net/network',
@@ -579,7 +580,6 @@ if not has_option('noshell') and usemozjs:
             "shell/dbshell.cpp",
             "shell/mongodbcr.cpp",
             "shell/shell_options_init.cpp",
-            env.Idlc('shell/shell_options.idl')[0],
         ] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=[
             "$BUILD_DIR/third_party/shim_pcrecpp",
@@ -589,6 +589,7 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/mongo/util/password",
         ],
         LIBDEPS_PRIVATE=[
+            'shell/shell_options_register',
             "$BUILD_DIR/mongo/client/connection_string",
             '$BUILD_DIR/mongo/util/net/ssl_options_client' if get_option('ssl') == 'on' else '',
         ],

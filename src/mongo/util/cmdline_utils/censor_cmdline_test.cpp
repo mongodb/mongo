@@ -28,196 +28,121 @@
  *    it in the license file.
  */
 
-#include <boost/range/size.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
+#include "mongo/util/cmdline_utils/censor_cmdline_test.h"
 #include "mongo/util/options_parser/environment.h"
-
-namespace mongo {
-
-namespace {
 
 namespace moe = mongo::optionenvironment;
 
-void testCensoringArgv(const char* const* expected, const char* const* toCensor, int elementCount) {
-    std::vector<std::string> toCensorStringVec(toCensor, toCensor + elementCount);
-    std::vector<char*> arrayStandin;
-    for (size_t i = 0; i < toCensorStringVec.size(); ++i)
-        arrayStandin.push_back(&*toCensorStringVec[i].begin());
+namespace mongo {
+namespace {
 
-    char** argv = &*arrayStandin.begin();
-
-    cmdline_utils::censorArgvArray(elementCount, argv);
-
-    for (int i = 0; i < elementCount; ++i) {
-        ASSERT_EQUALS(std::string(expected[i]), std::string(argv[i]));
-    }
-}
-
-void testCensoringVector(const char* const* expected,
-                         const char* const* toCensor,
-                         int elementCount) {
-    std::vector<std::string> actual(toCensor, toCensor + elementCount);
-
-    cmdline_utils::censorArgsVector(&actual);
-
-    for (int i = 0; i < elementCount; ++i) {
-        ASSERT_EQUALS(std::string(expected[i]), actual[i]);
-    }
-}
-
-TEST(ArgvCensorTests, NothingCensored) {
-    const char* const argv[] = {"first",
-                                "second",
-                                "sslPEMKeyPassword=KEEP",
-                                "---sslPEMKeyPassword=KEEP",
-                                "sslPEMKeyPassword",
-                                "KEEP",
-                                "servicePassword=KEEP",
-                                "--servicePassword-",
-                                "KEEP",
-                                "--servicePasswordFake=KEEP"};
-    const int argc = boost::size(argv);
-    testCensoringArgv(argv, argv, argc);
+TEST(ArgvVectorCensorTests, NothingCensored) {
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "servicePassword=KEEP",
+                                         "--servicePassword-",
+                                         "KEEP",
+                                         "--servicePasswordFake=KEEP"});
+    test::censoringArgv(argv, argv);
+    test::censoringVector(argv, argv);
 }
 
 TEST(ArgvCensorTests, SomeStuffCensoredDoubleHyphen) {
-    const char* const argv[] = {"first",
-                                "second",
-                                "--sslPEMKeyPassword=LOSEME",
-                                "--sslPEMKeyPassword",
-                                "Really, loose me!",
-                                "--servicePassword=bad news",
-                                "--servicePassword-",
-                                "KEEP",
-                                "--servicePassword",
-                                "get out of dodge"};
-    const int argc = boost::size(argv);
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "--servicePassword=bad news",
+                                         "--servicePassword-",
+                                         "KEEP",
+                                         "--servicePassword",
+                                         "get out of dodge"});
 
-    const char* const expected[] = {"first",
-                                    "second",
-                                    "--sslPEMKeyPassword=xxxxxx",
-                                    "--sslPEMKeyPassword",
-                                    "xxxxxxxxxxxxxxxxx",
-                                    "--servicePassword=xxxxxxxx",
-                                    "--servicePassword-",
-                                    "KEEP",
-                                    "--servicePassword",
-                                    "xxxxxxxxxxxxxxxx"};
-    ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "--servicePassword=xxxxxxxx",
+                                             "--servicePassword-",
+                                             "KEEP",
+                                             "--servicePassword",
+                                             "xxxxxxxxxxxxxxxx"});
 
-    testCensoringArgv(expected, argv, argc);
+    ASSERT_EQ(expected.size(), argv.size());
+    test::censoringArgv(expected, argv);
 }
 
 TEST(ArgvCensorTests, SomeStuffCensoredSingleHyphen) {
-    const char* const argv[] = {"first",
-                                "second",
-                                "-sslPEMKeyPassword=LOSEME",
-                                "-sslPEMKeyPassword",
-                                "Really, loose me!",
-                                "-servicePassword=bad news",
-                                "-servicePassword-",
-                                "KEEP",
-                                "-servicePassword",
-                                "get out of dodge"};
-    const int argc = boost::size(argv);
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "-servicePassword=bad news",
+                                         "-servicePassword-",
+                                         "KEEP",
+                                         "-servicePassword",
+                                         "get out of dodge"});
 
-    const char* const expected[] = {"first",
-                                    "second",
-                                    "-sslPEMKeyPassword=xxxxxx",
-                                    "-sslPEMKeyPassword",
-                                    "xxxxxxxxxxxxxxxxx",
-                                    "-servicePassword=xxxxxxxx",
-                                    "-servicePassword-",
-                                    "KEEP",
-                                    "-servicePassword",
-                                    "xxxxxxxxxxxxxxxx"};
-    ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "-servicePassword=xxxxxxxx",
+                                             "-servicePassword-",
+                                             "KEEP",
+                                             "-servicePassword",
+                                             "xxxxxxxxxxxxxxxx"});
 
-    testCensoringArgv(expected, argv, argc);
-}
-
-TEST(VectorCensorTests, NothingCensored) {
-    const char* const argv[] = {"first",
-                                "second",
-                                "sslPEMKeyPassword=KEEP",
-                                "---sslPEMKeyPassword=KEEP",
-                                "sslPEMKeyPassword",
-                                "KEEP",
-                                "servicePassword=KEEP",
-                                "--servicePassword-",
-                                "KEEP",
-                                "--servicePasswordFake=KEEP"};
-    const int argc = boost::size(argv);
-    testCensoringVector(argv, argv, argc);
+    ASSERT_EQ(expected.size(), argv.size());
+    test::censoringArgv(expected, argv);
 }
 
 TEST(VectorCensorTests, SomeStuffCensoredDoubleHyphen) {
-    const char* const argv[] = {"first",
-                                "second",
-                                "--sslPEMKeyPassword=LOSEME",
-                                "--sslPEMKeyPassword",
-                                "Really, loose me!",
-                                "--servicePassword=bad news",
-                                "--servicePassword-",
-                                "KEEP",
-                                "--servicePassword",
-                                "get out of dodge"};
-    const int argc = boost::size(argv);
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "--servicePassword=bad news",
+                                         "--servicePassword-",
+                                         "KEEP",
+                                         "--servicePassword",
+                                         "get out of dodge"});
 
-    const char* const expected[] = {"first",
-                                    "second",
-                                    "--sslPEMKeyPassword=<password>",
-                                    "--sslPEMKeyPassword",
-                                    "<password>",
-                                    "--servicePassword=<password>",
-                                    "--servicePassword-",
-                                    "KEEP",
-                                    "--servicePassword",
-                                    "<password>"};
-    ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "--servicePassword=<password>",
+                                             "--servicePassword-",
+                                             "KEEP",
+                                             "--servicePassword",
+                                             "<password>"});
 
-    testCensoringVector(expected, argv, argc);
+    ASSERT_EQ(expected.size(), argv.size());
+    test::censoringVector(expected, argv);
 }
 
 TEST(VectorCensorTests, SomeStuffCensoredSingleHyphen) {
-    const char* const argv[] = {"first",
-                                "second",
-                                "-sslPEMKeyPassword=LOSEME",
-                                "-sslPEMKeyPassword",
-                                "Really, loose me!",
-                                "-servicePassword=bad news",
-                                "-servicePassword-",
-                                "KEEP",
-                                "-servicePassword",
-                                "get out of dodge"};
-    const int argc = boost::size(argv);
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "-servicePassword=bad news",
+                                         "-servicePassword-",
+                                         "KEEP",
+                                         "-servicePassword",
+                                         "get out of dodge"});
 
-    const char* const expected[] = {"first",
-                                    "second",
-                                    "-sslPEMKeyPassword=<password>",
-                                    "-sslPEMKeyPassword",
-                                    "<password>",
-                                    "-servicePassword=<password>",
-                                    "-servicePassword-",
-                                    "KEEP",
-                                    "-servicePassword",
-                                    "<password>"};
-    ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "-servicePassword=<password>",
+                                             "-servicePassword-",
+                                             "KEEP",
+                                             "-servicePassword",
+                                             "<password>"});
 
-    testCensoringVector(expected, argv, argc);
+    ASSERT_EQ(expected.size(), argv.size());
+    test::censoringVector(expected, argv);
 }
 
 TEST(BSONObjCensorTests, Strings) {
     BSONObj obj = BSON("firstarg"
                        << "not a password"
-                       << "net.ssl.PEMKeyPassword"
+                       << "security.kmip.clientCertificatePassword"
                        << "this password should be censored"
-                       << "net.ssl.clusterPassword"
+                       << "security.ldap.bind.queryPassword"
                        << "this password should be censored"
                        << "middlearg"
                        << "also not a password"
@@ -228,9 +153,9 @@ TEST(BSONObjCensorTests, Strings) {
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
-                       << "net.ssl.PEMKeyPassword"
+                       << "security.kmip.clientCertificatePassword"
                        << "<password>"
-                       << "net.ssl.clusterPassword"
+                       << "security.ldap.bind.queryPassword"
                        << "<password>"
                        << "middlearg"
                        << "also not a password"
@@ -246,10 +171,10 @@ TEST(BSONObjCensorTests, Strings) {
 TEST(BSONObjCensorTests, Arrays) {
     BSONObj obj = BSON("firstarg"
                        << "not a password"
-                       << "net.ssl.PEMKeyPassword"
+                       << "security.kmip.clientCertificatePassword"
                        << BSON_ARRAY("first censored password"
                                      << "next censored password")
-                       << "net.ssl.clusterPassword"
+                       << "security.ldap.bind.queryPassword"
                        << BSON_ARRAY("first censored password"
                                      << "next censored password")
                        << "middlearg"
@@ -262,10 +187,10 @@ TEST(BSONObjCensorTests, Arrays) {
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
-                       << "net.ssl.PEMKeyPassword"
+                       << "security.kmip.clientCertificatePassword"
                        << BSON_ARRAY("<password>"
                                      << "<password>")
-                       << "net.ssl.clusterPassword"
+                       << "security.ldap.bind.queryPassword"
                        << BSON_ARRAY("<password>"
                                      << "<password>")
                        << "middlearg"
@@ -281,36 +206,27 @@ TEST(BSONObjCensorTests, Arrays) {
 }
 
 TEST(BSONObjCensorTests, SubObjects) {
-    BSONObj obj =
-        BSON("firstarg"
-             << "not a password"
-             << "net"
-             << BSON("ssl" << BSON("PEMKeyPassword" << BSON_ARRAY("first censored password"
-                                                                  << "next censored password")
-                                                    << "PEMKeyPassword"
-                                                    << "should be censored too"
-                                                    << "clusterPassword"
-                                                    << BSON_ARRAY("first censored password"
-                                                                  << "next censored password")
-                                                    << "clusterPassword"
-                                                    << "should be censored too"))
-             << "lastarg"
-             << false);
-
-    BSONObj res = BSON("firstarg"
+    BSONObj obj = BSON("firstarg"
                        << "not a password"
-                       << "net"
-                       << BSON("ssl" << BSON("PEMKeyPassword" << BSON_ARRAY("<password>"
-                                                                            << "<password>")
-                                                              << "PEMKeyPassword"
-                                                              << "<password>"
-                                                              << "clusterPassword"
-                                                              << BSON_ARRAY("<password>"
-                                                                            << "<password>")
-                                                              << "clusterPassword"
-                                                              << "<password>"))
+                       << "security"
+                       << BSON("kmip" << BSON("clientCertificatePassword"
+                                              << BSON_ARRAY("first censored password"
+                                                            << "next censored password")
+                                              << "clientCertificatePassword"
+                                              << "should be censored too"))
                        << "lastarg"
                        << false);
+
+    BSONObj res =
+        BSON("firstarg"
+             << "not a password"
+             << "security"
+             << BSON("kmip" << BSON("clientCertificatePassword" << BSON_ARRAY("<password>"
+                                                                              << "<password>")
+                                                                << "clientCertificatePassword"
+                                                                << "<password>"))
+             << "lastarg"
+             << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);

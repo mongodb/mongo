@@ -33,6 +33,7 @@
 
 #include "mongo/idl/config_option_test_gen.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/cmdline_utils/censor_cmdline_test.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
@@ -385,7 +386,212 @@ TEST(ConfigOption, Opt15) {
     ASSERT_EQ(gTestConfigOpt15, "");
 }
 
-}  // namespace
+TEST(RedactionArgvVector, NothingCensored) {
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "testConfigOpt16=KEEP",
+                                         "---testConfigOpt16=KEEP",
+                                         "testConfigOpt16",
+                                         "KEEP"});
+    censoringArgv(argv, argv);
+    censoringVector(argv, argv);
+}
 
+TEST(RedactionArgv, DoubleHyphen) {
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "--testConfigOpt16=LOSEME",
+                                         "--testConfigOpt16",
+                                         "Really, lose me!",
+                                         "--testConfigOpt16depr=LOSEME",
+                                         "--testConfigOpt16depr",
+                                         "Really, lose me!"});
+
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "--testConfigOpt16=xxxxxx",
+                                             "--testConfigOpt16",
+                                             "xxxxxxxxxxxxxxxx",
+                                             "--testConfigOpt16depr=xxxxxx",
+                                             "--testConfigOpt16depr",
+                                             "xxxxxxxxxxxxxxxx"});
+
+    ASSERT_EQ(expected.size(), argv.size());
+    censoringArgv(expected, argv);
+}
+
+TEST(RedactionArgv, SingleHyphen) {
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "-testConfigOpt16=LOSEME",
+                                         "-testConfigOpt16",
+                                         "Really, lose me!",
+                                         "-testConfigOpt16depr=LOSEME",
+                                         "-testConfigOpt16depr",
+                                         "Really, lose me!"});
+
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "-testConfigOpt16=xxxxxx",
+                                             "-testConfigOpt16",
+                                             "xxxxxxxxxxxxxxxx",
+                                             "-testConfigOpt16depr=xxxxxx",
+                                             "-testConfigOpt16depr",
+                                             "xxxxxxxxxxxxxxxx"});
+
+    ASSERT_EQ(expected.size(), argv.size());
+    censoringArgv(expected, argv);
+}
+
+TEST(RedactionVector, DoubleHyphen) {
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "--testConfigOpt16=LOSEME",
+                                         "--testConfigOpt16",
+                                         "Really, lose me!",
+                                         "--testConfigOpt16depr=LOSEME",
+                                         "--testConfigOpt16depr",
+                                         "Really, lose me!"});
+
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "--testConfigOpt16=<password>",
+                                             "--testConfigOpt16",
+                                             "<password>",
+                                             "--testConfigOpt16depr=<password>",
+                                             "--testConfigOpt16depr",
+                                             "<password>"});
+
+    ASSERT_EQ(expected.size(), argv.size());
+    censoringVector(expected, argv);
+}
+
+TEST(RedactionVector, SingleHyphen) {
+    const std::vector<std::string> argv({"first",
+                                         "second",
+                                         "-testConfigOpt16=LOSEME",
+                                         "-testConfigOpt16",
+                                         "Really, lose me!",
+                                         "-testConfigOpt16depr=LOSEME",
+                                         "-testConfigOpt16depr",
+                                         "Really, lose me!"});
+
+    const std::vector<std::string> expected({"first",
+                                             "second",
+                                             "-testConfigOpt16=<password>",
+                                             "-testConfigOpt16",
+                                             "<password>",
+                                             "-testConfigOpt16depr=<password>",
+                                             "-testConfigOpt16depr",
+                                             "<password>"});
+
+    ASSERT_EQ(expected.size(), argv.size());
+    censoringVector(expected, argv);
+}
+
+TEST(RedactionBSON, Strings) {
+    BSONObj obj = BSON("firstarg"
+                       << "not a password"
+                       << "test.config.opt16"
+                       << "this password should be censored"
+                       << "test.config.opt16depr"
+                       << "this password should be censored"
+                       << "middlearg"
+                       << "also not a password"
+                       << "test.config.opt16depr2"
+                       << "this password should also be censored"
+                       << "lastarg"
+                       << false);
+
+    BSONObj res = BSON("firstarg"
+                       << "not a password"
+                       << "test.config.opt16"
+                       << "<password>"
+                       << "test.config.opt16depr"
+                       << "<password>"
+                       << "middlearg"
+                       << "also not a password"
+                       << "test.config.opt16depr2"
+                       << "<password>"
+                       << "lastarg"
+                       << false);
+
+    cmdline_utils::censorBSONObj(&obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
+}
+
+TEST(RedactionBSON, Arrays) {
+    BSONObj obj = BSON("firstarg"
+                       << "not a password"
+                       << "test.config.opt16"
+                       << BSON_ARRAY("first censored password"
+                                     << "next censored password")
+                       << "test.config.opt16depr"
+                       << BSON_ARRAY("first censored password"
+                                     << "next censored password")
+                       << "middlearg"
+                       << "also not a password"
+                       << "test.config.opt16depr2"
+                       << BSON_ARRAY("first censored password"
+                                     << "next censored password")
+                       << "lastarg"
+                       << false);
+
+    BSONObj res = BSON("firstarg"
+                       << "not a password"
+                       << "test.config.opt16"
+                       << BSON_ARRAY("<password>"
+                                     << "<password>")
+                       << "test.config.opt16depr"
+                       << BSON_ARRAY("<password>"
+                                     << "<password>")
+                       << "middlearg"
+                       << "also not a password"
+                       << "test.config.opt16depr2"
+                       << BSON_ARRAY("<password>"
+                                     << "<password>")
+                       << "lastarg"
+                       << false);
+
+    cmdline_utils::censorBSONObj(&obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
+}
+
+TEST(RedactionBSON, SubObjects) {
+    BSONObj obj = BSON("firstarg"
+                       << "not a password"
+                       << "test"
+                       << BSON("config" << BSON("opt16" << BSON_ARRAY("first censored password"
+                                                                      << "next censored password")
+                                                        << "opt16"
+                                                        << "should be censored too"
+                                                        << "opt16depr"
+                                                        << BSON_ARRAY("first censored password"
+                                                                      << "next censored password")
+                                                        << "opt16depr"
+                                                        << "should be censored too"))
+                       << "lastarg"
+                       << false);
+
+    BSONObj res = BSON("firstarg"
+                       << "not a password"
+                       << "test"
+                       << BSON("config" << BSON("opt16" << BSON_ARRAY("<password>"
+                                                                      << "<password>")
+                                                        << "opt16"
+                                                        << "<password>"
+                                                        << "opt16depr"
+                                                        << BSON_ARRAY("<password>"
+                                                                      << "<password>")
+                                                        << "opt16depr"
+                                                        << "<password>"))
+                       << "lastarg"
+                       << false);
+
+    cmdline_utils::censorBSONObj(&obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
+}
+
+}  // namespace
 }  // namespace test
 }  // namespace mongo

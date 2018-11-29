@@ -4,8 +4,15 @@ Import("env")
 
 env = env.Clone()
 
-env.Library('cmdline_utils', ['censor_cmdline.cpp'],
-                              LIBDEPS=['$BUILD_DIR/mongo/base'])
+env.Library(
+    target='cmdline_utils',
+    source=[
+        'censor_cmdline.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ])
 
 env.CppUnitTest('censor_cmdline_test',
                 'censor_cmdline_test.cpp',

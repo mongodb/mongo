@@ -80,6 +80,7 @@ struct ShellGlobalParams {
     boost::optional<rpc::ProtocolSet> rpcProtocols = boost::none;
 
     int jsHeapLimitMB = 0;
+    bool nokillop = false;
 };
 
 extern ShellGlobalParams shellGlobalParams;

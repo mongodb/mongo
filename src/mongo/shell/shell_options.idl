@@ -114,7 +114,7 @@ configs:
     # For testing, kill op will also be disabled automatically if the tests starts a mongo program.
     description: "nokillop"
     arg_vartype: Switch
-    cpp_varname: mongo::shell_utils::_nokillop
+    cpp_varname: shellGlobalParams.nokillop
     hidden: true
   "autokillop":
     # For testing, will kill op without prompting.
@@ -183,6 +183,7 @@ configs:
     description: "password for authentication"
     arg_vartype: String
     implicit: ""
+    redact: true
   "authenticationDatabase":
     section: "Authentication Options"
     description: "user source (defaults to dbname)"

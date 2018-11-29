@@ -264,6 +264,7 @@ class ServerParameter(common.SourceLocation):
         self.cpp_vartype = None  # type: unicode
         self.cpp_varname = None  # type: unicode
         self.condition = None  # type: Condition
+        self.redact = False  # type: bool
         self.deprecated_name = []  # type: List[unicode]
 
         # Only valid if cpp_varname is specified.
@@ -315,6 +316,7 @@ class ConfigOption(common.SourceLocation):
         self.conflicts = []  # type: List[unicode]
         self.requires = []  # type: List[unicode]
         self.hidden = False  # type: bool
+        self.redact = False  # type: bool
         self.default = None  # type: unicode
         self.implicit = None  # type: unicode
         self.source = None  # type: unicode

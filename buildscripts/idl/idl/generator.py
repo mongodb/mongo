@@ -1724,6 +1724,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_server_parameter(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameter(WithStorage)."""
+        # pylint: disable=too-many-branches
         with self._condition(param.condition):
             if param.cpp_varname is not None:
                 self._writer.write_line(
@@ -1744,13 +1745,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             self._writer.write_line(
                                 'ret->addBound<idl_server_parameter_detail::%s>(%s);' %
                                 (pred.upper(), bound))
+
+                if param.redact:
+                    self._writer.write_line('ret->setRedact();')
+
             else:
                 self._writer.write_line(
                     common.template_args('auto* ret = new IDLServerParameter(${name}, ${spt});',
                                          spt=param.set_at, name=_encaps(param.name)))
                 if param.from_bson:
                     self._writer.write_line('ret->setFromBSON(%s);' % (param.from_bson))
-                self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
+
+                if param.append_bson:
+                    self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
+                elif param.redact:
+                    self._writer.write_line(
+                        'ret->setAppendBSON(IDLServerParameter::redactedAppendBSON);')
+
                 self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
 
             if param.default is not None:
@@ -1821,6 +1832,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('.setSources(moe::%s)' % (opt.source))
                 if opt.hidden:
                     self._writer.write_line('.hidden()')
+                if opt.redact:
+                    self._writer.write_line('.redact()')
                 for requires in opt.requires:
                     self._writer.write_line('.requires(%s)' % (_encaps(requires)))
                 for conflicts in opt.conflicts:

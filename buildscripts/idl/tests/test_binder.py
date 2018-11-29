@@ -1652,6 +1652,17 @@ class TestBinder(testcase.IDLTestcase):
                 from_string: qux
             """))
 
+        # Custom setting with only from_string callback, and auto-redaction.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                redact: true
+                from_string: baz
+            """))
+
     def test_server_parameter_negative(self):
         # type: () -> None
         """Negative server parameter test cases."""

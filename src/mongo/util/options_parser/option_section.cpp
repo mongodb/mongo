@@ -535,24 +535,26 @@ Status OptionSection::getBoostPositionalOptions(
 // TODO: should I make this an iterator?
 
 Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) const {
-    std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (const auto& opt : _options) {
         // We need to check here that we didn't register an option with an empty single name
         // that is allowed on the command line or in an old style config, since we don't have
         // this information available all at once when the option is registered
-        if (oditerator->_singleName.empty() && oditerator->_sources & SourceAllLegacy) {
+        if (opt._singleName.empty() && (opt._sources & SourceAllLegacy)) {
             StringBuilder sb;
-            sb << "Found option allowed on the command line with an empty singleName: "
-               << oditerator->_dottedName;
-            return Status(ErrorCodes::InternalError, sb.str());
+            return {ErrorCodes::InternalError,
+                    str::stream()
+                        << "Found option allowed on the command line with an empty singleName: "
+                        << opt._dottedName};
         }
 
-        options->push_back(*oditerator);
+        options->push_back(opt);
     }
 
-    std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
-        ositerator->getAllOptions(options).transitional_ignore();
+    for (const auto& section : _subSections) {
+        auto status = section.getAllOptions(options);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     return Status::OK();

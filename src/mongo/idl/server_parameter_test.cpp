@@ -145,5 +145,17 @@ TEST(IDLServerParameter, customSettingTest) {
     ASSERT_EQ(test::gCustomSetting, "Value via depr name");
 }
 
+TEST(IDLServerParameter, customSettingWithRedaction) {
+    auto* csr = getServerParameter("customSettingWithRedaction");
+    ASSERT_OK(csr->setFromString("Secret"));
+    ASSERT_EQ(test::gCustomSetting, "Secret");
+
+    BSONObjBuilder b;
+    csr->append(nullptr, b, csr->name());
+    auto obj = b.obj();
+    ASSERT_EQ(obj.nFields(), 1);
+    ASSERT_EQ(obj[csr->name()].String(), "###");
+}
+
 }  // namespace
 }  // namespace mongo

@@ -1,5 +1,3 @@
-// mongo/shell/shell_utils.h
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -29,65 +27,49 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <string>
+#include <vector>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/cmdline_utils/censor_cmdline.h"
 
 namespace mongo {
+namespace test {
 
-class Scope;
-class DBClientBase;
+inline void censoringArgv(const std::vector<std::string>& expected,
+                          const std::vector<std::string>& toCensor) {
+    ASSERT_EQ(expected.size(), toCensor.size());
 
-namespace shell_utils {
+    // Make a local copy we can mutate.
+    std::vector<std::string> localCensor = toCensor;
+    std::vector<char*> arrayStandin;
+    for (auto& censor : localCensor) {
+        arrayStandin.push_back(&*censor.begin());
+    }
 
-extern std::string _dbConnect;
-extern std::string _dbAuth;
+    char** argv = &*arrayStandin.begin();
+    cmdline_utils::censorArgvArray(arrayStandin.size(), argv);
 
-void RecordMyLocation(const char* _argv0);
-void installShellUtils(Scope& scope);
-
-void initScope(Scope& scope);
-void onConnect(DBClientBase& c);
-
-const char* getUserDir();
-
-BSONElement singleArg(const BSONObj& args);
-extern const BSONObj undefinedReturn;
-
-/** Prompt for confirmation from cin. */
-class Prompter {
-public:
-    Prompter(const std::string& prompt);
-    /** @return prompted confirmation or cached confirmation. */
-    bool confirm();
-
-private:
-    const std::string _prompt;
-    bool _confirmed;
-};
-
-/** Registry of server connections. */
-class ConnectionRegistry {
-public:
-    ConnectionRegistry();
-    void registerConnection(DBClientBase& client);
-    void killOperationsOnAllConnections(bool withPrompt) const;
-
-private:
-    std::map<std::string, std::set<std::string>> _connectionUris;
-    mutable stdx::mutex _mutex;
-};
-
-extern ConnectionRegistry connectionRegistry;
-
-// This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
-// it also protects the global dbexitCalled.
-extern stdx::mutex& mongoProgramOutputMutex;
-
-// Helper to tell if a file exists cross platform
-// TODO: Remove this when we have a cross platform file utility library
-bool fileExists(const std::string& file);
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQ(expected[i], std::string(argv[i], localCensor[i].size()));
+    }
 }
+
+inline void censoringVector(const std::vector<std::string>& expected,
+                            const std::vector<std::string>& toCensor) {
+    ASSERT_EQ(expected.size(), toCensor.size());
+
+    // Make a local copy we can mutate.
+    std::vector<std::string> localCensor = toCensor;
+
+    cmdline_utils::censorArgsVector(&localCensor);
+
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQUALS(expected[i], localCensor[i]);
+    }
 }
+
+}  // namespace test
+}  // namespace mongo

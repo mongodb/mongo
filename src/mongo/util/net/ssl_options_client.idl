@@ -62,6 +62,7 @@ configs:
     arg_vartype: String
     cpp_varname: "sslGlobalParams.sslPEMKeyPassword"
     requires: tls
+    redact: true
 
   "tls.CAFile":
     description: "Certificate Authority file for TLS"

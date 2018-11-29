@@ -200,11 +200,12 @@ if get_option('ssl') == 'on':
             'sock_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/util/fail_point',
             'network',
-            '$BUILD_DIR/mongo/db/server_options_servers',
             'socket',
             'ssl_manager',
             'ssl_options_server',
+            '$BUILD_DIR/mongo/db/server_options_servers',
+            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+            '$BUILD_DIR/mongo/util/fail_point',
         ],
     )

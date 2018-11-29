@@ -232,5 +232,17 @@ TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
     ASSERT_EQ(test::gRuntimeBoostDouble.get(), 1.0);
 }
 
+TEST(IDLServerParameterWithStorage, startupStringRedacted) {
+    auto* sp = getServerParameter("startupStringRedacted");
+    ASSERT_OK(sp->setFromString("Hello World"));
+    ASSERT_EQ(test::gStartupStringRedacted, "Hello World");
+
+    BSONObjBuilder b;
+    sp->append(nullptr, b, sp->name());
+    auto obj = b.obj();
+    ASSERT_EQ(obj.nFields(), 1);
+    ASSERT_EQ(obj[sp->name()].String(), "###");
+}
+
 }  // namespace
 }  // namespace mongo

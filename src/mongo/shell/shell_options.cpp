@@ -61,8 +61,6 @@ using std::endl;
 using std::string;
 using std::vector;
 
-ShellGlobalParams shellGlobalParams;
-
 // SERVER-36807: Limit --setShellParameter to SetParameters we know we want to expose.
 const std::set<std::string> kSetShellParameterWhitelist = {
     "disabledSecureAllocatorDomains",
@@ -340,53 +338,4 @@ Status storeMongoShellOptions(const moe::Environment& params,
     return Status::OK();
 }
 
-void redactPasswordOptions(int argc, char** argv) {
-    constexpr auto kLongPasswordOption = "--password"_sd;
-    constexpr auto kShortPasswordOption = "-p"_sd;
-    for (int i = 0; i < argc; ++i) {
-        StringData arg(argv[i]);
-        if (arg.startsWith(kShortPasswordOption)) {
-            char* toRedact = nullptr;
-            // Handle -p password
-            if ((arg == kShortPasswordOption) && (i + 1 < argc)) {
-                toRedact = argv[++i];
-                // Handle -ppassword
-            } else {
-                toRedact = argv[i] + kShortPasswordOption.size();
-            }
-
-            invariant(toRedact);
-            // The arg should be null-terminated, replace everything up to \0 to 'x'
-            while (*toRedact) {
-                *toRedact++ = 'x';
-            }
-        }
-        if (arg.startsWith(kLongPasswordOption)) {
-            char* toRedact = nullptr;
-            // Handle --password password
-            if ((arg == kLongPasswordOption) && (i + 1 < argc)) {
-                toRedact = argv[++i];
-                // Handle --password=password
-            } else if (arg.size() != kLongPasswordOption.size()) {
-                toRedact = argv[i] + kLongPasswordOption.size();
-                // It's not valid to do --passwordpassword, make sure there's an = separator
-                invariant(*(toRedact++) == '=');
-            }
-
-            // If there's nothing to redact, just exit
-            if (!toRedact) {
-                continue;
-            }
-
-            // The arg should be null-terminated, replace everything up to \0 to 'x'
-            while (*toRedact) {
-                *toRedact++ = 'x';
-            }
-        } else if (MongoURI::isMongoURI(arg)) {
-            auto reformedURI = MongoURI::redact(arg);
-            auto length = arg.size();
-            ::strncpy(argv[i], reformedURI.data(), length);
-        }
-    }
-}
 }  // namespace mongo

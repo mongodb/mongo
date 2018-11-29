@@ -34,6 +34,7 @@
 
 #include "mongo/util/net/ssl_options.h"
 
+#include <boost/range/size.hpp>
 #include <ostream>
 
 #include "mongo/base/global_initializer.h"
@@ -41,6 +42,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/cmdline_utils/censor_cmdline_test.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -478,6 +480,62 @@ TEST(SetupOptions, disableNonTLSConnectionLoggingInvalid) {
 
     ASSERT_OK(parser.run(options, argv, env_map, &environment));
     ASSERT_NOT_OK(mongo::storeServerOptions(environment));
+}
+
+TEST(SetupOptions, RedactionSingleName) {
+    const std::vector<std::string> argv({"mongod",
+                                         "--tlsMode",
+                                         "requireTLS",
+                                         "--tlsPEMKeyPassword=qwerty",
+                                         "--tlsClusterPassword",
+                                         "Lose Me.",
+                                         "--sslPEMKeyPassword=qwerty",
+                                         "--sslClusterPassword=qwerty"});
+
+    const std::vector<std::string> expected({"mongod",
+                                             "--tlsMode",
+                                             "requireTLS",
+                                             "--tlsPEMKeyPassword=<password>",
+                                             "--tlsClusterPassword",
+                                             "<password>",
+                                             "--sslPEMKeyPassword=<password>",
+                                             "--sslClusterPassword=<password>"});
+
+    ASSERT_EQ(expected.size(), argv.size());
+    ::mongo::test::censoringVector(expected, argv);
+}
+
+TEST(SetupOptions, RedactionDottedName) {
+    auto obj = BSON("net" << BSON("tls" << BSON("mode"
+                                                << "requireTLS"
+                                                << "PEMKeyPassword"
+                                                << "qwerty"
+                                                << "ClusterPassword"
+                                                << "qwerty")
+                                        << "ssl"
+                                        << BSON("mode"
+                                                << "requireSSL"
+                                                << "PEMKeyPassword"
+                                                << "qwerty"
+                                                << "ClusterPassword"
+                                                << "qwerty")));
+
+    auto res = BSON("net" << BSON("tls" << BSON("mode"
+                                                << "requireTLS"
+                                                << "PEMKeyPassword"
+                                                << "<password>"
+                                                << "ClusterPassword"
+                                                << "<password>")
+                                        << "ssl"
+                                        << BSON("mode"
+                                                << "requireSSL"
+                                                << "PEMKeyPassword"
+                                                << "<password>"
+                                                << "ClusterPassword"
+                                                << "<password>")));
+
+    cmdline_utils::censorBSONObj(&obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
 }
 
 }  // namespace

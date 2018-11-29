@@ -202,7 +202,7 @@ void shellHistoryAdd(const char* line) {
 }
 
 void killOps() {
-    if (mongo::shell_utils::_nokillop)
+    if (shellGlobalParams.nokillop)
         return;
 
     if (atPrompt.load())

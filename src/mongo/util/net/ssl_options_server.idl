@@ -76,6 +76,7 @@ configs:
     arg_vartype: String
     cpp_varname: sslGlobalParams.sslPEMKeyPassword
     implicit: ''
+    redact: true
 
   "net.tls.clusterFile":
     description: "Key file for internal TLS authentication"
@@ -91,6 +92,7 @@ configs:
     arg_vartype: String
     cpp_varname: sslGlobalParams.sslClusterPassword
     implicit: ''
+    redact: true
 
   "net.tls.CAFile":
     description: "Certificate Authority file for TLS"

@@ -104,6 +104,12 @@ public:
     OptionDescription& hidden();
 
     /*
+     * Mark this option as sensitive so that attempts by a client to read this setting
+     * will only return a placeholder value rather than the real setting.
+     */
+    OptionDescription& redact();
+
+    /*
      * Add a default value for this option if it is not specified
      *
      * throws DBException on errors, such as trying to set a default that does not have the same
@@ -217,6 +223,7 @@ public:
                                // (required by boost)
     std::string _description;  // Description of option printed in help output
     bool _isVisible;           // Visible in help output
+    bool _redact = false;      // Value should not be exposed to inquiry
     Value _default;            // Value if option is not specified
     Value _implicit;           // Value if option is specified with no argument
     bool _isComposing;         // Aggregate values from different sources instead of overriding

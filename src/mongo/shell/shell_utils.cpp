@@ -455,9 +455,8 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 
 ConnectionRegistry connectionRegistry;
 
-bool _nokillop = false;
 void onConnect(DBClientBase& c) {
-    if (_nokillop) {
+    if (shellGlobalParams.nokillop) {
         return;
     }
 

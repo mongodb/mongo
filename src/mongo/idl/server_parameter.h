@@ -99,6 +99,13 @@ public:
      */
     Status setFromString(const std::string& str) final;
 
+    /**
+     * Helper method usable as setAppendBSON() callback when redaction of value is requested.
+     */
+    static void redactedAppendBSON(OperationContext*, BSONObjBuilder* b, StringData name) {
+        b->append(name, "###");
+    }
+
 protected:
     std::function<appendBSON_t> _appendBSON;
     std::function<fromBSON_t> _fromBSON;

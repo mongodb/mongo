@@ -67,3 +67,9 @@ server_parameters:
     cpp_vartype: "synchronized_value<double>"
     cpp_varname: gRuntimeBoostDouble
 
+  startupStringRedacted:
+    set_at: startup
+    description: "Redacted param with storage"
+    cpp_vartype: "std::string"
+    cpp_varname: gStartupStringRedacted
+    redact: true

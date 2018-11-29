@@ -488,6 +488,7 @@ class ServerParameter(common.SourceLocation):
         self.cpp_varname = None  # type: unicode
         self.condition = None  # type: Condition
         self.deprecated_name = []  # type: List[unicode]
+        self.redact = False  # type: bool
 
         # Only valid if cppStorage is specified.
         self.validator = None  # type: Validator
@@ -539,6 +540,7 @@ class ConfigOption(common.SourceLocation):
         self.conflicts = []  # type: List[unicode]
         self.requires = []  # type: List[unicode]
         self.hidden = False  # type: bool
+        self.redact = False  # type: bool
         self.default = None  # type: unicode
         self.implicit = None  # type: unicode
         self.source = []  # type: List[unicode]
