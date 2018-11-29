@@ -91,10 +91,10 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
         _opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
 
     // Hybrid indexes are only enabled for background, non-unique indexes.
-    // TODO: Remove when SERVER-38036 and SERVER-37270 are complete.
-    const bool useHybrid = isBackgroundIndex && !descriptorPtr->unique();
+    // TODO: Remove when SERVER-37270 is complete.
+    const bool useHybrid = isBackgroundIndex;
     if (useHybrid) {
-        _indexBuildInterceptor = stdx::make_unique<IndexBuildInterceptor>(_opCtx);
+        _indexBuildInterceptor = stdx::make_unique<IndexBuildInterceptor>(_opCtx, _entry);
         _entry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
         _opCtx->recoveryUnit()->onCommit(
@@ -146,8 +146,15 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
     NamespaceString ns(_indexNamespace);
     invariant(_opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
 
-    // An index build should never be completed with writes remaining in the interceptor.
-    invariant(!_indexBuildInterceptor || _indexBuildInterceptor->areAllWritesApplied(_opCtx));
+    if (_indexBuildInterceptor) {
+        // An index build should never be completed with writes remaining in the interceptor.
+        invariant(_indexBuildInterceptor->areAllWritesApplied(_opCtx));
+
+        // Hybrid indexes must check for any outstanding duplicate key constraint violations when
+        // they finish.
+        uassertStatusOK(_indexBuildInterceptor->checkDuplicateKeyConstraints(_opCtx));
+    }
+
 
     LOG(2) << "marking index " << _indexName << " as ready in snapshot id "
            << _opCtx->recoveryUnit()->getSnapshotId();

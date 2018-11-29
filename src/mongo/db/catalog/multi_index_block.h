@@ -86,7 +86,8 @@ public:
      * If this is called before init(), we will ignore unique violations. This has no effect if
      * no specs are unique.
      *
-     * If this is called, any dupsOut sets passed in will never be filled.
+     * If this is called, any 'dupRecords' set passed to dumpInsertsFromBulk() will never be
+     * filled.
      */
     virtual void ignoreUniqueConstraint() = 0;
 
@@ -123,16 +124,13 @@ public:
     virtual Status insertAllDocumentsInCollection() = 0;
 
     /**
-     * Call this after init() for each document in the collection. Any duplicate keys inserted will
-     * be appended to 'dupKeysInserted' if it is not null.
+     * Call this after init() for each document in the collection.
      *
      * Do not call if you called insertAllDocumentsInCollection();
      *
      * Should be called inside of a WriteUnitOfWork.
      */
-    virtual Status insert(const BSONObj& wholeDocument,
-                          const RecordId& loc,
-                          std::vector<BSONObj>* const dupKeysInserted = nullptr) = 0;
+    virtual Status insert(const BSONObj& wholeDocument, const RecordId& loc) = 0;
 
     /**
      * Call this after the last insert(). This gives the index builder a chance to do any
@@ -145,15 +143,10 @@ public:
      * indexed, so callers MUST either fail this index build or delete the documents from the
      * collection.
      *
-     * If 'dupKeysInserted' is passed as non-NULL and duplicates are allowed for the unique index,
-     * violators of uniqueness constraints will still be indexed, and the keys will be appended to
-     * the vector. No DuplicateKey errors will be returned.
-     *
      * Should not be called inside of a WriteUnitOfWork.
      */
     virtual Status dumpInsertsFromBulk() = 0;
     virtual Status dumpInsertsFromBulk(std::set<RecordId>* const dupRecords) = 0;
-    virtual Status dumpInsertsFromBulk(std::vector<BSONObj>* const dupKeysInserted) = 0;
 
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,

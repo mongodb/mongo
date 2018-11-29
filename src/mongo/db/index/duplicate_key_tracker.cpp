@@ -34,12 +34,8 @@
 #include "mongo/db/index/duplicate_key_tracker.h"
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -49,60 +45,63 @@ namespace {
 static constexpr StringData kKeyField = "key"_sd;
 }
 
-DuplicateKeyTracker::DuplicateKeyTracker(const IndexCatalogEntry* entry, const NamespaceString& nss)
-    : _idCounter(0), _indexCatalogEntry(entry), _nss(nss) {
+DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* entry)
+    : _indexCatalogEntry(entry),
+      _keyConstraintsTable(
+          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)) {
 
     invariant(_indexCatalogEntry->descriptor()->unique());
 }
 
-DuplicateKeyTracker::~DuplicateKeyTracker() {}
+Status DuplicateKeyTracker::recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys) {
+    if (keys.size() == 0)
+        return Status::OK();
 
-NamespaceString DuplicateKeyTracker::makeTempNamespace() {
-    return NamespaceString("local.system.indexBuildConstraints-" + UUID::gen().toString());
-}
-
-Status DuplicateKeyTracker::recordDuplicates(OperationContext* opCtx,
-                                             Collection* tempCollection,
-                                             const std::vector<BSONObj>& keys) {
-    invariant(tempCollection->ns() == nss());
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-    invariant(opCtx->lockState()->isCollectionLockedForMode(tempCollection->ns().ns(), MODE_IX));
-
+    std::vector<BSONObj> toInsert;
+    toInsert.reserve(keys.size());
     for (auto&& key : keys) {
         BSONObjBuilder builder;
-        builder.append("_id", _idCounter++);
         builder.append(kKeyField, key);
 
         BSONObj obj = builder.obj();
 
-        LOG(2) << "Recording conflict for DuplicateKeyTracker: " << obj.toString();
-        Status s = tempCollection->insertDocument(opCtx, InsertStatement(obj), nullptr, false);
-        if (!s.isOK())
-            return s;
+        toInsert.emplace_back(std::move(obj));
     }
+
+    std::vector<Record> records;
+    records.reserve(keys.size());
+    for (auto&& obj : toInsert) {
+        records.emplace_back(Record{RecordId(), RecordData(obj.objdata(), obj.objsize())});
+    }
+
+    LOG(2) << "recording " << records.size() << " duplicate key conflicts for unique index: "
+           << _indexCatalogEntry->descriptor()->indexName();
+
+    WriteUnitOfWork wuow(opCtx);
+    std::vector<Timestamp> timestamps(records.size());
+    Status s = _keyConstraintsTable->rs()->insertRecords(opCtx, &records, timestamps);
+    if (!s.isOK())
+        return s;
+
+    wuow.commit();
+
     return Status::OK();
 }
 
-Status DuplicateKeyTracker::constraintsSatisfiedForIndex(OperationContext* opCtx,
-                                                         Collection* tempCollection) const {
-    invariant(tempCollection->ns() == nss());
-    invariant(opCtx->lockState()->isCollectionLockedForMode(tempCollection->ns().ns(), MODE_IS));
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
+    auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
+    auto record = constraintsCursor->next();
 
-    auto collScan = InternalPlanner::collectionScan(
-        opCtx, tempCollection->ns().ns(), tempCollection, PlanExecutor::YieldPolicy::YIELD_AUTO);
+    auto indexCursor =
+        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->newCursor(opCtx);
 
-    BSONObj conflict;
-    PlanExecutor::ExecState state;
-    while (PlanExecutor::ExecState::ADVANCED == (state = collScan->getNext(&conflict, nullptr))) {
-
-        LOG(2) << "Resolving conflict for DuplicateKeyTracker: " << conflict.toString();
-
+    int count = 0;
+    while (record) {
+        count++;
+        BSONObj conflict = record->data.toBson();
         BSONObj keyObj = conflict[kKeyField].Obj();
 
-        auto cursor =
-            _indexCatalogEntry->accessMethod()->getSortedDataInterface()->newCursor(opCtx);
-        auto entry = cursor->seekExact(keyObj);
+        auto entry = indexCursor->seekExact(keyObj);
 
         // If there is not an exact match, there is no duplicate.
         if (!entry) {
@@ -110,18 +109,19 @@ Status DuplicateKeyTracker::constraintsSatisfiedForIndex(OperationContext* opCtx
         }
 
         // If the following entry has the same key, this is a duplicate.
-        entry = cursor->next();
+        entry = indexCursor->next();
         if (entry && entry->key.woCompare(keyObj, BSONObj(), /*considerFieldNames*/ false) == 0) {
             return buildDupKeyErrorStatus(keyObj,
                                           _indexCatalogEntry->descriptor()->parentNS(),
                                           _indexCatalogEntry->descriptor()->indexName(),
                                           _indexCatalogEntry->descriptor()->keyPattern());
         }
+
+        record = constraintsCursor->next();
     }
 
-    if (PlanExecutor::IS_EOF != state) {
-        return WorkingSetCommon::getMemberObjectStatus(conflict);
-    }
+    LOG(1) << "resolved " << count << " duplicate key conflicts for unique index: "
+           << _indexCatalogEntry->descriptor()->indexName();
     return Status::OK();
 }
 

@@ -96,11 +96,9 @@
     };
 
     // Unique background index build succeeds:
-    // 1) when a document is inserted with a key that has already been indexed
-    // (with the insert failing on duplicate key error).
-    // 2) when a document with a key not present in the initial set is inserted twice
-    // (with the initial insert succeeding and the second failing on duplicate key error).
-    let succeedWithWriteErrors = function(coll, newKey) {
+    // 1) when a document is inserted and removed with a key that has already been indexed
+    // 2) when a document with a key not present in the initial set is inserted and removed
+    let succeedWithoutWriteErrors = function(coll, newKey) {
         let duplicateKey = 3;
 
         turnFailPointOn("hangAfterIndexBuildOf", duplicateKey);
@@ -112,32 +110,16 @@
             jsTestLog("Waiting to hang after index build of i=" + duplicateKey);
             checkLog.contains(conn, "Hanging after index build of i=" + duplicateKey);
 
-            assert.writeError(coll.save({i: duplicateKey, n: true}));
+            assert.commandWorked(coll.insert({i: duplicateKey, n: true}));
 
-            // First insert on key not present in initial set
-            assert.writeOK(coll.save({i: newKey, n: true}));
-        } catch (e) {
-            turnFailPointOff("hangAfterIndexBuildOf");
-            throw e;
-        }
+            // First insert on key not present in initial set.
+            assert.commandWorked(coll.insert({i: newKey, n: true}));
 
-        try {
-            // We are currently hanging after indexing document with {i: duplicateKey}.
-            // To perform next check, we need to hang after indexing document with {i: newKey}.
-            // Add a hang before indexing document {i: newKey}, then turn off current hang
-            // so we are always in a known state and don't skip over the indexing of {i: newKey}.
-            turnFailPointOn("hangBeforeIndexBuildOf", newKey);
-            turnFailPointOff("hangAfterIndexBuildOf");
-            turnFailPointOn("hangAfterIndexBuildOf", newKey);
-            turnFailPointOff("hangBeforeIndexBuildOf");
+            // Remove duplicates before completing the index build.
+            assert.commandWorked(coll.deleteOne({i: duplicateKey, n: true}));
+            assert.commandWorked(coll.deleteOne({i: newKey, n: true}));
 
-            // Second insert on key not present in intial set fails with duplicate key error
-            jsTestLog("Waiting to hang after index build of i=" + newKey);
-            checkLog.contains(conn, "Hanging after index build of i=" + newKey);
-
-            assert.writeError(coll.save({i: newKey, n: true}));
         } finally {
-            turnFailPointOff("hangBeforeIndexBuildOf");
             turnFailPointOff("hangAfterIndexBuildOf");
         }
 
@@ -164,7 +146,7 @@
         failOnInsertedDuplicateValue(coll);
         assert.eq(size, coll.count());
 
-        succeedWithWriteErrors(coll, size);
+        succeedWithoutWriteErrors(coll, size);
 
         waitParallel();
     };

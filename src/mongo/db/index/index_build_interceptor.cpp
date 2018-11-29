@@ -47,13 +47,30 @@
 
 namespace mongo {
 
-IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx)
-    : _sideWritesTable(
-          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)){};
+IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
+    : _indexCatalogEntry(entry),
+      _sideWritesTable(
+          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)) {
+
+    if (entry->descriptor()->unique()) {
+        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
+    }
+}
+
+Status IndexBuildInterceptor::recordDuplicateKeys(OperationContext* opCtx,
+                                                  const std::vector<BSONObj>& keys) {
+    invariant(_indexCatalogEntry->descriptor()->unique());
+    return _duplicateKeyTracker->recordKeys(opCtx, keys);
+}
+
+Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opCtx) const {
+    if (!_duplicateKeyTracker) {
+        return Status::OK();
+    }
+    return _duplicateKeyTracker->checkConstraints(opCtx);
+}
 
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
-                                                   IndexAccessMethod* indexAccessMethod,
-                                                   const IndexDescriptor* indexDescriptor,
                                                    const InsertDeleteOptions& options) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -136,8 +153,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // writes table.
         WriteUnitOfWork wuow(opCtx);
         for (auto& operation : batch) {
-            auto status = _applyWrite(
-                opCtx, indexAccessMethod, operation.second, options, &totalInserted, &totalDeleted);
+            auto status =
+                _applyWrite(opCtx, operation.second, options, &totalInserted, &totalDeleted);
             if (!status.isOK()) {
                 return status;
             }
@@ -159,15 +176,15 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
     progress->finished();
 
-    log() << "index build for " << indexDescriptor->indexName() << ": drain applied "
-          << (_numApplied - appliedAtStart) << " side writes. i: " << totalInserted
-          << ", d: " << totalDeleted << ", total: " << _numApplied;
+    log() << "index build for " << _indexCatalogEntry->descriptor()->indexName()
+          << ": drain applied " << (_numApplied - appliedAtStart)
+          << " side writes. i: " << totalInserted << ", d: " << totalDeleted
+          << ", total: " << _numApplied;
 
     return Status::OK();
 }
 
 Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
-                                          IndexAccessMethod* indexAccessMethod,
                                           const BSONObj& operation,
                                           const InsertDeleteOptions& options,
                                           int64_t* const keysInserted,
@@ -178,28 +195,34 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         (strcmp(operation.getStringField("op"), "i") == 0) ? Op::kInsert : Op::kDelete;
     const BSONObjSet keySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet({key});
 
+    auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
         InsertResult result;
-        Status s =
-            indexAccessMethod->insertKeys(opCtx,
-                                          keySet,
-                                          SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
-                                          MultikeyPaths{},
-                                          opRecordId,
-                                          options,
-                                          &result);
-        if (!s.isOK()) {
-            return s;
+        auto status = accessMethod->insertKeys(opCtx,
+                                               keySet,
+                                               SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                                               MultikeyPaths{},
+                                               opRecordId,
+                                               options,
+                                               &result);
+        if (!status.isOK()) {
+            return status;
         }
 
-        invariant(!result.dupsInserted.size());
+        if (result.dupsInserted.size()) {
+            status = recordDuplicateKeys(opCtx, result.dupsInserted);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
         *keysInserted += result.numInserted;
     } else {
         invariant(opType == Op::kDelete);
         DEV invariant(strcmp(operation.getStringField("op"), "d") == 0);
 
         int64_t numDeleted;
-        Status s = indexAccessMethod->removeKeys(opCtx, keySet, opRecordId, options, &numDeleted);
+        Status s = accessMethod->removeKeys(opCtx, keySet, opRecordId, options, &numDeleted);
         if (!s.isOK()) {
             return s;
         }
@@ -298,7 +321,9 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
 
     std::vector<Record> records;
     for (auto& doc : toInsert) {
-        records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize())});
+        records.emplace_back(Record{RecordId(),  // The storage engine will assign its own RecordId
+                                                 // when we pass one that is null.
+                                    RecordData(doc.objdata(), doc.objsize())});
     }
 
     // By passing a vector of null timestamps, these inserts are not timestamped individually, but
@@ -306,4 +331,5 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     std::vector<Timestamp> timestamps(records.size());
     return _sideWritesTable->rs()->insertRecords(opCtx, &records, timestamps);
 }
+
 }  // namespace mongo
