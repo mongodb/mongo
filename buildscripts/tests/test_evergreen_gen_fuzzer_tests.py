@@ -52,7 +52,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         options = mock.Mock
         options.num_tasks = 15
         options.name = "test_task"
-        options.use_multipath = False
+        options.use_multiversion = False
         options.npm_command = "jstestfuzz"
         options.num_files = 314
         options.jstestfuzz_vars = "var 1 var 2"
@@ -86,7 +86,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
 
     def test_evg_config_is_created_with_multiversion(self):
         options = self._create_options_mock()
-        options.use_multipath = "/data/multiversion"
+        options.use_multiversion = "/data/multiversion"
 
         config = gft._generate_evg_tasks(options).to_map()
 

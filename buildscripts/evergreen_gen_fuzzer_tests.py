@@ -30,7 +30,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "continue_on_failure",
     "should_shuffle",
     "timeout_secs",
-    "use_multipath",
+    "use_multiversion",
 ])
 
 
@@ -94,11 +94,12 @@ def _get_config_options(cmd_line_options, config_file):
                                        default="false")
     timeout_secs = _get_config_value("timeout_secs", cmd_line_options, config_file_data,
                                      default="1800")
-    use_multipath = _get_config_value("task_path_suffix", cmd_line_options, config_file_data,
-                                      default=False)
+    use_multiversion = _get_config_value("task_path_suffix", cmd_line_options, config_file_data,
+                                         default=False)
 
     return ConfigOptions(num_files, num_tasks, resmoke_args, npm_command, jstestfuzz_vars, name,
-                         variant, continue_on_failure, should_shuffle, timeout_secs, use_multipath)
+                         variant, continue_on_failure, should_shuffle, timeout_secs,
+                         use_multiversion)
 
 
 def _name_task(parent_name, task_index, total_tasks):
@@ -133,7 +134,7 @@ def _generate_evg_tasks(options):
         task = evg_config.task(name)
 
         commands = [CommandDefinition().function("do setup")]
-        if options.use_multipath:
+        if options.use_multiversion:
             commands.append(CommandDefinition().function("do multiversion setup"))
 
         commands.append(CommandDefinition().function("run jstestfuzz").vars({
@@ -146,7 +147,7 @@ def _generate_evg_tasks(options):
             "continue_on_failure": options.continue_on_failure,
             "resmoke_args": options.resmoke_args,
             "should_shuffle": options.should_shuffle,
-            "task_path_suffix": options.use_multipath,
+            "task_path_suffix": options.use_multiversion,
             "timeout_secs": options.timeout_secs,
         }
 
@@ -176,8 +177,8 @@ def main():
                         help="options to pass to jstestfuzz.")
     parser.add_argument("--name", dest="name", help="name of task to generate.")
     parser.add_argument("--variant", dest="build_variant", help="build variant to generate.")
-    parser.add_argument("--use-multipath", dest="task_path_suffix",
-                        help="Task path suffix for multipath generated tasks.")
+    parser.add_argument("--use-multiversion", dest="task_path_suffix",
+                        help="Task path suffix for multiversion generated tasks.")
     parser.add_argument("--continue-on-failure", dest="continue_on_failure",
                         help="continue_on_failure value for generated tasks.")
     parser.add_argument("--should-shuffle", dest="should_shuffle",
