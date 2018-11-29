@@ -37,6 +37,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -46,6 +47,17 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+namespace {
+
+void clearShardingOperationFailedStatus(OperationContext* opCtx) {
+    // We do not intend to immediately act upon sharding errors if we receive them during sessions
+    // collection operations. We will instead attempt the same operations during the next refresh
+    // cycle.
+    OperationShardingState::get(opCtx).resetShardingOperationFailedStatus();
+}
+
+}  // namespace
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(
     logicalSessionRefreshMillis,
@@ -221,6 +233,8 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             return uniqueCtx->get();
         }();
 
+        ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
+
         auto existsStatus = _sessionsColl->checkSessionsCollectionExists(opCtx);
         if (!existsStatus.isOK()) {
             StringData notSetUpWarning =
@@ -291,6 +305,8 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         uniqueCtx.emplace(client->makeOperationContext());
         return uniqueCtx->get();
     }();
+
+    ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
 
     auto setupStatus = _sessionsColl->setupSessionsCollection(opCtx);
 
