@@ -347,6 +347,14 @@ std::string KVCatalog::newTempIdent() {
     return buf.str();
 }
 
+std::string KVCatalog::getFilesystemPathForDb(const std::string& dbName) const {
+    if (_directoryPerDb) {
+        return storageGlobalParams.dbpath + '/' + escapeDbName(dbName);
+    } else {
+        return storageGlobalParams.dbpath;
+    }
+}
+
 std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
     StringBuilder buf;
