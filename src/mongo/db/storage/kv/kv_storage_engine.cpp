@@ -454,6 +454,10 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
     return ret;
 }
 
+std::string KVStorageEngine::getFilesystemPathForDb(const std::string& dbName) const {
+    return _catalog->getFilesystemPathForDb(dbName);
+}
+
 void KVStorageEngine::cleanShutdown() {
     for (DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it) {
         delete it->second;

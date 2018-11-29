@@ -113,6 +113,8 @@ public:
      */
     StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx, std::string ident);
 
+    std::string getFilesystemPathForDb(const std::string& dbName) const;
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;
