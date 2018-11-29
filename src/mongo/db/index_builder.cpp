@@ -141,7 +141,15 @@ void IndexBuilder::run() {
     Lock::DBLock dlk(opCtx.get(), ns.db(), MODE_X);
     Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx.get(), ns.db().toString());
 
-    Status status = _build(opCtx.get(), db, true, &dlk);
+    // This background index build can only be interrupted at shutdown.
+    // For the duration of the OperationContext::runWithoutInterruption() invocation, any kill
+    // status set by the killOp command will be ignored.
+    // After OperationContext::runWithoutInterruption() returns, any call to
+    // OperationContext::checkForInterrupt() will see the kill status and respond accordingly
+    // (checkForInterrupt() will throw an exception while checkForInterruptNoAssert() returns
+    // an error Status).
+    Status status =
+        opCtx->runWithoutInterruption([&, this] { return _build(opCtx.get(), db, true, &dlk); });
     if (!status.isOK()) {
         error() << "IndexBuilder could not build index: " << redact(status);
         fassert(28555, ErrorCodes::isInterruption(status.code()));

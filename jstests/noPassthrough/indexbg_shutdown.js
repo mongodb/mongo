@@ -2,6 +2,7 @@
  * Starts a replica set, builds an index in background,
  * shuts down a secondary while it's building that index, and confirms that the secondary
  * shuts down cleanly, without an fassert.
+ * Also confirms that killOp has no effect on the background index build on the secondary.
  * @tags: [requires_replication]
  */
 
@@ -73,6 +74,9 @@
     // Wait for index builds to start on the secondary.
     const opId = IndexBuildTest.waitForIndexBuildToStart(secondDB);
     jsTestLog('Index builds started on secondary. Op ID of one of the builds: ' + opId);
+
+    // Kill the index build. This should have no effect.
+    assert.commandWorked(secondDB.killOp(opId));
 
     jsTest.log("Restarting secondary to retry replication");
 

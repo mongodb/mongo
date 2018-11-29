@@ -52,23 +52,19 @@
     // When the index build starts, find its op id.
     const opId = IndexBuildTest.waitForIndexBuildToStart(testDB);
 
-    // Kill the index build.
+    // Kill the index build. This should have no effect.
     assert.commandWorked(testDB.killOp(opId));
 
     // Wait for the index build to stop.
-    try {
-        IndexBuildTest.waitForIndexBuildToStop(testDB);
-    } finally {
-        IndexBuildTest.resumeIndexBuilds(primary);
-    }
+    IndexBuildTest.resumeIndexBuilds(primary);
+    IndexBuildTest.waitForIndexBuildToStop(testDB);
 
     // Expect successful createIndex command invocation in parallel shell because applyOps returns
     // immediately after starting the background index build in a separate thread.
     createIdx();
 
-    // Check that no new index has been created.  This verifies that the index build was aborted
-    // rather than successfully completed.
-    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+    // Check that index was created on the primary despite the attempted killOp().
+    IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
     // Check that a new index has been created on the secondary.
     // This is due to the createIndexes command being replicated to the secondary before the primary
@@ -79,9 +75,5 @@
     const secondaryColl = secondaryDB.getCollection(coll.getName());
     IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
 
-    // Index 'a_1' was aborted on the primary, resulting in a different set of indexes on the
-    // secondary compared to the primary. Therefore, we skip the dbhash checking while tearing down
-    // the replica set test fixture.
-    TestData.skipCheckDBHashes = true;
     rst.stopSet();
 })();
