@@ -232,6 +232,8 @@ public:
 
     virtual Timestamp getAllCommittedTimestamp() const override;
 
+    virtual Timestamp getOldestOpenReadTimestamp() const override;
+
     bool supportsReadConcernSnapshot() const final override;
 
     /*

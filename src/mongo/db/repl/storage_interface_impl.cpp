@@ -1183,6 +1183,10 @@ Timestamp StorageInterfaceImpl::getAllCommittedTimestamp(ServiceContext* service
     return serviceCtx->getStorageEngine()->getAllCommittedTimestamp();
 }
 
+Timestamp StorageInterfaceImpl::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->getOldestOpenReadTimestamp();
+}
+
 Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* opCtx) const {
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
     invariant(readTimestamp);

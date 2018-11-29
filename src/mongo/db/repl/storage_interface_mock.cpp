@@ -95,6 +95,10 @@ Timestamp StorageInterfaceMock::getAllCommittedTimestamp(ServiceContext* service
     return allCommittedTimestamp;
 }
 
+Timestamp StorageInterfaceMock::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {
+    return oldestOpenReadTimestamp;
+}
+
 bool StorageInterfaceMock::supportsDocLocking(ServiceContext* serviceCtx) const {
     return supportsDocLockingBool;
 }

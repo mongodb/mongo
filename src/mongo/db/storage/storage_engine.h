@@ -477,6 +477,13 @@ public:
      * implementation.
      */
     virtual Timestamp getAllCommittedTimestamp() const = 0;
+
+    /**
+     * Returns the oldest read timestamp in use by an open transaction. Storage engines that support
+     * the 'snapshot' ReadConcern must provide an implementation. Other storage engines may provide
+     * a no-op implementation.
+     */
+    virtual Timestamp getOldestOpenReadTimestamp() const = 0;
 };
 
 }  // namespace mongo

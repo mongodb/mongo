@@ -402,6 +402,13 @@ public:
     virtual Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const = 0;
 
     /**
+     * Returns the oldest read timestamp in use by an open transaction. Storage engines that support
+     * the 'snapshot' ReadConcern must provide an implementation. Other storage engines may provide
+     * a no-op implementation.
+     */
+    virtual Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const = 0;
+
+    /**
      * Returns true if the storage engine supports document level locking.
      */
     virtual bool supportsDocLocking(ServiceContext* serviceCtx) const = 0;

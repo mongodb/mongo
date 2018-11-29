@@ -128,6 +128,10 @@ public:
         return Timestamp();
     }
 
+    virtual Timestamp getOldestOpenReadTimestamp() const override {
+        return Timestamp();
+    }
+
     virtual Status beginBackup(OperationContext* opCtx) override {
         return Status::OK();
     }

@@ -141,6 +141,10 @@ public:
         return Timestamp();
     }
 
+    virtual Timestamp getOldestOpenReadTimestamp() const override {
+        return Timestamp();
+    }
+
     // Biggie Specific
 
     /**
