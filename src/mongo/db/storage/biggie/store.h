@@ -678,29 +678,24 @@ public:
 
     const_iterator lower_bound(const Key& key) const {
         Node* node = _root.get();
-        std::vector<Node*> context;
-        context.push_back(node);
-
         const char* charKey = key.data();
-        // When we search a child array, always search to the right of 'idx' so that
-        // when we go back up the tree we never search anything less than something
-        // we already examined.
-        uint8_t idx = 0;
-        size_t depth = node->_depth + node->_trieKey.size();
+        std::vector<std::pair<Node*, uint8_t>> context;
+        size_t depth = 0;
 
         // Traverse the path given the key to see if the node exists.
         while (depth < key.size()) {
-            // idx is an unsigned int, and converting from a signed 8-bit char to an unsigned int is
-            // not trivial. It is necessary to convert the signed char to a unsigned 8-bit int (aka
-            // 'unsigned char' or 'uint8_t'). Then only it can be assigned to an unsigned int.
-            idx = static_cast<uint8_t>(charKey[depth]);
-            if (node->_children[idx] == nullptr) {
+            uint8_t idx = static_cast<uint8_t>(charKey[depth]);
+
+            // When we go back up the tree to search for the lower bound of key, always search to
+            // the right of 'idx' so that we never search anything less than what the lower bound
+            // would be.
+            if (idx != UINT8_MAX)
+                context.push_back(std::make_pair(node, idx + 1));
+
+            if (!node->_children[idx])
                 break;
-            }
 
             node = node->_children[idx].get();
-            // We may eventually need to search this node's parent for larger children.
-            idx += 1;
             size_t mismatchIdx =
                 _comparePrefix(node->_trieKey, charKey + depth, key.size() - depth);
 
@@ -713,71 +708,57 @@ public:
                 if (mismatchIdx == key.size() - depth ||
                     node->_trieKey[mismatchIdx] > mismatchChar) {
                     // If the current key is greater and has a value it is the lower bound.
-                    if (node->_data) {
+                    if (node->_data)
                         return const_iterator(_root, node);
-                    }
 
                     // If the current key has no value, place it in the context
                     // so that we can search its children.
-                    context.push_back(node);
-                    idx = 0;
-                } else {
-                    // If the current key is less, we will need to go back up the
-                    // tree and this node does not need to be pushed into the context.
-                    unsigned char c = static_cast<unsigned char>(charKey[depth]);
-                    idx = c + 1;
+                    context.push_back(std::make_pair(node, 0));
                 }
                 break;
             }
 
-            context.push_back(node);
             depth = node->_depth + node->_trieKey.size();
         }
 
-        if (depth == key.size() && node->_data) {
+        if (depth == key.size()) {
             // If the node exists, then we can just return an iterator to that node.
-            return const_iterator(_root, node);
-        } else if (depth == key.size()) {
+            if (node->_data)
+                return const_iterator(_root, node);
+
             // The search key is an exact prefix, so we need to search all of this node's
             // children.
-            idx = 0;
+            context.back() = std::make_pair(node, 0);
         }
 
-        // The node did not exist, so must find an node with the next largest key (if it exists).
-        // Use the context stack to move up the tree and keep searching for the next node with data
-        // if need be.
+        // The node with the provided key did not exist. Now we must find the next largest node, if
+        // it exists.
         while (!context.empty()) {
-            node = context.back();
+            uint8_t idx = 0;
+            std::tie(node, idx) = context.back();
             context.pop_back();
 
             for (auto iter = idx + node->_children.begin(); iter != node->_children.end(); ++iter) {
-                if (*iter != nullptr) {
-                    // There exists a node with a key larger than the one given, traverse to
-                    // this node which will be the left-most node in this sub-tree.
-                    node = iter->get();
-                    while (!node->_data) {
-                        for (auto iter = node->_children.begin(); iter != node->_children.end();
-                             ++iter) {
-                            if (*iter != nullptr) {
-                                node = iter->get();
-                                break;
-                            }
-                        }
-                    }
+                if (!(*iter))
+                    continue;
+
+                // There exists a node with a key larger than the one given.
+                node = iter->get();
+                if (node->_data)
                     return const_iterator(_root, node);
-                }
+
+                // Need to search this node's children for the next largest node.
+                context.push_back(std::make_pair(node, 0));
+                break;
             }
 
-            if (node->_trieKey.empty()) {
+            if (node->_trieKey.empty() && context.empty()) {
                 // We have searched the root. There's nothing left to search.
                 return end();
-            } else {
-                unsigned char c = static_cast<unsigned char>(node->_trieKey.front());
-                idx = c + 1;
             }
         }
 
-        // If there was no node with a larger key than the one given, return end().
+        // There was no node key at least as large as the one given.
         return end();
     }
 

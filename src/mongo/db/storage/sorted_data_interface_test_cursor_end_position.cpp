@@ -419,5 +419,46 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Inclusive) {
 TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Exclusive) {
     testSetEndPosition_Empty_Reverse(false, false);
 }
+
+void testSetEndPosition_Character_Limits(bool unique, bool inclusive) {
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+    auto opCtx = harnessHelper->newOperationContext();
+    auto sorted = harnessHelper->newSortedDataInterface(unique, {{key7, loc1}, {key8, loc1}});
+
+    auto cursor = sorted->newCursor(opCtx.get());
+    cursor->setEndPosition(key7, inclusive);
+
+    if (inclusive) {
+        ASSERT_EQ(cursor->seek(key7, true), IndexKeyEntry(key7, loc1));
+        ASSERT_EQ(cursor->next(), boost::none);
+    } else {
+        ASSERT_EQ(cursor->seek(key7, true), boost::none);
+    }
+
+    cursor = sorted->newCursor(opCtx.get());
+    cursor->setEndPosition(key8, inclusive);
+
+    if (inclusive) {
+        ASSERT_EQ(cursor->seek(key7, true), IndexKeyEntry(key7, loc1));
+        ASSERT_EQ(cursor->next(), IndexKeyEntry(key8, loc1));
+        ASSERT_EQ(cursor->next(), boost::none);
+    } else {
+        ASSERT_EQ(cursor->seek(key7, true), IndexKeyEntry(key7, loc1));
+        ASSERT_EQ(cursor->next(), boost::none);
+    }
+}
+
+TEST(SortedDataInterface, SetEndPosition_Character_Limits_Unique_Inclusive) {
+    testSetEndPosition_Character_Limits(true, true);
+}
+TEST(SortedDataInterface, SetEndPosition_Character_Limits_Unique_Exclusive) {
+    testSetEndPosition_Character_Limits(true, false);
+}
+TEST(SortedDataInterface, SetEndPosition_Character_Limits_Standard_Inclusive) {
+    testSetEndPosition_Character_Limits(false, true);
+}
+TEST(SortedDataInterface, SetEndPosition_Character_Limits_Standard_Exclusive) {
+    testSetEndPosition_Character_Limits(false, false);
+}
 }  // namespace
 }  // namespace mongo

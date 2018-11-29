@@ -1635,6 +1635,7 @@ TEST_F(RadixStoreTest, LowerBoundTest) {
     value_type value2 = std::make_pair("bad", "2");
     value_type value3 = std::make_pair("foo", "3");
     value_type value4 = std::make_pair("fools", "4");
+    value_type value5 = std::make_pair("baz", "5");
 
     thisStore.insert(value_type(value3));
     thisStore.insert(value_type(value1));
@@ -1671,6 +1672,10 @@ TEST_F(RadixStoreTest, LowerBoundTest) {
 
     iter = thisStore.lower_bound("three");
     ASSERT_TRUE(iter == thisStore.end());
+
+    thisStore.insert(value_type(value5));
+    iter = thisStore.lower_bound("bah");
+    ASSERT_TRUE(iter == thisStore.find("baz"));
 }
 
 TEST_F(RadixStoreTest, LowerBoundTestSmallerThanExistingPrefix) {
@@ -2430,6 +2435,26 @@ TEST_F(RadixStoreTest, HasPreviousVersionFlagTest) {
     }
 
     ASSERT_FALSE(hasPreviousVersion());
+}
+
+TEST_F(RadixStoreTest, LowerBoundEndpoint) {
+    value_type value1 = std::make_pair("AAA", "1");
+    value_type value2 = std::make_pair("\xff\xff\xff", "2");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+
+    auto it = thisStore.lower_bound("AAA");
+    ASSERT_TRUE(it->first == "AAA");
+
+    it = thisStore.lower_bound("\xff\xff");
+    ASSERT_TRUE(it->first == "\xff\xff\xff");
+
+    it = thisStore.lower_bound("\xff\xff\xff");
+    ASSERT_TRUE(it->first == "\xff\xff\xff");
+
+    it = thisStore.lower_bound("\xff\xff\xff\xff");
+    ASSERT_TRUE(it == thisStore.end());
 }
 
 }  // biggie namespace
