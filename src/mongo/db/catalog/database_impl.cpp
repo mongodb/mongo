@@ -414,11 +414,8 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     _dbEntry->appendExtraStats(opCtx, output, scale);
 
     if (!opCtx->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
-        boost::filesystem::path dbpath(storageGlobalParams.dbpath);
-        if (storageGlobalParams.directoryperdb) {
-            dbpath /= _name;
-        }
-
+        boost::filesystem::path dbpath(
+            opCtx->getServiceContext()->getGlobalStorageEngine()->getFilesystemPathForDb(_name));
         boost::system::error_code ec;
         boost::filesystem::space_info spaceInfo = boost::filesystem::space(dbpath, ec);
         if (!ec) {

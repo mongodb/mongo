@@ -365,6 +365,11 @@ public:
      */
     virtual Timestamp getAllCommittedTimestamp() const = 0;
 
+    /**
+     * Returns the path to the directory which has the data files of database with `dbName`.
+     */
+    virtual std::string getFilesystemPathForDb(const std::string& dbName) const = 0;
+
 protected:
     /**
      * The destructor will never be called. See cleanShutdown instead.

@@ -99,6 +99,8 @@ public:
         return _featureTracker.get();
     }
 
+    std::string getFilesystemPathForDb(const std::string& dbName) const;
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;

@@ -409,4 +409,13 @@ void MMAPV1Engine::cleanShutdown() {
 void MMAPV1Engine::setJournalListener(JournalListener* jl) {
     dur::setJournalListener(jl);
 }
+
+std::string MMAPV1Engine::getFilesystemPathForDb(const std::string& dbName) const {
+    if (storageGlobalParams.directoryperdb) {
+        return storageGlobalParams.dbpath + '/' + dbName;
+    } else {
+        return storageGlobalParams.dbpath;
+    }
+}
+
 }  // namespace mongo
