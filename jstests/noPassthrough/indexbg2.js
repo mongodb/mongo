@@ -4,7 +4,6 @@
 (function() {
     "use strict";
 
-    load("jstests/noPassthrough/libs/index_build.js");
     load("jstests/libs/check_log.js");
 
     const conn = MongoRunner.runMongod({nojournal: ""});
