@@ -77,6 +77,10 @@ public:
         return constraints;
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     DepsTracker::State getDependencies(DepsTracker* deps) const {
         // The namespace is not technically needed yet, but we will if there is more than one
         // collection involved.

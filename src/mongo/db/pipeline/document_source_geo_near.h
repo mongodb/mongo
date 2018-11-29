@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-class DocumentSourceGeoNear : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceGeoNear : public DocumentSource {
 public:
     static constexpr StringData kKeyFieldName = "key"_sd;
     static constexpr auto kStageName = "$geoNear";
@@ -121,16 +121,9 @@ public:
     BSONObj asNearQuery(StringData nearFieldName) const;
 
     /**
-     * This document source is sent as-is to the shards.
-     */
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return this;
-    }
-
-    /**
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
      */
-    MergingLogic mergingLogic() final;
+    boost::optional<MergingLogic> mergingLogic() final;
 
 
 private:

@@ -65,16 +65,23 @@ public:
 
     private:
         bool supportsWriteConcern() const override {
-            return Pipeline::aggSupportsWriteConcern(this->_request.body);
+            // For an aggregate command that specifies a writeConcern, we check on mongoS whether
+            // there's an $out in the pipeline, and reject the command if there isn't. Otherwise,
+            // we forward the writeConcern to any and all aggregates sent to the shards, even for an
+            // aggregate which represents a part of the global pipeline that does not contain the
+            // $out.  So if the command is from mongos we can trust that the write concern makes
+            // sense.  Otherwise we validate that writeConcern is only passed when there's an $out
+            // stage.
+            return this->_request.body["fromMongos"].trueValue() ||
+                Pipeline::aggSupportsWriteConcern(this->_request.body);
         }
 
         bool supportsReadConcern(repl::ReadConcernLevel level) const override {
             // Aggregations that are run directly against a collection allow any read concern.
             // Otherwise, if the aggregate is collectionless then the read concern must be 'local'
             // (e.g. $currentOp). The exception to this is a $changeStream on a whole database,
-            // which is
-            // considered collectionless but must be read concern 'majority'. Further read concern
-            // validation is done one the pipeline is parsed.
+            // which is considered collectionless but must be read concern 'majority'. Further read
+            // concern validation is done once the pipeline is parsed.
             return level == repl::ReadConcernLevel::kLocalReadConcern ||
                 level == repl::ReadConcernLevel::kMajorityReadConcern ||
                 !AggregationRequest::parseNs(_dbName, _request.body).isCollectionlessAggregateNS();

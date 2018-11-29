@@ -43,8 +43,7 @@ namespace mongo {
  * pipeline will be executed on mongoS if all other stages are eligible, and will be sent to a
  * random participating shard otherwise.
  */
-class DocumentSourceInternalSplitPipeline final : public DocumentSource,
-                                                  public NeedsMergerDocumentSource {
+class DocumentSourceInternalSplitPipeline final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSplitPipeline"_sd;
 
@@ -60,12 +59,9 @@ public:
         return kStageName.rawData();
     }
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
-    }
-
-    MergingLogic mergingLogic() final {
-        return {this};
+    boost::optional<MergingLogic> mergingLogic() final {
+        // {shardsStage, mergingStage, sortPattern}
+        return MergingLogic{nullptr, this, boost::none};
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

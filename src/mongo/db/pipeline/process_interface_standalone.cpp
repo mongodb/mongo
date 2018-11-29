@@ -142,7 +142,8 @@ DBClientBase* MongoInterfaceStandalone::directClient() {
 }
 
 bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
     const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     return metadata->isSharded();
 }
@@ -276,7 +277,14 @@ Status MongoInterfaceStandalone::appendRecordCount(OperationContext* opCtx,
 
 BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
     const auto infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
-    return infos.empty() ? BSONObj() : infos.front().getObjectField("options").getOwned();
+    if (infos.empty()) {
+        return BSONObj();
+    }
+    auto res = infos.front();
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << nss.toString() << " is a view, not a collection",
+            res["type"].String() != "view");
+    return res.getObjectField("options").getOwned();
 }
 
 void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(

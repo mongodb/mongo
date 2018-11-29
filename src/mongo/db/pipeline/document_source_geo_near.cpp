@@ -237,8 +237,9 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), coordsIsArray(false), spherical(false) {}
 
-NeedsMergerDocumentSource::MergingLogic DocumentSourceGeoNear::mergingLogic() {
-    return {nullptr, BSON(distanceField->fullPath() << 1)};
+boost::optional<DocumentSource::MergingLogic> DocumentSourceGeoNear::mergingLogic() {
+    // {shardsStage, mergingStage, sortPattern}
+    return MergingLogic{this, nullptr, BSON(distanceField->fullPath() << 1)};
 }
 
 }  // namespace mongo

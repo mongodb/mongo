@@ -87,7 +87,7 @@ private:
     std::string _groupId;
 };
 
-class DocumentSourceGroup final : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceGroup final : public DocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
@@ -162,9 +162,7 @@ public:
      */
     bool usedDisk() final;
 
-    // Virtuals for NeedsMergerDocumentSource.
-    boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    MergingLogic mergingLogic() final;
+    boost::optional<MergingLogic> mergingLogic() final;
     bool canRunInParallelBeforeOut(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
 

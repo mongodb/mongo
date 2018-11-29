@@ -47,7 +47,7 @@ namespace mongo {
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceLookUp final : public DocumentSource {
 public:
     static constexpr size_t kMaxSubPipelineDepth = 20;
 
@@ -110,12 +110,9 @@ public:
         return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.fullPath()});
     }
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
-    }
-
-    MergingLogic mergingLogic() final {
-        return {this};
+    boost::optional<MergingLogic> mergingLogic() final {
+        // {shardsStage, mergingStage, sortPattern}
+        return MergingLogic{nullptr, this, boost::none};
     }
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {

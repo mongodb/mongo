@@ -214,6 +214,10 @@ public:
                 TransactionRequirement::kAllowed};
     }
 
+    boost::optional<MergingLogic> mergingLogic() final {
+        return boost::none;
+    }
+
     const char* getSourceName() const final;
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

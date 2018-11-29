@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -298,11 +298,6 @@ BSONObj MongoSInterface::createCommandForTargetedShards(
         // notifies the shards that the mongoS is capable of merging streams based on resume token.
         // TODO SERVER-38539: the 'mergeByPBRT' flag is no longer necessary in 4.4.
         targetedCmd[AggregationRequest::kMergeByPBRTName] = Value(litePipe.hasChangeStream());
-
-        // For split pipelines which need merging, do *not* propagate the writeConcern to the shards
-        // part. Otherwise this is part of an exchange and in that case we should include the
-        // writeConcern.
-        targetedCmd[WriteConcernOptions::kWriteConcernField] = Value();
     }
 
     targetedCmd[AggregationRequest::kCursorName] =
@@ -420,6 +415,10 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
     boost::optional<cluster_aggregation_planner::SplitPipeline> splitPipeline;
 
     if (needsSplit) {
+        LOG(5) << "Splitting pipeline: "
+               << "targeting = " << shardIds.size()
+               << " shards, needsMongosMerge = " << needsMongosMerge
+               << ", needsPrimaryShardMerge = " << needsPrimaryShardMerge;
         splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
 
         exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(

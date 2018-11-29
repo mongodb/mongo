@@ -56,6 +56,10 @@ public:
                                 TransactionRequirement::kNotAllowed};
     }
 
+    virtual boost::optional<MergingLogic> mergingLogic() override {
+        return boost::none;
+    }
+
     virtual GetModPathsReturn getModifiedPaths() const override {
         MONGO_UNREACHABLE;
     }
