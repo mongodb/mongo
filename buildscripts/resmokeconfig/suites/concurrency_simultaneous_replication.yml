@@ -30,6 +30,10 @@ selector:
   # there is a concurrent dropDatabase waiting for the global X lock.
   # TODO: SERVER-37876
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+  # This workload starts and prepares many transactions, which can cause a deadlock when secondary
+  # application tries to acquire the global X lock.
+  # TODO: SERVER-37876
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
   exclude_with_any_tags:
   - requires_sharding
 

@@ -4,11 +4,12 @@
  * This test checks high level invariants of various transaction related metrics reported in
  * serverStatus and currentOp.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js');
+load('jstests/core/txns/libs/prepare_helpers.js');
 // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
@@ -59,6 +60,51 @@ var $config = extendWorkload($config, function($config, $super) {
     }
 
     /**
+     * serverStatus invariant: totalPreparedThenAborted + totalPreparedThenCommitted +
+     * currentPrepared = totalPrepared
+     */
+    function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared(
+        serverStatusTxnStats) {
+        let preparedAborted = Number(serverStatusTxnStats["totalPreparedThenAborted"]);
+        let preparedCommitted = Number(serverStatusTxnStats["totalPreparedThenCommitted"]);
+        let currentPrepared = Number(serverStatusTxnStats["currentPrepared"]);
+        let totalPrepared = Number(serverStatusTxnStats["totalPrepared"]);
+        return (preparedAborted + preparedCommitted + currentPrepared) === totalPrepared;
+    }
+
+    /**
+     * Certain metrics for non-prepared transactions can be calculated by subtracting the relevant
+     * total transactions metric by the relevant prepared transactions metric.
+     * serverStatus invariant: unpreparedAborted + unpreparedCommitted + unpreparedOpen =
+     * totalUnprepared
+     */
+    function unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared(
+        serverStatusTxnStats) {
+        let unpreparedAborted = Number(serverStatusTxnStats["totalAborted"]) -
+            Number(serverStatusTxnStats["totalPreparedThenAborted"]);
+        let unpreparedCommitted = Number(serverStatusTxnStats["totalCommitted"]) -
+            Number(serverStatusTxnStats["totalPreparedThenCommitted"]);
+        let unpreparedOpen = Number(serverStatusTxnStats["currentOpen"]) -
+            Number(serverStatusTxnStats["currentPrepared"]);
+        let totalUnprepared = Number(serverStatusTxnStats["totalStarted"]) -
+            Number(serverStatusTxnStats["totalPrepared"]);
+        return (unpreparedAborted + unpreparedCommitted + unpreparedOpen) === totalUnprepared;
+    }
+
+    /**
+     * Checks that the invariant described by 'predFn' holds for the given samples, with a
+     * maximum error of maxErrPct.
+     */
+    function checkInvariant(samples, predFn, maxErrPct) {
+        let failedSamples = filterFalse(samples, predFn);
+        let errRate = failedSamples.length / samples.length;
+        assertAlways.lte(errRate, maxErrPct, () => {
+            let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
+            return "'" + predFn.name + "' invariant violated. Failed samples: " + failedSamplesStr;
+        });
+    }
+
+    /**
      * Check invariants of transactions metrics reported in 'serverStatus' (server-wide metrics),
      * using the number of given samples.
      *
@@ -88,32 +134,26 @@ var $config = extendWorkload($config, function($config, $super) {
         // We consider an invariant failure rate of 5% within a large enough sample to be acceptable
         // For example, in a batch of 100 metrics samples, we would accept <= 5 violations of a
         // particular invariant.
-        let maxErrPct = 0.05;
+        const maxErrPct = 0.05;
 
-        let failedSamples = filterFalse(samples, activePlusInactiveEqualsOpen);
-        let errRate = failedSamples.length / samples.length;
-        assertAlways.lte(errRate, maxErrPct, () => {
-            let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
-            return "'activePlusInactiveEqualsOpen' invariant violated. Failed samples: " +
-                failedSamplesStr;
-        });
-
-        failedSamples = filterFalse(samples, committedPlusAbortedPlusOpenEqualsStarted);
-        errRate = failedSamples.length / samples.length;
-        assertAlways.lte(errRate, maxErrPct, () => {
-            let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
-            return "'committedPlusAbortedPlusOpenEqualsStarted' invariant violated." +
-                "Failed samples: " + failedSamplesStr;
-        });
+        checkInvariant(samples, activePlusInactiveEqualsOpen, maxErrPct);
+        checkInvariant(samples, committedPlusAbortedPlusOpenEqualsStarted, maxErrPct);
+        checkInvariant(samples,
+                       preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared,
+                       maxErrPct);
+        checkInvariant(
+            samples,
+            unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared,
+            maxErrPct);
 
         // allCountsNonNegative() is always expected to succeed.
-        failedSamples = filterFalse(samples, allCountsNonNegative);
-        assertAlways.eq(0, failedSamples.length, () => {
-            let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
-            return "'allCountsNonNegative' invariant violated." + "Failed samples: " +
-                failedSamplesStr;
-        });
+        checkInvariant(samples, allCountsNonNegative, 0);
     }
+
+    $config.setup = function(db, collName, cluster) {
+        $super.setup.apply(this, arguments);
+        this.prepareProbability = 0.5;
+    };
 
     $config.teardown = function(db, collName, cluster) {
         // Check the server-wide invariants one last time, with only a single sample, since all user

@@ -160,7 +160,10 @@ var $config = (function() {
                     const batchSize = Math.max(2, Math.floor(numDocs / 5));
                     allDocuments.push(...txnCollection.find().batchSize(batchSize).toArray());
                 }
-            }, {retryOnKilledSession: this.retryOnKilledSession});
+            }, {
+                retryOnKilledSession: this.retryOnKilledSession,
+                prepareProbability: this.prepareProbability
+            });
         } else {
             for (let collection of this.collections) {
                 allDocuments.push(...collection.find().toArray());
@@ -175,7 +178,6 @@ var $config = (function() {
     function getDocIdsToUpdate(numDocs) {
         // Generate between [2, numDocs / 2] operations.
         const numOps = 2 + Random.randInt(Math.ceil(numDocs / 2) - 1);
-
         // Select 'numOps' document (without replacement) to update.
         let docIds = Array.from({length: numDocs}, (value, index) => index);
         return Array.shuffle(docIds).slice(0, numOps);
@@ -241,7 +243,10 @@ var $config = (function() {
                         committedTxnInfo.push(
                             {_id: docId, dbName: txnDbName, collName: txnCollName});
                     }
-                }, {retryOnKilledSession: this.retryOnKilledSession});
+                }, {
+                    retryOnKilledSession: this.retryOnKilledSession,
+                    prepareProbability: this.prepareProbability
+                });
 
                 this.updatedDocsClientHistory[txnNumber] = committedTxnInfo;
                 ++this.iteration;
@@ -263,7 +268,6 @@ var $config = (function() {
      */
     function checkConsistencyOnLastIteration(data, func, checkConsistencyFunc) {
         let lastIteration = ++data.totalIteration >= data.iterations;
-
         func();
         if (lastIteration) {
             checkConsistencyFunc();

@@ -745,7 +745,7 @@ var {
         };
 
         this.startTransaction = function startTransaction(txnOptsObj, ignoreActiveTxn) {
-            // If the session is already in a transaction, raise an error. If retryNewTxnNum
+            // If the session is already in a transaction, raise an error. If ignoreActiveTxn
             // is true, don't raise an error. This is to allow multiple threads to try to
             // use the same session in a concurrency workload.
             if (this.isTxnActive() && !ignoreActiveTxn) {

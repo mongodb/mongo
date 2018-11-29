@@ -22,7 +22,8 @@ var {withTxnAndAutoRetry} = (function() {
     /**
      * Runs 'func' inside of a transaction started with 'txnOptions', and automatically retries
      * until it either succeeds or the server returns a non-TransientTransactionError error
-     * response.
+     * response. There is a probability of 'prepareProbability' that the transaction is prepared
+     * before committing.
      *
      * The caller should take care to ensure 'func' doesn't modify any captured variables in a
      * speculative fashion where calling it multiple times would lead to unintended behavior. The
@@ -31,22 +32,29 @@ var {withTxnAndAutoRetry} = (function() {
      */
     function withTxnAndAutoRetry(session, func, {
         txnOptions: txnOptions = {readConcern: {level: 'snapshot'}},
-        retryOnKilledSession: retryOnKilledSession = false
+        retryOnKilledSession: retryOnKilledSession = false,
+        prepareProbability: prepareProbability = 0.0
     } = {}) {
         let hasTransientError;
 
         do {
-            session.startTransaction(txnOptions);
+            session.startTransaction_forTesting(txnOptions, {ignoreActiveTxn: true});
             let hasCommitTxnError = false;
             hasTransientError = false;
 
             try {
                 func();
 
-                // commitTransaction() calls assert.commandWorked(), which may fail with a
-                // WriteConflict error response, which is ignored.
                 try {
-                    quietly(() => session.commitTransaction());
+                    const rand = Random.rand();
+                    if (rand < prepareProbability) {
+                        const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+                        PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+                    } else {
+                        // commitTransaction() calls assert.commandWorked(), which may fail with a
+                        // WriteConflict error response, which is ignored.
+                        quietly(() => session.commitTransaction());
+                    }
                 } catch (e) {
                     hasCommitTxnError = true;
                     throw e;
