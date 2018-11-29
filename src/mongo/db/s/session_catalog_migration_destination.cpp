@@ -247,7 +247,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
 
     const auto stmtId = *oplogEntry.getStatementId();
 
-    auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
+    auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, result.sessionId);
     auto const txnParticipant =
         TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
     txnParticipant->refreshFromStorageIfNeeded(opCtx);

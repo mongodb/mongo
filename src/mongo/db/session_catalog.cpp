@@ -73,14 +73,17 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
 }
 
 ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx) {
+    invariant(opCtx->getLogicalSessionId());
+    return checkOutSession(opCtx, *opCtx->getLogicalSessionId());
+}
+
+ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx,
+                                                        const LogicalSessionId& lsid) {
     // This method is not supposed to be called with an already checked-out session due to risk of
     // deadlock
     invariant(!operationSessionDecoration(opCtx));
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     invariant(!opCtx->lockState()->isLocked());
-
-    invariant(opCtx->getLogicalSessionId());
-    const auto lsid = *opCtx->getLogicalSessionId();
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     auto sri = _getOrCreateSessionRuntimeInfo(ul, opCtx, lsid);
@@ -94,7 +97,7 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
     sri->session._markCheckedOut(ul, opCtx);
 
     return ScopedCheckedOutSession(
-        opCtx, ScopedSession(std::move(sri)), boost::none /* Not checked out for kill */);
+        *this, std::move(sri), boost::none /* Not checked out for kill */);
 }
 
 ScopedCheckedOutSession SessionCatalog::checkOutSessionForKill(OperationContext* opCtx,
@@ -118,21 +121,7 @@ ScopedCheckedOutSession SessionCatalog::checkOutSessionForKill(OperationContext*
     sri->session._markCheckedOut(ul, opCtx);
 
     return ScopedCheckedOutSession(
-        opCtx, ScopedSession(std::move(sri)), std::move(killToken) /* Checked out for kill */);
-}
-
-ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
-                                                 const LogicalSessionId& lsid) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->getLogicalSessionId());
-    invariant(!opCtx->getTxnNumber());
-
-    auto ss = [&] {
-        stdx::unique_lock<stdx::mutex> ul(_mutex);
-        return ScopedSession(_getOrCreateSessionRuntimeInfo(ul, opCtx, lsid));
-    }();
-
-    return ss;
+        *this, std::move(sri), std::move(killToken) /* Checked out for kill */);
 }
 
 void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
@@ -167,14 +156,13 @@ std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreate
     return it->second;
 }
 
-void SessionCatalog::_releaseSession(const LogicalSessionId& lsid,
+void SessionCatalog::_releaseSession(std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri,
                                      boost::optional<Session::KillToken> killToken) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    auto it = _sessions.find(lsid);
-    invariant(it != _sessions.end());
-
-    auto& sri = it->second;
+    // Make sure we have exactly the same session on the map and that it is still associated with an
+    // operation context (meaning checked-out)
+    invariant(_sessions[sri->session.getSessionId()] == sri);
     invariant(sri->session.currentOperation());
 
     sri->session._markCheckedIn(lg);

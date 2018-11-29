@@ -519,21 +519,17 @@ public:
     void setUp() override {
         OpObserverTest::setUp();
         _opCtx = cc().makeOperationContext();
+
         _opObserver.emplace();
 
         MongoDSessionCatalog::onStepUp(opCtx());
-
-        // Create a session.
-        auto sessionCatalog = SessionCatalog::get(getServiceContext());
-        auto sessionId = makeLogicalSessionIdForTest();
-        _session = sessionCatalog->getOrCreateSession(opCtx(), sessionId);
-
         _times.emplace(opCtx());
-        opCtx()->setLogicalSessionId(session()->getSessionId());
-        opCtx()->setTxnNumber(txnNum());
 
+        opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        opCtx()->setTxnNumber(txnNum());
         _sessionCheckout = std::make_unique<MongoDOperationContextSession>(opCtx());
-        auto txnParticipant = TransactionParticipant::get(opCtx());
+
+        const auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
     }
 
@@ -592,7 +588,7 @@ protected:
     }
 
     Session* session() {
-        return _session->get();
+        return OperationContextSession::get(opCtx());
     }
 
     OpObserverImpl& opObserver() {
@@ -613,10 +609,11 @@ private:
         typedef OpObserver::ReservedTimes ReservedTimes;
     };
 
-    boost::optional<OpObserverImpl> _opObserver;
-    boost::optional<ScopedSession> _session;
     ServiceContext::UniqueOperationContext _opCtx;
+
+    boost::optional<OpObserverImpl> _opObserver;
     boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
+
     std::unique_ptr<MongoDOperationContextSession> _sessionCheckout;
     TxnNumber _txnNum = 0;
 };

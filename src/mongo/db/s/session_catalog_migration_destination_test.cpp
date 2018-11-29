@@ -164,10 +164,10 @@ public:
         return _migrationId.value();
     }
 
-    ScopedSession getSessionWithTxn(OperationContext* opCtx,
-                                    const LogicalSessionId& sessionId,
-                                    const TxnNumber& txnNum) {
-        auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, sessionId);
+    ScopedCheckedOutSession getSessionWithTxn(OperationContext* opCtx,
+                                              const LogicalSessionId& sessionId,
+                                              const TxnNumber& txnNum) {
+        auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, sessionId);
         const auto txnParticipant =
             TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
         txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
@@ -1590,7 +1590,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         // in TransactionTooOld. This should not preclude the entries for session 2 from getting
         // applied.
         auto scopedSession =
-            SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, *sessionInfo1.getSessionId());
+            SessionCatalog::get(opCtx)->checkOutSession(opCtx, *sessionInfo1.getSessionId());
         const auto txnParticipant =
             TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
         txnParticipant->refreshFromStorageIfNeeded(opCtx);

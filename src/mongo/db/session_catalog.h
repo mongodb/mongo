@@ -75,9 +75,12 @@ public:
     void reset_forTest();
 
     /**
-     * Potentially blocking call, which uses the session information stored in the specified
-     * operation context and either creates a brand new session object (if one doesn't exist) or
-     * "checks-out" the existing one (if it is not currently in use or marked for kill).
+     * Potentially blocking call, which either creates a brand new session object (if one doesn't
+     * exist) or "checks-out" the existing one (if it is not currently in use or marked for kill).
+     *
+     * The 'opCtx'-only variant uses the session information stored on the operation context and the
+     * variant, which has the 'lsid' parameter checks-out that session id. Neither of these methods
+     * can be called with an already checked-out session.
      *
      * Checking out a session puts it in the 'checked out' state and all subsequent calls to
      * checkout will block until it is checked back in. This happens when the returned object goes
@@ -86,6 +89,7 @@ public:
      * Throws exception on errors.
      */
     ScopedCheckedOutSession checkOutSession(OperationContext* opCtx);
+    ScopedCheckedOutSession checkOutSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
      * See the description of 'Session::kill' for more information on the session kill usage
@@ -93,17 +97,6 @@ public:
      */
     ScopedCheckedOutSession checkOutSessionForKill(OperationContext* opCtx,
                                                    Session::KillToken killToken);
-
-    /**
-     * Returns a reference to the specified cached session regardless of whether it is checked-out
-     * or not. The returned session is not returned checked-out and is allowed to be checked-out
-     * concurrently.
-     *
-     * The intended usage for this method is to allow migrations to run in parallel with writes for
-     * the same session without blocking it. Because of this, it may not be used from operations
-     * which run on a session.
-     */
-    ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
@@ -150,7 +143,7 @@ private:
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
-    void _releaseSession(const LogicalSessionId& lsid,
+    void _releaseSession(std::shared_ptr<SessionRuntimeInfo> sri,
                          boost::optional<Session::KillToken> killToken);
 
     stdx::mutex _mutex;
@@ -160,13 +153,24 @@ private:
 };
 
 /**
- * Scoped object representing a reference to a session.
+ * Scoped object representing a checked-out session. See comments for the 'checkoutSession' method
+ * for more information on its behaviour.
  */
-class ScopedSession {
+class ScopedCheckedOutSession {
+    MONGO_DISALLOW_COPYING(ScopedCheckedOutSession);
+
+    friend ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext*,
+                                                                   const LogicalSessionId&);
+    friend ScopedCheckedOutSession SessionCatalog::checkOutSessionForKill(OperationContext*,
+                                                                          Session::KillToken);
+
 public:
-    explicit ScopedSession(std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri)
-        : _sri(std::move(sri)) {
-        invariant(_sri);
+    ScopedCheckedOutSession(ScopedCheckedOutSession&&) = default;
+
+    ~ScopedCheckedOutSession() {
+        if (_sri) {
+            _catalog._releaseSession(std::move(_sri), std::move(_killToken));
+        }
     }
 
     Session* get() const {
@@ -182,63 +186,22 @@ public:
     }
 
     operator bool() const {
-        return !!_sri;
+        return bool(_sri);
     }
 
 private:
-    std::shared_ptr<SessionCatalog::SessionRuntimeInfo> _sri;
-};
-
-/**
- * Scoped object representing a checked-out session. See comments for the 'checkoutSession' method
- * for more information on its behaviour.
- */
-class ScopedCheckedOutSession {
-    MONGO_DISALLOW_COPYING(ScopedCheckedOutSession);
-
-    friend ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext*);
-    friend ScopedCheckedOutSession SessionCatalog::checkOutSessionForKill(OperationContext*,
-                                                                          Session::KillToken);
-
-public:
-    ScopedCheckedOutSession(ScopedCheckedOutSession&&) = default;
-
-    ~ScopedCheckedOutSession() {
-        if (_scopedSession) {
-            SessionCatalog::get(_opCtx)->_releaseSession(_scopedSession->getSessionId(),
-                                                         std::move(_killToken));
-        }
-    }
-
-    Session* get() const {
-        return _scopedSession.get();
-    }
-
-    Session* operator->() const {
-        return get();
-    }
-
-    Session& operator*() const {
-        return *get();
-    }
-
-    operator bool() const {
-        return _scopedSession;
-    }
-
-private:
-    ScopedCheckedOutSession(OperationContext* opCtx,
-                            ScopedSession scopedSession,
+    ScopedCheckedOutSession(SessionCatalog& catalog,
+                            std::shared_ptr<SessionCatalog::SessionRuntimeInfo> sri,
                             boost::optional<Session::KillToken> killToken)
-        : _opCtx(opCtx),
-          _killToken(std::move(killToken)),
-          _scopedSession(std::move(scopedSession)) {}
+        : _catalog(catalog), _sri(std::move(sri)), _killToken(std::move(killToken)) {}
 
-    OperationContext* const _opCtx;
+    // The owning session catalog into which the session should be checked back
+    SessionCatalog& _catalog;
 
+    std::shared_ptr<SessionCatalog::SessionRuntimeInfo> _sri;
+
+    // Only set if the session was obtained though checkOutSessionForKill
     boost::optional<Session::KillToken> _killToken;
-
-    ScopedSession _scopedSession;
 };
 
 /**
