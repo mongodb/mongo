@@ -13,7 +13,7 @@
  * applicable.
  *
  * This test requires replica set configuration and user credentials to persist across a restart.
- * @tags: [requires_persistence, uses_transactions]
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
 // Restarts cause issues with authentication for awaiting replication.
@@ -765,6 +765,17 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             .itcount(),
         0);
 
+    // Prepare the transaction and ensure the prepareTimestamp is valid.
+    const prepareRes = assert.commandWorked(sessionDB.adminCommand(
+        {prepareTransaction: 1, txnNumber: NumberLong(0), autocommit: false}));
+    assert(prepareRes.prepareTimestamp,
+           "prepareTransaction did not return a 'prepareTimestamp': " + tojson(prepareRes));
+    assert(prepareRes.prepareTimestamp instanceof Timestamp,
+           'prepareTimestamp was not a Timestamp: ' + tojson(prepareRes));
+    assert.neq(prepareRes.prepareTimestamp,
+               Timestamp(0, 0),
+               "prepareTimestamp cannot be null: " + tojson(prepareRes));
+
     const timeBeforeCurrentOp = new ISODate();
 
     // Check that the currentOp's transaction subdocument's fields align with our expectations.
@@ -783,16 +794,21 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
     assert.gte(transactionDocument.timeActiveMicros, 0);
     assert.gte(transactionDocument.timeInactiveMicros, 0);
+    assert.gte(transactionDocument.timePreparedMicros, 0);
     assert.eq(
         ISODate(transactionDocument.expiryTime).getTime(),
         ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000);
 
-    // Allow the transactions to complete and close the session.
+    // Allow the transactions to complete and close the session. We must commit prepared
+    // transactions at a timestamp greater than the prepare timestamp.
+    const commitTimestamp =
+        Timestamp(prepareRes.prepareTimestamp.getTime(), prepareRes.prepareTimestamp.getInc() + 1);
     assert.commandWorked(sessionDB.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(0),
         autocommit: false,
-        writeConcern: {w: 'majority'}
+        writeConcern: {w: 'majority'},
+        commitTimestamp: commitTimestamp
     }));
     session.endSession();
 

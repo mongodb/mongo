@@ -94,6 +94,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterPreallocateSnapshot);
 
 MONGO_FAIL_POINT_DEFINE(hangAfterReservingPrepareTimestamp);
 
+MONGO_FAIL_POINT_DEFINE(hangAfterSettingPrepareStartTime);
+
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 // The command names that are allowed in a prepared transaction.
@@ -826,6 +828,12 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
         _transactionMetricsObserver.onPrepare(ServerTransactionsMetrics::get(opCtx),
                                               *_oldestOplogEntryOpTime,
                                               tickSource->getTicks());
+    }
+
+    if (MONGO_FAIL_POINT(hangAfterSettingPrepareStartTime)) {
+        log() << "transaction - hangAfterSettingPrepareStartTime fail point enabled. Blocking "
+                 "until fail point is disabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterSettingPrepareStartTime);
     }
 
     return prepareOplogSlot.opTime.getTimestamp();
