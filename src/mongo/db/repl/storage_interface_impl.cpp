@@ -1179,5 +1179,9 @@ Timestamp StorageInterfaceImpl::getAllCommittedTimestamp(ServiceContext* service
     return serviceCtx->getStorageEngine()->getAllCommittedTimestamp();
 }
 
+Timestamp StorageInterfaceImpl::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->getOldestOpenReadTimestamp();
+}
+
 }  // namespace repl
 }  // namespace mongo

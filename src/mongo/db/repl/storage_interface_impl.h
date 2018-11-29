@@ -176,6 +176,8 @@ public:
 
     Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
 
+    Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;
+
     /**
      * Checks that the "admin" database contains a supported version of the auth data schema.
      */

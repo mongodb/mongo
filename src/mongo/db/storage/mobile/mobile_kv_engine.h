@@ -126,6 +126,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual Timestamp getOldestOpenReadTimestamp() const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     mutable stdx::mutex _mutex;
     void _initDBPath(const std::string& path);

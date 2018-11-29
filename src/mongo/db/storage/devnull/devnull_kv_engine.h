@@ -118,6 +118,10 @@ public:
         return Timestamp();
     }
 
+    virtual Timestamp getOldestOpenReadTimestamp() const override {
+        return Timestamp();
+    }
+
 private:
     std::shared_ptr<void> _catalogInfo;
 };

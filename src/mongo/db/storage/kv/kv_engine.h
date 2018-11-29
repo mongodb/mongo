@@ -341,6 +341,11 @@ public:
     virtual Timestamp getAllCommittedTimestamp() const = 0;
 
     /**
+     * See `StorageEngine::getOldestOpenReadTimestamp`
+     */
+    virtual Timestamp getOldestOpenReadTimestamp() const = 0;
+
+    /**
      * See `StorageEngine::supportsReadConcernSnapshot`
      */
     virtual bool supportsReadConcernSnapshot() const {

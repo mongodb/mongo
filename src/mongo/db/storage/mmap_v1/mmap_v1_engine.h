@@ -110,6 +110,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Timestamp getOldestOpenReadTimestamp() const override {
+        MONGO_UNREACHABLE;
+    }
+
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
 
 private:

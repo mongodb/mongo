@@ -315,6 +315,8 @@ public:
 
     Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
 
+    Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;
+
     bool supportsDocLocking(ServiceContext* serviceCtx) const override;
 
     Status isAdminDbValid(OperationContext* opCtx) override {
@@ -405,6 +407,7 @@ public:
 
     bool supportsDocLockingBool = false;
     Timestamp allCommittedTimestamp = Timestamp::min();
+    Timestamp oldestOpenReadTimestamp = Timestamp::min();
 
 private:
     mutable stdx::mutex _mutex;

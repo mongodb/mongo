@@ -698,6 +698,10 @@ Timestamp KVStorageEngine::getAllCommittedTimestamp() const {
     return _engine->getAllCommittedTimestamp();
 }
 
+Timestamp KVStorageEngine::getOldestOpenReadTimestamp() const {
+    return _engine->getOldestOpenReadTimestamp();
+}
+
 void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
     auto cursor = catalogRs->getCursor(opCtx);

@@ -214,6 +214,8 @@ public:
 
     bool supportsReadConcernSnapshot() const final;
 
+    virtual Timestamp getOldestOpenReadTimestamp() const override;
+
     bool supportsReadConcernMajority() const final;
 
     // wiredtiger specific

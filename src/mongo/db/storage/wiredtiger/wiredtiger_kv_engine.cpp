@@ -1609,6 +1609,21 @@ Timestamp WiredTigerKVEngine::getAllCommittedTimestamp() const {
     return Timestamp(_oplogManager->fetchAllCommittedValue(_conn));
 }
 
+Timestamp WiredTigerKVEngine::getOldestOpenReadTimestamp() const {
+    // Return the minimum read timestamp of all open transactions.
+    char buf[(2 * 8 /*bytes in hex*/) + 1 /*null terminator*/];
+    auto wtstatus = _conn->query_timestamp(_conn, buf, "get=oldest_reader");
+    if (wtstatus == WT_NOTFOUND) {
+        return Timestamp();
+    } else {
+        invariantWTOK(wtstatus);
+    }
+
+    uint64_t tmp;
+    fassert(38802, parseNumberFromStringWithBase(buf, 16, &tmp));
+    return Timestamp(tmp);
+}
+
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
     if (!supportsRecoveryTimestamp()) {
         severe() << "WiredTiger is configured to not support providing a recovery timestamp";
