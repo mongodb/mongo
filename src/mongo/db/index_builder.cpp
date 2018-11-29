@@ -34,6 +34,7 @@
 
 #include "mongo/db/index_builder.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -55,6 +56,9 @@ using std::endl;
 AtomicUInt32 IndexBuilder::_indexBuildCount;
 
 namespace {
+
+const StringData kIndexesFieldName = "indexes"_sd;
+const StringData kCommandName = "createIndexes"_sd;
 
 /**
  * Returns true if writes to the catalog entry for the input namespace require being
@@ -191,9 +195,21 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     fassert(40409, coll);
 
     {
+        BSONObjBuilder builder;
+        builder.append(kCommandName, ns.coll());
+        {
+            BSONArrayBuilder indexesBuilder;
+            indexesBuilder.append(_index);
+            builder.append(kIndexesFieldName, indexesBuilder.arr());
+        }
+        auto opDescObj = builder.obj();
+
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         // Show which index we're building in the curop display.
-        CurOp::get(opCtx)->setOpDescription_inlock(_index);
+        auto curOp = CurOp::get(opCtx);
+        curOp->setLogicalOp_inlock(LogicalOp::opCommand);
+        curOp->setNS_inlock(ns.ns());
+        curOp->setOpDescription_inlock(opDescObj);
     }
 
     MultiIndexBlockImpl indexer(opCtx, coll);

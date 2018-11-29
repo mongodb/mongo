@@ -1,7 +1,5 @@
-// TODO: SERVER-13215 move test back to replSets suite.
-
 /**
- * TODO: SERVER-13204
+ * TODO: SERVER-38301
  * This  tests inserts a huge number of documents, initiates a background index build
  * and tries to perform another task in parallel while the background index task is
  * active. The problem is that this is timing dependent and the current test setup
@@ -10,6 +8,8 @@
  */
 
 // Index drop race
+
+load('jstests/noPassthrough/libs/index_build.js');
 
 var dbname = 'dropbgindex';
 var collection = 'jstests_feh';
@@ -59,20 +59,7 @@ masterDB.getCollection(collection).ensureIndex({b: 1});
 masterDB.getCollection(collection).ensureIndex({i: 1}, {background: true});
 
 // make sure the index build has started on secondary
-assert.soon(function() {
-    var curOp = secondDB.currentOp();
-    printjson(curOp);
-    for (var i = 0; i < curOp.inprog.length; i++) {
-        try {
-            if (curOp.inprog[i].command.background) {
-                return true;
-            }
-        } catch (e) {
-            // catchem if you can
-        }
-    }
-    return false;
-}, "waiting for secondary bg index build", 20000, 10);
+IndexBuildTest.waitForIndexBuildToStart(secondDB);
 
 jsTest.log("dropping index");
 masterDB.runCommand({dropIndexes: collection, index: "*"});

@@ -21,8 +21,7 @@ class IndexBuildTest {
         let indexBuildOpId = -1;
 
         result.inprog.forEach(function(op) {
-            if ((op.op == 'command' && 'createIndexes' in op.command) ||  // primary
-                (op.op == 'none' && 'background' in op.command)) {        // secondary
+            if (op.op == 'command' && 'createIndexes' in op.command) {
                 indexBuildOpId = op.opid;
             }
         });

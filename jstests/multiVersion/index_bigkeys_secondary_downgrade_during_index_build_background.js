@@ -7,6 +7,7 @@
     'use strict';
 
     load("jstests/libs/feature_compatibility_version.js");
+    load('jstests/noPassthrough/libs/index_build.js');
 
     TestData.replSetFeatureCompatibilityVersion = "4.2";
     const rst = new ReplSetTest({nodes: [{binVersion: 'latest'}, {binVersion: 'latest'}]});
@@ -44,19 +45,7 @@
         {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", background: true}]}));
 
     // Make sure index build starts on the secondary.
-    assert.soon(() => {
-        // The currentOp entry for createIndexes looks like:
-        // {...,
-        //  "command": {"v": 2,
-        //              "key": {x: 1},
-        //              "name": "x_1",
-        //              "background": true,
-        //              "ns": "test.index_bigkeys_downgrade_during_index_build"},
-        //  ...
-        // }
-        let res = secondaryDB.currentOp({'command.name': "x_1"});
-        return res['ok'] === 1 && res["inprog"].length > 0;
-    });
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
     // Downgrade the FCV to 4.0
     assert.commandWorked(primaryDB.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
