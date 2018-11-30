@@ -849,6 +849,12 @@ shellHelper.it = function() {
     shellPrintHelper(___it___);
 };
 
+shellHelper.mongo = function() {
+    print("You've typed the mongo command within a mongo shell.");
+    print("This is an error.");
+    print("If you meant to run a new mongo shell, please exit the current shell.");
+};
+
 shellHelper.show = function(what) {
     assert(typeof what == "string");
 
