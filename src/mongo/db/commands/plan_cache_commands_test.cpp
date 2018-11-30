@@ -390,13 +390,13 @@ TEST(PlanCacheCommandsTest, planCacheClearOneKeyCollation) {
     // Create plan cache with 2 entries. Add an index so that indexability is included in the plan
     // cache keys.
     PlanCache planCache;
-    planCache.notifyOfIndexEntries({IndexEntry(fromjson("{a: 1}"),
-                                               false,
-                                               false,
-                                               false,
-                                               IndexEntry::Identifier{"index_name"},
-                                               NULL,
-                                               BSONObj())});
+    const auto keyPattern = fromjson("{a: 1}");
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                                   // sparse
+                       IndexEntry::Identifier{"indexName"})});  // name
+
     QuerySolution qs;
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;
@@ -640,13 +640,13 @@ TEST(PlanCacheCommandsTest, planCacheListPlansCollation) {
     // Create plan cache with 2 entries. Add an index so that indexability is included in the plan
     // cache keys. Give query with collation two solutions.
     PlanCache planCache;
-    planCache.notifyOfIndexEntries({IndexEntry(fromjson("{a: 1}"),
-                                               false,
-                                               false,
-                                               false,
-                                               IndexEntry::Identifier{"index_name"},
-                                               NULL,
-                                               BSONObj())});
+    const auto keyPattern = fromjson("{a: 1}");
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                                   // sparse
+                       IndexEntry::Identifier{"indexName"})});  // name
+
     QuerySolution qs;
     qs.cacheData.reset(createSolutionCacheData());
     std::vector<QuerySolution*> solns;

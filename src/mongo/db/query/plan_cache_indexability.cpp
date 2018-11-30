@@ -114,11 +114,11 @@ void PlanCacheIndexabilityState::processPartialIndex(const std::string& indexNam
     }
 }
 
-void PlanCacheIndexabilityState::processWildcardIndex(const IndexEntry& ie) {
-    invariant(ie.type == IndexType::INDEX_WILDCARD);
+void PlanCacheIndexabilityState::processWildcardIndex(const CoreIndexInfo& cii) {
+    invariant(cii.type == IndexType::INDEX_WILDCARD);
 
     _wildcardIndexDiscriminators.emplace_back(
-        ie.wildcardProjection, ie.identifier.catalogName, ie.filterExpr, ie.collator);
+        cii.wildcardProjection, cii.identifier.catalogName, cii.filterExpr, cii.collator);
 }
 
 void PlanCacheIndexabilityState::processIndexCollation(const std::string& indexName,
@@ -166,11 +166,12 @@ IndexToDiscriminatorMap PlanCacheIndexabilityState::buildWildcardDiscriminators(
     return ret;
 }
 
-void PlanCacheIndexabilityState::updateDiscriminators(const std::vector<IndexEntry>& indexEntries) {
+void PlanCacheIndexabilityState::updateDiscriminators(
+    const std::vector<CoreIndexInfo>& indexCores) {
     _pathDiscriminatorsMap = PathDiscriminatorsMap();
     _wildcardIndexDiscriminators.clear();
 
-    for (const IndexEntry& idx : indexEntries) {
+    for (const auto& idx : indexCores) {
         if (idx.type == IndexType::INDEX_WILDCARD) {
             processWildcardIndex(idx);
             continue;

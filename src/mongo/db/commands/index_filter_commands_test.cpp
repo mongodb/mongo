@@ -428,13 +428,12 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
     // Create a plan cache. Add an index so that indexability is included in the plan cache keys.
     PlanCache planCache;
-    planCache.notifyOfIndexEntries({IndexEntry(fromjson("{a: 1}"),
-                                               false,
-                                               false,
-                                               false,
-                                               IndexEntry::Identifier{"index_name"},
-                                               NULL,
-                                               BSONObj())});
+    const auto keyPattern = fromjson("{a: 1}");
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       true,                                     // sparse
+                       IndexEntry::Identifier{"index_name"})});  // name
 
     // Inject query shapes with and without collation into plan cache.
     addQueryShapeToPlanCache(
@@ -502,27 +501,23 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
 TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
     CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
-    IndexEntry collatedIndex(fromjson("{a: 1}"),
-                             false,
-                             false,
-                             false,
-                             IndexEntry::Identifier{"a_1:rev"},
-                             nullptr,
-                             BSONObj());
+    PlanCache planCache;
+    const auto keyPattern = fromjson("{a: 1}");
+    CoreIndexInfo collatedIndex(keyPattern,
+                                IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                false,                               // sparse
+                                IndexEntry::Identifier{"a_1:rev"});  // name
     collatedIndex.collator = &reverseCollator;
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     QuerySettings querySettings;
 
-    PlanCache planCache;
-    planCache.notifyOfIndexEntries({IndexEntry(fromjson("{a: 1}"),
-                                               false,
-                                               false,
-                                               false,
-                                               IndexEntry::Identifier{"a_1"},
-                                               nullptr,
-                                               BSONObj()),
-                                    collatedIndex});
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                           // sparse
+                       IndexEntry::Identifier{"a_1"}),  // name
+         collatedIndex});
 
     addQueryShapeToPlanCache(opCtx.get(), &planCache, "{a: 2}", "{}", "{}", "{}");
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 2}", "{}", "{}", "{}"));
