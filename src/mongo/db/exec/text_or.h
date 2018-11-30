@@ -157,6 +157,5 @@ private:
     const MatchExpression* _filter;
     WorkingSetID _idRetrying;
     std::unique_ptr<SeekableRecordCursor> _recordCursor;
-    IndexDescriptor* _index;
 };
 }  // namespace mongo
