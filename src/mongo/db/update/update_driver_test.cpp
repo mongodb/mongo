@@ -529,11 +529,9 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
         driverRepl().populateDocumentWithQueryFields(opCtx(), query, immutablePaths, doc()));
 }
 
-using mutablebson::Document;
-
 class ModifiedPathsTestFixture : public mongo::unittest::Test {
 public:
-    std::string getModifiedPaths(Document* doc,
+    std::string getModifiedPaths(mutablebson::Document* doc,
                                  BSONObj updateSpec,
                                  StringData matchedField = StringData(),
                                  std::vector<BSONObj> arrayFilterSpec = {}) {
@@ -565,60 +563,60 @@ public:
 
 TEST_F(ModifiedPathsTestFixture, SetFieldInRoot) {
     BSONObj spec = fromjson("{$set: {a: 1}}");
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, IncFieldInRoot) {
     BSONObj spec = fromjson("{$inc: {a: 1}}");
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UnsetFieldInRoot) {
     BSONObj spec = fromjson("{$unset: {a: ''}}");
-    Document doc(fromjson("{a: 0}"));
+    mutablebson::Document doc(fromjson("{a: 0}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateArrayElement) {
     BSONObj spec = fromjson("{$set: {'a.0.b': 1}}");
-    Document doc(fromjson("{a: [{b: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec), "{a.0.b}");
 }
 
 TEST_F(ModifiedPathsTestFixture, SetBeyondTheEndOfArrayShouldReturnPathToArray) {
     BSONObj spec = fromjson("{$set: {'a.1.b': 1}}");
-    Document doc(fromjson("{a: [{b: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, InsertingAndUpdatingArrayShouldReturnPathToArray) {
     BSONObj spec = fromjson("{$set: {'a.0.b': 1, 'a.1.c': 2}}");
-    Document doc(fromjson("{a: [{b: 0}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
 
     spec = fromjson("{$set: {'a.10.b': 1, 'a.1.c': 2}}");
-    Document doc2(fromjson("{a: [{b: 0}, {b: 0}]}"));
+    mutablebson::Document doc2(fromjson("{a: [{b: 0}, {b: 0}]}"));
     ASSERT_EQ(getModifiedPaths(&doc2, spec), "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperator) {
     BSONObj spec = fromjson("{$set: {'a.$': 1}}");
-    Document doc(fromjson("{a: [0, 1, 2]}"));
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec, "0"_sd), "{a.0}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperatorToNestedField) {
     BSONObj spec = fromjson("{$set: {'a.$.b': 1}}");
-    Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
+    mutablebson::Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec, "1"_sd), "{a.1.b}");
 }
 
 TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
     BSONObj spec = fromjson("{$set: {'a.$[i]': 1}}");
     BSONObj arrayFilter = fromjson("{i: 0}");
-    Document doc(fromjson("{a: [1, 2, 3]}"));
+    mutablebson::Document doc(fromjson("{a: [1, 2, 3]}"));
     ASSERT_EQ(getModifiedPaths(&doc, spec, ""_sd, {arrayFilter}), "{a}");
 }
 
