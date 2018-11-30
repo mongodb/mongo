@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/collection_index_builds_tracker.h"
@@ -42,7 +41,6 @@
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
@@ -54,49 +52,50 @@ class OperationContext;
 class ServiceContext;
 
 /**
- * This is a coordinator for all things index builds. It has a threadpool that runs index builds
- * asynchronously, returning results to waiting callers via Futures and Promises. Index builds can
- * be externally affected, notified, waited upon and aborted through this interface. The coordinator
- * uses the cross replica set index build state to control index build progression.
+ * This is a coordinator for all things index builds. Index builds can be externally affected,
+ * notified, waited upon and aborted through this interface. Index build results are returned to
+ * callers via Futures and Promises. The coordinator uses cross replica set index build state
+ * to control index build progression.
  *
  * The IndexBuildsCoordinator is instantiated on the ServiceContext as a decoration, and is always
- * accessible via the ServiceContext. It owns an IndexBuildsManager that manages the
- * MultiIndexBlockImpl index builder instances.
+ * accessible via the ServiceContext. It owns an IndexBuildsManager that manages all MultiIndexBlock
+ * index builder instances.
  */
 class IndexBuildsCoordinator {
-    MONGO_DISALLOW_COPYING(IndexBuildsCoordinator);
-
 public:
-    /**
-     * Sets up the thread pool.
-     */
-    IndexBuildsCoordinator();
-
     /**
      * Invariants that there are no index builds in-progress.
      */
-    ~IndexBuildsCoordinator();
+    virtual ~IndexBuildsCoordinator();
 
     /**
-     * Shuts down the thread pool, signals interrupt to all index builds, then waits for all of the
-     * threads to finish.
+     * Executes tasks that must be done prior to destruction of the instance.
      */
-    void shutdown();
+    virtual void shutdown() = 0;
 
+    /**
+     * Stores a coordinator on the specified service context. May only be called once for the
+     * lifetime of the service context.
+     */
+    static void set(ServiceContext* serviceContext, std::unique_ptr<IndexBuildsCoordinator> ibc);
+
+    /**
+     * Retrieves the coordinator set on the service context. set() above must be called before any
+     * get() calls.
+     */
     static IndexBuildsCoordinator* get(ServiceContext* serviceContext);
     static IndexBuildsCoordinator* get(OperationContext* operationContext);
 
     /**
-     * Sets up the in-memory and persisted state of the index build, then passes the build off to an
-     * asynchronous thread to run. A Future is returned to await the result of the asynchronous
-     * thread.
+     * Sets up the in-memory and persisted state of the index build. A Future is returned upon which
+     * the user can await the build result.
      *
      * Returns an error status if there are any errors setting up the index build.
      */
-    StatusWith<Future<void>> buildIndex(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const std::vector<BSONObj>& specs,
-                                        const UUID& buildUUID);
+    virtual StatusWith<Future<void>> buildIndex(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const std::vector<BSONObj>& specs,
+                                                const UUID& buildUUID) = 0;
 
     /**
      * TODO: not yet implemented.
@@ -176,24 +175,25 @@ public:
      */
     Future<void> abortIndexBuildByUUID(const UUID& buildUUID, const std::string& reason);
 
-    void signalChangeToPrimaryMode();
-
-    void signalChangeToSecondaryMode();
-
-    void signalChangeToInitialSyncMode();
+    /**
+     * Signal replica set member state changes that affect cross replica set index building.
+     */
+    virtual void signalChangeToPrimaryMode() = 0;
+    virtual void signalChangeToSecondaryMode() = 0;
+    virtual void signalChangeToInitialSyncMode() = 0;
 
     /**
      * TODO: This is not yet implemented.
      */
-    Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort);
+    virtual Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) = 0;
 
     /**
      * TODO: This is not yet implemented. (This will have to take a collection IS lock to look up
      * the collection UUID.)
      */
-    Status setCommitQuorum(const NamespaceString& nss,
-                           const std::vector<std::string>& indexNames,
-                           const BSONObj& newCommitQuorum);
+    virtual Status setCommitQuorum(const NamespaceString& nss,
+                                   const std::vector<std::string>& indexNames,
+                                   const BSONObj& newCommitQuorum) = 0;
 
     /**
      * TODO: This is not yet implemented.
@@ -257,16 +257,23 @@ private:
     friend class ScopedStopNewCollectionIndexBuilds;
 
     /**
-     * Keeps track of the relevant replica set member states. Index builds are managed differently
-     * depending on the state of the replica set member.
+     * Prevents new index builds being registered on the provided collection or database.
      *
-     * These states follow the replica set member states, as maintained by MemberState in the
-     * ReplicationCoordinator. If not in Primary or InitialSync modes, then the default will be
-     * Secondary, with the expectation that a replica set member must always transition to Secondary
-     * before Primary.
+     * It is safe to call this on the same collection/database concurrently in different threads. It
+     * will still behave correctly.
      */
-    enum class ReplState { Primary, Secondary, InitialSync };
+    void _stopIndexBuildsOnDatabase(StringData dbName);
+    void _stopIndexBuildsOnCollection(const UUID& collectionUUID);
 
+    /**
+     * Allows new index builds to again be registered on the provided collection or database. Should
+     * only be called after calling stopIndexBuildsOnCollection or stopIndexBuildsOnDatabase on the
+     * same collection or database, respectively.
+     */
+    void _allowIndexBuildsOnDatabase(StringData dbName);
+    void _allowIndexBuildsOnCollection(const UUID& collectionUUID);
+
+protected:
     /**
      * Registers an index build so that the rest of the system can discover it.
      *
@@ -286,50 +293,7 @@ private:
     /**
      * TODO: not yet implemented.
      */
-    void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept;
-
-    /**
-     * TODO: not yet implemented.
-     */
-    Status _finishScanningPhase();
-
-    /**
-     * TODO: not yet implemented.
-     */
-    Status _finishVerificationPhase();
-
-    /**
-     * TODO: not yet implemented.
-     */
-    Status _finishCommitPhase();
-
-    /**
-     * Prevents new index builds being registered on the provided collection or database.
-     *
-     * It is safe to call this on the same collection/database concurrently in different threads. It
-     * will still behave correctly.
-     */
-    void _stopIndexBuildsOnDatabase(StringData dbName);
-    void _stopIndexBuildsOnCollection(const UUID& collectionUUID);
-
-    /**
-     * Allows new index builds to again be registered on the provided collection or database. Should
-     * only be called after calling stopIndexBuildsOnCollection or stopIndexBuildsOnDatabase on the
-     * same collection or database, respectively.
-     */
-    void _allowIndexBuildsOnDatabase(StringData dbName);
-    void _allowIndexBuildsOnCollection(const UUID& collectionUUID);
-
-    /**
-     * TODO: not yet implemented.
-     */
-    StatusWith<bool> _checkCommitQuorum(const BSONObj& commitQuorum,
-                                        const std::vector<HostAndPort>& confirmedMembers);
-
-    /**
-     * TODO: not yet implemented.
-     */
-    void _refreshReplStateFromPersisted(OperationContext* opCtx, const UUID& buildUUID);
+    virtual void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept = 0;
 
     // Protects the below state.
     mutable stdx::mutex _mutex;
@@ -363,15 +327,6 @@ private:
 
     // Handles actually building the indexes.
     IndexBuildsManager _indexBuildsManager;
-
-    // Replication hooks will call into the Coordinator to update this on relevant state
-    // transitions. The Coordinator will then use the setting to inform how the index build is run.
-    // Index builds have different inter node communication responsibilities and error checking
-    // requirements depending on the replica set member's state.
-    ReplState _replMode = ReplState::Secondary;
-
-    // Thread pool on which index builds are run.
-    ThreadPool _threadPool;
 
     bool _sleepForTest = false;
 };

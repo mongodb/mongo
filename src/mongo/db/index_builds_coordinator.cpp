@@ -45,23 +45,6 @@ namespace mongo {
 namespace {
 
 /**
- * Constructs the options for the loader thread pool.
- */
-ThreadPool::Options makeDefaultThreadPoolOptions() {
-    ThreadPool::Options options;
-    options.poolName = "IndexBuildsCoordinator";
-    options.minThreads = 0;
-    options.maxThreads = 10;
-
-    // Ensure all threads have a client.
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-
-    return options;
-}
-
-/**
  * Returns the collection UUID for the given 'nss', or a NamespaceNotFound error.
  *
  * Momentarily takes the collection IS lock for 'nss' to access the collection UUID.
@@ -98,18 +81,26 @@ void abortIndexBuild(WithLock lk,
 
 }  // namespace
 
-const auto getIndexBuildsCoord = ServiceContext::declareDecoration<IndexBuildsCoordinator>();
+const auto getIndexBuildsCoord =
+    ServiceContext::declareDecoration<std::unique_ptr<IndexBuildsCoordinator>>();
+
+void IndexBuildsCoordinator::set(ServiceContext* serviceContext,
+                                 std::unique_ptr<IndexBuildsCoordinator> ibc) {
+    auto& indexBuildsCoordinator = getIndexBuildsCoord(serviceContext);
+    invariant(!indexBuildsCoordinator);
+
+    indexBuildsCoordinator = std::move(ibc);
+}
 
 IndexBuildsCoordinator* IndexBuildsCoordinator::get(ServiceContext* serviceContext) {
-    return &getIndexBuildsCoord(serviceContext);
+    auto& indexBuildsCoordinator = getIndexBuildsCoord(serviceContext);
+    invariant(indexBuildsCoordinator);
+
+    return indexBuildsCoordinator.get();
 }
 
 IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* operationContext) {
     return get(operationContext->getServiceContext());
-}
-
-IndexBuildsCoordinator::IndexBuildsCoordinator() : _threadPool(makeDefaultThreadPoolOptions()) {
-    _threadPool.startup();
 }
 
 IndexBuildsCoordinator::~IndexBuildsCoordinator() {
@@ -118,75 +109,6 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
     invariant(_disallowedCollections.empty());
     invariant(_collectionIndexBuilds.empty());
 }
-
-void IndexBuildsCoordinator::shutdown() {
-    // Stop new scheduling.
-    _threadPool.shutdown();
-
-    // Signal active builds to stop and wait for them to stop.
-    interruptAllIndexBuilds("Index build interrupted due to shutdown.");
-
-    // Wait for active threads to finish.
-    _threadPool.join();
-}
-
-StatusWith<Future<void>> IndexBuildsCoordinator::buildIndex(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const std::vector<BSONObj>& specs,
-                                                            const UUID& buildUUID) {
-    std::vector<std::string> indexNames;
-    for (auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
-        if (name.empty()) {
-            return Status(
-                ErrorCodes::CannotCreateIndex,
-                str::stream() << "Cannot create an index for a spec '" << spec
-                              << "' without a non-empty string value for the 'name' field");
-        }
-        indexNames.push_back(name);
-    }
-
-    UUID collectionUUID = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return autoColl.getCollection()->uuid().get();
-    }();
-
-    auto pf = makePromiseFuture<void>();
-
-    auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, indexNames, specs, std::move(pf.promise));
-
-    Status status = _registerIndexBuild(opCtx, replIndexBuildState);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = _threadPool.schedule([ this, buildUUID ]() noexcept {
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-
-        // Sets up and runs the index build. Sets result and cleans up index build.
-        _runIndexBuild(opCtx.get(), buildUUID);
-    });
-
-    // Clean up the index build if we failed to schedule it.
-    if (!status.isOK()) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-        // Unregister the index build before setting the promises, so callers do not see the build
-        // again.
-        _unregisterIndexBuild(lk, opCtx, replIndexBuildState);
-
-        // Set the promises in case another thread already joined the index build.
-        for (auto& promise : replIndexBuildState->promises) {
-            promise.setError(status);
-        }
-
-        return status;
-    }
-
-    return std::move(pf.future);
-}
-
 
 Future<void> IndexBuildsCoordinator::joinIndexBuilds(const NamespaceString& nss,
                                                      const std::vector<BSONObj>& indexSpecs) {
@@ -262,35 +184,9 @@ Future<void> IndexBuildsCoordinator::abortIndexBuildByUUID(const UUID& buildUUID
     return std::move(pf.future);
 }
 
-void IndexBuildsCoordinator::signalChangeToPrimaryMode() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _replMode = ReplState::Primary;
-}
-
-void IndexBuildsCoordinator::signalChangeToSecondaryMode() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _replMode = ReplState::Secondary;
-}
-
-void IndexBuildsCoordinator::signalChangeToInitialSyncMode() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _replMode = ReplState::InitialSync;
-}
-
-Status IndexBuildsCoordinator::voteCommitIndexBuild(const UUID& buildUUID,
-                                                    const HostAndPort& hostAndPort) {
+void IndexBuildsCoordinator::recoverIndexBuilds() {
     // TODO: not yet implemented.
-    return Status::OK();
 }
-
-Status IndexBuildsCoordinator::setCommitQuorum(const NamespaceString& nss,
-                                               const std::vector<std::string>& indexNames,
-                                               const BSONObj& newCommitQuorum) {
-    // TODO: not yet implemented.
-    return Status::OK();
-}
-
-void IndexBuildsCoordinator::recoverIndexBuilds() {}
 
 int IndexBuildsCoordinator::numInProgForDb(StringData db) const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -463,55 +359,6 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 }
 
-void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
-                                            const UUID& buildUUID) noexcept {
-    auto replState = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        auto it = _allIndexBuilds.find(buildUUID);
-        invariant(it != _allIndexBuilds.end());
-        return it->second;
-    }();
-
-    {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        while (_sleepForTest) {
-            lk.unlock();
-            sleepmillis(100);
-            lk.lock();
-        }
-    }
-
-    // TODO: create scoped object to create the index builder, then destroy the builder, set the
-    // promises and unregister the build.
-
-    // TODO: implement.
-
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    _unregisterIndexBuild(lk, opCtx, replState);
-
-    for (auto& promise : replState->promises) {
-        promise.emplaceValue();
-    }
-
-    return;
-}
-
-Status IndexBuildsCoordinator::_finishScanningPhase() {
-    // TODO: implement.
-    return Status::OK();
-}
-
-Status IndexBuildsCoordinator::_finishVerificationPhase() {
-    // TODO: implement.
-    return Status::OK();
-}
-
-Status IndexBuildsCoordinator::_finishCommitPhase() {
-    // TODO: implement.
-    return Status::OK();
-}
-
 void IndexBuildsCoordinator::_stopIndexBuildsOnDatabase(StringData dbName) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -555,15 +402,6 @@ void IndexBuildsCoordinator::_allowIndexBuildsOnCollection(const UUID& collectio
         _disallowedCollections.erase(it);
     }
 }
-
-StatusWith<bool> IndexBuildsCoordinator::_checkCommitQuorum(
-    const BSONObj& commitQuorum, const std::vector<HostAndPort>& confirmedMembers) {
-    // TODO: not yet implemented.
-    return false;
-}
-
-void IndexBuildsCoordinator::_refreshReplStateFromPersisted(OperationContext* opCtx,
-                                                            const UUID& buildUUID) {}
 
 ScopedStopNewDatabaseIndexBuilds::ScopedStopNewDatabaseIndexBuilds(
     IndexBuildsCoordinator* indexBuildsCoordinator, StringData dbName)

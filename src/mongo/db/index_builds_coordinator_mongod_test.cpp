@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_builds_coordinator_mongod.h"
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/multi_index_block.h"
@@ -46,7 +46,7 @@ using unittest::log;
 
 namespace {
 
-class IndexBuildsCoordinatorTest : public CatalogTestFixture {
+class IndexBuildsCoordinatorMongodTest : public CatalogTestFixture {
 private:
     void setUp() override;
     void tearDown() override;
@@ -60,22 +60,23 @@ public:
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
 };
 
-void IndexBuildsCoordinatorTest::setUp() {
+void IndexBuildsCoordinatorMongodTest::setUp() {
     CatalogTestFixture::setUp();
     createCollection(_testFooNss);
     createCollection(_testBarNss);
     createCollection(_othertestFooNss);
-    _indexBuildsCoord = std::make_unique<IndexBuildsCoordinator>();
+    _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
 }
 
-void IndexBuildsCoordinatorTest::tearDown() {
+void IndexBuildsCoordinatorMongodTest::tearDown() {
     _indexBuildsCoord->verifyNoIndexBuilds_forTestOnly();
+    _indexBuildsCoord->shutdown();
     _indexBuildsCoord.reset();
     // All databases are dropped during tear down.
     CatalogTestFixture::tearDown();
 }
 
-void IndexBuildsCoordinatorTest::createCollection(const NamespaceString& nss) {
+void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& nss) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
 }
 
@@ -97,7 +98,7 @@ std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::stri
     return indexSpecs;
 }
 
-TEST_F(IndexBuildsCoordinatorTest, CannotBuildIndexWithSameIndexName) {
+TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
@@ -118,7 +119,7 @@ TEST_F(IndexBuildsCoordinatorTest, CannotBuildIndexWithSameIndexName) {
 
 // Incrementally registering index builds and checking both that the registration was successful and
 // that the access functions convey the expected state of the manager.
-TEST_F(IndexBuildsCoordinatorTest, IndexBuildsCoordinatorRegistration) {
+TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorRegistration) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
@@ -205,7 +206,7 @@ TEST_F(IndexBuildsCoordinatorTest, IndexBuildsCoordinatorRegistration) {
 // functions, checking that they correctly disallow and allow index builds when
 // ScopedStopNewCollectionIndexBuilds and ScopedStopNewDatabaseIndexBuilds are present on a
 // collection or database name.
-TEST_F(IndexBuildsCoordinatorTest, IndexBuildsCoordinatorDisallowNewBuildsOnNamespace) {
+TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuildsOnNamespace) {
     UUID testFooUUID = getCollectionUUID(operationContext(), _testFooNss);
 
     {

@@ -891,7 +891,18 @@ env.Library(
 )
 
 env.Library(
-    target="index_builds_coordinator",
+    target="index_builds_coordinator_mongod",
+    source=[
+        "index_builds_coordinator_mongod.cpp",
+    ],
+    LIBDEPS=[
+        "index_builds_coordinator_interface",
+        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
+    ],
+)
+
+env.Library(
+    target="index_builds_coordinator_interface",
     source=[
         "collection_index_builds_tracker.cpp",
         "database_index_builds_tracker.cpp",
@@ -901,18 +912,17 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         '$BUILD_DIR/mongo/db/catalog_raii',
         "$BUILD_DIR/mongo/db/catalog/index_builds_manager",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
     ],
 )
 
 env.CppUnitTest(
-    target="index_builds_coordinator_test",
+    target="index_builds_coordinator_mongod_test",
     source=[
-        "index_builds_coordinator_test.cpp",
+        "index_builds_coordinator_mongod_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
-        "index_builds_coordinator",
+        "index_builds_coordinator_mongod",
     ]
 )
 
@@ -1826,6 +1836,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'commands/mongod',
+        'index_builds_coordinator_mongod',
         'service_context_d',
         'storage/devnull/storage_devnull',
         'storage/ephemeral_for_test/storage_ephemeral_for_test',
