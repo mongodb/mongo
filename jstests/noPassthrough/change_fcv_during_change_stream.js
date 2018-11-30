@@ -1,6 +1,6 @@
 // Tests that a change stream's resume token format will adapt as the server's feature compatibility
 // version changes.
-// @tags: [requires_replication, requires_majority_read_concern]
+// @tags: [requires_replication, uses_transactions]
 (function() {
     "use strict";
 
@@ -10,6 +10,13 @@
 
     const primary = rst.getPrimary();
     const testDB = primary.getDB("test");
+
+    if (!testDB.serverStatus().storageEngine.supportsCommittedReads) {
+        print(
+            "Skipping change_fcv_during_change_stream.js since storageEngine doesn't support it.");
+        rst.stopSet();
+        return;
+    }
 
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
