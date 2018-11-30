@@ -46,6 +46,11 @@
 
 namespace mongo {
 namespace {
+using transport::ConnectSSLMode;
+using transport::ConnectSSLMode::kEnableSSL;
+using transport::ConnectSSLMode::kDisableSSL;
+using transport::ConnectSSLMode::kGlobalSSLMode;
+
 struct URITestCase {
     std::string URI;
     std::string uname;
@@ -55,14 +60,15 @@ struct URITestCase {
     size_t numservers;
     size_t numOptions;
     std::string database;
+    ConnectSSLMode sslMode;
 };
 
 struct InvalidURITestCase {
     std::string URI;
-    boost::optional<Status> status;
-    InvalidURITestCase(std::string aURI, boost::optional<Status> aStatus = boost::none) {
+    boost::optional<ErrorCodes::Error> code;
+    InvalidURITestCase(std::string aURI, boost::optional<ErrorCodes::Error> aCode = boost::none) {
         URI = std::move(aURI);
-        status = std::move(aStatus);
+        code = std::move(aCode);
     }
 };
 
@@ -71,23 +77,39 @@ const ConnectionString::ConnectionType kSet = ConnectionString::SET;
 
 const URITestCase validCases[] = {
 
-    {"mongodb://user:pwd@127.0.0.1", "user", "pwd", kMaster, "", 1, 0, ""},
+    {"mongodb://user:pwd@127.0.0.1", "user", "pwd", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://user@127.0.0.1", "user", "", kMaster, "", 1, 0, ""},
+    {"mongodb://user@127.0.0.1", "user", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://localhost/?foo=bar", "", "", kMaster, "", 1, 1, ""},
+    {"mongodb://localhost/?foo=bar", "", "", kMaster, "", 1, 1, "", kGlobalSSLMode},
 
-    {"mongodb://localhost,/?foo=bar", "", "", kMaster, "", 1, 1, ""},
+    {"mongodb://localhost,/?foo=bar", "", "", kMaster, "", 1, 1, "", kGlobalSSLMode},
 
-    {"mongodb://user:pwd@127.0.0.1:1234", "user", "pwd", kMaster, "", 1, 0, ""},
+    {"mongodb://user:pwd@127.0.0.1:1234", "user", "pwd", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://user@127.0.0.1:1234", "user", "", kMaster, "", 1, 0, ""},
+    {"mongodb://user@127.0.0.1:1234", "user", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://127.0.0.1:1234/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
+    {"mongodb://127.0.0.1:1234/dbName?foo=a&c=b",
+     "",
+     "",
+     kMaster,
+     "",
+     1,
+     2,
+     "dbName",
+     kGlobalSSLMode},
 
-    {"mongodb://127.0.0.1/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
+    {"mongodb://127.0.0.1/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName", kGlobalSSLMode},
 
-    {"mongodb://user:pwd@127.0.0.1,/dbName?foo=a&c=b", "user", "pwd", kMaster, "", 1, 2, "dbName"},
+    {"mongodb://user:pwd@127.0.0.1,/dbName?foo=a&c=b",
+     "user",
+     "pwd",
+     kMaster,
+     "",
+     1,
+     2,
+     "dbName",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/dbname?a=b&replicaSet=replName",
      "user",
@@ -96,7 +118,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      2,
-     "dbname"},
+     "dbname",
+     kGlobalSSLMode},
 
     {"mongodb://needs%20encoding%25%23!%3C%3E:pwd@127.0.0.1,127.0.0.2/"
      "dbname?a=b&replicaSet=replName",
@@ -106,7 +129,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      2,
-     "dbname"},
+     "dbname",
+     kGlobalSSLMode},
 
     {"mongodb://needs%20encoding%25%23!%3C%3E:pwd@127.0.0.1,127.0.0.2/"
      "db@name?a=b&replicaSet=replName",
@@ -116,7 +140,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      2,
-     "db@name"},
+     "db@name",
+     kGlobalSSLMode},
 
     {"mongodb://user:needs%20encoding%25%23!%3C%3E@127.0.0.1,127.0.0.2/"
      "dbname?a=b&replicaSet=replName",
@@ -126,7 +151,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      2,
-     "dbname"},
+     "dbname",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/dbname?a=b&replicaSet=needs%20encoding%25%23!%3C%3E",
      "user",
@@ -135,7 +161,8 @@ const URITestCase validCases[] = {
      "needs encoding%#!<>",
      2,
      2,
-     "dbname"},
+     "dbname",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/needsencoding%40hello?a=b&replicaSet=replName",
      "user",
@@ -144,7 +171,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      2,
-     "needsencoding@hello"},
+     "needsencoding@hello",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/?replicaSet=replName",
      "user",
@@ -153,7 +181,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://user@127.0.0.1,127.0.0.2/?replicaSet=replName",
      "user",
@@ -162,7 +191,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://127.0.0.1,127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
      "",
@@ -171,7 +201,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      3,
-     "dbName"},
+     "dbName",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@127.0.0.1:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
@@ -180,7 +211,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://user@127.0.0.1:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
@@ -189,7 +221,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://127.0.0.1:1234,127.0.0.1:1234/dbName?foo=a&c=b&replicaSet=replName",
      "",
@@ -198,78 +231,20 @@ const URITestCase validCases[] = {
      "replName",
      2,
      3,
-     "dbName"},
+     "dbName",
+     kGlobalSSLMode},
 
-    {"mongodb://user:pwd@[::1]", "user", "pwd", kMaster, "", 1, 0, ""},
+    {"mongodb://user:pwd@[::1]", "user", "pwd", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://user@[::1]", "user", "", kMaster, "", 1, 0, ""},
+    {"mongodb://user@[::1]", "user", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://[::1]/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
+    {"mongodb://[::1]/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName", kGlobalSSLMode},
 
-    {"mongodb://user:pwd@[::1]:1234", "user", "pwd", kMaster, "", 1, 0, ""},
+    {"mongodb://user:pwd@[::1]:1234", "user", "pwd", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://user@[::1]:1234", "user", "", kMaster, "", 1, 0, ""},
+    {"mongodb://user@[::1]:1234", "user", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
-    {"mongodb://[::1]:1234/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
-
-    {"mongodb://user:pwd@[::1],127.0.0.2/?replicaSet=replName",
-     "user",
-     "pwd",
-     kSet,
-     "replName",
-     2,
-     1,
-     ""},
-
-    {"mongodb://user@[::1],127.0.0.2/?replicaSet=replName", "user", "", kSet, "replName", 2, 1, ""},
-
-    {"mongodb://[::1],127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
-     "",
-     "",
-     kSet,
-     "replName",
-     2,
-     3,
-     "dbName"},
-
-    {"mongodb://user:pwd@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
-     "user",
-     "pwd",
-     kSet,
-     "replName",
-     2,
-     1,
-     ""},
-
-    {"mongodb://user@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
-     "user",
-     "",
-     kSet,
-     "replName",
-     2,
-     1,
-     ""},
-
-    {"mongodb://[::1]:1234,[::1]:1234/dbName?foo=a&c=b&replicaSet=replName",
-     "",
-     "",
-     kSet,
-     "replName",
-     2,
-     3,
-     "dbName"},
-
-    {"mongodb://user:pwd@[::1]", "user", "pwd", kMaster, "", 1, 0, ""},
-
-    {"mongodb://user@[::1]", "user", "", kMaster, "", 1, 0, ""},
-
-    {"mongodb://[::1]/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
-
-    {"mongodb://user:pwd@[::1]:1234", "user", "pwd", kMaster, "", 1, 0, ""},
-
-    {"mongodb://user@[::1]:1234", "user", "", kMaster, "", 1, 0, ""},
-
-    {"mongodb://[::1]:1234/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName"},
+    {"mongodb://[::1]:1234/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName", kGlobalSSLMode},
 
     {"mongodb://user:pwd@[::1],127.0.0.2/?replicaSet=replName",
      "user",
@@ -278,9 +253,18 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
-    {"mongodb://user@[::1],127.0.0.2/?replicaSet=replName", "user", "", kSet, "replName", 2, 1, ""},
+    {"mongodb://user@[::1],127.0.0.2/?replicaSet=replName",
+     "user",
+     "",
+     kSet,
+     "replName",
+     2,
+     1,
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://[::1],127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
      "",
@@ -289,7 +273,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      3,
-     "dbName"},
+     "dbName",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
@@ -298,7 +283,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://user@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
@@ -307,7 +293,8 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://[::1]:1234,[::1]:1234/dbName?foo=a&c=b&replicaSet=replName",
      "",
@@ -316,7 +303,80 @@ const URITestCase validCases[] = {
      "replName",
      2,
      3,
-     "dbName"},
+     "dbName",
+     kGlobalSSLMode},
+
+    {"mongodb://user:pwd@[::1]", "user", "pwd", kMaster, "", 1, 0, "", kGlobalSSLMode},
+
+    {"mongodb://user@[::1]", "user", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
+
+    {"mongodb://[::1]/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName", kGlobalSSLMode},
+
+    {"mongodb://user:pwd@[::1]:1234", "user", "pwd", kMaster, "", 1, 0, "", kGlobalSSLMode},
+
+    {"mongodb://user@[::1]:1234", "user", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
+
+    {"mongodb://[::1]:1234/dbName?foo=a&c=b", "", "", kMaster, "", 1, 2, "dbName", kGlobalSSLMode},
+
+    {"mongodb://user:pwd@[::1],127.0.0.2/?replicaSet=replName",
+     "user",
+     "pwd",
+     kSet,
+     "replName",
+     2,
+     1,
+     "",
+     kGlobalSSLMode},
+
+    {"mongodb://user@[::1],127.0.0.2/?replicaSet=replName",
+     "user",
+     "",
+     kSet,
+     "replName",
+     2,
+     1,
+     "",
+     kGlobalSSLMode},
+
+    {"mongodb://[::1],127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
+     "",
+     "",
+     kSet,
+     "replName",
+     2,
+     3,
+     "dbName",
+     kGlobalSSLMode},
+
+    {"mongodb://user:pwd@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
+     "user",
+     "pwd",
+     kSet,
+     "replName",
+     2,
+     1,
+     "",
+     kGlobalSSLMode},
+
+    {"mongodb://user@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
+     "user",
+     "",
+     kSet,
+     "replName",
+     2,
+     1,
+     "",
+     kGlobalSSLMode},
+
+    {"mongodb://[::1]:1234,[::1]:1234/dbName?foo=a&c=b&replicaSet=replName",
+     "",
+     "",
+     kSet,
+     "replName",
+     2,
+     3,
+     "dbName",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@[::1]/?authMechanism=GSSAPI&authMechanismProperties=SERVICE_NAME:foobar",
      "user",
@@ -325,7 +385,8 @@ const URITestCase validCases[] = {
      "",
      1,
      2,
-     ""},
+     "",
+     kGlobalSSLMode},
 
     {"mongodb://user:pwd@[::1]/?authMechanism=GSSAPI&gssapiServiceName=foobar",
      "user",
@@ -334,9 +395,10 @@ const URITestCase validCases[] = {
      "",
      1,
      2,
-     ""},
+     "",
+     kGlobalSSLMode},
 
-    {"mongodb://%2Ftmp%2Fmongodb-27017.sock", "", "", kMaster, "", 1, 0, ""},
+    {"mongodb://%2Ftmp%2Fmongodb-27017.sock", "", "", kMaster, "", 1, 0, "", kGlobalSSLMode},
 
     {"mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/?replicaSet=replName",
      "",
@@ -345,7 +407,11 @@ const URITestCase validCases[] = {
      "replName",
      2,
      1,
-     ""},
+     "",
+     kGlobalSSLMode},
+
+    {"mongodb://localhost/?ssl=true", "", "", kMaster, "", 1, 1, "", kEnableSSL},
+    {"mongodb://localhost/?ssl=false", "", "", kMaster, "", 1, 1, "", kDisableSSL},
 };
 
 const InvalidURITestCase invalidCases[] = {
@@ -364,10 +430,7 @@ const InvalidURITestCase invalidCases[] = {
     {"mongodb://localhost:27017localhost:27018"},
 
     // % symbol in password must be escaped.
-    {"mongodb://localhost:pass%word@127.0.0.1:27017",
-     Status(ErrorCodes::FailedToParse,
-            "The characters after the % do not form a hex value. Please escape the % or pass a "
-            "valid hex value. ")},
+    {"mongodb://localhost:pass%word@127.0.0.1:27017", ErrorCodes::duplicateCodeForTest(51040)},
 
     // Domain sockets have to end in ".sock".
     {"mongodb://%2Fnotareal%2Fdomainsock"},
@@ -419,6 +482,9 @@ const InvalidURITestCase invalidCases[] = {
 
     // Missing an entire key-value pair
     {"mongodb://127.0.0.1:1234/dbName?foo=a&&c=b"},
+
+    // Illegal value for ssl.
+    {"mongodb://127.0.0.1:1234/dbName?ssl=blah", ErrorCodes::duplicateCodeForTest(51041)},
 };
 
 // Helper Method to take a filename for a json file and return the array of tests inside of it
@@ -480,8 +546,8 @@ TEST(MongoURI, InvalidURIs) {
         unittest::log() << "Testing URI: " << testCase.URI << '\n';
         auto cs_status = MongoURI::parse(testCase.URI);
         ASSERT_NOT_OK(cs_status);
-        if (testCase.status) {
-            ASSERT_EQUALS(testCase.status, cs_status.getStatus());
+        if (testCase.code) {
+            ASSERT_EQUALS(*testCase.code, cs_status.getStatus());
         }
     }
 }

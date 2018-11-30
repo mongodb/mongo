@@ -369,6 +369,11 @@ std::string ReplicaSetMonitor::getServerAddress() const {
     return _state->getConfirmedServerAddress();
 }
 
+const MongoURI& ReplicaSetMonitor::getOriginalUri() const {
+    // setUri is const so no need to lock.
+    return _state->setUri;
+}
+
 bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
     return _state->seedNodes.count(host);
@@ -996,13 +1001,14 @@ void Node::update(const IsMasterReply& reply) {
     lastWriteDateUpdateTime = Date_t::now();
 }
 
-SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes)
+SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes, MongoURI uri)
     : name(name.toString()),
       consecutiveFailedScans(0),
       seedNodes(seedNodes),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * 1000),
       rand(int64_t(time(0))),
       roundRobin(0),
+      setUri(std::move(uri)),
       refreshPeriod(getDefaultRefreshPeriod()) {
     uassert(13642, "Replica set seed list can't be empty", !seedNodes.empty());
 
@@ -1024,9 +1030,8 @@ SetState::SetState(StringData name, const std::set<HostAndPort>& seedNodes)
 
 SetState::SetState(const MongoURI& uri)
     : SetState(uri.getSetName(),
-               std::set<HostAndPort>(uri.getServers().begin(), uri.getServers().end())) {
-    setUri = uri;
-}
+               std::set<HostAndPort>(uri.getServers().begin(), uri.getServers().end()),
+               uri) {}
 
 HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) const {
     switch (criteria.pref) {

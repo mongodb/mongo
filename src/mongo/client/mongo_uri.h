@@ -41,6 +41,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -146,14 +147,10 @@ public:
         return _options;
     }
 
-    void addOption(std::string newKey, std::string newValue) {
-        _options[std::move(newKey)] = std::move(newValue);
-    }
-
     void setOptionIfNecessary(std::string uriParamKey, std::string value) {
         const auto key = _options.find(uriParamKey);
         if (key == end(_options) && !value.empty()) {
-            addOption(uriParamKey, value);
+            _options[std::move(uriParamKey)] = std::move(value);
         }
     }
 
@@ -210,24 +207,25 @@ public:
         return _retryWrites;
     }
 
+    transport::ConnectSSLMode getSSLMode() const {
+        return _sslMode;
+    }
+
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
     // get a new URI with the same info, except type() will be MASTER and getServers() will
     // be the single host you pass in.
     MongoURI cloneURIForServer(HostAndPort hostAndPort) const {
-        return MongoURI(ConnectionString(std::move(hostAndPort)),
-                        _user,
-                        _password,
-                        _database,
-                        _retryWrites,
-                        _options);
+        auto out = *this;
+        out._connectString = ConnectionString(std::move(hostAndPort));
+        return out;
     }
 
     ConnectionString::ConnectionType type() const {
         return _connectString.type();
     }
 
-    explicit MongoURI(const ConnectionString& connectString) : _connectString(connectString){};
+    explicit MongoURI(const ConnectionString& connectString) : _connectString(connectString) {}
 
     MongoURI() = default;
 
@@ -241,12 +239,14 @@ private:
              const std::string& password,
              const std::string& database,
              boost::optional<bool> retryWrites,
+             transport::ConnectSSLMode sslMode,
              OptionsMap options)
         : _connectString(std::move(connectString)),
           _user(user),
           _password(password),
           _database(database),
           _retryWrites(std::move(retryWrites)),
+          _sslMode(sslMode),
           _options(std::move(options)) {}
 
     boost::optional<BSONObj> _makeAuthObjFromOptions(int maxWireVersion) const;
@@ -258,6 +258,7 @@ private:
     std::string _password;
     std::string _database;
     boost::optional<bool> _retryWrites;
+    transport::ConnectSSLMode _sslMode = transport::kGlobalSSLMode;
     OptionsMap _options;
 };
 

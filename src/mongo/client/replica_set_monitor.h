@@ -152,8 +152,15 @@ public:
     /**
      * Returns a std::string with the format name/server1,server2.
      * If name is empty, returns just comma-separated list of servers.
+     * It IS updated to reflect the current members of the set.
      */
     std::string getServerAddress() const;
+
+    /**
+     * Returns the URI that was used to construct this monitor.
+     * It IS NOT updated to reflect the current members of the set.
+     */
+    const MongoURI& getOriginalUri() const;
 
     /**
      * Is server part of this set? Uses only cached information.

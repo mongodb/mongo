@@ -143,7 +143,7 @@ public:
     /**
      * seedNodes must not be empty
      */
-    SetState(StringData name, const std::set<HostAndPort>& seedNodes);
+    SetState(StringData name, const std::set<HostAndPort>& seedNodes, MongoURI uri = {});
 
     SetState(const MongoURI& uri);
 
@@ -208,7 +208,7 @@ public:
     int64_t latencyThresholdMicros;
     mutable PseudoRandom rand;  // only used for host selection to balance load
     mutable int roundRobin;     // used when useDeterministicHostSelection is true
-    MongoURI setUri;            // URI that may have constructed this
+    const MongoURI setUri;      // URI that may have constructed this
     Seconds refreshPeriod;
 };
 

@@ -303,25 +303,8 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
                                     << ", address resolved to 0.0.0.0");
     }
 
-    transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
-#ifdef MONGO_CONFIG_SSL
-    // Prefer to get SSL mode directly from our URI, but if it is not set, fall back to
-    // checking global SSL params. DBClientConnections create through the shell will have a
-    // meaningful URI set, but DBClientConnections created from within the server may not.
-    auto options = _uri.getOptions();
-    auto iter = options.find("ssl");
-    if (iter != options.end()) {
-        if (iter->second == "true") {
-            sslMode = transport::kEnableSSL;
-        } else {
-            sslMode = transport::kDisableSSL;
-        }
-    }
-
-#endif
-
-    auto tl = getGlobalServiceContext()->getTransportLayer();
-    auto sws = tl->connect(serverAddress, sslMode, _socketTimeout.value_or(Milliseconds{5000}));
+    auto sws = getGlobalServiceContext()->getTransportLayer()->connect(
+        serverAddress, _uri.getSSLMode(), _socketTimeout.value_or(Milliseconds{5000}));
     if (!sws.isOK()) {
         return Status(ErrorCodes::HostUnreachable,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()

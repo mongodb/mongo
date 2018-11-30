@@ -96,7 +96,7 @@ mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
             if (swHex.isOK()) {
                 out << swHex.getValue();
             } else {
-                return Status(ErrorCodes::FailedToParse,
+                return Status(ErrorCodes::Error(51040),
                               "The characters after the % do not form a hex value. Please escape "
                               "the % or pass a valid hex value. ");
             }
@@ -183,14 +183,11 @@ std::map<std::string, std::string> parseOptions(StringData options, StringData u
                           << "Missing a key for key/value pair in the options for mongodb:// URL: "
                           << url);
         }
-        const auto key = uriDecode(keyRaw);
-        if (!key.isOK()) {
-            uasserted(
-                ErrorCodes::FailedToParse,
-                str::stream() << "Key '" << keyRaw
-                              << "' in options cannot properly be URL decoded for mongodb:// URL: "
-                              << url);
-        }
+        const auto key = uassertStatusOKWithContext(
+            uriDecode(keyRaw),
+            str::stream() << "Key '" << keyRaw
+                          << "' in options cannot properly be URL decoded for mongodb:// URL: "
+                          << url);
         const auto valRaw = kvPair.second;
         if (valRaw.empty()) {
             uasserted(ErrorCodes::FailedToParse,
@@ -198,16 +195,13 @@ std::map<std::string, std::string> parseOptions(StringData options, StringData u
                                     << "' in the options for mongodb:// URL: "
                                     << url);
         }
-        const auto val = uriDecode(valRaw);
-        if (!val.isOK()) {
-            uasserted(
-                ErrorCodes::FailedToParse,
-                str::stream() << "Value '" << valRaw << "' for key '" << keyRaw
-                              << "' in options cannot properly be URL decoded for mongodb:// URL: "
-                              << url);
-        }
+        const auto val = uassertStatusOKWithContext(
+            uriDecode(valRaw),
+            str::stream() << "Value '" << valRaw << "' for key '" << keyRaw
+                          << "' in options cannot properly be URL decoded for mongodb:// URL: "
+                          << url);
 
-        ret[key.getValue()] = val.getValue();
+        ret[key] = val;
     }
 
     return ret;
@@ -360,21 +354,14 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
     }
 
     // Get the username and make sure it did not fail to decode
-    const auto usernameWithStatus = uriDecode(usernameSD);
-    if (!usernameWithStatus.isOK()) {
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Username cannot properly be URL decoded for mongodb:// URL: "
-                                << url);
-    }
-    const auto username = usernameWithStatus.getValue();
+    const auto username = uassertStatusOKWithContext(
+        uriDecode(usernameSD),
+        str::stream() << "Username cannot properly be URL decoded for mongodb:// URL: " << url);
 
     // Get the password and make sure it did not fail to decode
-    const auto passwordWithStatus = uriDecode(passwordSD);
-    if (!passwordWithStatus.isOK())
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Password cannot properly be URL decoded for mongodb:// URL: "
-                                << url);
-    const auto password = passwordWithStatus.getValue();
+    const auto password = uassertStatusOKWithContext(
+        uriDecode(passwordSD),
+        str::stream() << "Password cannot properly be URL decoded for mongodb:// URL: " << url);
 
     // 4. Validate, split, and URL decode the host identifiers.
     const auto hostIdentifiersStr = hostIdentifiers.toString();
@@ -383,14 +370,10 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
                                              boost::first_finder(",", boost::is_iequal()));
          i != std::remove_reference<decltype((i))>::type{};
          ++i) {
-        const auto hostWithStatus = uriDecode(boost::copy_range<std::string>(*i));
-        if (!hostWithStatus.isOK()) {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Host cannot properly be URL decoded for mongodb:// URL: "
-                                    << url);
-        }
+        const auto host = uassertStatusOKWithContext(
+            uriDecode(boost::copy_range<std::string>(*i)),
+            str::stream() << "Host cannot properly be URL decoded for mongodb:// URL: " << url);
 
-        const auto host = hostWithStatus.getValue();
         if (host.empty()) {
             continue;
         }
@@ -453,14 +436,11 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
     }
 
     // 5. Decode the database name
-    const auto databaseWithStatus = uriDecode(databaseSD);
-    if (!databaseWithStatus.isOK()) {
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Database name cannot properly be URL "
-                                   "decoded for mongodb:// URL: "
-                                << url);
-    }
-    const auto database = databaseWithStatus.getValue();
+    const auto database =
+        uassertStatusOKWithContext(uriDecode(databaseSD),
+                                   str::stream() << "Database name cannot properly be URL "
+                                                    "decoded for mongodb:// URL: "
+                                                 << url);
 
     // 6. Validate the database contains no prohibited characters
     // Prohibited characters:
@@ -507,10 +487,28 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
         }
     }
 
+    transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
+    auto sslModeIter = options.find("ssl");
+    if (sslModeIter != options.end()) {
+        const auto& val = sslModeIter->second;
+        if (val == "true") {
+            sslMode = transport::kEnableSSL;
+        } else if (val == "false") {
+            sslMode = transport::kDisableSSL;
+        } else {
+            uasserted(51041, str::stream() << "ssl must be either 'true' or 'false', not" << val);
+        }
+    }
+
     ConnectionString cs(
         setName.empty() ? ConnectionString::MASTER : ConnectionString::SET, servers, setName);
-    return MongoURI(
-        std::move(cs), username, password, database, std::move(retryWrites), std::move(options));
+    return MongoURI(std::move(cs),
+                    username,
+                    password,
+                    database,
+                    std::move(retryWrites),
+                    sslMode,
+                    std::move(options));
 }
 
 StatusWith<MongoURI> MongoURI::parse(const std::string& url) try {

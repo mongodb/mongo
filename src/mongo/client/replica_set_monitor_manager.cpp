@@ -97,6 +97,12 @@ void ReplicaSetMonitorManager::_setupTaskExecutorInLock(const std::string& name)
     }
 }
 
+namespace {
+void uassertNotMixingSSL(transport::ConnectSSLMode a, transport::ConnectSSLMode b) {
+    uassert(51042, "Mixing ssl modes with a single replica set is disallowed", a == b);
+}
+}
+
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     const ConnectionString& connStr) {
     invariant(connStr.type() == ConnectionString::SET);
@@ -106,6 +112,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     auto setName = connStr.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {
+        uassertNotMixingSSL(monitor->getOriginalUri().getSSLMode(), transport::kGlobalSSLMode);
         return monitor;
     }
 
@@ -127,6 +134,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
     const auto& setName = uri.getSetName();
     auto monitor = _monitors[setName].lock();
     if (monitor) {
+        uassertNotMixingSSL(monitor->getOriginalUri().getSSLMode(), uri.getSSLMode());
         return monitor;
     }
 
