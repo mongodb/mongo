@@ -755,6 +755,15 @@ private:
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
             {
                 auto opCtx = cc().makeOperationContext();
+
+                // This use of UninterruptibleLockGuard is intentional. It is undesirable to use an
+                // UninterruptibleLockGuard in client operations because stepdown requires the
+                // ability to interrupt client operations. However, it is acceptable to use an
+                // UninterruptibleLockGuard in batch application because the only cause of
+                // interruption would be shutdown, and the ReplBatcher thread has its own shutdown
+                // handling.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
                 while (!_syncTail->tryPopAndWaitForMore(
                     opCtx.get(), _oplogBuffer, &ops, batchLimits)) {
                 }
