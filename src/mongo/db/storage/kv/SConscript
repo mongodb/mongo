@@ -33,6 +33,17 @@ env.Library(
 
 # Should not be referenced outside this SConscript file.
 env.Library(
+    target='kv_drop_pending_ident_reaper',
+    source=['kv_drop_pending_ident_reaper.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        'kv_prefix',
+    ],
+)
+
+# Should not be referenced outside this SConscript file.
+env.Library(
     target='kv_database_catalog_entry_core',
     source=['kv_database_catalog_entry_base.cpp'],
     LIBDEPS=[
@@ -108,6 +119,17 @@ env.Library(
         'kv_prefix',
         ],
     )
+
+env.CppUnitTest(
+    target='kv_drop_pending_ident_reaper_test',
+    source=[
+        'kv_drop_pending_ident_reaper_test.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'kv_drop_pending_ident_reaper',
+    ],
+)
 
 env.CppUnitTest(
     target='kv_database_catalog_entry_test',
