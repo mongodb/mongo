@@ -30,14 +30,21 @@
             as: "connected"
         }
     };
-    const normalResults = graphColl.aggregate([graphLookupStage]).toArray();
-    const facetedResults = graphColl.aggregate([{$facet: {nested: [graphLookupStage]}}]).toArray();
+
+    const projectStage = {$project: {_id: 1, edges: 1, connected_length: {$size: "$connected"}}};
+
+    const normalResults = graphColl.aggregate([graphLookupStage, projectStage]).toArray();
+    const facetedResults =
+        graphColl.aggregate([{$facet: {nested: [graphLookupStage, projectStage]}}]).toArray();
     assert.eq(facetedResults, [{nested: normalResults}]);
 
+    const sortStage = {$sort: {_id: 1, "connected._id": 1}};
+
     const normalResultsUnwound =
-        graphColl.aggregate([graphLookupStage, {$unwind: "$connected"}]).toArray();
+        graphColl.aggregate([graphLookupStage, {$unwind: "$connected"}, sortStage]).toArray();
     const facetedResultsUnwound =
-        graphColl.aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}]}}])
+        graphColl
+            .aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}, sortStage]}}])
             .toArray();
     assert.eq(facetedResultsUnwound, [{nested: normalResultsUnwound}]);
 }());

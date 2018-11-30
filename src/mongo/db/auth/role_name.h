@@ -40,7 +40,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -92,6 +91,11 @@ public:
      */
     const std::string& toString() const {
         return getFullName();
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const RoleName& rname) {
+        return H::combine(std::move(h), rname.getFullName());
     }
 
 private:
@@ -174,16 +178,6 @@ private:
 };
 
 }  // namespace mongo
-
-// Define hash function for RoleNames so they can be keys in stdx::unordered_map
-MONGO_HASH_NAMESPACE_START
-template <>
-struct hash<mongo::RoleName> {
-    size_t operator()(const mongo::RoleName& rname) const {
-        return hash<std::string>()(rname.getFullName());
-    }
-};
-MONGO_HASH_NAMESPACE_END
 
 namespace mongo {
 

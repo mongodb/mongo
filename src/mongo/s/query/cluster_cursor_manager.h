@@ -474,8 +474,7 @@ private:
     class CursorEntry;
     struct CursorEntryContainer;
     using CursorEntryMap = stdx::unordered_map<CursorId, CursorEntry>;
-    using NssToCursorContainerMap =
-        stdx::unordered_map<NamespaceString, CursorEntryContainer, NamespaceString::Hasher>;
+    using NssToCursorContainerMap = stdx::unordered_map<NamespaceString, CursorEntryContainer>;
 
     /**
      * Transfers ownership of the given pinned cursor back to the manager, and moves the cursor to

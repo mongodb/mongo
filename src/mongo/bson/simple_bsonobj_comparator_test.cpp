@@ -86,14 +86,6 @@ TEST(SimpleBSONObjContainerTest, UnorderedSetIsDefaultConstructible) {
     ASSERT_EQ(uset.size(), 2UL);
 }
 
-TEST(SimpleBSONObjContainerTest, UnorderedMultiSetIsDefaultConstructible) {
-    SimpleBSONObjUnorderedMultiset umultiset;
-    umultiset.insert(BSON("x" << 1));
-    umultiset.insert(BSON("x" << 1));
-    umultiset.insert(BSON("y" << 1));
-    ASSERT_EQ(umultiset.size(), 3UL);
-}
-
 /**
  * Asserts that the key-value pair 'pair' can be successfully inserted into 'map'.
  */
@@ -141,12 +133,5 @@ TEST(SimpleBSONObjContainerTest, UnorderedMapIsDefaultConstructible) {
     ASSERT_EQ(umap.size(), 2UL);
 }
 
-TEST(SimpleBSONObjContainerTest, UnorderedMultiMapIsDefaultConstructible) {
-    SimpleBSONObjUnorderedMultiMap<std::string> umultimap;
-    umultimap.insert(std::make_pair(BSON("_id" << 0), "anica"));
-    umultimap.insert(std::make_pair(BSON("_id" << 0), "raj"));
-    umultimap.insert(std::make_pair(BSON("_id" << 1), "ian"));
-    ASSERT_EQ(umultimap.size(), 3UL);
-}
 }  // namespace
 }  // namespace mongo

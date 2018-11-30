@@ -47,7 +47,6 @@
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"

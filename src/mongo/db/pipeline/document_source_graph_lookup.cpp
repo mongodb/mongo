@@ -289,7 +289,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
         if (auto entry = _cache[*it]) {
             cached->insert(entry->begin(), entry->end());
             size_t valueSize = it->getApproximateSize();
-            it = _frontier.erase(it);
+            _frontier.erase(it++);
 
             // If the cached value increased in size while in the cache, we don't want to underflow
             // '_frontierUsageBytes'.

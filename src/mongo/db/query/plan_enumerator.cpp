@@ -411,7 +411,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
                 // either of the predicates on 'c', since this would change the predicate's meaning
                 // from a==1 to "b.a"==1.
                 if (it->second.traversedThroughElemMatchObj) {
-                    it = childContextCopy.outsidePreds.erase(it);
+                    childContextCopy.outsidePreds.erase(it++);
                 } else {
                     it->second.route.push_back(i);
                     ++it;
@@ -1331,7 +1331,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
         RelevantTag* usedRt = static_cast<RelevantTag*>(assignedPred->getTag());
         set<string> usedPrefixes;
         usedPrefixes.insert(getPathPrefix(usedRt->path));
-        used[NULL] = usedPrefixes;
+        used[nullptr] = usedPrefixes;
 
         // If 'assigned' is a predicate inside an $elemMatch, we have to
         // add the prefix not only to the top-level context, but also to the
@@ -1356,8 +1356,8 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
 
         if (used.end() == used.find(rt->elemMatchExpr)) {
             // This is a new $elemMatch that we haven't seen before.
-            invariant(used.end() != used.find(NULL));
-            set<string>& topLevelUsed = used.find(NULL)->second;
+            invariant(used.end() != used.find(nullptr));
+            set<string>& topLevelUsed = used.find(nullptr)->second;
 
             // If the top-level path prefix of the $elemMatch hasn't been
             // used yet, couldCompound[i] is safe to compound.

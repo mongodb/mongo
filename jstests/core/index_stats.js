@@ -111,26 +111,21 @@
     // Confirm $and operation ticks indexes for winning plan, but not rejected plans.
     //
 
-    // Run explain to determine which indexes would be used for this query. Note that index
-    // access counters are not incremented for explain execution.
-    var explain = col.find({a: 2, b: 2}).explain("queryPlanner");
-    var indexNameList = getIndexNamesForWinningPlan(explain);
-    assert.gte(indexNameList.length, 1);
-
-    for (var i = 0; i < indexNameList.length; ++i) {
-        // Increment the expected $indexStats count for each index used.
-        var name = indexNameList[i];
-        if (name === "a_1") {
-            countA++;
-        } else {
-            assert(name === "b_1_c_1");
-            countB++;
-        }
+    // We cannot use explain() to determine which indexes would be used for this query, since
+    // 1) explain() will not bump the access counters
+    // 2) explain() always runs the multi planner, and the multi planner may choose a different
+    // index each run. We therefore run the query, and check that only one of the indexes has its
+    // counter bumped (assuming we never choose an index intersection plan).
+    const results = col.find({a: 2, b: 2}).itcount();
+    if (countA + 1 == getUsageCount("a_1")) {
+        // Plan using index A was chosen. Index B should not have been used (assuming no index
+        // intersection plans are used).
+        countA++;
+    } else {
+        // Plan using index B was chosen. Index A should not have been used (assuming no index
+        // intersection plans are used).
+        assert.eq(++countB, getUsageCount("b_1_c_1"));
     }
-
-    // Run the query again without explain to increment index access counters.
-    col.findOne({a: 2, b: 2});
-    // Check all indexes for proper count.
     assert.eq(countA, getUsageCount("a_1"));
     assert.eq(countB, getUsageCount("b_1_c_1"));
     assert.eq(0, getUsageCount("_id_"));

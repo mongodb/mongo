@@ -444,7 +444,7 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
                 // If there's an operation actively using the cursor, then that operation is now
                 // responsible for cleaning it up.  Otherwise we can immediately dispose of it.
                 if (cursor->_operationUsingCursor) {
-                    it = partition.erase(it);
+                    partition.erase(it++);
                     continue;
                 }
 
@@ -454,7 +454,7 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
                     ++it;
                 } else {
                     toDisposeWithoutMutex.emplace_back(cursor);
-                    it = partition.erase(it);
+                    partition.erase(it++);
                 }
             }
         }
@@ -483,7 +483,7 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
             auto* cursor = it->second;
             if (cursorShouldTimeout_inlock(cursor, now)) {
                 toDisposeWithoutMutex.emplace_back(cursor);
-                it = lockedPartition->erase(it);
+                lockedPartition->erase(it++);
             } else {
                 ++it;
             }

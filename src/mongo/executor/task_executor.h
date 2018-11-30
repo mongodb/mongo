@@ -40,7 +40,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/platform/hash_namespace.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/baton.h"
@@ -335,12 +334,13 @@ public:
         return isValid();
     }
 
-    std::size_t hash() const {
-        return std::hash<decltype(_callback)>()(_callback);
-    }
-
     bool isCanceled() const {
         return getCallback()->isCanceled();
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const CallbackHandle& handle) {
+        return H::combine(std::move(h), handle._callback);
     }
 
 private:
@@ -445,13 +445,3 @@ struct TaskExecutor::RemoteCommandCallbackArgs {
 
 }  // namespace executor
 }  // namespace mongo
-
-// Provide a specialization for hash<CallbackHandle> so it can easily be stored in unordered_set.
-MONGO_HASH_NAMESPACE_START
-template <>
-struct hash<::mongo::executor::TaskExecutor::CallbackHandle> {
-    size_t operator()(const ::mongo::executor::TaskExecutor::CallbackHandle& x) const {
-        return x.hash();
-    }
-};
-MONGO_HASH_NAMESPACE_END

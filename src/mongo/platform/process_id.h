@@ -38,8 +38,6 @@
 #include <unistd.h>
 #endif
 
-#include "mongo/platform/hash_namespace.h"
-
 namespace mongo {
 
 #ifdef _WIN32
@@ -126,6 +124,11 @@ public:
         return _npid >= other._npid;
     }
 
+    template <typename H>
+    friend H AbslHashValue(H h, const ProcessId pid) {
+        return H::combine(std::move(h), pid.asUInt32());
+    }
+
 private:
     explicit ProcessId(NativeProcessId npid) : _npid(npid) {}
 
@@ -135,12 +138,3 @@ private:
 std::ostream& operator<<(std::ostream& os, ProcessId pid);
 
 }  // namespace mongo
-
-MONGO_HASH_NAMESPACE_START
-template <>
-struct hash<::mongo::ProcessId> {
-    size_t operator()(const ::mongo::ProcessId pid) const {
-        return hash<::std::uint32_t>()(pid.asUInt32());
-    }
-};
-MONGO_HASH_NAMESPACE_END

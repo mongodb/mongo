@@ -285,7 +285,7 @@ private:
      * otherwise pass nullptr and this function will lock/check the weak_ptr itself.
      */
     ActiveIterator _invalidateActiveIterator(UniqueLockWithPtrGuard& guard,
-                                             const ActiveIterator& it,
+                                             ActiveIterator it,
                                              std::shared_ptr<Value>&& value) {
         // If the iterator is past-the-end, then just return the iterator
         if (it == _active.end()) {
@@ -311,7 +311,8 @@ private:
 
         // Erase the iterator from the _active map and return the next iterator (so this
         // can be called in a loop).
-        return _active.erase(it);
+        _active.erase(it++);
+        return it;
     }
 
     /*

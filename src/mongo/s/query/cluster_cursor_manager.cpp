@@ -538,7 +538,7 @@ std::size_t ClusterCursorManager::killCursorsSatisfying(
             cursorsToDestroy.push_back(entry.releaseCursor(nullptr));
 
             // Destroy the entry and set the iterator to the next element.
-            cursorIdEntryIt = entryMap.erase(cursorIdEntryIt);
+            entryMap.erase(cursorIdEntryIt++);
         }
 
         if (entryMap.empty()) {
@@ -735,7 +735,7 @@ auto ClusterCursorManager::eraseContainer(NssToCursorContainerMap::iterator it)
     // with this namespace.
     size_t numDeleted = _cursorIdPrefixToNamespaceMap.erase(container.containerPrefix);
     invariant(numDeleted == 1);
-    it = _namespaceToContainerMap.erase(it);
+    _namespaceToContainerMap.erase(it++);
     invariant(_namespaceToContainerMap.size() == _cursorIdPrefixToNamespaceMap.size());
     return it;
 }

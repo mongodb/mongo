@@ -113,6 +113,11 @@ public:
         return getUser() < rhs.getUser() || (getUser() == rhs.getUser() && getDB() < rhs.getDB());
     }
 
+    template <typename H>
+    friend H AbslHashValue(H h, const UserName& userName) {
+        return H::combine(std::move(h), userName.getFullName());
+    }
+
 private:
     void _serializeToSubObj(BSONObjBuilder* sub) const;
 

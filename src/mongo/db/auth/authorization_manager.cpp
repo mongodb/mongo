@@ -55,7 +55,6 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/compiler.h"

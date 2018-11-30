@@ -94,10 +94,10 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(Opera
 
     std::shared_ptr<TransactionCoordinator> coordinatorToReturn;
 
-    const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
+    auto coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
     if (coordinatorsForSessionIter != _coordinatorsBySession.end()) {
         const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
-        const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
+        auto coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
         if (coordinatorForTxnIter != coordinatorsForSession.end()) {
             coordinatorToReturn = coordinatorForTxnIter->second;
         }
@@ -107,10 +107,10 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(Opera
         // If the failpoint is on and we couldn't find the coordinator in the main catalog, fall
         // back to the "defunct" catalog, which stores coordinators that have completed and would
         // normally be forgotten.
-        const auto& coordinatorsForSessionIter = _coordinatorsBySessionDefunct.find(lsid);
-        if (coordinatorsForSessionIter != _coordinatorsBySession.end()) {
+        auto coordinatorsForSessionIter = _coordinatorsBySessionDefunct.find(lsid);
+        if (coordinatorsForSessionIter != _coordinatorsBySessionDefunct.end()) {
             const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
-            const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
+            auto coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
             if (coordinatorForTxnIter != coordinatorsForSession.end()) {
                 coordinatorToReturn = coordinatorForTxnIter->second;
             }
