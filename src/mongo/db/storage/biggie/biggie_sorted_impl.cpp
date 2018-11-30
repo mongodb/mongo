@@ -262,7 +262,8 @@ SortedDataInterface::SortedDataInterface(OperationContext* opCtx,
       _collectionNamespace(desc->parentNS()),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
-      _isUnique(desc->unique()) {
+      _isUnique(desc->unique()),
+      _isPartial(desc->isPartial()) {
     // This is the string representation of the KeyString before elements in this ident, which is
     // ident + \0. This is before all elements in this ident.
     _KSForIdentStart = createKeyString(
@@ -276,7 +277,8 @@ SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique
     : _order(ordering),
       _prefix(ident.toString().append(1, '\1')),
       _identEnd(ident.toString().append(1, '\2')),
-      _isUnique(isUnique) {
+      _isUnique(isUnique),
+      _isPartial(false) {
     _KSForIdentStart = createKeyString(
         BSONObj(), RecordId::min(), ident.toString().append(1, '\0'), _order, _isUnique);
     _KSForIdentEnd = createKeyString(BSONObj(), RecordId::min(), _identEnd, _order, _isUnique);
@@ -375,6 +377,11 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
             removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
         else
             removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ true);
+
+        // Check that the record id matches when using partial indexes. We may be called to unindex
+        // records that are not present in the index due to the partial filter expression.
+        if (!ifPartialCheckRecordIdEquals(opCtx, removeKeyString, loc))
+            return;
         numErased = workingCopy->erase(removeKeyString);
 
         if (numErased == 0) {
@@ -385,6 +392,9 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
                 removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ true);
             else
                 removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
+
+            if (!ifPartialCheckRecordIdEquals(opCtx, removeKeyString, loc))
+                return;
             numErased = workingCopy->erase(removeKeyString);
         }
     } else {
@@ -507,6 +517,22 @@ std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterface::newCurs
 
 Status SortedDataInterface::initAsEmpty(OperationContext* opCtx) {
     return Status::OK();
+}
+
+bool SortedDataInterface::ifPartialCheckRecordIdEquals(OperationContext* opCtx,
+                                                       const std::string key,
+                                                       const RecordId rid) const {
+    if (!_isPartial)
+        return true;
+
+    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
+    auto workingCopyIt = workingCopy->find(key);
+    if (workingCopyIt == workingCopy->end())
+        return true;
+
+    IndexKeyEntry entry =
+        keyStringToIndexKeyEntry(workingCopyIt->first, workingCopyIt->second, _order);
+    return entry.loc == rid;
 }
 
 // Cursor

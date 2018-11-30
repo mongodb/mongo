@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/biggie/biggie_sorted_impl.h"
@@ -49,8 +50,29 @@ private:
 
 public:
     SortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
-    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique) final {
-        return std::make_unique<SortedDataInterface>(_order, unique, "ident"_sd);
+    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
+                                                                       bool partial) final {
+        std::string ns = "test.biggie";
+        OperationContextNoop opCtx(newRecoveryUnit().release());
+
+        BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
+                                  << "testIndex"
+                                  << "v"
+                                  << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
+                                  << "ns"
+                                  << ns
+                                  << "unique"
+                                  << unique);
+        if (partial) {
+            auto partialBSON =
+                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON(""
+                                                                                     << ""));
+            spec = spec.addField(partialBSON.firstElement());
+        }
+
+        IndexDescriptor desc(NULL, "", spec);
+
+        return std::make_unique<SortedDataInterface>(&opCtx, "ident"_sd, &desc);
     }
 
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {

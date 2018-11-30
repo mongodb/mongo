@@ -43,6 +43,7 @@ void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
+        /*partial=*/false,
         {
             {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1}, {key5, loc1},
         });
@@ -82,6 +83,7 @@ void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
+        /*partial=*/false,
         {
             {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1}, {key5, loc1},
         });
@@ -121,6 +123,7 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             // No key2
@@ -169,6 +172,7 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             {key2, loc1},
@@ -219,6 +223,7 @@ void testSetEndPosition_Restore_Forward(bool unique) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
+        /*partial=*/false,
         {
             {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1},
         });
@@ -255,6 +260,7 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
+        /*partial=*/false,
         {
             {key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc1},
         });
@@ -295,6 +301,7 @@ void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1}, {key4, loc1},
                                                         });
@@ -329,6 +336,7 @@ void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1}, {key4, loc1},
                                                         });
@@ -365,6 +373,7 @@ void testSetEndPosition_Empty_Forward(bool unique, bool inclusive) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
         harnessHelper->newSortedDataInterface(unique,
+                                              /*partial=*/false,
                                               {
                                                   {key1, loc1}, {key2, loc1}, {key3, loc1},
                                               });
@@ -395,6 +404,7 @@ void testSetEndPosition_Empty_Reverse(bool unique, bool inclusive) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
         harnessHelper->newSortedDataInterface(unique,
+                                              /*partial=*/false,
                                               {
                                                   {key1, loc1}, {key2, loc1}, {key3, loc1},
                                               });
@@ -423,7 +433,8 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Exclusive) {
 void testSetEndPosition_Character_Limits(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique, {{key7, loc1}, {key8, loc1}});
+    auto sorted = harnessHelper->newSortedDataInterface(
+        unique, /*partial=*/false, {{key7, loc1}, {key8, loc1}});
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key7, inclusive);
@@ -460,5 +471,6 @@ TEST(SortedDataInterface, SetEndPosition_Character_Limits_Standard_Inclusive) {
 TEST(SortedDataInterface, SetEndPosition_Character_Limits_Standard_Exclusive) {
     testSetEndPosition_Character_Limits(false, false);
 }
+
 }  // namespace
 }  // namespace mongo

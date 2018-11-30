@@ -43,7 +43,8 @@ namespace {
 // Verify that an empty index takes up no space.
 TEST(SortedDataInterface, GetSpaceUsedBytesEmpty) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -62,7 +63,8 @@ TEST(SortedDataInterface, GetSpaceUsedBytesEmpty) {
 // Verify that a nonempty index takes up some space.
 TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

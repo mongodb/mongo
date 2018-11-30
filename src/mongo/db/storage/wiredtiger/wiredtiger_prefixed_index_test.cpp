@@ -69,7 +69,7 @@ public:
         _conn->close(_conn, NULL);
     }
 
-    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {
         std::string ns = "test.wt";
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
@@ -81,6 +81,13 @@ public:
                                   << ns
                                   << "unique"
                                   << unique);
+
+        if (partial) {
+            auto partialBSON =
+                BSON(IndexDescriptor::kPartialFilterExprFieldName.toString() << BSON(""
+                                                                                     << ""));
+            spec = spec.addField(partialBSON.firstElement());
+        }
 
         IndexDescriptor desc(NULL, "", spec);
 

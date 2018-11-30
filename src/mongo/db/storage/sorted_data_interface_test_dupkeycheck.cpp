@@ -45,7 +45,8 @@ namespace {
 // pair that was inserted, it should still return an OK status.
 TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -81,7 +82,8 @@ TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
 // not exist in the index.
 TEST(SortedDataInterface, DupKeyCheckEmpty) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -102,7 +104,8 @@ TEST(SortedDataInterface, DupKeyCheckEmpty) {
 // when the insert key is located at a RecordId that comes after the one specified.
 TEST(SortedDataInterface, DupKeyCheckWhenDiskLocBefore) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -137,7 +140,8 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocBefore) {
 // when the insert key is located at a RecordId that comes before the one specified.
 TEST(SortedDataInterface, DupKeyCheckWhenDiskLocAfter) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

@@ -43,7 +43,8 @@ namespace {
 // Add a key using a bulk builder.
 TEST(SortedDataInterface, BuilderAddKey) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -68,7 +69,8 @@ TEST(SortedDataInterface, BuilderAddKey) {
 // Add a reserved RecordId using a bulk builder.
 TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT(sorted->isEmpty(opCtx.get()));
@@ -95,7 +97,8 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
 // Add a compound key using a bulk builder.
 TEST(SortedDataInterface, BuilderAddCompoundKey) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -122,7 +125,8 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
 // not allowed.
 TEST(SortedDataInterface, BuilderAddSameKey) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -149,7 +153,8 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
 // the returned status is OK when duplicates are allowed.
 TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -175,7 +180,8 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
 // Add multiple keys using a bulk builder.
 TEST(SortedDataInterface, BuilderAddMultipleKeys) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -202,7 +208,8 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
 // Add multiple compound keys using a bulk builder.
 TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

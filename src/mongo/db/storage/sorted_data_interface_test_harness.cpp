@@ -39,12 +39,12 @@
 #include "mongo/unittest/unittest.h"
 
 auto mongo::SortedDataInterfaceHarnessHelper::newSortedDataInterface(
-    bool unique, std::initializer_list<IndexKeyEntry> toInsert)
+    bool unique, bool partial, std::initializer_list<IndexKeyEntry> toInsert)
     -> std::unique_ptr<SortedDataInterface> {
     invariant(std::is_sorted(
         toInsert.begin(), toInsert.end(), IndexEntryComparison(Ordering::make(BSONObj()))));
 
-    auto index = newSortedDataInterface(unique);
+    auto index = newSortedDataInterface(unique, partial);
     insertToIndex(this, index, toInsert);
     return index;
 }
@@ -74,7 +74,8 @@ namespace {
 
 TEST(SortedDataInterface, InsertWithDups1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -106,7 +107,8 @@ TEST(SortedDataInterface, InsertWithDups1) {
 
 TEST(SortedDataInterface, InsertWithDups2) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -134,7 +136,8 @@ TEST(SortedDataInterface, InsertWithDups2) {
 
 TEST(SortedDataInterface, InsertWithDups3AndRollback) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -162,7 +165,8 @@ TEST(SortedDataInterface, InsertWithDups3AndRollback) {
 
 TEST(SortedDataInterface, InsertNoDups1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -190,7 +194,8 @@ TEST(SortedDataInterface, InsertNoDups1) {
 
 TEST(SortedDataInterface, InsertNoDups2) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -218,7 +223,8 @@ TEST(SortedDataInterface, InsertNoDups2) {
 
 TEST(SortedDataInterface, Unindex1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -283,7 +289,8 @@ TEST(SortedDataInterface, Unindex1) {
 
 TEST(SortedDataInterface, Unindex2Rollback) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -318,7 +325,8 @@ TEST(SortedDataInterface, Unindex2Rollback) {
 
 TEST(SortedDataInterface, CursorIterate1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     int N = 5;
     for (int i = 0; i < N; i++) {
@@ -344,7 +352,8 @@ TEST(SortedDataInterface, CursorIterate1) {
 
 TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     int N = 5;
     for (int i = 0; i < N; i++) {
@@ -373,7 +382,8 @@ TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
 
 TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     int N = 5;
     for (int i = 0; i < N; i++) {
@@ -402,7 +412,8 @@ TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
 
 TEST(SortedDataInterface, Locate1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     BSONObj key = BSON("" << 1);
     RecordId loc(5, 16);
@@ -431,7 +442,8 @@ TEST(SortedDataInterface, Locate1) {
 
 TEST(SortedDataInterface, Locate2) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -457,7 +469,8 @@ TEST(SortedDataInterface, Locate2) {
 
 TEST(SortedDataInterface, Locate2Empty) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -488,7 +501,8 @@ TEST(SortedDataInterface, Locate2Empty) {
 
 TEST(SortedDataInterface, Locate3Descending) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     auto buildEntry = [](int i) { return IndexKeyEntry(BSON("" << i), RecordId(1, i * 2)); };
 
@@ -531,7 +545,8 @@ TEST(SortedDataInterface, Locate3Descending) {
 
 TEST(SortedDataInterface, Locate4) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto sorted = harnessHelper->newSortedDataInterface(false,
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique=*/false,
+                                                        /*partial=*/false,
                                                         {
                                                             {BSON("" << 1), RecordId(1, 2)},
                                                             {BSON("" << 1), RecordId(1, 4)},

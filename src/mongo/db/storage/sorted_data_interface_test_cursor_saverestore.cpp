@@ -45,7 +45,8 @@ namespace {
 // restorePosition() in succession.
 TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -90,7 +91,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
 // restorePosition() in succession.
 TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -137,7 +139,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
 // as part of the current position of the cursor.
 TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -182,7 +185,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
 // as part of the current position of the cursor.
 TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -226,7 +230,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
 // May be useful to run this test under valgrind to verify there are no leaks.
 TEST(SortedDataInterface, SavePositionWithoutRestore) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -258,7 +263,8 @@ TEST(SortedDataInterface, SavePositionWithoutRestore) {
 // May be useful to run this test under valgrind to verify there are no leaks.
 TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -293,6 +299,7 @@ void testSaveAndRestorePositionSeesNewInserts(bool forward, bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1}, {key3, loc1},
                                                         });
@@ -327,6 +334,7 @@ void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, bool uniq
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1}, {key3, loc1},
                                                         });
@@ -366,7 +374,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Revers
 void testSaveAndRestorePositionSeesNewInsertsAfterEOF(bool forward, bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(false,
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique=*/false,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                         });
@@ -407,7 +416,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_F
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
-        harnessHelper->newSortedDataInterface(/*isUnique*/ false,
+        harnessHelper->newSortedDataInterface(/*unique*/ false,
+                                              /*partial=*/false,
                                               {
                                                   {key1, loc1}, {key2, loc1}, {key3, loc1},
                                               });
@@ -447,7 +457,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_For
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
-        /*isUnique*/ true, {{key1, loc1}, {key2, loc2}, {key3, loc2}, {key4, loc2}});
+        /*unique*/ true,
+        /*partial=*/false,
+        {{key1, loc1}, {key2, loc2}, {key3, loc2}, {key4, loc2}});
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -487,7 +499,8 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_R
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
-        harnessHelper->newSortedDataInterface(/*isUnique*/ false,
+        harnessHelper->newSortedDataInterface(/*unique*/ false,
+                                              /*partial=*/false,
                                               {
                                                   {key0, loc1}, {key1, loc1}, {key2, loc2},
                                               });
@@ -527,7 +540,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Rev
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
-        /*isUnique*/ true, {{key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc2}});
+        /*unique*/ true,
+        /*partial=*/false,
+        {{key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc2}});
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -567,7 +582,8 @@ TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
-        harnessHelper->newSortedDataInterface(false,
+        harnessHelper->newSortedDataInterface(/*unique=*/false,
+                                              /*partial=*/false,
                                               {
                                                   {key1, loc1}, {key2, loc1}, {key3, loc1},
                                               });

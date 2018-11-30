@@ -173,6 +173,16 @@ public:
     };
 
 private:
+    /**
+     * Returns false only when the index is partial and the IndexKeyEntry's record id does not match
+     * the provided rid from the given key.
+     *
+     * Returns true in all other cases.
+     */
+    bool ifPartialCheckRecordIdEquals(OperationContext* opCtx,
+                                      const std::string key,
+                                      const RecordId rid) const;
+
     const Ordering _order;
     // These two are the same as before.
     std::string _prefix;
@@ -186,6 +196,8 @@ private:
     std::string _KSForIdentEnd;
     // This stores whether or not the end position is inclusive.
     bool _isUnique;
+    // Whether or not the index is partial
+    bool _isPartial;
 };
 }  // namespace biggie
 }  // namespace mongo

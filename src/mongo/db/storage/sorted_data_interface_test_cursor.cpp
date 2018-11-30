@@ -44,7 +44,8 @@ namespace {
 // Verify that a forward cursor is positioned at EOF when the index is empty.
 TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -65,7 +66,8 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
 // Verify that a reverse cursor is positioned at EOF when the index is empty.
 TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -88,7 +90,8 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
 // When a cursor positioned at EOF is advanced, it stays at EOF.
 TEST(SortedDataInterface, ExhaustCursor) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -130,7 +133,8 @@ TEST(SortedDataInterface, ExhaustCursor) {
 // When a cursor positioned at EOF is advanced, it stays at EOF.
 TEST(SortedDataInterface, ExhaustCursorReversed) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -172,7 +176,7 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
 void testBoundaries(bool unique, bool forward, bool inclusive) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(unique));
+        harnessHelper->newSortedDataInterface(unique, /*partial=*/false));
 
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     ASSERT(sorted->isEmpty(opCtx.get()));

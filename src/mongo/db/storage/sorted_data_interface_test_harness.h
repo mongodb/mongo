@@ -90,7 +90,8 @@ class RecoveryUnit;
 
 class SortedDataInterfaceHarnessHelper : public virtual HarnessHelper {
 public:
-    virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) = 0;
+    virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique,
+                                                                        bool partial) = 0;
 
     /**
      * Creates a new SDI with some initial data.
@@ -98,7 +99,7 @@ public:
      * For clarity to readers, toInsert must be sorted.
      */
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(
-        bool unique, std::initializer_list<IndexKeyEntry> toInsert);
+        bool unique, bool partial, std::initializer_list<IndexKeyEntry> toInsert);
 };
 
 /**

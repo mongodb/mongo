@@ -43,6 +43,7 @@ void testSeekExact_Hit(bool unique, bool forward) {
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
         harnessHelper->newSortedDataInterface(unique,
+                                              /*partial=*/false,
                                               {
                                                   {key1, loc1}, {key2, loc1}, {key3, loc1},
                                               });
@@ -74,6 +75,7 @@ void testSeekExact_Miss(bool unique, bool forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             // No key2.
@@ -107,7 +109,8 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
-        false,
+        /*unique=*/false,
+        /*partial=*/false,
         {
             {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
         });
@@ -126,7 +129,8 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
-        false,
+        /*unique=*/false,
+        /*partial=*/false,
         {
             {key1, loc1}, {key2, loc1}, {key2, loc2}, {key3, loc1},
         });
