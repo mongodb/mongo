@@ -2,6 +2,7 @@
 'use strict';
 
 function CollectionValidator() {
+    load('jstests/libs/feature_compatibility_version.js');
     load('jstests/libs/parallelTester.js');
 
     if (!(this instanceof CollectionValidator)) {
@@ -86,18 +87,20 @@ function CollectionValidator() {
     // Run a separate thread to validate collections on each server in parallel.
     const validateCollectionsThread = function(validatorFunc, host) {
         try {
+            load('jstests/libs/feature_compatibility_version.js');
+
             print('Running validate() on ' + host);
             const conn = new Mongo(host);
             conn.setSlaveOk();
             jsTest.authenticate(conn);
 
-            if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
-                let adminDB = conn.getDB('admin');
-                // Make sure this node has the desired FCV.
-                assert.soon(() => {
-                    return adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'})
-                               .version ===
-                        jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+            const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+            if (requiredFCV) {
+                // Make sure this node has the desired FCV as it may take time for the updates to
+                // replicate to the nodes that weren't part of the w=majority.
+                assert.soonNoExcept(() => {
+                    checkFCV(conn.getDB('admin'), requiredFCV);
+                    return true;
                 });
             }
 
@@ -123,16 +126,24 @@ function CollectionValidator() {
         let adminDB;
         let originalFCV;
 
-        if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
+        const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+        if (requiredFCV) {
             let conn = new Mongo(setFCVHost);
             adminDB = conn.getDB('admin');
-            originalFCV =
-                adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version;
-            if (originalFCV !== jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
-                assert.commandWorked(adminDB.adminCommand({
-                    setFeatureCompatibilityVersion:
-                        jsTest.options().forceValidationWithFeatureCompatibilityVersion
-                }));
+            originalFCV = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+
+            if (originalFCV.targetVersion) {
+                // If a previous FCV upgrade or downgrade was interrupted, then we run the
+                // setFeatureCompatibilityVersion command to complete it before attempting to set
+                // the feature compatibility version to 'requiredFCV'.
+                assert.commandWorked(adminDB.runCommand(
+                    {setFeatureCompatibilityVersion: originalFCV.targetVersion}));
+                checkFCV(adminDB, originalFCV.targetVersion);
+            }
+
+            if (originalFCV.version !== requiredFCV && originalFCV.targetVersion !== requiredFCV) {
+                assert.commandWorked(
+                    adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
             }
         }
 
@@ -155,12 +166,13 @@ function CollectionValidator() {
             });
         }
 
-        if (jsTest.options().forceValidationWithFeatureCompatibilityVersion !== originalFCV) {
-            assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV}));
+        if (originalFCV && originalFCV.version !== requiredFCV) {
+            assert.commandWorked(
+                adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version}));
         }
     };
 }
 
-// Ensure compatability with existing callers. Cannot use `const` or `let` here since this file may
+// Ensure compatibility with existing callers. Cannot use `const` or `let` here since this file may
 // be loaded more than once.
 var validateCollections = new CollectionValidator().validateCollections;

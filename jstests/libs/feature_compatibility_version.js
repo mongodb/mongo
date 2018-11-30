@@ -5,10 +5,13 @@
  * These constants represent the current "latest" and "last-stable" values for the
  * featureCompatibilityVersion parameter. They should only be used for testing of upgrade-downgrade
  * scenarios that are intended to be maintained between releases.
+ *
+ * We cannot use `const` when declaring them because it must be possible to load() this file
+ * multiple times.
  */
 
-const latestFCV = "4.2";
-const lastStableFCV = "4.0";
+var latestFCV = "4.2";
+var lastStableFCV = "4.0";
 
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The
