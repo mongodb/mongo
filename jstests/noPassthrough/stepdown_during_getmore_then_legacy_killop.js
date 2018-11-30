@@ -6,6 +6,7 @@
  * - Kill the cursor using OP_KILL_CURSORS.
  *
  * This is intended to reproduce SERVER-37838.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";
