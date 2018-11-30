@@ -455,7 +455,7 @@ variables:
     multiversion_platform: windows
     multiversion_edition: enterprise
     gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
   tasks:
@@ -1267,7 +1267,7 @@ functions:
   "build new tools" :
     command: shell.exec
     params:
-      working_dir: src/src/mongo/gotools
+      working_dir: src/src/mongo/gotools/src/github.com/mongodb/mongo-tools
       script: |
         set -o verbose
         set -o errexit
@@ -1277,10 +1277,11 @@ functions:
             set -o igncr
         fi;
 
-        sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
-        sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
-
-        . ./${set_tools_gopath|set_gopath.sh}
+        # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
+        . ./set_goenv.sh
+        GOROOT="" set_goenv || exit
+        env | grep ^GO
+        go version
 
         build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
 
@@ -1289,8 +1290,8 @@ functions:
         fi
 
         for i in $build_tools; do
-             ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
-             "../../mongo-tools/$i${exe|}" --version
+            go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
+            "../../../../../../mongo-tools/$i${exe|}" --version
         done
 
   "get modified patch files" :
@@ -8363,7 +8364,6 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --ssl=off --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off --release
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     test_flags: --excludeWithAnyTags=requires_http_client
     tooltags: ""
     build_mongoreplay: true
@@ -8386,7 +8386,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
     test_flags: --repeatSuites=10 --shuffle
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     test_flags: --excludeWithAnyTags=requires_http_client
     tooltags: ""
     build_mongoreplay: true
@@ -8449,7 +8448,6 @@ buildvariants:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     test_flags: --excludeWithAnyTags=requires_http_client
     tooltags: ""
     build_mongoreplay: true
@@ -8633,7 +8631,6 @@ buildvariants:
     # exclude those tests as well.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -8683,7 +8680,6 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=uses_transactions,does_not_support_wiredtiger_lsm
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -8714,8 +8710,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -8818,8 +8813,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -8916,8 +8910,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -8978,8 +8971,7 @@ buildvariants:
       --allocator=system
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -9022,8 +9014,7 @@ buildvariants:
       CXXFLAGS="-Wno-register"
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -9066,8 +9057,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -9179,7 +9169,6 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
@@ -9269,7 +9258,6 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: org
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
@@ -9308,8 +9296,7 @@ buildvariants:
     packager_arch: ppc64le
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: ppc64le
@@ -9404,8 +9391,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     multiversion_platform: ubuntu1604
     multiversion_architecture: s390x
@@ -9521,8 +9507,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
   display_tasks:
@@ -9605,8 +9590,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
   display_tasks:
@@ -9712,8 +9696,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -9799,8 +9782,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -9903,7 +9885,6 @@ buildvariants:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10"'
     tooltags: ""
     build_mongoreplay: false
   display_tasks:
@@ -10077,8 +10058,7 @@ buildvariants:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
   display_tasks:
@@ -10403,8 +10383,7 @@ buildvariants:
     ext: zip
     use_scons_cache: true
     test_flags: --serviceExecutor=adaptive
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: false
   tasks:
   - name: compile_TG
@@ -10437,8 +10416,7 @@ buildvariants:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: false
   display_tasks:
   - *dbtest
@@ -10515,8 +10493,7 @@ buildvariants:
     python3: '/cygdrive/c/python/python36/python.exe'
     ext: zip
     use_scons_cache: true
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
     build_mongoreplay: false
   display_tasks:
   - *dbtest
@@ -10638,8 +10615,7 @@ buildvariants:
     python3: '/cygdrive/c/python/python36/python.exe'
     ext: zip
     use_scons_cache: true
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: false
   tasks:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
@@ -10669,8 +10645,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
     resmoke_jobs_max: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
-    tooltags: "-tags 'ssl openssl_pre_1.0'"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -10780,7 +10755,6 @@ buildvariants:
     resmoke_jobs_max: 1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -10817,8 +10791,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
     resmoke_jobs_max: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
-    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -10866,8 +10839,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
-    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -10915,8 +10887,7 @@ buildvariants:
       CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
       CXXFLAGS="-Wno-register"
     resmoke_jobs_max: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
-    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -10958,8 +10929,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: osx
     push_arch: x86_64-enterprise
-    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
-    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11
+    tooltags: "ssl sasl"
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
     resmoke_jobs_max: 1
@@ -11442,8 +11412,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -12059,8 +12028,7 @@ buildvariants:
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12616,8 +12584,7 @@ buildvariants:
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12761,8 +12728,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -12856,7 +12822,6 @@ buildvariants:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
   tasks:
@@ -12890,8 +12855,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13000,8 +12964,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13112,8 +13075,7 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
@@ -13233,8 +13195,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     multiversion_platform: rhel72
     multiversion_architecture: s390x
@@ -13351,8 +13312,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel67
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13458,9 +13418,8 @@ buildvariants:
     push_name: linux
     push_arch: s390x-rhel67
     repo_edition: org
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     build_mongoreplay: true
-    tooltags: "-tags ssl"
+    tooltags: "ssl"
   display_tasks:
   - *dbtest
   - *unittests
@@ -13501,8 +13460,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13562,8 +13520,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13630,8 +13587,7 @@ buildvariants:
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13650,7 +13606,6 @@ buildvariants:
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -13685,8 +13640,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13745,8 +13699,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     multiversion_platform: suse12
     multiversion_architecture: s390x
@@ -13850,7 +13803,6 @@ buildvariants:
   - suse12-test
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -13864,8 +13816,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13965,8 +13916,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: enterprise
     scons_cache: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -14024,8 +13974,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: org
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -14122,8 +14071,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: enterprise
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     scons_cache_scope: shared
     build_mongoreplay: true
   display_tasks:
@@ -14184,8 +14132,7 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: org
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     scons_cache_scope: shared
     build_mongoreplay: true
   display_tasks:
@@ -14305,8 +14252,7 @@ buildvariants:
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -14496,7 +14442,6 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       MONGO_DISTMOD=rhel62
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
@@ -14577,7 +14522,6 @@ buildvariants:
         CCFLAGS="-march=armv8-a+crc -mtune=generic"
         MONGO_DISTMOD=ubuntu1604
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
@@ -14657,7 +14601,6 @@ buildvariants:
       CPPPATH=/opt/mongodbtoolchain/v2/include
       LINKFLAGS="-mmacosx-version-min=10.10"
     resmoke_jobs_max: 1
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
@@ -14699,7 +14642,6 @@ buildvariants:
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -14794,8 +14736,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     resmoke_jobs_factor: 0.25
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -14883,8 +14824,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    tooltags: -tags 'sasl ssl'
+    tooltags: "ssl sasl"
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -14998,8 +14938,7 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -15154,8 +15093,7 @@ buildvariants:
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -15201,8 +15139,7 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     scons_cache_scope: shared
   display_tasks:
@@ -15350,8 +15287,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -15383,8 +15319,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl'"
+    tooltags: "ssl"
     build_mongoreplay: false
     hang_analyzer_dump_core: false
     test_flags: --serviceExecutor=adaptive
@@ -15491,8 +15426,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     build_mongoreplay: true
   display_tasks:
@@ -15541,8 +15475,7 @@ buildvariants:
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "ssl sasl"
     build_mongoreplay: true
     has_packages: false
   display_tasks:
@@ -15583,7 +15516,6 @@ buildvariants:
     use_scons_cache: true
     multiversion_platform: windows
     multiversion_edition: enterprise
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10"'
     tooltags: ""
     build_mongoreplay: false
   display_tasks:

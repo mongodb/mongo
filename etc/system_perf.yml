@@ -102,7 +102,7 @@ functions:
         file: src/compile_expansions.yml
     - command: shell.exec
       params:
-        working_dir: src/src/mongo/gotools
+        working_dir: src/src/mongo/gotools/src/github.com/mongodb/mongo-tools
         script: |
           set -o verbose
           set -o errexit
@@ -110,16 +110,17 @@ functions:
           if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
           fi;
-          sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
-          sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
-          . ./${set_tools_gopath|set_gopath.sh}
+          # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
+          . ./set_goenv.sh
+          GOROOT="" set_goenv || exit
+          go version
           build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
           if [ "${build_mongoreplay}" = "true" ]; then
-            build_tools="$build_tools mongoreplay"
+              build_tools="$build_tools mongoreplay"
           fi
           for i in $build_tools; do
-            ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
-            "../../mongo-tools/$i${exe|}" --version
+              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
+              "../../../../../../mongo-tools/$i${exe|}" --version
           done
     - command: shell.exec
       params:
@@ -681,7 +682,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     platform: linux
     project_dir: &project_dir dsi
     tooltags: ""
