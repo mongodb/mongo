@@ -129,6 +129,9 @@ class ShardedClusterFixture(interface.Fixture):
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
             primary = self.configsvr.get_primary().mongo_client()
+            # Prior to the changes from SERVER-34653, running the refreshLogicalSessionCacheNow
+            # command with a logical session requires being authenticated.
+            self._auth_to_db(primary)
             primary.admin.command({ "refreshLogicalSessionCacheNow" : 1 })
 
 
