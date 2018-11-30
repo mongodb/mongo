@@ -120,7 +120,7 @@ public:
     }
 
     virtual Timestamp getOldestOpenReadTimestamp() const override {
-        MONGO_UNREACHABLE;
+        return Timestamp();
     }
 
 private:

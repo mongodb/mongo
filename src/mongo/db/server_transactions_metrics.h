@@ -141,7 +141,7 @@ public:
     /**
      * Appends the accumulated stats to a transactions stats object.
      */
-    void updateStats(TransactionsStats* stats);
+    void updateStats(TransactionsStats* stats, OperationContext* opCtx);
 
 private:
     /**
@@ -149,6 +149,13 @@ private:
      * Returns boost::none if there are no transaction oplog entry optimes stored.
      */
     boost::optional<repl::OpTime> _calculateOldestActiveOpTime(WithLock) const;
+
+    /**
+     * Returns the oldest read timestamp in use by any open unprepared transaction. This will
+     * return a null timestamp if there is no oldest open unprepared read timestamp to be
+     * returned.
+     */
+    static Timestamp _getOldestOpenUnpreparedReadTimestamp(OperationContext* opCtx);
 
     //
     // Member variables, excluding atomic variables, are labeled with the following code to

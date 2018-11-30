@@ -7,27 +7,32 @@
     function verifyServerStatusFields(serverStatusResponse) {
         assert(serverStatusResponse.hasOwnProperty("transactions"),
                "Expected the serverStatus response to have a 'transactions' field\n" +
-                   serverStatusResponse);
+                   tojson(serverStatusResponse));
         assert(serverStatusResponse.transactions.hasOwnProperty("currentActive"),
                "The 'transactions' field in serverStatus did not have the 'currentActive' field\n" +
-                   serverStatusResponse.transactions);
+                   tojson(serverStatusResponse.transactions));
         assert(
             serverStatusResponse.transactions.hasOwnProperty("currentInactive"),
             "The 'transactions' field in serverStatus did not have the 'currentInactive' field\n" +
-                serverStatusResponse.transactions);
+                tojson(serverStatusResponse.transactions));
         assert(serverStatusResponse.transactions.hasOwnProperty("currentOpen"),
                "The 'transactions' field in serverStatus did not have the 'currentOpen' field\n" +
-                   serverStatusResponse.transactions);
+                   tojson(serverStatusResponse.transactions));
         assert(serverStatusResponse.transactions.hasOwnProperty("totalAborted"),
                "The 'transactions' field in serverStatus did not have the 'totalAborted' field\n" +
-                   serverStatusResponse.transactions);
+                   tojson(serverStatusResponse.transactions));
         assert(
             serverStatusResponse.transactions.hasOwnProperty("totalCommitted"),
             "The 'transactions' field in serverStatus did not have the 'totalCommitted' field\n" +
-                serverStatusResponse.transactions);
+                tojson(serverStatusResponse.transactions));
         assert(serverStatusResponse.transactions.hasOwnProperty("totalStarted"),
                "The 'transactions' field in serverStatus did not have the 'totalStarted' field\n" +
-                   serverStatusResponse.transactions);
+                   tojson(serverStatusResponse.transactions));
+        assert(
+            serverStatusResponse.transactions.hasOwnProperty("oldestOpenUnpreparedReadTimestamp"),
+            "The 'transactions' field in serverStatus did not have the " +
+                "'oldestOpenUnpreparedReadTimestamp' field\n" +
+                tojson(serverStatusResponse.transactions));
     }
 
     // Verifies that the given value of the server status response is incremented in the way
@@ -68,6 +73,9 @@
     // Compare server status after starting a transaction with the server status before.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
+    // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
+    assert.eq(sessionColl.find({_id: "insert-1"}).itcount(), 1);
+
     let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     // Verify that the open transaction counter is incremented while inside the transaction.
@@ -77,6 +85,8 @@
         initialStatus.transactions, newStatus.transactions, "currentActive", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
+    // Verify that the oldestOpenUnpreparedReadTimestamp has been set.
+    assert.gt(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Compare server status after the transaction commit with the server status before.
     session.commitTransaction();
@@ -92,6 +102,9 @@
         initialStatus.transactions, newStatus.transactions, "currentActive", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
+    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
+    // has closed.
+    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // This transaction will abort.
     jsTest.log("Start a transaction and then abort it.");
@@ -99,6 +112,9 @@
     // Compare server status after starting a transaction with the server status before.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
+    // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
+    assert.eq(sessionColl.find({_id: "insert-2"}).itcount(), 1);
+
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     // Verify that the open transaction counter is incremented while inside the transaction.
@@ -108,6 +124,8 @@
         initialStatus.transactions, newStatus.transactions, "currentActive", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
+    // Verify that the oldestOpenUnpreparedReadTimestamp has been set.
+    assert.gt(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Compare server status after the transaction abort with the server status before.
     session.abortTransaction_forTesting();
@@ -124,6 +142,9 @@
         initialStatus.transactions, newStatus.transactions, "currentActive", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
+    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
+    // has closed.
+    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // This transaction will abort due to a duplicate key insert.
     jsTest.log("Start a transaction that will abort on a duplicated key error.");
@@ -132,6 +153,9 @@
     session.startTransaction();
     // Inserting a new document will work fine, and the transaction starts.
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
+    // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
+    assert.eq(sessionColl.find({_id: "insert-3"}).itcount(), 1);
+
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     // Verify that the open transaction counter is incremented while inside the transaction.
@@ -141,6 +165,8 @@
         initialStatus.transactions, newStatus.transactions, "currentActive", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
+    // Verify that the oldestOpenUnpreparedReadTimestamp has been set.
+    assert.gt(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // Compare server status after the transaction abort with the server status before.
     // The duplicated insert will fail, causing the transaction to abort.
@@ -212,6 +238,9 @@
         initialStatus.transactions, newStatus.transactions, "currentActive", 0);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
+    // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
+    // has closed.
+    assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
 
     // End the session and stop the replica set.
     session.endSession();

@@ -84,3 +84,5 @@ structs:
         default: 0
       oldestActiveOplogEntryTimestamp:
         type: timestamp
+      oldestOpenUnpreparedReadTimestamp:
+        type: timestamp

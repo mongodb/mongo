@@ -273,7 +273,15 @@ unsigned int ServerTransactionsMetrics::getTotalActiveOpTimes() const {
     return _oldestActiveOplogEntryOpTimes.size();
 }
 
-void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
+Timestamp ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(
+    OperationContext* opCtx) {
+    // The history is not pinned in memory once a transaction has been prepared since reads
+    // are no longer possible. Therefore, the timestamp returned by the storage engine refers
+    // to the oldest read timestamp for any open unprepared transaction.
+    return opCtx->getServiceContext()->getStorageEngine()->getOldestOpenReadTimestamp();
+}
+
+void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, OperationContext* opCtx) {
     stats->setCurrentActive(_currentActive.load());
     stats->setCurrentInactive(_currentInactive.load());
     stats->setCurrentOpen(_currentOpen.load());
@@ -284,6 +292,8 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalPreparedThenCommitted(_totalPreparedThenCommitted.load());
     stats->setTotalPreparedThenAborted(_totalPreparedThenAborted.load());
     stats->setCurrentPrepared(_currentPrepared.load());
+    stats->setOldestOpenUnpreparedReadTimestamp(
+        ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(opCtx));
     // Acquire _mutex before reading _oldestActiveOplogEntryOpTime.
     stdx::lock_guard<stdx::mutex> lm(_mutex);
     // To avoid compression loss, we have Timestamp(0, 0) be the default value if no oldest active
@@ -313,7 +323,7 @@ public:
         // lifecycle within a session. Both are assigned transaction numbers, and so both are often
         // referred to as “transactions”.
         RetryableWritesStats::get(opCtx)->updateStats(&stats);
-        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats);
+        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats, opCtx);
         return stats.toBSON();
     }
 
