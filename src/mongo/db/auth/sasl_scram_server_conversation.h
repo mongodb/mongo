@@ -83,7 +83,7 @@ private:
     int _step{0};
     std::string _authMessage;
     User::SCRAMCredentials<HashBlock> _scramCredentials;
-    scram::Secrets<HashBlock> _secrets;
+    scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy> _secrets;
 
     // client and server nonce concatenated
     std::string _nonce;

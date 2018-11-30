@@ -222,9 +222,10 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         }
     }
 
-    _secrets = scram::Secrets<HashBlock>("",
-                                         base64::decode(_scramCredentials.storedKey),
-                                         base64::decode(_scramCredentials.serverKey));
+    _secrets = scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>(
+        "",
+        base64::decode(_scramCredentials.storedKey),
+        base64::decode(_scramCredentials.serverKey));
 
     // Generate server-first-message
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
