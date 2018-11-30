@@ -166,17 +166,15 @@ public:
     }
 
     BackupCursorState openBackupCursor(OperationContext* opCtx) final {
-        MONGO_UNREACHABLE;
+        return BackupCursorState{UUID::gen(), boost::none, {}};
     }
 
-    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {
-        MONGO_UNREACHABLE;
-    }
+    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {}
 
     BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
                                                const UUID& backupId,
                                                const Timestamp& extendTo) final {
-        MONGO_UNREACHABLE;
+        return {{}};
     }
 
     std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
