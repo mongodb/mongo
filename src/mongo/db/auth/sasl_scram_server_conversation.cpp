@@ -221,15 +221,17 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         }
     }
 
-    _secrets.push_back(scram::Secrets<HashBlock>("",
-                                                 base64::decode(scramCredentials.storedKey),
-                                                 base64::decode(scramCredentials.serverKey)));
+    _secrets.push_back(scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>(
+        "",
+        base64::decode(scramCredentials.storedKey),
+        base64::decode(scramCredentials.serverKey)));
 
     if (userName == internalSecurity.user->getName() && internalSecurity.alternateCredentials) {
         auto altCredentials = internalSecurity.alternateCredentials->scram<HashBlock>();
-        _secrets.push_back(scram::Secrets<HashBlock>("",
-                                                     base64::decode(altCredentials.storedKey),
-                                                     base64::decode(altCredentials.serverKey)));
+        _secrets.push_back(scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>(
+            "",
+            base64::decode(altCredentials.storedKey),
+            base64::decode(altCredentials.serverKey)));
     }
 
     // Generate server-first-message
@@ -337,13 +339,14 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
 
     const auto decodedProof = base64::decode(proof.toString());
     std::string serverSignature;
-    const auto checkSecret = [&](const scram::Secrets<HashBlock>& secret) {
-        if (!secret.verifyClientProof(_authMessage, decodedProof))
-            return false;
+    const auto checkSecret =
+        [&](const scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>& secret) {
+            if (!secret.verifyClientProof(_authMessage, decodedProof))
+                return false;
 
-        serverSignature = secret.generateServerSignature(_authMessage);
-        return true;
-    };
+            serverSignature = secret.generateServerSignature(_authMessage);
+            return true;
+        };
 
     if (!std::any_of(_secrets.begin(), _secrets.end(), checkSecret)) {
         return Status(ErrorCodes::AuthenticationFailed,

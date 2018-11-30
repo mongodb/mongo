@@ -85,7 +85,7 @@ private:
 
     // The secrets to check the client proof against during the second step
     // Usually only contains one element, except during key rollover.
-    std::vector<scram::Secrets<HashBlock>> _secrets;
+    std::vector<scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>> _secrets;
 
     // client and server nonce concatenated
     std::string _nonce;
