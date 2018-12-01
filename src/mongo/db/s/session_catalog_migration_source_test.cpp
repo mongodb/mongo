@@ -42,14 +42,13 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 using executor::RemoteCommandRequest;
 
-namespace {
+const NamespaceString kNs("a.b");
 
 class SessionCatalogMigrationSourceTest : public MockReplCoordServerFixture {};
-
-const NamespaceString kNs("a.b");
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.

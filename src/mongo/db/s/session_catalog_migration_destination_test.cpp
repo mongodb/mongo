@@ -208,7 +208,7 @@ public:
                                 Session* session,
                                 TxnNumber txnNumber,
                                 StmtId stmtId,
-                                repl::OplogEntry& expectedOplog) {
+                                const repl::OplogEntry& expectedOplog) {
         const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session);
         auto oplog = txnParticipant->checkStatementExecuted(opCtx, txnNumber, stmtId);
         ASSERT_TRUE(oplog);
@@ -1517,41 +1517,38 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory) {
-    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(2);
+    const std::vector<repl::OplogEntry> oplogEntries{
+        makeOplogEntry(OpTime(Timestamp(100, 2), 1),              // optime
+                       OpTypeEnum::kInsert,                       // op type
+                       BSON("x" << 100),                          // o
+                       boost::none,                               // o2
+                       sessionInfo,                               // session info
+                       Date_t::now(),                             // wall clock time
+                       23),                                       // statement id
+        makeOplogEntry(OpTime(Timestamp(80, 2), 1),               // optime
+                       OpTypeEnum::kNoop,                         // op type
+                       {},                                        // o
+                       TransactionParticipant::kDeadEndSentinel,  // o2
+                       sessionInfo,                               // session info
+                       Date_t::now(),                             // wall clock time
+                       kIncompleteHistoryStmtId),                 // statement id
+        makeOplogEntry(OpTime(Timestamp(60, 2), 1),               // optime
+                       OpTypeEnum::kInsert,                       // op type
+                       BSON("x" << 60),                           // o
+                       boost::none,                               // o2
+                       sessionInfo,                               // session info
+                       Date_t::now(),                             // wall clock time
+                       5)};                                       // statement id
 
     SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
     sessionMigration.start(getServiceContext());
     sessionMigration.finish();
 
-    OperationSessionInfo sessionInfo;
-    sessionInfo.setSessionId(sessionId);
-    sessionInfo.setTxnNumber(2);
+    returnOplog(oplogEntries);
 
-    auto oplog1 = makeOplogEntry(OpTime(Timestamp(100, 2), 1),  // optime
-                                 OpTypeEnum::kInsert,           // op type
-                                 BSON("x" << 100),              // o
-                                 boost::none,                   // o2
-                                 sessionInfo,                   // session info
-                                 Date_t::now(),                 // wall clock time
-                                 23);                           // statement id
-
-    auto oplog2 = makeOplogEntry(OpTime(Timestamp(80, 2), 1),               // optime
-                                 OpTypeEnum::kNoop,                         // op type
-                                 {},                                        // o
-                                 TransactionParticipant::kDeadEndSentinel,  // o2
-                                 sessionInfo,                               // session info
-                                 Date_t::now(),                             // wall clock time
-                                 kIncompleteHistoryStmtId);                 // statement id
-
-    auto oplog3 = makeOplogEntry(OpTime(Timestamp(60, 2), 1),  // optime
-                                 OpTypeEnum::kInsert,          // op type
-                                 BSON("x" << 60),              // o
-                                 boost::none,                  // o2
-                                 sessionInfo,                  // session info
-                                 Date_t::now(),                // wall clock time
-                                 5);                           // statement id
-
-    returnOplog({oplog1, oplog2, oplog3});
     // migration always fetches at least twice to transition from committing to done.
     returnOplog({});
     returnOplog({});
@@ -1561,26 +1558,116 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto opCtx = operationContext();
-    auto session = getSessionWithTxn(opCtx, sessionId, 2);
+    auto session = getSessionWithTxn(opCtx, *sessionInfo.getSessionId(), 2);
     const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
     ASSERT_TRUE(historyIter.hasNext());
-    checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
+    checkOplogWithNestedOplog(oplogEntries[2], historyIter.next(opCtx));
 
     ASSERT_TRUE(historyIter.hasNext());
-    checkOplog(oplog2, historyIter.next(opCtx));
+    checkOplog(oplogEntries[1], historyIter.next(opCtx));
 
     ASSERT_TRUE(historyIter.hasNext());
-    checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));
+    checkOplogWithNestedOplog(oplogEntries[0], historyIter.next(opCtx));
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    checkStatementExecuted(opCtx, session.get(), 2, 23, oplog1);
-    checkStatementExecuted(opCtx, session.get(), 2, 5, oplog3);
+    checkStatementExecuted(opCtx, session.get(), 2, 23, oplogEntries[0]);
+    checkStatementExecuted(opCtx, session.get(), 2, 5, oplogEntries[2]);
     ASSERT_THROWS(txnParticipant->checkStatementExecuted(opCtx, 2, 38), AssertionException);
 }
 
-}  // namespace
+TEST_F(SessionCatalogMigrationDestinationTest,
+       OplogEntriesWithOldTransactionFollowedByUpToDateEntries) {
+    auto opCtx = operationContext();
 
+    OperationSessionInfo sessionInfo1;
+    sessionInfo1.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo1.setTxnNumber(2);
+    {
+        // "Start" a new transaction on session 1, so that migrating the entries above will result
+        // in TransactionTooOld. This should not preclude the entries for session 2 from getting
+        // applied.
+        auto scopedSession =
+            SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, *sessionInfo1.getSessionId());
+        const auto txnParticipant =
+            TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
+        txnParticipant->refreshFromStorageIfNeeded(opCtx);
+        txnParticipant->beginOrContinue(3, boost::none, boost::none);
+    }
+
+    OperationSessionInfo sessionInfo2;
+    sessionInfo2.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo2.setTxnNumber(15);
+
+    const std::vector<repl::OplogEntry> oplogEntries{
+        // Session 1 entries
+        makeOplogEntry(OpTime(Timestamp(100, 2), 1),  // optime
+                       OpTypeEnum::kInsert,           // op type
+                       BSON("x" << 100),              // o
+                       boost::none,                   // o2
+                       sessionInfo1,                  // session info
+                       Date_t::now(),                 // wall clock time
+                       23),                           // statement id
+
+        // Session 2 entries
+        makeOplogEntry(OpTime(Timestamp(50, 2), 1),  // optime
+                       OpTypeEnum::kInsert,          // op type
+                       BSON("x" << 50),              // o
+                       boost::none,                  // o2
+                       sessionInfo2,                 // session info
+                       Date_t::now(),                // wall clock time
+                       56),                          // statement id
+        makeOplogEntry(OpTime(Timestamp(20, 2), 1),  // optime
+                       OpTypeEnum::kInsert,          // op type
+                       BSON("x" << 20),              // o
+                       boost::none,                  // o2
+                       sessionInfo2,                 // session info
+                       Date_t::now(),                // wall clock time
+                       55)};                         // statement id
+
+    SessionCatalogMigrationDestination sessionMigration(kFromShard, migrationId());
+    sessionMigration.start(getServiceContext());
+    sessionMigration.finish();
+
+    returnOplog(oplogEntries);
+
+    // migration always fetches at least twice to transition from committing to done.
+    returnOplog({});
+    returnOplog({});
+
+    sessionMigration.join();
+
+    ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+
+    // Check nothing was written for session 1
+    {
+        auto session1 = getSessionWithTxn(opCtx, *sessionInfo1.getSessionId(), 3);
+        const auto txnParticipant1 =
+            TransactionParticipant::getFromNonCheckedOutSession(session1.get());
+        ASSERT(txnParticipant1->getLastWriteOpTime(3).isNull());
+    }
+
+    // Check session 2 was correctly updated
+    {
+        auto session2 = getSessionWithTxn(opCtx, *sessionInfo2.getSessionId(), 15);
+        const auto txnParticipant2 =
+            TransactionParticipant::getFromNonCheckedOutSession(session2.get());
+
+        TransactionHistoryIterator historyIter(txnParticipant2->getLastWriteOpTime(15));
+        ASSERT_TRUE(historyIter.hasNext());
+        checkOplogWithNestedOplog(oplogEntries[2], historyIter.next(opCtx));
+
+        ASSERT_TRUE(historyIter.hasNext());
+        checkOplogWithNestedOplog(oplogEntries[1], historyIter.next(opCtx));
+
+        ASSERT_FALSE(historyIter.hasNext());
+
+        checkStatementExecuted(opCtx, session2.get(), 15, 56, oplogEntries[1]);
+        checkStatementExecuted(opCtx, session2.get(), 15, 55, oplogEntries[2]);
+    }
+}
+
+}  // namespace
 }  // namespace mongo

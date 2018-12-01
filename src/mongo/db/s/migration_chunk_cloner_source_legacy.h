@@ -145,12 +145,15 @@ public:
     Status nextModsBatch(OperationContext* opCtx, Database* db, BSONObjBuilder* builder);
 
     /**
-     * Appends to the buffer oplogs that contain session information for this migration.
-     * If this function returns a valid OpTime, this means that the oplog appended are
-     * not guaranteed to be majority committed and the caller has to use wait for the
-     * returned opTime to be majority committed. If the underlying SessionCatalogMigrationSource
-     * does not exist, that means this node is running as a standalone and doesn't support retryable
-     * writes, so we return boost::none.
+     * Appends to 'arrBuilder' oplog entries which wrote to the currently migrated chunk and contain
+     * session information.
+     *
+     * If this function returns a valid OpTime, this means that the oplog appended are not
+     * guaranteed to be majority committed and the caller has to wait for the returned opTime to be
+     * majority committed before returning them to the donor shard.
+     *
+     * If the underlying SessionCatalogMigrationSource does not exist, that means this node is
+     * running as a standalone and doesn't support retryable writes, so we return boost::none.
      *
      * This waiting is necessary because session migration is only allowed to send out committed
      * entries, as opposed to chunk migration, which can send out uncommitted documents. With chunk

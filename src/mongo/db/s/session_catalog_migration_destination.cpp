@@ -60,10 +60,11 @@ const WriteConcernOptions kMajorityWC(WriteConcernOptions::kMajority,
                                       Milliseconds(0));
 
 struct ProcessOplogResult {
-    bool isPrePostImage = false;
-    repl::OpTime oplogTime;
     LogicalSessionId sessionId;
     TxnNumber txnNum;
+
+    repl::OpTime oplogTime;
+    bool isPrePostImage = false;
 };
 
 /**
@@ -141,12 +142,13 @@ repl::OplogLink extractPrePostImageTs(const ProcessOplogResult& lastResult,
  * Parses the oplog into an oplog entry and makes sure that it contains the expected fields.
  */
 repl::OplogEntry parseOplog(const BSONObj& oplogBSON) {
-    auto oplogStatus = repl::OplogEntry::parse(oplogBSON);
-    uassertStatusOK(oplogStatus.getStatus());
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
 
-    auto oplogEntry = oplogStatus.getValue();
+    // Session oplog entries must always contain wall clock time, because we will not be
+    // transferring anything from a previous version of the server
+    invariant(oplogEntry.getWallClockTime());
 
-    auto sessionInfo = oplogEntry.getOperationSessionInfo();
+    const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
 
     uassert(ErrorCodes::UnsupportedFormat,
             str::stream() << "oplog with opTime " << oplogEntry.getTimestamp().toString()
@@ -205,8 +207,12 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
 ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                        const BSONObj& oplogBSON,
                                        const ProcessOplogResult& lastResult) {
-    ProcessOplogResult result;
     auto oplogEntry = parseOplog(oplogBSON);
+    const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
+
+    ProcessOplogResult result;
+    result.sessionId = *sessionInfo.getSessionId();
+    result.txnNum = *sessionInfo.getTxnNumber();
 
     BSONObj object2;
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
@@ -232,21 +238,14 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                   << ", oplog ts: "
                                   << oplogEntry.getTimestamp().toString()
                                   << ": "
-                                  << redact(oplogBSON),
+                                  << oplogBSON,
                     !lastResult.isPrePostImage);
         }
     } else {
         object2 = oplogBSON;  // TODO: strip redundant info?
     }
 
-    const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
-    result.sessionId = sessionInfo.getSessionId().value();
-    result.txnNum = sessionInfo.getTxnNumber().value();
     const auto stmtId = *oplogEntry.getStatementId();
-
-    // Session oplog entries must always contain wall clock time, because we will not be
-    // transferring anything from a previous version of the server
-    invariant(oplogEntry.getWallClockTime());
 
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
     auto const txnParticipant =
@@ -292,7 +291,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                            false /* prepare */,
                                            OplogSlot());
 
-            auto oplogOpTime = result.oplogTime;
+            const auto& oplogOpTime = result.oplogTime;
             uassert(40633,
                     str::stream() << "Failed to create new oplog entry for oplog with opTime: "
                                   << oplogEntry.getOpTime().toString()
@@ -336,7 +335,21 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
         _isStateChanged.notify_all();
     }
 
-    _thread = stdx::thread([=] { _retrieveSessionStateFromSource(service); });
+    _thread = stdx::thread([=] {
+        try {
+            _retrieveSessionStateFromSource(service);
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::CommandNotFound) {
+                // TODO: remove this after v3.7
+                //
+                // This means that the donor shard is running at an older version so it is safe to
+                // just end this because there is no session information to transfer.
+                return;
+            }
+
+            _errorOccurred(ex.toString());
+        }
+    });
 }
 
 void SessionCatalogMigrationDestination::finish() {
@@ -384,85 +397,67 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
             }
         }
 
-        try {
-            auto nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
-            BSONArray oplogArray(nextBatch[kOplogField].Obj());
-            BSONArrayIteratorSorted oplogIter(oplogArray);
+        auto nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
+        BSONArray oplogArray(nextBatch[kOplogField].Obj());
+        BSONArrayIteratorSorted oplogIter(oplogArray);
 
-            if (!oplogIter.more()) {
-                {
-                    stdx::lock_guard<stdx::mutex> lk(_mutex);
-                    if (_state == State::Committing) {
-                        // The migration is considered done only when it gets an empty result from
-                        // the source shard while this is in state committing. This is to make sure
-                        // that it doesn't miss any new oplog created between the time window where
-                        // this depleted the buffer from the source shard and receiving the commit
-                        // command.
-                        if (oplogDrainedAfterCommiting) {
-                            break;
-                        }
-
-                        oplogDrainedAfterCommiting = true;
+        if (!oplogIter.more()) {
+            {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                if (_state == State::Committing) {
+                    // The migration is considered done only when it gets an empty result from the
+                    // source shard while this is in state committing. This is to make sure that it
+                    // doesn't miss any new oplog created between the time window where this
+                    // depleted the buffer from the source shard and receiving the commit command.
+                    if (oplogDrainedAfterCommiting) {
+                        break;
                     }
-                }
 
-                WriteConcernResult wcResult;
-                auto wcStatus =
-                    waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &wcResult);
-                if (!wcStatus.isOK()) {
-                    _errorOccurred(wcStatus.toString());
-                    return;
+                    oplogDrainedAfterCommiting = true;
                 }
-
-                // We depleted the buffer at least once, transition to ready for commit.
-                {
-                    stdx::lock_guard<stdx::mutex> lk(_mutex);
-                    // Note: only transition to "ready to commit" if state is not error/force stop.
-                    if (_state == State::Migrating) {
-                        _state = State::ReadyToCommit;
-                        _isStateChanged.notify_all();
-                    }
-                }
-
-                if (lastOpTimeWaited == lastResult.oplogTime) {
-                    // We got an empty result at least twice in a row from the source shard so
-                    // space it out a little bit so we don't hammer the shard.
-                    opCtx->sleepFor(Milliseconds(200));
-                }
-
-                lastOpTimeWaited = lastResult.oplogTime;
             }
 
-            while (oplogIter.more()) {
+            WriteConcernResult unusedWCResult;
+            uassertStatusOK(
+                waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &unusedWCResult));
+
+            // We depleted the buffer at least once, transition to ready for commit.
+            {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                // Note: only transition to "ready to commit" if state is not error/force stop.
+                if (_state == State::Migrating) {
+                    _state = State::ReadyToCommit;
+                    _isStateChanged.notify_all();
+                }
+            }
+
+            if (lastOpTimeWaited == lastResult.oplogTime) {
+                // We got an empty result at least twice in a row from the source shard so space it
+                // out a little bit so we don't hammer the shard
+                opCtx->sleepFor(Milliseconds(200));
+            }
+
+            lastOpTimeWaited = lastResult.oplogTime;
+        }
+
+        while (oplogIter.more()) {
+            try {
                 lastResult = processSessionOplog(opCtx, oplogIter.next().Obj(), lastResult);
-            }
-        } catch (const DBException& excep) {
-            if (excep.code() == ErrorCodes::ConflictingOperationInProgress ||
-                excep.code() == ErrorCodes::TransactionTooOld) {
-                // This means that the server has a newer txnNumber than the oplog being migrated,
-                // so just skip it.
-                continue;
-            }
+            } catch (const DBException& ex) {
+                if (ex.code() == ErrorCodes::ConflictingOperationInProgress ||
+                    ex.code() == ErrorCodes::TransactionTooOld) {
+                    // This means that the server has a newer txnNumber than the oplog being
+                    // migrated, so just skip it
+                    continue;
+                }
 
-            if (excep.code() == ErrorCodes::CommandNotFound) {
-                // TODO: remove this after v3.7
-                //
-                // This means that the donor shard is running at an older version so it is safe to
-                // just end this because there is no session information to transfer.
-                break;
+                throw;
             }
-
-            _errorOccurred(excep.toString());
-            return;
         }
     }
 
-    WriteConcernResult wcResult;
-    auto wcStatus = waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &wcResult);
-    if (!wcStatus.isOK()) {
-        _errorOccurred(wcStatus.toString());
-        return;
-    }
+    WriteConcernResult unusedWCResult;
+    uassertStatusOK(waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &unusedWCResult));
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

@@ -53,11 +53,10 @@
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+namespace {
 
 using repl::OplogEntry;
 using unittest::assertGet;
-
-namespace {
 
 class OpObserverTest : public ServiceContextMongoDTest {
 public:
