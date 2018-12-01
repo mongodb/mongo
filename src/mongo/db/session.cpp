@@ -445,13 +445,15 @@ bool Session::onMigrateBeginOnPrimary(OperationContext* opCtx, TxnNumber txnNumb
             return false;
         }
     } catch (const DBException& ex) {
-        // If the transaction chain was truncated on the recipient shard, then we
-        // are most likely copying from a session that hasn't been touched on the
-        // recipient shard for a very long time but could be recent on the donor.
+        // If the transaction chain was truncated on the recipient shard, then we are most likely
+        // copying from a session that hasn't been touched on the recipient shard for a very long
+        // time but could be recent on the donor.
+        //
         // We continue copying regardless to get the entire transaction from the donor.
         if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
             throw;
         }
+
         if (stmtId == kIncompleteHistoryStmtId) {
             return false;
         }
