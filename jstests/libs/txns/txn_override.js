@@ -449,7 +449,7 @@
         let res;
         let retryCommit = false;
         jsTestLog("Retrying commitTransaction for txnNum: " + commandObj.txnNumber + " and lsid: " +
-                  commandObj.lsid);
+                  tojson(commandObj.lsid));
         do {
             res = runCommandInTransactionIfNeeded(
                 conn, dbName, "commitTransaction", commandObj, func, makeFuncArgs);
