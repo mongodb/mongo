@@ -3,7 +3,7 @@
 // embedded null character (SERVER-36859).
 //
 // The 'restartCatalog' command is not available on embedded.
-// @tags: [ incompatible_with_embedded ]
+// @tags: [ incompatible_with_embedded, SERVER-38379 ]
 
 (function() {
     "use strict";
