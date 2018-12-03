@@ -78,7 +78,7 @@ public:
         auto client = opCtx->getClient();
 
         auto res = cache->refreshNow(client);
-        if (!res.isOK()) {
+        if (!res.isOK() && res.code() != ErrorCodes::DuplicateKey) {
             return appendCommandStatus(result, res);
         }
 
