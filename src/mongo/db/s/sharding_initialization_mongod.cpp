@@ -133,6 +133,8 @@ void initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
     PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(opCtx->getServiceContext(),
                                                                          isStandaloneOrPrimary);
 
+    Grid::get(opCtx)->setShardingInitialized();
+
     LOG(0) << "Finished initializing sharding components for "
            << (isStandaloneOrPrimary ? "primary" : "secondary") << " node.";
 }
@@ -399,8 +401,6 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         replCoord->getMemberState().primary()) {
         LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, true);
     }
-
-    Grid::get(opCtx)->setShardingInitialized();
 }
 
 }  // namespace mongo
