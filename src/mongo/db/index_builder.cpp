@@ -254,6 +254,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         _setBgIndexStarting();
         invariant(dbLock);
         opCtx->recoveryUnit()->abandonSnapshot();
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         dbLock->relockWithMode(MODE_IX);
     }
 
@@ -283,6 +284,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 
     if (allowBackgroundBuilding) {
         opCtx->recoveryUnit()->abandonSnapshot();
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         dbLock->relockWithMode(MODE_X);
     }
 
@@ -328,7 +330,12 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     }
 
     if (allowBackgroundBuilding) {
-        dbLock->relockWithMode(MODE_X);
+        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X),
+                  str::stream() << "Database not locked in exclusive mode after committing "
+                                   "background index: "
+                                << ns.ns()
+                                << ": "
+                                << _index);
         Database* reloadDb = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
         fassert(28553, reloadDb);
         fassert(28554, reloadDb->getCollection(opCtx, ns));
