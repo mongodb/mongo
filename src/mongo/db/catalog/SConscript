@@ -65,14 +65,24 @@ env.Library(
 )
 
 env.Library(
-    target='index_build_entry_idl',
+    target='commit_quorum_idl',
     source=[
-        env.Idlc('index_build_entry.idl')[0],
+        env.Idlc('commit_quorum.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
+    target='index_build_entry_idl',
+    source=[
+        env.Idlc('index_build_entry.idl')[0],
+    ],
+    LIBDEPS=[
+        'commit_quorum_idl',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )

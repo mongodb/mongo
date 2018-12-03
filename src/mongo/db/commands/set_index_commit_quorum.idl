@@ -26,53 +26,30 @@
 # it in the license file.
 #
 
+# setIndexCommitQuorum IDL File.
+
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/util/uuid.h"
+        - "mongo/db/write_concern_options.h"
 
 imports:
     - "mongo/db/catalog/commit_quorum.idl"
     - "mongo/idl/basic_types.idl"
-    - "mongo/util/net/hostandport.idl"
 
-structs:
-    IndexBuildEntry:
-        description: "A document that tracks the progress of an index build across replica set
-                      members."
+commands:
+    setIndexCommitQuorum:
+        cpp_name: SetIndexCommitQuorum
+        description: "Resets the commitQuorum for an index build."
         strict: false
+        namespace: concatenate_with_db
         fields:
-            _id:
-                cpp_name: buildUUID
-                optional: false
-                type: uuid
-                description: "Unique identifier of an index build across replica set members."
-            collectionUUID:
-                optional: false
-                type: uuid
-                description: "Identifies the collection upon which the index is being built."
+            indexNames:
+                type: array<string>
+                description: "an array of all index names matching a single prior createIndexes
+                              request."
             commitQuorum:
-                optional: false
                 type: CommitQuorum
                 description: "commitQuorum can be set to the same values as writeConcern.w and
                               indicates how many and/or which replica set members are needed for the
                               primary to commit the index build."
-            indexNames:
-                optional: false
-                type: array<string>
-                description: "An array of index names associated with this particular cross replica
-                              set index build."
-            prepareIndexBuild:
-                optional: false
-                type: bool
-                default: false
-                description: "Indicates that the primary has entered the commit phase, and 
-                              secondaries are allowed to proceed with the index constraint 
-                              violations resolution phase when ready and then send 
-                              voteCommitIndexBuild."
-            commitReadyMembers:
-                optional: true
-                type: array<HostAndPort>
-                description: "List of replica set members, by their host and port, that are in the
-                              commit phase waiting for the primary to write the commitIndexBuild
-                              oplog entry."

@@ -464,6 +464,7 @@
         saslContinue: {skip: isUnrelated},
         saslStart: {skip: isUnrelated},
         serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
+        setIndexCommitQuorum: {skip: isUnrelated},
         setCommittedSnapshot: {skip: isAnInternalCommand},
         setFeatureCompatibilityVersion: {skip: isUnrelated},
         setFreeMonitoring: {skip: isUnrelated},

@@ -33,33 +33,34 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/vote_commit_index_build_gen.h"
+#include "mongo/db/commands/set_index_commit_quorum_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Confirms that a specified replica set member is ready for commit of the index build identified by
- * the provided index build UUID.
+ * Resets the commitQuorum set on an index build identified by the list of index names that were
+ * previously specified in a createIndexes request.
  *
  * {
- *     voteCommitIndexBuilds: <index_build_uuid>,
- *     hostAndPort: "host:port",
+ *     setIndexCommitQuorum: coll,
+ *     indexNames: ["x_1", "y_1", "xIndex", "someindexname"],
+ *     commitQuorum: "majority" / 3 / {"replTagName": "replTagValue"},
  * }
  */
-class VoteCommitIndexBuildCommand final : public TypedCommand<VoteCommitIndexBuildCommand> {
+class SetIndexCommitQuorumCommand final : public TypedCommand<SetIndexCommitQuorumCommand> {
 public:
-    using Request = VoteCommitIndexBuild;
+    using Request = SetIndexCommitQuorum;
 
     std::string help() const override {
-        return "Internal intra replica set command";
+        return "Resets the commitQuorum for an index build";
     }
 
     bool adminOnly() const override {
-        return true;
+        return false;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -71,19 +72,13 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(IndexBuildsCoordinator::get(opCtx)->voteCommitIndexBuild(
-                request().getCommandParameter(), request().getHostAndPort()));
-
-            // Must set the latest op time on the OperationContext in case no write was needed in
-            // voteCommitIndexBuild above, i.e. if this command is called several times before it is
-            // successful regarding write concern.
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            uassertStatusOK(IndexBuildsCoordinator::get(opCtx)->setCommitQuorum(
+                request().getNamespace(), request().getIndexNames(), request().getCommitQuorum()));
         }
 
     private:
         NamespaceString ns() const override {
-            MONGO_UNREACHABLE;
-            return {};
+            return request().getNamespace();
         }
 
         bool supportsWriteConcern() const override {
@@ -94,12 +89,13 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forExactNamespace(request().getNamespace()),
+                            ActionType::createIndex));
         }
     };
 
-} voteCommitIndexBuildCmd;
+} setCommitQuorumCmd;
 
 }  // namespace
 }  // namespace mongo
