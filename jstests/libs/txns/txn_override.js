@@ -249,9 +249,10 @@
                                                              0);
 
                 if (createCmdRes.ok !== 1) {
-                    if (createCmdRes.code !== ErrorCodes.NamespaceExists) {
-                        // The collection still does not exist. So we just return the original
-                        // response to the caller,
+                    // If the error is retryable, we retry the entire transaction. Otherwise, we
+                    // return the original error to the caller.
+                    if (createCmdRes.code !== ErrorCodes.NamespaceExists &&
+                        !RetryableWritesUtil.isRetryableCode(createCmdRes.code)) {
                         logFailedCommandAndError(commandObj, commandName, createCmdRes);
                         return res;
                     }
