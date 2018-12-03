@@ -50,8 +50,7 @@ variables:
   - func: "run tests"
     vars:
       resmoke_args: --help
-      run_multiple_jobs: false
-      max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
+      resmoke_jobs_max: 0  # No cap on number of jobs.
 
 # Used for tests that invoke resmoke.py and require no additional setup.
 - &task_depending_on_all_template
@@ -68,7 +67,7 @@ variables:
   - func: "run tests"
     vars:
       resmoke_args: --help
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - &benchrun_embedded_template
@@ -80,7 +79,7 @@ variables:
   - func: "run tests"
     vars:
       resmoke_args: --help
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - &jepsen_config_vars
@@ -111,6 +110,7 @@ variables:
   num_files: 15
   num_tasks: 10
   resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
+  resmoke_jobs_max: 1
   should_shuffle: false
   continue_on_failure: false
   # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
@@ -450,7 +450,6 @@ variables:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     python3: '/cygdrive/c/python/python36/python.exe'
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -1315,6 +1314,29 @@ functions:
           fi
         fi
 
+  "determine resmoke jobs" : &determine_resmoke_jobs
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        $python buildscripts/evergreen_resmoke_job_count.py \
+          --taskName ${task_name}                           \
+          --buildVariant ${build_variant}                   \
+          --jobFactor ${resmoke_jobs_factor|1}              \
+          --jobsMax ${resmoke_jobs_max|0}                   \
+          --outFile resmoke_jobs_expansion.yml
+
+  "update resmoke jobs expansions" : &update_resmoke_jobs_expansions
+    command: expansions.update
+    params:
+      ignore_missing_file: true
+      file: src/resmoke_jobs_expansion.yml
+
   "determine task timeout" : &determine_task_timeout
     command: shell.exec
     params:
@@ -1453,6 +1475,8 @@ functions:
         - key: aws_secret_remote
           value: ${mongodatafiles_aws_secret}
     - *set_up_remote_credentials
+    - *determine_resmoke_jobs
+    - *update_resmoke_jobs_expansions
     - command: shell.exec
       type: test
       params:
@@ -1492,39 +1516,7 @@ functions:
             fi
           fi
 
-          extra_args=""
-          if [ ${run_multiple_jobs|false} = true ]; then
-            processor_architecture=$(uname -m)
-            num_jobs_available=${num_jobs_available|1}
-            # Reduce the number of available jobs by half when running any sharding*, replica_sets*
-            # and select jsCore passthrough tasks on Windows and ARM to avoid overwhelming test hosts.
-            if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
-              case "${task_name}" in
-              replica_sets_initsync_jscore_passthrough          \
-              |replica_sets_initsync_static_jscore_passthrough  \
-              |replica_sets*                           \
-              |sharding*                              \
-              )
-                num_jobs_available=$((${num_jobs_available|2} / 2))
-                echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
-                ;;
-              esac
-            fi
-
-            # Reduce the number of available jobs by two-thirds when running the
-            # secondary_reads_passthrough task on the Enterprise RHEL 6.2 InMemory build variant.
-            if [[ "${build_variant}" = "enterprise-rhel-62-64-bit-inmem" \
-                  && "${task_name}" = "secondary_reads_passthrough" ]]; then
-              num_jobs_available=$((${num_jobs_available|3} / 3))
-              echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
-            fi
-
-            if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
-              extra_args="$extra_args --jobs=${max_jobs}"
-            else
-              extra_args="$extra_args --jobs=$num_jobs_available"
-            fi
-          fi
+          extra_args="$extra_args --jobs=${resmoke_jobs|1}"
 
           if [ ${should_shuffle|true} = true ]; then
             extra_args="$extra_args --shuffle"
@@ -3753,7 +3745,6 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=unittests
-        run_multiple_jobs: true
 
 ## compile_dbtest ##
 - name: compile_dbtest
@@ -3781,7 +3772,6 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=dbtest --storageEngine=wiredTiger
-        run_multiple_jobs: true
 
 ## embedded_sdk_build_and_test_* - build the embedded-dev and embedded-test targets only ##
 
@@ -4650,7 +4640,6 @@ tasks:
       task_path_suffix: /data/multiversion:$HOME
       resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeatSuites=2
-      run_multiple_jobs: true
 
 - <<: *benchmark_template
   name: benchmarks_orphaned
@@ -4659,7 +4648,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchmarks
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchmark_template
@@ -4669,7 +4658,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchmarks_sharding
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *task_template
@@ -4736,7 +4725,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_aggregation
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4746,7 +4735,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_commands
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4756,7 +4745,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_insert
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4766,7 +4755,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_misc
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4776,7 +4765,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_mixed_and_multi
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4786,7 +4775,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_queries
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4796,7 +4785,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_remove
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *benchrun_embedded_template
@@ -4806,7 +4795,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchrun_embedded_update
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
   - func: "send benchmark results"
 
 - <<: *run_jepsen_template
@@ -5194,7 +5183,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_ese
@@ -5205,7 +5193,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_ese --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_auth
@@ -5216,7 +5203,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_facet_unwind_passthrough
@@ -5227,7 +5213,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_facet_unwind_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_mongos_passthrough
@@ -5238,7 +5223,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_mongos_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_one_shard_sharded_collections
@@ -5249,7 +5233,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_one_shard_sharded_collections --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_read_concern_majority_passthrough
@@ -5260,7 +5243,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_read_concern_majority_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_sharded_collections_passthrough
@@ -5271,7 +5253,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_sharded_collections_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: audit
@@ -5280,7 +5261,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=audit --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: auth
@@ -5289,7 +5269,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: auth_audit
@@ -5298,7 +5277,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=auth_audit --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams
@@ -5307,7 +5285,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_mongos_sessions_passthrough
@@ -5318,7 +5295,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_mongos_sessions_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_mongos_passthrough
@@ -5329,7 +5305,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_mongos_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_secondary_reads
@@ -5340,7 +5315,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_secondary_reads --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_sharded_collections_passthrough
@@ -5351,7 +5325,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_sharded_collections_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough
@@ -5362,7 +5335,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_db_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_db_mongos_passthrough
@@ -5373,7 +5345,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_db_mongos_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_db_secondary_reads_passthrough
@@ -5384,7 +5355,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_db_secondary_reads_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_db_sharded_collections_passthrough
@@ -5395,7 +5365,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_db_sharded_collections_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_cluster_passthrough
@@ -5406,7 +5375,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_cluster_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_cluster_mongos_passthrough
@@ -5417,7 +5385,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_cluster_mongos_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_cluster_secondary_reads_passthrough
@@ -5428,7 +5395,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_cluster_secondary_reads_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: change_streams_whole_cluster_sharded_collections_passthrough
@@ -5439,7 +5405,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=change_streams_whole_cluster_sharded_collections_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: disk_mobile
@@ -5448,7 +5413,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=disk_mobile --storageEngine=mobile
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: disk_wiredtiger
@@ -5457,7 +5422,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=disk_wiredtiger --storageEngine=wiredTiger
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: ese
@@ -5466,7 +5431,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: failpoints
@@ -5475,7 +5439,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=failpoints --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: failpoints_auth
@@ -5484,7 +5447,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=failpoints_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth
@@ -5493,7 +5455,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --excludeWithAnyTags=requires_find_command --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_write_cmd
@@ -5502,7 +5463,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=commands --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_basics_passthrough
@@ -5511,7 +5471,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_write_cmd
@@ -5520,7 +5479,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: integration_tests_standalone
@@ -5529,7 +5487,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: integration_tests_standalone_audit
@@ -5538,7 +5495,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone_audit --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: integration_tests_replset
@@ -5547,7 +5503,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_replset --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: integration_tests_sharded
@@ -5556,7 +5511,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_sharded --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: external_auth
@@ -5565,7 +5519,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=external_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough
@@ -5576,7 +5529,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -5587,7 +5539,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore
@@ -5596,7 +5547,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_mobile
@@ -5605,7 +5555,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_background_index,requires_ttl_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,requires_capped,requires_profiling,requires_javascript,requires_fsync,requires_compact
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_ese
@@ -5616,7 +5565,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_ese --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_compatibility
@@ -5627,7 +5575,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_auth
@@ -5638,7 +5585,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_auth
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_minimum_batch_size
@@ -5649,7 +5595,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_minimum_batch_size --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_op_query
@@ -5660,7 +5605,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_op_query --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_txns
@@ -5669,7 +5613,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_txns --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_jscore_txns
@@ -5678,7 +5621,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_jscore_txns --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_jscore_txns_sharded_collections
@@ -5687,7 +5629,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_jscore_txns_sharded_collections --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
@@ -5696,7 +5637,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_causally_consistent_jscore_txns_passthrough
@@ -5705,7 +5645,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_collections_causally_consistent_jscore_txns_passthrough
@@ -5725,7 +5664,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_jscore_passthrough
@@ -5736,7 +5674,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
@@ -5747,7 +5684,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_stepdown_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
@@ -5758,7 +5694,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
@@ -5769,7 +5704,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_initsync_jscore_passthrough
@@ -5780,7 +5714,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_initsync_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_initsync_static_jscore_passthrough
@@ -5791,7 +5724,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_initsync_static_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_kill_primary_jscore_passthrough
@@ -5802,7 +5734,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_kill_primary_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_terminate_primary_jscore_passthrough
@@ -5813,7 +5744,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_terminate_primary_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_kill_secondaries_jscore_passthrough
@@ -5824,7 +5754,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_kill_secondaries_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: mongosTest
@@ -5833,7 +5762,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=mongos_test
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: multiversion_auth
@@ -5844,7 +5772,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=multiversion_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: multiversion
@@ -5855,7 +5782,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=multiversion --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: noPassthrough
@@ -5864,7 +5790,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=no_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: noPassthroughWithMongod
@@ -5873,7 +5798,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: bulk_gle_passthrough
@@ -5882,7 +5806,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=bulk_gle_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: slow1
@@ -5891,7 +5814,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow1 --storageEngine=wiredTiger
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: serial_run
@@ -5900,7 +5823,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=serial_run --storageEngine=wiredTiger
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: sharded_collections_jscore_passthrough
@@ -5911,7 +5834,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_jscore_passthrough
@@ -5922,7 +5844,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_jscore_op_query_passthrough
@@ -5933,7 +5854,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_jscore_passthrough_wire_ops
@@ -5944,7 +5864,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_multi_stmt_txn_jscore_passthrough
@@ -5955,7 +5874,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: parallel
@@ -5966,6 +5884,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=parallel --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: parallel_compatibility
@@ -5976,6 +5895,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency
@@ -5984,6 +5904,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_replication
@@ -5992,6 +5913,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_replication_causal_consistency
@@ -6000,6 +5922,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_replication_multi_stmt_txn
@@ -6008,6 +5931,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication_multi_stmt_txn --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_replication_ubsan
@@ -6016,6 +5940,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication_ubsan --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_replication_causal_consistency_ubsan
@@ -6024,6 +5949,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication_causal_consistency_ubsan --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_replication_multi_stmt_txn_ubsan
@@ -6032,6 +5958,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication_multi_stmt_txn_ubsan --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_sharded_replication
@@ -6040,6 +5967,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_replication --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_sharded_replication_with_balancer
@@ -6048,6 +5976,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_replication_with_balancer --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency
@@ -6056,6 +5985,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_causal_consistency --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency_and_balancer
@@ -6064,6 +5994,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns
@@ -6072,6 +6003,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_with_stepdowns --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns_and_balancer
@@ -6080,6 +6012,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_simultaneous
@@ -6088,6 +6021,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_simultaneous --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: concurrency_simultaneous_replication
@@ -6096,6 +6030,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_simultaneous_replication --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: read_concern_linearizable_passthrough
@@ -6106,7 +6041,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_concern_linearizable_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: read_concern_majority_passthrough
@@ -6117,7 +6051,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_concern_majority_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: write_concern_majority_passthrough
@@ -6128,7 +6061,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: secondary_reads_passthrough
@@ -6139,7 +6071,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=secondary_reads_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets
@@ -6148,7 +6079,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese
@@ -6157,7 +6087,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_0
@@ -6166,7 +6095,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_1
@@ -6175,7 +6103,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_2
@@ -6184,7 +6111,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_2 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_3
@@ -6193,7 +6119,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_3 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_4
@@ -6202,7 +6127,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_4 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_5
@@ -6211,7 +6135,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_5 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_6
@@ -6220,7 +6143,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_6 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_ese_misc
@@ -6229,7 +6151,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese_misc --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth
@@ -6238,7 +6159,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_0
@@ -6247,7 +6167,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_1
@@ -6256,7 +6175,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_2
@@ -6265,7 +6183,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_2 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_3
@@ -6274,7 +6191,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_3 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_4
@@ -6283,7 +6199,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_4 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_5
@@ -6292,7 +6207,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_5 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_6
@@ -6301,7 +6215,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_6 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_auth_misc
@@ -6310,7 +6223,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth_misc --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sasl
@@ -6319,7 +6231,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sasl --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding
@@ -6328,7 +6239,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_0
@@ -6337,7 +6247,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_1
@@ -6346,7 +6255,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_2
@@ -6355,7 +6263,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_2 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_3
@@ -6364,7 +6271,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_3 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_4
@@ -6373,7 +6279,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_4 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_5
@@ -6382,7 +6287,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_5 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_6
@@ -6391,7 +6295,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_6 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_7
@@ -6400,7 +6303,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_7 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_8
@@ -6409,7 +6311,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_8 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_9
@@ -6418,7 +6319,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_9 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_10
@@ -6427,7 +6327,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_10 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_11
@@ -6436,7 +6335,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_11 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_12
@@ -6445,7 +6343,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_12 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_13
@@ -6454,7 +6351,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_13 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_14
@@ -6463,7 +6359,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_14 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_misc
@@ -6472,7 +6367,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_misc --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_csrs_continuous_config_stepdown
@@ -6481,7 +6375,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_continuous_config_stepdown --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese
@@ -6490,7 +6383,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_0
@@ -6499,7 +6391,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_1
@@ -6508,7 +6399,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_2
@@ -6517,7 +6407,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_2 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_3
@@ -6526,7 +6415,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_3 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_4
@@ -6535,7 +6423,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_4 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_5
@@ -6544,7 +6431,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_5 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_6
@@ -6553,7 +6439,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_6 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_7
@@ -6562,7 +6447,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_7 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_8
@@ -6571,7 +6455,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_8 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_9
@@ -6580,7 +6463,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_9 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_10
@@ -6589,7 +6471,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_10 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_11
@@ -6598,7 +6479,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_11 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_12
@@ -6607,7 +6487,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_12 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_13
@@ -6616,7 +6495,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_13 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_14
@@ -6625,7 +6503,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_14 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_15
@@ -6634,7 +6511,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_15 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_16
@@ -6643,7 +6519,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_16 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_17
@@ -6652,7 +6527,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_17 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_18
@@ -6661,7 +6535,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_18 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_19
@@ -6670,7 +6543,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_19 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_20
@@ -6679,7 +6551,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_20 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_ese_misc
@@ -6688,7 +6559,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese_misc --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query
@@ -6697,7 +6567,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_0
@@ -6706,7 +6575,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_0 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_1
@@ -6715,7 +6583,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_1 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_2
@@ -6724,7 +6591,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_2 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_3
@@ -6733,7 +6599,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_3 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_4
@@ -6742,7 +6607,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_4 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_5
@@ -6751,7 +6615,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_5 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_6
@@ -6760,7 +6623,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_6 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_7
@@ -6769,7 +6631,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_7 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_8
@@ -6778,7 +6639,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_8 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_9
@@ -6787,7 +6647,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_9 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_10
@@ -6796,7 +6655,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_10 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_11
@@ -6805,7 +6663,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_11 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_op_query_misc
@@ -6814,7 +6671,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_misc --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth
@@ -6823,7 +6679,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_0
@@ -6832,7 +6687,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_1
@@ -6841,7 +6695,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_2
@@ -6850,7 +6703,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_2 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_3
@@ -6859,7 +6711,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_3 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_4
@@ -6868,7 +6719,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_4 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_5
@@ -6877,7 +6727,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_5 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_6
@@ -6886,7 +6735,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_6 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_7
@@ -6895,7 +6743,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_7 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_8
@@ -6904,7 +6751,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_8 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_9
@@ -6913,7 +6759,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_9 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_10
@@ -6922,7 +6767,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_10 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_11
@@ -6931,7 +6775,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_11 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_12
@@ -6940,7 +6783,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_12 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_13
@@ -6949,7 +6791,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_13 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_14
@@ -6958,7 +6799,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_14 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_15
@@ -6967,7 +6807,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_15 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_16
@@ -6976,7 +6815,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_16 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_17
@@ -6985,7 +6823,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_17 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_18
@@ -6994,7 +6831,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_18 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_19
@@ -7003,7 +6839,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_19 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_misc
@@ -7012,7 +6847,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_misc --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit
@@ -7023,7 +6857,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_0
@@ -7054,7 +6887,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_1
@@ -7064,7 +6896,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_1 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_2
@@ -7074,7 +6905,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_2 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_3
@@ -7084,7 +6914,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_3 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_4
@@ -7094,7 +6923,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_4 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_5
@@ -7104,7 +6932,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_5 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_6
@@ -7114,7 +6941,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_6 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_7
@@ -7124,7 +6950,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_7 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_8
@@ -7134,7 +6959,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_8 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_9
@@ -7144,7 +6968,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_9 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_10
@@ -7154,7 +6977,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_10 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_11
@@ -7164,7 +6986,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_11 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_12
@@ -7174,7 +6995,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_12 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_13
@@ -7184,7 +7004,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_13 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_14
@@ -7194,7 +7013,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_14 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_15
@@ -7204,7 +7022,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_15 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_16
@@ -7214,7 +7031,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_16 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_17
@@ -7224,7 +7040,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_17 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_18
@@ -7234,7 +7049,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_18 --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_auth_audit_misc
@@ -7244,7 +7058,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit_misc --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards
@@ -7255,7 +7068,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_0
@@ -7266,7 +7078,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_0
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_1
@@ -7277,7 +7088,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_1
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_2
@@ -7288,7 +7098,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_2
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_3
@@ -7299,7 +7108,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_3
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_4
@@ -7310,7 +7118,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_4
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_5
@@ -7321,7 +7128,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_5
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_6
@@ -7332,7 +7138,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_6
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_7
@@ -7343,7 +7148,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_7
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_8
@@ -7354,7 +7158,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_8
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_9
@@ -7365,7 +7168,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_9
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_10
@@ -7376,7 +7178,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_10
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_11
@@ -7387,7 +7188,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_11
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_last_stable_mongos_and_mixed_shards_misc
@@ -7398,7 +7198,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_misc
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: snmp
@@ -7409,7 +7208,6 @@ tasks:
     vars:
       snmp_config_path: SNMPCONFPATH=snmpconf
       resmoke_args: --suites=snmp --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: ssl
@@ -7432,7 +7230,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=ssl --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sslSpecial
@@ -7441,7 +7238,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=ssl_special --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: tool
@@ -7450,7 +7246,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=tool --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_decimal
@@ -7459,7 +7254,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=decimal --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: read_only
@@ -7468,7 +7262,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_only --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: read_only_sharded
@@ -7477,7 +7270,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_only_sharded --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: session_jscore_passthrough
@@ -7488,7 +7280,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=session_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: causally_consistent_jscore_passthrough
@@ -7499,7 +7290,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=causally_consistent_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: causally_consistent_jscore_passthrough_auth
@@ -7510,7 +7300,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=causally_consistent_jscore_passthrough_auth --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_causally_consistent_jscore_passthrough
@@ -7521,7 +7310,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_causally_consistent_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: retryable_writes_jscore_passthrough
@@ -7532,7 +7320,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=retryable_writes_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_replication_default_refresh_jscore_passthrough
@@ -7543,7 +7330,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_replication_default_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
@@ -7554,7 +7340,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_replication_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
@@ -7565,7 +7350,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_replication_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
@@ -7576,7 +7360,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_replication_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_sharding_default_refresh_jscore_passthrough
@@ -7587,7 +7370,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_default_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
@@ -7598,7 +7380,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
@@ -7609,7 +7390,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
@@ -7620,7 +7400,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_standalone_default_refresh_jscore_passthrough
@@ -7631,7 +7410,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_default_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
@@ -7642,7 +7420,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
@@ -7653,7 +7430,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
@@ -7664,7 +7440,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: retryable_writes_jscore_stepdown_passthrough
@@ -7675,7 +7450,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=retryable_writes_jscore_stepdown_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: watchdog_wiredtiger
@@ -7685,7 +7459,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=watchdog --storageEngine=wiredTiger
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
 - <<: *task_template
@@ -7696,7 +7470,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=watchdog --storageEngine=inMemory
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: free_monitoring
@@ -7722,7 +7496,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=free_monitoring --storageEngine=wiredTiger
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: jsonSchema
@@ -7731,7 +7505,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - name: powercycle
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -7916,6 +7690,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=buildscripts_test
+      resmoke_jobs_max: 1
 
 - name: package
   depends_on:
@@ -8558,7 +8333,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --ssl=off --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off --release
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     test_flags: --excludeWithAnyTags=requires_http_client
@@ -8671,7 +8445,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeatSuites=10 --shuffle
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -8734,7 +8507,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: x86_64
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -8898,7 +8671,7 @@ buildvariants:
   - wtdevelop
   expansions:
     use_wt_develop: true
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
     use_scons_cache: true
     build_mongoreplay: true
@@ -8915,7 +8688,6 @@ buildvariants:
     push_name: linux-duroff
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
@@ -8969,7 +8741,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=uses_transactions,does_not_support_wiredtiger_lsm
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -8997,7 +8768,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: ubuntu1404
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -9102,7 +8872,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -9201,7 +8970,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -9268,7 +9036,6 @@ buildvariants:
       --cxx-std=17
       --disable-warnings-as-errors
       --allocator=system
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -9313,7 +9080,6 @@ buildvariants:
       --allocator=system
       CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
       CXXFLAGS="-Wno-register"
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -9354,7 +9120,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: ubuntu1604
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -9468,8 +9233,7 @@ buildvariants:
     push_name: linux
     push_arch: arm64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
+    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: arm64
@@ -9559,8 +9323,7 @@ buildvariants:
     push_name: linux
     push_arch: arm64-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
+    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
     packager_arch: arm64
@@ -9599,7 +9362,7 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: 2
+    resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: ppc64le
@@ -9695,7 +9458,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: 2
+    resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -9812,7 +9575,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -9897,7 +9659,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: amazon
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -10005,7 +9766,6 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -10093,7 +9853,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: amazon
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -10194,7 +9953,6 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2012plus
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
@@ -10375,7 +10133,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     python3: '/cygdrive/c/python/python36/python.exe'
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -10703,7 +10460,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     python3: '/cygdrive/c/python/python36/python.exe'
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
     test_flags: --serviceExecutor=adaptive
@@ -10736,7 +10492,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     python3: '/cygdrive/c/python/python36/python.exe'
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     ext: zip
     use_scons_cache: true
@@ -10818,7 +10573,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     python3: '/cygdrive/c/python/python36/python.exe'
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
     gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
@@ -10942,7 +10696,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     python3: '/cygdrive/c/python/python36/python.exe'
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
     gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
@@ -10975,7 +10728,7 @@ buildvariants:
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl openssl_pre_1.0'"
     build_mongoreplay: true
@@ -11084,7 +10837,7 @@ buildvariants:
   run_on:
   - macos-1012
   expansions:
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
@@ -11123,7 +10876,7 @@ buildvariants:
     push_arch: x86_64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
@@ -11172,7 +10925,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
@@ -11221,7 +10974,7 @@ buildvariants:
       --cxx-std=17
       CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
       CXXFLAGS="-Wno-register"
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
@@ -11269,7 +11022,7 @@ buildvariants:
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.11 CGO_LDFLAGS=-mmacosx-version-min=10.11
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     build_mongoreplay: true
     build_openssl: true
     openssl_config_flags: "-mmacosx-version-min=10.11"
@@ -11743,7 +11496,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -12362,7 +12114,6 @@ buildvariants:
       MONGO_DISTMOD=rhel62
     multiversion_platform: rhel62
     multiversion_edition: enterprise
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -12913,7 +12664,7 @@ buildvariants:
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
     # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
     # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
@@ -13060,7 +12811,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -13159,7 +12909,7 @@ buildvariants:
   run_on:
   - ubuntu1604-test
   expansions:
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -13190,7 +12940,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -13301,7 +13050,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel70
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -13410,7 +13158,7 @@ buildvariants:
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
+    resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: ppc64le
@@ -13531,7 +13279,7 @@ buildvariants:
   stepback: false
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: 2
+    resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -13650,7 +13398,6 @@ buildvariants:
   stepback: false
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-hardware-crc32=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -13758,7 +13505,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-hardware-crc32=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -13805,7 +13551,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -13867,7 +13612,6 @@ buildvariants:
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -13991,7 +13735,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -14053,7 +13796,6 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -14170,7 +13912,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -14274,7 +14015,6 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian81
     compile_flags: --ssl MONGO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -14334,7 +14074,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: debian81
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -14434,7 +14173,6 @@ buildvariants:
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -14497,7 +14235,6 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: debian92
     multiversion_edition: targeted
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -14601,7 +14338,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl sasl'"
@@ -14793,7 +14529,6 @@ buildvariants:
       --ssl=off
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       MONGO_DISTMOD=rhel62
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_mongoreplay: true
@@ -14875,8 +14610,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_gcc.vars
         CCFLAGS="-march=armv8-a+crc -mtune=generic"
         MONGO_DISTMOD=ubuntu1604
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
+    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
@@ -14956,7 +14690,7 @@ buildvariants:
       CCFLAGS="-mmacosx-version-min=10.10"
       CPPPATH=/opt/mongodbtoolchain/v2/include
       LINKFLAGS="-mmacosx-version-min=10.10"
-    num_jobs_available: 1
+    resmoke_jobs_max: 1
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
@@ -14998,7 +14732,6 @@ buildvariants:
     # Transactions are not explicitly supported on the ephemeralForTest storage engine.
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
@@ -15093,7 +14826,7 @@ buildvariants:
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
+    resmoke_jobs_factor: 0.25
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
@@ -15182,7 +14915,7 @@ buildvariants:
   stepback: false
   expansions:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: 2
+    resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
@@ -15298,7 +15031,7 @@ buildvariants:
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -15453,7 +15186,7 @@ buildvariants:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -15500,7 +15233,7 @@ buildvariants:
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under UBSAN build.
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
@@ -15648,7 +15381,7 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under {A,UB}SAN build.
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -15681,7 +15414,7 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under {A,UB}SAN build.
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: false
@@ -15788,7 +15521,6 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     scons_cache_mode: all
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
@@ -15840,7 +15572,6 @@ buildvariants:
       --dbg=on
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl sasl'"
@@ -15874,7 +15605,6 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" MSVC_VERSION=14.1 --cxx-std=14 --dynamic-windows --dbg=off --opt=on -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
@@ -15916,7 +15646,6 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" MSVC_VERSION=14.1 CXXFLAGS="/wd4834 /wd5033 /wd5041" CPPDEFINES="_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS _HAS_AUTO_PTR_ETC=1" --cxx-std=17 --dynamic-windows --dbg=off --opt=on -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
