@@ -22,9 +22,8 @@
         // writeConcern{w: "majority", j: "false"}},
     ];
 
-    // Unspecified WC and WC majority should succeed.
+    // Only write concern majority can be sent to the config server.
     const acceptableWCsForConfig = [
-        {},
         {writeConcern: {w: "majority"}},
         {writeConcern: {w: "majority", wtimeout: 15000}},
     ];
