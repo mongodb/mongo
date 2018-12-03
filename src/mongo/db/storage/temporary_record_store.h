@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -42,10 +41,12 @@ namespace mongo {
  * storage engine.
  */
 class TemporaryRecordStore {
-    MONGO_DISALLOW_COPYING(TemporaryRecordStore);
-
 public:
     TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)) {}
+
+    // Not copyable.
+    TemporaryRecordStore(const TemporaryRecordStore&) = delete;
+    TemporaryRecordStore& operator=(const TemporaryRecordStore&) = delete;
 
     // Move constructor.
     TemporaryRecordStore(TemporaryRecordStore&& other) noexcept : _rs(std::move(other._rs)) {}

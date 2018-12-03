@@ -50,6 +50,10 @@ public:
                            std::unique_ptr<RecordStore> rs)
         : TemporaryRecordStore(std::move(rs)), _opCtx(opCtx), _kvEngine(kvEngine){};
 
+    // Not copyable.
+    TemporaryKVRecordStore(const TemporaryKVRecordStore&) = delete;
+    TemporaryKVRecordStore& operator=(const TemporaryKVRecordStore&) = delete;
+
     // Move constructor.
     TemporaryKVRecordStore(TemporaryKVRecordStore&& other) noexcept
         : TemporaryRecordStore(std::move(other._rs)),
