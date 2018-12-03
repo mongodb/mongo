@@ -1,0 +1,9 @@
+LIBRARY STITCH_SUPPORT
+EXPORTS
+    stitch_support_v1_init
+    stitch_support_v1_fini
+    stitch_support_v1_status_get_error
+    stitch_support_v1_status_get_explanation
+    stitch_support_v1_status_get_code
+    stitch_support_v1_status_create
+    stitch_support_v1_status_destroy

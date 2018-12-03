@@ -50,6 +50,7 @@ env.SConscript(
     dirs=[
         'mongo_embedded',
         'mongoc_embedded',
+        'stitch_support',
     ],
     exports={
         'env' : frameworksEnv,

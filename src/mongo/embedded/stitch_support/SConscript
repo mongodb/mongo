@@ -1,0 +1,85 @@
+# -*- mode: python; -*-
+
+import libdeps
+
+Import("env")
+Import("get_option")
+
+env = env.Clone()
+
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'share/doc/stitch_support',
+        source=[
+            '#/LICENSE-Community.txt',
+        ],
+        INSTALL_ALIAS=[
+            'stitch-support',
+        ],
+    )
+
+stitchSupportEnv = env.Clone()
+stitchSupportEnv.AppendUnique(
+    CPPDEFINES=[
+        'STITCH_SUPPORT_COMPILING',
+     ],
+)
+
+if get_option('link-model') == 'static':
+    stitchSupportEnv.AppendUnique(
+        CPPDEFINES=[
+            'STITCH_SUPPORT_STATIC',
+        ],
+    )
+elif get_option('link-model') == 'dynamic-sdk':
+    stitchSupportEnv['LIBDEPS_SHLIBEMITTER'] = libdeps.make_libdeps_emitter(
+        'SharedArchive',
+        libdeps.dependency_visibility_honored
+    )
+
+# Please see the note in ../mongo_embedded/SConscript about how to
+# interpret and adjust the current and compatibility versions.
+stitchSupportEnv.AppendUnique(
+    SHLINKFLAGS=[
+        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+    ],
+)
+
+stitchSupportTargets = stitchSupportEnv.Library(
+    target='stitch_support',
+    source=[
+        'stitch_support.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+    INSTALL_ALIAS=[
+        'stitch-support',
+    ],
+)
+
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'include/stitch_support/v1/stitch_support',
+        source=['stitch_support.h'],
+        INSTALL_ALIAS=[
+            'stitch-support',
+        ],
+    )
+
+if get_option('link-model') != 'dynamic-sdk':
+    stitchSupportTestEnv = env.Clone()
+    unitTest = stitchSupportTestEnv.CppUnitTest(
+        target="stitch_support_test",
+        source=[
+            "stitch_support_test.cpp",
+        ],
+        LIBDEPS=[
+            'stitch_support',
+        ],
+        INSTALL_ALIAS=[
+            'stitch-support-test',
+        ],
+    )
+
+    env.RegisterUnitTest(unitTest[0]);
