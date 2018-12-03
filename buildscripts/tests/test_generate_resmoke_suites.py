@@ -398,6 +398,41 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(len(tests), 0)
 
 
+class DivideRemainingTestsAmongSuitesTest(unittest.TestCase):
+    @staticmethod
+    def generate_tests(n_tests):
+        tests = {}
+        test_names = []
+        for idx in range(n_tests):
+            name = "test_{0}".format(idx)
+            test_names.append(name)
+            tests[name] = {"max_runtime": 2 * idx}
+
+        return test_names, tests
+
+    def test_each_suite_gets_one_test(self):
+        suites = [grs.Suite(), grs.Suite(), grs.Suite()]
+        test_names, tests = self.generate_tests(3)
+
+        grs.divide_remaining_tests_among_suites(test_names, tests, suites)
+
+        for suite in suites:
+            self.assertEqual(suite.get_test_count(), 1)
+
+    def test_each_suite_gets_at_least_one_test(self):
+        suites = [grs.Suite(), grs.Suite(), grs.Suite()]
+        test_names, tests = self.generate_tests(5)
+
+        grs.divide_remaining_tests_among_suites(test_names, tests, suites)
+
+        total_tests = 0
+        for suite in suites:
+            total_tests += suite.get_test_count()
+            self.assertGreaterEqual(suite.get_test_count(), 1)
+
+        self.assertEqual(total_tests, len(tests))
+
+
 class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
     def test_if_less_total_than_max_only_one_suite_created(self):
         max_time = 20
@@ -438,6 +473,26 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
         self.assertEqual(len(suites), 2)
         self.assertEqual(suites[0].get_test_count(), 1)
         self.assertEqual(suites[0].get_runtime(), 15)
+
+    def test_max_sub_suites_options(self):
+        max_time = 5
+        max_suites = 2
+        test_names = ["test1", "test2", "test3", "test4", "test5"]
+        tests = {
+            test_names[0]: {"max_runtime": 5},
+            test_names[1]: {"max_runtime": 4},
+            test_names[2]: {"max_runtime": 3},
+            test_names[3]: {"max_runtime": 4},
+            test_names[4]: {"max_runtime": 3},
+        }
+
+        suites = grs.divide_tests_into_suites_by_maxtime(tests, test_names, max_time,
+                                                         max_suites=max_suites)
+        self.assertEqual(len(suites), max_suites)
+        total_tests = 0
+        for suite in suites:
+            total_tests += suite.get_test_count()
+        self.assertEqual(total_tests, len(test_names))
 
 
 class SuiteTest(unittest.TestCase):

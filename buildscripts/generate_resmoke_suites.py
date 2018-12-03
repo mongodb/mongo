@@ -201,7 +201,19 @@ def sort_list_of_test_by_max_runtime(tests):
     return sorted(tests.keys(), key=lambda test: tests[test][MAX_RUNTIME_KEY], reverse=True)
 
 
-def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds):
+def divide_remaining_tests_among_suites(remaining_tests, tests, suites):
+    """Divide the list of tests given among the suites given."""
+    suite_idx = 0
+    for test_name in remaining_tests:
+        test = tests[test_name]
+        current_suite = suites[suite_idx]
+        current_suite.add_test(test_name, test)
+        suite_idx += 1
+        if suite_idx >= len(suites):
+            suite_idx = 0
+
+
+def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds, max_suites=None):
     """
     Divide the given tests into suites.
 
@@ -209,8 +221,9 @@ def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds):
     """
     suites = []
     current_suite = Suite()
+    last_test_processed = len(sorted_tests)
     LOGGER.debug("Determines suites for runtime: %ds", max_time_seconds)
-    for test_name in sorted_tests:
+    for idx, test_name in enumerate(sorted_tests):
         test = tests[test_name]
         if current_suite.get_runtime() + test[MAX_RUNTIME_KEY] > max_time_seconds:
             LOGGER.debug("Runtime(%d) + new test(%d) > max(%d)", current_suite.get_runtime(),
@@ -218,11 +231,18 @@ def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds):
             if current_suite.get_test_count() > 0:
                 suites.append(current_suite)
                 current_suite = Suite()
+                if max_suites and len(suites) >= max_suites:
+                    last_test_processed = idx
+                    break
 
         current_suite.add_test(test_name, test)
 
     if current_suite.get_test_count() > 0:
         suites.append(current_suite)
+
+    if max_suites and last_test_processed < len(sorted_tests):
+        # We must have hit the max suite limit, just randomly add the remaining tests to suites.
+        divide_remaining_tests_among_suites(sorted_tests[last_test_processed:], tests, suites)
 
     return suites
 
@@ -328,6 +348,8 @@ class Main(object):
         parser.add_argument("--variants", dest="variants", metavar="<variant1,variant2,...>",
                             default=None,
                             help="Comma-separated list of Evergreeen build variants to analyze.")
+        parser.add_argument("--max-sub-suites", dest="max_sub_suites", type=int,
+                            help="Max number of suites to divide into.")
         parser.add_argument("--verbose", dest="verbose", action="store_true", default=False,
                             help="Enable verbose logging.")
         parser.add_argument("task", nargs=1, help="task to analyze.")
@@ -351,7 +373,8 @@ class Main(object):
         """Divide test into suites that can be run in less than the specified execution time."""
         tests = organize_executions_by_test(data)
         self.test_list = sort_list_of_test_by_max_runtime(tests)
-        return divide_tests_into_suites_by_maxtime(tests, self.test_list, execution_time_secs)
+        return divide_tests_into_suites_by_maxtime(tests, self.test_list, execution_time_secs,
+                                                   self.options.max_sub_suites)
 
     def render_suites(self, suites, task):
         """Render the given suites into yml files that can be used by resmoke.py."""
