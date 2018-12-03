@@ -17,14 +17,14 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
  */
 var setUp = function() {
     var configDB = st.s.getDB('config');
-    configDB.adminCommand({enableSharding: 'test'});
-    configDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
+    assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
+    assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
     // Each time we drop the 'test' DB we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
     st.rs0.nodes.forEach(function(node) {
-        node.getDB('test').setProfilingLevel(2);
-        node.getDB('admin').setProfilingLevel(2);
+        assert(node.getDB('test').setProfilingLevel(2));
+        assert(node.getDB('admin').setProfilingLevel(2));
     });
 };
 
@@ -32,7 +32,7 @@ var setUp = function() {
  * Clean up after testReadPreference() or testBadMode(), prepare to call setUp() again.
  */
 var tearDown = function() {
-    st.s.getDB('test').dropDatabase();
+    assert.commandWorked(st.s.getDB('test').dropDatabase());
     // Hack until SERVER-7739 gets fixed
     st.rs0.awaitReplication();
 };
@@ -165,9 +165,10 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     cmdTest({collStats: 'user'}, true, formatProfileQuery({count: 'user'}));
     cmdTest({dbStats: 1}, true, formatProfileQuery({dbStats: 1}));
 
-    testDB.user.ensureIndex({loc: '2d'});
-    testDB.user.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10});
-    testDB.runCommand({getLastError: 1, w: NODE_COUNT});
+    assert.commandWorked(testDB.user.ensureIndex({loc: '2d'}));
+    assert.commandWorked(
+        testDB.user.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10}));
+    assert.commandWorked(testDB.runCommand({getLastError: 1, w: NODE_COUNT}));
     cmdTest({geoNear: 'user', near: [1, 1]}, true, formatProfileQuery({geoNear: 'user'}));
 
     // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
