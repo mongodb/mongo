@@ -128,7 +128,7 @@ let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResy
     let node = replSet.start(
         originalNode, {dbpath: originalNode.dbpath, port: originalNode.port, restart: !cleanData});
 
-    replSet.waitForState(node, ReplSetTest.State.SECONDARY);
+    replSet.awaitSecondaryNodes();
 
     // Ensure that an initial sync attempt was made and succeeded if the data directory was cleaned.
     let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1, initialSync: 1}));
