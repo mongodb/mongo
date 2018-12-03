@@ -495,9 +495,9 @@ public:
             uassert(28734,
                     "Can't parse sub-node of DELETE: " + nodeArgs["node"].Obj().toString(),
                     NULL != subNode);
-            DeleteStageParams params;
-            params.isMulti = nodeArgs["isMulti"].Bool();
-            return new DeleteStage(opCtx, params, workingSet, collection, subNode);
+            auto params = std::make_unique<DeleteStageParams>();
+            params->isMulti = nodeArgs["isMulti"].Bool();
+            return new DeleteStage(opCtx, std::move(params), workingSet, collection, subNode);
         } else {
             return NULL;
         }

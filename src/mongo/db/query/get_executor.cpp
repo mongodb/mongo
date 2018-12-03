@@ -830,14 +830,14 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
                       str::stream() << "Not primary while removing from " << nss.ns());
     }
 
-    DeleteStageParams deleteStageParams;
-    deleteStageParams.isMulti = request->isMulti();
-    deleteStageParams.fromMigrate = request->isFromMigrate();
-    deleteStageParams.isExplain = request->isExplain();
-    deleteStageParams.returnDeleted = request->shouldReturnDeleted();
-    deleteStageParams.sort = request->getSort();
-    deleteStageParams.opDebug = opDebug;
-    deleteStageParams.stmtId = request->getStmtId();
+    auto deleteStageParams = std::make_unique<DeleteStageParams>();
+    deleteStageParams->isMulti = request->isMulti();
+    deleteStageParams->fromMigrate = request->isFromMigrate();
+    deleteStageParams->isExplain = request->isExplain();
+    deleteStageParams->returnDeleted = request->shouldReturnDeleted();
+    deleteStageParams->sort = request->getSort();
+    deleteStageParams->opDebug = opDebug;
+    deleteStageParams->stmtId = request->getStmtId();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     const PlanExecutor::YieldPolicy policy = parsedDelete->yieldPolicy();
@@ -878,7 +878,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
             auto idHackStage = std::make_unique<IDHackStage>(
                 opCtx, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
             unique_ptr<DeleteStage> root = make_unique<DeleteStage>(
-                opCtx, deleteStageParams, ws.get(), collection, idHackStage.release());
+                opCtx, std::move(deleteStageParams), ws.get(), collection, idHackStage.release());
             return PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, policy);
         }
 
@@ -903,10 +903,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     unique_ptr<QuerySolution> querySolution = std::move(executionResult.getValue().querySolution);
     unique_ptr<PlanStage> root = std::move(executionResult.getValue().root);
 
-    deleteStageParams.canonicalQuery = cq.get();
+    deleteStageParams->canonicalQuery = cq.get();
 
     invariant(root);
-    root = make_unique<DeleteStage>(opCtx, deleteStageParams, ws.get(), collection, root.release());
+    root = make_unique<DeleteStage>(
+        opCtx, std::move(deleteStageParams), ws.get(), collection, root.release());
 
     if (!request->getProj().isEmpty()) {
         invariant(request->shouldReturnDeleted());

@@ -143,12 +143,12 @@ public:
         collScanParams.tailable = false;
 
         // Configure the delete stage.
-        DeleteStageParams deleteStageParams;
-        deleteStageParams.isMulti = true;
+        auto deleteStageParams = std::make_unique<DeleteStageParams>();
+        deleteStageParams->isMulti = true;
 
         WorkingSet ws;
         DeleteStage deleteStage(&_opCtx,
-                                deleteStageParams,
+                                std::move(deleteStageParams),
                                 &ws,
                                 coll,
                                 new CollectionScan(&_opCtx, coll, collScanParams, &ws, NULL));
@@ -213,12 +213,12 @@ public:
         qds->pushBack(id);
 
         // Configure the delete.
-        DeleteStageParams deleteParams;
-        deleteParams.returnDeleted = true;
-        deleteParams.canonicalQuery = cq.get();
+        auto deleteParams = std::make_unique<DeleteStageParams>();
+        deleteParams->returnDeleted = true;
+        deleteParams->canonicalQuery = cq.get();
 
-        const auto deleteStage =
-            make_unique<DeleteStage>(&_opCtx, deleteParams, ws.get(), coll, qds.release());
+        const auto deleteStage = make_unique<DeleteStage>(
+            &_opCtx, std::move(deleteParams), ws.get(), coll, qds.release());
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
 

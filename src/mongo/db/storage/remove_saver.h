@@ -43,7 +43,10 @@
 namespace mongo {
 
 /**
- * for saving deleted bson objects to a flat file
+ * This class provides facility for saving bson objects to a flat file. The common use case is for
+ * making a back-up copy of a document before an internal operation (like migration or rollback)
+ * deletes it. To use this correctly, the caller must call goingToDelete first before the actual
+ * deletion, otherwise the document will be lost if the process gets terminated in between.
  */
 class RemoveSaver {
     MONGO_DISALLOW_COPYING(RemoveSaver);

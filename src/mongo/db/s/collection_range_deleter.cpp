@@ -42,11 +42,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -387,56 +389,46 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         return {ErrorCodes::InternalError, msg};
     }
 
-    boost::optional<RemoveSaver> saver;
+    auto deleteStageParams = std::make_unique<DeleteStageParams>();
+    deleteStageParams->fromMigrate = true;
+    deleteStageParams->isMulti = true;
+    deleteStageParams->returnDeleted = true;
+
     if (serverGlobalParams.moveParanoia) {
-        saver.emplace("moveChunk", nss.ns(), "cleaning");
+        deleteStageParams->removeSaver =
+            std::make_unique<RemoveSaver>("moveChunk", nss.ns(), "cleaning");
     }
 
-    auto halfOpen = BoundInclusion::kIncludeStartKeyOnly;
-    auto manual = PlanExecutor::YIELD_MANUAL;
-    auto forward = InternalPlanner::FORWARD;
-    auto fetch = InternalPlanner::IXSCAN_FETCH;
+    auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
+                                                     collection,
+                                                     std::move(deleteStageParams),
+                                                     descriptor,
+                                                     min,
+                                                     max,
+                                                     BoundInclusion::kIncludeStartKeyOnly,
+                                                     PlanExecutor::YIELD_MANUAL,
+                                                     InternalPlanner::FORWARD);
 
-    auto exec = InternalPlanner::indexScan(
-        opCtx, collection, descriptor, min, max, halfOpen, manual, forward, fetch);
+    PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
 
     int numDeleted = 0;
     do {
-        RecordId rloc;
-        BSONObj obj;
-        PlanExecutor::ExecState state = exec->getNext(&obj, &rloc);
+        BSONObj deletedObj;
+        PlanExecutor::ExecState state = exec->getNext(&deletedObj, nullptr);
+
         if (state == PlanExecutor::IS_EOF) {
             break;
         }
+
         if (state == PlanExecutor::FAILURE || state == PlanExecutor::DEAD) {
             warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
                       << redact(min) << " to " << redact(max) << " in " << nss << ": "
-                      << redact(WorkingSetCommon::toStatusString(obj))
+                      << redact(WorkingSetCommon::toStatusString(deletedObj))
                       << ", stats: " << Explain::getWinningPlanStats(exec.get());
             break;
         }
+
         invariant(PlanExecutor::ADVANCED == state);
-
-        exec->saveState();
-
-        writeConflictRetry(opCtx, "delete range", nss.ns(), [&] {
-            WriteUnitOfWork wuow(opCtx);
-            if (saver) {
-                uassertStatusOK(saver->goingToDelete(obj));
-            }
-            collection->deleteDocument(opCtx, kUninitializedStmtId, rloc, nullptr, true);
-            wuow.commit();
-        });
-
-        try {
-            exec->restoreState();
-        } catch (const DBException& ex) {
-            warning() << "error restoring cursor state while trying to delete " << redact(min)
-                      << " to " << redact(max) << " in " << nss
-                      << ", stats: " << Explain::getWinningPlanStats(exec.get()) << ": "
-                      << redact(ex.toStatus());
-            break;
-        }
         ShardingStatistics::get(opCtx).countDocsDeletedOnDonor.addAndFetch(1);
 
     } while (++numDeleted < maxToDelete);

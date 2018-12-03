@@ -1186,6 +1186,7 @@ env.Library(
         'stats/serveronly_stats',
         'storage/oplog_hack',
         'storage/storage_options',
+        'storage/remove_saver',
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
