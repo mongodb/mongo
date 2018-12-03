@@ -8,8 +8,8 @@ To build MongoDB, you will need:
     * Clang 3.8 (or Apple XCode 8.3.2 Clang) or newer
     * Visual Studio 2015 Update 3 or newer (See Windows section below for details)
 * On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
-    * Fedora/RHEL - dnf install libcurl-devel
-    * Ubuntu/Debian - apt-get install libcurl-dev
+    * Fedora/RHEL - `dnf install libcurl-devel`
+    * Ubuntu/Debian - `apt-get install libcurl-dev`
 * Python 2.7.x and Pip modules:
   * pyyaml
   * typing
