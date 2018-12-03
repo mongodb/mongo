@@ -297,8 +297,8 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         [ this, size = toInsert.size() ] { _sideWritesCounter.fetchAndSubtract(size); });
 
     std::vector<Record> records;
-    for (auto& obj : toInsert) {
-        records.emplace_back(Record{RecordId(), RecordData(obj.objdata(), obj.objsize())});
+    for (auto& doc : toInsert) {
+        records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize())});
     }
 
     // By passing a vector of null timestamps, these inserts are not timestamped individually, but
