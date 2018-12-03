@@ -421,7 +421,9 @@
         return res;
     }
 
-    function retryEntireTransaction(conn, txnNumber, lsid, func) {
+    function retryEntireTransaction(conn, lsid, func) {
+        let txnOptions = getTxnOptionsForClient(conn);
+        let txnNumber = txnOptions.txnNumber;
         jsTestLog("Retrying entire transaction on TransientTransactionError for aborted txn " +
                   "with txnNum: " + txnNumber + " and lsid " + tojson(lsid));
         // Set the transactionState to inactive so continueTransaction() will bump the
@@ -438,7 +440,7 @@
 
             if (res.hasOwnProperty('errorLabels') &&
                 res.errorLabels.includes('TransientTransactionError')) {
-                return retryEntireTransaction(conn, txnNumber, lsid, func);
+                return retryEntireTransaction(conn, op.lsid, func);
             }
         }
 
@@ -463,7 +465,7 @@
                 res.errorLabels.includes('TransientTransactionError')) {
                 transientErrorToLog = res;
                 retryCommit = true;
-                res = retryEntireTransaction(conn, commandObj.txnNumber, commandObj.lsid, func);
+                res = retryEntireTransaction(conn, commandObj.lsid, func);
             } else if (res.ok === 1) {
                 retryCommit = false;
             }
@@ -490,7 +492,7 @@
                 conn, dbName, commandName, commandObj, func, makeFuncArgs);
         }
 
-        return retryEntireTransaction(conn, commandObj.txnNumber, commandObj.lsid, func);
+        return retryEntireTransaction(conn, commandObj.lsid, func);
     }
 
     function runCommandWithTransactionRetries(
