@@ -83,7 +83,9 @@ public:
         auto client = opCtx->getClient();
 
         auto res = cache->refreshNow(client);
-        uassertStatusOK(res);
+        if (res.code() != ErrorCodes::DuplicateKey) {
+            uassertStatusOK(res);
+        }
 
         return true;
     }
