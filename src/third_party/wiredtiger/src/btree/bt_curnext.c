@@ -582,9 +582,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
 	uint32_t flags;
-	bool newpage, valid;
+	bool newpage, visible;
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -595,32 +594,19 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	/*
-	 * When retrying an operation due to a prepare conflict, the cursor is
-	 * is at an update list which resulted in conflict. So, when retrying
-	 * we should examine the same update again instead of iterating to the
-	 * next object. We'll eventually find a valid update, return prepare-
-	 * conflict until successful.
+	 * If this cursor has returned prepare conflict earlier, check to see
+	 * whether that prepared update is resolved or not. If not resolved,
+	 * continue returning prepare conflict. If resolved, return the value
+	 * based on the visibility rules.
 	 */
-	F_CLR(cbt, WT_CBT_RETRY_PREV);
-	if (F_ISSET(cbt, WT_CBT_RETRY_NEXT)) {
-		WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
-		if (!valid)
-			WT_ERR(WT_PREPARE_CONFLICT);
-
-		/* The update that returned prepared conflict is now visible. */
-		F_CLR(cbt, WT_CBT_RETRY_NEXT);
-
-		/*
-		 * The underlying key-return function uses a comparison value
-		 * of 0 to indicate the search function has pre-built the key
-		 * we want to return. That's not the case, don't take that path.
-		 */
-		cbt->compare = 1;
-		WT_ERR(__cursor_kv_return(session, cbt, upd));
+	if (F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT)) {
+		WT_ERR(__cursor_check_prepared_update(cbt, &visible));
+		if (visible) {
 #ifdef HAVE_DIAGNOSTIC
-		WT_ERR(__wt_cursor_key_order_check(session, cbt, true));
+			WT_ERR(__wt_cursor_key_order_check(session, cbt, true));
 #endif
-		return (0);
+			return (0);
+		}
 	}
 
 	WT_ERR(__cursor_func_init(cbt, false));
@@ -653,7 +639,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 				break;
 			WT_ILLEGAL_VALUE_ERR(session, page->type);
 			}
-			if (ret == 0)
+			if (ret == 0 || ret == WT_PREPARE_CONFLICT)
 				break;
 			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
 			if (ret != WT_NOTFOUND)
@@ -710,7 +696,21 @@ err:	switch (ret) {
 	case 0:
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 #ifdef HAVE_DIAGNOSTIC
-		ret = __wt_cursor_key_order_check(session, cbt, true);
+		/*
+		 * Skip key order check, if prev is called after a next returned
+		 * a prepare conflict error, i.e cursor has changed direction
+		 * at a prepared update, hence current key returned could be
+		 * same as earlier returned key.
+		 *
+		 * eg: Initial data set : {1,2,3,...10)
+		 * insert key 11 in a prepare transaction.
+		 * loop on next will return 1,2,3...10 and subsequent call to
+		 * next will return a prepare conflict. Now if we call prev
+		 * key 10 will be returned which will be same as earlier
+		 * returned key.
+		 */
+		if (!F_ISSET(cbt, WT_CBT_ITERATE_RETRY_PREV))
+			ret = __wt_cursor_key_order_check(session, cbt, true);
 #endif
 		break;
 	case WT_PREPARE_CONFLICT:
@@ -719,10 +719,11 @@ err:	switch (ret) {
 		 * as current cursor position will be reused in case of a
 		 * retry from user.
 		 */
-		F_SET(cbt, WT_CBT_RETRY_NEXT);
+		F_SET(cbt, WT_CBT_ITERATE_RETRY_NEXT);
 		break;
 	default:
 		WT_TRET(__cursor_reset(cbt));
 	}
+	F_CLR(cbt, WT_CBT_ITERATE_RETRY_PREV);
 	return (ret);
 }

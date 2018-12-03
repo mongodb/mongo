@@ -1,12 +1,7 @@
+#include <wiredtiger_config.h>
 #include <inttypes.h>
 #include <stddef.h>
 
-/*
- * The checksum code doesn't include WiredTiger configuration or include files.
- * This means the HAVE_NO_CRC32_HARDWARE #define isn't configurable as part of
- * standalone WiredTiger configuration, there's no way to turn off the checksum
- * hardware.
- */
 #if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
 #define CRC_TABLE
 #include "crc32_constants.h"

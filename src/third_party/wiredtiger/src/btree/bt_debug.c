@@ -1173,6 +1173,8 @@ __debug_modify(WT_DBG *ds, WT_UPDATE *upd)
 static int
 __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 {
+	char hex_timestamp[WT_TS_HEX_SIZE];
+
 	for (; upd != NULL; upd = upd->next) {
 		switch (upd->type) {
 		case WT_UPDATE_INVALID:
@@ -1207,15 +1209,11 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 		else
 			WT_RET(ds->f(ds, "\t" "txn id %" PRIu64, upd->txnid));
 
-#ifdef HAVE_TIMESTAMPS
-		if (!__wt_timestamp_iszero(
-		    WT_TIMESTAMP_NULL(&upd->timestamp))) {
-			char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
-			WT_RET(__wt_timestamp_to_hex_string(
-			    ds->session, hex_timestamp, &upd->timestamp));
+		if (upd->timestamp != 0) {
+			__wt_timestamp_to_hex_string(
+			    hex_timestamp, upd->timestamp);
 			WT_RET(ds->f(ds, ", stamp %s", hex_timestamp));
 		}
-#endif
 		WT_RET(ds->f(ds, "\n"));
 	}
 	return (0);

@@ -48,9 +48,6 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'log=(enabled)'
 
     def test_degenerate_timestamps(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
 
@@ -80,9 +77,6 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
                 lambda: self.session.query_timestamp('get=' + query))
 
     def test_query_read_commit_timestamps(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
 
@@ -109,9 +103,6 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
     def test_query_round_read_timestamp(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
 
@@ -132,9 +123,6 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
     def test_query_prepare_timestamp(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
 

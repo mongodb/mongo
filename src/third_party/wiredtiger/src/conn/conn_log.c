@@ -447,7 +447,18 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 		__wt_verbose(session, WT_VERB_LOG,
 		    "Missed %" PRIu32 ". Now pre-allocating up to %" PRIu32,
 		    log->prep_missed, conn->log_prealloc);
+	} else if (reccount > conn->log_prealloc / 2 &&
+	    conn->log_prealloc > 2) {
+		/*
+		 * If we used less than half, then start adjusting down.
+		 */
+		--conn->log_prealloc;
+		__wt_verbose(session, WT_VERB_LOG,
+		    "Adjust down. Did not use %" PRIu32
+		    ". Now pre-allocating %" PRIu32,
+		    reccount, conn->log_prealloc);
 	}
+
 	WT_STAT_CONN_SET(session, log_prealloc_max, conn->log_prealloc);
 	/*
 	 * Allocate up to the maximum number that we just computed and detected.
@@ -920,6 +931,7 @@ __log_server(void *arg)
 	 * pre-allocation.  Start it so that we run on the first time through.
 	 */
 	timediff = WT_THOUSAND;
+	time_start = __wt_clock(session);
 
 	/*
 	 * The log server thread does a variety of work.  It forces out any
@@ -1001,10 +1013,10 @@ __log_server(void *arg)
 					    "log_archive: Blocked due to open "
 					    "log cursor holding archive lock");
 			}
+			time_start = __wt_clock(session);
 		}
 
 		/* Wait until the next event. */
-		time_start = __wt_clock(session);
 		__wt_cond_auto_wait_signal(
 		    session, conn->log_cond, did_work, NULL, &signalled);
 		time_stop = __wt_clock(session);

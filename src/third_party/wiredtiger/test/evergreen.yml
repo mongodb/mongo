@@ -1,0 +1,925 @@
+#
+# This file defines the tasks and platforms for WiredTiger in the
+# MongoDB continuous integration system (see https://mci.mongodb.com).
+#
+
+functions:
+  "fetch source" :
+    command: git.get_project
+    params:
+      directory: wiredtiger
+  "fetch artifacts" : 
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        bucket: build_external
+        extract_to: wiredtiger
+  "fetch mongo-tests repo" :
+    command: shell.exec
+    params:
+      script: | 
+        git clone https://github.com/wiredtiger/mongo-tests
+  "compile wiredtiger":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        if [ "Windows_NT" = "$OS" ]; then
+          scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${smp_command|}
+        else
+          ./build_posix/reconf
+          ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+          ${make_command|make} ${smp_command|} 2>&1
+    
+          # On macOS, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
+          # appears not to work for dynamic modules loaded by python. For wt, the libtool generated
+          # script has the wrong path for running on test machines.
+          if [ "$(uname -s)" == "Darwin" ]; then
+            WT_VERSION=$(m4 build_posix/aclocal/version.m4)
+            install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib lang/python/_wiredtiger*.so
+            install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib .libs/wt
+          fi
+        fi
+
+pre:
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf "wiredtiger"
+post:
+  - command: archive.targz_pack
+    params:
+      target: "wiredtiger.tgz"
+      source_dir: "wiredtiger"
+      include:
+        - "./**"
+  - command: s3.put
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_file: wiredtiger.tgz
+      bucket: build_external
+      permissions: public-read
+      content_type: application/tar
+      display_name: Artifacts
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf "wiredtiger"
+
+tasks:
+## Base compile task on posix flavours
+  - name: compile
+    depends_on: []
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - func: "compile wiredtiger"
+
+  - name: make-check-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
+
+  # Start of normal make check test tasks
+
+  - name: lang-python-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C lang/python ${smp_command|} 2>&1
+
+  - name: examples-c-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C examples/c  ${smp_command|} 2>&1
+
+  - name: bloom-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/bloom  ${smp_command|} 2>&1
+
+  - name: checkpoint-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/checkpoint ${smp_command|} 2>&1
+
+  - name: cursor-order-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/cursor_order ${smp_command|} 2>&1
+
+  - name: fops-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/fops ${smp_command|} 2>&1
+
+  - name: format-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/format ${smp_command|} 2>&1
+
+  - name: huge-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/huge ${smp_command|} 2>&1
+
+  - name: manydbs-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/manydbs ${smp_command|} 2>&1
+
+  - name: packing-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/packing ${smp_command|} 2>&1
+
+  - name: readonly-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/readonly ${smp_command|} 2>&1
+
+  - name: salvage-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/salvage ${smp_command|} 2>&1
+
+  - name: thread-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C test/thread ${smp_command|} 2>&1
+
+  - name: bench-wtperf-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check -C bench/wtperf ${smp_command|} 2>&1
+
+  # End of normal make check test tasks
+
+  # Start of csuite test tasks
+
+  - name: csuite-random-abort-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/random_abort/smoke.sh 2>&1
+
+  - name: csuite-random-directio-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/random_directio/smoke.sh 2>&1
+
+  - name: csuite-schema-abort-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/schema_abort/smoke.sh 2>&1
+
+  - name: csuite-timestamp-abort-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/timestamp_abort/smoke.sh 2>&1
+
+  - name: csuite-scope-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_scope 2>&1
+
+  - name: csuite-truncated-log-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_truncated_log 2>&1
+
+  - name: csuite-wt1965-col-efficiency-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt1965_col_efficiency 2>&1
+
+  - name: csuite-wt2403-lsm-workload-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt2403_lsm_workload 2>&1
+
+  - name: csuite-wt2447-join-main-table-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt2447_join_main_table 2>&1
+
+  - name: csuite-wt2695-checksum-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt2695_checksum 2>&1
+
+  - name: csuite-wt2592-join-schema-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt2592_join_schema 2>&1
+
+  - name: csuite-wt2719-reconfig-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt2719_reconfig 2>&1
+
+  - name: csuite-wt2999-join-extractor-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt2999_join_extractor 2>&1
+
+  - name: csuite-wt3120-filesys-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt3120_filesys 2>&1
+
+  - name: csuite-wt3135-search-near-collator-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt3135_search_near_collator 2>&1
+
+  - name: csuite-wt3184-dup-index-collator-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt3184_dup_index_collator 2>&1
+
+  - name: csuite-wt3363-checkpoint-op-races-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt3363_checkpoint_op_races 2>&1
+
+  - name: csuite-wt3874-pad-byte-collator-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt3874_pad_byte_collator 2>&1
+
+  - name: csuite-wt4105-large-doc-small-upd-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt4105_large_doc_small_upd 2>&1
+
+  - name: csuite-wt4117-checksum-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt4117_checksum 2>&1
+
+  - name: csuite-wt4156-metadata-salvage-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test_wt4156_metadata_salvage 2>&1
+
+  - name: csuite-rwlock-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_rwlock 2>&1
+
+  - name: csuite-wt2246-col-append-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2246_col_append 2>&1
+
+  - name: csuite-wt2323-join-visibility-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2323_join_visibility 2>&1
+
+  - name: csuite-wt2535-insert-race-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2535_insert_race 2>&1
+
+  - name: csuite-wt2834-join-bloom-fix-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2834_join_bloom_fix 2>&1
+
+  - name: csuite-wt2853-perf-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2853_perf 2>&1
+
+  - name: csuite-wt2909-checkpoint-integrity-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2909_checkpoint_integrity 2>&1
+
+  - name: csuite-wt3338-partial-update-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt3338_partial_update 2>&1
+
+  - name: csuite-wt4333-handle-locks-test
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt4333_handle_locks 2>&1
+
+  # End of csuite test tasks
+
+  - name: unit-test
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            if [ "Windows_NT" = "$OS" ]; then
+              ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
+            elif [ "$(uname -s)" == "Darwin" ]; then
+              # Avoid /usr/bin/python, at least on macOS: with System Integrity
+              # Protection enabled, it ignores DYLD_LIBRARY_PATH and hence
+              # doesn't find the WiredTiger library in the local tree.
+              ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
+            else # Ubuntu
+              # Change directory to where the local installed 'wt' binary is located, 
+              # to avoid libtool generated 'wt' script from being selected by run.py,
+              # which invokes relink_command that tries to changing to a non-existed 
+              # /data/mci/<uniq> directory, as 'make' is done by a separate 'compile' task.
+              cd .libs
+              ${python_test_env_vars|} python ../test/suite/run.py -v 2 ${smp_command|} 2>&1
+            fi
+
+  - name: compile-windows-alt
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
+
+  - name: fops
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            if [ "Windows_NT" = "$OS" ]; then
+              cmd.exe /c t_fops.exe
+            else
+              ./test/fops/t
+            fi
+
+  - name: format
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            # format assumes we run it from the format directory
+            cmd.exe /c "cd test\\format && ..\\..\\t_format.exe reverse=0 encryption=none logging_compression=none runs=20"
+
+  - name: million-collection-test
+    depends_on: []
+    run_on: 
+      - rhel62-large
+    commands: 
+      - func: "fetch mongo-tests repo"
+      - command: shell.exec
+        params:
+          working_dir: mongo-tests
+          script: | 
+            set -o errexit
+            set -o verbose
+            ulimit -n 1000000
+            ulimit -c unlimited 
+            largescale/run-million-collection-test.sh .
+
+buildvariants:
+- name: ubuntu1404
+  display_name: Ubuntu 14.04
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    # It's ugly, but we need the absolute path here, not the relative
+    test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    # Python (unit) test is executed under the .libs directory, where wiredtiger shared library files locate
+    python_test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH LD_LIBRARY_PATH=$(pwd)
+    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+  tasks:
+    - name: compile
+    - name: lang-python-test
+    - name: examples-c-test
+    - name: bloom-test
+    - name: checkpoint-test
+    - name: cursor-order-test
+    - name: fops-test
+    - name: format-test
+    - name: huge-test
+    - name: manydbs-test
+    - name: packing-test
+    - name: readonly-test
+    - name: salvage-test
+    - name: thread-test
+    - name: bench-wtperf-test
+    - name: csuite-random-abort-test
+    - name: csuite-random-directio-test
+    - name: csuite-schema-abort-test
+    - name: csuite-timestamp-abort-test
+    - name: csuite-scope-test
+    - name: csuite-truncated-log-test
+    - name: csuite-wt1965-col-efficiency-test
+    - name: csuite-wt2403-lsm-workload-test
+    - name: csuite-wt2447-join-main-table-test
+    - name: csuite-wt2695-checksum-test
+    - name: csuite-wt2592-join-schema-test
+    - name: csuite-wt2719-reconfig-test
+    - name: csuite-wt2999-join-extractor-test
+    - name: csuite-wt3120-filesys-test
+    - name: csuite-wt3135-search-near-collator-test
+    - name: csuite-wt3184-dup-index-collator-test
+    - name: csuite-wt3363-checkpoint-op-races-test
+    - name: csuite-wt3874-pad-byte-collator-test
+    - name: csuite-wt4105-large-doc-small-upd-test
+    - name: csuite-wt4117-checksum-test
+    - name: csuite-wt4156-metadata-salvage-test
+    - name: csuite-rwlock-test
+    - name: csuite-wt2246-col-append-test
+    - name: csuite-wt2323-join-visibility-test
+    - name: csuite-wt2535-insert-race-test
+    - name: csuite-wt2834-join-bloom-fix-test
+    - name: csuite-wt2853-perf-test
+    - name: csuite-wt2909-checkpoint-integrity-test
+    - name: csuite-wt3338-partial-update-test
+    - name: csuite-wt4333-handle-locks-test
+    - name: unit-test
+    - name: fops
+
+- name: large-scale-test
+  display_name: Large scale testing
+  batchtime: 1440 # 1 day
+  run_on:
+  - rhel62-large
+  expansions:
+    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+  tasks:
+    - name: million-collection-test
+
+- name: windows-64
+  display_name: Windows 64-bit
+  run_on:
+  - windows-64-vs2013-test
+  tasks:
+    - name: compile
+    - name: compile-windows-alt
+    - name: unit-test
+    #- name: format  - Enable when we have a solution for hangs and crashses
+    - name: fops
+
+- name: macos-1012
+  display_name: OS X 10.12
+  run_on:
+  - macos-1012
+  expansions:
+    smp_command: -j $(sysctl -n hw.logicalcpu)
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    make_command: PATH=/opt/mongodbtoolchain/v2/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
+    test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs
+  tasks:
+    - name: compile
+    - name: make-check-test
+    - name: unit-test
+    - name: fops
+

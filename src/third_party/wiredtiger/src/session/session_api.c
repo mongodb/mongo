@@ -1012,6 +1012,10 @@ __session_reset(WT_SESSION *wt_session)
 	/* Release common session resources. */
 	WT_TRET(__wt_session_release_resources(session));
 
+	/* Reset the session statistics. */
+	if (WT_STAT_ENABLED(session))
+		__wt_stat_session_clear_single(&session->stats);
+
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -2230,6 +2234,8 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		    session, WT_OPTRACK_BUFSIZE, &session_ret->optrack_buf));
 		session_ret->optrackbuf_ptr = 0;
 	}
+
+       __wt_stat_session_init_single(&session_ret->stats);
 
 	/* Set the default value for session flags. */
 	if (F_ISSET(conn, WT_CONN_CACHE_CURSORS))

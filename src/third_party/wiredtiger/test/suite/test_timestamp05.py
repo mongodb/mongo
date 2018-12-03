@@ -42,9 +42,6 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:ts05'
 
     def test_create(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         s = self.session
         conn = self.conn
 
@@ -64,9 +61,6 @@ class test_timestamp05(wttest.WiredTigerTestCase, suite_subprocess):
         s.checkpoint('use_timestamp=true')
 
     def test_bulk(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         s = self.session
         conn = self.conn
 

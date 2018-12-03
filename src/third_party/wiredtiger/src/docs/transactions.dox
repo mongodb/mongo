@@ -157,19 +157,12 @@ Named snapshots are not durable: they do not survive WT_CONNECTION::close.
 
 Some applications have their own notion of time, including an expected commit
 order for transactions that may be inconsistent with the order assigned by
-WiredTiger.  We assume that applications can represent their notion of a
-timestamp as an unsigned integral value of some size that generally increases
-over time.  For example, a simple 64-bit integer could be incremented to
-generate transaction timestamps, if that is sufficient for the application.
+WiredTiger. We assume applications can represent their notion of a timestamp
+as an unsigned 64-bit integral value that generally increases over time. For
+example, a counter could be incremented to generate transaction timestamps,
+if that is sufficient for the application.
 
-The application's timestamp size is specified as a number of bytes at build
-time, with <code>configure --with-timestamp-size=X</code>.  The default
-timestamp size is 8 bytes (i.e., 64 bits).  Setting a size of zero disables
-transaction timestamp functionality. Timestamps are communicated to WiredTiger
-using a hexadecimal encoding, so the encoded value can be twice as long as the
-raw timestamp value.
-
-Applications assign explicit commit timestamps to transactions, then read
+Applications can assign explicit commit timestamps to transactions, then read
 "as of" a timestamp. The timestamp mechanism operates in parallel with
 WiredTiger's internal transaction ID management. It is recommended that once
 timestamps are in use for a particular table, all subsequent updates also use
@@ -180,7 +173,7 @@ timestamps.
 Applications that use timestamps will generally provide a timestamp at
 WT_SESSION::transaction_commit that will be assigned to all updates that are
 part of the transaction. WiredTiger also provides the ability to set a different
-commit timestamp for different sets of updates in a single transaction. This can
+commit timestamp for different updates in a single transaction. This can
 be done by calling WT_SESSION::timestamp_transaction repeatedly to set a new
 commit timestamp between a set of updates for the current transaction. This
 gives the ability to commit updates with different read "as of" timestamps in a

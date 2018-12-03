@@ -32,6 +32,11 @@ build() {
 		echo "    typedef $t $n $upper;"
 	done
 
+	# There's one fixed type we use.
+	echo
+	echo 'typedef uint64_t wt_timestamp_t;'
+	echo
+
 	echo '/*'
 	sed -e '/Forward type declarations .*: END/,${' \
 	    -e 'p' \

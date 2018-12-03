@@ -59,9 +59,6 @@ class test_prepare_lookaside02(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(types, txn_end)
 
     def test_prepare_conflict(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         self.session.create(self.uri, self.s_config)
         c = self.session.open_cursor(self.uri)
 

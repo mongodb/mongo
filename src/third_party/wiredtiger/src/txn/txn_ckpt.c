@@ -634,7 +634,6 @@ __checkpoint_prepare(
 	txn_state->id = txn_state->pinned_id =
 	    txn_state->metadata_pinned = WT_TXN_NONE;
 
-#ifdef HAVE_TIMESTAMPS
 	/*
 	 * Set the checkpoint transaction's timestamp, if requested.
 	 *
@@ -654,29 +653,22 @@ __checkpoint_prepare(
 		 * timestamp until its checkpoint is complete.
 		 */
 		if (txn_global->has_stable_timestamp) {
-			__wt_timestamp_set(&txn->read_timestamp,
-			    &txn_global->stable_timestamp);
-			__wt_timestamp_set(&txn_global->checkpoint_timestamp,
-			    &txn->read_timestamp);
+			txn->read_timestamp = txn_global->stable_timestamp;
+			txn_global->checkpoint_timestamp = txn->read_timestamp;
 			F_SET(txn, WT_TXN_HAS_TS_READ);
 			if (!F_ISSET(conn, WT_CONN_RECOVERING))
-				__wt_timestamp_set(
-				    &txn_global->meta_ckpt_timestamp,
-				    &txn->read_timestamp);
+				txn_global->meta_ckpt_timestamp =
+				    txn->read_timestamp;
 		} else if (!F_ISSET(conn, WT_CONN_RECOVERING))
-			__wt_timestamp_set(&txn_global->meta_ckpt_timestamp,
-			    &txn_global->recovery_timestamp);
+			txn_global->meta_ckpt_timestamp =
+			    txn_global->recovery_timestamp;
 	} else if (!F_ISSET(conn, WT_CONN_RECOVERING))
-		__wt_timestamp_set_zero(&txn_global->meta_ckpt_timestamp);
-#else
-	WT_UNUSED(use_timestamp);
-#endif
+		txn_global->meta_ckpt_timestamp = 0;
 
 	__wt_writeunlock(session, &txn_global->rwlock);
 
-#ifdef HAVE_TIMESTAMPS
 	if (F_ISSET(txn, WT_TXN_HAS_TS_READ)) {
-		__wt_verbose_timestamp(session, &txn->read_timestamp,
+		__wt_verbose_timestamp(session, txn->read_timestamp,
 		    "Checkpoint requested at stable timestamp");
 
 		/*
@@ -687,7 +679,6 @@ __checkpoint_prepare(
 		 */
 		__wt_txn_get_snapshot(session);
 	}
-#endif
 
 	/*
 	 * Get a list of handles we want to flush; for named checkpoints this
@@ -768,22 +759,17 @@ __txn_checkpoint_can_skip(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-#ifdef HAVE_TIMESTAMPS
 	/*
 	 * If the checkpoint is using timestamps, and the stable timestamp
 	 * hasn't been updated since the last checkpoint there is nothing
 	 * more that could be written.
 	 */
 	if (use_timestamp && txn_global->has_stable_timestamp &&
-	    !__wt_timestamp_iszero(&txn_global->last_ckpt_timestamp) &&
-	    __wt_timestamp_cmp(&txn_global->last_ckpt_timestamp,
-	    &txn_global->stable_timestamp) == 0) {
+	    txn_global->last_ckpt_timestamp != 0 &&
+	    txn_global->last_ckpt_timestamp == txn_global->stable_timestamp) {
 		*can_skipp = true;
 		return (0);
 	}
-#else
-	WT_UNUSED(txn_global);
-#endif
 
 	return (0);
 }
@@ -798,10 +784,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_DECL_TIMESTAMP(ckpt_tmp_ts)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
+	wt_timestamp_t ckpt_tmp_ts;
 	uint64_t fsync_duration_usecs, generation, time_start, time_stop;
 	u_int i;
 	bool can_skip, failed, full, idle, logging, tracking, use_timestamp;
@@ -928,7 +914,6 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	session->dhandle = NULL;
 
-#ifdef HAVE_TIMESTAMPS
 	/*
 	 * Record the timestamp from the transaction if we were successful.
 	 * Store it in a temp variable now because it will be invalidated during
@@ -936,12 +921,11 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * is successful. We have to set the system information before we
 	 * release the snapshot.
 	 */
-	__wt_timestamp_set_zero(&ckpt_tmp_ts);
+	ckpt_tmp_ts = 0;
 	if (full) {
 		WT_ERR(__wt_meta_sysinfo_set(session));
-		__wt_timestamp_set(&ckpt_tmp_ts, &txn->read_timestamp);
+		ckpt_tmp_ts = txn->read_timestamp;
 	}
-#endif
 
 	/* Release the snapshot so we aren't pinning updates in cache. */
 	__wt_txn_release_snapshot(session);
@@ -1016,7 +1000,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (full) {
 		__checkpoint_stats(session);
-#ifdef HAVE_TIMESTAMPS
+
 		/*
 		 * If timestamps were used to define the content of the
 		 * checkpoint update the saved last checkpoint timestamp,
@@ -1025,10 +1009,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		 * the saved last checkpoint timestamp regardless.
 		 */
 		if (use_timestamp)
-			__wt_timestamp_set(
-			    &conn->txn_global.last_ckpt_timestamp,
-			    &ckpt_tmp_ts);
-#endif
+			conn->txn_global.last_ckpt_timestamp = ckpt_tmp_ts;
 	}
 
 err:	/*
@@ -1884,7 +1865,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 		WT_RET(__wt_txn_update_oldest(
 		    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 		return (__wt_txn_visible_all(session, btree->rec_max_txn,
-		    WT_TIMESTAMP_NULL(&btree->rec_max_timestamp)) ?
+		    btree->rec_max_timestamp) ?
 		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
 	}
 

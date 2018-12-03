@@ -355,13 +355,12 @@ __txn_log_recover(WT_SESSION_IMPL *session,
 static int
 __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
 {
-#ifdef HAVE_TIMESTAMPS
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_DECL_TIMESTAMP(ckpt_timestamp)
 	WT_SESSION_IMPL *session;
-	char *sys_config;
+	wt_timestamp_t ckpt_timestamp;
+	char hex_timestamp[WT_TS_HEX_SIZE], *sys_config;
 
 	sys_config = NULL;
 
@@ -372,7 +371,7 @@ __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
 	 * save the stable timestamp of the last checkpoint for later query.
 	 * This gets saved in the connection.
 	 */
-	__wt_timestamp_set_zero(&ckpt_timestamp);
+	ckpt_timestamp = 0;
 
 	/* Search in the metadata for the system information. */
 	WT_ERR_NOTFOUND_OK(
@@ -395,26 +394,19 @@ __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
 	 * timestamp so that the checkpoint after recovery writes the correct
 	 * value into the metadata.
 	 */
-	__wt_timestamp_set(
-	    &conn->txn_global.meta_ckpt_timestamp, &ckpt_timestamp);
-	__wt_timestamp_set(
-	    &conn->txn_global.recovery_timestamp, &ckpt_timestamp);
+	conn->txn_global.meta_ckpt_timestamp =
+	    conn->txn_global.recovery_timestamp = ckpt_timestamp;
 
 	if (WT_VERBOSE_ISSET(session,
 	    WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS)) {
-		char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
-		WT_TRET(__wt_timestamp_to_hex_string(session,
-		    hex_timestamp, &conn->txn_global.recovery_timestamp));
+		__wt_timestamp_to_hex_string(
+		    hex_timestamp, conn->txn_global.recovery_timestamp);
 		__wt_verbose(session,
 		    WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS,
 		    "Set global recovery timestamp: %s", hex_timestamp);
 	}
 err:	__wt_free(session, sys_config);
 	return (ret);
-#else
-	WT_UNUSED(r);
-	return (0);
-#endif
 }
 
 /*
@@ -554,10 +546,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	r.session = session;
 	WT_MAX_LSN(&r.max_ckpt_lsn);
 	WT_MAX_LSN(&r.max_rec_lsn);
-#ifdef HAVE_TIMESTAMPS
-	__wt_timestamp_set_zero(&conn->txn_global.recovery_timestamp);
-	__wt_timestamp_set_zero(&conn->txn_global.meta_ckpt_timestamp);
-#endif
+	conn->txn_global.recovery_timestamp =
+	    conn->txn_global.meta_ckpt_timestamp = 0;
 
 	F_SET(conn, WT_CONN_RECOVERING);
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
@@ -639,6 +629,15 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		}
 		if (F_ISSET(conn, WT_CONN_SALVAGE))
 			ret = 0;
+		/*
+		 * If log scan couldn't find a file we expected to be around,
+		 * this indicates a corruption of some sort.
+		 */
+		if (ret == ENOENT) {
+			F_SET(conn, WT_CONN_DATA_CORRUPTION);
+			ret = WT_ERROR;
+		}
+
 		WT_ERR(ret);
 	}
 

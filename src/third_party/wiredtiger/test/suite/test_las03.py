@@ -58,9 +58,6 @@ class test_las03(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_checkpoint_las_reads(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         # Create a small table.
         uri = "table:test_las03"
         nrows = 100

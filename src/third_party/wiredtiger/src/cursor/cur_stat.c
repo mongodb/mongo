@@ -514,6 +514,37 @@ __curstat_join_init(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __curstat_session_init --
+ *	Initialize the statistics for a session.
+ */
+static void
+__curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
+{
+	/* This is a stub at the moment, initialize the session stats to 0. */
+	session->stats.bytes_read = 0;
+	session->stats.bytes_write = 0;
+	session->stats.cache_time = 0;
+	session->stats.lock_dhandle_wait = 0;
+	session->stats.lock_schema_wait = 0;
+	session->stats.read_time = 0;
+	session->stats.write_time = 0;
+
+	/*
+	 * Copy stats from the session to the cursor. Optionally clear the
+	 * session's statistics.
+	 */
+	memcpy(&cst->u.session_stats,
+	    &session->stats, sizeof(WT_SESSION_STATS));
+	if (F_ISSET(cst, WT_STAT_CLEAR))
+		__wt_stat_session_clear_single(&session->stats);
+
+	cst->stats = (int64_t *)&cst->u.session_stats;
+	cst->stats_base = WT_SESSION_STATS_BASE;
+	cst->stats_count = sizeof(WT_SESSION_STATS) / sizeof(int64_t);
+	cst->stats_desc = __wt_stat_session_desc;
+}
+
+/*
  * __wt_curstat_init --
  *	Initialize a statistics cursor.
  */
@@ -532,23 +563,21 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 
 	if (strcmp(dsrc_uri, "join") == 0)
 		WT_RET(__curstat_join_init(session, curjoin, cfg, cst));
-
+	else if (strcmp(dsrc_uri, "session") == 0) {
+		__curstat_session_init(session, cst);
+		return (0);
+	}
 	else if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
 		WT_RET(
 		    __wt_curstat_colgroup_init(session, dsrc_uri, cfg, cst));
-
 	else if (WT_PREFIX_MATCH(dsrc_uri, "file:"))
 		WT_RET(__curstat_file_init(session, dsrc_uri, cfg, cst));
-
 	else if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
 		WT_RET(__wt_curstat_index_init(session, dsrc_uri, cfg, cst));
-
 	else if (WT_PREFIX_MATCH(dsrc_uri, "lsm:"))
 		WT_RET(__wt_curstat_lsm_init(session, dsrc_uri, cst));
-
 	else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
 		WT_RET(__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
-
 	else
 		return (__wt_bad_object_type(session, uri));
 

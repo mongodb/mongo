@@ -1957,7 +1957,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session,
 		    !WT_PAGE_IS_INTERNAL(page) &&
 		    !modified && page->modify != NULL &&
 		    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
-		    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp))) {
+		    page->modify->rec_max_timestamp)) {
 			__wt_page_modify_set(session, page);
 			goto fast;
 		}

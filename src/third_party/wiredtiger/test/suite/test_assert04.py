@@ -38,9 +38,6 @@ def timestamp_str(t):
 
 class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
     def test_timestamp_alter(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         base = 'assert04'
         uri = 'file:' + base
         cfg_on = 'assert=(commit_timestamp=key_consistent)'
@@ -168,9 +165,6 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
     def test_timestamp_usage(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         base = 'assert04'
         uri = 'file:' + base
         msg_ooo='/out of order/'

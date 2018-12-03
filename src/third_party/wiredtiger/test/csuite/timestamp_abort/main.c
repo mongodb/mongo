@@ -127,7 +127,7 @@ thread_ts_run(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	THREAD_DATA *td;
-	char tscfg[64], ts_buf[WT_TIMESTAMP_SIZE];
+	char tscfg[64], ts_buf[WT_TS_HEX_SIZE];
 
 	td = (THREAD_DATA *)arg;
 
@@ -490,19 +490,6 @@ run_workload(uint32_t nth)
 	exit(EXIT_SUCCESS);
 }
 
-/*
- * Determines whether this is a timestamp build or not
- */
-static bool
-timestamp_build(void)
-{
-#ifdef HAVE_TIMESTAMPS
-	return (true);
-#else
-	return (false);
-#endif
-}
-
 extern int __wt_optind;
 extern char *__wt_optarg;
 
@@ -572,10 +559,6 @@ main(int argc, char *argv[])
 	const char *working_dir;
 	char buf[512], fname[64], kname[64], statname[1024];
 	bool fatal, rand_th, rand_time, verify_only;
-
-	/* We have nothing to do if this is not a timestamp build */
-	if (!timestamp_build())
-		return (EXIT_SUCCESS);
 
 	(void)testutil_set_progname(argv);
 

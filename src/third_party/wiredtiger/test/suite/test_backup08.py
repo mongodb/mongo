@@ -125,9 +125,6 @@ class test_backup08(wttest.WiredTigerTestCase):
         self.assertTimestampsEqual(q, timestamp_str(expected_rec_ts))
 
     def test_timestamp_backup(self):
-        if not wiredtiger.timestamp_build():
-            self.skipTest('requires a timestamp build')
-
         # Add some data and checkpoint using the timestamp or not
         # depending on the configuration. Get the expected timestamp
         # where the data is checkpointed for the backup.

@@ -269,14 +269,11 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 				if (((mod = walk->page->modify) != NULL) &&
 				    mod->rec_max_txn > btree->rec_max_txn)
 					btree->rec_max_txn = mod->rec_max_txn;
-#ifdef HAVE_TIMESTAMPS
-				if (mod != NULL && __wt_timestamp_cmp(
-				    &btree->rec_max_timestamp,
-				    &mod->rec_max_timestamp) < 0)
-					__wt_timestamp_set(
-					    &btree->rec_max_timestamp,
-					    &mod->rec_max_timestamp);
-#endif
+				if (mod != NULL &&
+				    btree->rec_max_timestamp <
+				    mod->rec_max_timestamp)
+					btree->rec_max_timestamp =
+					    mod->rec_max_timestamp;
 				continue;
 			}
 
