@@ -59,6 +59,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         options.resmoke_args = "resmoke args"
         options.variant = "build variant"
         options.continue_on_failure = "false"
+        options.resmoke_jobs_max = 0
         options.should_shuffle = "false"
         options.timeout_secs = "1800"
 

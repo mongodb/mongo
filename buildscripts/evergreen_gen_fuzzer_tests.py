@@ -28,6 +28,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "name",
     "variant",
     "continue_on_failure",
+    "resmoke_jobs_max",
     "should_shuffle",
     "timeout_secs",
     "use_multiversion",
@@ -62,7 +63,7 @@ def _get_config_value(attrib, cmd_line_options, config_file_data, required=False
     return default
 
 
-def _get_config_options(cmd_line_options, config_file):
+def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-many-locals
     """
     Get the configuration to use.
 
@@ -90,6 +91,8 @@ def _get_config_options(cmd_line_options, config_file):
     variant = _get_config_value("build_variant", cmd_line_options, config_file_data, required=True)
     continue_on_failure = _get_config_value("continue_on_failure", cmd_line_options,
                                             config_file_data, default="false")
+    resmoke_jobs_max = _get_config_value("resmoke_jobs_max", cmd_line_options, config_file_data,
+                                         default="0")
     should_shuffle = _get_config_value("should_shuffle", cmd_line_options, config_file_data,
                                        default="false")
     timeout_secs = _get_config_value("timeout_secs", cmd_line_options, config_file_data,
@@ -98,8 +101,8 @@ def _get_config_options(cmd_line_options, config_file):
                                          default=False)
 
     return ConfigOptions(num_files, num_tasks, resmoke_args, npm_command, jstestfuzz_vars, name,
-                         variant, continue_on_failure, should_shuffle, timeout_secs,
-                         use_multiversion)
+                         variant, continue_on_failure, resmoke_jobs_max, should_shuffle,
+                         timeout_secs, use_multiversion)
 
 
 def _name_task(parent_name, task_index, total_tasks):
@@ -146,6 +149,7 @@ def _generate_evg_tasks(options):
         run_tests_vars = {
             "continue_on_failure": options.continue_on_failure,
             "resmoke_args": options.resmoke_args,
+            "resmoke_jobs_max": options.resmoke_jobs_max,
             "should_shuffle": options.should_shuffle,
             "task_path_suffix": options.use_multiversion,
             "timeout_secs": options.timeout_secs,
@@ -181,6 +185,8 @@ def main():
                         help="Task path suffix for multiversion generated tasks.")
     parser.add_argument("--continue-on-failure", dest="continue_on_failure",
                         help="continue_on_failure value for generated tasks.")
+    parser.add_argument("--resmoke-jobs-max", dest="resmoke_jobs_max",
+                        help="resmoke_jobs_max value for generated tasks.")
     parser.add_argument("--should-shuffle", dest="should_shuffle",
                         help="should_shuffle value for generated tasks.")
     parser.add_argument("--timeout-secs", dest="timeout_secs",
