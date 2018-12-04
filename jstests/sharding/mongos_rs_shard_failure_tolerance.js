@@ -31,13 +31,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Create the unsharded database
     assert.writeOK(collUnsharded.insert({some: "doc"}));
     assert.writeOK(collUnsharded.remove({}));
-    printjson(
-        admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
+    st.ensurePrimaryShard(collUnsharded.getDB().toString(), st.shard0.shardName);
 
     // Create the sharded database
     assert.commandWorked(admin.runCommand({enableSharding: collSharded.getDB().toString()}));
-    printjson(
-        admin.runCommand({movePrimary: collSharded.getDB().toString(), to: st.shard0.shardName}));
+    st.ensurePrimaryShard(collSharded.getDB().toString(), st.shard0.shardName);
     assert.commandWorked(
         admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
