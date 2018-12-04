@@ -142,9 +142,7 @@ public:
             filter->path() == kNameField;
         intmax_t totalSize = 0;
         for (const auto& dbname : dbNames) {
-            if (authorizedDatabases &&
-                !as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                      ActionType::find)) {
+            if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
                 // We don't have listDatabases on the cluser or find on this database.
                 continue;
             }

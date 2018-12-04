@@ -12,10 +12,24 @@
         for (let i = 0; i < 8; ++i) {
             mongod.getDB('db' + i).foo.insert({bar: "baz"});
         }
+        mongod.getDB("db0").baz.insert({x: "y"});
+        mongod.getDB("db2").baz.insert({x: "y"});
 
         admin.createRole({
             role: 'dbLister',
             privileges: [{resource: {cluster: true}, actions: ['listDatabases']}],
+            roles: []
+        });
+
+        admin.createRole({
+            role: 'specificCollection',
+            privileges: [{resource: {db: "db0", collection: "baz"}, actions: ['find']}],
+            roles: []
+        });
+
+        admin.createRole({
+            role: 'sharedNameCollections',
+            privileges: [{resource: {db: "", collection: "baz"}, actions: ['find']}],
             roles: []
         });
 
@@ -36,8 +50,12 @@
 
         // Make db4 readable by user 4, and let them list all dbs.
         // Make db5 readable by user 5, and let them list all dbs.
+        // Make collection baz in db0 findable by user6, and let them list db0.
+        // Make all baz collections findable by user7, and let them list all dbs.
         admin.createUser({user: 'user4', pwd: 'pass', roles: [makeRole('read', 4), 'dbLister']});
         admin.createUser({user: 'user5', pwd: 'pass', roles: [makeRole('read', 5), 'dbLister']});
+        admin.createUser({user: 'user6', pwd: 'pass', roles: ['specificCollection']});
+        admin.createUser({user: 'user7', pwd: 'pass', roles: ['sharedNameCollections']});
         admin.logout();
 
         const admin_dbs = ["admin", "db0", "db1", "db2", "db3", "db4", "db5", "db6", "db7"];
@@ -47,6 +65,8 @@
          {user: "user3", dbs: ["db0", "db1", "db2", "db3", "db4", "db6"]},
          {user: "user4", dbs: admin_dbs, authDbs: ["db4"]},
          {user: "user5", dbs: admin_dbs, authDbs: ["db5"]},
+         {user: "user6", dbs: ["db0"]},
+         {user: "user7", dbs: admin_dbs},
          {user: "admin", dbs: admin_dbs, authDbs: admin_dbs},
         ].forEach(function(test) {
             function filterSpecial(db) {
@@ -82,8 +102,8 @@
             assert.eq(mongod.getDBs(undefined, {}, true).filter(filterSpecial),
                       test.dbs,
                       "Shell helper speaking to same version");
-            if (test.user !== 'admin') {
-                // Admin doesn't have an explicit list of DBs to parse.
+            if (test.user !== 'admin' && test.user !== "user7") {
+                // Admin and user7 don't have an explicit list of DBs to parse.
                 assert.eq(mongod._getDatabaseNamesFromPrivileges(), test.authDbs || test.dbs);
             }
 

@@ -185,9 +185,7 @@ public:
                 if (name == NamespaceString::kLocalDb)
                     continue;
 
-                if (authorizedDatabases &&
-                    !as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(name),
-                                                          ActionType::find)) {
+                if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(name)) {
                     // We don't have listDatabases on the cluser or find on this database.
                     continue;
                 }
