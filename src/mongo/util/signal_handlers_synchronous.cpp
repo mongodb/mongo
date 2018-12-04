@@ -200,10 +200,10 @@ void myTerminate() {
                 throw;
             } catch (const DBException& ex) {
                 typeInfo = &typeid(ex);
-                mallocFreeOStream << "DBException::toString(): " << ex.toString() << '\n';
+                mallocFreeOStream << "DBException::toString(): " << redact(ex) << '\n';
             } catch (const std::exception& ex) {
                 typeInfo = &typeid(ex);
-                mallocFreeOStream << "std::exception::what(): " << ex.what() << '\n';
+                mallocFreeOStream << "std::exception::what(): " << redact(ex.what()) << '\n';
             } catch (const boost::exception& ex) {
                 typeInfo = &typeid(ex);
                 mallocFreeOStream << "boost::diagnostic_information(): "

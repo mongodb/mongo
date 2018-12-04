@@ -149,12 +149,7 @@ void BackgroundJob::jobBody() {
 
     LOG(1) << "BackgroundJob starting: " << threadName;
 
-    try {
-        run();
-    } catch (const std::exception& e) {
-        error() << "backgroundjob " << threadName << " exception: " << redact(e.what());
-        throw;
-    }
+    run();
 
     // We must cache this value so that we can use it after we leave the following scope.
     const bool selfDelete = _selfDelete;
