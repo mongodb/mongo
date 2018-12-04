@@ -147,6 +147,11 @@ public:
 Counter64 opsAppliedStats;
 ServerStatusMetricField<Counter64> displayOpsApplied("repl.apply.ops", &opsAppliedStats);
 
+// Tracks the oplog application batch size.
+Counter64 oplogApplicationBatchSize;
+ServerStatusMetricField<Counter64> displayOplogApplicationBatchSize("repl.apply.batchSize",
+                                                                    &oplogApplicationBatchSize);
+
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
 ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
@@ -350,8 +355,10 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     bool isNoOp = opType[0] == 'n';
     if (isNoOp || (opType[0] == 'i' && nss.isSystemDotIndexes())) {
-        if (isNoOp && nss.db() == "")
+        if (isNoOp && nss.db() == "") {
+            incrementOpsAppliedStats();
             return Status::OK();
+        }
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         return applyOp(ctx.db());
@@ -1494,6 +1501,9 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};
     }
+
+    // Increment the batch size stat.
+    oplogApplicationBatchSize.increment(ops.size());
 
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     {
