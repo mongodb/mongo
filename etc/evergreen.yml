@@ -7758,7 +7758,9 @@ tasks:
 - name: push
   patchable: false
   depends_on:
-  - name: "*"
+  - name: jsCore
+  - name: dbtest
+  - name: replica_sets_jscore_passthrough
   stepback: false
   commands:
     - func: "fetch artifacts"
@@ -8964,6 +8966,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -9208,6 +9211,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: free_monitoring
   - name: jsCore
+  - name: replica_sets_jscore_passthrough
   - name: push
     distros:
     - ubuntu1604-test
@@ -9468,6 +9472,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth
   - name: replica_sets_ese
+  - name: replica_sets_jscore_passthrough
   - name: powercycle
   - name: sasl
   - name: sharding_auth
@@ -9647,6 +9652,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth
   - name: replica_sets_ese
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit
@@ -10010,6 +10016,7 @@ buildvariants:
   - name: replica_sets_ese_5
   - name: replica_sets_ese_6
   - name: replica_sets_ese_misc
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_0
     distros:
@@ -10672,6 +10679,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: ssl
   - name: sslSpecial
@@ -12463,6 +12471,7 @@ buildvariants:
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: external_auth
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit
@@ -13086,6 +13095,7 @@ buildvariants:
     - rhel67-zseries-build
   - name: jsCore
   - name: ssl
+  - name: replica_sets_jscore_passthrough
   - name: push
     distros:
     - rhel62-large
@@ -13141,6 +13151,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -13221,6 +13232,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -13330,6 +13342,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -13597,6 +13610,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -13752,6 +13766,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
