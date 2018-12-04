@@ -34,6 +34,7 @@
 #include <map>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -66,6 +67,8 @@ public:
         // Only set for transactions with snapshot level read concern.
         boost::optional<LogicalTime> atClusterTime;
     };
+
+    enum class TransactionActions { kStart, kContinue, kCommit };
 
     /**
      * Represents a shard participant in a distributed transaction. Lives only for the duration of
@@ -154,7 +157,9 @@ public:
      * Starts a fresh transaction in this session or continue an existing one. Also cleans up the
      * previous transaction state.
      */
-    void beginOrContinueTxn(OperationContext* opCtx, TxnNumber txnNumber, bool startTransaction);
+    void beginOrContinueTxn(OperationContext* opCtx,
+                            TxnNumber txnNumber,
+                            TransactionActions action);
 
     /**
      * Attaches the required transaction related fields for a request to be sent to the given
@@ -228,7 +233,8 @@ public:
      * Commits the transaction. For transactions with multiple participants, this will initiate
      * the two phase commit procedure.
      */
-    Shard::CommandResponse commitTransaction(OperationContext* opCtx);
+    Shard::CommandResponse commitTransaction(OperationContext* opCtx,
+                                             boost::optional<TxnRecoveryToken> recoveryToken);
 
     /**
      * Sends abort to all participants and returns the responses from all shards.
@@ -253,6 +259,8 @@ public:
      */
     boost::optional<Participant&> getParticipant(const ShardId& shard);
 
+    void appendRecoveryToken(BSONObjBuilder* builder);
+
 private:
     // Shortcut to obtain the id of the session under which this transaction router runs
     const LogicalSessionId& _sessionId() const;
@@ -261,6 +269,9 @@ private:
      * Run basic commit for transactions that touched a single shard.
      */
     Shard::CommandResponse _commitSingleShardTransaction(OperationContext* opCtx);
+
+    Shard::CommandResponse _commitWithRecoveryToken(OperationContext* opCtx,
+                                                    const TxnRecoveryToken& recoveryToken);
 
     /**
      * Run two phase commit for transactions that touched multiple shards.
@@ -331,6 +342,9 @@ private:
     // coordinator. If so, the router should no longer implicitly abort the transaction on errors,
     // since the coordinator may independently make a commit decision.
     bool _initiatedTwoPhaseCommit{false};
+
+    // Indicates whether this is trying to recover a commitTransaction on the current transaction.
+    bool _isRecoveringCommit{false};
 
     // Map of current participants of the current transaction.
     StringMap<Participant> _participants;

@@ -84,7 +84,8 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         _scopedSession.emplace(operationContext());
-        txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        txnRouter()->beginOrContinueTxn(
+            operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
     }
 
     TransactionRouter* txnRouter() const {
@@ -186,7 +187,8 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         _scopedSession.emplace(operationContext());
-        txnRouter()->beginOrContinueTxn(operationContext(), kTxnNumber, true);
+        txnRouter()->beginOrContinueTxn(
+            operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
     }
 
     TransactionRouter* txnRouter() const {

@@ -10,17 +10,17 @@
     // The test modifies config.transactions, which must be done outside of a session.
     TestData.disableImplicitSessions = true;
 
-    let st = new ShardingTest({shards: 2});
+    let st = new ShardingTest({shards: 2, mongos: 2});
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+    assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.name);
-    assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
+    assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
+    assert.commandWorked(st.s0.adminCommand({split: 'test.user', middle: {x: 0}}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name}));
+        st.s0.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name}));
 
     // Insert documents to prime mongos and shards with the latest sharding metadata.
-    let testDB = st.s.getDB('test');
+    let testDB = st.s0.getDB('test');
     assert.commandWorked(testDB.runCommand({insert: 'user', documents: [{x: -10}, {x: 10}]}));
 
     let coordinatorConn = st.rs0.getPrimary();
@@ -46,7 +46,8 @@
             u: {"$set": {lastTxnNumber: txnNumber}},
             upsert: true
         };
-        assert.commandWorked(testDB.runCommand({
+
+        let res = assert.commandWorked(testDB.runCommand({
             update: 'user',
             updates: [updateDocumentOnShard0, updateDocumentOnShard1],
             lsid: lsid,
@@ -54,6 +55,19 @@
             autocommit: false,
             startTransaction: true
         }));
+
+        assert.neq(null, res.recoveryToken);
+        return res.recoveryToken;
+    };
+
+    const sendCommitViaOtherMongos = function(lsid, txnNumber, recoveryToken) {
+        return st.s1.getDB('admin').runCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            recoveryToken: recoveryToken
+        });
     };
 
     // TODO (SERVER-37364): Once coordinateCommit returns as soon as the decision is made durable,
@@ -69,7 +83,8 @@
         jsTest.log(
             "coordinateCommit sent after coordinator finished coordinating an abort decision.");
         ++txnNumber;
-        startNewTransactionThroughMongos();
+
+        let recoveryToken = startNewTransactionThroughMongos();
         assert.commandWorked(st.rs0.getPrimary().adminCommand({
             abortTransaction: 1,
             lsid: lsid,
@@ -86,10 +101,14 @@
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
                                      ErrorCodes.NoSuchTransaction);
 
+        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+
         jsTest.log(
             "coordinateCommit sent after coordinator finished coordinating a commit decision.");
         ++txnNumber;
-        startNewTransactionThroughMongos();
+
+        recoveryToken = startNewTransactionThroughMongos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -97,6 +116,8 @@
             autocommit: false
         }));
         assert.commandWorked(runCoordinateCommit(txnNumber, participantList));
+
+        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
 
         jsTest.log(
             "coordinateCommit sent for lower transaction number than last number participant saw.");
@@ -115,7 +136,7 @@
         jsTest.log(
             "coordinateCommit sent for higher transaction number than participant has seen.");
         ++txnNumber;
-        startNewTransactionThroughMongos();
+        recoveryToken = startNewTransactionThroughMongos();
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber + 1, participantList),
                                      ErrorCodes.NoSuchTransaction);
 
@@ -130,6 +151,11 @@
             autocommit: false
         }),
                                      ErrorCodes.NoSuchTransaction);
+
+        // Previous commit already discarded the coordinator since it aborted, so we get
+        // "transaction too old" instead.
+        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.TransactionTooOld);
     };
 
     // Test with a real participant list, to simulate retrying through main router.

@@ -53,13 +53,17 @@
             autocommit: false
         })),
                                      ErrorCodes.OperationNotSupportedInTransaction);
-        assert.commandFailedWithCode(sessionDb.adminCommand({
-            commitTransaction: 1,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(1),
-            autocommit: false
-        }),
-                                     ErrorCodes.NoSuchTransaction);
+
+        // Mongos has special handling for commitTransaction to support commit recovery.
+        if (!isMongos) {
+            assert.commandFailedWithCode(sessionDb.adminCommand({
+                commitTransaction: 1,
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(1),
+                autocommit: false
+            }),
+                                         ErrorCodes.NoSuchTransaction);
+        }
 
         // Check that the command fails inside a transaction, but does not abort the transaction.
         setup();
@@ -184,14 +188,17 @@
     }),
                                  ErrorCodes.OperationNotSupportedInTransaction);
 
-    // The failed find should abort the transaction so a commit should fail.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        autocommit: false,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(1),
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    // Mongos has special handling for commitTransaction to support commit recovery.
+    if (!isMongos) {
+        // The failed find should abort the transaction so a commit should fail.
+        assert.commandFailedWithCode(sessionDb.adminCommand({
+            commitTransaction: 1,
+            autocommit: false,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(1),
+        }),
+                                     ErrorCodes.NoSuchTransaction);
+    }
 
     session.endSession();
 }());

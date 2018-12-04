@@ -31,20 +31,16 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
-
-
-commands:
-    commitTransaction:
-        description: "commitTransaction Command"
-        namespace: ignored
-        fields:
-            commitTimestamp:
-                description: "Timestamp at which to commit the transaction. Required for prepared
-                              transactions and illegal for non-prepared ones."
-                optional: true
-                type: timestamp
+    - "mongo/s/sharding_types.idl"
 
 structs:
+    TxnRecoveryToken:
+        description: "Contains info for retrying the commit of a sharded transaction"
+        fields:
+            shardId:
+                description: "The id of the shard that can make progress committing the transaction"
+                type: shard_id
+
     CommitTransactionOplogObject:
         description: A document representing the 'o' field of a 'commitTransaction' oplog entry.
         fields:
@@ -62,3 +58,19 @@ structs:
             abortTransaction:
                 type: int
                 default: 1
+
+commands:
+    commitTransaction:
+        description: "commitTransaction Command"
+        namespace: ignored
+        fields:
+            commitTimestamp:
+                description: "Timestamp at which to commit the transaction. Required for prepared
+                              transactions and illegal for non-prepared ones."
+                optional: true
+                type: timestamp
+            recoveryToken:
+                description: "A mongos that doesn't know about this transaction can attempt to make
+                              progress on commit by processing using the info in the recoveryToken."
+                optional: true
+                type: TxnRecoveryToken

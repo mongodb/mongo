@@ -7,6 +7,7 @@
 (function() {
     "use strict";
     load('jstests/libs/uuid_util.js');
+    load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
     // Makes assertions on commands run without logical session ids.
     TestData.disableImplicitSessions = true;
@@ -176,14 +177,17 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
-    // Committing the transaction should fail.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    // Mongos has special handling for commitTransaction to support commit recovery.
+    if (!FixtureHelpers.isMongos(sessionDb)) {
+        // Committing the transaction should fail.
+        assert.commandFailedWithCode(sessionDb.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"}
+        }),
+                                     ErrorCodes.NoSuchTransaction);
+    }
 
     jsTestLog("Run a non-initial transaction operation with autocommit=true");
     txnNumber++;

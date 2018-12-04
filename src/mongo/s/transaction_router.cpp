@@ -290,7 +290,9 @@ BSONObj TransactionRouter::attachTxnFieldsIfNeeded(const ShardId& shardId, const
 }
 
 void TransactionRouter::_verifyReadConcern() {
-    invariant(!_readConcernArgs.isEmpty());
+    if (!_isRecoveringCommit) {
+        invariant(!_readConcernArgs.isEmpty());
+    }
 
     if (_atClusterTime) {
         invariant(_atClusterTime->isSet());
@@ -482,8 +484,8 @@ void TransactionRouter::_setAtClusterTime(const boost::optional<LogicalTime>& af
 
 void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
                                            TxnNumber txnNumber,
-                                           bool startTransaction) {
-    if (startTransaction) {
+                                           TransactionActions action) {
+    if (action == TransactionActions::kStart) {
         // TODO: do we need more robust checking? Like, did we actually sent start to the
         // participants?
         uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -509,8 +511,18 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
                     isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel()));
         }
         _readConcernArgs = readConcernArgs;
+    } else if (action == TransactionActions::kCommit) {
+        uassert(ErrorCodes::TransactionTooOld,
+                str::stream() << "txnNumber " << txnNumber << " is less than last txnNumber "
+                              << _txnNumber
+                              << " seen in session "
+                              << _sessionId(),
+                txnNumber >= _txnNumber);
+
+        if (_participants.empty()) {
+            _isRecoveringCommit = true;
+        }
     } else {
-        // TODO: figure out what to do with recovery
         uassert(ErrorCodes::NoSuchTransaction,
                 str::stream() << "cannot continue txnId " << _txnNumber << " for session "
                               << _sessionId()
@@ -645,8 +657,12 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
         Shard::RetryPolicy::kIdempotent));
 }
 
-Shard::CommandResponse TransactionRouter::commitTransaction(OperationContext* opCtx) {
-    uassert(50940, "cannot commit with no participants", !_participants.empty());
+Shard::CommandResponse TransactionRouter::commitTransaction(
+    OperationContext* opCtx, boost::optional<TxnRecoveryToken> recoveryToken) {
+    if (_participants.empty()) {
+        uassert(50940, "cannot commit with no participants", recoveryToken);
+        return _commitWithRecoveryToken(opCtx, *recoveryToken);
+    }
 
     if (_participants.size() == 1) {
         return _commitSingleShardTransaction(opCtx);
@@ -706,6 +722,45 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
 std::string TransactionRouter::_txnIdToString() {
     return str::stream() << "(txnNumber: " << _txnNumber << ", lsid: " << _sessionId().getId()
                          << ")";
+}
+
+void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) {
+    if (_coordinatorId) {
+        BSONObjBuilder recoveryTokenBuilder(
+            builder->subobjStart(CommitTransaction::kRecoveryTokenFieldName));
+        TxnRecoveryToken recoveryToken(*_coordinatorId);
+        recoveryToken.serialize(&recoveryTokenBuilder);
+        recoveryTokenBuilder.doneFast();
+    }
+}
+
+Shard::CommandResponse TransactionRouter::_commitWithRecoveryToken(
+    OperationContext* opCtx, const TxnRecoveryToken& recoveryToken) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto coordinatorId = recoveryToken.getShardId();
+
+    auto coordinateCommitCmd = [&] {
+        CoordinateCommitTransaction coordinateCommitCmd;
+        coordinateCommitCmd.setDbName("admin");
+        coordinateCommitCmd.setParticipants({});
+
+        auto rawCoordinateCommit = coordinateCommitCmd.toBSON(
+            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+
+        auto existingParticipant = getParticipant(coordinatorId);
+        auto coordinatorParticipant =
+            existingParticipant ? existingParticipant : _createParticipant(coordinatorId);
+        return coordinatorParticipant->attachTxnFieldsIfNeeded(rawCoordinateCommit, false);
+    }();
+
+    _initiatedTwoPhaseCommit = true;
+    auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, coordinatorId));
+    return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        coordinateCommitCmd,
+        Shard::RetryPolicy::kIdempotent));
 }
 
 }  // namespace mongo
