@@ -428,7 +428,7 @@ variables:
 - &enterprise-windows-64-2k8-nopush-template
   name: enterprise-windows-64-2k8-nopush-template
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   modules:
   - enterprise
   display_tasks:
@@ -444,7 +444,7 @@ variables:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -463,10 +463,10 @@ variables:
     requires:
     - name: burn_in_tests
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: burn_in_tests
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation_wildcard_fuzzer_gen
@@ -522,193 +522,193 @@ variables:
   - name: sasl
   - name: sharding_auth_0
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_1
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_2
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_3
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_4
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_5
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_6
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_7
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_8
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_9
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_10
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_11
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_12
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_13
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_14
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_15
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_16
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_17
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_18
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_19
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_misc
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_0
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_1
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_2
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_3
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_4
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_5
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_6
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_7
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_8
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_9
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_10
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_11
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_12
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_13
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_14
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_15
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_16
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_17
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_18
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_misc
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_0
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_1
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_2
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_3
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_4
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_5
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_6
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_7
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_8
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_9
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_10
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_11
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_12
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_13
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_14
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_15
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_16
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_17
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_18
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_19
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_20
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_misc
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: snmp
   - name: ssl
   - name: sslSpecial
@@ -9978,7 +9978,7 @@ buildvariants:
 - name: windows-64-2k8-debug
   display_name: "* Windows 2008R2 DEBUG"
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -10002,7 +10002,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: aggregation
   - name: aggregation_facet_unwind_passthrough
   - name: aggregation_mongos_passthrough
@@ -10052,102 +10052,102 @@ buildvariants:
     # with more RAM for these suites.
   - name: concurrency
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_replication
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_replication_causal_consistency
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_replication_multi_stmt_txn
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_replication
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_replication_with_balancer
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_causal_consistency
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_causal_consistency_and_balancer
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_with_stepdowns
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_with_stepdowns_and_balancer
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_simultaneous
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_simultaneous_replication
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: read_concern_linearizable_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: read_concern_majority_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: read_only
   - name: read_only_sharded
   - name: replica_sets
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_initsync_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_kill_primary_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_terminate_primary_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: retryable_writes_jscore_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: session_jscore_passthrough
   - name: sharding
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: tool
   - name: write_concern_majority_passthrough
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
 
 - name: enterprise-windows-64-2k8
   display_name: "! Enterprise Windows 2008R2"
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -10157,7 +10157,7 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10184,10 +10184,10 @@ buildvariants:
     - name: burn_in_tests
     - name: verify_pip
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: burn_in_tests
   - name: verify_pip
   - name: audit
@@ -10197,7 +10197,7 @@ buildvariants:
   - name: buildscripts_test
   - name: dbtest_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: ese
   - name: external_auth
     distros:
@@ -10243,193 +10243,193 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_auth_0
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_1
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_2
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_3
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_4
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_5
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_6
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_7
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_8
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_9
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_10
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_11
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_12
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_13
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_14
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_15
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_16
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_17
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_18
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_19
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_misc
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_0
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_1
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_2
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_3
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_4
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_5
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_6
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_7
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_8
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_9
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_10
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_11
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_12
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_13
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_14
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_15
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_16
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_17
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_18
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit_misc
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_0
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_1
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_2
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_3
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_4
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_5
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_6
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_7
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_8
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_9
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_10
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_11
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_12
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_13
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_14
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_15
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_16
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_17
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_18
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_19
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_20
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_ese_misc
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: snmp
   - name: ssl
   - name: sslSpecial
@@ -10453,14 +10453,14 @@ buildvariants:
   name: enterprise-windows-64-2k8-compile-all
   display_name: "* Enterprise Windows 2008R2 compile_all"
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   display_tasks:
   - *dbtest
   - *unittests
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   # Do not add more tasks to this list.
 
 - <<: *enterprise-windows-64-2k8-nopush-template
@@ -10476,7 +10476,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
@@ -10484,7 +10484,7 @@ buildvariants:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10499,7 +10499,7 @@ buildvariants:
   tasks:
   - name: compile_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: jsCore
   - name: replica_sets
   - name: sharding
@@ -10509,14 +10509,14 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10536,14 +10536,14 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: audit
   - name: auth_audit
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
@@ -10574,10 +10574,10 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_auth
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_auth_audit
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: snmp
   - name: ssl
   - name: sslSpecial
@@ -10585,7 +10585,7 @@ buildvariants:
 - name: windows-64-2k8-ssl
   display_name: Windows 2008R2
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -10597,7 +10597,7 @@ buildvariants:
     multiversion_platform: windows_x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MONGO_DISTMOD=2012plus -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10614,7 +10614,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: aggregation
   - name: aggregation_mongos_passthrough
   - name: aggregation_one_shard_sharded_collections
@@ -10626,7 +10626,7 @@ buildvariants:
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -10689,7 +10689,7 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
@@ -10697,7 +10697,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops
   - name: sharding_last_stable_mongos_and_mixed_shards
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: slow1
   - name: ssl
   - name: sslSpecial
@@ -10714,13 +10714,13 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-small
+  - windows-64-vs2017-test
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10737,7 +10737,7 @@ buildvariants:
   # timing-sensitive tests to fail.
   - name: compile_TG
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2017-compile
   - name: audit
   # Do not add more tasks to this list.
 
@@ -15642,47 +15642,6 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1804-build
-  - name: audit
-  - name: ese
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jsCore_txns
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: sasl
-  - name: snmp
-  - name: ssl
-  - name: sslSpecial
-
-- name: windows-64-vs2017
-  display_name: "Windows VS2017 Canary C++14 Builder"
-  run_on:
-  - windows-64-vs2017-test
-  modules:
-  - enterprise
-  expansions:
-    platform_decompress: unzip
-    exe: ".exe"
-    content_type: application/zip
-    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" MSVC_VERSION=14.1 --cxx-std=14 --dynamic-windows --dbg=off --opt=on -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: python
-    python3: '/cygdrive/c/python/python36/python.exe'
-    ext: zip
-    use_scons_cache: true
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10"'
-    tooltags: ""
-    build_mongoreplay: false
-  display_tasks:
-  - *dbtest
-  - *unittests
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - windows-64-vs2017-compile
   - name: audit
   - name: ese
   - name: jsCore

@@ -6,6 +6,13 @@ Import("env")
 Import("get_option")
 Import("has_option")
 
+if not env.TargetOSIs('windows'):
+    Return()
+
+import re
+import subprocess
+import _winreg
+
 env = env.Clone()
 
 env.SConscript(
@@ -24,10 +31,23 @@ env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
 env['WIXLIGHT'] = r'$WIXPATH\light.exe'
 env['WIXUIEXT'] = r'$WIXPATH\WixUIExtension.dll'
 env['WIXUTILEXT'] = r'$WIXPATH\WixUtilExtension.dll'
-env['MERGEMODULESBASEPATH'] = os.environ.get('MERGEMODULESBASEPATH')
-if env['MERGEMODULESBASEPATH'] == None and os.environ.get('ProgramFiles(x86)') != None:
-    env['MERGEMODULESBASEPATH'] = (os.environ.get('ProgramFiles(x86)') +
-            r"\Common Files\Merge Modules")
+
+# How to locate the Merge Modules path is described in https://docs.microsoft.com/en-us/cpp/ide/redistributing-visual-cpp-files?view=vs-2017
+
+# When we run this on evergreen, the environment is broken, fall back to hard coded C:\Program Files (x86)
+programfilesx86 = os.environ.get('ProgramFiles(x86)')
+if programfilesx86 is None:
+    programfilesx86 = "C:\\Program Files (x86)"
+
+# Use vswhere (it has a fixed stable path) to query where Visual Studio is installed.
+vsinstall_path = subprocess.check_output([os.path.join(programfilesx86, "Microsoft Visual Studio", "Installer", "vswhere.exe"), "-version", "[15.0,16.0)", "-property", "installationPath", "-nologo"]).strip()
+
+# Check the registry key that has the runtime lib version
+vsruntime_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64")
+vslib_version,vslib_version_type = _winreg.QueryValueEx(vsruntime_key, "Version")
+
+# Combine and set the full merge module path
+env['MERGEMODULESBASEPATH'] = os.path.join(vsinstall_path, "VC", "Redist", "MSVC", re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1), "MergeModules")
 
 sourcesList = [ "BinaryFragment.wxs",
             "FeatureFragment.wxs",
