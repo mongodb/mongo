@@ -148,9 +148,8 @@ private:
     // Management of the _metadata list is implemented in ScopedCollectionMetadata
     friend class ScopedCollectionMetadata;
 
-    // For access to _rangesToClean and _managerLock under task callback
-    friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
-        OperationContext*, NamespaceString const&, OID const&, int, CollectionRangeDeleter*);
+    // For access to _managerLock, _rangesToClean, and _clearAllCleanups under task callback
+    friend class CollectionRangeDeleter;
 
     /**
      * Represents an instance of what the filtering metadata for this collection was at a particular
