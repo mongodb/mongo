@@ -36,6 +36,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
@@ -428,6 +429,10 @@ Status canonicalizeSSLServerOptions(moe::Environment* params) {
     return Status::OK();
 }
 
+namespace {
+bool gImplicitDisableTLS10 = false;
+}  // namespace
+
 Status storeSSLServerOptions(const moe::Environment& params) {
     if (params.count("net.ssl.mode")) {
         std::string sslModeParam = params["net.ssl.mode"].as<string>();
@@ -506,8 +511,7 @@ Status storeSSLServerOptions(const moe::Environment& params) {
          * old version of OpenSSL (pre 1.0.0l)
          * which does not support TLS 1.1 or later.
          */
-        log() << "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "
-                 "specify --sslDisabledProtocols 'none'";
+        gImplicitDisableTLS10 = true;
         sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_0);
 #endif
     }
@@ -674,5 +678,22 @@ Status storeSSLClientOptions(const moe::Environment& params) {
 #endif
     return Status::OK();
 }
+
+namespace {
+// This warning must be deferred until after
+// ServerLogRedirection has started up so that
+// it goes to the right place.
+// ServerLogRedirection won't be present in unittests though,
+// so for 4.0 we'll use "default".
+// In 4.2, we can shim a stub for the two tests which care.
+MONGO_INITIALIZER_WITH_PREREQUISITES(ImplicitDisableTLS10Warning, ("default"))
+(InitializerContext*) {
+    if (gImplicitDisableTLS10) {
+        log() << "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "
+                 "specify --sslDisabledProtocols 'none'";
+    }
+    return Status::OK();
+}
+}  // namespace
 
 }  // namespace mongo
