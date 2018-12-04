@@ -245,10 +245,10 @@ MONGO_INITIALIZER_GENERAL(
         manager->getGlobalDomain()->clearAppenders();
         manager->getGlobalDomain()->attachAppender(
             std::make_unique<SyslogAppender<MessageEventEphemeral>>(
-                std::make_unique<logger::MessageEventWithContextEncoder>()));
+                std::make_unique<logger::MessageEventDetailsEncoder>()));
         manager->getNamedDomain("javascriptOutput")
             ->attachAppender(std::make_unique<SyslogAppender<MessageEventEphemeral>>(
-                std::make_unique<logger::MessageEventWithContextEncoder>()));
+                std::make_unique<logger::MessageEventDetailsEncoder>()));
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
