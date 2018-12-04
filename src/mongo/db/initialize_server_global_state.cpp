@@ -223,11 +223,11 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         LogManager* manager = logger::globalLogManager();
         manager->getGlobalDomain()->clearAppenders();
         manager->getGlobalDomain()->attachAppender(MessageLogDomain::AppenderAutoPtr(
-            new SyslogAppender<MessageEventEphemeral>(new logger::MessageEventWithContextEncoder)));
+            new SyslogAppender<MessageEventEphemeral>(new logger::MessageEventDetailsEncoder)));
         manager->getNamedDomain("javascriptOutput")
             ->attachAppender(
                 MessageLogDomain::AppenderAutoPtr(new SyslogAppender<MessageEventEphemeral>(
-                    new logger::MessageEventWithContextEncoder)));
+                    new logger::MessageEventDetailsEncoder)));
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
