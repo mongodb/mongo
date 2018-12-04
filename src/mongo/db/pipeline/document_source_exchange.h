@@ -72,8 +72,19 @@ class Exchange : public RefCountable {
     static std::vector<FieldPath> extractKeyPaths(const BSONObj& keyPattern);
 
 public:
+    /**
+     * Create an exchange. 'pipeline' represents the input to the exchange operator and must not be
+     * nullptr.
+     **/
     Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
-    DocumentSource::GetNextResult getNext(OperationContext* opCtx, size_t consumerId);
+
+    /**
+     * Interface for retrieving the next document. 'resourceYielder' is optional, and if provided,
+     * will be used to give up resources while waiting for other threads to empty their buffers.
+     */
+    DocumentSource::GetNextResult getNext(OperationContext* opCtx,
+                                          size_t consumerId,
+                                          ResourceYielder* resourceYielder);
 
     size_t getConsumers() const {
         return _consumers.size();
@@ -161,7 +172,7 @@ private:
 
     // Synchronization.
     stdx::mutex _mutex;
-    stdx::condition_variable _haveBufferSpace;
+    stdx::condition_variable_any _haveBufferSpace;
 
     // A thread that is currently loading the exchange buffers.
     size_t _loadingThreadId{kInvalidThreadId};
@@ -181,9 +192,16 @@ private:
 
 class DocumentSourceExchange final : public DocumentSource {
 public:
+    /**
+     * Create an Exchange consumer. 'resourceYielder' is so the exchange may temporarily yield
+     * resources (such as the Session) while waiting for other threads to do
+     * work. 'resourceYielder' may be nullptr if there are no resources which need to be given up
+     * while waiting.
+     */
     DocumentSourceExchange(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            const boost::intrusive_ptr<Exchange> exchange,
-                           size_t consumerId);
+                           size_t consumerId,
+                           std::unique_ptr<ResourceYielder> yielder);
 
     GetNextResult getNext() final;
 
@@ -230,6 +248,10 @@ private:
     boost::intrusive_ptr<Exchange> _exchange;
 
     const size_t _consumerId;
+
+    // While waiting for another thread to make room in its buffer, we may want to yield certain
+    // resources (such as the Session). Through this interface we can do that.
+    std::unique_ptr<ResourceYielder> _resourceYielder;
 };
 
 }  // namespace mongo

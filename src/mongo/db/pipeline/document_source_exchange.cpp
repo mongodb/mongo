@@ -36,6 +36,7 @@
 #include <iterator>
 #include <set>
 
+#include "mongo/db/curop.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/storage/key_string.h"
@@ -44,6 +45,45 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
+
+class MutexAndResourceLock {
+    OperationContext* _opCtx;
+    ResourceYielder* _resourceYielder;
+    stdx::unique_lock<stdx::mutex> _lock;
+
+public:
+    // Must be constructed with the mutex held. 'yielder' may be null if there are no resources
+    // which need to be yielded while waiting.
+    MutexAndResourceLock(OperationContext* opCtx,
+                         stdx::unique_lock<stdx::mutex> m,
+                         ResourceYielder* yielder)
+        : _opCtx(opCtx), _resourceYielder(yielder), _lock(std::move(m)) {
+        invariant(_lock.owns_lock());
+    }
+
+    void lock() {
+        // Acquire the operation-wide resources, then the mutex.
+        if (_resourceYielder) {
+            _resourceYielder->unyield(_opCtx);
+        }
+        _lock.lock();
+    }
+    void unlock() {
+        _lock.unlock();
+        if (_resourceYielder) {
+            _resourceYielder->yield(_opCtx);
+        }
+    }
+
+    /**
+     * Releases ownership of the lock to the caller. May only be called when the mutex is held
+     * (after a call to unlock(), for example).
+     */
+    stdx::unique_lock<stdx::mutex> releaseLockOwnership() {
+        invariant(_lock.owns_lock());
+        return std::move(_lock);
+    }
+};
 
 constexpr size_t Exchange::kMaxBufferSize;
 constexpr size_t Exchange::kMaxNumberConsumers;
@@ -59,11 +99,15 @@ Value DocumentSourceExchange::serialize(boost::optional<ExplainOptions::Verbosit
 DocumentSourceExchange::DocumentSourceExchange(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<Exchange> exchange,
-    size_t consumerId)
-    : DocumentSource(expCtx), _exchange(exchange), _consumerId(consumerId) {}
+    size_t consumerId,
+    std::unique_ptr<ResourceYielder> yielder)
+    : DocumentSource(expCtx),
+      _exchange(exchange),
+      _consumerId(consumerId),
+      _resourceYielder(std::move(yielder)) {}
 
 DocumentSource::GetNextResult DocumentSourceExchange::getNext() {
-    return _exchange->getNext(pExpCtx->opCtx, _consumerId);
+    return _exchange->getNext(pExpCtx->opCtx, _consumerId, _resourceYielder.get());
 }
 
 Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
@@ -236,11 +280,16 @@ void Exchange::unblockLoading(size_t consumerId) {
         _haveBufferSpace.notify_all();
     }
 }
-DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx, size_t consumerId) {
+DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
+                                                size_t consumerId,
+                                                ResourceYielder* resourceYielder) {
     // Grab a lock.
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     for (;;) {
+        // Guard against some of the trickiness we do with moving the lock to/from the
+        // MutexAndResourceLock.
+        invariant(lk.owns_lock());
         // Execute only in case we have not encountered an error.
         if (!_errorInLoadNextBatch.isOK()) {
             uasserted(ErrorCodes::ExchangePassthrough,
@@ -296,7 +345,9 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx, size_t 
         } else {
             // Some other consumer is already loading the buffers. There is nothing else we can do
             // but wait.
-            _haveBufferSpace.wait(lk);
+            MutexAndResourceLock mutexAndResourceLock(opCtx, std::move(lk), resourceYielder);
+            _haveBufferSpace.wait(mutexAndResourceLock);
+            lk = mutexAndResourceLock.releaseLockOwnership();
         }
     }
 }

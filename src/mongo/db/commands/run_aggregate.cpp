@@ -544,8 +544,8 @@ Status runAggregate(OperationContext* opCtx,
 
                 // Create a new pipeline for the consumer consisting of a single
                 // DocumentSourceExchange.
-                boost::intrusive_ptr<DocumentSource> consumer =
-                    new DocumentSourceExchange(expCtx, exchange, idx);
+                boost::intrusive_ptr<DocumentSource> consumer = new DocumentSourceExchange(
+                    expCtx, exchange, idx, expCtx->mongoProcessInterface->getResourceYielder());
                 pipelines.emplace_back(uassertStatusOK(Pipeline::create({consumer}, expCtx)));
             }
         } else {
