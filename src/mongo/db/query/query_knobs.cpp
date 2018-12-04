@@ -29,6 +29,8 @@
  */
 
 #include "mongo/db/query/query_knobs.h"
+
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 
@@ -89,7 +91,19 @@ MONGO_EXPORT_SERVER_PARAMETER(internalDocumentSourceSortMaxBlockingSortBytes,
     ->withValidator([](const long long& newVal) {
         if (newVal <= 0) {
             return Status(ErrorCodes::BadValue,
-                          "internalDocumentSourceSortMaxBlockingSortBytes must be >= 0");
+                          "internalDocumentSourceSortMaxBlockingSortBytes must be > 0");
+        }
+        return Status::OK();
+    });
+
+MONGO_EXPORT_SERVER_PARAMETER(internalLookupStageIntermediateDocumentMaxSizeBytes,
+                              long long,
+                              100 * 1024 * 1024)
+    ->withValidator([](const long long& newVal) {
+        if (newVal < BSONObjMaxInternalSize) {
+            return Status(ErrorCodes::BadValue,
+                          "internalLookupStageIntermediateDocumentMaxSizeBytes must be >= " +
+                              std::to_string(BSONObjMaxInternalSize));
         }
         return Status::OK();
     });
@@ -100,7 +114,7 @@ MONGO_EXPORT_SERVER_PARAMETER(internalDocumentSourceGroupMaxMemoryBytes,
     ->withValidator([](const long long& newVal) {
         if (newVal <= 0) {
             return Status(ErrorCodes::BadValue,
-                          "internalDocumentSourceGroupMaxMemoryBytes must be >= 0");
+                          "internalDocumentSourceGroupMaxMemoryBytes must be > 0");
         }
         return Status::OK();
     });

@@ -130,6 +130,8 @@ extern AtomicInt32 internalQueryFacetBufferSizeBytes;
 
 extern AtomicInt64 internalDocumentSourceSortMaxBlockingSortBytes;
 
+extern AtomicInt64 internalLookupStageIntermediateDocumentMaxSizeBytes;
+
 extern AtomicInt64 internalDocumentSourceGroupMaxMemoryBytes;
 
 extern AtomicInt32 internalInsertMaxBatchSize;
