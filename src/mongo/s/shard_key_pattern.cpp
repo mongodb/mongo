@@ -89,8 +89,12 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
 
         // Numeric and ascending (1.0), or "hashed" and single field
         uassert(ErrorCodes::BadValue,
-                str::stream() << "Field " << patternEl.fieldNameStringData()
-                              << " can only be 1 or 'hashed'",
+                str::stream()
+                    << "Shard key "
+                    << keyPattern.toString()
+                    << " can contain either a single 'hashed' field"
+                    << " or multiple numerical fields set to a value of 1. Failed to parse field "
+                    << patternEl.fieldNameStringData(),
                 (patternEl.isNumber() && patternEl.numberInt() == 1) ||
                     (keyPattern.nFields() == 1 && ShardKeyPattern::isHashedPatternEl(patternEl)));
 
