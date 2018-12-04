@@ -169,7 +169,6 @@ private:
     WiredTigerSessionCache* _sessionCache;  // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
     UniqueWiredTigerSession _session;
-    bool _areWriteUnitOfWorksBanned = false;
     bool _inUnitOfWork;
     bool _active;
     bool _isTimestamped = false;
@@ -199,4 +198,5 @@ private:
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
 };
-}
+
+}  // namespace mongo

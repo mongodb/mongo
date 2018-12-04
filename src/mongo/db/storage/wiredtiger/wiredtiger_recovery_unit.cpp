@@ -141,13 +141,11 @@ void WiredTigerRecoveryUnit::_abort() {
 }
 
 void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-    invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
     _inUnitOfWork = true;
 }
 
 void WiredTigerRecoveryUnit::prepareUnitOfWork() {
-    invariant(!_areWriteUnitOfWorksBanned);
     invariant(_inUnitOfWork);
     invariant(!_prepareTimestamp.isNull());
 
@@ -230,7 +228,6 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
         // Can't be in a WriteUnitOfWork, so safe to rollback
         _txnClose(false);
     }
-    _areWriteUnitOfWorksBanned = false;
 }
 
 void WiredTigerRecoveryUnit::preallocateSnapshot() {
@@ -548,4 +545,5 @@ void WiredTigerRecoveryUnit::beginIdle() {
         _session->closeAllCursors("");
     }
 }
-}
+
+}  // namespace mongo
