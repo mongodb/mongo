@@ -208,9 +208,10 @@ void forkServerOrDie() {
         quickExit(EXIT_FAILURE);
 }
 
-MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                          ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer", "MungeUmask"),
-                          ("default"))
+MONGO_INITIALIZER_GENERAL(
+    ServerLogRedirection,
+    ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer", "MungeUmask"),
+    ("default"))
 (InitializerContext*) {
     using logger::LogManager;
     using logger::MessageEventEphemeral;
