@@ -20,6 +20,7 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
     assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
 
+    assert.eq(ss.metrics.repl.apply.batchSize, opCount + offset, "apply ops batch size mismatch");
     assert(ss.metrics.repl.apply.batches.num > 0, "no batches");
     assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time");
     assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops");

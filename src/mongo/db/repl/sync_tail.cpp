@@ -95,6 +95,11 @@ MONGO_FAIL_POINT_DEFINE(hangAfterRecordingOpApplicationStartTime);
 Counter64 opsAppliedStats;
 ServerStatusMetricField<Counter64> displayOpsApplied("repl.apply.ops", &opsAppliedStats);
 
+// Tracks the oplog application batch size.
+Counter64 oplogApplicationBatchSize;
+ServerStatusMetricField<Counter64> displayOplogApplicationBatchSize("repl.apply.batchSize",
+                                                                    &oplogApplicationBatchSize);
+
 // Number of times we tried to go live as a secondary.
 Counter64 attemptsToBecomeSecondary;
 ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
@@ -317,6 +322,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     if (opType == OpTypeEnum::kNoop) {
         if (nss.db() == "") {
+            incrementOpsAppliedStats();
             return Status::OK();
         }
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
@@ -1300,6 +1306,9 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};
     }
+
+    // Increment the batch size stat.
+    oplogApplicationBatchSize.increment(ops.size());
 
     std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().numThreads);
     {
