@@ -42,6 +42,7 @@ namespace mongo {
 
 class BSONObj;
 class Collection;
+class MetadataManager;
 class OperationContext;
 
 // The maximum number of documents to delete in a single batch during range deletion.
@@ -184,6 +185,18 @@ public:
                                                     CollectionRangeDeleter* forTestOnly = nullptr);
 
 private:
+    /**
+     * Verifies that the metadata for the collection to be cleaned up is still valid. Makes sure
+     * the collection has not been dropped (or dropped then recreated).
+     */
+    static bool _checkCollectionMetadataStillValid(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        OID const& epoch,
+        CollectionRangeDeleter* forTestOnly,
+        Collection* collection,
+        std::shared_ptr<MetadataManager> metadataManager);
+
     /**
      * Performs the deletion of up to maxToDelete entries within the range in progress. Must be
      * called under the collection lock.
