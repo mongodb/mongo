@@ -284,4 +284,9 @@ StatusWith<std::vector<std::string>> DevNullKVEngine::beginNonBlockingBackup(
     return filesToCopy;
 }
 
+StatusWith<std::vector<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
+    std::vector<std::string> filesToCopy = {"journal/WiredTigerLog.999"};
+    return filesToCopy;
+}
+
 }  // namespace mongo

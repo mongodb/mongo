@@ -172,6 +172,9 @@ public:
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
 
+    virtual StatusWith<std::vector<std::string>> extendBackupCursor(
+        OperationContext* opCtx) override;
+
     int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;
 
     Status repairIdent(OperationContext* opCtx, StringData ident) override;
@@ -444,6 +447,7 @@ private:
     mutable Date_t _previousCheckedDropsQueued;
 
     std::unique_ptr<WiredTigerSession> _backupSession;
+    WT_CURSOR* _backupCursor;
     mutable stdx::mutex _oplogPinnedByBackupMutex;
     boost::optional<Timestamp> _oplogPinnedByBackup;
     Timestamp _recoveryTimestamp;

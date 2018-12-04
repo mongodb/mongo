@@ -609,6 +609,10 @@ void KVStorageEngine::endNonBlockingBackup(OperationContext* opCtx) {
     return _engine->endNonBlockingBackup(opCtx);
 }
 
+StatusWith<std::vector<std::string>> KVStorageEngine::extendBackupCursor(OperationContext* opCtx) {
+    return _engine->extendBackupCursor(opCtx);
+}
+
 bool KVStorageEngine::isDurable() const {
     return _engine->isDurable();
 }

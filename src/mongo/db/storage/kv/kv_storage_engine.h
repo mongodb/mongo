@@ -118,6 +118,8 @@ public:
 
     virtual void endNonBlockingBackup(OperationContext* opCtx);
 
+    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx);
+
     virtual bool isDurable() const;
 
     virtual bool isEphemeral() const;

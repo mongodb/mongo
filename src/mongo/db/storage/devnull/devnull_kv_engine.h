@@ -143,6 +143,9 @@ public:
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override {}
 
+    virtual StatusWith<std::vector<std::string>> extendBackupCursor(
+        OperationContext* opCtx) override;
+
 private:
     std::shared_ptr<void> _catalogInfo;
 

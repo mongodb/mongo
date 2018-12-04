@@ -278,6 +278,11 @@ public:
         return;
     }
 
+    virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support a concurrent mode.");
+    }
+
     /**
      * Recover as much data as possible from a potentially corrupt RecordStore.
      * This only recovers the record data, not indexes or anything else.

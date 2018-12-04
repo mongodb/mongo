@@ -431,6 +431,34 @@ TicketServerParameter openReadTransactionParam(&openReadTransaction,
 stdx::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](StringData) -> bool {
     fassertFailed(40358);
 };
+
+StatusWith<std::vector<std::string>> getDataFilesFromBackupCursor(WT_CURSOR* cursor,
+                                                                  std::string dbPath,
+                                                                  const char* statusPrefix) {
+    int wtRet;
+    std::vector<std::string> files;
+    const char* filename;
+    const auto directoryPath = boost::filesystem::path(dbPath);
+    const auto wiredTigerLogFilePrefix = "WiredTigerLog";
+    while ((wtRet = cursor->next(cursor)) == 0) {
+        invariantWTOK(cursor->get_key(cursor, &filename));
+
+        std::string name(filename);
+
+        auto filePath = directoryPath;
+        if (name.find(wiredTigerLogFilePrefix) == 0) {
+            // TODO SERVER-13455:replace `journal/` with the configurable journal path.
+            filePath /= boost::filesystem::path("journal");
+        }
+        filePath /= name;
+
+        files.push_back(filePath.string());
+    }
+    if (wtRet != WT_NOTFOUND) {
+        return wtRCToStatus(wtRet, statusPrefix);
+    }
+    return files;
+}
 }  // namespace
 
 StringData WiredTigerKVEngine::kTableUriPrefix = "table:"_sd;
@@ -894,32 +922,18 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
         return wtRCToStatus(wtRet);
     }
 
-    std::vector<std::string> filesToCopy;
+    auto swFilesToCopy =
+        getDataFilesFromBackupCursor(cursor, _path, "Error opening backup cursor.");
 
-    const char* filename;
-    const auto dbPath = boost::filesystem::path(_path);
-    const auto wiredTigerLogFilePrefix = "WiredTigerLog";
-    while ((wtRet = cursor->next(cursor)) == 0) {
-        invariantWTOK(cursor->get_key(cursor, &filename));
-
-        std::string name(filename);
-
-        auto filePath = dbPath;
-        if (name.find(wiredTigerLogFilePrefix) == 0) {
-            // TODO SERVER-13455:replace `journal/` with the configurable journal path.
-            filePath /= boost::filesystem::path("journal");
-        }
-        filePath /= name;
-
-        filesToCopy.push_back(filePath.string());
-    }
-    if (wtRet != WT_NOTFOUND) {
-        return wtRCToStatus(wtRet, "Error opening backup cursor.");
+    if (!swFilesToCopy.isOK()) {
+        return swFilesToCopy;
     }
 
-    _backupSession = std::move(sessionRaii);
     pinOplogGuard.Dismiss();
-    return filesToCopy;
+    _backupSession = std::move(sessionRaii);
+    _backupCursor = cursor;
+
+    return swFilesToCopy;
 }
 
 void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
@@ -927,6 +941,24 @@ void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     // Oplog truncation thread can now remove the pinned oplog.
     stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
     _oplogPinnedByBackup = boost::none;
+    _backupCursor = nullptr;
+}
+
+StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
+    OperationContext* opCtx) {
+    invariant(_backupCursor);
+
+    auto sessionRaii = WiredTigerSession(_conn);
+    // This cursor will be closed on exiting this scope.
+    WT_CURSOR* cursor = NULL;
+    WT_SESSION* session = sessionRaii.getSession();
+    int wtRet = WT_OP_CHECK(
+        session->open_cursor(session, NULL, _backupCursor, "target=(\"log:\")", &cursor));
+    if (wtRet != 0) {
+        return wtRCToStatus(wtRet);
+    }
+
+    return getDataFilesFromBackupCursor(cursor, _path, "Error extending backup cursor.");
 }
 
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
