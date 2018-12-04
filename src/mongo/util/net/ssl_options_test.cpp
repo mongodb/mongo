@@ -37,6 +37,7 @@
 #include <ostream>
 
 #include "mongo/base/global_initializer.h"
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/unittest/unittest.h"
@@ -50,6 +51,12 @@ namespace moe = mongo::optionenvironment;
 
 namespace mongo {
 namespace {
+
+MONGO_INITIALIZER(ServerLogRedirection)(InitializerContext*) {
+    // ssl_options_server.cpp has an initializer which depends on logging.
+    // We can stub that dependency out for unit testing purposes.
+    return Status::OK();
+}
 
 Status executeInitializer(const std::string& name) try {
     const auto* node =
