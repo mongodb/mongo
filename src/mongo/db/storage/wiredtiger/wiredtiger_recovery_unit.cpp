@@ -104,7 +104,7 @@ void WiredTigerRecoveryUnit::_commit() {
         }
         _changes.clear();
 
-        invariant(!_active);
+        invariant(!_active, "commit handler reopened transaction");
     } catch (...) {
         std::terminate();
     }
@@ -134,7 +134,7 @@ void WiredTigerRecoveryUnit::_abort() {
         }
         _changes.clear();
 
-        invariant(!_active);
+        invariant(!_active, "rollback handler reopened transaction");
     } catch (...) {
         std::terminate();
     }

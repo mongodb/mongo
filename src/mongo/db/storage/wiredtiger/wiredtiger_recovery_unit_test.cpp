@@ -39,6 +39,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -581,5 +582,19 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
 
     ASSERT(ru->getReadOnce());
 }
+
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
+             RollbackHandlerAbortsOnTxnOpen,
+             "rollback handler reopened transaction") {
+    auto opCtx = clientAndCtx1.second.get();
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    ASSERT(ru->getSession());
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ru->assertInActiveTxn();
+        ru->onRollback([ru] { ru->getSession(); });
+    }
+}
+
 }  // namespace
 }  // namespace mongo
