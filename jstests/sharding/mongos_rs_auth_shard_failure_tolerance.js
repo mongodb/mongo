@@ -54,12 +54,13 @@ var collUnsharded = mongos.getCollection("fooUnsharded.barUnsharded");
 // Create the unsharded database with shard0 primary
 assert.writeOK(collUnsharded.insert({some: "doc"}));
 assert.writeOK(collUnsharded.remove({}));
-printjson(
+assert.commandWorked(
     admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
 
 // Create the sharded database with shard1 primary
 assert.commandWorked(admin.runCommand({enableSharding: collSharded.getDB().toString()}));
-printjson(admin.runCommand({movePrimary: collSharded.getDB().toString(), to: st.shard1.shardName}));
+assert.commandWorked(
+    admin.runCommand({movePrimary: collSharded.getDB().toString(), to: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
 assert.commandWorked(admin.runCommand(
