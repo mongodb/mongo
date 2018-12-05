@@ -47,7 +47,7 @@ namespace biggie {
 /**
  * A RecordStore that stores all data in-memory.
  */
-class RecordStore : public ::mongo::RecordStore {
+class RecordStore final : public ::mongo::RecordStore {
 public:
     explicit RecordStore(StringData ns,
                          StringData ident,
@@ -126,6 +126,24 @@ public:
 private:
     friend class VisibilityManagerChange;
 
+    /**
+     * This gets the next (guaranteed) unique record id.
+     */
+    inline int64_t _nextRecordId() {
+        return _highestRecordId.fetchAndAdd(1);
+    }
+
+    StatusWith<RecordId> extractAndCheckLocForOplog(OperationContext* opCtx,
+                                                    const char* data,
+                                                    int len) const;
+
+    /**
+     *  Two helper functions for deleting excess records in capped record stores.
+     *  The caller should not have an active SizeAdjuster.
+     */
+    bool _cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy);
+    void _cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* workingCopy);
+
     const bool _isCapped;
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxDocs;
@@ -141,26 +159,32 @@ private:
 
     mutable stdx::mutex _cappedDeleterMutex;
 
-    AtomicWord<long long> _highest_record_id{1};
+    AtomicWord<long long> _highestRecordId{1};
     AtomicWord<long long> _numRecords{0};
+    AtomicWord<long long> _dataSize{0};
+
     std::string generateKey(const uint8_t* key, size_t key_len) const;
 
     bool _isOplog;
     std::unique_ptr<VisibilityManager> _visibilityManager;
 
-    /*
-     * This gets the next (guaranteed) unique record id.
+    /**
+     * Automatically adjust the record count and data size based on the size in change of the
+     * underlying radix store during the life time of the SizeAdjuster.
      */
-    inline int64_t nextRecordId() {
-        return _highest_record_id.fetchAndAdd(1);
-    }
+    friend class SizeAdjuster;
+    class SizeAdjuster {
+    public:
+        SizeAdjuster(OperationContext* opCtx, RecordStore* rs);
+        ~SizeAdjuster();
 
-    StatusWith<RecordId> extractAndCheckLocForOplog(OperationContext* opCtx,
-                                                    const char* data,
-                                                    int len) const;
-
-    bool cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy);
-    void cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* workingCopy);
+    private:
+        OperationContext* const _opCtx;
+        RecordStore* const _rs;
+        const StringStore* _workingCopy;
+        const int64_t _origNumRecords;
+        const int64_t _origDataSize;
+    };
 
     class Cursor final : public SeekableRecordCursor {
         OperationContext* opCtx;

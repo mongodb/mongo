@@ -358,7 +358,7 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
                                   bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     std::string removeKeyString;
-    size_t numErased = 0;
+    bool erased;
 
     if (_isUnique) {
         // For unique indexes, to unindex them we do the following:
@@ -377,9 +377,9 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
         // records that are not present in the index due to the partial filter expression.
         if (!ifPartialCheckRecordIdEquals(opCtx, removeKeyString, loc))
             return;
-        numErased = workingCopy->erase(removeKeyString);
+        erased = workingCopy->erase(removeKeyString);
 
-        if (numErased == 0) {
+        if (!erased) {
             // If nothing above was erased, then we have to generate the KeyString with or without
             // the RecordId in it, and erase that. This could only happen on unique indexes where
             // duplicate index entries were/are allowed.
@@ -390,14 +390,14 @@ void SortedDataInterface::unindex(OperationContext* opCtx,
 
             if (!ifPartialCheckRecordIdEquals(opCtx, removeKeyString, loc))
                 return;
-            numErased = workingCopy->erase(removeKeyString);
+            erased = workingCopy->erase(removeKeyString);
         }
     } else {
         removeKeyString = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
-        numErased = workingCopy->erase(removeKeyString);
+        erased = workingCopy->erase(removeKeyString);
     }
 
-    if (numErased >= 1)
+    if (erased)
         RecoveryUnit::get(opCtx)->makeDirty();
 }
 
