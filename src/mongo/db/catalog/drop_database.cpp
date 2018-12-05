@@ -53,7 +53,8 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterLastCollectionDrop);
+MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeLog);
+MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
 
 namespace {
 
@@ -69,10 +70,10 @@ Status _finishDropDatabase(OperationContext* opCtx, const std::string& dbName, D
 
     log() << "dropDatabase " << dbName << " - finished";
 
-    if (MONGO_FAIL_POINT(dropDatabaseHangAfterLastCollectionDrop)) {
-        log() << "dropDatabase - fail point dropDatabaseHangAfterLastCollectionDrop enabled. "
+    if (MONGO_FAIL_POINT(dropDatabaseHangBeforeLog)) {
+        log() << "dropDatabase - fail point dropDatabaseHangBeforeLog enabled. "
                  "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterLastCollectionDrop);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangBeforeLog);
     }
 
     WriteUnitOfWork wunit(opCtx);
@@ -111,7 +112,6 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     using Result = boost::optional<Status>;
     // Get an optional result--if it's there, early return; otherwise, wait for collections to drop.
     auto result = writeConflictRetry(opCtx, "dropDatabase_collection", dbName, [&] {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         Database* const db = autoDB.getDb();
@@ -193,8 +193,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     // drop-pending state on Database.
     auto dropPendingGuardWhileAwaitingReplication = MakeGuard([dbName, opCtx] {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        Lock::GlobalWrite lk(opCtx);
-        AutoGetDb autoDB(opCtx, dbName, MODE_X);
+        AutoGetDb autoDB(opCtx, dbName, MODE_IX);
         if (auto db = autoDB.getDb()) {
             db->setDropPending(opCtx, false);
         }
@@ -267,8 +266,13 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
     dropPendingGuardWhileAwaitingReplication.Dismiss();
 
+    if (MONGO_FAIL_POINT(dropDatabaseHangAfterAllCollectionsDrop)) {
+        log() << "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. "
+                 "Blocking until fail point is disabled. ";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterAllCollectionsDrop);
+    }
+
     return writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         auto db = autoDB.getDb();

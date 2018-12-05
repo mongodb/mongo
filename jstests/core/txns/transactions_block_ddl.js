@@ -68,9 +68,8 @@
     testSuccessOnTxnCommit(dbName, dropCmd, {"command.drop": collName});
 
     // Test 'dropDatabase'.
-    // We cannot run testTimeout() for dropDatabase, since dropDatabase does not respect maxTimeMS
-    // TODO SERVER-35290: Run testTimeout() for dropDatabase.
     const dropDatabaseCmd = {dropDatabase: 1, writeConcern: {w: "majority"}};
+    testTimeout(dbName, dropDatabaseCmd);
     testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {"command.dropDatabase": 1});
 
     // Test 'renameCollection' in the same database.
