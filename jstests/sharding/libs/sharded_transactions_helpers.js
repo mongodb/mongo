@@ -4,10 +4,12 @@ const kSnapshotErrors =
 function setFailCommandOnShards(st, mode, commands, code, numShards) {
     for (let i = 0; i < numShards; i++) {
         const shardConn = st["rs" + i].getPrimary();
+        // Sharding tests require failInternalCommands: true, since the mongos appears to mongod to
+        // be an internal client.
         assert.commandWorked(shardConn.adminCommand({
             configureFailPoint: "failCommand",
             mode: mode,
-            data: {errorCode: code, failCommands: commands}
+            data: {errorCode: code, failCommands: commands, failInternalCommands: true}
         }));
     }
 }

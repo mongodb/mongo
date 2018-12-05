@@ -9,10 +9,16 @@
     let sessionDB = session.getDatabase("test");
 
     st.rs0.nodes.forEach(function(node) {
+        // Sharding tests require failInternalCommands: true, since the mongos appears to mongod to
+        // be an internal client.
         assert.commandWorked(node.getDB("admin").runCommand({
             configureFailPoint: "failCommand",
             mode: "alwaysOn",
-            data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["insert"]}
+            data: {
+                errorCode: ErrorCodes.WriteConflict,
+                failCommands: ["insert"],
+                failInternalCommands: true
+            }
         }));
     });
 

@@ -38,10 +38,16 @@
     // Targets Shard0 successfully.
     assert.commandWorked(sessionDB.runCommand({find: collName, filter: {_id: -1}}));
 
+    // Sharding tests require failInternalCommands: true, since the mongos appears to mongod to be
+    // an internal client.
     assert.commandWorked(st.rs1.getPrimary().adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.InternalError, failCommands: ["find"]}
+        data: {
+            errorCode: ErrorCodes.InternalError,
+            failCommands: ["find"],
+            failInternalCommands: true
+        }
     }));
 
     // Targets Shard1 and encounters a transaction fatal error.

@@ -478,6 +478,12 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;
     }
 
+    if (client->session() && (client->session()->getTags() & transport::Session::kInternalClient)) {
+        if (!data.hasField("failInternalCommands") || !data.getBoolField("failInternalCommands")) {
+            return false;
+        }
+    }
+
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
             return true;
