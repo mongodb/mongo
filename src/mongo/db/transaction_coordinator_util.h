@@ -31,7 +31,9 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/transaction_coordinator.h"
+#include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -124,6 +126,7 @@ Future<void> sendCommit(executor::TaskExecutor* executor,
                         const LogicalSessionId& lsid,
                         const TxnNumber& txnNumber,
                         Timestamp commitTimestamp);
+
 /**
  * Sends abort to all shards and returns a future that will be resolved when all participants have
  * responded with success.
@@ -134,20 +137,73 @@ Future<void> sendAbort(executor::TaskExecutor* executor,
                        const LogicalSessionId& lsid,
                        const TxnNumber& txnNumber);
 
+/**
+ * Upserts a document of the form:
+ *
+ * {
+ *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
+ *    participants: ["shard0000", "shard0001"]
+ * }
+ *
+ * into config.transaction_coordinators and waits for the upsert to be majority-committed.
+ *
+ * Throws if the upsert fails or waiting for writeConcern fails.
+ * If the upsert returns a DuplicateKey error, converts it to an anonymous error, because it means
+ * a document for the (lsid, txnNumber) exists with a different participant list.
+ */
+void persistParticipantList(OperationContext* opCtx,
+                            LogicalSessionId lsid,
+                            TxnNumber txnNumber,
+                            const std::vector<ShardId>& participantList);
 
 /**
- * Persists the participant list to the config.transactionCommitDecisions collection.
+ * If 'commitTimestamp' is boost::none, updates the document in config.transaction_coordinators for
+ * (lsid, txnNumber) to be:
  *
- * TODO (SERVER-36853): Implement this. It is currently a stub.
+ * {
+ *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
+ *    participants: ["shard0000", "shard0001"]
+ *    decision: "abort"
+ * }
+ *
+ * else updates the document to be:
+ *
+ * {
+ *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
+ *    participants: ["shard0000", "shard0001"]
+ *    decision: "commit"
+ *    commitTimestamp: Timestamp(xxxxxxxx, x),
+ * }
+ *
+ * and waits for the update to be majority-committed.
+ *
+ * Throws if the update fails or waiting for writeConcern fails.
+ * If the update succeeds but did not update any document, throws an anonymous error, because it
+ * means either no document for (lsid, txnNumber) exists, or a document exists but has a different
+ * participant list, different decision, or different commit Timestamp.
  */
-void persistParticipantList();
+void persistDecision(OperationContext* opCtx,
+                     LogicalSessionId lsid,
+                     TxnNumber txnNumber,
+                     const std::vector<ShardId>& participantList,
+                     const boost::optional<Timestamp>& commitTimestamp);
 
 /**
- * Persists the commit decision to the config.transactionCommitDecisions collection.
+ * Deletes the document in config.transaction_coordinators for (lsid, txnNumber).
  *
- * TODO (SERVER-36853): Implement this. It is currently a stub.
+ * Does *not* wait for the delete to be majority-committed.
+ *
+ * Throws if the update fails.
+ * If the update succeeds but did not update any document, throws an anonymous error, because it
+ * means either no document for (lsid, txnNumber) exists, or a document exists but without a
+ * decision.
  */
-CoordinatorCommitDecision persistDecision(PrepareVoteConsensus response);
+void deleteCoordinatorDoc(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
+
+/**
+ * Reads and returns all documents in config.transaction_coordinators.
+ */
+std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx);
 
 //
 // BELOW THIS ARE FUTURES-RELATED UTILITIES.

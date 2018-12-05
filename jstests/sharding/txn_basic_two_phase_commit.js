@@ -4,7 +4,12 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
+
 (function() {
+    'use strict';
+
+    load("jstests/libs/check_log.js");
+
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
@@ -15,8 +20,57 @@
     let participant1 = st.shard1;
     let participant2 = st.shard2;
 
+    let expectedParticipantList =
+        [participant1.shardName, participant2.shardName, coordinator.shardName];
+
     let lsid = {id: UUID()};
     let txnNumber = 0;
+
+    const checkParticipantListMatches =
+        function(coordinatorConn, lsid, txnNumber, expectedParticipantList) {
+        let coordDoc = coordinatorConn.getDB("config")
+                           .getCollection("transaction_coordinators")
+                           .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+        assert.neq(null, coordDoc);
+        assert.sameMembers(coordDoc.participants, expectedParticipantList);
+    }
+
+    const checkDecisionIs =
+        function(coordinatorConn, lsid, txnNumber, expectedDecision) {
+        let coordDoc = coordinatorConn.getDB("config")
+                           .getCollection("transaction_coordinators")
+                           .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+        assert.neq(null, coordDoc);
+        assert.eq(expectedDecision, coordDoc.decision);
+        if (expectedDecision === "commit") {
+            assert.neq(null, coordDoc.commitTimestamp);
+        } else {
+            assert.eq(null, coordDoc.commitTimestamp);
+        }
+    }
+
+    const checkDocumentDeleted =
+        function(coordinatorConn, lsid, txnNumber) {
+        let coordDoc = coordinatorConn.getDB("config")
+                           .getCollection("transaction_coordinators")
+                           .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+        return null === coordDoc;
+    }
+
+    const runCommitThroughMongosInParallelShellExpectSuccess = function() {
+        const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
+            "commitTransaction: 1," + "lsid: " + tojson(lsid) + "," + "txnNumber: NumberLong(" +
+            txnNumber + ")," + "stmtId: NumberInt(0)," + "autocommit: false," + "}));";
+        return startParallelShell(runCommitExpectSuccessCode, st.s.port);
+    };
+
+    const runCommitThroughMongosInParallelShellExpectAbort = function() {
+        const runCommitExpectSuccessCode = "assert.commandFailedWithCode(db.adminCommand({" +
+            "commitTransaction: 1," + "lsid: " + tojson(lsid) + "," + "txnNumber: NumberLong(" +
+            txnNumber + ")," + "stmtId: NumberInt(0)," + "autocommit: false," + "})," +
+            "ErrorCodes.NoSuchTransaction);";
+        return startParallelShell(runCommitExpectSuccessCode, st.s.port);
+    };
 
     const startSimulatingNetworkFailures = function(connArray) {
         connArray.forEach(function(conn) {
@@ -100,81 +154,101 @@
         }));
     };
 
-    const testTwoPhaseAbort = function(simulateNetworkFailures) {
-        jsTest.log("Testing two-phase abort with simulateNetworkFailures: " +
-                   simulateNetworkFailures);
+    const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
+        jsTest.log("Testing two-phase " + (shouldCommit ? "commit" : "abort") +
+                   " protocol with simulateNetworkFailures: " + simulateNetworkFailures);
 
         txnNumber++;
         setUp();
 
-        // Manually abort the transaction on one of the participants, so that the participant fails
-        // to prepare.
-        assert.commandWorked(participant2.adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
-        }));
+        if (!shouldCommit) {
+            // Manually abort the transaction on one of the participants, so that the participant
+            // fails to prepare.
+            assert.commandWorked(participant2.adminCommand({
+                abortTransaction: 1,
+                lsid: lsid,
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(0),
+                autocommit: false,
+            }));
+        }
 
         if (simulateNetworkFailures) {
             startSimulatingNetworkFailures([participant1, participant2, coordinator]);
         }
-        assert.commandFailedWithCode(st.s.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
-        }),
-                                     ErrorCodes.NoSuchTransaction);
-        if (simulateNetworkFailures) {
-            stopSimulatingNetworkFailures([participant1, participant2, coordinator]);
-        }
 
-        // Verify that the transaction was aborted on all shards.
-        assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
-        st.s.getDB(dbName).getCollection(collName).drop();
-    };
-
-    const testTwoPhaseCommit = function(simulateNetworkFailures) {
-        jsTest.log("Testing two-phase commit with simulateNetworkFailures: " +
-                   simulateNetworkFailures);
-
-        txnNumber++;
-        setUp();
-
-        if (simulateNetworkFailures) {
-            startSimulatingNetworkFailures([participant1, participant2, coordinator]);
-        }
-        assert.commandWorked(st.s.adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
+        // Turn on failpoints so that the coordinator hangs after each write it does, so that the
+        // test can check that the write happened correctly.
+        assert.commandWorked(coordinator.adminCommand({
+            configureFailPoint: "hangBeforeWaitingForParticipantListWriteConcern",
+            mode: "alwaysOn",
         }));
-        if (simulateNetworkFailures) {
-            stopSimulatingNetworkFailures([participant1, participant2, coordinator]);
+        assert.commandWorked(coordinator.adminCommand({
+            configureFailPoint: "hangBeforeWaitingForDecisionWriteConcern",
+            mode: "alwaysOn",
+        }));
+
+        // Run commitTransaction through a parallel shell.
+        let awaitResult;
+        if (shouldCommit) {
+            awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+        } else {
+            awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
         }
 
-        // Verify that the transaction was committed on all shards.
-        // Use assert.soon(), because although coordinateCommitTransaction currently blocks until
-        // the commit process is fully complete, it will eventually be changed to only block until
-        // the decision is *written*, at which point the test can pass the operationTime returned by
-        // coordinateCommitTransaction as 'afterClusterTime' in the read to ensure the read sees the
-        // transaction's writes (TODO SERVER-37165).
+        // Check that the coordinator wrote the participant list.
+        checkLog.containsWithCount(coordinator,
+                                   "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint",
+                                   txnNumber);
+        checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
+        assert.commandWorked(coordinator.adminCommand({
+            configureFailPoint: "hangBeforeWaitingForParticipantListWriteConcern",
+            mode: "off",
+        }));
+
+        // Check that the coordinator wrote the decision.
+        checkLog.containsWithCount(
+            coordinator, "Hit hangBeforeWaitingForDecisionWriteConcern failpoint", txnNumber);
+        checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
+        checkDecisionIs(coordinator, lsid, txnNumber, (shouldCommit ? "commit" : "abort"));
+        assert.commandWorked(coordinator.adminCommand({
+            configureFailPoint: "hangBeforeWaitingForDecisionWriteConcern",
+            mode: "off",
+        }));
+
+        // Check that the coordinator deleted its persisted state.
+        awaitResult();
         assert.soon(function() {
-            return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
+            return checkDocumentDeleted(coordinator, lsid, txnNumber);
         });
 
+        if (simulateNetworkFailures) {
+            stopSimulatingNetworkFailures([participant1, participant2, coordinator]);
+        }
+
+        // Check that the transaction committed or aborted as expected.
+        if (!shouldCommit) {
+            jsTest.log("Verify that the transaction was aborted on all shards.");
+            assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
+        } else {
+            jsTest.log("Verify that the transaction was committed on all shards.");
+            // Use assert.soon(), because although coordinateCommitTransaction currently blocks
+            // until the commit process is fully complete, it will eventually be changed to only
+            // block until the decision is *written*, at which point the test can pass the
+            // operationTime returned by coordinateCommitTransaction as 'afterClusterTime' in the
+            // read to ensure the read sees the transaction's writes (TODO SERVER-37165).
+            assert.soon(function() {
+                return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
+            });
+        }
+
         st.s.getDB(dbName).getCollection(collName).drop();
     };
 
-    testTwoPhaseAbort(false);
-    testTwoPhaseCommit(false);
-    testTwoPhaseAbort(true);
-    testTwoPhaseCommit(true);
+    testCommitProtocol(false /* test abort */, false /* no network failures */);
+    testCommitProtocol(true /* test commit */, false /* no network failures */);
+    testCommitProtocol(false /* test abort */, true /* with network failures */);
+    testCommitProtocol(true /* test commit */, true /* with network failures */);
 
     st.stop();
 

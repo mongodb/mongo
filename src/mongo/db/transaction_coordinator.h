@@ -159,24 +159,11 @@ private:
     // in continuations. Basically they just make the main code prettier.
 
     /**
-     * Rersists the commit decision and returns a response containing the decision and, if the
-     * decision was to commit, the commit timestamp.
-     */
-    Future<txn::CoordinatorCommitDecision> _persistDecision(
-        const txn::PrepareVoteConsensus& prepareResponse);
-
-    /**
     * Asynchronously sends the commit decision to all participants (commit or abort), resolving the
     * returned future when all participants have acknowledged the decision.
     */
     Future<void> _sendDecisionToParticipants(const std::vector<ShardId>& participantShards,
                                              txn::CoordinatorCommitDecision coordinatorDecision);
-
-    /**
-     * Asynchronously deletes the commit decision from the config.transactionCommitDecisions
-     * collection, resolving the returned future when the decision has been persisted.
-     */
-    Future<void> _deleteDecision();
 
     /**
      * Notifies all callers of onCompletion that the commit process has completed by fulfilling

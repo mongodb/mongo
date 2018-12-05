@@ -689,25 +689,6 @@ TEST_F(TransactionCoordinatorTest,
               static_cast<int>(TransactionCoordinator::CommitDecision::kAbort));
 }
 
-TEST_F(TransactionCoordinatorTest, RunCommitAfterAbortVoteSubsequentPrepareRequestsDontRetry) {
-    auto commitDecisionFuture = coordinator()->runCommit(kTwoShardIdList);
-
-    // One participant votes abort after retry.
-    assertPrepareSentAndRespondWithRetryableError();
-    assertPrepareSentAndRespondWithNoSuchTransaction();
-
-    // One participant cannot be reached
-    assertPrepareSentAndRespondWithRetryableError();
-    // Should not be a retry here since one participant already voted abort.
-
-    assertAbortSentAndRespondWithSuccess();
-    assertAbortSentAndRespondWithSuccess();
-
-    auto commitDecision = commitDecisionFuture.get();
-    ASSERT_EQ(static_cast<int>(commitDecision),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kAbort));
-}
-
 TEST_F(TransactionCoordinatorTest,
        RunCommitReturnsCorrectCommitDecisionOnCommitAfterNetworkRetries) {
     auto commitDecisionFuture = coordinator()->runCommit(kTwoShardIdList);

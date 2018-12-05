@@ -648,10 +648,12 @@ env.Library(
         'transaction_coordinator_factory_mongod.cpp',
         'transaction_coordinator_service.cpp',
         'transaction_coordinator_util.cpp',
+        env.Idlc('transaction_coordinator_document.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'catalog_raii',
+        'rw_concern_d',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
@@ -689,7 +691,6 @@ env.Library(
         'transaction_participant.cpp',
         's/recover_transaction_decision_from_local_participant.cpp',
         env.Idlc('session_txn_record.idl')[0],
-        env.Idlc('transaction_commit_decision.idl')[0],
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
@@ -727,6 +728,7 @@ env.CppUnitTest(
         'transaction_coordinator_catalog_test.cpp',
         'transaction_coordinator_service_test.cpp',
         'transaction_coordinator_test.cpp',
+        'transaction_coordinator_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',

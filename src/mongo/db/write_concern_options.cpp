@@ -67,6 +67,9 @@ const int WriteConcernOptions::kNoWaiting(-1);
 
 const StringData WriteConcernOptions::kWriteConcernField = "writeConcern"_sd;
 const char WriteConcernOptions::kMajority[] = "majority";
+
+// TODO (PM-1301): Remove once the stable Timestamp is allowed to advance past the oldest prepare
+// Timestamp.
 const char WriteConcernOptions::kInternalMajorityNoSnapshot[] = "internalMajorityNoSnapshot";
 
 const BSONObj WriteConcernOptions::Default = BSONObj();

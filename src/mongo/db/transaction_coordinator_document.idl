@@ -37,16 +37,23 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 structs:
-    TransactionCommitDecision:
-        description: "A document used for storing the coordinator commit decision."
+    TransactionCoordinatorDocument:
+        description: "A document used for majority confirming the coordinator's state changes"
         strict: true
         fields:
             _id:
                 type: OperationSessionInfo
                 description: "The sessionId and txnNumber of this transaction."
-            commitTimestamp:
-                type: timestamp
-                description: "The clusterTime at which the participants should make the transaction's writes visible."
+                cpp_name: id
             participants:
                 type: array<shard_id>
-                description: "List of transaction participants."
+                description: "The list of transaction participants."
+            decision:
+                type: string
+                description: "The coordinator's decision for the transaction, that is, 'commit' or 'abort'. Only set if the coordinator has made a decision."
+                optional: true
+                # TODO (SERVER-38324): Add validator that the string is 'abort' or 'commit'
+            commitTimestamp:
+                type: timestamp
+                description: "The clusterTime at which the participants should make the transaction's writes visible. Only set if the coordinator decided to commit."
+                optional: true

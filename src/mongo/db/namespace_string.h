@@ -93,6 +93,9 @@ public:
     // Namespace of the the oplog collection.
     static const NamespaceString kRsOplogNamespace;
 
+    // Namespace for storing the persisted state of transaction coordinators.
+    static const NamespaceString kTransactionCoordinatorsNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

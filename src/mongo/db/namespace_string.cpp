@@ -58,8 +58,15 @@ const NamespaceString NamespaceString::kServerConfigurationNamespace(NamespaceSt
                                                                      "system.version");
 const NamespaceString NamespaceString::kLogicalSessionsNamespace(NamespaceString::kConfigDb,
                                                                  "system.sessions");
+
+// Persisted state for a shard participating in a transaction or retryable write.
 const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
     NamespaceString::kConfigDb, "transactions");
+
+// Persisted state for a shard coordinating a cross-shard transaction.
+const NamespaceString NamespaceString::kTransactionCoordinatorsNamespace(
+    NamespaceString::kConfigDb, "transaction_coordinators");
+
 const NamespaceString NamespaceString::kShardConfigCollectionsNamespace(NamespaceString::kConfigDb,
                                                                         "cache.collections");
 const NamespaceString NamespaceString::kShardConfigDatabasesNamespace(NamespaceString::kConfigDb,

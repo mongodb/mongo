@@ -40,6 +40,10 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
@@ -49,9 +53,18 @@
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
+MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
+
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 using CommitDecision = TransactionCoordinator::CommitDecision;
+
+const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
+    WriteConcernOptions::kInternalMajorityNoSnapshot,
+    WriteConcernOptions::SyncMode::UNSET,
+    WriteConcernOptions::kNoTimeout);
 
 /**
  * Finds the host and port for a shard.
@@ -161,6 +174,32 @@ bool isRetryableError(ErrorCodes::Error code) {
                      RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
                      code) != RemoteCommandRetryScheduler::kAllRetriableErrors.end() ||
         code == ErrorCodes::NetworkInterfaceExceededTimeLimit;
+}
+
+BSONArray buildParticipantListMatchesConditions(const std::vector<ShardId>& participantList) {
+    BSONArrayBuilder barr;
+    for (const auto& participant : participantList) {
+        barr.append(participant.toString());
+    }
+
+    const long long participantListLength = participantList.size();
+    BSONObj participantListHasSize = BSON(TransactionCoordinatorDocument::kParticipantsFieldName
+                                          << BSON("$size" << participantListLength));
+
+    BSONObj participantListContains =
+        BSON(TransactionCoordinatorDocument::kParticipantsFieldName << BSON("$all" << barr.arr()));
+
+    return BSON_ARRAY(participantListContains << participantListHasSize);
+}
+
+std::string buildParticipantListString(const std::vector<ShardId>& participantList) {
+    StringBuilder ss;
+    ss << "[";
+    for (const auto& participant : participantList) {
+        ss << participant << " ";
+    }
+    ss << "]";
+    return ss.str();
 }
 
 }  // namespace
@@ -418,33 +457,270 @@ Future<void> sendAbort(executor::TaskExecutor* executor,
     return whenAll(responses);
 }
 
-void persistParticipantList() {
-    // TODO (SERVER-36853): Implement this.
-}
+void persistParticipantList(OperationContext* opCtx,
+                            LogicalSessionId lsid,
+                            TxnNumber txnNumber,
+                            const std::vector<ShardId>& participantList) {
+    LOG(0) << "Going to write participant list for lsid: " << lsid.toBSON()
+           << ", txnNumber: " << txnNumber;
 
-CoordinatorCommitDecision persistDecision(PrepareVoteConsensus response) {
-    invariant(response.decision);
-    CoordinatorCommitDecision coordinatorDecision{response.decision.get(), boost::none};
-    LOG(3) << "Coordinator shard persisting commit decision " << response.decision;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
 
-    if (response.decision == TransactionCoordinator::CommitDecision::kCommit) {
-        invariant(response.maxPrepareTimestamp);
-        coordinatorDecision.commitTimestamp = Timestamp(response.maxPrepareTimestamp->getSecs(),
-                                                        response.maxPrepareTimestamp->getInc() + 1);
-        LOG(3) << "Coordinator shard adjusting cluster time to "
-               << coordinatorDecision.commitTimestamp.get();
-        Status s = LogicalClock::get(getGlobalServiceContext())
-                       ->advanceClusterTime(LogicalTime(response.maxPrepareTimestamp.get()));
-        if (!s.isOK()) {
-            log() << "Coordinator shard failed to advance cluster time to "
-                     "commitTimestamp "
-                  << causedBy(s);
-        }
+    DBDirectClient client(opCtx);
+
+    // Throws if serializing the request or deserializing the response fails.
+    const auto commandResponse = client.runCommand([&] {
+        write_ops::Update updateOp(NamespaceString::kTransactionCoordinatorsNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+
+            // Ensure that the document for the (lsid, txnNumber) either has no participant list or
+            // has the same participant list. The document may have the same participant list if an
+            // earlier attempt to write the participant list failed waiting for writeConcern.
+            BSONObj noParticipantList = BSON(TransactionCoordinatorDocument::kParticipantsFieldName
+                                             << BSON("$exists" << false));
+            BSONObj sameParticipantList =
+                BSON("$and" << buildParticipantListMatchesConditions(participantList));
+            entry.setQ(BSON(TransactionCoordinatorDocument::kIdFieldName
+                            << sessionInfo.toBSON()
+                            << "$or"
+                            << BSON_ARRAY(noParticipantList << sameParticipantList)));
+
+            // Update with participant list.
+            TransactionCoordinatorDocument doc;
+            doc.setId(std::move(sessionInfo));
+            doc.setParticipants(std::move(participantList));
+            entry.setU(doc.toBSON());
+
+            entry.setUpsert(true);
+            return entry;
+        }()});
+        return updateOp.serialize({});
+    }());
+
+    const auto upsertStatus = getStatusFromWriteCommandReply(commandResponse->getCommandReply());
+
+    // Convert a DuplicateKey error to an anonymous error.
+    if (upsertStatus.code() == ErrorCodes::DuplicateKey) {
+        // Attempt to include the document for this (lsid, txnNumber) in the error message, if one
+        // exists. Note that this is best-effort: the document may have been deleted or manually
+        // changed since the update above ran.
+        const auto doc = client.findOne(
+            NamespaceString::kTransactionCoordinatorsNamespace.toString(),
+            QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
+        uasserted(51025,
+                  str::stream() << "While attempting to write participant list "
+                                << buildParticipantListString(participantList)
+                                << " for lsid "
+                                << lsid.toBSON()
+                                << " and txnNumber "
+                                << txnNumber
+                                << ", found document for the (lsid, txnNumber) with a different "
+                                   "participant list. Current document for the (lsid, txnNumber): "
+                                << doc);
     }
 
-    // TODO (SERVER-36853): Actually persist decision.
+    // Throw any other error.
+    uassertStatusOK(upsertStatus);
 
-    return coordinatorDecision;
+    LOG(0) << "Wrote participant list for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+
+    if (MONGO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
+        LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
+    }
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+        opCtx, hangBeforeWaitingForParticipantListWriteConcern);
+
+    WriteConcernResult unusedWCResult;
+    uassertStatusOK(
+        waitForWriteConcern(opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            kInternalMajorityNoSnapshotWriteConcern,
+                            &unusedWCResult));
+}
+
+void persistDecision(OperationContext* opCtx,
+                     LogicalSessionId lsid,
+                     TxnNumber txnNumber,
+                     const std::vector<ShardId>& participantList,
+                     const boost::optional<Timestamp>& commitTimestamp) {
+    LOG(0) << "Going to write decision " << (commitTimestamp ? "commit" : "abort")
+           << " for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    DBDirectClient client(opCtx);
+
+    // Throws if serializing the request or deserializing the response fails.
+    const auto commandResponse = client.runCommand([&] {
+        write_ops::Update updateOp(NamespaceString::kTransactionCoordinatorsNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+
+            // Ensure that the document for the (lsid, txnNumber) has the same participant list and
+            // either has no decision or the same decision. The document may have the same decision
+            // if an earlier attempt to write the decision failed waiting for writeConcern.
+            BSONObj noDecision = BSON(TransactionCoordinatorDocument::kDecisionFieldName
+                                      << BSON("$exists" << false)
+                                      << "commitTimestamp"
+                                      << BSON("$exists" << false));
+            BSONObj sameDecision;
+            if (commitTimestamp) {
+                sameDecision = BSON(TransactionCoordinatorDocument::kDecisionFieldName
+                                    << "commit"
+                                    << TransactionCoordinatorDocument::kCommitTimestampFieldName
+                                    << *commitTimestamp);
+            } else {
+                sameDecision = BSON(TransactionCoordinatorDocument::kDecisionFieldName
+                                    << "abort"
+                                    << TransactionCoordinatorDocument::kCommitTimestampFieldName
+                                    << BSON("$exists" << false));
+            }
+            entry.setQ(BSON(TransactionCoordinatorDocument::kIdFieldName
+                            << sessionInfo.toBSON()
+                            << "$and"
+                            << buildParticipantListMatchesConditions(participantList)
+                            << "$or"
+                            << BSON_ARRAY(noDecision << sameDecision)));
+
+            // Update with decision.
+            TransactionCoordinatorDocument doc;
+            doc.setId(sessionInfo);
+            doc.setParticipants(std::move(participantList));
+            if (commitTimestamp) {
+                doc.setDecision("commit"_sd);
+                doc.setCommitTimestamp(commitTimestamp);
+            } else {
+                doc.setDecision("abort"_sd);
+            }
+            entry.setU(doc.toBSON());
+
+            return entry;
+        }()});
+        return updateOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    // If no document matched, throw an anonymous error. (The update itself will not have thrown an
+    // error, because it's legal for an update to match no documents.)
+    if (commandReply.getIntField("n") != 1) {
+        // Attempt to include the document for this (lsid, txnNumber) in the error message, if one
+        // exists. Note that this is best-effort: the document may have been deleted or manually
+        // changed since the update above ran.
+        const auto doc = client.findOne(
+            NamespaceString::kTransactionCoordinatorsNamespace.toString(),
+            QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
+        uasserted(51026,
+                  str::stream() << "While attempting to write decision "
+                                << (commitTimestamp ? "'commit'" : "'abort'")
+                                << " for lsid "
+                                << lsid.toBSON()
+                                << " and txnNumber "
+                                << txnNumber
+                                << ", either failed to find document for this (lsid, txnNumber) or "
+                                   "document existed with a different participant list, different "
+                                   "decision, or different commitTimestamp. Current document for "
+                                   "the (lsid, txnNumber): "
+                                << doc);
+    }
+
+    LOG(0) << "Wrote decision " << (commitTimestamp ? "commit" : "abort")
+           << " for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+
+    if (MONGO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
+        LOG(0) << "Hit hangBeforeWaitingForDecisionWriteConcern failpoint";
+    }
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                    hangBeforeWaitingForDecisionWriteConcern);
+
+    WriteConcernResult unusedWCResult;
+    uassertStatusOK(
+        waitForWriteConcern(opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            kInternalMajorityNoSnapshotWriteConcern,
+                            &unusedWCResult));
+}
+
+void deleteCoordinatorDoc(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+    LOG(0) << "Going to delete coordinator doc for lsid: " << lsid.toBSON()
+           << ", txnNumber: " << txnNumber;
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    DBDirectClient client(opCtx);
+
+    // Throws if serializing the request or deserializing the response fails.
+    auto commandResponse = client.runCommand([&] {
+        write_ops::Delete deleteOp(NamespaceString::kTransactionCoordinatorsNamespace);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+
+            // Ensure the document is only deleted after a decision has been made.
+            BSONObj abortDecision =
+                BSON(TransactionCoordinatorDocument::kDecisionFieldName << "abort");
+            BSONObj commitDecision =
+                BSON(TransactionCoordinatorDocument::kDecisionFieldName << "commit");
+            entry.setQ(BSON(TransactionCoordinatorDocument::kIdFieldName
+                            << sessionInfo.toBSON()
+                            << TransactionCoordinatorDocument::kDecisionFieldName
+                            << BSON("$exists" << true)));
+
+            entry.setMulti(false);
+            return entry;
+        }()});
+        return deleteOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    // If no document matched, throw an anonymous error. (The delete itself will not have thrown an
+    // error, because it's legal for a delete to match no documents.)
+    if (commandReply.getIntField("n") != 1) {
+        // Attempt to include the document for this (lsid, txnNumber) in the error message, if one
+        // exists. Note that this is best-effort: the document may have been deleted or manually
+        // changed since the update above ran.
+        const auto doc = client.findOne(
+            NamespaceString::kTransactionCoordinatorsNamespace.toString(),
+            QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
+        uasserted(51027,
+                  str::stream() << "While attempting to delete document for lsid " << lsid.toBSON()
+                                << " and txnNumber "
+                                << txnNumber
+                                << ", either failed to find document for this (lsid, txnNumber) or "
+                                   "document existed without a decision. Current document for the "
+                                   "(lsid, txnNumber): "
+                                << doc);
+    }
+
+    LOG(0) << "Deleted coordinator doc for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+}
+
+std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx) {
+    std::vector<TransactionCoordinatorDocument> allCoordinatorDocs;
+
+    Query query;
+    DBDirectClient client(opCtx);
+    auto coordinatorDocsCursor =
+        client.query(NamespaceString::kTransactionCoordinatorsNamespace, query);
+
+    while (coordinatorDocsCursor->more()) {
+        // TODO (SERVER-38307): Try/catch around parsing the document and skip the document if it
+        // fails to parse.
+        auto nextDecision = TransactionCoordinatorDocument::parse(IDLParserErrorContext(""),
+                                                                  coordinatorDocsCursor->next());
+        allCoordinatorDocs.push_back(nextDecision);
+    }
+
+    return allCoordinatorDocs;
 }
 
 Future<void> whenAll(std::vector<Future<void>>& futures) {
