@@ -528,6 +528,7 @@ bzDecompressInit
 bzalloc
 bzfree
 bzip
+calc
 call's
 calloc
 cas
@@ -952,6 +953,7 @@ marshalled
 maxCLevel
 maxcpu
 maxdbs
+maxdiff
 mbll
 mbss
 mem
@@ -999,9 +1001,11 @@ needkey
 needvalue
 negint
 nentries
+nentriesp
 newbar
 newfile
 newuri
+newv
 nextprev
 nfilename
 nhex
@@ -1030,6 +1034,7 @@ numSymbols
 numbare
 offpage
 ok
+oldv
 ondisk
 onint
 online
@@ -1217,6 +1222,7 @@ subgets
 subinit
 sublicense
 subone
+suboptimal
 subtest
 subtree
 sunique

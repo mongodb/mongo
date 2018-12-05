@@ -690,9 +690,6 @@ dsrc_stats = [
     ##########################################
     # Compression statistics
     ##########################################
-    CompressStat('compress_raw_fail', 'raw compression call failed, no additional data available'),
-    CompressStat('compress_raw_fail_temporary', 'raw compression call failed, additional data available'),
-    CompressStat('compress_raw_ok', 'raw compression call succeeded'),
     CompressStat('compress_read', 'compressed pages read'),
     CompressStat('compress_write', 'compressed pages written'),
     CompressStat('compress_write_fail', 'page written failed to compress'),

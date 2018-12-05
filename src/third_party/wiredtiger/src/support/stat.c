@@ -107,9 +107,6 @@ static const char * const __stats_dsrc_desc[] = {
 	"compression: compressed pages written",
 	"compression: page written failed to compress",
 	"compression: page written was too small to compress",
-	"compression: raw compression call failed, additional data available",
-	"compression: raw compression call failed, no additional data available",
-	"compression: raw compression call succeeded",
 	"cursor: bulk-loaded cursor-insert calls",
 	"cursor: close calls that result in cache",
 	"cursor: create calls",
@@ -293,9 +290,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->compress_write = 0;
 	stats->compress_write_fail = 0;
 	stats->compress_write_too_small = 0;
-	stats->compress_raw_fail_temporary = 0;
-	stats->compress_raw_fail = 0;
-	stats->compress_raw_ok = 0;
 	stats->cursor_insert_bulk = 0;
 	stats->cursor_cache = 0;
 	stats->cursor_create = 0;
@@ -480,9 +474,6 @@ __wt_stat_dsrc_aggregate_single(
 	to->compress_write += from->compress_write;
 	to->compress_write_fail += from->compress_write_fail;
 	to->compress_write_too_small += from->compress_write_too_small;
-	to->compress_raw_fail_temporary += from->compress_raw_fail_temporary;
-	to->compress_raw_fail += from->compress_raw_fail;
-	to->compress_raw_ok += from->compress_raw_ok;
 	to->cursor_insert_bulk += from->cursor_insert_bulk;
 	to->cursor_cache += from->cursor_cache;
 	to->cursor_create += from->cursor_create;
@@ -700,10 +691,6 @@ __wt_stat_dsrc_aggregate(
 	to->compress_write_fail += WT_STAT_READ(from, compress_write_fail);
 	to->compress_write_too_small +=
 	    WT_STAT_READ(from, compress_write_too_small);
-	to->compress_raw_fail_temporary +=
-	    WT_STAT_READ(from, compress_raw_fail_temporary);
-	to->compress_raw_fail += WT_STAT_READ(from, compress_raw_fail);
-	to->compress_raw_ok += WT_STAT_READ(from, compress_raw_ok);
 	to->cursor_insert_bulk += WT_STAT_READ(from, cursor_insert_bulk);
 	to->cursor_cache += WT_STAT_READ(from, cursor_cache);
 	to->cursor_create += WT_STAT_READ(from, cursor_create);

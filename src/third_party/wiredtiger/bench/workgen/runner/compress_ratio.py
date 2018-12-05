@@ -82,11 +82,12 @@ conn_config="create,cache_size=2GB,session_max=1000,eviction=(threads_min=4,thre
 table_config="allocation_size=4k,memory_page_max=10MB,prefix_compression=false,split_pct=90,leaf_page_max=32k,internal_page_max=16k,type=file"
 compression_opts = {
     "none" : "block_compressor=none",
-    "zlib_noraw" : "block_compressor=zlib-noraw",
-    "zlib_noraw_onepage" : "block_compressor=zlib-noraw,memory_page_image_max=32k",
-    "zlib_noraw_tenpage" : "block_compressor=zlib-noraw,memory_page_image_max=320k",
-    "zlib_raw" : "block_compressor=zlib",
+    "lz4" : "block_compressor=lz4"
     "snappy" : "block_compressor=snappy"
+    "zlib" : "block_compressor=zlib",
+    "zlib_onepage" : "block_compressor=zlib,memory_page_image_max=32k",
+    "zlib_tenpage" : "block_compressor=zlib,memory_page_image_max=320k",
+    "zstd" : "block_compressor=zstd"
 }
 #conn_config += extensions_config(['compressors/snappy'])
 conn = wiredtiger_open("WT_TEST", conn_config)

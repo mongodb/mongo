@@ -424,9 +424,6 @@ static void wt_open_corrupt(const char *)
 static void
 wt_open_corrupt(const char *sfx)
 {
-#ifdef HAVE_ATTACH
-	WT_UNUSED(sfx);
-#else
 	WT_CONNECTION *conn;
 	WT_DECL_RET;
 	char buf[1024];
@@ -446,7 +443,6 @@ wt_open_corrupt(const char *sfx)
 		fprintf(stderr,
 		    "OPEN_CORRUPT: wiredtiger_open returned %d\n", ret);
 	testutil_assert(ret == WT_TRY_SALVAGE || ret == 0);
-#endif
 	exit (EXIT_SUCCESS);
 }
 

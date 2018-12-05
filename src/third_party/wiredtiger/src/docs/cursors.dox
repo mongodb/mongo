@@ -63,7 +63,8 @@ At \c read-committed (the default) or \c snapshot isolation levels,
 committed changes from concurrent transactions become visible when no
 cursor is positioned.  In other words, at these isolation levels, all
 cursors in a session read from a stable snapshot while any cursor in the
-session remains positioned.
+session remains positioned. A call to WT_CURSOR::next or WT_CURSOR::prev
+on a positioned cursor will not update the snapshot.
 
 Cursor positions survive transaction boundaries, unless a transaction
 is rolled back. When a transaction is rolled-back either implicitly

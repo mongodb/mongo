@@ -791,9 +791,6 @@ struct __wt_dsrc_stats {
 	int64_t compress_write;
 	int64_t compress_write_fail;
 	int64_t compress_write_too_small;
-	int64_t compress_raw_fail_temporary;
-	int64_t compress_raw_fail;
-	int64_t compress_raw_ok;
 	int64_t cursor_insert_bulk;
 	int64_t cursor_cache;
 	int64_t cursor_create;

@@ -348,7 +348,7 @@ main(int argc, char *argv[])
 			testutil_check(__wt_snprintf(
 			    buf, sizeof(buf),"%s/%s", home, fname));
 			while (stat(buf, &sb) != 0)
-				sleep(1);
+				testutil_sleep_wait(1, pid);
 			++i;
 		}
 		sleep(timeout);

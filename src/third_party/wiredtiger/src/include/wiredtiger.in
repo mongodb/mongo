@@ -1168,6 +1168,15 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
 	 * checkpoint-level durability., a boolean flag; default \c true.}
 	 * @config{ ),,}
+	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\,
+	 * in bytes.  If non-zero\, schedule writes for dirty blocks belonging
+	 * to this object in the system buffer cache after that many bytes from
+	 * this object are written into the buffer cache., an integer greater
+	 * than or equal to 0; default \c 0.}
+	 * @config{os_cache_max, maximum system buffer cache usage\, in bytes.
+	 * If non-zero\, evict object blocks from the system buffer cache after
+	 * that many bytes from this object are read or written into the buffer
+	 * cache., an integer greater than or equal to 0; default \c 0.}
 	 * @configend
 	 * @errors
 	 */
@@ -2281,6 +2290,12 @@ struct __wt_connection {
 	 * configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive
 	 * unneeded log files., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty
+	 * system buffer cache usage\, as a percentage of the log's \c file_max.
+	 * If non-zero\, schedule writes for dirty blocks belonging to the log
+	 * in the system buffer cache after that percentage of the log has been
+	 * written into the buffer cache without an intervening file sync., an
+	 * integer between 0 and 100; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a
 	 * boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into
@@ -2938,9 +2953,15 @@ struct __wt_connection {
  * logging subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
  * integer between 100KB and 2GB; default \c 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which log
- * files are written.  The directory must already exist.  If the value is not an
- * absolute path\, the path is relative to the database home (see @ref
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty system
+ * buffer cache usage\, as a percentage of the log's \c file_max.  If non-zero\,
+ * schedule writes for dirty blocks belonging to the log in the system buffer
+ * cache after that percentage of the log has been written into the buffer cache
+ * without an intervening file sync., an integer between 0 and 100; default \c
+ * 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the name of a directory into which
+ * log files are written.  The directory must already exist.  If the value is
+ * not an absolute path\, the path is relative to the database home (see @ref
  * absolute_path for more information)., a string; default \c ".".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
  * flag; default \c true.}
@@ -3612,8 +3633,41 @@ struct __wt_config_parser {
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
-/*! @} */
 #endif /* !defined(SWIG) */
+
+/*!
+ * Calculate a set of WT_MODIFY operations to represent an update.
+ * This call will calculate a set of modifications to an old value that produce
+ * the new value.  If more modifications are required than fit in the array
+ * passed in by the caller, or if more bytes have changed than the \c maxdiff
+ * parameter, the call will fail.  The matching algorithm is approximate, so it
+ * may fail and return WT_NOTFOUND if a matching set of WT_MODIFY operations
+ * is not found.
+ *
+ * The \c maxdiff parameter bounds how much work will be done searching for a
+ * match: to ensure a match is found, it may need to be set larger than actual
+ * number of bytes that differ between the old and new values.  In particular,
+ * repeated patterns of bytes in the values can lead to suboptimal matching,
+ * and matching ranges less than 64 bytes long will not be detected.
+ *
+ * If the call succeeds, the WT_MODIFY operations will point into \c newv,
+ * which must remain valid until WT_CURSOR::modify is called.
+ *
+ * @snippet ex_all.c Calculate a modify operation
+ *
+ * @param session the current WiredTiger session (may be NULL)
+ * @param oldv old value
+ * @param newv new value
+ * @param maxdiff maximum bytes difference
+ * @param[out] entries array of modifications producing the new value
+ * @param[in,out] nentriesp size of \c entries array passed in,
+ *	set to the number of entries used
+ * @errors
+ */
+int wiredtiger_calc_modify(WT_SESSION *session,
+    const WT_ITEM *oldv, const WT_ITEM *newv,
+    size_t maxdiff, WT_MODIFY *entries, int *nentriesp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Get version information.
@@ -3628,6 +3682,8 @@ uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
  */
 const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
+
+/*! @} */
 
 /*******************************************
  * Error returns
@@ -3849,121 +3905,6 @@ struct __wt_compressor {
 	    uint8_t *src, size_t src_len,
 	    uint8_t *dst, size_t dst_len,
 	    size_t *result_lenp, int *compression_failed);
-
-	/*!
-	 * Callback to compress a list of byte strings.
-	 *
-	 * WT_COMPRESSOR::compress_raw gives applications fine-grained control
-	 * over disk block size when writing row-store or variable-length
-	 * column-store pages.  Where this level of control is not required by
-	 * the underlying storage device, set the WT_COMPRESSOR::compress_raw
-	 * callback to \c NULL and WiredTiger will internally split each page
-	 * into blocks, each block then compressed by WT_COMPRESSOR::compress.
-	 *
-	 * WT_COMPRESSOR::compress_raw takes a source buffer and an array of
-	 * 0-based offsets of byte strings in that buffer.  The callback then
-	 * encodes none, some or all of the byte strings and copies the encoded
-	 * representation into a destination buffer.  The callback returns the
-	 * number of byte strings encoded and the bytes needed for the encoded
-	 * representation. The encoded representation has header information
-	 * prepended and is written as a block to the underlying file object.
-	 *
-	 * On entry, \c page_max is the configured maximum size for objects of
-	 * this type.  (This value is provided for convenience, and will be
-	 * either the \c internal_page_max or \c leaf_page_max value specified
-	 * to WT_SESSION::create when the object was created.)
-	 *
-	 * On entry, \c split_pct is the configured Btree page split size for
-	 * this object.  (This value is provided for convenience, and will be
-	 * the \c split_pct value specified to WT_SESSION::create when the
-	 * object was created.)
-	 *
-	 * On entry, \c extra is a count of additional bytes that will be added
-	 * to the encoded representation before it is written.  In other words,
-	 * if the target write size is 8KB, the returned encoded representation
-	 * should be less than or equal to (8KB - \c extra).  The method does
-	 * not need to skip bytes in the destination buffer based on \c extra,
-	 * the method should only use \c extra to decide how many bytes to store
-	 * into the destination buffer for its ideal block size.
-	 *
-	 * On entry, \c src points to the source buffer; \c offsets is an array
-	 * of \c slots 0-based offsets into \c src, where each offset is the
-	 * start of a byte string, except for the last offset, which is the
-	 * offset of the first byte past the end of the last byte string.  (In
-	 * other words, <code>offsets[0]</code> will be 0, the offset of the
-	 * first byte of the first byte string in \c src, and
-	 * <code>offsets[slots]</code> is the total length of all of the byte
-	 * strings in the \c src buffer.)
-	 *
-	 * On entry, \c dst points to the destination buffer with a length
-	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
-	 * the destination buffer will be at least the size returned by that
-	 * method; otherwise, the destination buffer will be at least as large
-	 * as the length of the data to compress.
-	 *
-	 * After successful completion, the callback should return \c 0, and
-	 * set \c result_slotsp to the number of byte strings encoded and
-	 * \c result_lenp to the bytes needed for the encoded representation.
-	 *
-	 * There is no requirement the callback encode any or all of the byte
-	 * strings passed by WiredTiger.  If the callback does not encode any
-	 * of the byte strings and compression should not be retried, the
-	 * callback should set \c result_slotsp to 0.
-	 *
-	 * If the callback does not encode any of the byte strings and
-	 * compression should be retried with additional byte strings, the
-	 * callback must return \c EAGAIN.  In that case, WiredTiger will
-	 * accumulate more rows and repeat the call.
-	 *
-	 * If there are no more rows to accumulate or the callback indicates
-	 * that it cannot be retried, WiredTiger writes the remaining rows
-	 * using \c WT_COMPRESSOR::compress.
-	 *
-	 * On entry, \c final is zero if there are more rows to be written as
-	 * part of this page (if there will be additional data provided to the
-	 * callback), and non-zero if there are no more rows to be written as
-	 * part of this page.  If \c final is set and the callback fails to
-	 * encode any rows, WiredTiger writes the remaining rows without further
-	 * calls to the callback.  If \c final is set and the callback encodes
-	 * any number of rows, WiredTiger continues to call the callback until
-	 * all of the rows are encoded or the callback fails to encode any rows.
-	 *
-	 * The WT_COMPRESSOR::compress_raw callback is intended for applications
-	 * wanting to create disk blocks in specific sizes.
-	 * WT_COMPRESSOR::compress_raw is not a replacement for
-	 * WT_COMPRESSOR::compress: objects which WT_COMPRESSOR::compress_raw
-	 * cannot handle (for example, overflow key or value items), or which
-	 * WT_COMPRESSOR::compress_raw chooses not to compress for any reason
-	 * (for example, if WT_COMPRESSOR::compress_raw callback chooses not to
-	 * compress a small number of rows, but the page being written has no
-	 * more rows to accumulate), will be passed to WT_COMPRESSOR::compress.
-	 *
-	 * The WT_COMPRESSOR::compress_raw callback is only called for objects
-	 * where it is applicable, that is, for row-store and variable-length
-	 * column-store objects, where both row-store key prefix compression
-	 * and row-store and variable-length column-store dictionary compression
-	 * are \b not configured.  When WT_COMPRESSOR::compress_raw is not
-	 * applicable, the WT_COMPRESSOR::compress callback is used instead.
-	 *
-	 * @param[in] page_max the configured maximum page size for this object
-	 * @param[in] split_pct the configured page split size for this object
-	 * @param[in] extra the count of the additional bytes
-	 * @param[in] src the data to compress
-	 * @param[in] offsets the byte offsets of the byte strings in src
-	 * @param[in] slots the number of entries in offsets
-	 * @param[in] dst the destination buffer
-	 * @param[in] dst_len the length of the destination buffer
-	 * @param[in] final non-zero if there are no more rows to accumulate
-	 * @param[out] result_lenp the length of the compressed data
-	 * @param[out] result_slotsp the number of byte offsets taken
-	 * @returns zero for success, non-zero to indicate an error.
-	 */
-	int (*compress_raw)(WT_COMPRESSOR *compressor, WT_SESSION *session,
-	    size_t page_max, int split_pct, size_t extra,
-	    uint8_t *src, uint32_t *offsets, uint32_t slots,
-	    uint8_t *dst, size_t dst_len,
-	    int final,
-	    size_t *result_lenp, uint32_t *result_slotsp);
 
 	/*!
 	 * Callback to decompress a chunk of data.
@@ -6095,89 +6036,83 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2102
 /*! compression: page written was too small to compress */
 #define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2103
-/*! compression: raw compression call failed, additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2104
-/*! compression: raw compression call failed, no additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2105
-/*! compression: raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2106
 /*! cursor: bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2107
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2104
 /*! cursor: close calls that result in cache */
-#define	WT_STAT_DSRC_CURSOR_CACHE			2108
+#define	WT_STAT_DSRC_CURSOR_CACHE			2105
 /*! cursor: create calls */
-#define	WT_STAT_DSRC_CURSOR_CREATE			2109
+#define	WT_STAT_DSRC_CURSOR_CREATE			2106
 /*! cursor: cursor operation restarted */
-#define	WT_STAT_DSRC_CURSOR_RESTART			2110
+#define	WT_STAT_DSRC_CURSOR_RESTART			2107
 /*! cursor: cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2111
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2108
 /*! cursor: cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2112
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2109
 /*! cursor: cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2113
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2110
 /*! cursor: cursors reused from cache */
-#define	WT_STAT_DSRC_CURSOR_REOPEN			2114
+#define	WT_STAT_DSRC_CURSOR_REOPEN			2111
 /*! cursor: insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			2115
+#define	WT_STAT_DSRC_CURSOR_INSERT			2112
 /*! cursor: modify calls */
-#define	WT_STAT_DSRC_CURSOR_MODIFY			2116
+#define	WT_STAT_DSRC_CURSOR_MODIFY			2113
 /*! cursor: next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			2117
+#define	WT_STAT_DSRC_CURSOR_NEXT			2114
 /*! cursor: prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			2118
+#define	WT_STAT_DSRC_CURSOR_PREV			2115
 /*! cursor: remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			2119
+#define	WT_STAT_DSRC_CURSOR_REMOVE			2116
 /*! cursor: reserve calls */
-#define	WT_STAT_DSRC_CURSOR_RESERVE			2120
+#define	WT_STAT_DSRC_CURSOR_RESERVE			2117
 /*! cursor: reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			2121
+#define	WT_STAT_DSRC_CURSOR_RESET			2118
 /*! cursor: search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			2122
+#define	WT_STAT_DSRC_CURSOR_SEARCH			2119
 /*! cursor: search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2123
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2120
 /*! cursor: truncate calls */
-#define	WT_STAT_DSRC_CURSOR_TRUNCATE			2124
+#define	WT_STAT_DSRC_CURSOR_TRUNCATE			2121
 /*! cursor: update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			2125
+#define	WT_STAT_DSRC_CURSOR_UPDATE			2122
 /*! reconciliation: dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2126
+#define	WT_STAT_DSRC_REC_DICTIONARY			2123
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2127
+#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2124
 /*!
  * reconciliation: internal page key bytes discarded using suffix
  * compression
  */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2128
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2125
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2129
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2126
 /*! reconciliation: internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2130
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2127
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2131
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2128
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2132
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2129
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2133
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2130
 /*! reconciliation: maximum blocks required for a page */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2134
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2131
 /*! reconciliation: overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2135
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2132
 /*! reconciliation: page checksum matches */
-#define	WT_STAT_DSRC_REC_PAGE_MATCH			2136
+#define	WT_STAT_DSRC_REC_PAGE_MATCH			2133
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2137
+#define	WT_STAT_DSRC_REC_PAGES				2134
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2138
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2135
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2139
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2136
 /*! session: cached cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSORS_CACHED		2140
+#define	WT_STAT_DSRC_SESSION_CURSORS_CACHED		2137
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2141
+#define	WT_STAT_DSRC_SESSION_COMPACT			2138
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2142
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2139
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2143
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2140
 
 /*!
  * @}

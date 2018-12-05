@@ -153,10 +153,6 @@ file_runtime_config = common_runtime_config + [
         option leads to an advisory call to an appropriate operating
         system API where available''',
         choices=['none', 'random', 'sequential']),
-    Config('cache_resident', 'false', r'''
-        do not ever evict the object's pages from cache. Not compatible with
-        LSM tables; see @ref tuning_cache_resident for more information''',
-        type='boolean'),
     Config('assert', '', r'''
         enable enhanced checking. ''',
         type='category', subconfig= [
@@ -173,6 +169,10 @@ file_runtime_config = common_runtime_config + [
             if mixed read use is allowed.''',
             choices=['always','never','none'])
         ], undoc=True),
+    Config('cache_resident', 'false', r'''
+        do not ever evict the object's pages from cache. Not compatible with
+        LSM tables; see @ref tuning_cache_resident for more information''',
+        type='boolean'),
     Config('log', '', r'''
         the transaction log configuration for this object.  Only valid if
         log is enabled in ::wiredtiger_open''',
@@ -181,6 +181,17 @@ file_runtime_config = common_runtime_config + [
             if false, this object has checkpoint-level durability''',
             type='boolean'),
         ]),
+    Config('os_cache_max', '0', r'''
+        maximum system buffer cache usage, in bytes.  If non-zero, evict
+        object blocks from the system buffer cache after that many bytes
+        from this object are read or written into the buffer cache''',
+        min=0),
+    Config('os_cache_dirty_max', '0', r'''
+        maximum dirty system buffer cache usage, in bytes.  If non-zero,
+        schedule writes for dirty blocks belonging to this object in the
+        system buffer cache after that many bytes from this object are
+        written into the buffer cache''',
+        min=0),
 ]
 
 # Per-file configuration
@@ -318,17 +329,6 @@ file_config = format_meta + file_runtime_config + [
         for pages to be temporarily larger than this value.  This setting
         is ignored for LSM trees, see \c chunk_size''',
         min='512B', max='10TB'),
-    Config('os_cache_max', '0', r'''
-        maximum system buffer cache usage, in bytes.  If non-zero, evict
-        object blocks from the system buffer cache after that many bytes
-        from this object are read or written into the buffer cache''',
-        min=0),
-    Config('os_cache_dirty_max', '0', r'''
-        maximum dirty system buffer cache usage, in bytes.  If non-zero,
-        schedule writes for dirty blocks belonging to this object in the
-        system buffer cache after that many bytes from this object are
-        written into the buffer cache''',
-        min=0),
     Config('prefix_compression', 'false', r'''
         configure prefix compression on row-store leaf pages''',
         type='boolean'),
@@ -676,6 +676,13 @@ log_configuration_common = [
     Config('archive', 'true', r'''
         automatically archive unneeded log files''',
         type='boolean'),
+    Config('os_cache_dirty_pct', '0', r'''
+        maximum dirty system buffer cache usage, as a percentage of the
+        log's \c file_max.  If non-zero, schedule writes for dirty blocks
+        belonging to the log in the system buffer cache after that percentage
+        of the log has been written into the buffer cache without an
+        intervening file sync.''',
+        min='0', max='100'),
     Config('prealloc', 'true', r'''
         pre-allocate log files''',
         type='boolean'),

@@ -32,13 +32,13 @@
  * Test case description: Smoke-test the partial update construction.
  */
 
-#define	DEBUG		0
+#define	DEBUG			0
 
-#define	DATASIZE	1024
+#define	DATASIZE		1024
+#define	MAX_MODIFY_ENTRIES	37		/* Maximum modify vectors */
 
-#define	MAX_MODIFY_ENTRIES	37
-static WT_MODIFY entries[MAX_MODIFY_ENTRIES];		/* Entries vector */
-static int nentries;					/* Entries count */
+static WT_MODIFY entries[1000];			/* Entries vector */
+static int nentries;				/* Entries count */
 
 /*
  * The replacement bytes array is 2x the maximum replacement string so we can
@@ -213,11 +213,11 @@ slow_apply_api(WT_ITEM *orig)
 }
 
 /*
- * diff --
- *	Diff the two results.
+ * compare --
+ *	Compare two results.
  */
 static void
-diff(WT_ITEM *local, WT_ITEM *library)
+compare(WT_ITEM *local, WT_ITEM *library)
 {
 #if DEBUG
 	if (local->size != library->size ||
@@ -232,42 +232,92 @@ diff(WT_ITEM *local, WT_ITEM *library)
 	    local->data, library->data, local->size) == 0);
 }
 
-/*
- * modify_init --
- *	Initialize the buffers to a known state.
- */
-static void
-modify_init(WT_ITEM *local, WT_ITEM *library)
-{
-	size_t len;
-
-	len = (size_t)(__wt_random(&rnd) % MAX_REPL_BYTES);
-	testutil_check(__wt_buf_set(NULL, local, modify_repl, len));
-	testutil_check(__wt_buf_set(NULL, library, modify_repl, len));
-}
-
-static int nruns = 1000;
+static int nruns = 10000;
 
 /*
  * modify_run
- *	Run some tests.
+ *	Run some tests:
+ *	1. Create an initial value, a copy and a fake cursor to use with the
+ *	WiredTiger routines. Generate a set of modify vectors and apply them to
+ *	the item stored in the cursor using the modify apply API. Also apply the
+ *	same modify vector to one of the copies using a helper routine written
+ *	to test the modify API. The final value generated with the modify API
+ *	and the helper routine should match.
+ *
+ *	2. Use the initial value and the modified value generated above as
+ *	inputs into the calculate-modify API to generate a set of modify
+ *	vectors. Apply this generated vector to the initial value using the
+ *	modify apply API to obtain a final value. The final value generated
+ *	should match the modified value that was used as input to the
+ *	calculate-modify API.
  */
 static void
-modify_run(WT_CURSOR *cursor, WT_ITEM *local, bool verbose)
+modify_run(bool verbose)
 {
+	WT_CURSOR *cursor, _cursor;
+	WT_DECL_RET;
+	WT_ITEM *localA, _localA, *localB, _localB;
+	size_t len;
 	int i, j;
 
+	/* Initialize the RNG. */
+	__wt_random_init_seed(NULL, &rnd);
+
+	/* Set up replacement information. */
+	modify_repl_init();
+
+	/* We need three WT_ITEMs, one of them part of a fake cursor. */
+	localA = &_localA;
+	memset(&_localA, 0, sizeof(_localA));
+	localB = &_localB;
+	memset(&_localB, 0, sizeof(_localB));
+	cursor = &_cursor;
+	memset(&_cursor, 0, sizeof(_cursor));
+	cursor->value_format = "u";
+
 	for (i = 0; i < nruns; ++i) {
-		modify_init(local, &cursor->value);
+		/* Create an initial value. */
+		len = (size_t)(__wt_random(&rnd) % MAX_REPL_BYTES);
+		testutil_check(__wt_buf_set(NULL, localA, modify_repl, len));
 
 		for (j = 0; j < 1000; ++j) {
-			modify_build();
+			/* Copy the current value into the second item. */
+			testutil_check(__wt_buf_set(
+			    NULL, localB, localA->data, localA->size));
 
-			slow_apply_api(local);
+			/*
+			 * Create a random set of modify vectors, run the
+			 * underlying library modification function, then
+			 * compare the result against our implementation
+			 * of modify.
+			 */
+			modify_build();
+			testutil_check(__wt_buf_set(
+			    NULL, &cursor->value, localA->data, localA->size));
 			testutil_check(__wt_modify_apply_api(
 			    NULL, cursor, entries, nentries));
+			slow_apply_api(localA);
+			compare(localA, &cursor->value);
 
-			diff(local, &cursor->value);
+			/*
+			 * Call the WiredTiger function to build a modification
+			 * vector for the change, and repeat the test using the
+			 * WiredTiger modification vector, then compare results
+			 * against our implementation of modify.
+			 */
+			nentries = WT_ELEMENTS(entries);
+			ret = wiredtiger_calc_modify(NULL,
+			    localB, localA,
+			    WT_MAX(localB->size, localA->size) + 100,
+			    entries, &nentries);
+			if (ret == WT_NOTFOUND)
+				continue;
+			testutil_check(ret);
+			testutil_check(__wt_buf_set(
+			    NULL, &cursor->value, localB->data, localB->size));
+			testutil_check(__wt_modify_apply_api(
+			    NULL, cursor, entries, nentries));
+			compare(localA, &cursor->value);
 		}
 		if (verbose) {
 			printf("%d (%d%%)\r", i, (i * 100) / nruns);
@@ -275,18 +325,17 @@ modify_run(WT_CURSOR *cursor, WT_ITEM *local, bool verbose)
 		}
 	}
 	if (verbose)
-		printf("\n");
+		printf("%d (100%%)\n", i);
+
+	__wt_buf_free(NULL, localA);
+	__wt_buf_free(NULL, localB);
+	__wt_buf_free(NULL, &cursor->value);
 }
 
 int
 main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
-	WT_CURSOR *cursor, _cursor;
-	WT_ITEM *local, _local;
-
-	if (testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
-		nruns = 10000;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
@@ -295,24 +344,8 @@ main(int argc, char *argv[])
 	testutil_check(
 	    wiredtiger_open(opts->home, NULL, "create", &opts->conn));
 
-	/* Initialize the RNG. */
-	__wt_random_init_seed(NULL, &rnd);
-
-	/* Set up replacement information. */
-	modify_repl_init();
-
-	/* We need two items, one of them hooked into fake cursor. */
-	local = &_local;
-	memset(&_local, 0, sizeof(_local));
-	cursor = &_cursor;
-	memset(&_cursor, 0, sizeof(_cursor));
-	cursor->value_format = "u";
-
 	/* Run the test. */
-	modify_run(cursor, local, opts->verbose);
-
-	__wt_buf_free(NULL, local);
-	__wt_buf_free(NULL, &cursor->value);
+	modify_run(opts->verbose);
 
 	testutil_cleanup(opts);
 	return (EXIT_SUCCESS);

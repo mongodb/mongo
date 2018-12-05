@@ -27,14 +27,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_compress01.py
-#   Basic block compression operations
+#    Smoke-test compression
 #
 
-import os, run
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# Test basic compression
+# Smoke-test compression
 class test_compress01(wttest.WiredTigerTestCase):
 
     types = [
@@ -43,8 +42,12 @@ class test_compress01(wttest.WiredTigerTestCase):
     ]
     compress = [
         ('nop', dict(compress='nop')),
+        ('lz4', dict(compress='lz4')),
+        ('lz4-noraw', dict(compress='lz4')),    # API compatibility test
         ('snappy', dict(compress='snappy')),
-        ('none', dict(compress=None)),
+        ('zlib', dict(compress='zlib')),
+        ('zlib-noraw', dict(compress='zlib')),  # API compatibility test
+        ('zstd', dict(compress='zstd')),
     ]
     scenarios = make_scenarios(types, compress)
 
@@ -58,13 +61,9 @@ class test_compress01(wttest.WiredTigerTestCase):
 
     # Create a table, add keys with both big and small values, then verify them.
     def test_compress(self):
-
         # Use relatively small leaf pages to force big values to be overflow
         # items, but still large enough that we get some compression action.
         params = 'key_format=S,value_format=S,leaf_page_max=4096'
-        if self.compress != None:
-            params += ',block_compressor=' + self.compress
-
         self.session.create(self.uri, params)
         cursor = self.session.open_cursor(self.uri, None)
         for idx in xrange(1,self.nrecords):

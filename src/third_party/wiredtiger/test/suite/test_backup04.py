@@ -37,7 +37,7 @@ from wtthread import op_thread
 
 # test_backup04.py
 #    Utilities: wt backup
-# Test cursor backup with target URIs
+# Test incremental cursor backup.
 class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     dir='backup.dir'                    # Backup directory name
     logmax="100K"

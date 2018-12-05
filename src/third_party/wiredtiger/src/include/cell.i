@@ -818,29 +818,3 @@ __wt_page_cell_data_ref(WT_SESSION_IMPL *session,
 {
 	return (__cell_data_ref(session, page, page->type, unpack, store));
 }
-
-/*
- * __wt_cell_data_copy --
- *	Copy the data from an unpacked cell into a buffer.
- */
-static inline int
-__wt_cell_data_copy(WT_SESSION_IMPL *session,
-    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
-{
-	/*
-	 * We have routines to both copy and reference a cell's information.  In
-	 * most cases, all we need is a reference and we prefer that, especially
-	 * when returning key/value items.  In a few we need a real copy: call
-	 * the standard reference function and get a reference.  In some cases,
-	 * a copy will be made (for example, when reading an overflow item from
-	 * the underlying object.  If that happens, we're done, otherwise make
-	 * a copy.
-	 *
-	 * We don't require two versions of this function, no callers need to
-	 * handle WT_CELL_VALUE_OVFL_RM cells.
-	 */
-	WT_RET(__wt_dsk_cell_data_ref(session, page_type, unpack, store));
-	if (!WT_DATA_IN_ITEM(store))
-		WT_RET(__wt_buf_set(session, store, store->data, store->size));
-	return (0);
-}
