@@ -51,7 +51,9 @@ stitchSupportTargets = stitchSupportEnv.Library(
         'stitch_support.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_icu',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
     ],
     INSTALL_ALIAS=[
         'stitch-support',

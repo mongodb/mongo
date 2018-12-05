@@ -229,6 +229,96 @@ stitch_support_v1_init(stitch_support_v1_status* status);
 STITCH_SUPPORT_API int MONGO_API_CALL
 stitch_support_v1_fini(stitch_support_v1_lib* const lib, stitch_support_v1_status* const status);
 
+/**
+ * A collator object represents a parsed collation. A single collator can be used by multiple
+ * matcher, projection, and update objects.
+ *
+ * It is the client's responsibility to call stitch_support_v1_collator_destroy() to free up
+ * resources used by the collator. Once a collator is destroyed, it is not safe to call any
+ * functions on matcher, projection, and update objects that reference the collator, except for
+ * their destroy functions.
+ */
+typedef struct stitch_support_v1_collator stitch_support_v1_collator;
+
+/**
+ * Creates a stitch_support_v1_collator object, which stores a parsed collation.
+ *
+ * This function will fail if the collationBSON is invalid. On failure, it returns NULL and
+ * populates the 'status' object if it is not NULL.
+ */
+STITCH_SUPPORT_API stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
+    stitch_support_v1_lib* lib, const char* collationBSON, stitch_support_v1_status* const status);
+
+/**
+ * Destroys a valid stitch_support_v1_collator object.
+ *
+ * This function is not thread safe, and it must not execute concurrently with any other function
+ * that accesses the collation object being destroyed including those that access a matcher,
+ * projection or update object which reference the collation object.
+ *
+ * This function does not report failures.
+ */
+STITCH_SUPPORT_API void MONGO_API_CALL
+stitch_support_v1_collator_destroy(stitch_support_v1_collator* collator);
+
+/**
+ * A matcher object is used to determine if a BSON document matches a predicate.
+ *
+ * A matcher can optionally use a collator. The client is responsible for ensuring that a matcher's
+ * collator continues to exist for the lifetime of the matcher and for ultimately destroying both
+ * the collator and the matcher. Multiple matcher, projection, and update objects can share the same
+ * collation object.
+ */
+typedef struct stitch_support_v1_matcher stitch_support_v1_matcher;
+
+/**
+ * Creates a stitch_support_v1_matcher object, which represents a predicate to match against. The
+ * predicate itself is represented as a BSON object, which is passed in the 'filterBSON' argument.
+ *
+ * This function will fail if the predicate is invalid, returning NULL and populating 'status' with
+ * information about the error.
+ *
+ * The 'collator' argument, a pointer to a stitch_support_v1_collator, will cause the matcher to use
+ * the given collator if provided but the pointer can be NULL to cause the matcher to use no
+ * collator. The newly created matcher does _not_ take ownership of its 'collator' object.
+ */
+STITCH_SUPPORT_API stitch_support_v1_matcher* MONGO_API_CALL
+stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
+                                 const char* filterBSON,
+                                 stitch_support_v1_collator* collator,
+                                 stitch_support_v1_status* status);
+
+/**
+ * Destroys a valid stitch_support_v1_matcher object.
+ *
+ * This function does not destroy the collator associated with the destroyed matcher. When
+ * destroying a matcher and its associated collator together, it is safe to destroy them in either
+ * order. Although a matcher is no longer valid once its associated collator has been destroyed, it
+ * is still safe to call this destroy function on the matcher.
+ *
+ * This function is not thread safe, and it must not execute concurrently with any other function
+ * that accesses the matcher object being destroyed.
+ *
+ * This function does not report failures.
+ */
+STITCH_SUPPORT_API void MONGO_API_CALL
+stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher);
+
+/**
+ * Check if the 'documentBSON' input matches the predicate represented by the 'matcher' object.
+ *
+ * The 'matcher' and 'documentBSON' parameters must point to initialized objects of their respective
+ * types, and 'isMatch' must be non-NULL.
+ *
+ * When the check is successful, this function returns STITCH_SUPPORT_V1_SUCCESS, sets 'isMatch' to
+ * indicate whether the document matched.
+ */
+STITCH_SUPPORT_API int MONGO_API_CALL
+stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
+                              const char* documentBSON,
+                              bool* isMatch,
+                              stitch_support_v1_status* status);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

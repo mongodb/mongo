@@ -33,6 +33,10 @@
 #include "stitch_support/stitch_support.h"
 
 #include "mongo/base/initializer.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/matcher/matcher.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 
@@ -80,12 +84,10 @@ private:
     stitch_support_v1_error _code;
 };
 
-stitch_support_v1_status translateException() try {
-    throw;
+stitch_support_v1_status translateException() try { throw; } catch (const DBException& ex) {
+    return {STITCH_SUPPORT_V1_ERROR_EXCEPTION, ex.code(), ex.what()};
 } catch (const StitchSupportException& ex) {
     return {ex.statusCode(), mongo::ErrorCodes::InternalError, ex.what()};
-} catch (const DBException& ex) {
-    return {STITCH_SUPPORT_V1_ERROR_EXCEPTION, ex.code(), ex.what()};
 } catch (const std::bad_alloc& ex) {
     return {STITCH_SUPPORT_V1_ERROR_ENOMEM, mongo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::exception& ex) {
@@ -161,6 +163,27 @@ struct stitch_support_v1_lib {
     mongo::EmbeddedServiceContextPtr serviceContext;
 };
 
+struct stitch_support_v1_collator {
+    stitch_support_v1_collator(std::unique_ptr<mongo::CollatorInterface> collator)
+        : collator(std::move(collator)) {}
+    std::unique_ptr<mongo::CollatorInterface> collator;
+};
+
+struct stitch_support_v1_matcher {
+    stitch_support_v1_matcher(mongo::ServiceContext::UniqueClient client,
+                              const mongo::BSONObj& filterBSON,
+                              stitch_support_v1_collator* collator)
+        : client(std::move(client)),
+          opCtx(this->client->makeOperationContext()),
+          matcher(filterBSON,
+                  new mongo::ExpressionContext(opCtx.get(),
+                                               collator ? collator->collator.get() : nullptr)){};
+
+    mongo::ServiceContext::UniqueClient client;
+    mongo::ServiceContext::UniqueOperationContext opCtx;
+    mongo::Matcher matcher;
+};
+
 namespace mongo {
 namespace {
 
@@ -197,6 +220,45 @@ void stitch_lib_fini(stitch_support_v1_lib* const lib, stitch_support_v1_status&
     }
 
     library.reset();
+}
+
+stitch_support_v1_collator* collator_create(stitch_support_v1_lib* const lib,
+                                            BSONObj collationSpecExpr) {
+    if (!library) {
+        throw StitchSupportException{STITCH_SUPPORT_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+                                     "Cannot create a new collator when the Stitch Support Library "
+                                     "is not yet initialized."};
+    }
+
+    if (library.get() != lib) {
+        throw StitchSupportException{STITCH_SUPPORT_V1_ERROR_INVALID_LIB_HANDLE,
+                                     "Cannot create a new collator when the Stitch Support Library "
+                                     "is not yet initialized."};
+    }
+
+    auto statusWithCollator =
+        CollatorFactoryInterface::get(lib->serviceContext.get())->makeFromBSON(collationSpecExpr);
+    uassertStatusOK(statusWithCollator.getStatus());
+    return new stitch_support_v1_collator(std::move(statusWithCollator.getValue()));
+}
+
+stitch_support_v1_matcher* matcher_create(stitch_support_v1_lib* const lib,
+                                          BSONObj filter,
+                                          stitch_support_v1_collator* collator) {
+    if (!library) {
+        throw StitchSupportException{STITCH_SUPPORT_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+                                     "Cannot create a new matcher when the Stitch Support Library "
+                                     "is not yet initialized."};
+    }
+
+    if (library.get() != lib) {
+        throw StitchSupportException{STITCH_SUPPORT_V1_ERROR_INVALID_LIB_HANDLE,
+                                     "Cannot create a new matcher when the Stitch Support Library "
+                                     "is not yet initialized."};
+    }
+
+    return new stitch_support_v1_matcher(
+        lib->serviceContext->makeClient("stitch_support"), filter.getOwned(), collator);
 }
 
 template <typename Function,
@@ -316,7 +378,45 @@ stitch_support_v1_status* MONGO_API_CALL stitch_support_v1_status_create(void) {
 }
 
 void MONGO_API_CALL stitch_support_v1_status_destroy(stitch_support_v1_status* const status) {
-    delete status;
+    static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete status; }));
+}
+
+stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
+    stitch_support_v1_lib* lib, const char* collationBSON, stitch_support_v1_status* const status) {
+    return enterCXX(status, [&](stitch_support_v1_status& status) {
+        mongo::BSONObj collationSpecExpr(collationBSON);
+        return mongo::collator_create(lib, collationSpecExpr);
+    });
+}
+
+void MONGO_API_CALL stitch_support_v1_collator_destroy(stitch_support_v1_collator* const collator) {
+    static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete collator; }));
+}
+
+stitch_support_v1_matcher* MONGO_API_CALL
+stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
+                                 const char* filterBSON,
+                                 stitch_support_v1_collator* collator,
+                                 stitch_support_v1_status* const statusPtr) {
+    return enterCXX(statusPtr, [&](stitch_support_v1_status& status) {
+        mongo::BSONObj filter(filterBSON);
+        return mongo::matcher_create(lib, filter, collator);
+    });
+}
+
+void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher) {
+    static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete matcher; }));
+}
+
+int MONGO_API_CALL
+stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
+                              const char* documentBSON,
+                              bool* isMatch,
+                              stitch_support_v1_status* statusPtr) {
+    return enterCXX(statusPtr, [&](stitch_support_v1_status& status) {
+            mongo::BSONObj document(documentBSON);
+            *isMatch = matcher->matcher.matches(document, nullptr);
+        });
 }
 
 }  // extern "C"

@@ -100,6 +100,16 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target="collator_factory_icu",
+    source=[
+        "collator_factory_icu_decoration.cpp",
+    ],
+    LIBDEPS=[
+        "collator_icu",
+    ],
+)
+
 env.CppUnitTest(
     target="collator_factory_icu_test",
     source=[
