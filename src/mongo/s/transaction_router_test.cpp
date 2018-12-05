@@ -71,6 +71,8 @@ protected:
 
     const Status kDummyStatus = {ErrorCodes::InternalError, "dummy"};
 
+    const NamespaceString kViewNss = NamespaceString("test.foo");
+
     void setUp() override {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -1031,7 +1033,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                                          << "test"));
     ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
 
-    txnRouter.onViewResolutionError();
+    txnRouter.onViewResolutionError(kViewNss);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
@@ -1184,7 +1186,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     // Simulate a view resolution error on the first client statement that leads to a retry which
     // targets the same shard.
 
-    txnRouter.onViewResolutionError();
+    txnRouter.onViewResolutionError(kViewNss);
 
     // The only participant was the coordinator, so it should have been reset.
     ASSERT_FALSE(txnRouter.getCoordinatorId());
@@ -1203,7 +1205,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
 
     // Simulate a view resolution error.
 
-    txnRouter.onViewResolutionError();
+    txnRouter.onViewResolutionError(kViewNss);
 
     // Only the new participant shard was reset.
     firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});

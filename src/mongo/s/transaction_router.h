@@ -185,7 +185,7 @@ public:
      * Updates the transaction tracking state to allow for a retry attempt on a view resolution
      * error.
      */
-    void onViewResolutionError();
+    void onViewResolutionError(const NamespaceString& nss);
 
     /**
      * Computes and sets the atClusterTime for the current transaction based on the given query
@@ -233,7 +233,8 @@ public:
     /**
      * Sends abort to all participants and returns the responses from all shards.
      */
-    std::vector<AsyncRequestsSender::Response> abortTransaction(OperationContext* opCtx);
+    std::vector<AsyncRequestsSender::Response> abortTransaction(OperationContext* opCtx,
+                                                                bool isImplicit = false);
 
     /**
      * Sends abort to all shards in the current participant list. Will retry on retryable errors,
@@ -316,6 +317,12 @@ private:
      * matches the transaction's.
      */
     void _verifyParticipantAtClusterTime(const Participant& participant);
+
+    /**
+     * Returns a string with the active transaction's transaction number and logical session id
+     * (i.e. the transaction id).
+     */
+    std::string _txnIdToString();
 
     // The currently active transaction number on this transaction router (i.e. on the session)
     TxnNumber _txnNumber{kUninitializedTxnNumber};

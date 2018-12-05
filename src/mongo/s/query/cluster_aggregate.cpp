@@ -884,7 +884,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     result->resetToEmpty();
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter->onViewResolutionError();
+        txnRouter->onViewResolutionError(requestedNss);
     }
 
     // We pass both the underlying collection namespace and the view namespace here. The

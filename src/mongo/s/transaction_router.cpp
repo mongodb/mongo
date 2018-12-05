@@ -279,10 +279,13 @@ const boost::optional<ShardId>& TransactionRouter::getCoordinatorId() const {
 
 BSONObj TransactionRouter::attachTxnFieldsIfNeeded(const ShardId& shardId, const BSONObj& cmdObj) {
     if (auto txnPart = getParticipant(shardId)) {
+        LOG(4) << _txnIdToString()
+               << " Sending transaction fields to existing participant: " << shardId;
         return txnPart->attachTxnFieldsIfNeeded(cmdObj, false);
     }
 
     auto txnPart = _createParticipant(shardId);
+    LOG(4) << _txnIdToString() << " Sending transaction fields to new participant: " << shardId;
     return txnPart.attachTxnFieldsIfNeeded(cmdObj, true);
 }
 
@@ -378,13 +381,19 @@ void TransactionRouter::onStaleShardOrDbError(StringData cmdName, const Status& 
                           << errorStatus,
             _canContinueOnStaleShardOrDbError(cmdName));
 
+    LOG(0) << _txnIdToString()
+           << " Clearing pending participants after stale version error: " << errorStatus;
+
     // Remove participants created during the current statement so they are sent the correct options
     // if they are targeted again by the retry.
     _clearPendingParticipants();
 }
 
-void TransactionRouter::onViewResolutionError() {
+void TransactionRouter::onViewResolutionError(const NamespaceString& nss) {
     // The router can always retry on a view resolution error.
+
+    LOG(0) << _txnIdToString()
+           << " Clearing pending participants after view resolution error on namespace: " << nss;
 
     // Requests against views are always routed to the primary shard for its database, but the retry
     // on the resolved namespace does not have to re-target the primary, so pending participants
@@ -404,6 +413,10 @@ void TransactionRouter::onSnapshotError(const Status& errorStatus) {
                           << errorStatus,
             _canContinueOnSnapshotError());
 
+    LOG(0) << _txnIdToString() << " Clearing pending participants and resetting global snapshot "
+                                  "timestamp after snapshot error: "
+           << errorStatus << ", previous timestamp: " << _atClusterTime->getTime();
+
     // The transaction must be restarted on all participants because a new read timestamp will be
     // selected, so clear all pending participants. Snapshot errors are only retryable on the first
     // client statement, so all participants should be cleared, including the coordinator.
@@ -412,7 +425,6 @@ void TransactionRouter::onSnapshotError(const Status& errorStatus) {
     invariant(!_coordinatorId);
 
     // Reset the global snapshot timestamp so the retry will select a new one.
-    invariant(_atClusterTime);
     _atClusterTime.reset();
     _atClusterTime.emplace();
 }
@@ -461,6 +473,9 @@ void TransactionRouter::_setAtClusterTime(const boost::optional<LogicalTime>& af
         _atClusterTime->setTime(*afterClusterTime, _latestStmtId);
         return;
     }
+
+    LOG(0) << _txnIdToString() << " Setting global snapshot timestamp to " << candidateTime
+           << " on statement " << _latestStmtId;
 
     _atClusterTime->setTime(candidateTime, _latestStmtId);
 }
@@ -529,6 +544,8 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     if (_readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         _atClusterTime.emplace();
     }
+
+    LOG(0) << _txnIdToString() << " New transaction started";
 }
 
 const LogicalSessionId& TransactionRouter::_sessionId() const {
@@ -545,6 +562,9 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
 
     CommitTransaction commitCmd;
     commitCmd.setDbName("admin");
+
+    LOG(0) << _txnIdToString()
+           << " Committing single shard transaction, single participant: " << shardId;
 
     const auto& participant = citer->second;
     return uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
@@ -611,6 +631,9 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
 
     _initiatedTwoPhaseCommit = true;
 
+    LOG(0) << _txnIdToString()
+           << " Committing multi shard transaction, coordinator: " << *_coordinatorId;
+
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -633,7 +656,7 @@ Shard::CommandResponse TransactionRouter::commitTransaction(OperationContext* op
 }
 
 std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, bool isImplicit) {
     // The router has yet to send any commands to a remote shard for this transaction.
     // Return the same error that would have been returned by a shard.
     uassert(ErrorCodes::NoSuchTransaction,
@@ -645,6 +668,14 @@ std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
     std::vector<AsyncRequestsSender::Request> abortRequests;
     for (const auto& participantEntry : _participants) {
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
+    }
+
+    if (isImplicit) {
+        LOG(0) << _txnIdToString() << " Implicitly aborting transaction on " << _participants.size()
+               << " shard(s)";
+    } else {
+        LOG(0) << _txnIdToString() << " Aborting transaction on " << _participants.size()
+               << " shard(s)";
     }
 
     return gatherResponses(opCtx,
@@ -660,17 +691,21 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
     }
 
     if (_initiatedTwoPhaseCommit) {
-        LOG(0) << "Router not sending implicit abortTransaction for transaction "
-               << *opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON()
-               << " because already initiated two phase commit for the transaction";
+        LOG(0) << _txnIdToString() << " Router not sending implicit abortTransaction because "
+                                      "already initiated two phase commit for the transaction";
         return;
     }
 
     try {
-        abortTransaction(opCtx);
+        abortTransaction(opCtx, true /*isImplicit*/);
     } catch (...) {
         // Ignore any exceptions.
     }
+}
+
+std::string TransactionRouter::_txnIdToString() {
+    return str::stream() << "(txnNumber: " << _txnNumber << ", lsid: " << _sessionId().getId()
+                         << ")";
 }
 
 }  // namespace mongo
