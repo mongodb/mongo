@@ -132,9 +132,15 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},
                                                  {"update", 1}};
 
-bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName) {
+bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName, Client* client) {
     if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
+
+    if (client->session() && (client->session()->getTags() & transport::Session::kInternalClient)) {
+        if (!data.hasField("failInternalCommands") || !data.getBoolField("failInternalCommands")) {
+            return false;
+        }
+    }
 
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
@@ -528,7 +534,8 @@ bool runCommandImpl(OperationContext* opCtx,
 
         auto waitForWriteConcern = [&](auto&& bb) {
             MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-                return shouldActivateFailCommandFailPoint(data, request.getCommandName()) &&
+                return shouldActivateFailCommandFailPoint(
+                           data, request.getCommandName(), opCtx->getClient()) &&
                     data.hasField("writeConcernError");
             }) {
                 bb.append(data.getData()["writeConcernError"]);
@@ -593,7 +600,7 @@ bool runCommandImpl(OperationContext* opCtx,
  */
 void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-        return shouldActivateFailCommandFailPoint(data, commandName) &&
+        return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient()) &&
             (data.hasField("closeConnection") || data.hasField("errorCode"));
     }) {
         bool closeConnection;

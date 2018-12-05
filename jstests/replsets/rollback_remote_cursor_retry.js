@@ -45,10 +45,12 @@
     checkLog.contains(rollbackNode, "rollback - rollbackHangBeforeStart fail point enabled");
 
     // Fail the 'find' command exactly twice.
-    // TODO SERVER-35004 Configure this failpoint to only fail the 'find' command.
     jsTestLog("Failing the next two 'find' commands.");
-    assert.commandWorked(syncSource.adminCommand(
-        {configureFailPoint: "failCommand", data: {closeConnection: true}, mode: {times: 2}}));
+    assert.commandWorked(syncSource.adminCommand({
+        configureFailPoint: "failCommand",
+        data: {closeConnection: true, failInternalCommands: true, failCommands: ["find"]},
+        mode: {times: 2}
+    }));
 
     // Let rollback proceed.
     assert.commandWorked(
