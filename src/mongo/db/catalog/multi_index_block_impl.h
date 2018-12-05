@@ -104,10 +104,10 @@ public:
     /**
      * State transitions:
      *
-     * Uninitialized --> Running --> PreCommit --> Committed
-     *       |              |            |            ^
-     *       |              |            |            |
-     *       \--------------+------------+-------> Aborted
+     * Uninitialized --> Running --> Committed
+     *       |              |           ^
+     *       |              |           |
+     *       \--------------+------> Aborted
      *
      * It is possible for abort() to skip intermediate states. For example, calling abort() when the
      * index build has not been initialized will transition from Uninitialized directly to Aborted.
@@ -119,7 +119,7 @@ public:
      * Not part of MultiIndexBlock interface. Callers should not have to query the state of the
      * MultiIndexBlock directly.
      */
-    enum class State { kUninitialized, kRunning, kPreCommit, kCommitted, kAborted };
+    enum class State { kUninitialized, kRunning, kCommitted, kAborted };
     State getState_forTest() const;
 
 private:

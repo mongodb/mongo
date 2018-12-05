@@ -113,7 +113,6 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk());
-    ASSERT_EQUALS(MultiIndexBlockImpl::State::kPreCommit, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());
     {
@@ -135,7 +134,6 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
 
     ASSERT_OK(indexer->insert({}, {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk());
-    ASSERT_EQUALS(MultiIndexBlockImpl::State::kPreCommit, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());
     {
@@ -224,7 +222,6 @@ TEST_F(MultiIndexBlockTest, CommitFailsAfterAbort) {
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk());
-    ASSERT_EQUALS(MultiIndexBlockImpl::State::kPreCommit, indexer->getState_forTest());
 
     indexer->abort("test"_sd);
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kAborted, indexer->getState_forTest());

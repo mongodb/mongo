@@ -600,9 +600,7 @@ Status MultiIndexBlockImpl::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) 
         }
     }
 
-    _setState(State::kPreCommit);
     _updateCurOpOpDescription(true);
-
     return Status::OK();
 }
 
@@ -791,8 +789,6 @@ std::ostream& operator<<(std::ostream& os, const MultiIndexBlockImpl::State& sta
             return os << "Uninitialized";
         case MultiIndexBlockImpl::State::kRunning:
             return os << "Running";
-        case MultiIndexBlockImpl::State::kPreCommit:
-            return os << "PreCommit";
         case MultiIndexBlockImpl::State::kCommitted:
             return os << "Committed";
         case MultiIndexBlockImpl::State::kAborted:
