@@ -177,7 +177,6 @@
     profileObj = getLatestProfilerEntry(testDB);
     assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "remove", tojson(profileObj));
-    assert.eq(profileObj.ndeleted, 0, tojson(profileObj));
     assert.eq(profileObj.errCode, ErrorCodes.WriteConflict, tojson(profileObj));
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);

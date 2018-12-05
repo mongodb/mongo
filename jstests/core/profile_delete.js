@@ -76,4 +76,27 @@
 
     assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+
+    //
+    // Confirm killing a remove operation will not log 'ndeleted' to the profiler.
+    //
+    assert(coll.drop());
+
+    for (let i = 0; i < 100; ++i) {
+        assert.commandWorked(coll.insert({a: 1}));
+    }
+
+    const deleteResult = testDB.runCommand({
+        delete: coll.getName(),
+        deletes: [{q: {$where: "sleep(1000);return true", a: 1}, limit: 0}],
+        maxTimeMS: 1
+    });
+
+    // This command will time out before completing.
+    assert.commandFailedWithCode(deleteResult, ErrorCodes.MaxTimeMSExpired);
+
+    profileObj = getLatestProfilerEntry(testDB);
+
+    // 'ndeleted' should not be defined.
+    assert(!profileObj.hasOwnProperty("ndeleted"), profileObj);
 })();

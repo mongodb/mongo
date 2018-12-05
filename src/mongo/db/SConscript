@@ -222,6 +222,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'curop',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
     ],
 )
 

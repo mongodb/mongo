@@ -786,8 +786,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.ensureStarted();
     }
 
-    curOp.debug().additiveMetrics.ndeleted = 0;
-
     DeleteRequest request(ns);
     request.setQuery(op.getQ());
     request.setCollation(write_ops::collationOf(op));

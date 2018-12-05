@@ -32,7 +32,9 @@
 
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -170,5 +172,41 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     ASSERT_EQ(*additiveMetrics.prepareReadConflicts, 8);
 }
 
+TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
+    // 'basicFields' should always be present in the logs and profiler, for any operation.
+    std::vector<std::string> basicFields{"op", "ns", "command", "numYield", "locks", "millis"};
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    SingleThreadedLockStats ls;
+
+    auto curop = CurOp::get(*opCtx);
+    const OpDebug& od = curop->debug();
+
+    // Create dummy command.
+    BSONObj command = BSON("a" << 3);
+
+    // Set dummy 'ns' and 'command'.
+    curop->setGenericOpRequestDetails(
+        opCtx.get(), NamespaceString("myDb.coll"), nullptr, command, NetworkOp::dbQuery);
+
+    BSONObjBuilder builder;
+    od.append(*curop, ls, builder);
+    auto bs = builder.done();
+
+    // Append should always include these basic fields.
+    for (const std::string& field : basicFields) {
+        ASSERT_TRUE(bs.hasField(field));
+    }
+
+    // Append should include only the basic fields when just initialized.
+    ASSERT_EQ(static_cast<size_t>(bs.nFields()), basicFields.size());
+
+    // 'reportString' should only contain basic fields.
+    std::string reportString = od.report(serviceContext.getClient(), *curop, nullptr);
+    std::string expectedReportString = "query myDb.coll command: { a: 3 } numYields:0 0ms";
+
+    ASSERT_EQ(reportString, expectedReportString);
+}
 }  // namespace
 }  // namespace mongo
