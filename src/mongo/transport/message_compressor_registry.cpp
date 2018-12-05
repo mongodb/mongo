@@ -37,6 +37,7 @@
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/message_compressor_zlib.h"
+#include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/util/options_parser/option_section.h"
 
 #include <boost/algorithm/string/classification.hpp>
@@ -45,7 +46,7 @@
 namespace mongo {
 namespace {
 const auto kDisabledConfigValue = "disabled"_sd;
-const auto kDefaultConfigValue = "snappy,zlib"_sd;
+const auto kDefaultConfigValue = "snappy,zstd,zlib"_sd;
 }  // namespace
 
 StringData getMessageCompressorName(MessageCompressor id) {
@@ -56,6 +57,8 @@ StringData getMessageCompressorName(MessageCompressor id) {
             return "snappy"_sd;
         case MessageCompressor::kZlib:
             return "zlib"_sd;
+        case MessageCompressor::kZstd:
+            return "zstd"_sd;
         default:
             fassert(40269, "Invalid message compressor ID");
     }

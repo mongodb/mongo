@@ -40,6 +40,7 @@
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/message_compressor_zlib.h"
+#include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -235,6 +236,11 @@ TEST(ZlibMessageCompressor, Fidelity) {
     checkFidelity(testMessage, stdx::make_unique<ZlibMessageCompressor>());
 }
 
+TEST(ZstdMessageCompressor, Fidelity) {
+    auto testMessage = buildMessage();
+    checkFidelity(testMessage, stdx::make_unique<ZstdMessageCompressor>());
+}
+
 TEST(SnappyMessageCompressor, Overflow) {
     checkOverflow(stdx::make_unique<SnappyMessageCompressor>());
 }
@@ -243,10 +249,18 @@ TEST(ZlibMessageCompressor, Overflow) {
     checkOverflow(stdx::make_unique<ZlibMessageCompressor>());
 }
 
+TEST(ZstdMessageCompressor, Overflow) {
+    checkOverflow(stdx::make_unique<ZstdMessageCompressor>());
+}
+
 TEST(MessageCompressorManager, SERVER_28008) {
 
     // Create a client and server that will negotiate the same compressors,
     // but with a different ordering for the preferred compressor.
+
+    std::unique_ptr<MessageCompressorBase> zstdCompressor =
+        stdx::make_unique<ZstdMessageCompressor>();
+    const auto zstdId = zstdCompressor->getId();
 
     std::unique_ptr<MessageCompressorBase> zlibCompressor =
         stdx::make_unique<ZlibMessageCompressor>();
@@ -257,8 +271,10 @@ TEST(MessageCompressorManager, SERVER_28008) {
     const auto snappyId = snappyCompressor->getId();
 
     MessageCompressorRegistry registry;
-    registry.setSupportedCompressors({snappyCompressor->getName(), zlibCompressor->getName()});
+    registry.setSupportedCompressors(
+        {snappyCompressor->getName(), zlibCompressor->getName(), zstdCompressor->getName()});
     registry.registerImplementation(std::move(zlibCompressor));
+    registry.registerImplementation(std::move(zstdCompressor));
     registry.registerImplementation(std::move(snappyCompressor));
     ASSERT_OK(registry.finalizeSupportedCompressors());
 
@@ -294,6 +310,17 @@ TEST(MessageCompressorManager, SERVER_28008) {
     toSend = assertOk(serverManager.compressMessage(recvd, &compressorId));
     recvd = assertOk(clientManager.decompressMessage(toSend, &compressorId));
     ASSERT_EQ(compressorId, zlibId);
+
+    // Then, force the client to send as zstd. We should round trip as
+    // zstd if we feed the out compresor id parameter from
+    // decompressMessage back in to compressMessage.
+    toSend = buildMessage();
+    toSend = assertOk(clientManager.compressMessage(toSend, &zstdId));
+    recvd = assertOk(serverManager.decompressMessage(toSend, &compressorId));
+    ASSERT_EQ(compressorId, zstdId);
+    toSend = assertOk(serverManager.compressMessage(recvd, &compressorId));
+    recvd = assertOk(clientManager.decompressMessage(toSend, &compressorId));
+    ASSERT_EQ(compressorId, zstdId);
 }
 
 TEST(MessageCompressorManager, MessageSizeTooLarge) {

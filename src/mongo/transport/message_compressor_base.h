@@ -42,6 +42,7 @@ enum class MessageCompressor : uint8_t {
     kNoop = 0,
     kSnappy = 1,
     kZlib = 2,
+    kZstd = 3,
     kExtended = 255,
 };
 
@@ -55,7 +56,7 @@ public:
     virtual ~MessageCompressorBase() = default;
 
     /*
-     * Returns the name for subclass compressors (e.g. "snappy", "zlib", or "noop")
+     * Returns the name for subclass compressors (e.g. "snappy", "zlib", "zstd" or "noop")
      */
     const std::string& getName() const {
         return _name;
