@@ -51,9 +51,10 @@ var checkLog;
          * Throws an exception on timeout.
          */
         var containsWithCount = function(conn, msg, expectedCount) {
-            var count = 0;
+            let count;
             assert.soon(
                 function() {
+                    count = 0;
                     var logMessages = getGlobalLog(conn);
                     if (logMessages === null) {
                         return false;
