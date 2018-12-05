@@ -160,9 +160,8 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
         invariant(_indexBuildInterceptor->areAllConstraintsChecked(_opCtx));
     }
 
+    log() << "index build: done building index " << _indexName << "";
 
-    LOG(2) << "marking index " << _indexName << " as ready in snapshot id "
-           << _opCtx->recoveryUnit()->getSnapshotId();
     _collection->indexBuildSuccess(_opCtx, _entry);
 
     OperationContext* opCtx = _opCtx;

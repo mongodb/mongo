@@ -341,21 +341,20 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
     _ns = nss.ns();
 }
 
-ProgressMeter& CurOp::setMessage_inlock(const char* msg,
-                                        std::string name,
-                                        unsigned long long progressMeterTotal,
-                                        int secondsBetween) {
-    if (progressMeterTotal) {
-        if (_progressMeter.isActive()) {
-            error() << "old _message: " << redact(_message) << " new message:" << redact(msg);
-            verify(!_progressMeter.isActive());
-        }
-        _progressMeter.reset(progressMeterTotal, secondsBetween);
-        _progressMeter.setName(name);
-    } else {
-        _progressMeter.finished();
+void CurOp::setMessage_inlock(StringData message) {
+    if (_progressMeter.isActive()) {
+        error() << "old _message: " << redact(_message) << " new message:" << redact(message);
+        verify(!_progressMeter.isActive());
     }
-    _message = msg;
+    _message = message.toString();  // copy
+}
+
+ProgressMeter& CurOp::setProgress_inlock(StringData message,
+                                         unsigned long long progressMeterTotal,
+                                         int secondsBetween) {
+    setMessage_inlock(message);
+    _progressMeter.reset(progressMeterTotal, secondsBetween);
+    _progressMeter.setName(message);
     return _progressMeter;
 }
 

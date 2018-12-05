@@ -422,7 +422,6 @@ bool runCreateIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IS);
 
-        LOG(1) << "performing first index build drain";
         uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
     }
 
@@ -436,7 +435,6 @@ bool runCreateIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
 
-        LOG(1) << "performing second index build drain";
         uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
     }
 
@@ -463,7 +461,6 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
-    LOG(1) << "performing final index build drain";
     uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
 
     // This is required before completion.

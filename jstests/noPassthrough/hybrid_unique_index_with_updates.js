@@ -26,7 +26,7 @@
         assert.commandWorked(testDB.adminCommand({configureFailPoint: failPointName, mode: "off"}));
     };
 
-    const docsToInsert = 10;
+    const docsToInsert = 1000;
     let setUp = function(coll) {
         coll.drop();
 

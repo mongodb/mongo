@@ -51,7 +51,7 @@
 
         // Make sure the index build started and hit the failpoint.
         jsTestLog("Waiting for background index build to start and hang due to failpoint.");
-        checkLog.contains(node, "build index on: " + testDB[collName].getFullName());
+        checkLog.contains(node, "index build: starting on " + testDB[collName].getFullName());
         checkLog.contains(node, "Hanging index build with no locks");
     }
 

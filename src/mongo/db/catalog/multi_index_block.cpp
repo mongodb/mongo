@@ -242,9 +242,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
         }
         index.options.fromIndexBuilder = true;
 
-        log() << "build index on: " << ns << " properties: " << descriptor->toString();
+        log() << "index build: starting on " << ns << " properties: " << descriptor->toString();
         if (index.bulk)
-            log() << "\t building index using bulk method; build may temporarily use up to "
+            log() << "build may temporarily use up to "
                   << eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024 << " megabytes of RAM";
 
         index.filterExpression = index.block->getEntry()->getFilterExpression();
@@ -308,12 +308,13 @@ Status MultiIndexBlock::insertAllDocumentsInCollection() {
     }
     MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo();
 
-    const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
+    const char* curopMessage = "Index Build: scanning collection";
     const auto numRecords = _collection->numRecords(_opCtx);
-    stdx::unique_lock<Client> lk(*_opCtx->getClient());
-    ProgressMeterHolder progress(
-        CurOp::get(_opCtx)->setMessage_inlock(curopMessage, curopMessage, numRecords));
-    lk.unlock();
+    ProgressMeterHolder progress;
+    {
+        stdx::unique_lock<Client> lk(*_opCtx->getClient());
+        progress.set(CurOp::get(_opCtx)->setProgress_inlock(curopMessage, numRecords));
+    }
 
     Timer t;
 
@@ -434,12 +435,12 @@ Status MultiIndexBlock::insertAllDocumentsInCollection() {
 
     progress->finished();
 
+    log() << "index build: collection scan done. scanned " << n << " total records in "
+          << t.seconds() << " secs";
+
     Status ret = dumpInsertsFromBulk();
     if (!ret.isOK())
         return ret;
-
-    log() << "build index collection scan done.  scanned " << n << " total records. " << t.seconds()
-          << " secs";
 
     return Status::OK();
 }
@@ -501,7 +502,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
         std::vector<BSONObj> dupKeysInserted;
 
         IndexCatalogEntry* entry = _indexes[i].block->getEntry();
-        LOG(1) << "\t dumping from external sorter into index: "
+        LOG(1) << "index build: inserting from external sorter into index: "
                << entry->descriptor()->indexName();
         Status status = _indexes[i].real->commitBulk(_opCtx,
                                                      _indexes[i].bulk.get(),
@@ -553,9 +554,6 @@ Status MultiIndexBlock::drainBackgroundWritesIfNeeded() {
         auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
         if (!interceptor)
             continue;
-
-        LOG(1) << "draining background writes on collection " << _collection->ns()
-               << " into index: " << _indexes[i].block->getEntry()->descriptor()->indexName();
 
         auto status = interceptor->drainWritesIntoIndex(_opCtx, _indexes[i].options);
         if (!status.isOK()) {

@@ -646,13 +646,13 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
 
-    stdx::unique_lock<Client> lk(*opCtx->getClient());
-    ProgressMeterHolder pm(
-        CurOp::get(opCtx)->setMessage_inlock("Index Bulk Build: (2/3) btree bottom up",
-                                             "Index: (2/3) BTree Bottom Up Progress",
-                                             bulk->getKeysInserted(),
-                                             10));
-    lk.unlock();
+    static const char* message = "Index Build: inserting keys from external sorter into index";
+    ProgressMeterHolder pm;
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        pm.set(CurOp::get(opCtx)->setProgress_inlock(
+            message, bulk->getKeysInserted(), 3 /* secondsBetween */));
+    }
 
     auto builder = std::unique_ptr<SortedDataBuilderInterface>(
         _newInterface->getBulkBuilder(opCtx, dupsAllowed));
@@ -722,13 +722,8 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     pm.finished();
 
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setMessage_inlock("Index Bulk Build: (3/3) btree-middle",
-                                             "Index: (3/3) BTree Middle Progress");
-    }
-
-    LOG(timer.seconds() > 10 ? 0 : 1) << "\t done building bottom layer, going to commit";
+    log() << "index build: inserted keys from external sorter into index in " << timer.seconds()
+          << " seconds";
 
     WriteUnitOfWork wunit(opCtx);
     SpecialFormatInserted specialFormatInserted = builder->commit(mayInterrupt);

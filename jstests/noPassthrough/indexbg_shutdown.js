@@ -81,7 +81,7 @@
     // There should be a message for each index we tried to create.
     checkLog.containsWithCount(
         replTest.getSecondary(),
-        'build index on: ' + masterColl.getFullName() + ' properties: { v: 2, key: { i:',
+        'index build: starting on ' + masterColl.getFullName() + ' properties: { v: 2, key: { i:',
         indexSpecs.length);
 
     jsTest.log("Restarting secondary to retry replication");
@@ -95,7 +95,7 @@
     // the message was logged twice in total.
     checkLog.containsWithCount(
         replTest.getSecondary(),
-        'build index on: ' + masterColl.getFullName() + ' properties: { v: 2, key: { i:',
+        'index build: starting on ' + masterColl.getFullName() + ' properties: { v: 2, key: { i:',
         indexSpecs.length);
 
     replTest.stopSet();

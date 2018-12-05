@@ -75,6 +75,8 @@ public:
 private:
     const IndexCatalogEntry* _indexCatalogEntry;
 
+    AtomicInt64 _duplicateCounter{0};
+
     // This temporary record store is owned by the duplicate key tracker and dropped along with it.
     std::unique_ptr<TemporaryRecordStore> _keyConstraintsTable;
 };

@@ -79,8 +79,8 @@ public:
         return _units;
     }
 
-    void setName(std::string name) {
-        _name = name.c_str();
+    void setName(StringData name) {
+        _name = name;
     }
     std::string getName() const {
         return _name.toString();
@@ -128,41 +128,45 @@ private:
     ThreadSafeString _name;
 };
 
-// e.g.:
-// CurOp * op = CurOp::get(opCtx);
-// ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
-// "Index: External Sort Progress", d->stats.nrecords, 10)); loop { pm.hit(); }
+/*
+ * Wraps a ProgressMeter and calls finished() when destructed. This may only exist as long as the
+ * underlying ProgressMeter, which is owned by CurOp.
+ */
 class ProgressMeterHolder {
     MONGO_DISALLOW_COPYING(ProgressMeterHolder);
 
 public:
-    ProgressMeterHolder(ProgressMeter& pm) : _pm(pm) {}
+    ProgressMeterHolder() : _pm(nullptr) {}
+
+    ProgressMeterHolder(ProgressMeter& pm) : _pm(&pm) {}
 
     ~ProgressMeterHolder() {
-        _pm.finished();
+        if (_pm) {
+            _pm->finished();
+        }
+    }
+
+    void set(ProgressMeter& pm) {
+        _pm = &pm;
     }
 
     ProgressMeter* operator->() {
-        return &_pm;
+        return _pm;
     }
 
     ProgressMeter* get() {
-        return &_pm;
+        return _pm;
     }
 
     bool hit(int n = 1) {
-        return _pm.hit(n);
+        return _pm->hit(n);
     }
 
     void finished() {
-        _pm.finished();
-    }
-
-    bool operator==(const ProgressMeter& other) {
-        return _pm == other;
+        _pm->finished();
     }
 
 private:
-    ProgressMeter& _pm;
+    ProgressMeter* _pm;
 };
 }

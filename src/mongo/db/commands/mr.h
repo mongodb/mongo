@@ -305,7 +305,7 @@ public:
 
     void finalReduce(BSONList& values);
 
-    void finalReduce(OperationContext* opCtx, CurOp* op, ProgressMeterHolder& pm);
+    void finalReduce(OperationContext* opCtx, CurOp* op);
 
     // ------- cleanup/data positioning ----------
 
@@ -317,10 +317,9 @@ public:
     /**
        @return number objects in collection
      */
-    long long postProcessCollection(OperationContext* opCtx, CurOp* op, ProgressMeterHolder& pm);
+    long long postProcessCollection(OperationContext* opCtx, CurOp* op);
     long long postProcessCollectionNonAtomic(OperationContext* opCtx,
                                              CurOp* op,
-                                             ProgressMeterHolder& pm,
                                              bool callerHoldsGlobalLock);
 
     /**
