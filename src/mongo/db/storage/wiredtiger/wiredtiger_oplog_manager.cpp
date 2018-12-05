@@ -132,7 +132,9 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lk, [&] {
         auto newLatestVisibleTimestamp = getOplogReadTimestamp();
         if (newLatestVisibleTimestamp < currentLatestVisibleTimestamp) {
-            LOG(1) << "oplog latest visible timestamp went backwards";
+            LOG(1) << "Oplog latest visible timestamp went backwards. newLatestVisibleTimestamp: "
+                   << Timestamp(newLatestVisibleTimestamp) << " currentLatestVisibleTimestamp: "
+                   << Timestamp(currentLatestVisibleTimestamp);
             // If the visibility went backwards, this means a rollback occurred.
             // Thus, we are finished waiting.
             return true;
@@ -141,7 +143,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
         RecordId latestVisible = RecordId(currentLatestVisibleTimestamp);
         if (latestVisible < waitingFor) {
             LOG(2) << "Operation is waiting for " << waitingFor << "; latestVisible is "
-                   << currentLatestVisibleTimestamp;
+                   << Timestamp(currentLatestVisibleTimestamp);
         }
         return latestVisible >= waitingFor;
     });
@@ -205,7 +207,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         }
 
         if (_shuttingDown) {
-            log() << "oplog journal thread loop shutting down";
+            log() << "Oplog journal thread loop shutting down";
             return;
         }
         invariant(_opsWaitingForJournal);
@@ -218,7 +220,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         // where we commit data file changes separately from oplog changes, so ignore
         // a non-incrementing timestamp.
         if (newTimestamp <= _oplogReadTimestamp.load()) {
-            LOG(2) << "no new oplog entries were made visible: " << newTimestamp;
+            LOG(2) << "No new oplog entries were made visible: " << Timestamp(newTimestamp);
             continue;
         }
 
@@ -256,7 +258,7 @@ void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
 void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimestamp) {
     _oplogReadTimestamp.store(newTimestamp);
     _opsBecameVisibleCV.notify_all();
-    LOG(2) << "setting new oplogReadTimestamp: " << newTimestamp;
+    LOG(2) << "Setting new oplogReadTimestamp: " << Timestamp(newTimestamp);
 }
 
 uint64_t WiredTigerOplogManager::fetchAllCommittedValue(WT_CONNECTION* conn) {
