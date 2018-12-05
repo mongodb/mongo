@@ -68,7 +68,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
     # This suite requires w="majority" writes to be applied on all secondaries. By using a 2-node
     # replica set and having secondaries vote, the majority of the replica set is all nodes.
     num_nodes: 2

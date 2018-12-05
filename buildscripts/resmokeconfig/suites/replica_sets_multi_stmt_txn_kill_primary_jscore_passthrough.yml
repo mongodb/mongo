@@ -420,7 +420,6 @@ executor:
             recovery: 2
           transaction: 4
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
         enableElectionHandoff: 0
     all_nodes_electable: true
     num_nodes: 3

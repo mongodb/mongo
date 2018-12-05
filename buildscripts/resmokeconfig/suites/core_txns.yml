@@ -28,6 +28,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
     # Use a 1-node replica set.
     num_nodes: 1

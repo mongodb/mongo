@@ -44,6 +44,7 @@
         secondaryStartupParams = secondaryStartupParams || {};
         secondaryStartupParams['failpoint.' + failPoint] =
             tojson({mode: 'alwaysOn', data: {nss: nss}});
+        secondaryStartupParams['numInitialSyncAttempts'] = 1;
         replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
 
         jsTestLog("Waiting for secondary to reach failPoint " + failPoint);

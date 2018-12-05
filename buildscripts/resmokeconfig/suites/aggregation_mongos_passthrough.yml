@@ -39,6 +39,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
     enable_sharding:
     - test

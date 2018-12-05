@@ -69,7 +69,6 @@ executor:
           command: 1
           query: 1
           replication: 3
-        numInitialSyncAttempts: 1
     # This suite requires w:"majority" writes to be applied on all shard secondaries.
     # By setting shards to two node replsets and having secondaries vote, the majority
     # is all voting nodes. TODO: use causal consistency instead (SERVER-32791).

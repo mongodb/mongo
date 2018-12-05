@@ -224,7 +224,6 @@ executor:
           replication:
             heartbeats: 2
           tracking: 0
-        numInitialSyncAttempts: 1
     num_rs_nodes_per_shard: 2
     # TODO SERVER-32572 remove voting_secondaries: true
     shard_options:

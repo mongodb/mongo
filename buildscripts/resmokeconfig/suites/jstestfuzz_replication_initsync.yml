@@ -30,7 +30,6 @@ executor:
         enableTestCommands: 1
         logComponentVerbosity:
           replication: 2
-        numInitialSyncAttempts: 1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
     num_nodes: 2

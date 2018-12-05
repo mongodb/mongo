@@ -49,7 +49,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
     num_nodes: 2

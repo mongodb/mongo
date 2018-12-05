@@ -44,7 +44,6 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
         enableElectionHandoff: 0

@@ -176,7 +176,6 @@ executor:
       syncdelay: 5
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
         enableElectionHandoff: 0
         logComponentVerbosity:
           replication:

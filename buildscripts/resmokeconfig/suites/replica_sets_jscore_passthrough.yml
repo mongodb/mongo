@@ -51,7 +51,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
         # When running tests that intentionally trigger a DuplicateKeyError, we somehow end up
         # performing an atClusterTime read in the CheckReplDBHashInBackground hook based on an
         # operationTime that is greater than anything in the oplog. The periodic no-op writer must

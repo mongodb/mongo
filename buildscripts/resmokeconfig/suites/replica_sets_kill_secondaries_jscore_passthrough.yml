@@ -49,7 +49,6 @@ executor:
       syncdelay: 5
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
         logComponentVerbosity:
           replication:
             heartbeats: 2
