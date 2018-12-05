@@ -1,3 +1,4 @@
+// @tags: [assumes_balancer_off]
 load("jstests/libs/fixture_helpers.js");
 
 t = db.index_diag;

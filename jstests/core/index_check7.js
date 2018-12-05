@@ -1,3 +1,4 @@
+// @tags: [assumes_balancer_off]
 
 t = db.index_check7;
 t.drop();

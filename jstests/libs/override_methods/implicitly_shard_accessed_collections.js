@@ -9,6 +9,30 @@
  * dropped in a sharded cluster.
  */
 
+/**
+ * Settings for the converting implictily accessed collections to sharded collections.
+ */
+const ImplicitlyShardAccessCollSettings = (function() {
+    let mode = 0;  // Default to hashed shard key.
+
+    return {
+        Modes: {
+            kUseHashedSharding: 0,
+            kHashedMoveToSingleShard: 1,
+        },
+        setMode: function(newMode) {
+            if (newMode !== 0 && newMode !== 1) {
+                throw new Error("Cannot set mode to unknown mode: " + newMode);
+            }
+
+            mode = newMode;
+        },
+        getMode: function() {
+            return mode;
+        },
+    };
+})();
+
 (function() {
     'use strict';
 
@@ -31,6 +55,8 @@
         /\.system\./,
     ];
 
+    const kZoneName = 'moveToHereForMigrationPassthrough';
+
     function shardCollection(collection) {
         var db = collection.getDB();
         var dbName = db.getName();
@@ -51,18 +77,45 @@
 
         res = db.adminCommand(
             {shardCollection: fullName, key: {_id: 'hashed'}, collation: {locale: "simple"}});
-        if (res.ok === 0 && testMayRunDropInParallel) {
-            // We ignore ConflictingOperationInProgress error responses from the
-            // "shardCollection" command if it's possible the test was running a "drop" command
-            // concurrently. We could retry running the "shardCollection" command, but tests
-            // that are likely to trigger this case are also likely running the "drop" command
-            // in a loop. We therefore just let the test continue with the collection being
-            // unsharded.
-            assert.commandFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
-            print("collection '" + fullName +
-                  "' failed to be sharded due to a concurrent drop operation");
-        } else {
-            assert.commandWorked(res, "sharding '" + fullName + "' with a hashed _id key failed");
+
+        let checkResult = function(res, opDescription) {
+            if (res.ok === 0 && testMayRunDropInParallel) {
+                // We ignore ConflictingOperationInProgress error responses from the
+                // "shardCollection" command if it's possible the test was running a "drop" command
+                // concurrently. We could retry running the "shardCollection" command, but tests
+                // that are likely to trigger this case are also likely running the "drop" command
+                // in a loop. We therefore just let the test continue with the collection being
+                // unsharded.
+                assert.commandFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
+                jsTest.log("Ignoring failure while " + opDescription +
+                           " due to a concurrent drop operation: " + tojson(res));
+            } else {
+                assert.commandWorked(res, opDescription + " failed");
+            }
+        };
+
+        checkResult(res, 'shard ' + fullName);
+
+        // Set the entire chunk range to a single zone, so balancer will be forced to move the
+        // evenly distributed chunks to a shard (selected at random).
+        if (res.ok === 1 &&
+            ImplicitlyShardAccessCollSettings.getMode() ===
+                ImplicitlyShardAccessCollSettings.Modes.kHashedMoveToSingleShard) {
+            let shardName =
+                db.getSiblingDB('config').shards.aggregate([{$sample: {size: 1}}]).toArray()[0]._id;
+
+            checkResult(db.adminCommand({addShardToZone: shardName, zone: kZoneName}),
+                        'add ' + shardName + ' to zone ' + kZoneName);
+            checkResult(db.adminCommand({
+                updateZoneKeyRange: fullName,
+                min: {_id: MinKey},
+                max: {_id: MaxKey},
+                zone: kZoneName
+            }),
+                        'set zone for ' + fullName);
+
+            // Wake up the balancer.
+            checkResult(db.adminCommand({balancerStart: 1}), 'turn on balancer');
         }
     }
 

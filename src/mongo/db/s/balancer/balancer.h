@@ -144,6 +144,11 @@ public:
      */
     void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
+    /**
+     * Informs the balancer that a setting that affects it changed.
+     */
+    void notifyPersistedBalancerSettingsChanged();
+
 private:
     /**
      * Possible runtime states of the balancer. The comments indicate the allowed next state.
