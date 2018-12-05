@@ -5649,7 +5649,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_collections_causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
-      resmoke_jobs_max: 0  # No cap on number of jobs.
 
 - <<: *task_template
   name: replica_sets_jscore_passthrough
