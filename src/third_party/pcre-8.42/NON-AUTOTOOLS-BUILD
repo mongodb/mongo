@@ -760,13 +760,14 @@ The character code used is EBCDIC, not ASCII or Unicode. In z/OS, UNIX APIs and
 applications can be supported through UNIX System Services, and in such an
 environment PCRE can be built in the same way as in other systems. However, in
 native z/OS (without UNIX System Services) and in z/VM, special ports are
-required. For details, please see this web site:
+required. PCRE1 version 8.39 is available in file 882 on this site:
 
-  http://www.zaconsultants.net
+  http://www.cbttape.org
 
-You may download PCRE from WWW.CBTTAPE.ORG, file 882.  Everything, source and
-executable, is in EBCDIC and native z/OS file formats and this is the
-recommended download site.
+Everything, source and executable, is in EBCDIC and native z/OS file formats.
+However, this software is not maintained and will not be upgraded. If you are
+new to PCRE you should be looking at PCRE2 (version 10.30 or later).
 
-==========================
-Last Updated: 25 June 2015
+===============================
+Last Updated: 13 September 2017
+===============================

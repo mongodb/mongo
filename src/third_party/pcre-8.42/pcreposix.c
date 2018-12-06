@@ -6,7 +6,7 @@
 and semantics are as close as possible to those of the Perl 5 language.
 
                        Written by Philip Hazel
-           Copyright (c) 1997-2017 University of Cambridge
+           Copyright (c) 1997-2018 University of Cambridge
 
 -----------------------------------------------------------------------------
 Redistribution and use in source and binary forms, with or without
@@ -389,8 +389,8 @@ if (rc >= 0)
     {
     for (i = 0; i < (size_t)rc; i++)
       {
-      pmatch[i].rm_so = ovector[i*2] + so;
-      pmatch[i].rm_eo = ovector[i*2+1] + so;
+      pmatch[i].rm_so = (ovector[i*2] < 0)? -1 : ovector[i*2] + so;
+      pmatch[i].rm_eo = (ovector[i*2+1] < 0)? -1: ovector[i*2+1] + so;
       }
     if (allocated_ovector) free(ovector);
     for (; i < nmatch; i++) pmatch[i].rm_so = pmatch[i].rm_eo = -1;

@@ -2287,12 +2287,14 @@ for (;;)
       case OP_NOTI:
       if (clen > 0)
         {
-        unsigned int otherd;
+        pcre_uint32 otherd;
 #ifdef SUPPORT_UTF
         if (utf && d >= 128)
           {
 #ifdef SUPPORT_UCP
           otherd = UCD_OTHERCASE(d);
+#else
+          otherd = d;
 #endif  /* SUPPORT_UCP */
           }
         else
