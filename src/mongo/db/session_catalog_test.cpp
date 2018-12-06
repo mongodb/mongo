@@ -440,5 +440,65 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     }
 }
 
+// Test that session kill will block normal sesion chechout and will be signaled correctly.
+// Even if the implementaion has a bug, the test may not always fail depending on thread
+// scheduling, however, this test case still gives us a good coverage.
+TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
+    auto lsid = makeLogicalSessionIdForTest();
+    _opCtx->setLogicalSessionId(lsid);
+
+    stdx::future<void> normalCheckOutFinish, killCheckOutFinish;
+
+    // This variable is protected by the session check-out.
+    std::string lastSessionCheckOut = "first session";
+    {
+        // Check out the session to block both normal check-out and checkOutForKill.
+        OperationContextSession firstCheckOut(_opCtx);
+
+        // Normal check out should start after kill.
+        normalCheckOutFinish = stdx::async(stdx::launch::async, [&] {
+            ThreadClient tc(getGlobalServiceContext());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(lsid);
+            OperationContextSession normalCheckOut(sideOpCtx.get());
+            ASSERT_EQ("session kill", lastSessionCheckOut);
+            lastSessionCheckOut = "session checkout";
+        });
+
+        // Kill will short-cut the queue and be the next one to check out.
+        killCheckOutFinish = stdx::async(stdx::launch::async, [&] {
+            ThreadClient tc(getGlobalServiceContext());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(lsid);
+
+            // Kill the session
+            std::vector<Session::KillToken> killTokens;
+            catalog()->scanSessions(SessionKiller::Matcher(KillAllSessionsByPatternSet{
+                                        makeKillAllSessionsByPattern(sideOpCtx.get())}),
+                                    [&killTokens](WithLock sessionCatalogLock, Session* session) {
+                                        killTokens.emplace_back(session->kill(
+                                            sessionCatalogLock, ErrorCodes::InternalError));
+                                    });
+            ASSERT_EQ(1U, killTokens.size());
+            auto checkOutSessionForKill(
+                catalog()->checkOutSessionForKill(sideOpCtx.get(), std::move(killTokens[0])));
+            ASSERT_EQ("first session", lastSessionCheckOut);
+            lastSessionCheckOut = "session kill";
+        });
+
+        // The main thread won't check in the session until it's killed.
+        {
+            stdx::mutex m;
+            stdx::condition_variable cond;
+            stdx::unique_lock<std::mutex> lock(m);
+            ASSERT_EQ(ErrorCodes::InternalError,
+                      _opCtx->waitForConditionOrInterruptNoAssert(cond, lock));
+        }
+    }
+    normalCheckOutFinish.get();
+    killCheckOutFinish.get();
+    ASSERT_EQ("session checkout", lastSessionCheckOut);
+}
+
 }  // namespace
 }  // namespace mongo

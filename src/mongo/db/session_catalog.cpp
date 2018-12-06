@@ -166,7 +166,7 @@ void SessionCatalog::_releaseSession(std::shared_ptr<SessionCatalog::SessionRunt
     invariant(sri->session.currentOperation());
 
     sri->session._markCheckedIn(lg);
-    sri->availableCondVar.notify_one();
+    sri->availableCondVar.notify_all();
 
     if (killToken) {
         invariant(sri->session.killed());
