@@ -911,7 +911,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                 break;
             }
 
-            _applyMigrateOp(opCtx, mods, &lastOpApplied);
+            if (!_applyMigrateOp(opCtx, mods, &lastOpApplied)) {
+                continue;
+            }
 
             const int maxIterations = 3600 * 50;
 
