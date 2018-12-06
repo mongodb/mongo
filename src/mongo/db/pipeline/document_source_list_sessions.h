@@ -83,6 +83,14 @@ public:
         return kStageName;
     }
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final {
+        // Because this stage needs to serialize its original specification to send to the shards in
+        // a sharded cluster, we must override and prevent the $match-$match combining optimization
+        // we inherit from DocumentSourceMatch. For more details, see SERVER-37200.
+        return std::next(itr);
+    }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }

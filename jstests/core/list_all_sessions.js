@@ -14,6 +14,10 @@
     function listSessions() {
         return config.system.sessions.aggregate(pipeline);
     }
+    function listSessionsWithFilter(filter) {
+        return config.system.sessions.aggregate(
+            [{'$listSessions': {allUsers: true}}, {$match: filter}]);
+    }
 
     // Start a new session and capture its sessionId.
     const myid = assert.commandWorked(admin.runCommand({startSession: 1})).id.id;
@@ -35,6 +39,9 @@
                                     });
         return resultArrayMine.length == 1;
     }, "Failed to locate session in collection");
+
+    const sessionList = listSessionsWithFilter({_id: "non_existent"}).toArray();
+    assert.eq(0, sessionList.length, tojson(sessionList));
 
     // Make sure pipelining other collections fail.
     assertErrorCode(admin.system.collections, pipeline, ErrorCodes.InvalidNamespace);

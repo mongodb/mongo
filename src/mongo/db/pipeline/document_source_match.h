@@ -70,7 +70,7 @@ public:
      * $and.
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+                                                     Pipeline::SourceContainer* container) override;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
