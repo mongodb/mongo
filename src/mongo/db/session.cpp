@@ -629,7 +629,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
 
         const auto now = curTimeMicros64();
         _transactionExpireDate = Date_t::fromMillisSinceEpoch(now / 1000) +
-            stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
+            Seconds{transactionLifetimeLimitSeconds.load()};
         // Tracks various transactions metrics.
         {
             stdx::lock_guard<stdx::mutex> ls(_statsMutex);

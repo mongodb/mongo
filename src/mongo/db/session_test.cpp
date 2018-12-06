@@ -766,7 +766,7 @@ TEST_F(SessionTest, ReportStashedResources) {
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
         Date_t::fromMillisSinceEpoch(session.getSingleTransactionStats()->getStartTime() / 1000) +
-            stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()});
+            Seconds{transactionLifetimeLimitSeconds.load()});
     ASSERT_EQ(stashedState.getField("client").valueStringData().toString(), "");
     ASSERT_EQ(stashedState.getField("connectionId").numberLong(), 0);
     ASSERT_EQ(stashedState.getField("appName").valueStringData().toString(), "appName");
@@ -843,7 +843,7 @@ TEST_F(SessionTest, ReportUnstashedResources) {
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
         Date_t::fromMillisSinceEpoch(session.getSingleTransactionStats()->getStartTime() / 1000) +
-            stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()});
+            Seconds{transactionLifetimeLimitSeconds.load()});
     // For the following time metrics, we are only verifying that the transaction sub-document is
     // being constructed correctly with proper types because we have other tests to verify that the
     // values are being tracked correctly.

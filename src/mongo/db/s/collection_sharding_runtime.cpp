@@ -81,8 +81,8 @@ void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
 
 auto CollectionShardingRuntime::cleanUpRange(ChunkRange const& range, CleanWhen when)
     -> CleanupNotification {
-    Date_t time = (when == kNow) ? Date_t{} : Date_t::now() +
-            stdx::chrono::seconds{orphanCleanupDelaySecs.load()};
+    Date_t time =
+        (when == kNow) ? Date_t{} : Date_t::now() + Seconds(orphanCleanupDelaySecs.load());
     return _metadataManager->cleanUpRange(range, time);
 }
 

@@ -288,7 +288,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                    << redact(self->_orphans.front().range.toString()) << " next.";
         }
 
-        return Date_t::now() + stdx::chrono::milliseconds{rangeDeleterBatchDelayMS.load()};
+        return Date_t::now() + Milliseconds(rangeDeleterBatchDelayMS.load());
     }
 
     invariant(range);
@@ -296,7 +296,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     invariant(wrote.getValue() > 0);
 
     notification.abandon();
-    return Date_t::now() + stdx::chrono::milliseconds{rangeDeleterBatchDelayMS.load()};
+    return Date_t::now() + Milliseconds(rangeDeleterBatchDelayMS.load());
 }
 
 bool CollectionRangeDeleter::_checkCollectionMetadataStillValid(
