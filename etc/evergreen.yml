@@ -3693,8 +3693,8 @@ tasks:
         content_type: ${content_type|application/gzip}
         display_name: Source tarball
         # We only need to upload the source tarball from one of the build variants
-        # because it should be the same everywhere, so just use linux-64/windows-64-2k8-ssl.
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        # because it should be the same everywhere, so just use rhel70/windows-64-2k8-ssl.
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
     # For patch builds that bypass compile, we upload links to pre-existing tarballs, except for the
     # artifacts.tgz.
     - command: attach.artifacts
@@ -7793,7 +7793,7 @@ tasks:
         remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
     - func: "apply compile expansions"
     - func: "fetch debugsymbols archive"
     - func: "set up remote credentials"
@@ -7848,7 +7848,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
 
     # Put the debug symbols
     - command: s3.put
@@ -7894,7 +7894,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
 
     # Put the debug symbols signature
     - command: s3.put
@@ -7952,7 +7952,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
 
     # Put the debug symbols sha1
     - command: s3.put
@@ -8010,7 +8010,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
 
     # Put the debug symbols sha256
     - command: s3.put
@@ -8068,7 +8068,7 @@ tasks:
         permissions: public-read
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
-        build_variants: [ linux-64, windows-64-2k8-ssl ]
+        build_variants: [ rhel70, windows-64-2k8-ssl ]
 
     # Put the debug symbols md5
     - command: s3.put
@@ -8110,7 +8110,7 @@ tasks:
             #Source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
+               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
 
             #MSI (Windows only)
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
@@ -8128,7 +8128,7 @@ tasks:
             #Source tarball signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
+               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
 
             #SHA1 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
@@ -8141,7 +8141,7 @@ tasks:
             #SHA1 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
+               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
 
             #SHA1 for MSI
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
@@ -8159,7 +8159,7 @@ tasks:
             #SHA256 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
+               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
 
             #SHA256 for MSI files
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
@@ -8177,7 +8177,7 @@ tasks:
             #MD5 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
+               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
 
             #MD5 for MSIs
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
@@ -8367,103 +8367,13 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_http_client
     tooltags: ""
     build_mongoreplay: true
-  display_tasks:
-  - *dbtest
-  - *unittests
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_TG
     distros:
     - rhel62-large
-  - name: aggregation
-  - name: aggregation_auth
-  - name: aggregation_mongos_passthrough
-  - name: aggregation_one_shard_sharded_collections
-  - name: aggregation_read_concern_majority_passthrough
-  - name: aggregation_sharded_collections_passthrough
-  - name: auth
-  - name: change_streams
-  - name: change_streams_mongos_passthrough
-  - name: change_streams_mongos_sessions_passthrough
-  - name: change_streams_secondary_reads
-  - name: change_streams_sharded_collections_passthrough
-  - name: change_streams_whole_db_passthrough
-  - name: change_streams_whole_db_mongos_passthrough
-  - name: change_streams_whole_db_secondary_reads_passthrough
-  - name: change_streams_whole_db_sharded_collections_passthrough
-  - name: change_streams_whole_cluster_passthrough
-  - name: change_streams_whole_cluster_mongos_passthrough
-  - name: change_streams_whole_cluster_secondary_reads_passthrough
-  - name: change_streams_whole_cluster_sharded_collections_passthrough
-  - name: disk_wiredtiger
-  - name: failpoints
-  - name: failpoints_auth
-  - name: gle_auth
-  - name: gle_auth_write_cmd
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: integration_tests_standalone
-  - name: integration_tests_replset
-  - name: integration_tests_sharded
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jsCore_op_query
-  - name: jsCore_compatibility
-  - name: jsCore_decimal
-  - name: jsCore_txns
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: jstestfuzz_gen
-  - name: jstestfuzz_concurrent_gen
-  - name: jstestfuzz_concurrent_replication_gen
-  - name: jstestfuzz_concurrent_sharded_gen
-  - name: jstestfuzz_replication_gen
-  - name: aggregation_wildcard_fuzzer_gen
-  - name: jstestfuzz_sharded_gen
-  - name: mongosTest
-  - name: multiversion_auth
-  - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: bulk_gle_passthrough
-  - name: parallel
-  - name: parallel_compatibility
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
-  - name: concurrency_replication_multi_stmt_txn
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
-  - name: read_only
-  - name: read_only_sharded
-  - name: replica_sets
-  - name: replica_sets_auth
+  - name: dbtest
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
-  - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
-  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_jscore_txns
-  - name: sharded_jscore_txns_sharded_collections
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: tool
-  - name: write_concern_majority_passthrough
-  - name: publish_packages
+  - name: jsCore
   - name: push
 
 - name: linux-64-repeated-execution
