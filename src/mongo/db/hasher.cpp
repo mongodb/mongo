@@ -92,8 +92,8 @@ void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
         // if there are no embedded objects (subobjects or arrays),
         // compute the hash, squashing numeric types to 64-bit ints
         if (e.isNumber()) {
-            // Use safeNumberLong, it is well-defined for troublesome doubles.
-            const auto i = endian::nativeToLittle(e.safeNumberLong());
+            // Use safeNumberLongForHash, it is well-defined for troublesome doubles.
+            const auto i = endian::nativeToLittle(e.safeNumberLongForHash());
             h->addData(&i, sizeof(i));
         } else {
             h->addData(e.value(), e.valuesize());

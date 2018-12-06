@@ -701,7 +701,7 @@ bool BitTestMatchExpression::matchesSingleElement(const BSONElement& e,
         // integer are treated as 0. We use 'kLongLongMaxAsDouble' because if we just did
         // eDouble > 2^63-1, it would be compared against 2^63. eDouble=2^63 would not get caught
         // that way.
-        if (eDouble >= MatchExpressionParser::kLongLongMaxPlusOneAsDouble ||
+        if (eDouble >= BSONElement::kLongLongMaxPlusOneAsDouble ||
             eDouble < std::numeric_limits<long long>::min()) {
             return false;
         }

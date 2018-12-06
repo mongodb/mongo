@@ -2003,11 +2003,6 @@ private:
 class ExpressionConvert final : public Expression {
 public:
     /**
-     * Constant double representation of 2^63.
-     */
-    static const double kLongLongMaxPlusOneAsDouble;
-
-    /**
      * Creates a $convert expression converting from 'input' to the type given by 'toType'. Leaves
      * 'onNull' and 'onError' unspecified.
      */

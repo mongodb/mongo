@@ -350,6 +350,11 @@ public:
      *  very small doubles -> LLONG_MIN  */
     long long safeNumberLong() const;
 
+    /** This safeNumberLongForHash() function does the same thing as safeNumberLong, but it
+     *  preserves edge-case behavior from older versions.
+     */
+    long long safeNumberLongForHash() const;
+
     /** Retrieve decimal value for the element safely. */
     Decimal128 numberDecimal() const;
 
@@ -695,6 +700,16 @@ public:
     template <typename T>
     bool coerce(T* out) const;
 
+    /**
+     * Constant double representation of 2^63, the smallest value that will overflow a long long.
+     *
+     * It is not safe to obtain this value by casting std::numeric_limits<long long>::max() to
+     * double, because the conversion loses precision, and the C++ standard leaves it up to the
+     * implementation to decide whether to round up to 2^63 or round down to the next representable
+     * value (2^63 - 2^10).
+     */
+    static const double kLongLongMaxPlusOneAsDouble;
+
 private:
     const char* data;
     int fieldNameSize_;  // internal size includes null terminator
@@ -829,7 +844,7 @@ inline long long BSONElement::safeNumberLong() const {
             if (std::isnan(d)) {
                 return 0;
             }
-            if (d > (double)std::numeric_limits<long long>::max()) {
+            if (!(d < kLongLongMaxPlusOneAsDouble)) {
                 return std::numeric_limits<long long>::max();
             }
             if (d < std::numeric_limits<long long>::min()) {
@@ -853,6 +868,38 @@ inline long long BSONElement::safeNumberLong() const {
         default:
             return numberLong();
     }
+}
+
+/**
+ * This safeNumberLongForHash() function does the same thing as safeNumberLong, but it preserves
+ * edge-case behavior from older versions. It's provided for use by hash functions that need to
+ * maintain compatibility with older versions. Don't make any changes to safeNumberLong() without
+ * ensuring that this function (which is implemented in terms of safeNumberLong()) has exactly the
+ * same behavior.
+ *
+ * Historically, safeNumberLong() used a check that would consider 2^63 to be safe to cast to
+ * int64_t, but that value actually overflows. That overflow is preserved here.
+ *
+ * The new safeNumberLong() function uses a tight bound, allowing it to correctly clamp double 2^63
+ * to the max 64-bit int (2^63 - 1).
+ */
+inline long long BSONElement::safeNumberLongForHash() const {
+    if (NumberDouble == type()) {
+        double d = numberDouble();
+        if (std::isnan(d)) {
+            return 0;
+        }
+        if (d > (double)std::numeric_limits<long long>::max()) {
+            return std::numeric_limits<long long>::max();
+        }
+        if (d < std::numeric_limits<long long>::min()) {
+            return std::numeric_limits<long long>::min();
+        }
+        return (long long)d;
+    }
+
+    // safeNumberLong() and safeNumberLongForHash() have identical behavior for non-long value.
+    return safeNumberLong();
 }
 
 inline BSONElement::BSONElement() {

@@ -88,13 +88,13 @@ TEST(MatchExpressionParserTest, ParseIntegerElementToLongAcceptsNegative) {
 }
 
 TEST(MatchExpressionParserTest, ParseIntegerElementToNonNegativeLongRejectsTooLargeDouble) {
-    BSONObj query = BSON("" << MatchExpressionParser::kLongLongMaxPlusOneAsDouble);
+    BSONObj query = BSON("" << BSONElement::kLongLongMaxPlusOneAsDouble);
     ASSERT_NOT_OK(
         MatchExpressionParser::parseIntegerElementToNonNegativeLong(query.firstElement()));
 }
 
 TEST(MatchExpressionParserTest, ParseIntegerElementToLongRejectsTooLargeDouble) {
-    BSONObj query = BSON("" << MatchExpressionParser::kLongLongMaxPlusOneAsDouble);
+    BSONObj query = BSON("" << BSONElement::kLongLongMaxPlusOneAsDouble);
     ASSERT_NOT_OK(MatchExpressionParser::parseIntegerElementToLong(query.firstElement()));
 }
 

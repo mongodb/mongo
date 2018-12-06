@@ -1210,7 +1210,7 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToLong) {
         convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberLong);
 
     // maxVal is the highest double value that will not overflow long long.
-    double maxVal = std::nextafter(ExpressionConvert::kLongLongMaxPlusOneAsDouble, 0.0);
+    double maxVal = std::nextafter(BSONElement::kLongLongMaxPlusOneAsDouble, 0.0);
     Document maxInput{{"path1", maxVal}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(maxInput), static_cast<long long>(maxVal), BSONType::NumberLong);
@@ -1231,7 +1231,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLong) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    double overflowLong = ExpressionConvert::kLongLongMaxPlusOneAsDouble;
+    double overflowLong = BSONElement::kLongLongMaxPlusOneAsDouble;
     Document overflowInput{{"path1", overflowLong}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
                              AssertionException,
@@ -1294,7 +1294,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLongWithOnError) {
                                         << "X"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    double overflowLong = ExpressionConvert::kLongLongMaxPlusOneAsDouble;
+    double overflowLong = BSONElement::kLongLongMaxPlusOneAsDouble;
     Document overflowInput{{"path1", overflowLong}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), "X"_sd, BSONType::String);
 
@@ -2010,7 +2010,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLong) {
 
 TEST_F(ExpressionConvertTest, ConvertStringToLongOverflow) {
     auto expCtx = getExpCtx();
-    auto longMaxPlusOneAsString = std::to_string(ExpressionConvert::kLongLongMaxPlusOneAsDouble);
+    auto longMaxPlusOneAsString = std::to_string(BSONElement::kLongLongMaxPlusOneAsDouble);
     // Remove digits after the decimal to avoid parse failure.
     longMaxPlusOneAsString = longMaxPlusOneAsString.substr(0, longMaxPlusOneAsString.find('.'));
 
@@ -2057,7 +2057,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToLongFailsForFloats) {
 TEST_F(ExpressionConvertTest, ConvertStringToLongWithOnError) {
     auto expCtx = getExpCtx();
     const auto onErrorValue = "><(((((>"_sd;
-    auto longMaxPlusOneAsString = std::to_string(ExpressionConvert::kLongLongMaxPlusOneAsDouble);
+    auto longMaxPlusOneAsString = std::to_string(BSONElement::kLongLongMaxPlusOneAsDouble);
     // Remove digits after the decimal to avoid parse failure.
     longMaxPlusOneAsString = longMaxPlusOneAsString.substr(0, longMaxPlusOneAsString.find('.'));
 

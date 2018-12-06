@@ -56,6 +56,9 @@ using std::dec;
 using std::hex;
 using std::string;
 
+const double BSONElement::kLongLongMaxPlusOneAsDouble =
+    scalbn(1, std::numeric_limits<long long>::digits);
+
 string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, int pretty) const {
     std::stringstream s;
     if (includeFieldNames)
