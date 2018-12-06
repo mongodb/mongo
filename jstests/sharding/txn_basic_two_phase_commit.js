@@ -26,17 +26,16 @@
     let lsid = {id: UUID()};
     let txnNumber = 0;
 
-    const checkParticipantListMatches =
-        function(coordinatorConn, lsid, txnNumber, expectedParticipantList) {
+    const checkParticipantListMatches = function(
+        coordinatorConn, lsid, txnNumber, expectedParticipantList) {
         let coordDoc = coordinatorConn.getDB("config")
                            .getCollection("transaction_coordinators")
                            .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
         assert.neq(null, coordDoc);
         assert.sameMembers(coordDoc.participants, expectedParticipantList);
-    }
+    };
 
-    const checkDecisionIs =
-        function(coordinatorConn, lsid, txnNumber, expectedDecision) {
+    const checkDecisionIs = function(coordinatorConn, lsid, txnNumber, expectedDecision) {
         let coordDoc = coordinatorConn.getDB("config")
                            .getCollection("transaction_coordinators")
                            .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
@@ -47,15 +46,14 @@
         } else {
             assert.eq(null, coordDoc.commitTimestamp);
         }
-    }
+    };
 
-    const checkDocumentDeleted =
-        function(coordinatorConn, lsid, txnNumber) {
+    const checkDocumentDeleted = function(coordinatorConn, lsid, txnNumber) {
         let coordDoc = coordinatorConn.getDB("config")
                            .getCollection("transaction_coordinators")
                            .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
         return null === coordDoc;
-    }
+    };
 
     const runCommitThroughMongosInParallelShellExpectSuccess = function() {
         const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
