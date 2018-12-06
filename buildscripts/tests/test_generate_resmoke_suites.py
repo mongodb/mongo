@@ -13,6 +13,7 @@ from buildscripts import generate_resmoke_suites as grs
 from generate_resmoke_suites import render_suite, render_misc_suite, \
     prepare_directory_for_suite
 
+
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use
 
 
@@ -545,10 +546,9 @@ class RenderSuites(unittest.TestCase):
 
     def _test(self, size):
 
-        suites = [create_suite(start=3 * i) for i in range(size)]
-        expected = [
-            self.EXPECTED_FORMAT.format(*range(3 * i, 3 * (i + 1))) for i in range(len(suites))
-        ]
+        suites = [create_suite(start=3*i) for i in range(size)]
+        expected = [self.EXPECTED_FORMAT .format(*range(3 * i, 3 * (i+1)))
+                    for i in range(len(suites))]
 
         m = mock_open(read_data=yaml.dump({'selector': {'roots': [], 'excludes': ['fixed']}}))
         with patch('generate_resmoke_suites.open', m, create=True):
@@ -558,10 +558,8 @@ class RenderSuites(unittest.TestCase):
         # The other writes are for the headers.
         self.assertEquals(len(suites) * 2, handle.write.call_count)
         handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
-        calls = [
-            call('buildscripts/resmokeconfig/suites/suite_name.yml', 'r')
-            for _ in range(len(suites))
-        ]
+        calls = [call('buildscripts/resmokeconfig/suites/suite_name.yml', 'r')
+                 for _ in range(len(suites))]
         m.assert_has_calls(calls, any_order=True)
         filename = 'tmp/suite_name_{{:0{}}}.yml'.format(int(math.ceil(math.log10(size))))
         calls = [call(filename.format(i), 'w') for i in range(size)]
@@ -578,6 +576,7 @@ class RenderSuites(unittest.TestCase):
 
 
 class RenderMiscSuites(unittest.TestCase):
+
     def test_single_suite(self):
 
         test_list = ['test{}'.format(i) for i in range(10)]
@@ -610,6 +609,7 @@ class RenderMiscSuites(unittest.TestCase):
 
 
 class PrepareDirectoryForSuite(unittest.TestCase):
+
     def test_no_directory(self):
         with patch('generate_resmoke_suites.os') as mock_os,\
              patch('generate_resmoke_suites.glob.glob') as mock_glob:
@@ -628,9 +628,8 @@ class PrepareDirectoryForSuite(unittest.TestCase):
             mock_glob.side_effect = (matched, [])
             prepare_directory_for_suite('suite_name', 'tmp')
 
-        mock_glob.assert_has_calls(
-            [call('tmp/suite_name_[0-9]*.yml'),
-             call('tmp/suite_name_misc.yml')])
+        mock_glob.assert_has_calls([call('tmp/suite_name_[0-9]*.yml'),
+                                      call('tmp/suite_name_misc.yml')])
         if matched:
             mock_os.remove.assert_has_calls([call(filename) for filename in matched])
         else:
