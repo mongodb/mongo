@@ -112,11 +112,13 @@ int mongoedMain(int argc, char* argv[], char** envp) {
         uassertStatusOK(addMongodOptions(&startupOptions));
         uassertStatusOK(
             embedded_integration_helpers::parseCommandLineOptions(argc, argv, startupOptions));
-        uassertStatusOK(storeMongodOptions(optionenvironment::startupOptionsParsed));
 
         // Add embedded specific options that's not available in mongod here.
         YAML::Emitter yaml;
         serviceContext = embedded::initialize(yaml.c_str());
+
+        // storeMongodOptions() triggers cmdline censoring, which must happen after initializers.
+        uassertStatusOK(storeMongodOptions(optionenvironment::startupOptionsParsed));
 
         // Override the ServiceEntryPoint with one that can support transport layers.
         serviceContext->setServiceEntryPoint(
