@@ -467,6 +467,20 @@ void TransactionParticipant::_setSpeculativeTransactionOpTime(
     _transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
 }
 
+void TransactionParticipant::_setSpeculativeTransactionReadTimestamp(WithLock,
+                                                                     OperationContext* opCtx,
+                                                                     Timestamp timestamp) {
+    // Read concern code should have already set the timestamp on the recovery unit.
+    invariant(timestamp == opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
+
+    repl::ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    opCtx->recoveryUnit()->preallocateSnapshot();
+    _speculativeTransactionReadOpTime = {timestamp, replCoord->getTerm()};
+    stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+    _transactionMetricsObserver.onChooseReadTimestamp(timestamp);
+}
+
 TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx) {
     // Stash the transaction on the OperationContext on the stack. At the end of this function it
     // will be unstashed onto the OperationContext.
@@ -706,21 +720,6 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
             return;
         }
 
-        // Set speculative execution.
-        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        const bool speculative =
-            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
-            !readConcernArgs.getArgsAtClusterTime();
-        // Only set speculative on primary.
-        if (opCtx->writesAreReplicated() && speculative) {
-            _setSpeculativeTransactionOpTime(lg,
-                                             opCtx,
-                                             readConcernArgs.getOriginalLevel() ==
-                                                     repl::ReadConcernLevel::kSnapshotReadConcern
-                                                 ? SpeculativeTransactionOpTime::kAllCommitted
-                                                 : SpeculativeTransactionOpTime::kLastApplied);
-        }
-
         // All locks of transactions must be acquired inside the global WUOW so that we can
         // yield and restore all locks on state transition. Otherwise, we'd have to remember
         // which locks are managed by WUOW.
@@ -752,7 +751,35 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
     // exclusive lock here because we might be doing writes in this transaction, and it is currently
     // not deadlock-safe to upgrade IS to IX.
     Lock::GlobalLock(opCtx, MODE_IX);
-    opCtx->recoveryUnit()->preallocateSnapshot();
+
+    {
+        // Set speculative execution.  This must be done after the global lock is acquired, because
+        // we need to check that we are primary.
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        // TODO(SERVER-38203): We cannot wait for write concern on secondaries, so we do not set the
+        // speculative optime on secondaries either.  This means that reads done in transactions on
+        // secondaries will not wait for the read snapshot to become majority-committed.
+        repl::ReplicationCoordinator* replCoord =
+            repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+        if (replCoord->canAcceptWritesForDatabase(
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db())) {
+            if (readConcernArgs.getArgsAtClusterTime()) {
+                _setSpeculativeTransactionReadTimestamp(
+                    lg, opCtx, readConcernArgs.getArgsAtClusterTime()->asTimestamp());
+            } else {
+                _setSpeculativeTransactionOpTime(
+                    lg,
+                    opCtx,
+                    readConcernArgs.getOriginalLevel() ==
+                            repl::ReadConcernLevel::kSnapshotReadConcern
+                        ? SpeculativeTransactionOpTime::kAllCommitted
+                        : SpeculativeTransactionOpTime::kLastApplied);
+            }
+        } else {
+            opCtx->recoveryUnit()->preallocateSnapshot();
+        }
+    }
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.

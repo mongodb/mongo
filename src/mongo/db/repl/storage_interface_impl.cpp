@@ -1124,8 +1124,12 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) {
+void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
+                                                                   bool primaryOnly) {
     Lock::GlobalLock lk(opCtx, MODE_IS);
+    if (primaryOnly &&
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin"))
+        return;
     Collection* oplog;
     {
         // We don't want to be holding the collection lock while blocking, to avoid deadlocks.

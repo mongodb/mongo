@@ -58,6 +58,16 @@ class OperationContext;
 
 extern AtomicInt32 transactionLifetimeLimitSeconds;
 
+/**
+ * Read timestamp to be used for a speculative transaction.  For transactions with read
+ * concern level specified as 'snapshot', we will use 'kAllCommitted' which ensures a snapshot
+ * with no 'holes'; that is, it is a state of the system that could be reconstructed from
+ * the oplog.  For transactions with read concern level specified as 'local' or 'majority',
+ * we will use 'kLastApplied' which gives us the most recent snapshot.  This snapshot may
+ * reflect oplog 'holes' from writes earlier than the last applied write which have not yet
+ * completed.  Using 'kLastApplied' ensures that transactions with mode 'local' are always able to
+ * read writes from earlier transactions with mode 'local' on the same connection.
+ */
 enum class SpeculativeTransactionOpTime {
     kLastApplied,
     kAllCommitted,
@@ -639,6 +649,14 @@ private:
     void _setSpeculativeTransactionOpTime(WithLock,
                                           OperationContext* opCtx,
                                           SpeculativeTransactionOpTime opTimeChoice);
+
+
+    // Like _setSpeculativeTransactionOpTime, but caller chooses timestamp of snapshot explicitly.
+    // It is up to the caller to ensure that Timestamp is greater than or equal to the all-committed
+    // optime before calling this method (e.g. by calling ReplCoordinator::waitForOpTimeForRead).
+    void _setSpeculativeTransactionReadTimestamp(WithLock,
+                                                 OperationContext* opCtx,
+                                                 Timestamp timestamp);
 
     // Finishes committing the multi-document transaction after the storage-transaction has been
     // committed, the oplog entry has been inserted into the oplog, and the transactions table has

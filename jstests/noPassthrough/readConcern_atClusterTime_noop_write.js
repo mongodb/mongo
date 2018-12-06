@@ -1,8 +1,10 @@
-// Test that 'atClusterTime' triggers a noop write to advance the majority commit point if
-// necessary.
+// Test that 'atClusterTime' triggers a noop write to advance the lastApplied optime if
+// necessary.  This covers the case where a read is done at a cluster time that is only present
+// as an actual opTime on another shard.
 // @tags: [requires_sharding, uses_transactions]
 (function() {
     "use strict";
+    load("jstests/replsets/rslib.js");
 
     // Skip this test if running with --nojournal and WiredTiger.
     if (jsTest.options().noJournal &&
@@ -45,9 +47,9 @@
     testDB1.coll1.find().itcount();
 
     // Attempt a snapshot read at 'clusterTime' on shard 1. Test that it performs a noop write to
-    // advance its majority commit point. The snapshot read itself may fail if the noop write
-    // advances the node's majority commit point past 'clusterTime' and it releases that snapshot.
-    // Test reading from the primary.
+    // advance its lastApplied optime past 'clusterTime'. The snapshot read itself may fail if the
+    // noop write advances the node's majority commit point past 'clusterTime' and it releases that
+    // snapshot.  Test reading from the primary.
     const shard1Session =
         st.rs1.getPrimary().getDB("test1").getMongo().startSession({causalConsistency: false});
     shard1Session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
@@ -59,9 +61,8 @@
     } else {
         shard1Session.commitTransaction();
     }
-    const shard1PrimaryMajOpTime =
-        st.rs1.getReadConcernMajorityOpTimeOrThrow(st.rs1.getPrimary()).ts;
-    assert.gte(shard1PrimaryMajOpTime, clusterTime);
+    const shard1PrimaryOpTime = getLastOpTime(st.rs1.getPrimary()).ts;
+    assert.gte(shard1PrimaryOpTime, clusterTime);
 
     // Perform a write on shard 1 and get its op time.
     res = assert.commandWorked(testDB1.runCommand({insert: "coll1", documents: [{_id: 0}]}));
@@ -73,12 +74,14 @@
     testDB0.coll0.find().readPref('secondary').itcount();
 
     // Attempt a snapshot read at 'clusterTime' on shard 0. Test that it performs a noop write to
-    // advance its majority commit point. The snapshot read itself may fail if the noop write
-    // advances the node's majority commit point past 'clusterTime' and it releases that snapshot.
-    // Test reading from the secondary.
+    // advance its lastApplied optime past 'clusterTime'. The snapshot read itself may fail if the
+    // noop write advances the node's majority commit point past 'clusterTime' and it releases that
+    // snapshot.  Test reading from the secondary.
     const shard0Session =
         st.rs0.getSecondary().getDB("test0").getMongo().startSession({causalConsistency: false});
-    shard0Session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
+    shard0Session.startTransaction({
+        readConcern: {level: "snapshot", atClusterTime: clusterTime},
+    });
     res = shard0Session.getDatabase("test0").runCommand({find: "coll0"});
     if (res.ok === 0) {
         assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
@@ -87,9 +90,8 @@
     } else {
         shard0Session.commitTransaction();
     }
-    const shard0SecondaryMajOpTime =
-        st.rs0.getReadConcernMajorityOpTimeOrThrow(st.rs0.getSecondary()).ts;
-    assert.gte(shard0SecondaryMajOpTime, clusterTime);
+    const shard0SecondaryOpTime = getLastOpTime(st.rs0.getSecondary()).ts;
+    assert.gte(shard0SecondaryOpTime, clusterTime);
 
     st.stop();
 }());

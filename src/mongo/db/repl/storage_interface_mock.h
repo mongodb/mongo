@@ -323,7 +323,8 @@ public:
         return isAdminDbValidFn(opCtx);
     };
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) override {
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
+                                                 bool primaryOnly) override {
         return;
     }
 

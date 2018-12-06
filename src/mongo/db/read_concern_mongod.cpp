@@ -212,15 +212,6 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord);
 
-    // Currently speculative read concern is used only for transactions (equivalently, when the read
-    // concern level is 'snapshot'). However, speculative read concern is not yet supported with
-    // atClusterTime.
-    //
-    // TODO SERVER-34620: Re-enable speculative behavior when "atClusterTime" is specified.
-    const bool speculative =
-        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
-        !readConcernArgs.getArgsAtClusterTime();
-
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
             // For standalone nodes, Linearizable Read is not supported.
@@ -295,19 +286,14 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     }
 
     if (atClusterTime) {
-        opCtx->recoveryUnit()->setIgnorePrepared(false);
-
-        // TODO(SERVER-34620): We should be using Session::setSpeculativeTransactionReadOpTime when
-        // doing speculative execution with atClusterTime.
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                       atClusterTime->asTimestamp());
-        return Status::OK();
-    }
-
-    if ((readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-         readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) &&
-        !speculative &&
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
+    } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
+               replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
+        // This block is not used for kSnapshotReadConcern because snapshots are always speculative;
+        // we wait for majority when the transaction commits.
+        // It is not used for atClusterTime because waitUntilOpTimeForRead handles waiting for
+        // the majority snapshot in that case.
 
         const int debugLevel = serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;
 

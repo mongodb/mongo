@@ -75,6 +75,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/future.h"
@@ -2488,6 +2489,10 @@ public:
         }
 
         presentTs = _clock->getClusterTime().asTimestamp();
+        // This test does not run a real ReplicationCoordinator, so must advance the snapshot
+        // manager manually.
+        auto storageEngine = cc().getServiceContext()->getStorageEngine();
+        storageEngine->getSnapshotManager()->setLocalSnapshot(presentTs);
         const auto beforeTxnTime = _clock->reserveTicks(1);
         beforeTxnTs = beforeTxnTime.asTimestamp();
         commitEntryTs = beforeTxnTime.addTicks(1).asTimestamp();

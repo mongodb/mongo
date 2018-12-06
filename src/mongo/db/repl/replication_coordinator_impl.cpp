@@ -1382,7 +1382,11 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         // only then do we know that it will fill in all "holes" before that time.  If we do it
         // earlier, we may return when the requested optime has been reached, but other writes
         // at optimes before that time are not yet visible.
-        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+        //
+        // We wait only on primaries, because on secondaries, other mechanisms assure that the
+        // last applied optime is always hole-free, and waiting for all earlier writes to be visible
+        // can deadlock against secondary command application.
+        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx, /* primaryOnly =*/true);
     }
 
     return Status::OK();
@@ -1403,14 +1407,10 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
     invariant(!readConcern.getArgsOpTime());
 
-    // TODO SERVER-34620: Re-enable speculative behavior when "atClusterTime" is specified.
-    const bool speculative = readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern &&
-        !readConcern.getArgsAtClusterTime();
-
+    // We don't set isMajorityCommittedRead for kSnapshotReadConcern because snapshots are always
+    // speculative; we wait for majority when the transaction commits.
     const bool isMajorityCommittedRead =
-        (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
-         readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern) &&
-        !speculative;
+        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
 
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime, deadline);
 }
