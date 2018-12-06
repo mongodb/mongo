@@ -35,12 +35,27 @@ void BenchmarkReporter::PrintBasicContext(std::ostream *out,
   CHECK(out) << "cannot be null";
   auto &Out = *out;
 
-  Out << "Run on (" << context.num_cpus << " X " << context.mhz_per_cpu
-      << " MHz CPU " << ((context.num_cpus > 1) ? "s" : "") << ")\n";
-
   Out << LocalDateTimeString() << "\n";
 
-  if (context.cpu_scaling_enabled) {
+  if (context.executable_name)
+    Out << "Running " << context.executable_name << "\n";
+
+  const CPUInfo &info = context.cpu_info;
+  Out << "Run on (" << info.num_cpus << " X "
+      << (info.cycles_per_second / 1000000.0) << " MHz CPU "
+      << ((info.num_cpus > 1) ? "s" : "") << ")\n";
+  if (info.caches.size() != 0) {
+    Out << "CPU Caches:\n";
+    for (auto &CInfo : info.caches) {
+      Out << "  L" << CInfo.level << " " << CInfo.type << " "
+          << (CInfo.size / 1000) << "K";
+      if (CInfo.num_sharing != 0)
+        Out << " (x" << (info.num_cpus / CInfo.num_sharing) << ")";
+      Out << "\n";
+    }
+  }
+
+  if (info.scaling_enabled) {
     Out << "***WARNING*** CPU scaling is enabled, the benchmark "
            "real time measurements may be noisy and will incur extra "
            "overhead.\n";
@@ -51,6 +66,11 @@ void BenchmarkReporter::PrintBasicContext(std::ostream *out,
          "affected.\n";
 #endif
 }
+
+// No initializer because it's already initialized to NULL.
+const char* BenchmarkReporter::Context::executable_name;
+
+BenchmarkReporter::Context::Context() : cpu_info(CPUInfo::Get()) {}
 
 double BenchmarkReporter::Run::GetAdjustedRealTime() const {
   double new_time = real_accumulated_time * GetTimeUnitMultiplier(time_unit);
