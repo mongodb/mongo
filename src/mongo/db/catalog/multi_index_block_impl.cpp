@@ -50,6 +50,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/logger/redaction.h"
@@ -62,8 +63,18 @@
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
+
+namespace {
+
+const StringData kBuildUUIDFieldName = "buildUUID"_sd;
+const StringData kBuildingPhaseCompleteFieldName = "buildingPhaseComplete"_sd;
+const StringData kRunTwoPhaseIndexBuildFieldName = "runTwoPhaseIndexBuild"_sd;
+const StringData kCommitReadyMembersFieldName = "commitReadyMembers"_sd;
+
+}  // namespace
 
 MONGO_EXPORT_SERVER_PARAMETER(useReadOnceCursorsForIndexBuilds, bool, true);
 
@@ -224,6 +235,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
                               << " provided. First index spec: "
                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
     }
+
+    _updateCurOpOpDescription(false);
 
     WriteUnitOfWork wunit(_opCtx);
 
@@ -581,6 +594,7 @@ Status MultiIndexBlockImpl::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
     }
 
     _setState(State::kPreCommit);
+    _updateCurOpOpDescription(true);
 
     return Status::OK();
 }
@@ -730,6 +744,41 @@ void MultiIndexBlockImpl::_setStateToAbortedIfNotCommitted(StringData reason) {
     }
     _state = State::kAborted;
     _abortReason = reason.toString();
+}
+
+void MultiIndexBlockImpl::_updateCurOpOpDescription(bool isBuildingPhaseComplete) const {
+    BSONObjBuilder builder;
+
+    // TODO(SERVER-37980): Replace with index build UUID.
+    auto buildUUID = UUID::gen();
+    buildUUID.appendToBuilder(&builder, kBuildUUIDFieldName);
+
+    builder.append(kBuildingPhaseCompleteFieldName, isBuildingPhaseComplete);
+
+    builder.appendBool(kRunTwoPhaseIndexBuildFieldName, false);
+
+    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+    if (replCoord->isReplEnabled()) {
+        // TODO(SERVER-37939): Update the membersBuilder array to state the actual commit ready
+        // members.
+        BSONArrayBuilder membersBuilder;
+        auto config = replCoord->getConfig();
+        for (auto it = config.membersBegin(); it != config.membersEnd(); ++it) {
+            const auto& memberConfig = *it;
+            if (memberConfig.isArbiter()) {
+                continue;
+            }
+            membersBuilder.append(memberConfig.getHostAndPort().toString());
+        }
+        builder.append(kCommitReadyMembersFieldName, membersBuilder.arr());
+    }
+
+    stdx::unique_lock<Client> lk(*_opCtx->getClient());
+    auto curOp = CurOp::get(_opCtx);
+    builder.appendElementsUnique(curOp->opDescription());
+    auto opDescObj = builder.obj();
+    curOp->setOpDescription_inlock(opDescObj);
+    curOp->ensureStarted();
 }
 
 std::ostream& operator<<(std::ostream& os, const MultiIndexBlockImpl::State& state) {

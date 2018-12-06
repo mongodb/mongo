@@ -157,6 +157,11 @@ private:
      */
     void _setStateToAbortedIfNotCommitted(StringData reason);
 
+    /**
+     * Updates CurOp's 'opDescription' field with the current state of this index build.
+     */
+    void _updateCurOpOpDescription(bool isBuildingPhaseComplete) const;
+
     std::vector<IndexToBuild> _indexes;
 
     std::unique_ptr<BackgroundOperation> _backgroundOperation;

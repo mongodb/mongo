@@ -38,6 +38,10 @@
     const secondaryDB = secondary.getDB(testDB.getName());
     const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
+    // CurOp output should contain the current state of the index builder such as the build UUID
+    // and build phase.
+    IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, false);
+
     // Kill the index build. This should have no effect.
     assert.commandWorked(secondaryDB.killOp(opId));
 
