@@ -1085,7 +1085,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
     LOG(3) << "applying op: " << redact(op)
            << ", oplog application mode: " << OplogApplication::modeToString(mode);
 
-    OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
+    // Choose opCounters based on running on standalone/primary or secondary by checking
+    // whether writes are replicated. Atomic applyOps command is an exception, which runs
+    // on primary/standalone but disables write replication.
+    OpCounters* opCounters =
+        (mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated())
+        ? &globalOpCounters
+        : &replOpCounters;
 
     std::array<StringData, 8> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2"};
     std::array<BSONElement, 8> fields;
@@ -1540,6 +1546,11 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
     const char* opType = fieldOp.valuestrsafe();
     invariant(*opType == 'c');  // only commands are processed here
+
+    // Choose opCounters based on running on standalone/primary or secondary by checking
+    // whether writes are replicated.
+    OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
+    opCounters->gotCommand();
 
     if (fieldO.eoo()) {
         return Status(ErrorCodes::NoSuchKey, "Missing expected field 'o'");
