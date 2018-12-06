@@ -228,13 +228,18 @@ public:
         ClientCursor* cursor = ccPin.getValue().getCursor();
 
         // If the fail point is enabled, busy wait until it is disabled.
-        while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
-            if (readLock) {
-                // We unlock and re-acquire the locks periodically in order to avoid deadlock (see
-                // SERVER-21997 for details).
-                sleepFor(Milliseconds(10));
-                readLock.reset();
-                readLock.emplace(opCtx, request.nss);
+        if (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+            log() << "getMore - keepCursorPinnedDuringGetMore fail point "
+                     "enabled. Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+                if (readLock) {
+                    // We unlock and re-acquire the locks periodically in order to avoid deadlock
+                    // (see
+                    // SERVER-21997 for details).
+                    sleepFor(Milliseconds(10));
+                    readLock.reset();
+                    readLock.emplace(opCtx, request.nss);
+                }
             }
         }
 

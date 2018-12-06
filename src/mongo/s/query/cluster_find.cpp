@@ -411,7 +411,12 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
 
     // If the fail point is enabled, busy wait until it is disabled.
-    while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+    if (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+        log() << "getMore - keepCursorPinnedDuringGetMore fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+            sleepFor(Milliseconds(2));
+        }
     }
 
     // A user can only call getMore on their own cursor. If there were multiple users authenticated
