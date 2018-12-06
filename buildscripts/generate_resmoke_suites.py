@@ -16,11 +16,11 @@ import logging
 import math
 import os
 import sys
-import yaml
-
 from collections import defaultdict
 from collections import namedtuple
 from operator import itemgetter
+
+import yaml
 
 from client.github import GithubApi
 
@@ -255,13 +255,16 @@ def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds, m
 
 
 def get_suite_filename(suite_name):
-    """ Get the source suite filename"""
+    """Get the source suite filename."""
     return "{dir}/{suite_name}.yml".format(dir=TEST_SUITE_DIR, suite_name=suite_name)
 
 
 def get_subsuite_filename(directory, suite_name, index, index_width=None):
-    """Generate filename for sub-suite from directory, suite_name and index. zero fill index if
-    index_width is not None,"""
+    """
+    Generate filename for sub-suite from directory, suite_name and index.
+
+    zero fill index if index_width is not None.
+    """
     filled_index = index
     if index_width is not None:
         filled_index = str(index).zfill(index_width)
@@ -270,8 +273,11 @@ def get_subsuite_filename(directory, suite_name, index, index_width=None):
 
 
 def generate_subsuite_file(suite_file, target_file, roots=None, excludes=None):
-    """ Read and evaluate the yaml suite file. Over ride selector.roots and selector.excludes
-    with the provided values. Write the result to target_file."""
+    """
+    Read and evaluate the yaml suite file.
+
+    Over ride selector.roots and selector.excludes with the provided values. Write the result to target_file.
+    """
     with open(suite_file, "r") as fstream:
         suite_config = yaml.load(fstream)
 
@@ -284,35 +290,35 @@ def generate_subsuite_file(suite_file, target_file, roots=None, excludes=None):
         out.write(yaml.dump(suite_config, default_flow_style=False, Dumper=yaml.SafeDumper))
 
 
-def render_suite(suites, suite_name, dir):
+def render_suite(suites, suite_name, director):
     """Render the given suites into yml files that can be used by resmoke.py."""
 
     suite_file = get_suite_filename(suite_name)
 
     index_width = int(math.ceil(math.log10(len(suites))))
     for idx, suite in enumerate(suites):
-        subsuite_file = get_subsuite_filename(dir, suite_name, idx, index_width=index_width)
+        subsuite_file = get_subsuite_filename(director, suite_name, idx, index_width=index_width)
         generate_subsuite_file(suite_file, subsuite_file, roots=suite.tests)
 
 
-def render_misc_suite(test_list, suite_name, dir):
+def render_misc_suite(test_list, suite_name, director):
     """Render a misc suite to run any tests that might be added to the directory."""
     suite_file = get_suite_filename(suite_name)
 
-    subsuite_file = get_subsuite_filename(dir, suite_name, 'misc')
+    subsuite_file = get_subsuite_filename(director, suite_name, 'misc')
     generate_subsuite_file(suite_file, subsuite_file, excludes=test_list)
 
 
-def prepare_directory_for_suite(suite_name, dir):
+def prepare_directory_for_suite(suite_name, director):
     """Ensure that dir exists and that it does not contain any suite related files."""
-    if os.path.exists(dir):
-        suite_files_glob = get_subsuite_filename(dir, suite_name, '[0-9]*')
-        misc_file_glob = get_subsuite_filename(dir, suite_name, 'misc')
+    if os.path.exists(director):
+        suite_files_glob = get_subsuite_filename(director, suite_name, '[0-9]*')
+        misc_file_glob = get_subsuite_filename(director, suite_name, 'misc')
         for suite_file in glob.glob(suite_files_glob) + glob.glob(misc_file_glob):
             os.remove(suite_file)
-        LOGGER.debug("Removing %s", dir)
+        LOGGER.debug("Removing %s", director)
     else:
-        os.makedirs(dir)
+        os.makedirs(director)
 
 
 class Suite(object):
