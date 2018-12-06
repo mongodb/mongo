@@ -45,15 +45,12 @@ OperationContext* Session::currentOperation() const {
 
 Session::KillToken Session::kill(WithLock sessionCatalogLock, ErrorCodes::Error reason) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Session " << getSessionId().getId()
-                          << " is already killed and is in the process of being cleaned up",
-            !_killRequested);
-    _killRequested = true;
+    const bool firstKiller = (0 == _killsRequested);
+    ++_killsRequested;
 
     // For currently checked-out sessions, interrupt the operation context so that the current owner
     // can release the session
-    if (_checkoutOpCtx) {
+    if (firstKiller && _checkoutOpCtx) {
         const auto serviceContext = _checkoutOpCtx->getServiceContext();
 
         stdx::lock_guard<Client> clientLock(*_checkoutOpCtx->getClient());
@@ -65,7 +62,7 @@ Session::KillToken Session::kill(WithLock sessionCatalogLock, ErrorCodes::Error 
 
 bool Session::killed() const {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    return _killRequested;
+    return _killsRequested > 0;
 }
 
 void Session::_markCheckedOut(WithLock sessionCatalogLock, OperationContext* checkoutOpCtx) {
@@ -82,8 +79,8 @@ void Session::_markCheckedIn(WithLock sessionCatalogLock) {
 
 void Session::_markNotKilled(WithLock sessionCatalogLock, KillToken killToken) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    invariant(_killRequested);
-    _killRequested = false;
+    invariant(_killsRequested > 0);
+    --_killsRequested;
 }
 
 }  // namespace mongo

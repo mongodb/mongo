@@ -270,7 +270,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
     future.get();
 }
 
-TEST_F(SessionCatalogTest, MarkSessionAsKilledThrowsWhenCalledTwice) {
+TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
     const auto lsid = makeLogicalSessionIdForTest();
 
     // Create the session so there is something to kill
@@ -279,14 +279,11 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledThrowsWhenCalledTwice) {
         const auto unusedSession(catalog()->checkOutSession(opCtx.get(), lsid));
     }
 
-    auto killToken = catalog()->killSession(lsid);
+    auto killToken1 = catalog()->killSession(lsid);
+    auto killToken2 = catalog()->killSession(lsid);
 
-    // Second mark as killed attempt will throw since the session is already killed
-    ASSERT_THROWS_CODE(catalog()->killSession(lsid),
-                       AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
-
-    // Make sure that regular session check-out will fail because the session is marked as killed
+    // Make sure that regular session check-out will fail because there are two killers on the
+    // session
     {
         auto opCtx = makeOperationContext();
         opCtx->setLogicalSessionId(lsid);
@@ -295,10 +292,36 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledThrowsWhenCalledTwice) {
             OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
     }
 
-    // Finish "killing" the session so the SessionCatalog destructor doesn't complain
+    boost::optional<Session::KillToken> killTokenWhileSessionIsCheckedOutForKill;
+
+    // Finish the first killer of the session
     {
         auto opCtx = makeOperationContext();
-        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken));
+        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken1));
+        ASSERT_EQ(opCtx.get(), scopedSession->currentOperation());
+
+        // Killing a session while checked out for kill should not affect the killers
+        killTokenWhileSessionIsCheckedOutForKill.emplace(catalog()->killSession(lsid));
+    }
+
+    // Regular session check-out should still fail because there are now still two killers on the
+    // session
+    {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
+    }
+    {
+        auto opCtx = makeOperationContext();
+        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken2));
+        ASSERT_EQ(opCtx.get(), scopedSession->currentOperation());
+    }
+    {
+        auto opCtx = makeOperationContext();
+        auto scopedSession = catalog()->checkOutSessionForKill(
+            opCtx.get(), std::move(*killTokenWhileSessionIsCheckedOutForKill));
         ASSERT_EQ(opCtx.get(), scopedSession->currentOperation());
     }
 }

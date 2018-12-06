@@ -65,17 +65,17 @@ public:
     OperationContext* currentOperation() const;
 
     /**
-     * Marks the session as killed and returns a 'kill token' to to be passed later on to
-     * 'checkOutSessionForKill' method of the SessionCatalog in order to permit the caller to
-     * execute any kill cleanup tasks and pass further on to '_markNotKilled' in order to reset the
-     * kill state. Marking session as killed is an internal property only that will cause any
-     * further calls to 'checkOutSession' to block until 'checkOutSessionForKill' is called and the
-     * returned scoped object destroyed.
+     * Increments the number of "killers" for this session and returns a 'kill token' to to be
+     * passed later on to 'checkOutSessionForKill' method of the SessionCatalog in order to permit
+     * the caller to execute any kill cleanup tasks. This token is later on passed to
+     * '_markNotKilled' in order to decrement the number of "killers".
      *
-     * If the session is currently checked-out, this method will also interrupt the operation
-     * context which has it checked-out.
+     * Marking session as killed is an internal property only that will cause any further calls to
+     * 'checkOutSession' to block until 'checkOutSessionForKill' is called the same number of times
+     * as 'kill' was called and the returned scoped object destroyed.
      *
-     * If the session is already killed throws ConflictingOperationInProgress exception.
+     * If the first killer finds the session checked-out, this method will also interrupt the
+     * operation context which has it checked-out.
      *
      * Must be called under the owning SessionCatalog's lock.
      */
@@ -123,8 +123,8 @@ private:
     // is no operation currently running for the Session.
     OperationContext* _checkoutOpCtx{nullptr};
 
-    // Set to true if markKilled has been invoked for this session.
-    bool _killRequested{false};
+    // Incremented every time 'kill' is invoked and decremented by '_markNotKilled'.
+    int _killsRequested{0};
 };
 
 }  // namespace mongo
