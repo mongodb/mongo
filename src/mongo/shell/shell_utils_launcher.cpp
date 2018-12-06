@@ -487,7 +487,7 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
     // (e.g., mongorestore-2.4) or just <utility>. For windows, the appropriate extension
     // needs to be appended.
     //
-    if (p.extension() != ".exe") {
+    if (!p.has_extension()) {
         p = prog + ".exe";
     }
 #endif
