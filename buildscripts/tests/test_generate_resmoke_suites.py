@@ -3,16 +3,11 @@
 from __future__ import absolute_import
 
 import datetime
-import math
 import unittest
-import yaml
 
-from mock import patch, mock_open, call
+from mock import patch, Mock
 
 from buildscripts import generate_resmoke_suites as grs
-from generate_resmoke_suites import render_suite, render_misc_suite, \
-    prepare_directory_for_suite
-
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use
 
@@ -525,119 +520,62 @@ class SuiteTest(unittest.TestCase):
         self.assertEqual(suite.get_test_count(), 3)
         self.assertEqual(suite.get_runtime(), 29)
 
+    def test_model_generation(self):
+        suite = grs.Suite()
+        suite.add_test('test1', {
+            "max_runtime": 10 * 60,
+            "variant1": 5 * 60,
+            "variant2": 10 * 60,
+            "variant3": 7 * 60,
+        })
+        suite.add_test('test2', {
+            "max_runtime": 12 * 60,
+            "variant1": 12 * 60,
+            "variant2": 8 * 60,
+            "variant3": 6 * 60,
+        })
+        suite.add_test('test3', {
+            "max_runtime": 7 * 60,
+            "variant1": 6 * 60,
+            "variant2": 6 * 60,
+            "variant3": 7 * 60,
+        })
 
-def create_suite(count=3, start=0):
-    """ Create a suite with count tests."""
-    suite = grs.Suite()
-    for i in range(start, start + count):
-        suite.add_test('test{}'.format(i), {})
-    return suite
+        model = suite.get_model()
 
-
-class RenderSuites(unittest.TestCase):
-    EXPECTED_FORMAT = """selector:
-  excludes:
-  - fixed
-  roots:
-  - test{}
-  - test{}
-  - test{}
-"""
-
-    def _test(self, size):
-
-        suites = [create_suite(start=3*i) for i in range(size)]
-        expected = [self.EXPECTED_FORMAT .format(*range(3 * i, 3 * (i+1)))
-                    for i in range(len(suites))]
-
-        m = mock_open(read_data=yaml.dump({'selector': {'roots': [], 'excludes': ['fixed']}}))
-        with patch('generate_resmoke_suites.open', m, create=True):
-            render_suite(suites, 'suite_name', 'tmp')
-        handle = m()
-
-        # The other writes are for the headers.
-        self.assertEquals(len(suites) * 2, handle.write.call_count)
-        handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
-        calls = [call('buildscripts/resmokeconfig/suites/suite_name.yml', 'r')
-                 for _ in range(len(suites))]
-        m.assert_has_calls(calls, any_order=True)
-        filename = 'tmp/suite_name_{{:0{}}}.yml'.format(int(math.ceil(math.log10(size))))
-        calls = [call(filename.format(i), 'w') for i in range(size)]
-        m.assert_has_calls(calls, any_order=True)
-
-    def test_1_suite(self):
-        self._test(1)
-
-    def test_11_suites(self):
-        self._test(11)
-
-    def test_101_suites(self):
-        self._test(101)
+        self.assertEqual(model["test_names"], ["test1", "test2", "test3"])
+        self.assertIn({"runtime": 23, "name": "variant1"}, model["variants"])
+        self.assertIn({"runtime": 24, "name": "variant2"}, model["variants"])
+        self.assertIn({"runtime": 20, "name": "variant3"}, model["variants"])
 
 
-class RenderMiscSuites(unittest.TestCase):
+class GetMiscModelTest(unittest.TestCase):
+    def test_model_with_test_in_same_dir(self):
+        test_list = [
+            "dir0/subdir0/test0",
+            "dir0/subdir0/test1",
+            "dir0/subdir0/test2",
+            "dir0/subdir0/test3",
+        ]
 
-    def test_single_suite(self):
+        model = grs.get_misc_model(test_list)
 
-        test_list = ['test{}'.format(i) for i in range(10)]
-        m = mock_open(read_data=yaml.dump({'selector': {'roots': []}}))
-        with patch('generate_resmoke_suites.open', m, create=True):
-            render_misc_suite(test_list, 'suite_name', 'tmp')
-        handle = m()
+        self.assertIn("is_misc", model)
 
-        # The other writes are for the headers.
-        self.assertEquals(2, handle.write.call_count)
-        handle.write.assert_any_call("""selector:
-  exclude_files:
-  - test0
-  - test1
-  - test2
-  - test3
-  - test4
-  - test5
-  - test6
-  - test7
-  - test8
-  - test9
-  roots: []
-""")
-        calls = [call('buildscripts/resmokeconfig/suites/suite_name.yml', 'r')]
-        m.assert_has_calls(calls, any_order=True)
-        filename = 'tmp/suite_name_misc.yml'
-        calls = [call(filename, 'w')]
-        m.assert_has_calls(calls, any_order=True)
+        self.assertIn("excluded_tests", model)
+        self.assertEqual(len(model["excluded_tests"]), 4)
+        self.assertIn("dir0/subdir0/test0", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test1", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test2", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test3", model["excluded_tests"])
 
+    def test_model_includes_extra_data(self):
+        test_list = ["dir0/subdir0/test0"]
+        extra_data = {
+            "extra": "data",
+        }
 
-class PrepareDirectoryForSuite(unittest.TestCase):
+        model = grs.get_misc_model(test_list, extra_data)
 
-    def test_no_directory(self):
-        with patch('generate_resmoke_suites.os') as mock_os,\
-             patch('generate_resmoke_suites.glob.glob') as mock_glob:
-            mock_os.path.exists.return_value = False
-            prepare_directory_for_suite('suite_name', 'tmp')
-
-        mock_os.makedirs.assert_called_once_with('tmp')
-        mock_glob.assert_not_called()
-
-    def _test(self, matched=None):
-        if matched is None:
-            matched = []
-        with patch('generate_resmoke_suites.os') as mock_os, \
-                patch('generate_resmoke_suites.glob.glob') as mock_glob:
-            mock_os.path.exists.return_value = True
-            mock_glob.side_effect = (matched, [])
-            prepare_directory_for_suite('suite_name', 'tmp')
-
-        mock_glob.assert_has_calls([call('tmp/suite_name_[0-9]*.yml'),
-                                      call('tmp/suite_name_misc.yml')])
-        if matched:
-            mock_os.remove.assert_has_calls([call(filename) for filename in matched])
-        else:
-            mock_os.remove.assert_not_called()
-        mock_os.makedirs.assert_not_called()
-
-    def test_empty_directory(self):
-        self._test()
-
-    def test_old_suite_files(self):
-        self._test(matched=['tmp/suite_name_{}.yml'.format(i) for i in range(3)])
+        self.assertIn("extra", model)
+        self.assertEqual(model["extra"], "data")
