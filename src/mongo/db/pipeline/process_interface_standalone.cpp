@@ -522,15 +522,14 @@ void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext
                               ? makeSessionFilterForAuthenticatedUsers(opCtx)
                               : KillAllSessionsByPatternSet{{}});
 
-    sessionCatalog->scanSessions(
-        {std::move(sessionFilter)},
-        [&](WithLock sessionCatalogLock, Session* session) {
-            auto op =
-                TransactionParticipant::getFromNonCheckedOutSession(session)->reportStashedState();
-            if (!op.isEmpty()) {
-                ops->emplace_back(op);
-            }
-        });
+    sessionCatalog->scanSessions({std::move(sessionFilter)},
+                                 [&](WithLock sessionCatalogLock, Session* session) {
+                                     auto op =
+                                         TransactionParticipant::get(session)->reportStashedState();
+                                     if (!op.isEmpty()) {
+                                         ops->emplace_back(op);
+                                     }
+                                 });
 }
 
 std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefaultCollator(

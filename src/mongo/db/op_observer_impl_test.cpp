@@ -346,8 +346,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
 
         // Create a session and sync it from disk
         auto session = sessionCatalog->checkOutSession(opCtx.get());
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        const auto txnParticipant = TransactionParticipant::get(session.get());
         txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
 
         // Simulate a write occurring on that session
@@ -373,8 +372,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         opCtx->setLogicalSessionId(sessionId);
 
         auto session = sessionCatalog->checkOutSession(opCtx.get());
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        const auto txnParticipant = TransactionParticipant::get(session.get());
         ASSERT_THROWS_CODE(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId),
                            DBException,
                            ErrorCodes::ConflictingOperationInProgress);
@@ -397,8 +395,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
 
         // Create a session and sync it from disk
         auto session = sessionCatalog->checkOutSession(opCtx.get());
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        const auto txnParticipant = TransactionParticipant::get(session.get());
         txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
 
         // Simulate a write occurring on that session
@@ -423,8 +420,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         opCtx->setLogicalSessionId(sessionId);
 
         auto session = sessionCatalog->checkOutSession(opCtx.get());
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        const auto txnParticipant = TransactionParticipant::get(session.get());
         ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
     }
 }
@@ -570,7 +566,7 @@ protected:
         ASSERT_EQ(txnState != boost::none,
                   txnRecordObj.hasField(SessionTxnRecord::kStateFieldName));
 
-        const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session());
+        const auto txnParticipant = TransactionParticipant::get(session());
         if (!opTime.isNull()) {
             ASSERT_EQ(opTime, txnRecord.getLastWriteOpTime());
             ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime(txnNum));

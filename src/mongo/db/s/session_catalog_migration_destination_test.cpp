@@ -168,8 +168,7 @@ public:
                                               const LogicalSessionId& sessionId,
                                               const TxnNumber& txnNum) {
         auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, sessionId);
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
+        const auto txnParticipant = TransactionParticipant::get(scopedSession.get());
         txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
         return scopedSession;
     }
@@ -199,7 +198,7 @@ public:
                                 Session* session,
                                 TxnNumber txnNumber,
                                 StmtId stmtId) {
-        const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session);
+        const auto txnParticipant = TransactionParticipant::get(session);
         auto oplog = txnParticipant->checkStatementExecuted(opCtx, txnNumber, stmtId);
         ASSERT_TRUE(oplog);
     }
@@ -209,7 +208,7 @@ public:
                                 TxnNumber txnNumber,
                                 StmtId stmtId,
                                 const repl::OplogEntry& expectedOplog) {
-        const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session);
+        const auto txnParticipant = TransactionParticipant::get(session);
         auto oplog = txnParticipant->checkStatementExecuted(opCtx, txnNumber, stmtId);
         ASSERT_TRUE(oplog);
         checkOplogWithNestedOplog(expectedOplog, *oplog);
@@ -356,7 +355,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
     finishSessionExpectSuccess(&sessionMigration);
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
@@ -418,7 +417,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, txnNum);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(txnNum));
 
     ASSERT_TRUE(historyIter.hasNext());
@@ -470,7 +469,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
 
     ASSERT_TRUE(historyIter.hasNext());
@@ -538,8 +537,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 
     {
         auto session = getSessionWithTxn(opCtx, sessionId1, 2);
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        const auto txnParticipant = TransactionParticipant::get(session.get());
 
         TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
         ASSERT_TRUE(historyIter.hasNext());
@@ -551,8 +549,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 
     {
         auto session = getSessionWithTxn(opCtx, sessionId2, 42);
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(session.get());
+        const auto txnParticipant = TransactionParticipant::get(session.get());
 
         TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(42));
         ASSERT_TRUE(historyIter.hasNext());
@@ -616,7 +613,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
 
@@ -667,7 +664,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
     ASSERT_TRUE(historyIter.hasNext());
@@ -756,7 +753,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
     ASSERT_TRUE(historyIter.hasNext());
@@ -848,7 +845,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
     ASSERT_TRUE(historyIter.hasNext());
@@ -948,7 +945,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto session = getSessionWithTxn(opCtx, sessionId, 20);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(20));
     ASSERT_TRUE(historyIter.hasNext());
@@ -1010,7 +1007,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, NewerTxnWriteShouldNotBeOverwritt
     finishSessionExpectSuccess(&sessionMigration);
 
     auto session = getSessionWithTxn(opCtx, sessionId, 20);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(20));
     ASSERT_TRUE(historyIter.hasNext());
@@ -1190,7 +1187,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     finishSessionExpectSuccess(&sessionMigration);
 
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
     ASSERT_TRUE(historyIter.hasNext());
@@ -1494,7 +1491,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
     finishSessionExpectSuccess(&sessionMigration);
 
     auto session = getSessionWithTxn(opCtx, sessionId, 19);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(19));
     ASSERT_TRUE(historyIter.hasNext());
@@ -1559,7 +1556,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory
 
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, *sessionInfo.getSessionId(), 2);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session.get());
+    const auto txnParticipant = TransactionParticipant::get(session.get());
 
     TransactionHistoryIterator historyIter(txnParticipant->getLastWriteOpTime(2));
     ASSERT_TRUE(historyIter.hasNext());
@@ -1591,8 +1588,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         // applied.
         auto scopedSession =
             SessionCatalog::get(opCtx)->checkOutSession(opCtx, *sessionInfo1.getSessionId());
-        const auto txnParticipant =
-            TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
+        const auto txnParticipant = TransactionParticipant::get(scopedSession.get());
         txnParticipant->refreshFromStorageIfNeeded(opCtx);
         txnParticipant->beginOrContinue(3, boost::none, boost::none);
     }
@@ -1644,16 +1640,14 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     // Check nothing was written for session 1
     {
         auto session1 = getSessionWithTxn(opCtx, *sessionInfo1.getSessionId(), 3);
-        const auto txnParticipant1 =
-            TransactionParticipant::getFromNonCheckedOutSession(session1.get());
+        const auto txnParticipant1 = TransactionParticipant::get(session1.get());
         ASSERT(txnParticipant1->getLastWriteOpTime(3).isNull());
     }
 
     // Check session 2 was correctly updated
     {
         auto session2 = getSessionWithTxn(opCtx, *sessionInfo2.getSessionId(), 15);
-        const auto txnParticipant2 =
-            TransactionParticipant::getFromNonCheckedOutSession(session2.get());
+        const auto txnParticipant2 = TransactionParticipant::get(session2.get());
 
         TransactionHistoryIterator historyIter(txnParticipant2->getLastWriteOpTime(15));
         ASSERT_TRUE(historyIter.hasNext());

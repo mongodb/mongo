@@ -142,19 +142,15 @@ public:
 
     static const BSONObj kDeadEndSentinel;
 
-    TransactionParticipant() = default;
+    TransactionParticipant();
+    ~TransactionParticipant();
 
     /**
-     * Obtains the transaction participant from an operation context on which the session has been
-     * checked-out.
+     * Obtains the transaction participant from a session and a syntactic sugar variant, which
+     * obtains it from an operation context on which the session has been checked-out.
      */
     static TransactionParticipant* get(OperationContext* opCtx);
-
-    /**
-     * This should only be used when session was obtained without checking it out and its only user
-     * should be chunk migration.
-     */
-    static TransactionParticipant* getFromNonCheckedOutSession(Session* session);
+    static TransactionParticipant* get(Session* session);
 
     /**
      * Kills the transaction if it is running, ensuring that it releases all resources, even if the

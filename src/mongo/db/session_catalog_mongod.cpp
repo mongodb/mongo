@@ -164,8 +164,7 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
         for (auto& sessionKillToken : *sessionKillTokens) {
             auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
 
-            auto const txnParticipant =
-                TransactionParticipant::getFromNonCheckedOutSession(session.get());
+            auto const txnParticipant = TransactionParticipant::get(session.get());
             txnParticipant->invalidate();
         }
     }));

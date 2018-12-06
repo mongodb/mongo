@@ -1010,8 +1010,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
             newOpCtx->setTxnNumber(txnNumberToStart);
 
             auto session = SessionCatalog::get(newOpCtx)->checkOutSession(newOpCtx);
-            auto txnParticipant =
-                TransactionParticipant::getFromNonCheckedOutSession(session.get());
+            auto txnParticipant = TransactionParticipant::get(session.get());
 
             ASSERT_THROWS_CODE(txnParticipant->beginOrContinue(txnNumberToStart, false, true),
                                AssertionException,

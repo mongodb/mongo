@@ -203,7 +203,7 @@ protected:
                                 boost::optional<DurableTxnStateEnum> txnState) {
         const auto uuid = UUID::gen();
 
-        const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session);
+        const auto txnParticipant = TransactionParticipant::get(session);
         txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -239,7 +239,7 @@ protected:
         ASSERT_EQ(txnState != boost::none,
                   txnRecordObj.hasField(SessionTxnRecord::kStateFieldName));
 
-        const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(session);
+        const auto txnParticipant = TransactionParticipant::get(session);
         ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime(txnNum));
 
         txnParticipant->invalidate();
@@ -253,7 +253,7 @@ protected:
 TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
@@ -272,7 +272,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin)
 TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrite) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 21;
@@ -300,7 +300,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
        StartingNewerTransactionUpdatesThePersistedSession) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const auto firstOpTime = writeTxnRecord(&session, 100, 0, {}, boost::none);
@@ -329,7 +329,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
 TEST_F(TransactionParticipantRetryableWritesTest, TransactionTableUpdatesReplaceEntireDocument) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const auto firstOpTime = writeTxnRecord(&session, 100, 0, {}, boost::none);
@@ -347,7 +347,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, TransactionTableUpdatesReplace
 TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
@@ -362,7 +362,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {
 TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionNotDefaultCreated) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     // Drop the transactions table
@@ -387,7 +387,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
 TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
@@ -419,7 +419,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
 TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecutedForOldTransactionThrows) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
@@ -434,7 +434,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
        CheckStatementExecutedForInvalidatedTransactionThrows) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->invalidate();
 
     ASSERT_THROWS_CODE(txnParticipant->checkStatementExecuted(opCtx(), 100, 0),
@@ -446,7 +446,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
        WriteOpCompletedOnPrimaryForOldTransactionThrows) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
@@ -478,7 +478,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
        WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
@@ -501,7 +501,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
        WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
@@ -577,7 +577,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTru
     }
 
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 0),
@@ -603,7 +603,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     osi.setTxnNumber(txnNum);
 
     Session session(sessionId);
-    const auto txnParticipant = TransactionParticipant::getFromNonCheckedOutSession(&session);
+    const auto txnParticipant = TransactionParticipant::get(&session);
     txnParticipant->refreshFromStorageIfNeeded(opCtx());
     txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
 

@@ -86,14 +86,12 @@ void killSessionsAction(OperationContext* opCtx,
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
                                        const SessionKiller::Matcher& matcher,
                                        ErrorCodes::Error reason) {
-    killSessionsAction(opCtx,
-                       matcher,
-                       [](Session*) { return true; },
-                       [](Session* session) {
-                           TransactionParticipant::getFromNonCheckedOutSession(session)
-                               ->abortArbitraryTransaction();
-                       },
-                       reason);
+    killSessionsAction(
+        opCtx,
+        matcher,
+        [](Session*) { return true; },
+        [](Session* session) { TransactionParticipant::get(session)->abortArbitraryTransaction(); },
+        reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -115,14 +113,12 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
         opCtx,
         matcherAllSessions,
         [](Session* session) {
-            const auto txnParticipant =
-                TransactionParticipant::getFromNonCheckedOutSession(session);
+            const auto txnParticipant = TransactionParticipant::get(session);
 
             return txnParticipant->expired();
         },
         [](Session* session) {
-            const auto txnParticipant =
-                TransactionParticipant::getFromNonCheckedOutSession(session);
+            const auto txnParticipant = TransactionParticipant::get(session);
 
             LOG(0)
                 << "Aborting transaction with txnNumber " << txnParticipant->getActiveTxnNumber()
@@ -153,9 +149,7 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
     killSessionsAction(opCtx,
                        matcherAllSessions,
                        [](Session*) { return true; },
-                       [](Session* session) {
-                           TransactionParticipant::getFromNonCheckedOutSession(session)->shutdown();
-                       },
+                       [](Session* session) { TransactionParticipant::get(session)->shutdown(); },
                        ErrorCodes::InterruptedAtShutdown);
 }
 

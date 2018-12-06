@@ -248,8 +248,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     const auto stmtId = *oplogEntry.getStatementId();
 
     auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, result.sessionId);
-    auto const txnParticipant =
-        TransactionParticipant::getFromNonCheckedOutSession(scopedSession.get());
+    auto const txnParticipant = TransactionParticipant::get(scopedSession.get());
     txnParticipant->refreshFromStorageIfNeeded(opCtx);
 
     if (!txnParticipant->onMigrateBeginOnPrimary(opCtx, result.txnNum, stmtId)) {

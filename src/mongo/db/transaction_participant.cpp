@@ -281,16 +281,20 @@ MONGO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
 
 const BSONObj TransactionParticipant::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));
 
+TransactionParticipant::TransactionParticipant() = default;
+
+TransactionParticipant::~TransactionParticipant() = default;
+
 TransactionParticipant* TransactionParticipant::get(OperationContext* opCtx) {
     auto session = OperationContextSession::get(opCtx);
     if (!session) {
         return nullptr;
     }
 
-    return &getTransactionParticipant(session);
+    return get(session);
 }
 
-TransactionParticipant* TransactionParticipant::getFromNonCheckedOutSession(Session* session) {
+TransactionParticipant* TransactionParticipant::get(Session* session) {
     return &getTransactionParticipant(session);
 }
 
