@@ -66,8 +66,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-using namespace stdx::chrono;
-
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
@@ -197,12 +195,13 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     const Date_t startDate = getNet()->now();
     const int numCommandsExpected = config.getNumMembers() - 1;
     for (int i = 0; i < numCommandsExpected; ++i) {
-        getNet()->scheduleResponse(
-            getNet()->getNextReadyRequest(), startDate + 10ms, {ErrorCodes::NoSuchKey, "No reply"});
+        getNet()->scheduleResponse(getNet()->getNextReadyRequest(),
+                                   startDate + Milliseconds(10),
+                                   {ErrorCodes::NoSuchKey, "No reply"});
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
-    ASSERT_EQUALS(startDate + 10ms, getNet()->now());
+    ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
     ASSERT_REASON_CONTAINS(
@@ -233,7 +232,7 @@ const BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIn
 // initiate and reconfig, so we set the default config version to 0, which is less than all valid
 // config versions.
 executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsConfig,
-                                                      const stdx::chrono::milliseconds millis,
+                                                      const Milliseconds millis,
                                                       const long long configVersion = 0,
                                                       const BSONObj& extraFields = {}) {
     ReplSetHeartbeatResponse hbResp;
@@ -285,9 +284,10 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second) << "Already saw "
                                                         << request.target.toString();
-        getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+        getNet()->scheduleResponse(
+            noi, startDate + Milliseconds(10), makeHeartbeatResponse(rsConfig, Milliseconds(8)));
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_OK(waitForQuorumCheck());
 }
@@ -339,12 +339,14 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToOneDownNode) {
                                                         << request.target.toString();
         if (request.target == HostAndPort("h2", 1)) {
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
         } else {
-            getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -399,17 +401,18 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
         if (request.target == HostAndPort("h4", 1)) {
             getNet()->scheduleResponse(
                 noi,
-                startDate + 10ms,
+                startDate + Milliseconds(10),
                 (RemoteCommandResponse(
                     BSON("ok" << 0 << "code" << ErrorCodes::InconsistentReplicaSetNames << "errmsg"
                               << "replica set name doesn't match."),
                     Milliseconds(8))));
         } else {
-            getNet()->scheduleResponse(
-                noi, startDate + 10ms, RemoteCommandResponse(BSON("ok" << 1), Milliseconds(8)));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse(BSON("ok" << 1), Milliseconds(8)));
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -480,13 +483,15 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
             long long configVersion = 0;
             getNet()->scheduleResponse(
                 noi,
-                startDate + 10ms,
-                makeHeartbeatResponse(rsConfig, 8ms, configVersion, bob.obj()));
+                startDate + Milliseconds(10),
+                makeHeartbeatResponse(rsConfig, Milliseconds(8), configVersion, bob.obj()));
         } else {
-            getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -544,12 +549,16 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNode) {
         if (request.target == HostAndPort("h5", 1)) {
             long long configVersion = 1;
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms, configVersion));
+                noi,
+                startDate + Milliseconds(10),
+                makeHeartbeatResponse(rsConfig, Milliseconds(8), configVersion));
         } else {
-            getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -604,12 +613,14 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
         if (request.target == HostAndPort("h5", 1)) {
             long long configVersion = 1;
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms, configVersion));
+                noi,
+                startDate + Milliseconds(10),
+                makeHeartbeatResponse(rsConfig, Milliseconds(8), configVersion));
         } else {
             getNet()->blackHole(noi);
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -658,12 +669,14 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
         if (request.target == HostAndPort("h1", 1)) {
             long long configVersion = 5;
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms, configVersion));
+                noi,
+                startDate + Milliseconds(10),
+                makeHeartbeatResponse(rsConfig, Milliseconds(8), configVersion));
         } else {
             getNet()->blackHole(noi);
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -710,17 +723,17 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
         if (request.target == HostAndPort("h2", 1)) {
             getNet()->scheduleResponse(
                 noi,
-                startDate + 10ms,
+                startDate + Milliseconds(10),
                 (RemoteCommandResponse(
                     BSON("ok" << 0 << "code" << ErrorCodes::InconsistentReplicaSetNames << "errmsg"
                               << "replica set name doesn't match."),
                     Milliseconds(8))));
         } else {
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -778,13 +791,15 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
         ASSERT(seenHosts.insert(request.target).second) << "Already saw "
                                                         << request.target.toString();
         if (request.target == HostAndPort("h1", 1) || request.target == HostAndPort("h5", 1)) {
-            getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         } else {
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -838,13 +853,15 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
         ASSERT(seenHosts.insert(request.target).second) << "Already saw "
                                                         << request.target.toString();
         if (request.target == HostAndPort("h5", 1)) {
-            getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         } else {
             getNet()->scheduleResponse(
-                noi, startDate + 10ms, {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -898,12 +915,14 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
         ASSERT(seenHosts.insert(request.target).second) << "Already saw "
                                                         << request.target.toString();
         if (request.target == HostAndPort("h1", 1) || request.target == HostAndPort("h2", 1)) {
-            getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         } else {
             getNet()->blackHole(noi);
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_OK(waitForQuorumCheck());
 }
@@ -946,7 +965,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckProcessesCallbackCanceledResponse) {
         if (request.target == HostAndPort("h1", 1)) {
             getNet()->scheduleResponse(
                 noi,
-                startDate + 10ms,
+                startDate + Milliseconds(10),
                 (RemoteCommandResponse(ErrorCodes::CallbackCanceled, "Testing canceled callback")));
         } else {
             getNet()->scheduleResponse(noi,
@@ -954,7 +973,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckProcessesCallbackCanceledResponse) {
                                        RemoteCommandResponse(BSON("ok" << 0), Milliseconds(8)));
         }
     }
-    getNet()->runUntil(startDate + 10ms);
+    getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
 
     Status status = waitForQuorumCheck();

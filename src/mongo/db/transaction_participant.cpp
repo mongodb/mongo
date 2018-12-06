@@ -359,7 +359,7 @@ void TransactionParticipant::_beginMultiDocumentTransaction(WithLock wl, TxnNumb
     auto now = getGlobalServiceContext()->getPreciseClockSource()->now();
     auto tickSource = getGlobalServiceContext()->getTickSource();
 
-    _transactionExpireDate = now + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
+    _transactionExpireDate = now + Seconds(transactionLifetimeLimitSeconds.load());
 
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);

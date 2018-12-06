@@ -2605,7 +2605,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
         startTime);
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
-        startTime + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()});
+        startTime + Seconds(transactionLifetimeLimitSeconds.load()));
     ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), preparedDuration);
 
     ASSERT_EQ(stashedState.getField("client").valueStringData().toString(), "");
@@ -2686,7 +2686,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
         startTime);
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
-        startTime + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()});
+        startTime + Seconds(transactionLifetimeLimitSeconds.load()));
     ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), prepareDuration);
 
     // For the following time metrics, we are only verifying that the transaction sub-document is

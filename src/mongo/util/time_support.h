@@ -178,7 +178,7 @@ public:
 
     template <typename Duration>
     Date_t& operator+=(Duration d) {
-        millis += duration_cast<Milliseconds>(d).count();
+        *this = *this + d;
         return *this;
     }
 
@@ -189,9 +189,7 @@ public:
 
     template <typename Duration>
     Date_t operator+(Duration d) const {
-        Date_t result = *this;
-        result += d;
-        return result;
+        return Date_t::fromDurationSinceEpoch(toDurationSinceEpoch() + d);
     }
 
     template <typename Duration>

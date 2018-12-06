@@ -857,5 +857,41 @@ TEST(SystemTime, ConvertDateToSystemTime) {
     ASSERT_EQUALS(aDate, Date_t(aTimePoint));
 }
 
+TEST(DateTArithmetic, AdditionNoOverflowSucceeds) {
+    auto dateFromMillis = [](long long ms) {
+        return Date_t::fromDurationSinceEpoch(Milliseconds{ms});
+    };
+
+    // Test operator+
+    ASSERT_EQ(dateFromMillis(1001), dateFromMillis(1000) + Milliseconds{1});
+    // Test operator+=
+    auto dateToIncrement = dateFromMillis(1000);
+    dateToIncrement += Milliseconds(1);
+    ASSERT_EQ(dateFromMillis(1001), dateToIncrement);
+}
+
+TEST(DateTArithmetic, AdditionOverflowThrows) {
+    // Test operator+
+    ASSERT_THROWS_CODE(Date_t::max() + Milliseconds(1), DBException, ErrorCodes::DurationOverflow);
+    // Test operator+=
+    auto dateToIncrement = Date_t::max();
+    ASSERT_THROWS_CODE(
+        dateToIncrement += Milliseconds(1), DBException, ErrorCodes::DurationOverflow);
+
+    // TODO (SERVER-38442): Can change Date_t::fromDurationSinceEpoch(Milliseconds::min()) to
+    // Date_t::min() once it's correct.
+    ASSERT_THROWS_CODE(Date_t::fromDurationSinceEpoch(Milliseconds::min()) + Milliseconds(-1),
+                       DBException,
+                       ErrorCodes::DurationOverflow);
+}
+
+TEST(DateTArithmetic, SubtractionOverflowThrows) {
+    // TODO (SERVER-38442): Can change Date_t::fromDurationSinceEpoch(Milliseconds::min()) to
+    // Date_t::min() once it's correct.
+    ASSERT_THROWS_CODE(Date_t::fromDurationSinceEpoch(Milliseconds::min()) - Milliseconds(1),
+                       DBException,
+                       ErrorCodes::DurationOverflow);
+    ASSERT_THROWS_CODE(Date_t::max() - Milliseconds(-1), DBException, ErrorCodes::DurationOverflow);
+}
 }  // namespace
 }  // namespace mongo
