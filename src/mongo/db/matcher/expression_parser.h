@@ -108,11 +108,6 @@ public:
         AllowedFeatures::kExpr | AllowedFeatures::kJSONSchema;
 
     /**
-     * Constant double representation of 2^63.
-     */
-    static const double kLongLongMaxPlusOneAsDouble;
-
-    /**
      * Parses PathAcceptingKeyword from 'typeElem'. Returns 'defaultKeyword' if 'typeElem'
      * doesn't represent a known type, or represents PathAcceptingKeyword::EQUALITY which is not
      * handled by this parser (see SERVER-19565).

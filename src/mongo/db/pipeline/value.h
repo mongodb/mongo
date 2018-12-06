@@ -352,16 +352,6 @@ public:
     void serializeForIDL(BSONArrayBuilder* builder) const;
     static Value deserializeForIDL(const BSONElement& element);
 
-    /**
-     * Constant double representation of 2^63, the smallest value that will overflow a long long.
-     *
-     * It is not safe to obtain this value by casting std::numeric_limits<long long>::max() to
-     * double, because the conversion loses precision, and the C++ standard leaves it up to the
-     * implentation to decide whether to round up to 2^63 or round down to the next representable
-     * value (2^63 - 2^10).
-     */
-    static const double kLongLongMaxPlusOneAsDouble;
-
 private:
     /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
      *  types. bool is especially bad since without this it will accept any pointer.

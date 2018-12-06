@@ -5210,7 +5210,7 @@ private:
                     << "Conversion would overflow target type in $convert with no onError value: "
                     << inputDouble,
                 inputDouble >= std::numeric_limits<long long>::lowest() &&
-                    inputDouble < ExpressionConvert::kLongLongMaxPlusOneAsDouble);
+                    inputDouble < BSONElement::kLongLongMaxPlusOneAsDouble);
 
         return Value(static_cast<long long>(inputDouble));
     }
@@ -5390,9 +5390,6 @@ Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType t
 }
 
 }  // namespace
-
-const double ExpressionConvert::kLongLongMaxPlusOneAsDouble =
-    scalbn(1, std::numeric_limits<long long>::digits);
 
 REGISTER_EXPRESSION(convert, ExpressionConvert::parse);
 

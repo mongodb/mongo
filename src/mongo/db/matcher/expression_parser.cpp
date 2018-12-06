@@ -102,9 +102,6 @@ constexpr StringData OrMatchExpression::kName;
 constexpr StringData AndMatchExpression::kName;
 constexpr StringData NorMatchExpression::kName;
 
-const double MatchExpressionParser::kLongLongMaxPlusOneAsDouble =
-    scalbn(1, std::numeric_limits<long long>::digits);
-
 /**
  * 'DocumentParseLevel' refers to the current position of the parser as it descends a
  *  MatchExpression tree.
@@ -155,7 +152,7 @@ StatusWith<long long> MatchExpressionParser::parseIntegerElementToLong(BSONEleme
         // No integral doubles that are too large to be represented as a 64 bit signed integer.
         // We use 'kLongLongMaxAsDouble' because if we just did eDouble > 2^63-1, it would be
         // compared against 2^63. eDouble=2^63 would not get caught that way.
-        if (eDouble >= MatchExpressionParser::kLongLongMaxPlusOneAsDouble ||
+        if (eDouble >= BSONElement::kLongLongMaxPlusOneAsDouble ||
             eDouble < std::numeric_limits<long long>::min()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Cannot represent as a 64-bit integer: " << elem);
