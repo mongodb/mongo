@@ -288,6 +288,10 @@ public:
         std::abort();
     }
 
+    void establishOplogCollectionForLogging(OperationContext* opCtx) {
+        std::abort();
+    }
+
     OptionalCollectionUUID uuid() const {
         return UUID::gen();
     }

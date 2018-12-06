@@ -340,6 +340,8 @@ public:
             ScanDirection scanDirection) = 0;
 
         virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
+
+        virtual void establishOplogCollectionForLogging(OperationContext* opCtx) = 0;
     };
 
 public:
@@ -745,6 +747,16 @@ public:
 
     inline void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
         return this->_impl().indexBuildSuccess(opCtx, index);
+    }
+
+    /**
+     * Use this Collection as the new cached pointer to the local oplog.
+     *
+     * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding
+     * onto the global lock in exclusive mode.
+     */
+    inline void establishOplogCollectionForLogging(OperationContext* opCtx) {
+        this->_impl().establishOplogCollectionForLogging(opCtx);
     }
 
 private:

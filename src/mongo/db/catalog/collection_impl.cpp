@@ -64,6 +64,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -1306,4 +1307,9 @@ void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntr
     _details->indexBuildSuccess(opCtx, index->descriptor()->indexName());
     _indexCatalog->indexBuildSuccess(opCtx, index);
 }
+
+void CollectionImpl::establishOplogCollectionForLogging(OperationContext* opCtx) {
+    repl::establishOplogCollectionForLogging(opCtx, _this);
+}
+
 }  // namespace mongo

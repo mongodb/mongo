@@ -367,6 +367,8 @@ public:
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
+    void establishOplogCollectionForLogging(OperationContext* opCtx) final;
+
 private:
     inline DatabaseCatalogEntry* dbce() const final {
         return this->_dbce;
