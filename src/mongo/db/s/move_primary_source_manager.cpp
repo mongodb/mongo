@@ -86,9 +86,6 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         ShardingCatalogClient::kMajorityWriteConcern));
 
     {
-        // Register for notifications from the replication subsystem
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
         // We use AutoGetOrCreateDb the first time just in case movePrimary was called before any
         // data was inserted into the database.
         AutoGetOrCreateDb autoDb(opCtx, getNss().toString(), MODE_X);
@@ -141,7 +138,6 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
         // The critical section must be entered with the database X lock in order to ensure there
         // are no writes which could have entered and passed the database version check just before
         // we entered the critical section, but will potentially complete after we left it.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
 
         if (!autoDb.getDb()) {
@@ -191,7 +187,6 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     commitMovePrimaryRequest.setTo(_toShard.toString());
 
     {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
 
         if (!autoDb.getDb()) {

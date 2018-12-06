@@ -245,7 +245,6 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         auto* const css = CollectionShardingRuntime::get(opCtx, getNss());
         invariant(nullptr == std::exchange(msmForCsr(css), this));
