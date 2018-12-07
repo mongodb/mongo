@@ -8371,7 +8371,7 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel62-large
-  - name: dbtest
+  - name: dbtest_TG
   - name: replica_sets_jscore_passthrough
   - name: jsCore
   - name: push
