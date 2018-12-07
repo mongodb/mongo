@@ -358,8 +358,11 @@
             TestData.skipRetryOnNetworkError = false;
         }
 
-        var collCount = testDb.user.find({}).itcount();
-        assert.soon(() => 2 == collCount, 'testDb.user returned ' + collCount + ' entries');
+        let collCount = 0;
+        assert.soon(() => {
+            collCount = testDb.user.find({}).itcount();
+            return collCount == 2;
+        }, 'testDb.user returned ' + collCount + ' entries');
 
         // Test exception throw. One update must succeed and the other must fail.
         assert.commandWorked(priConn.adminCommand({
