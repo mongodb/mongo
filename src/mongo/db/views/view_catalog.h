@@ -46,6 +46,7 @@
 #include "mongo/db/views/view_graph.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -138,37 +139,39 @@ public:
     }
 
 private:
-    Status _createOrUpdateView_inlock(OperationContext* opCtx,
-                                      const NamespaceString& viewName,
-                                      const NamespaceString& viewOn,
-                                      const BSONArray& pipeline,
-                                      std::unique_ptr<CollatorInterface> collator);
+    Status _createOrUpdateView(WithLock,
+                               OperationContext* opCtx,
+                               const NamespaceString& viewName,
+                               const NamespaceString& viewOn,
+                               const BSONArray& pipeline,
+                               std::unique_ptr<CollatorInterface> collator);
     /**
      * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
      * the graph if necessary. Returns an error status if the resulting graph would be invalid.
      */
-    Status _upsertIntoGraph(OperationContext* opCtx, const ViewDefinition& viewDef);
+    Status _upsertIntoGraph(WithLock, OperationContext* opCtx, const ViewDefinition& viewDef);
 
     /**
      * Returns Status::OK with the set of involved namespaces if the given pipeline is eligible to
      * act as a view definition. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
-    StatusWith<stdx::unordered_set<NamespaceString>> _validatePipeline_inlock(
-        OperationContext* opCtx, const ViewDefinition& viewDef) const;
+    StatusWith<stdx::unordered_set<NamespaceString>> _validatePipeline(
+        WithLock, OperationContext* opCtx, const ViewDefinition& viewDef) const;
 
     /**
      * Returns Status::OK if each view namespace in 'refs' has the same default collation as 'view'.
      * Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
-    Status _validateCollation_inlock(OperationContext* opCtx,
-                                     const ViewDefinition& view,
-                                     const std::vector<NamespaceString>& refs);
+    Status _validateCollation(WithLock,
+                              OperationContext* opCtx,
+                              const ViewDefinition& view,
+                              const std::vector<NamespaceString>& refs);
 
-    std::shared_ptr<ViewDefinition> _lookup_inlock(OperationContext* opCtx, StringData ns);
-    Status _reloadIfNeeded_inlock(OperationContext* opCtx);
+    std::shared_ptr<ViewDefinition> _lookup(WithLock, OperationContext* opCtx, StringData ns);
+    Status _reloadIfNeeded(WithLock, OperationContext* opCtx);
 
-    void _requireValidCatalog_inlock(OperationContext* opCtx) {
-        uassertStatusOK(_reloadIfNeeded_inlock(opCtx));
+    void _requireValidCatalog(WithLock lk, OperationContext* opCtx) {
+        uassertStatusOK(_reloadIfNeeded(lk, opCtx));
         invariant(_valid.load());
     }
 
