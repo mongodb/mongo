@@ -58,6 +58,8 @@ public:
 
     void dropConnections(transport::Session::TagMask tags);
 
+    void dropConnections(const HostAndPort& hostAndPort);
+
     void mutateTags(
         const HostAndPort& hostAndPort,
         const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc);

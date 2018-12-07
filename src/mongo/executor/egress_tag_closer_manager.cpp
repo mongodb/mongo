@@ -36,6 +36,8 @@
 
 #include "mongo/util/log.h"
 
+#include "mongo/util/net/hostandport.h"
+
 namespace mongo {
 namespace executor {
 
@@ -63,6 +65,14 @@ void EgressTagCloserManager::dropConnections(transport::Session::TagMask tags) {
 
     for (auto etc : _egressTagClosers) {
         etc->dropConnections(tags);
+    }
+}
+
+void EgressTagCloserManager::dropConnections(const HostAndPort& hostAndPort) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    for (auto etc : _egressTagClosers) {
+        etc->dropConnections(hostAndPort);
     }
 }
 

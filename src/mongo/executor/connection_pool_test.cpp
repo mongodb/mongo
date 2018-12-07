@@ -1306,13 +1306,14 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
 }
 
 template <typename T>
-void dropConnectionsByTagTest(ConnectionPool& pool, T& t) {
+void dropConnectionsTest(ConnectionPool& pool, T& t) {
     auto now = Date_t::now();
     PoolImpl::setNow(now);
 
     HostAndPort hap1("a");
     HostAndPort hap2("b");
     HostAndPort hap3("c");
+    HostAndPort hap4("d");
 
     // Successfully get connections to two hosts
     ConnectionImpl::pushSetup(Status::OK());
@@ -1361,22 +1362,35 @@ void dropConnectionsByTagTest(ConnectionPool& pool, T& t) {
     ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap1));
     ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap2));
     ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap3));
+
+    ConnectionImpl::pushSetup(Status::OK());
+    pool.get(hap4, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        doneWith(swConn.getValue());
+    });
+
+    // drop connections by hostAndPort
+    t.dropConnections(hap1);
+
+    ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap1));
+    ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap2));
+    ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap3));
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap4));
 }
 
-TEST_F(ConnectionPoolTest, DropConnectionsByTag) {
+TEST_F(ConnectionPoolTest, DropConnections) {
     ConnectionPool::Options options;
     ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
-    dropConnectionsByTagTest(pool, pool);
+    dropConnectionsTest(pool, pool);
 }
 
-TEST_F(ConnectionPoolTest, DropConnectionsByTagInMultipleViaManager) {
+TEST_F(ConnectionPoolTest, DropConnectionsInMultipleViaManager) {
     EgressTagCloserManager manager;
     ConnectionPool::Options options;
     options.egressTagCloserManager = &manager;
     ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
-    dropConnectionsByTagTest(pool, manager);
+    dropConnectionsTest(pool, manager);
 }
 
 TEST_F(ConnectionPoolTest, TryGetWorks) {
