@@ -1846,7 +1846,7 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python -m pip install git+https://github.com/evergreen-ci/shrub.py
+          $python -m pip install -r etc/pip/evgtest-requirements.txt
           $python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file expansions.yml
 
     - command: archive.targz_pack
