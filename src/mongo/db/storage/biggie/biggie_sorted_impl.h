@@ -87,9 +87,7 @@ public:
                          const BSONObj& key,
                          const RecordId& loc,
                          bool dupsAllowed) override;
-    virtual Status dupKeyCheck(OperationContext* opCtx,
-                               const BSONObj& key,
-                               const RecordId& loc) override;
+    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) override;
     virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const override;
@@ -182,6 +180,8 @@ private:
     bool ifPartialCheckRecordIdEquals(OperationContext* opCtx,
                                       const std::string key,
                                       const RecordId rid) const;
+
+    bool keyExists(OperationContext* opCtx, const BSONObj& key);
 
     const Ordering _order;
     // These two are the same as before.

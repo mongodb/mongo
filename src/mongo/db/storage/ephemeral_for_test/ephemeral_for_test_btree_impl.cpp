@@ -72,13 +72,21 @@ BSONObj stripFieldNames(const BSONObj& query) {
 
 typedef std::set<IndexKeyEntry, IndexEntryComparison> IndexSet;
 
-bool isDup(const IndexSet& data, const BSONObj& key, RecordId loc) {
-    const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, RecordId()));
+bool keyExists(const IndexSet& data, const BSONObj& key) {
+    IndexSet::const_iterator it = data.find(IndexKeyEntry(key, RecordId()));
+    return it != data.end();
+}
+
+bool isDup(const IndexSet& data, const BSONObj& key) {
+    IndexSet::const_iterator it = data.find(IndexKeyEntry(key, RecordId()));
     if (it == data.end())
         return false;
 
-    // Not a dup if the entry is for the same loc.
-    return it->loc != loc;
+    ++it;
+    if (it == data.end())
+        return false;
+
+    return it->key.woCompare(key, BSONObj(), false) == 0;
 }
 
 class EphemeralForTestBtreeBuilderImpl : public SortedDataBuilderInterface {
@@ -165,7 +173,7 @@ public:
 
 
         // TODO optimization: save the iterator from the dup-check to speed up insert
-        if (!dupsAllowed && isDup(*_data, key, loc))
+        if (!dupsAllowed && keyExists(*_data, key))
             return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
 
         IndexKeyEntry entry(key.getOwned(), loc);
@@ -209,9 +217,9 @@ public:
         return _currentKeySize + (sizeof(IndexKeyEntry) * _data->size());
     }
 
-    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& loc) {
+    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
         invariant(!hasFieldNames(key));
-        if (isDup(*_data, key, loc))
+        if (isDup(*_data, key))
             return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
         return Status::OK();
     }

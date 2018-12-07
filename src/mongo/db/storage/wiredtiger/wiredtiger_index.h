@@ -108,7 +108,7 @@ public:
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const;
-    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& id);
+    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key);
 
     virtual bool isEmpty(OperationContext* opCtx);
 
@@ -126,10 +126,7 @@ public:
 
     // WiredTigerIndex additions
 
-    virtual bool isDup(OperationContext* opCtx,
-                       WT_CURSOR* c,
-                       const BSONObj& key,
-                       const RecordId& id);
+    virtual bool isDup(OperationContext* opCtx, WT_CURSOR* c, const BSONObj& key);
 
     uint64_t tableId() const {
         return _tableId;
@@ -214,10 +211,7 @@ public:
 
     bool isTimestampSafeUniqueIdx() const override;
 
-    bool isDup(OperationContext* opCtx,
-               WT_CURSOR* c,
-               const BSONObj& key,
-               const RecordId& id) override;
+    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const BSONObj& key) override;
 
     StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
                                               WT_CURSOR* c,
@@ -256,6 +250,11 @@ public:
                                bool dupsAllowed);
 
 private:
+    /**
+     * If this returns true, the cursor will be positioned on the first matching the input 'key'.
+     */
+    bool _keyExists(OperationContext* opCtx, WT_CURSOR* c, const KeyString& key);
+
     bool _partial;
 };
 

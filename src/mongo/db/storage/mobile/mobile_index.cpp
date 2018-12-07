@@ -239,45 +239,26 @@ Status MobileIndex::create(OperationContext* opCtx, const std::string& ident) {
     return Status::OK();
 }
 
-Status MobileIndex::dupKeyCheck(OperationContext* opCtx,
-                                const BSONObj& key,
-                                const RecordId& recId) {
+Status MobileIndex::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
     invariant(!hasFieldNames(key));
     invariant(_isUnique);
 
-    if (_isDup(opCtx, key, recId))
+    if (_isDup(opCtx, key))
         return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
     return Status::OK();
 }
 
-bool MobileIndex::_isDup(OperationContext* opCtx, const BSONObj& key, RecordId recId) {
+bool MobileIndex::_isDup(OperationContext* opCtx, const BSONObj& key) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string dupCheckQuery = "SELECT value FROM \"" + _ident + "\" WHERE key = ?;";
+    std::string dupCheckQuery = "SELECT COUNT(*) FROM \"" + _ident + "\" WHERE key = ?;";
     SqliteStatement dupCheckStmt(*session, dupCheckQuery);
 
     KeyString keyStr(_keyStringVersion, key, _ordering);
-
     dupCheckStmt.bindBlob(0, keyStr.getBuffer(), keyStr.getSize());
 
-    bool isEntryFound = false;
-
-    // If the key exists, check if we already have this record id at this key. If so, we don't
-    // consider that to be a dup.
-    int status;
-    while ((status = dupCheckStmt.step()) == SQLITE_ROW) {
-        const void* value = dupCheckStmt.getColBlob(0);
-        int64_t size = dupCheckStmt.getColBytes(0);
-
-        isEntryFound = true;
-
-        BufReader br(value, size);
-        if (KeyString::decodeRecordId(&br) == recId) {
-            return false;
-        }
-    }
-    checkStatus(status, SQLITE_DONE, "sqlite3_step");
-
-    return isEntryFound;
+    dupCheckStmt.step(SQLITE_ROW);
+    long long records = dupCheckStmt.getColInt(0);
+    return records > 1;
 }
 
 class MobileIndex::BulkBuilderBase : public SortedDataBuilderInterface {

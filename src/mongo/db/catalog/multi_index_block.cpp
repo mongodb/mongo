@@ -271,11 +271,14 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
 
         _collection->getIndexCatalog()->prepareInsertDeleteOptions(
             _opCtx, descriptor, &index.options);
-        index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
-        index.options.fromIndexBuilder = true;
+        // Allow duplicates when explicitly allowed or an interceptor is installed, which will
+        // perform duplicate checking itself.
+        index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique ||
+            index.block->getEntry()->indexBuildInterceptor();
         if (_ignoreUnique) {
             index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
         }
+        index.options.fromIndexBuilder = true;
 
         log() << "build index on: " << ns << " properties: " << descriptor->toString();
         if (index.bulk)
@@ -483,9 +486,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection() {
     return Status::OK();
 }
 
-Status MultiIndexBlock::insert(const BSONObj& doc,
-                               const RecordId& loc,
-                               std::vector<BSONObj>* const dupKeysInserted) {
+Status MultiIndexBlock::insert(const BSONObj& doc, const RecordId& loc) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -512,29 +513,15 @@ Status MultiIndexBlock::insert(const BSONObj& doc,
 
         if (!idxStatus.isOK())
             return idxStatus;
-
-        if (dupKeysInserted) {
-            dupKeysInserted->insert(
-                dupKeysInserted->end(), result.dupsInserted.begin(), result.dupsInserted.end());
-        }
     }
     return Status::OK();
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk() {
-    return _dumpInsertsFromBulk(nullptr, nullptr);
+    return dumpInsertsFromBulk(nullptr);
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
-    return _dumpInsertsFromBulk(dupRecords, nullptr);
-}
-
-Status MultiIndexBlock::dumpInsertsFromBulk(std::vector<BSONObj>* dupKeysInserted) {
-    return _dumpInsertsFromBulk(nullptr, dupKeysInserted);
-}
-
-Status MultiIndexBlock::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
-                                             std::vector<BSONObj>* dupKeysInserted) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -549,16 +536,36 @@ Status MultiIndexBlock::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == NULL)
             continue;
+
+        // If 'dupRecords' is provided, it will be used to store all records that would result in
+        // duplicate key errors. Only pass 'dupKeysInserted', which stores inserted duplicate keys,
+        // when 'dupRecords' is not used because these two vectors are mutually incompatible.
+        std::vector<BSONObj> dupKeysInserted;
+
+        IndexCatalogEntry* entry = _indexes[i].block->getEntry();
         LOG(1) << "\t dumping from external sorter into index: "
-               << _indexes[i].block->getEntry()->descriptor()->indexName();
+               << entry->descriptor()->indexName();
         Status status = _indexes[i].real->commitBulk(_opCtx,
                                                      _indexes[i].bulk.get(),
                                                      _allowInterruption,
                                                      _indexes[i].options.dupsAllowed,
                                                      dupRecords,
-                                                     dupKeysInserted);
+                                                     (dupRecords) ? nullptr : &dupKeysInserted);
         if (!status.isOK()) {
             return status;
+        }
+
+        auto interceptor = entry->indexBuildInterceptor();
+        if (!interceptor || _ignoreUnique) {
+            continue;
+        }
+
+        // Record duplicate key insertions for later verification.
+        if (dupKeysInserted.size()) {
+            status = interceptor->recordDuplicateKeys(_opCtx, dupKeysInserted);
+            if (!status.isOK()) {
+                return status;
+            }
         }
     }
 
@@ -591,10 +598,7 @@ Status MultiIndexBlock::drainBackgroundWritesIfNeeded() {
         LOG(1) << "draining background writes on collection " << _collection->ns()
                << " into index: " << _indexes[i].block->getEntry()->descriptor()->indexName();
 
-        auto status = interceptor->drainWritesIntoIndex(_opCtx,
-                                                        _indexes[i].real,
-                                                        _indexes[i].block->getEntry()->descriptor(),
-                                                        _indexes[i].options);
+        auto status = interceptor->drainWritesIntoIndex(_opCtx, _indexes[i].options);
         if (!status.isOK()) {
             return status;
         }

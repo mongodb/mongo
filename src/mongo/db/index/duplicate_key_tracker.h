@@ -34,56 +34,39 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/temporary_record_store.h"
 
 namespace mongo {
 
 /**
  * Records keys that have violated duplicate key constraints on unique indexes. The keys are backed
- * by a temporary collection that the caller is responsible for creating, destroying, and holding
- * locks while passing into mutating functions.
+ * by a temporary table that is created and destroyed by this tracker.
  */
 class DuplicateKeyTracker {
     MONGO_DISALLOW_COPYING(DuplicateKeyTracker);
 
 public:
-    DuplicateKeyTracker(const IndexCatalogEntry* indexCatalogEntry, const NamespaceString& tempNss);
-    ~DuplicateKeyTracker();
+    DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry);
 
     /**
-     * Generates a unique namespace that should be used to construct the temporary backing
-     * Collection for this tracker.
+     * Given a set of duplicate keys, insert them into the key constraint table.
      */
-    static NamespaceString makeTempNamespace();
-
-    /**
-     * Given a set of duplicate keys, insert them into tempCollection.
-     *
-     * The caller must hold locks for 'tempCollection' and be in a WriteUnitOfWork.
-     */
-    Status recordDuplicates(OperationContext* opCtx,
-                            Collection* tempCollection,
-                            const std::vector<BSONObj>& keys);
+    Status recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys);
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
      * resolved for the index. Returns a DuplicateKey error if there are still duplicate key
      * constraint violations on the index.
-     *
-     * The caller must hold locks for 'tempCollection'.
      */
-    Status constraintsSatisfiedForIndex(OperationContext* opCtx, Collection* tempCollection) const;
-
-    const NamespaceString& nss() const {
-        return _nss;
-    }
+    Status checkConstraints(OperationContext* opCtx) const;
 
 private:
-    std::int64_t _idCounter;
-
     const IndexCatalogEntry* _indexCatalogEntry;
-    const NamespaceString _nss;
+
+    // This temporary record store is owned by the duplicate key tracker and dropped along with it.
+    std::unique_ptr<TemporaryRecordStore> _keyConstraintsTable;
 };
 
 }  // namespace mongo

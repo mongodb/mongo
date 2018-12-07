@@ -71,8 +71,7 @@ TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1, loc1));
-            ASSERT_NOT_OK(sorted->dupKeyCheck(opCtx.get(), key1, RecordId::min()));
+            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
             uow.commit();
         }
     }
@@ -94,7 +93,7 @@ TEST(SortedDataInterface, DupKeyCheckEmpty) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1, loc1));
+            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
             uow.commit();
         }
     }
@@ -130,7 +129,7 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocBefore) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_NOT_OK(sorted->dupKeyCheck(opCtx.get(), key1, RecordId::min()));
+            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
             uow.commit();
         }
     }
@@ -166,9 +165,88 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocAfter) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_NOT_OK(sorted->dupKeyCheck(opCtx.get(), key1, RecordId::max()));
+            ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
             uow.commit();
         }
+    }
+}
+
+TEST(SortedDataInterface, DupKeyCheckWithDuplicates) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+        ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true));
+        uow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+        ASSERT_NOT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
+    }
+}
+
+TEST(SortedDataInterface, DupKeyCheckWithDeletedFirstEntry) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+        ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true));
+        uow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork uow(opCtx.get());
+        sorted->unindex(opCtx.get(), key1, loc1, true);
+        uow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+        ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
+    }
+}
+
+TEST(SortedDataInterface, DupKeyCheckWithDeletedSecondEntry) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT(sorted->isEmpty(opCtx.get()));
+
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, true));
+        ASSERT_OK(sorted->insert(opCtx.get(), key1, loc2, true));
+        uow.commit();
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork uow(opCtx.get());
+        sorted->unindex(opCtx.get(), key1, loc2, true);
+        uow.commit();
+    }
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+        ASSERT_OK(sorted->dupKeyCheck(opCtx.get(), key1));
     }
 }
 

@@ -79,7 +79,7 @@ public:
 
     Status initAsEmpty(OperationContext* opCtx) override;
 
-    Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& recId) override;
+    Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key) override;
 
     // Beginning of MobileIndex-specific methods
 
@@ -114,7 +114,7 @@ public:
     }
 
 protected:
-    bool _isDup(OperationContext* opCtx, const BSONObj& key, RecordId recId);
+    bool _isDup(OperationContext* opCtx, const BSONObj& key);
 
     /**
      * Performs the deletion from the table matching the given key.

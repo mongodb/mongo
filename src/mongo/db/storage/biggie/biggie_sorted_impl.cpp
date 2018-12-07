@@ -210,8 +210,16 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
                       "expected ascending (key, RecordId) order in bulk builder");
     }
 
-    if (!_dupsAllowed && twoKeyCmp == 0 && twoRIDCmp != 0) {
-        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+    std::string workingCopyInsertKey =
+        createKeyString(key, loc, _prefix, _order, /* isUnique */ _unique);
+
+    if (twoKeyCmp == 0 && twoRIDCmp != 0) {
+        if (!_dupsAllowed) {
+            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
+        }
+        // Duplicate index entries are allowed on this unique index, so we put the RecordId in the
+        // KeyString until the unique constraint is resolved.
+        workingCopyInsertKey = createKeyString(key, loc, _prefix, _order, /* isUnique */ false);
     }
 
     std::string internalTbString(newKS->getTypeBits().getBuffer(), newKS->getTypeBits().getSize());
@@ -222,8 +230,6 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
     std::memcpy(&data[0], &recIdRepr, sizeof(int64_t));
     std::memcpy(&data[0] + sizeof(int64_t), internalTbString.data(), internalTbString.length());
 
-    std::string workingCopyInsertKey =
-        createKeyString(key, loc, _prefix, _order, /* isUnique */ _unique);
     workingCopy->insert(StringStore::value_type(workingCopyInsertKey, data));
 
     _hasLast = true;
@@ -323,16 +329,6 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
                     SpecialFormatInserted::NoSpecialFormatInserted);
             }
         }
-
-        // If dups are not allowed, then we need to check that we are not inserting something with
-        // an existing key but a different recordId. However, if the combination of key, recordId
-        // already exists, then we are fine, since we are allowed to insert duplicates.
-        if (!dupsAllowed) {
-            Status status = dupKeyCheck(opCtx, key, loc);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
     } else {
         invariant(dupsAllowed);
     }
@@ -423,39 +419,34 @@ Status SortedDataInterface::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
-                                        const BSONObj& key,
-                                        const RecordId& loc) {
-    std::string workingCopyCheckKey = createKeyString(key, loc, _prefix, _order, _isUnique);
+Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx, const BSONObj& key) {
+    invariant(_isUnique);
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
+
+    std::string minKey = createKeyString(key, RecordId::min(), _prefix, _order, _isUnique);
+    std::string maxKey = createKeyString(key, RecordId::max(), _prefix, _order, _isUnique);
 
     // We effectively do the same check as in insert. However, we also check to make sure that
     // the iterator returned to us by lower_bound also happens to be inside out ident.
-    auto workingCopyIt = workingCopy->find(workingCopyCheckKey);
-    if (workingCopyIt == workingCopy->end()) {
+    auto lowerBoundIterator = workingCopy->lower_bound(minKey);
+    if (lowerBoundIterator == workingCopy->end()) {
+        return Status::OK();
+    }
+    if (lowerBoundIterator->first.compare(maxKey) > 0) {
+        return Status::OK();
+    }
+    auto lower =
+        keyStringToIndexKeyEntry(lowerBoundIterator->first, lowerBoundIterator->second, _order);
+
+    ++lowerBoundIterator;
+    if (lowerBoundIterator == workingCopy->end()) {
         return Status::OK();
     }
 
-    if (_isUnique) {
-        // The RecordId is stored inside the index entry for unique indexes.
-        IndexKeyEntry entry =
-            keyStringToIndexKeyEntry(workingCopyIt->first, workingCopyIt->second, _order);
-        if (entry.loc == loc) {
-            return Status::OK();
-        }
+    auto next =
+        keyStringToIndexKeyEntry(lowerBoundIterator->first, lowerBoundIterator->second, _order);
+    if (key.woCompare(next.key, _order, false) == 0) {
         return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
-    } else {
-        std::string lowerBoundKey =
-            createKeyString(key, RecordId::min(), _prefix, _order, _isUnique);
-        auto lowerBoundIterator = workingCopy->lower_bound(lowerBoundKey);
-
-        if (lowerBoundIterator != workingCopy->end() &&
-            lowerBoundIterator->first != workingCopyCheckKey &&
-            lowerBoundIterator->first.compare(_KSForIdentEnd) < 0 &&
-            lowerBoundIterator->first.compare(
-                createKeyString(key, RecordId::max(), _prefix, _order, _isUnique)) <= 0) {
-            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
-        }
     }
 
     return Status::OK();
