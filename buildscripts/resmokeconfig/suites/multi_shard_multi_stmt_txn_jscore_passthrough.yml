@@ -433,6 +433,17 @@ executor:
         enableTestCommands: 1
     mongod_options:
       set_parameters:
+        logComponentVerbosity:
+          verbosity: 0
+          command: 2
+          replication:
+            election: 4
+            heartbeats: 2
+            initialSync: 2
+            rollback: 2
+          storage:
+            recovery: 2
+          transaction: 4
         enableTestCommands: 1
         numInitialSyncAttempts: 1
         writePeriodicNoops: true
