@@ -365,11 +365,12 @@ bool TransactionRouter::_canContinueOnStaleShardOrDbError(StringData cmdName) co
     return false;
 }
 
-void TransactionRouter::onStaleShardOrDbError(StringData cmdName) {
+void TransactionRouter::onStaleShardOrDbError(StringData cmdName, const Status& errorStatus) {
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream() << "Transaction " << _txnNumber << " was aborted on statement "
                           << _latestStmtId
-                          << " due to cluster data placement change",
+                          << " due to an error from cluster data placement change: "
+                          << errorStatus,
             _canContinueOnStaleShardOrDbError(cmdName));
 
     // Remove participants created during the current statement so they are sent the correct options
@@ -390,11 +391,12 @@ bool TransactionRouter::_canContinueOnSnapshotError() const {
     return _atClusterTime && _atClusterTime->canChange(_latestStmtId);
 }
 
-void TransactionRouter::onSnapshotError() {
+void TransactionRouter::onSnapshotError(const Status& errorStatus) {
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream() << "Transaction " << _txnNumber << " was aborted on statement "
                           << _latestStmtId
-                          << " due to a non-retryable snapshot error",
+                          << " due to a non-retryable snapshot error: "
+                          << errorStatus,
             _canContinueOnSnapshotError());
 
     // The transaction must be restarted on all participants because a new read timestamp will be

@@ -478,7 +478,7 @@ void runCommand(OperationContext* opCtx,
                     auto abortGuard =
                         MakeGuard([&] { txnRouter->implicitlyAbortTransaction(opCtx); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
-                    txnRouter->onStaleShardOrDbError(commandName);
+                    txnRouter->onStaleShardOrDbError(commandName, ex.toStatus());
                     abortGuard.Dismiss();
                 }
 
@@ -497,7 +497,7 @@ void runCommand(OperationContext* opCtx,
                     auto abortGuard =
                         MakeGuard([&] { txnRouter->implicitlyAbortTransaction(opCtx); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
-                    txnRouter->onStaleShardOrDbError(commandName);
+                    txnRouter->onStaleShardOrDbError(commandName, ex.toStatus());
                     abortGuard.Dismiss();
                 }
 
@@ -514,7 +514,7 @@ void runCommand(OperationContext* opCtx,
                     auto abortGuard =
                         MakeGuard([&] { txnRouter->implicitlyAbortTransaction(opCtx); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
-                    txnRouter->onSnapshotError();
+                    txnRouter->onSnapshotError(ex.toStatus());
                     abortGuard.Dismiss();
                 }
 

@@ -172,14 +172,14 @@ public:
      * Updates the transaction state to allow for a retry of the current command on a stale version
      * error. Will throw if the transaction cannot be continued.
      */
-    void onStaleShardOrDbError(StringData cmdName);
+    void onStaleShardOrDbError(StringData cmdName, const Status& errorStatus);
 
     /**
      * Resets the transaction state to allow for a retry attempt. This includes clearing all
      * participants, clearing the coordinator, and resetting the global read timestamp. Will throw
      * if the transaction cannot be continued.
      */
-    void onSnapshotError();
+    void onSnapshotError(const Status& errorStatus);
 
     /**
      * Updates the transaction tracking state to allow for a retry attempt on a view resolution

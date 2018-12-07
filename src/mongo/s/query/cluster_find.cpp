@@ -463,7 +463,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 // A transaction can always continue on a stale version error during find because
                 // the operation must be idempotent.
-                txnRouter->onStaleShardOrDbError(kFindCmdName);
+                txnRouter->onStaleShardOrDbError(kFindCmdName, ex.toStatus());
             }
         }
     }
