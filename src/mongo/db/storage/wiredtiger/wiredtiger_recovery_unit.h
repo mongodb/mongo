@@ -118,6 +118,8 @@ public:
         return _readOnce;
     };
 
+    BSONObj getOperationStatistics() const override;
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();

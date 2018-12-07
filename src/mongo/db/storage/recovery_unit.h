@@ -242,6 +242,13 @@ public:
     }
 
     /**
+     * Fetches the storage level statistics.
+     */
+    virtual BSONObj getOperationStatistics() const {
+        return {};
+    }
+
+    /**
      * The ReadSource indicates which exteral or provided timestamp to read from for future
      * transactions.
      */

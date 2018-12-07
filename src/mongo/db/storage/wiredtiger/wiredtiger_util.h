@@ -151,6 +151,14 @@ public:
                                     BSONObjBuilder* bob);
 
     /**
+     * Fetches the operation statistics, converts those into a BSONObj and resets the statistics
+     * at the end.
+     */
+    static Status exportOperationStatsInfoToBSON(WT_SESSION* s,
+                                                 const std::string& uri,
+                                                 const std::string& config,
+                                                 BSONObjBuilder* bob);
+    /**
      * Appends information about the storage engine's currently available snapshots and the settings
      * that affect that window of maintained history.
      *
