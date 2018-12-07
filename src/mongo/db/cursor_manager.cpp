@@ -408,24 +408,15 @@ Status CursorManager::withCursorManager(OperationContext* opCtx,
 
 // --------------------------
 
-std::size_t CursorManager::PlanExecutorPartitioner::operator()(const PlanExecutor* exec,
-                                                               const std::size_t nPartitions) {
-    auto token = exec->getRegistrationToken();
-    invariant(token);
-    return (*token) % nPartitions;
-}
-
 CursorManager::CursorManager(NamespaceString nss)
     : _nss(std::move(nss)),
       _collectionCacheRuntimeId(_nss.isEmpty() ? 0
                                                : globalCursorIdCache->registerCursorManager(_nss)),
       _random(stdx::make_unique<PseudoRandom>(globalCursorIdCache->nextSeed())),
-      _registeredPlanExecutors(),
       _cursorMap(stdx::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {
-    // All cursors and PlanExecutors should have been deleted already.
-    invariant(_registeredPlanExecutors.empty());
+    // All cursors should have been deleted already.
     invariant(_cursorMap->empty());
 
     if (!isGlobalManager()) {
@@ -439,15 +430,6 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
     invariant(!isGlobalManager());  // The global cursor manager should never need to kill cursors.
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
     fassert(28819, !BackgroundOperation::inProgForNs(_nss));
-    auto allExecPartitions = _registeredPlanExecutors.lockAllPartitions();
-    for (auto&& partition : allExecPartitions) {
-        for (auto&& exec : partition) {
-            // The PlanExecutor is owned elsewhere, so we just mark it as killed and let it be
-            // cleaned up later.
-            exec->markAsKilled({ErrorCodes::QueryPlanKilled, reason});
-        }
-    }
-    allExecPartitions.clear();
 
     // Mark all cursors as killed, but keep around those we can in order to provide a useful error
     // message to the user when they attempt to use it next time.
@@ -515,24 +497,6 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
         cursor->dispose(opCtx);
     }
     return toDisposeWithoutMutex.size();
-}
-
-namespace {
-static AtomicUInt32 registeredPlanExecutorId;
-}  // namespace
-
-Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId CursorManager::registerExecutor(
-    PlanExecutor* exec) {
-    auto partitionId = registeredPlanExecutorId.fetchAndAdd(1);
-    exec->setRegistrationToken(partitionId);
-    _registeredPlanExecutors.insert(exec);
-    return partitionId;
-}
-
-void CursorManager::deregisterExecutor(PlanExecutor* exec) {
-    if (exec->getRegistrationToken()) {
-        _registeredPlanExecutors.erase(exec);
-    }
 }
 
 StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
@@ -698,9 +662,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     // Make sure the PlanExecutor isn't registered, since we will register the ClientCursor wrapping
     // it.
     invariant(cursorParams.exec);
-    deregisterExecutor(cursorParams.exec.get());
     cursorParams.exec.get_deleter().dismissDisposal();
-    cursorParams.exec->unsetRegistered();
 
     // Note we must hold the registration lock from now until insertion into '_cursorMap' to ensure
     // we don't insert two cursors with the same cursor id.

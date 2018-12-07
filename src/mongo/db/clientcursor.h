@@ -51,8 +51,8 @@ class RecoveryUnit;
  * Parameters used for constructing a ClientCursor. Makes an owned copy of 'originatingCommandObj'
  * to be used across getMores.
  *
- * ClientCursors cannot be constructed in isolation, but rather must be
- * constructed and managed using a CursorManager. See cursor_manager.h for more details.
+ * ClientCursors cannot be constructed in isolation, but rather must be constructed and managed
+ * using a CursorManager. See cursor_manager.h for more details.
  */
 struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,

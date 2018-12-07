@@ -239,9 +239,6 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
 
     if (collection) {
         _nss = collection->ns();
-        if (_yieldPolicy->canReleaseLocksDuringExecution()) {
-            _registrationToken = collection->getCursorManager()->registerExecutor(this);
-        }
     } else {
         invariant(_cq);
         _nss = _cq->getQueryRequest().nss();
@@ -661,15 +658,6 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx, CursorManager* cursorMan
         return;
     }
 
-    // If we are registered with the CursorManager we need to be sure to deregister ourselves.
-    // However, if we have been killed we should not attempt to deregister ourselves, since the
-    // caller of markAsKilled() will have done that already, and the CursorManager may no longer
-    // exist. Note that the caller's collection lock prevents us from being marked as killed during
-    // this method, since any interruption event requires a lock in at least MODE_IX.
-    if (cursorManager && _registrationToken && !isMarkedAsKilled()) {
-        dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IS));
-        cursorManager->deregisterExecutor(this);
-    }
     _root->dispose(opCtx);
     _currentState = kDisposed;
 }
@@ -701,19 +689,6 @@ Status PlanExecutorImpl::executePlan() {
 
 void PlanExecutorImpl::enqueue(const BSONObj& obj) {
     _stash.push(obj.getOwned());
-}
-
-void PlanExecutorImpl::unsetRegistered() {
-    _registrationToken.reset();
-}
-
-PlanExecutor::RegistrationToken PlanExecutorImpl::getRegistrationToken() const& {
-    return _registrationToken;
-}
-
-void PlanExecutorImpl::setRegistrationToken(RegistrationToken token)& {
-    invariant(!_registrationToken);
-    _registrationToken = token;
 }
 
 bool PlanExecutorImpl::isMarkedAsKilled() const {

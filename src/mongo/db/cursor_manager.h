@@ -57,17 +57,10 @@ class PlanExecutor;
  * ClientCursors. It is also responsible for allocating the cursor ids that are passed back to
  * clients.
  *
- * In addition to managing the lifetime of ClientCursors, the CursorManager is responsible for
- * notifying yielded queries of write operations and collection drops. For this reason, query
- * PlanExecutor objects which are not contained within a ClientCursor are also registered with the
- * CursorManager. Query executors must be registered with the CursorManager, either as a bare
- * PlanExecutor or inside a ClientCursor (but cannot be registered in both ways).
- *
  * There is a CursorManager per-collection and a global CursorManager. The global CursorManager owns
  * cursors whose lifetime is not tied to that of the collection and which do not need to receive
  * notifications about writes for a particular collection. In contrast, cursors owned by a
- * collection's CursorManager, unless pinned, are destroyed when the collection is destroyed. Such
- * cursors receive notifications about writes to the collection.
+ * collection's CursorManager, unless pinned, are destroyed when the collection is destroyed.
  *
  * Callers must hold the collection lock in at least MODE_IS in order to access a collection's
  * CursorManager, which guards against the CursorManager being concurrently deleted due to a
@@ -81,8 +74,6 @@ class PlanExecutor;
  */
 class CursorManager {
 public:
-    using RegistrationToken = Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId;
-
     /**
      * Appends the sessions that have open cursors on the global cursor manager and across
      * all collection-level cursor managers to the given set of lsids.
@@ -108,18 +99,22 @@ public:
     CursorManager(NamespaceString nss);
 
     /**
-     * Destroys the CursorManager. All cursors and PlanExecutors must be cleaned up via
-     * invalidateAll() before destruction.
+     * Destroys the CursorManager. All cursors must be cleaned up via invalidateAll() before
+     * destruction.
      */
     ~CursorManager();
 
     /**
-     * Kills all managed query executors and ClientCursors. Callers must have exclusive access to
-     * the collection (i.e. must have the collection, database, or global resource locked in
-     * MODE_X).
+     * Kills all managed ClientCursors. Callers must have exclusive access to the collection (i.e.
+     * must have the collection, database, or global resource locked in MODE_X).
+     *
+     * Must be called before the CursorManger is destroyed.
      *
      * 'collectionGoingAway' indicates whether the Collection instance is being deleted.  This could
      * be because the db is being closed, or the collection/db is being dropped.
+     *
+     * For any cursors that are in use by an active operation, ownership is transferred to the
+     * respective cursor pin objects.
      *
      * The 'reason' is the motivation for invalidating all cursors. This will be used for error
      * reporting and logging when an operation finds that the cursor it was operating on has been
@@ -135,21 +130,6 @@ public:
      * Returns the number of cursors that were timed out.
      */
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
-
-    /**
-     * Register an executor so that it can be notified of events that cause the PlanExecutor to be
-     * killed. Must be called before an executor yields. Registration happens automatically for
-     * yielding PlanExecutors, so this should only be called by a PlanExecutor itself. Returns a
-     * token that must be stored for use during deregistration.
-     */
-    Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId registerExecutor(
-        PlanExecutor* exec);
-
-    /**
-     * Remove an executor from the registry. It is legal to call this even if 'exec' is not
-     * registered.
-     */
-    void deregisterExecutor(PlanExecutor* exec);
 
     /**
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
@@ -212,8 +192,7 @@ public:
     stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
 
     /**
-     * Returns the number of ClientCursors currently registered. Excludes any registered bare
-     * PlanExecutors.
+     * Returns the number of ClientCursors currently registered.
      */
     std::size_t numCursors() const;
 
@@ -255,10 +234,6 @@ private:
     static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
 
-    struct PlanExecutorPartitioner {
-        std::size_t operator()(const PlanExecutor* exec, std::size_t nPartitions);
-    };
-
     CursorId allocateCursorId_inlock();
 
     ClientCursorPin _registerCursor(
@@ -283,29 +258,23 @@ private:
     const NamespaceString _nss;
     const uint32_t _collectionCacheRuntimeId;
 
-    // A CursorManager holds a pointer to all open PlanExecutors and all open ClientCursors. All
-    // pointers to PlanExecutors are unowned, and a PlanExecutor will notify the CursorManager when
-    // it is being destroyed. ClientCursors are owned by the CursorManager, except when they are in
-    // use by a ClientCursorPin. When in use by a pin, an unowned pointer remains to ensure they
-    // still receive kill notifications while in use.
+    // A CursorManager holds a pointer to all open ClientCursors. ClientCursors are owned by the
+    // CursorManager, except when they are in use by a ClientCursorPin. When in use by a pin, an
+    // unowned pointer remains to ensure they still receive kill notifications while in use.
     //
     // There are several mutexes at work to protect concurrent access to data structures managed by
-    // this cursor manager. The two registration data structures '_registeredPlanExecutors' and
-    // '_cursorMap' are partitioned to decrease contention, and each partition of the structure is
-    // protected by its own mutex. Separately, there is a '_registrationLock' which protects
-    // concurrent access to '_random' for cursor id generation, and must be held from cursor id
-    // generation until insertion into '_cursorMap'. If you ever need to acquire more than one of
-    // these mutexes at once, you must follow the following rules:
+    // this cursor manager. The '_cursorMap' is partitioned to decrease contention, and each
+    // partition of the structure is protected by its own mutex. Separately, there is a
+    // '_registrationLock' which protects concurrent access to '_random' for cursor id generation,
+    // and must be held from cursor id generation until insertion into '_cursorMap'. If you ever
+    // need to acquire more than one of these mutexes at once, you must follow the following rules:
     // - '_registrationLock' must be acquired first, if at all.
-    // - Mutex(es) for '_registeredPlanExecutors' must be acquired next.
     // - Mutex(es) for '_cursorMap' must be acquired next.
-    // - If you need to access multiple partitions within '_registeredPlanExecutors' or '_cursorMap'
-    //   at once, you must acquire the mutexes for those partitions in ascending order, or use the
-    //   partition helpers to acquire mutexes for all partitions.
+    // - If you need to access multiple partitions within '_cursorMap' at once, you must acquire the
+    // mutexes for those partitions in ascending order, or use the partition helpers to acquire
+    // mutexes for all partitions.
     mutable SimpleMutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
-    Partitioned<stdx::unordered_set<PlanExecutor*>, kNumPartitions, PlanExecutorPartitioner>
-        _registeredPlanExecutors;
     std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>>
         _cursorMap;
 };

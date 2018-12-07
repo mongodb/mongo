@@ -74,9 +74,6 @@ public:
     void dispose(OperationContext* opCtx, CursorManager* cursorManager) final;
     void enqueue(const BSONObj& obj) final;
     BSONObjSet getOutputSorts() const final;
-    void unsetRegistered() final;
-    RegistrationToken getRegistrationToken() const&;
-    void setRegistrationToken(RegistrationToken token) & final;
     bool isMarkedAsKilled() const final;
     Status getKillStatus() final;
     bool isDisposed() const final;
@@ -178,10 +175,6 @@ private:
     std::queue<BSONObj> _stash;
 
     enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
-
-    // Set if this PlanExecutor is registered with the CursorManager.
-    boost::optional<Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId>
-        _registrationToken;
 
     bool _everDetachedFromOperationContext = false;
 };

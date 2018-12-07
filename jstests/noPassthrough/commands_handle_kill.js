@@ -70,6 +70,8 @@
      *   currentOp output. The default checks that all fields of cmdObj are in the curOp command.
      * @param {Function} [options.customSetup=undefined] - A callback to do any necessary setup
      *   before the command can be run, like adding a geospatial index before a geoNear command.
+     * @param {Boolean} [options.usesIndex] - True if this command should scan index {a: 1}, and
+     *   therefore should be killed if this index is dropped.
      */
     function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
         options = options || {};
@@ -85,10 +87,16 @@
         // These are commands that will cause all running PlanExecutors to be invalidated, and the
         // error messages that should be propagated when that happens.
         const invalidatingCommands = [
-            {command: {dropDatabase: 1}, message: 'database dropped'},
-            {command: {drop: collName}, message: 'collection dropped'},
-            {command: {dropIndexes: collName, index: {a: 1}}, message: 'index \'a_1\' dropped'},
+            {command: {dropDatabase: 1}, message: 'Collection dropped'},
+            {command: {drop: collName}, message: 'Collection dropped'},
         ];
+
+        if (options.usesIndex) {
+            invalidatingCommands.push({
+                command: {dropIndexes: collName, index: {a: 1}},
+                message: 'index \'a_1\' dropped'
+            });
+        }
 
         for (let invalidatingCommand of invalidatingCommands) {
             setupCollection();
@@ -165,15 +173,19 @@ if (${ canYield }) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
     assertCommandPropogatesPlanExecutorKillReason({aggregate: collName, pipeline: [], cursor: {}});
+    assertCommandPropogatesPlanExecutorKillReason(
+        {aggregate: collName, pipeline: [{$match: {a: {$gte: 0}}}], cursor: {}}, {usesIndex: true});
 
     assertCommandPropogatesPlanExecutorKillReason({dataSize: coll.getFullName()},
                                                   {commandYields: false});
 
     assertCommandPropogatesPlanExecutorKillReason("dbHash", {commandYields: false});
 
-    assertCommandPropogatesPlanExecutorKillReason({count: collName, query: {_id: {$gte: 0}}});
+    assertCommandPropogatesPlanExecutorKillReason({count: collName, query: {a: {$gte: 0}}},
+                                                  {usesIndex: true});
 
-    assertCommandPropogatesPlanExecutorKillReason({distinct: collName, key: "_id", query: {}});
+    assertCommandPropogatesPlanExecutorKillReason(
+        {distinct: collName, key: "_id", query: {a: {$gte: 0}}}, {usesIndex: true});
 
     assertCommandPropogatesPlanExecutorKillReason(
         {findAndModify: collName, filter: {fakeField: {$gt: 0}}, update: {$inc: {a: 1}}});
@@ -197,12 +209,15 @@ if (${ canYield }) {
         });
 
     assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {}});
+    assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {a: {$gte: 0}}},
+                                                  {usesIndex: true});
 
     assertCommandPropogatesPlanExecutorKillReason(
-        {update: coll.getName(), updates: [{q: {}, u: {$set: {a: 1}}}]},
-        {curOpFilter: {op: 'update'}});
+        {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}}]},
+        {curOpFilter: {op: 'update'}, usesIndex: true});
 
     assertCommandPropogatesPlanExecutorKillReason(
-        {delete: coll.getName(), deletes: [{q: {}, limit: 0}]}, {curOpFilter: {op: 'remove'}});
+        {delete: coll.getName(), deletes: [{q: {a: {$gte: 0}}, limit: 0}]},
+        {curOpFilter: {op: 'remove'}, usesIndex: true});
     MongoRunner.stopMongod(mongod);
 })();

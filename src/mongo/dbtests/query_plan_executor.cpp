@@ -189,51 +189,6 @@ private:
 };
 
 /**
- * Test dropping the collection while the
- * PlanExecutor is doing a collection scan.
- */
-TEST_F(PlanExecutorTest, DropCollScan) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-    insert(BSON("_id" << 1));
-    insert(BSON("_id" << 2));
-
-    BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
-
-    Collection* coll = ctx.getCollection();
-    auto exec = makeCollScanExec(coll, filterObj);
-
-    BSONObj objOut;
-    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
-    ASSERT_EQUALS(1, objOut["_id"].numberInt());
-
-    // After dropping the collection, the plan executor should be dead.
-    dropCollection();
-    ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
-}
-
-/**
- * Test dropping the collection while the PlanExecutor is doing an index scan.
- */
-TEST_F(PlanExecutorTest, DropIndexScan) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-    insert(BSON("_id" << 1 << "a" << 6));
-    insert(BSON("_id" << 2 << "a" << 7));
-    insert(BSON("_id" << 3 << "a" << 8));
-    BSONObj indexSpec = BSON("a" << 1);
-    addIndex(indexSpec);
-
-    auto exec = makeIndexScanExec(ctx.db(), indexSpec, 7, 10);
-
-    BSONObj objOut;
-    ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
-    ASSERT_EQUALS(7, objOut["a"].numberInt());
-
-    // After dropping the collection, the plan executor should be dead.
-    dropCollection();
-    ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
-}
-
-/**
  * Test dropping the collection while an agg PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScanAgg) {
