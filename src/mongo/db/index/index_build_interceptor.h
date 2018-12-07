@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
@@ -51,7 +50,7 @@ public:
      * intercept side writes. This interceptor must not exist longer than the operation context used
      * to construct it, as the underlying TemporaryRecordStore needs it to destroy itself.
      */
-    IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
+    IndexBuildInterceptor(OperationContext* opCtx);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written
@@ -68,19 +67,6 @@ public:
                      int64_t* const numKeysOut);
 
     /**
-     * Given a set of duplicate keys, record the keys for later verification by a call to
-     * checkConstraints();
-     */
-    Status recordDuplicateKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys);
-
-    /**
-     * Returns Status::OK if all previously recorded duplicate key constraint violations have been
-     * resolved for the index. Returns a DuplicateKey error if there are still duplicate key
-     * constraint violations on the index.
-     */
-    Status checkDuplicateKeyConstraints(OperationContext* opCtx) const;
-
-    /**
      * Performs a resumable scan on the side writes table, and either inserts or removes each key
      * from the underlying IndexAccessMethod. This will only insert as many records as are visible
      * in the current snapshot.
@@ -88,8 +74,10 @@ public:
      * This is resumable, so subsequent calls will start the scan at the record immediately
      * following the last inserted record from a previous call to drainWritesIntoIndex.
      */
-    Status drainWritesIntoIndex(OperationContext* opCtx, const InsertDeleteOptions& options);
-
+    Status drainWritesIntoIndex(OperationContext* opCtx,
+                                IndexAccessMethod* indexAccessMethod,
+                                const IndexDescriptor* indexDescriptor,
+                                const InsertDeleteOptions& options);
 
     /**
      * Returns 'true' if there are no visible records remaining to be applied from the side writes
@@ -107,18 +95,14 @@ private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
     Status _applyWrite(OperationContext* opCtx,
+                       IndexAccessMethod* indexAccessMethod,
                        const BSONObj& doc,
                        const InsertDeleteOptions& options,
                        int64_t* const keysInserted,
                        int64_t* const keysDeleted);
 
-    // The entry for the index that is being built.
-    IndexCatalogEntry* _indexCatalogEntry;
-
     // This temporary record store is owned by the interceptor and dropped along with it.
     std::unique_ptr<TemporaryRecordStore> _sideWritesTable;
-
-    std::unique_ptr<DuplicateKeyTracker> _duplicateKeyTracker;
 
     int64_t _numApplied{0};
 

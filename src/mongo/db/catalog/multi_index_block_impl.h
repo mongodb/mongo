@@ -78,10 +78,13 @@ public:
 
     Status insertAllDocumentsInCollection() override;
 
-    Status insert(const BSONObj& doc, const RecordId& loc) override;
+    Status insert(const BSONObj& doc,
+                  const RecordId& loc,
+                  std::vector<BSONObj>* const dupKeysInserted = nullptr) override;
 
     Status dumpInsertsFromBulk() override;
     Status dumpInsertsFromBulk(std::set<RecordId>* dupRecords) override;
+    Status dumpInsertsFromBulk(std::vector<BSONObj>* dupKeysInserted) override;
 
     /**
      * See MultiIndexBlock::drainBackgroundWritesIfNeeded()
@@ -136,7 +139,8 @@ private:
         InsertDeleteOptions options;
     };
 
-    Status _dumpInsertsFromBulk(std::set<RecordId>* dupRecords);
+    Status _dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
+                                std::vector<BSONObj>* dupKeysInserted);
 
     /**
      * Returns the current state.

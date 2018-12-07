@@ -132,7 +132,7 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->insert({}, {}));
+    ASSERT_OK(indexer->insert({}, {}, nullptr));
     ASSERT_OK(indexer->dumpInsertsFromBulk());
 
     ASSERT_FALSE(indexer->isCommitted());
@@ -152,7 +152,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
     auto specs = unittest::assertGet(indexer->init(std::vector<BSONObj>()));
     ASSERT_EQUALS(0U, specs.size());
-    ASSERT_OK(indexer->insert({}, {}));
+    ASSERT_OK(indexer->insert({}, {}, nullptr));
     indexer->abortWithoutCleanup();
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kAborted, indexer->getState_forTest());
 
@@ -184,13 +184,13 @@ TEST_F(MultiIndexBlockTest, InsertingSingleDocumentFailsAfterAbort) {
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kAborted, indexer->getState_forTest());
 
     ASSERT_EQUALS(ErrorCodes::IndexBuildAborted,
-                  indexer->insert(BSON("_id" << 123 << "a" << 456), {}));
+                  indexer->insert(BSON("_id" << 123 << "a" << 456), {}, nullptr));
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kAborted, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());
 }
 
-TEST_F(MultiIndexBlockTest, DumpInsertsFromBulkFailsAfterAbort) {
+TEST_F(MultiIndexBlockTest, dumpInsertsFromBulkFailsAfterAbort) {
     auto indexer = getIndexer();
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kUninitialized, indexer->getState_forTest());
 
@@ -198,7 +198,7 @@ TEST_F(MultiIndexBlockTest, DumpInsertsFromBulkFailsAfterAbort) {
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->insert(BSON("_id" << 123 << "a" << 456), {}));
+    ASSERT_OK(indexer->insert(BSON("_id" << 123 << "a" << 456), {}, nullptr));
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
     indexer->abort("test"_sd);
@@ -218,7 +218,7 @@ TEST_F(MultiIndexBlockTest, CommitFailsAfterAbort) {
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->insert(BSON("_id" << 123 << "a" << 456), {}));
+    ASSERT_OK(indexer->insert(BSON("_id" << 123 << "a" << 456), {}, nullptr));
     ASSERT_EQUALS(MultiIndexBlockImpl::State::kRunning, indexer->getState_forTest());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk());

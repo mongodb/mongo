@@ -206,17 +206,7 @@ public:
 
         ASSERT_OK(indexer.init(spec).getStatus());
         const Status status = indexer.insertAllDocumentsInCollection();
-        if (!background) {
-            ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
-            return;
-        }
-
-        // Background builds do not detect duplicates until they commit.
-        ASSERT_OK(status);
-
-        WriteUnitOfWork wunit(&_opCtx);
-        ASSERT_THROWS_CODE(indexer.commit(), AssertionException, ErrorCodes::DuplicateKey);
-        wunit.commit();
+        ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
     }
 };
 
