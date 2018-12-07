@@ -13,7 +13,7 @@
     load("jstests/aggregation/extras/out_helpers.js");  // For withEachOutMode().
 
     // Mongos currently uses its own error code if any shard's explain fails.
-    const kErrorCode = FixtureHelpers.isMongos(db) ? 17403 : 51028;
+    const kErrorCode = FixtureHelpers.isMongos(db) ? 17403 : 51029;
 
     let sourceColl = db.explain_out_source;
     let targetColl = db.explain_out_target;

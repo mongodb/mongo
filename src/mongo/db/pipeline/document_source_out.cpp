@@ -202,7 +202,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
         // getNext() to be called for the 'executionStats' and 'allPlansExecution' explain modes.
         // This assertion should not be triggered for 'queryPlanner' explain of a $out, which is
         // perfectly legal.
-        uassert(51028,
+        uassert(51029,
                 str::stream() << "explain of $out is not allowed with verbosity: "
                               << ExplainOptions::verbosityString(*pExpCtx->explain),
                 !pExpCtx->explain);
