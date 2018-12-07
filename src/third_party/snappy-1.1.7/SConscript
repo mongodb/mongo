@@ -5,24 +5,24 @@ Import("endian")
 
 env = env.Clone()
 
-if env.TargetOSIs('linux'):
+if env['TARGET_ARCH'] == 's390x':
+    env.Append(CPPPATH=["build_linux_s390x"])
+elif env.TargetOSIs('linux'):
     env.Append(CPPPATH=["build_linux"])
-    env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
 elif env.TargetOSIs('windows'):
     # C4996: 'memccpy': The POSIX name for this item is deprecated. Instead, use the ISO C and C++
     # conformant name: _memccpy. See online help for details
     env.Append(CCFLAGS=['/wd4996'])
     # C4018: '<': signed/unsigned mismatch
     env.Append(CCFLAGS=['/wd4018'])
+    env.Append(CPPPATH=["build_windows"])
 elif not env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_posix"])
-    env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
+
+env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
 
 if env.ToolchainIs('clang', 'GCC'):
     env.Append(CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function'])
-
-if endian == "big":
-    env.Append(CPPDEFINES=['WORDS_BIGENDIAN'])
 
 env.Library(
     target='snappy',
