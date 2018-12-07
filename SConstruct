@@ -2674,11 +2674,17 @@ def doConfigure(myenv):
             myenv.FatalError("Using the leak sanitizer requires a valid symbolizer")
 
         if using_asan:
-            myenv.AppendUnique(CCFLAGS=['-DADDRESS_SANITIZER'])
+            # Unfortunately, abseil requires that we make these macros
+            # (this, and THREAD_ and UNDEFINED_BEHAVIOR_ below) set,
+            # because apparently it is too hard to query the running
+            # compiler. We do this unconditionally because abseil is
+            # basically pervasive via the 'base' library.
+            myenv.AppendUnique(CPPDEFINES=['ADDRESS_SANITIZER'])
 
         if using_tsan:
             tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options
+            myenv.AppendUnique(CPPDEFINES=['THREAD_SANITIZER'])
 
         if using_ubsan:
             # By default, undefined behavior sanitizer doesn't stop on
@@ -2686,6 +2692,7 @@ def doConfigure(myenv):
             # have renamed the flag.
             if not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
                 AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
+            myenv.AppendUnique(CPPDEFINES=['UNDEFINED_BEHAVIOR_SANITIZER'])
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
