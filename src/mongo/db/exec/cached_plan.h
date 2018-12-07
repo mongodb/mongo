@@ -33,7 +33,7 @@
 #include <memory>
 #include <queue>
 
-#include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/requires_all_indices_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
@@ -46,13 +46,16 @@ namespace mongo {
 class PlanYieldPolicy;
 
 /**
- * This stage outputs its mainChild, and possibly its backup child
- * and also updates the cache.
+ * Runs a trial period in order to evaluate the cost of a cached plan. If the cost is unexpectedly
+ * high, the plan cache entry is deactivated and we use multi-planning to select an entirely new
+ * winning plan. This process is called "replanning".
  *
- * Preconditions: Valid RecordId.
- *
+ * This stage requires all indices to stay intact during the trial period so that replanning can
+ * occur with the set of indices in 'params'. As a future improvement, we could instead refresh the
+ * list of indices in 'params' prior to replanning, and thus avoid inheriting from
+ * RequiresAllIndicesStage.
  */
-class CachedPlanStage final : public RequiresCollectionStage {
+class CachedPlanStage final : public RequiresAllIndicesStage {
 public:
     CachedPlanStage(OperationContext* opCtx,
                     Collection* collection,
@@ -85,11 +88,6 @@ public:
      * yielding according to 'yieldPolicy'). Otherwise, the cached plan is run.
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
-
-protected:
-    void doSaveStateRequiresCollection() final {}
-
-    void doRestoreStateRequiresCollection() final {}
 
 private:
     /**

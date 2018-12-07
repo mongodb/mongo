@@ -119,6 +119,11 @@ public:
         return nullptr;
     }
 
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared()
+        const override {
+        return {};
+    }
+
     IndexAccessMethod* getIndex(const IndexDescriptor* const desc) override {
         return nullptr;
     }

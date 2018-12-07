@@ -22,15 +22,15 @@ var $config = (function() {
             {a: 1, c: 1},
             {b: 1},
             {b: 1, c: 1},
-        ]
+        ],
+        numDocs: 200,
     };
 
     var states = {
         query: function query(db, collName) {
             var cursor = db[this.collName].find({$or: [{a: 0}, {b: 0}]});
             try {
-                // No documents are ever inserted into the collection.
-                assertAlways.eq(0, cursor.itcount());
+                assertAlways.eq(this.numDocs, cursor.itcount());
             } catch (e) {
                 // Ignore errors due to the plan executor being killed.
             }
@@ -67,6 +67,9 @@ var $config = (function() {
         this.indexSpecs.forEach(indexSpec => {
             assertAlways.commandWorked(db[this.collName].createIndex(indexSpec));
         });
+        for (let i = 0; i < this.numDocs; ++i) {
+            assertAlways.commandWorked(db[this.collName].insert({a: 0, b: 0, c: 0}));
+        }
     }
 
     return {

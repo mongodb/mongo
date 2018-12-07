@@ -63,7 +63,7 @@ CachedPlanStage::CachedPlanStage(OperationContext* opCtx,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  PlanStage* root)
-    : RequiresCollectionStage(kStageType, opCtx, collection),
+    : RequiresAllIndicesStage(kStageType, opCtx, collection),
       _ws(ws),
       _canonicalQuery(cq),
       _plannerParams(params),
@@ -76,6 +76,14 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // execution work that happens here, so this is needed for the time accounting to
     // make sense.
     ScopedTimer timer(getClock(), &_commonStats.executionTimeMillis);
+
+    // During plan selection, the list of indices we are using to plan must remain stable, so the
+    // query will die during yield recovery if any index has been dropped. However, once plan
+    // selection completes successfully, we no longer need all indices to stick around. The selected
+    // plan should safely die on yield recovery if it is using the dropped index.
+    //
+    // Dismiss the requirement that no indices can be dropped when this method returns.
+    ON_BLOCK_EXIT([this] { releaseAllIndicesRequirement(); });
 
     // If we work this many times during the trial period, then we will replan the
     // query from scratch.

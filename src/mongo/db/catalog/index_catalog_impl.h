@@ -166,6 +166,8 @@ public:
 
     std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
+
     IndexAccessMethod* getIndex(const IndexDescriptor* desc) override;
     const IndexAccessMethod* getIndex(const IndexDescriptor* desc) const override;
 

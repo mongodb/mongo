@@ -207,6 +207,10 @@ public:
         _entries.push_back(std::move(entry));
     }
 
+    std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllEntries() const {
+        return {_entries.begin(), _entries.end()};
+    }
+
 private:
     std::vector<std::shared_ptr<IndexCatalogEntry>> _entries;
 };

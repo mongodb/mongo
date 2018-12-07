@@ -292,6 +292,12 @@ public:
     virtual std::shared_ptr<const IndexCatalogEntry> getEntryShared(
         const IndexDescriptor*) const = 0;
 
+    /**
+     * Returns a vector of shared pointers to all index entries. Excludes unfinished indexes.
+     */
+    virtual std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared()
+        const = 0;
+
     virtual IndexAccessMethod* getIndex(const IndexDescriptor* const desc) = 0;
 
     virtual const IndexAccessMethod* getIndex(const IndexDescriptor* const desc) const = 0;

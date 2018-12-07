@@ -1109,6 +1109,11 @@ std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
     return _buildingIndexes.findShared(indexDescriptor);
 }
 
+std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getAllReadyEntriesShared()
+    const {
+    return _readyIndexes.getAllEntries();
+}
+
 const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
                                                       const IndexDescriptor* oldDesc) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));

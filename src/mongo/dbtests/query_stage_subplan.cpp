@@ -68,6 +68,10 @@ public:
         ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns(), obj));
     }
 
+    void dropIndex(BSONObj keyPattern) {
+        _client.dropIndex(nss.ns(), std::move(keyPattern));
+    }
+
     void insert(const BSONObj& doc) {
         _client.insert(nss.ns(), doc);
     }
@@ -564,6 +568,92 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled, subplanStage.pickBestPlan(&alwaysPlanKilledYieldPolicy));
+}
+
+TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelection) {
+    Collection* collection = nullptr;
+    {
+        dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
+        addIndex(BSON("p1" << 1 << "opt1" << 1));
+        addIndex(BSON("p1" << 1 << "opt2" << 1));
+        addIndex(BSON("p2" << 1 << "opt1" << 1));
+        addIndex(BSON("p2" << 1 << "opt2" << 1));
+        addIndex(BSON("irrelevant" << 1));
+
+        collection = ctx.getCollection();
+        ASSERT(collection);
+    }
+
+    // Build a query with a rooted $or.
+    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
+    auto canonicalQuery =
+        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
+
+    // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
+    // the query.
+    QueryPlannerParams params;
+    fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
+
+    // Create the SubplanStage.
+    WorkingSet workingSet;
+    SubplanStage subplanStage(opCtx(), collection, &workingSet, params, canonicalQuery.get());
+
+    // Mimic a yield by saving the state of the subplan stage. Then, drop an index not being used
+    // while yielded.
+    subplanStage.saveState();
+    dropIndex(BSON("irrelevant" << 1));
+
+    // Attempt to restore state. This should throw due the index drop. As a future improvement, we
+    // may wish to make the subplan stage tolerate drops of indices it is not using.
+    ASSERT_THROWS_CODE(subplanStage.restoreState(), DBException, ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSelection) {
+    Collection* collection = nullptr;
+    {
+        dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
+        addIndex(BSON("p1" << 1 << "opt1" << 1));
+        addIndex(BSON("p1" << 1 << "opt2" << 1));
+        addIndex(BSON("p2" << 1 << "opt1" << 1));
+        addIndex(BSON("p2" << 1 << "opt2" << 1));
+        addIndex(BSON("irrelevant" << 1));
+
+        collection = ctx.getCollection();
+        ASSERT(collection);
+    }
+
+    // Build a query with a rooted $or.
+    auto queryRequest = stdx::make_unique<QueryRequest>(nss);
+    queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
+    auto canonicalQuery =
+        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
+
+    // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
+    // the query.
+    QueryPlannerParams params;
+    fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
+
+    boost::optional<AutoGetCollectionForReadCommand> collLock;
+    collLock.emplace(opCtx(), nss);
+
+    // Create the SubplanStage.
+    WorkingSet workingSet;
+    SubplanStage subplanStage(opCtx(), collection, &workingSet, params, canonicalQuery.get());
+
+    PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, serviceContext()->getFastClockSource());
+    ASSERT_OK(subplanStage.pickBestPlan(&yieldPolicy));
+
+    // Mimic a yield by saving the state of the subplan stage and dropping our lock. Then drop an
+    // index not being used while yielded.
+    subplanStage.saveState();
+    collLock.reset();
+    dropIndex(BSON("irrelevant" << 1));
+
+    // Restoring state should succeed, since the plan selected by pickBestPlan() does not use the
+    // index {irrelevant: 1}.
+    collLock.emplace(opCtx(), nss);
+    subplanStage.restoreState();
 }
 
 }  // namespace

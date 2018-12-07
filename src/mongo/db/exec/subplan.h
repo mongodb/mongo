@@ -37,7 +37,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/requires_all_indices_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -69,7 +69,7 @@ class OperationContext;
  *
  *   --Plans for entire rooted $or queries are neither written to nor read from the plan cache.
  */
-class SubplanStage final : public RequiresCollectionStage {
+class SubplanStage final : public RequiresAllIndicesStage {
 public:
     SubplanStage(OperationContext* opCtx,
                  const Collection* collection,
@@ -126,11 +126,6 @@ public:
     QuerySolution* compositeSolution() const {
         return _compositeSolution.get();
     }
-
-protected:
-    void doSaveStateRequiresCollection() final {}
-
-    void doRestoreStateRequiresCollection() final {}
 
 private:
     /**

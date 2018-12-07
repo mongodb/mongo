@@ -56,7 +56,8 @@ public:
     RequiresCollectionStageBase(const char* stageType, OperationContext* opCtx, CollectionT coll)
         : PlanStage(stageType, opCtx),
           _collection(coll),
-          _collectionUUID(_collection->uuid().get()) {
+          _collectionUUID(_collection->uuid().get()),
+          _nss(_collection->ns()) {
         invariant(_collection);
     }
 
@@ -88,6 +89,10 @@ protected:
 private:
     CollectionT _collection;
     const UUID _collectionUUID;
+
+    // TODO SERVER-31695: The namespace will no longer be needed once queries can survive collection
+    // renames.
+    const NamespaceString _nss;
 };
 
 // Type alias for use by PlanStages that read a Collection.

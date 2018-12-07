@@ -29,35 +29,18 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/requires_index_stage.h"
+#include "mongo/db/exec/requires_all_indices_stage.h"
 
 namespace mongo {
 
-void RequiresIndexStage::doSaveStateRequiresCollection() {
-    doSaveStateRequiresIndex();
-
-    // During yield, we relinquish our shared ownership of the index catalog entry. This allows the
-    // index to be dropped during yield, but permits us to check via the weak_ptr interface
-    // whether the index is still valid on yield recovery.
-    //
-    // We also set catalog pointers to null, since accessing these pointers is illegal during yield.
-    _indexCatalogEntry.reset();
-    _indexDescriptor = nullptr;
-    _indexAccessMethod = nullptr;
-}
-
-void RequiresIndexStage::doRestoreStateRequiresCollection() {
-    // Reacquire shared ownership of the index catalog entry. If we're unable to do so, then the
-    // our index is no longer valid, and the query should die.
-    _indexCatalogEntry = _weakIndexCatalogEntry.lock();
-    uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            _indexCatalogEntry);
-
-    _indexDescriptor = _indexCatalogEntry->descriptor();
-    _indexAccessMethod = _indexCatalogEntry->accessMethod();
-
-    doRestoreStateRequiresIndex();
+void RequiresAllIndicesStage::doRestoreStateRequiresCollection() {
+    size_t i = 0;
+    for (auto&& index : _indexCatalogEntries) {
+        uassert(ErrorCodes::QueryPlanKilled,
+                str::stream() << "query plan killed :: index '" << _indexNames[i] << "' dropped",
+                index.lock());
+        ++i;
+    }
 }
 
 }  // namespace mongo
