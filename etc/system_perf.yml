@@ -462,7 +462,6 @@ buildvariants:
     - wtdevelop
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     platform: linux
     project_dir: &project_dir dsi
     tooltags: ""
