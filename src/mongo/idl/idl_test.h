@@ -60,7 +60,7 @@ inline Status validateNearlyInt(double value) {
  * Validates that the provided string starts with a given letter.
  */
 template <char letter>
-Status validateStartsWith(StringData value) {
+Status validateStartsWith(const std::string& value) {
     if ((value.empty() || value[0] != letter)) {
         return {ErrorCodes::BadValue, "Value does not begin with correct letter"};
     }

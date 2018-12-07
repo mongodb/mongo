@@ -536,7 +536,7 @@ structs:
                 validator: { gte: 0, lt: 256 }
             range_int:
                 type: int
-                validator: { gte: -2147483658, lte: 2147483647 }
+                validator: { gte: -2147483648, lte: 2147483647 }
 
     double_basic_ranges:
         description: Struct using basic range validators on doubles
@@ -568,6 +568,10 @@ structs:
                 validator: { callback: 'validateNearlyInt' }
             string_starts_with_x:
                 type: string
+                validator: { callback: "validateStartsWith<'x'>" }
+            string_starts_with_x2:
+                type: string
+                optional: true
                 validator: { callback: "validateStartsWith<'x'>" }
 
 

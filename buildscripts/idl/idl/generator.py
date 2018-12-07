@@ -37,7 +37,7 @@ import string
 import sys
 import textwrap
 import uuid
-from typing import cast, Dict, List, Mapping, Union
+from typing import cast, Dict, List, Mapping, Tuple, Union
 
 from . import ast
 from . import bson
@@ -92,11 +92,7 @@ def _get_field_constant_name(field):
 
 def _get_field_member_validator_name(field):
     # type (ast.Field) -> unicode
-    """
-    Get the name of the validator method for this field.
-
-    Fields with no validation rules will have a stub validator which returns Status::OK().
-    """
+    """Get the name of the validator method for this field."""
     return 'validate%s' % common.title_case(field.cpp_name)
 
 
@@ -564,23 +560,25 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_template(
                     '${const_type}${param_type} ${method_name}() const { ${body} }')
 
-    def gen_validator(self, field):
+    def gen_validators(self, field):
         # type: (ast.Field) -> None
-        """Generate the C++ validator definition for a field."""
+        """Generate the C++ validators definition for a field."""
+        assert field.validator
+
+        param_type = field.cpp_type
+        if not cpp_types.is_primitive_type(param_type):
+            param_type += '&'
 
         template_params = {
             'method_name': _get_field_member_validator_name(field),
-            'param_type': cpp_types.get_cpp_type(field).get_getter_setter_type()
+            'param_type': param_type,
         }
 
         with self._with_template(template_params):
-            if field.validator is None:
-                # Header inline the Status::OK stub for non-validated fields.
-                self._writer.write_template(
-                    'Status ${method_name}(${param_type}) { return Status::OK(); }')
-            else:
-                # Declare method implemented in C++ file.
-                self._writer.write_template('Status ${method_name}(${param_type});')
+            # Declare method implemented in C++ file.
+            self._writer.write_template('void ${method_name}(const ${param_type} value);')
+            self._writer.write_template(
+                'void ${method_name}(IDLParserErrorContext& ctxt, const ${param_type} value);')
 
         self._writer.write_empty_line()
 
@@ -595,22 +593,21 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if _is_required_serializer_field(field):
             post_body = '%s = true;' % (_get_has_field_member_name(field))
 
-        validator = ''
+        validator_method_name = ''
         if field.validator is not None:
-            validator = 'uassertStatusOK(%s(value));' % _get_field_member_validator_name(field)
+            validator_method_name = _get_field_member_validator_name(field)
 
         template_params = {
             'method_name': _get_field_member_setter_name(field),
             'member_name': member_name,
             'param_type': param_type,
-            'body': cpp_type_info.get_setter_body(member_name),
+            'body': cpp_type_info.get_setter_body(member_name, validator_method_name),
             'post_body': post_body,
-            'validator': validator,
         }
 
         with self._with_template(template_params):
             self._writer.write_template(
-                'void ${method_name}(${param_type} value) & { ${validator} ${body} ${post_body} }')
+                'void ${method_name}(${param_type} value) & { ${body} ${post_body} }')
 
         self._writer.write_empty_line()
 
@@ -838,7 +835,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                                 self.gen_description_comment(field.description)
                             self.gen_getter(struct, field)
                             if not struct.immutable and not field.chained_struct_field:
-                                self.gen_validator(field)
                                 self.gen_setter(field)
 
                     if struct.generate_comparison_operators:
@@ -846,6 +842,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     self.write_unindented_line('protected:')
                     self.gen_protected_serializer_methods(struct)
+
+                    # Write private validators
+                    if [field for field in struct.fields if field.validator]:
+                        self.write_unindented_line('private:')
+                        for field in struct.fields:
+                            if not field.ignore and not struct.immutable and \
+                                not field.chained_struct_field and field.validator:
+                                self.gen_validators(field)
 
                     self.write_unindented_line('private:')
 
@@ -1011,8 +1015,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             with self._block('{', '}'):
                 self._writer.write_line('auto value = %s;' % (expression))
-                self._writer.write_line('uassertStatusOK(%s(value));' %
-                                        (_get_field_member_validator_name(field)))
+                self._writer.write_line('%s(value);' % (_get_field_member_validator_name(field)))
                 self._writer.write_line('%s = std::move(value);' % (field_name))
 
         if field.chained:
@@ -1279,6 +1282,47 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line(method_info.get_call('object'))
             self._writer.write_line('return object;')
 
+    def _compare_and_return_status(self, op, limit, field, optional_param):
+        # type: (unicode, Union[int, float], ast.Field, unicode) -> None
+        """Throw an error on comparison failure."""
+        with self._block('if (!(value %s %s)) {' % (op, repr(limit)), '}'):
+            self._writer.write_line('throwComparisonError<%s>(%s"%s", "%s"_sd, value, %s);' %
+                                    (field.cpp_type, optional_param, field.name, op, limit))
+
+    def _gen_field_validator(self, struct, field, optional_params):
+        # type: (ast.Struct, ast.Field, Tuple[unicode, unicode]) -> None
+        """Generate non-trivial field validators."""
+        validator = field.validator
+
+        param_type = field.cpp_type
+        if not cpp_types.is_primitive_type(param_type):
+            param_type += '&'
+
+        method_template = {
+            'class_name': common.title_case(struct.name),
+            'method_name': _get_field_member_validator_name(field),
+            'param_type': param_type,
+            'optional_param': optional_params[0],
+        }
+
+        with self._with_template(method_template):
+            self._writer.write_template(
+                'void ${class_name}::${method_name}(${optional_param}const ${param_type} value)')
+            with self._block('{', '}'):
+                if validator.gt is not None:
+                    self._compare_and_return_status('>', validator.gt, field, optional_params[1])
+                if validator.gte is not None:
+                    self._compare_and_return_status('>=', validator.gte, field, optional_params[1])
+                if validator.lt is not None:
+                    self._compare_and_return_status('<', validator.lt, field, optional_params[1])
+                if validator.lte is not None:
+                    self._compare_and_return_status('<=', validator.lte, field, optional_params[1])
+
+                if validator.callback is not None:
+                    self._writer.write_line('uassertStatusOK(%s(value));' % (validator.callback))
+
+        self._writer.write_empty_line()
+
     def gen_field_validators(self, struct):
         # type: (ast.Struct) -> None
         """Generate non-trivial field validators."""
@@ -1287,44 +1331,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # Fields without validators are implemented in the header.
                 continue
 
-            cpp_type = cpp_types.get_cpp_type(field)
-
-            method_template = {
-                'class_name': common.title_case(struct.name),
-                'method_name': _get_field_member_validator_name(field),
-                'param_type': cpp_type.get_getter_setter_type(),
-            }
-
-            def compare_and_return_status(op, limit):
-                # type: (unicode, Union[int, float]) -> None
-                """Emit a comparison which returns an BadValue Status on failure."""
-                with self._block('if (!(value %s %s)) {' % (op, repr(limit)), '}'):
-                    self._writer.write_line(
-                        'return {::mongo::ErrorCodes::BadValue, str::stream() << ' +
-                        '"Value must be %s %s, \'" << value << "\' provided"};' % (op, limit))
-
-            validator = field.validator
-            with self._with_template(method_template):
-                self._writer.write_template(
-                    'Status ${class_name}::${method_name}(${param_type} value)')
-                with self._block('{', '}'):
-                    if validator.gt is not None:
-                        compare_and_return_status('>', validator.gt)
-                    if validator.gte is not None:
-                        compare_and_return_status('>=', validator.gte)
-                    if validator.lt is not None:
-                        compare_and_return_status('<', validator.lt)
-                    if validator.lte is not None:
-                        compare_and_return_status('<=', validator.lte)
-
-                    if validator.callback is not None:
-                        with self._block('{', '}'):
-                            self._writer.write_line('Status status = %s(value);' %
-                                                    (validator.callback))
-                            with self._block('if (!status.isOK()) {', '}'):
-                                self._writer.write_line('return status;')
-
-                    self._writer.write_line('return Status::OK();')
+            for optional_params in [('IDLParserErrorContext& ctxt, ', 'ctxt, '), ('', '')]:
+                self._gen_field_validator(struct, field, optional_params)
 
     def gen_bson_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None

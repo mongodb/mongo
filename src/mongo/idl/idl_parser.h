@@ -54,6 +54,13 @@ namespace mongo {
 class IDLParserErrorContext {
     MONGO_DISALLOW_COPYING(IDLParserErrorContext);
 
+    template <typename T>
+    friend void throwComparisonError(IDLParserErrorContext& ctxt,
+                                     StringData fieldName,
+                                     StringData op,
+                                     T actualValue,
+                                     T expectedValue);
+
 public:
     /**
      * String constants for well-known IDL fields.
@@ -190,6 +197,33 @@ private:
     // field with an error.
     const IDLParserErrorContext* _predecessor;
 };
+
+/**
+ * Throw an error when BSON validation fails during parse.
+ */
+template <typename T>
+void throwComparisonError(IDLParserErrorContext& ctxt,
+                          StringData fieldName,
+                          StringData op,
+                          T actualValue,
+                          T expectedValue) {
+    std::string path = ctxt.getElementPath(fieldName);
+    throwComparisonError(path, op, actualValue, expectedValue);
+}
+
+/**
+ * Throw an error when a user calls a setter and it fails the comparison.
+ */
+template <typename T>
+void throwComparisonError(StringData fieldName, StringData op, T actualValue, T expectedValue) {
+    uasserted(51024,
+              str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
+                            << expectedValue
+                            << ", actual value '"
+                            << actualValue
+                            << "'");
+}
+
 
 /**
  * Transform a vector of input type to a vector of output type.
