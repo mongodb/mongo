@@ -45,6 +45,7 @@
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -57,17 +58,28 @@ using std::vector;
 using stdx::make_unique;
 
 const std::string kTestNamespace = "test.coll";
+const BSONObj kTestKeyPattern = BSON("testIndex" << 1);
 
 class QueryStageNearTest : public unittest::Test {
 public:
     void setUp() override {
         directClient.createCollection(kTestNamespace);
+        ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace, kTestKeyPattern));
+
+        AutoGetCollectionForRead autoColl(_opCtx, NamespaceString{kTestNamespace});
+        auto* coll = autoColl.getCollection();
+        ASSERT(coll);
+        _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndCollationSpec(
+            _opCtx, kTestKeyPattern, BSONObj{});
+        ASSERT(_mockGeoIndex);
     }
 
 protected:
     const ServiceContext::UniqueOperationContext _uniqOpCtx = cc().makeOperationContext();
     OperationContext* const _opCtx = _uniqOpCtx.get();
     DBDirectClient directClient{_opCtx};
+
+    IndexDescriptor* _mockGeoIndex;
 };
 
 /**
@@ -85,8 +97,11 @@ public:
         double max;
     };
 
-    MockNearStage(OperationContext* opCtx, WorkingSet* workingSet, const Collection* coll)
-        : NearStage(opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, coll),
+    MockNearStage(OperationContext* opCtx,
+                  WorkingSet* workingSet,
+                  const IndexDescriptor* indexDescriptor)
+        : NearStage(
+              opCtx, "MOCK_DISTANCE_SEARCH_STAGE", STAGE_UNKNOWN, workingSet, indexDescriptor),
           _pos(0) {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
@@ -165,11 +180,7 @@ TEST_F(QueryStageNearTest, Basic) {
     vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    AutoGetCollectionForRead autoColl(_opCtx, NamespaceString{kTestNamespace});
-    auto* coll = autoColl.getCollection();
-    ASSERT(coll);
-
-    MockNearStage nearStage(_opCtx, &workingSet, coll);
+    MockNearStage nearStage(_opCtx, &workingSet, _mockGeoIndex);
 
     // First set of results
     mockData.clear();
@@ -208,7 +219,7 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     auto* coll = autoColl.getCollection();
     ASSERT(coll);
 
-    MockNearStage nearStage(_opCtx, &workingSet, coll);
+    MockNearStage nearStage(_opCtx, &workingSet, _mockGeoIndex);
 
     // Empty set of results
     mockData.clear();

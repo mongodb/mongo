@@ -47,8 +47,8 @@ NearStage::NearStage(OperationContext* opCtx,
                      const char* typeName,
                      StageType type,
                      WorkingSet* workingSet,
-                     const Collection* collection)
-    : RequiresCollectionStage(typeName, opCtx, collection),
+                     const IndexDescriptor* indexDescriptor)
+    : RequiresIndexStage(typeName, opCtx, indexDescriptor),
       _workingSet(workingSet),
       _searchState(SearchState_Initializing),
       _nextIntervalStats(nullptr),

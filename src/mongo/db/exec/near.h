@@ -38,7 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
@@ -88,7 +88,7 @@ namespace mongo {
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
  */
-class NearStage : public RequiresCollectionStage {
+class NearStage : public RequiresIndexStage {
 public:
     struct CoveredInterval;
 
@@ -109,7 +109,7 @@ protected:
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,
-              const Collection* collection);
+              const IndexDescriptor* indexDescriptor);
 
     //
     // Methods implemented for specific search functionality
@@ -145,9 +145,9 @@ protected:
                                   WorkingSet* workingSet,
                                   WorkingSetID* out) = 0;
 
-    void doSaveStateRequiresCollection() final {}
+    void doSaveStateRequiresIndex() final {}
 
-    void doRestoreStateRequiresCollection() final {}
+    void doRestoreStateRequiresIndex() final {}
 
     // Filled in by subclasses.
     NearStats _specificStats;

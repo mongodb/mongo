@@ -250,8 +250,7 @@ PlanStage* buildStages(OperationContext* opCtx,
                 opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
-            GeoNear2DStage* nearStage =
-                new GeoNear2DStage(params, opCtx, ws, collection, twoDIndex);
+            GeoNear2DStage* nearStage = new GeoNear2DStage(params, opCtx, ws, twoDIndex);
 
             return nearStage;
         }
@@ -269,7 +268,7 @@ PlanStage* buildStages(OperationContext* opCtx,
                 opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
-            return new GeoNear2DSphereStage(params, opCtx, ws, collection, s2Index);
+            return new GeoNear2DSphereStage(params, opCtx, ws, s2Index);
         }
         case STAGE_TEXT: {
             const TextNode* node = static_cast<const TextNode*>(root);

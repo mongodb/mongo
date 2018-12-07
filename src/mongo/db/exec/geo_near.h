@@ -70,8 +70,7 @@ public:
     GeoNear2DStage(const GeoNearParams& nearParams,
                    OperationContext* opCtx,
                    WorkingSet* workingSet,
-                   const Collection* collection,
-                   IndexDescriptor* twoDIndex);
+                   const IndexDescriptor* twoDIndex);
 
 protected:
     StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
@@ -86,10 +85,6 @@ protected:
 
 private:
     const GeoNearParams _nearParams;
-
-    // The 2D index we're searching over
-    // Not owned here
-    IndexDescriptor* const _twoDIndex;
 
     // The total search annulus
     const R2Annulus _fullBounds;
@@ -115,8 +110,7 @@ public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
                          OperationContext* opCtx,
                          WorkingSet* workingSet,
-                         const Collection* collection,
-                         IndexDescriptor* s2Index);
+                         const IndexDescriptor* s2Index);
 
     ~GeoNear2DSphereStage();
 
@@ -133,10 +127,6 @@ protected:
 
 private:
     const GeoNearParams _nearParams;
-
-    // The 2D index we're searching over
-    // Not owned here
-    IndexDescriptor* const _s2Index;
 
     S2IndexingParams _indexParams;
 
