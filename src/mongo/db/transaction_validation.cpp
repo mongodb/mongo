@@ -83,8 +83,8 @@ void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, Str
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
             wcResult.usedDefault || cmdName == "commitTransaction" ||
-                cmdName == "abortTransaction" || cmdName == "prepareTransaction" ||
-                cmdName == "doTxn");
+                cmdName == "coordinateCommitTransaction" || cmdName == "abortTransaction" ||
+                cmdName == "prepareTransaction" || cmdName == "doTxn");
 }
 
 bool shouldCommandSkipSessionCheckout(StringData cmdName) {
