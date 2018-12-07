@@ -19,9 +19,9 @@ var $config = extendWorkload($config, function($config, $super) {
         // collection in order to stress the behavior of reading from the same snapshot over the
         // course of multiple network roundtrips.
         const batchSize = Math.max(2, Math.floor(this.numDocs / 5));
-        let prevDocuments;
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
+            let prevDocuments = undefined;
             for (let i = 0; i < this.numReads; i++) {
                 const collectionDocs = collection.find().batchSize(batchSize).toArray();
                 assertWhenOwnColl.eq(

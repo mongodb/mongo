@@ -14,9 +14,9 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.numReads = 5;
 
     $config.states.repeatedRead = function repeatedRead(db, collName) {
-        let prevDocuments;
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
+            let prevDocuments = undefined;
             for (let i = 0; i < this.numReads; i++) {
                 const collectionDocs = collection.find().toArray();
                 assertWhenOwnColl.eq(
