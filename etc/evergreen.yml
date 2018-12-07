@@ -1388,9 +1388,8 @@ functions:
 
           # Install any pip modules needed by the scripts or tests
           ${activate_virtualenv}
+          pip install -r buildscripts/requirements.txt
           pip install boto3==1.5.27
-          pip install mock==2.0.0
-          pip install psutil==5.4.3
 
     - *determine_task_timeout
     - *update_task_timeout_expansions
@@ -1771,7 +1770,7 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python -m pip install git+https://github.com/evergreen-ci/shrub.py
+          $python -m pip install -r buildscripts/requirements.txt
           $python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file expansions.yml
 
     - command: archive.targz_pack

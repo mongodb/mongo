@@ -3,11 +3,16 @@
 from __future__ import absolute_import
 
 import datetime
+import math
+import os
 import unittest
+import yaml
 
-from mock import patch, Mock
+from mock import patch, mock_open, call, Mock
 
 from buildscripts import generate_resmoke_suites as grs
+from generate_resmoke_suites import render_suite, render_misc_suite, \
+    prepare_directory_for_suite
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use
 
@@ -251,8 +256,8 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(len(tests), 0)
 
     @patch("buildscripts.generate_resmoke_suites.os")
-    def test_only_test_executions(self, os):
-        os.path.isfile.return_value = True
+    def test_only_test_executions(self, mock_os):
+        mock_os.path.isfile.return_value = True
 
         executions = [{
             "revision": "revision1",
@@ -279,8 +284,8 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(tests["test3.js"]["variant1"], 3)
 
     @patch("buildscripts.generate_resmoke_suites.os")
-    def test_mix_of_test_and_hook_executions(self, os):
-        os.path.isfile.return_value = True
+    def test_mix_of_test_and_hook_executions(self, mock_os):
+        mock_os.path.isfile.return_value = True
 
         executions = [
             {
@@ -323,8 +328,8 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(tests["test3.js"]["variant1"], 6)
 
     @patch("buildscripts.generate_resmoke_suites.os")
-    def test_multiple_revisions_for_same_test(self, os):
-        os.path.isfile.return_value = True
+    def test_multiple_revisions_for_same_test(self, mock_os):
+        mock_os.path.isfile.return_value = True
 
         executions = [
             {
@@ -373,8 +378,8 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(tests["test3.js"]["variant1"], 3)
 
     @patch("buildscripts.generate_resmoke_suites.os")
-    def test_non_files_are_not_included(self, os):
-        os.path.isfile.return_value = False
+    def test_non_files_are_not_included(self, mock_os):
+        mock_os.path.isfile.return_value = False
 
         executions = [{
             "revision": "revision1",
@@ -520,62 +525,150 @@ class SuiteTest(unittest.TestCase):
         self.assertEqual(suite.get_test_count(), 3)
         self.assertEqual(suite.get_runtime(), 29)
 
-    def test_model_generation(self):
-        suite = grs.Suite()
-        suite.add_test('test1', {
-            "max_runtime": 10 * 60,
-            "variant1": 5 * 60,
-            "variant2": 10 * 60,
-            "variant3": 7 * 60,
-        })
-        suite.add_test('test2', {
-            "max_runtime": 12 * 60,
-            "variant1": 12 * 60,
-            "variant2": 8 * 60,
-            "variant3": 6 * 60,
-        })
-        suite.add_test('test3', {
-            "max_runtime": 7 * 60,
-            "variant1": 6 * 60,
-            "variant2": 6 * 60,
-            "variant3": 7 * 60,
-        })
 
-        model = suite.get_model()
-
-        self.assertEqual(model["test_names"], ["test1", "test2", "test3"])
-        self.assertIn({"runtime": 23, "name": "variant1"}, model["variants"])
-        self.assertIn({"runtime": 24, "name": "variant2"}, model["variants"])
-        self.assertIn({"runtime": 20, "name": "variant3"}, model["variants"])
+def create_suite(count=3, start=0):
+    """ Create a suite with count tests."""
+    suite = grs.Suite()
+    for i in range(start, start + count):
+        suite.add_test('test{}'.format(i), {})
+    return suite
 
 
-class GetMiscModelTest(unittest.TestCase):
-    def test_model_with_test_in_same_dir(self):
-        test_list = [
-            "dir0/subdir0/test0",
-            "dir0/subdir0/test1",
-            "dir0/subdir0/test2",
-            "dir0/subdir0/test3",
+class RenderSuites(unittest.TestCase):
+    EXPECTED_FORMAT = """selector:
+  excludes:
+  - fixed
+  roots:
+  - test{}
+  - test{}
+  - test{}
+"""
+
+    def _test(self, size):
+
+        suites = [create_suite(start=3 * i) for i in range(size)]
+        expected = [
+            self.EXPECTED_FORMAT.format(*range(3 * i, 3 * (i + 1))) for i in range(len(suites))
         ]
 
-        model = grs.get_misc_model(test_list)
+        m = mock_open(read_data=yaml.dump({'selector': {'roots': [], 'excludes': ['fixed']}}))
+        with patch('generate_resmoke_suites.open', m, create=True):
+            render_suite(suites, 'suite_name')
+        handle = m()
 
-        self.assertIn("is_misc", model)
+        # The other writes are for the headers.
+        self.assertEquals(len(suites) * 2, handle.write.call_count)
+        handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
+        calls = [
+            call(os.path.join(grs.TEST_SUITE_DIR, 'suite_name.yml'), 'r')
+            for _ in range(len(suites))
+        ]
+        m.assert_has_calls(calls, any_order=True)
+        filename = os.path.join(grs.CONFIG_DIR, 'suite_name_{{:0{}}}.yml'.format(
+            int(math.ceil(math.log10(size)))))
+        calls = [call(filename.format(i), 'w') for i in range(size)]
+        m.assert_has_calls(calls, any_order=True)
 
-        self.assertIn("excluded_tests", model)
-        self.assertEqual(len(model["excluded_tests"]), 4)
-        self.assertIn("dir0/subdir0/test0", model["excluded_tests"])
-        self.assertIn("dir0/subdir0/test1", model["excluded_tests"])
-        self.assertIn("dir0/subdir0/test2", model["excluded_tests"])
-        self.assertIn("dir0/subdir0/test3", model["excluded_tests"])
+    def test_1_suite(self):
+        self._test(1)
 
-    def test_model_includes_extra_data(self):
-        test_list = ["dir0/subdir0/test0"]
-        extra_data = {
-            "extra": "data",
-        }
+    def test_11_suites(self):
+        self._test(11)
 
-        model = grs.get_misc_model(test_list, extra_data)
+    def test_101_suites(self):
+        self._test(101)
 
-        self.assertIn("extra", model)
-        self.assertEqual(model["extra"], "data")
+
+class RenderMiscSuites(unittest.TestCase):
+    def test_single_suite(self):
+
+        test_list = ['test{}'.format(i) for i in range(10)]
+        m = mock_open(read_data=yaml.dump({'selector': {'roots': []}}))
+        with patch('generate_resmoke_suites.open', m, create=True):
+            render_misc_suite(test_list, 'suite_name')
+        handle = m()
+
+        # The other writes are for the headers.
+        self.assertEquals(2, handle.write.call_count)
+        handle.write.assert_any_call("""selector:
+  exclude_files:
+  - test0
+  - test1
+  - test2
+  - test3
+  - test4
+  - test5
+  - test6
+  - test7
+  - test8
+  - test9
+  roots: []
+""")
+        calls = [call(os.path.join(grs.TEST_SUITE_DIR, 'suite_name.yml'), 'r')]
+        m.assert_has_calls(calls, any_order=True)
+        filename = os.path.join(grs.CONFIG_DIR, 'suite_name_misc.yml')
+        calls = [call(filename, 'w')]
+        m.assert_has_calls(calls, any_order=True)
+
+
+class PrepareDirectoryForSuite(unittest.TestCase):
+    def test_no_directory(self):
+        with patch('generate_resmoke_suites.os') as mock_os:
+            mock_os.path.exists.return_value = False
+            prepare_directory_for_suite('tmp')
+
+        mock_os.makedirs.assert_called_once_with('tmp')
+
+
+class GenerateEvgConfigTest(unittest.TestCase):
+    @staticmethod
+    def generate_mock_suites(count):
+        suites = []
+        for idx in range(count):
+            suite = Mock()
+            suite.name = "suite {0}".format(idx)
+            suites.append(suite)
+
+        return suites
+
+    @staticmethod
+    def generate_mock_options():
+        options = Mock()
+        options.resmoke_args = "resmoke_args"
+        options.run_multiple_jobs = "true"
+        options.variant = "buildvariant"
+        options.suite = "suite"
+        options.task = "suite"
+
+        return options
+
+    def test_evg_config_is_created(self):
+        options = self.generate_mock_options()
+        suites = self.generate_mock_suites(3)
+
+        config = grs.generate_evg_config(suites, options).to_map()
+
+        self.assertEqual(len(config["tasks"]), len(suites) + 1)
+        command1 = config["tasks"][0]["commands"][1]
+        self.assertIn(options.resmoke_args, command1["vars"]["resmoke_args"])
+        self.assertIn(options.run_multiple_jobs, command1["vars"]["run_multiple_jobs"])
+        self.assertEqual("run tests", command1["func"])
+
+    def test_evg_config_is_created_with_diff_task_and_suite(self):
+        options = self.generate_mock_options()
+        options.task = "task"
+        suites = self.generate_mock_suites(3)
+
+        config = grs.generate_evg_config(suites, options).to_map()
+
+        self.assertEqual(len(config["tasks"]), len(suites) + 1)
+        display_task = config["buildvariants"][0]["display_tasks"][0]
+        self.assertEqual(options.task, display_task["name"])
+        self.assertEqual(len(suites) + 2, len(display_task["execution_tasks"]))
+        self.assertIn(options.task + "_gen", display_task["execution_tasks"])
+        self.assertIn(options.task + "_misc_" + options.variant, display_task["execution_tasks"])
+
+        task = config["tasks"][0]
+        self.assertIn(options.variant, task["name"])
+        self.assertIn(task["name"], display_task["execution_tasks"])
+        self.assertIn(options.suite, task["commands"][1]["vars"]["resmoke_args"])

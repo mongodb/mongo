@@ -9,13 +9,14 @@ import os
 
 from collections import namedtuple
 
-import yaml
-
 from shrub.config import Configuration
 from shrub.command import CommandDefinition
 from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
+
+import util.read_config as read_config
+import util.taskname as taskname
 
 CONFIG_DIRECTORY = "generated_resmoke_config"
 
@@ -35,34 +36,6 @@ ConfigOptions = namedtuple("ConfigOptions", [
 ])
 
 
-def _get_config_value(attrib, cmd_line_options, config_file_data, required=False, default=None):
-    """
-    Get the configuration value to use.
-
-    First use command line options, then config file option, then the default. If required is
-    true, throw an exception if the value is not found.
-
-    :param attrib: Attribute to search for.
-    :param cmd_line_options: Command line options.
-    :param config_file_data: Config file data.
-    :param required: Is this option required.
-    :param default: Default value if option is not found.
-    :return: value to use for this option.
-    """
-    value = getattr(cmd_line_options, attrib, None)
-    if value:
-        return value
-
-    value = config_file_data.get(attrib)
-    if value:
-        return value
-
-    if required:
-        raise ValueError("{0} must be specified".format(attrib))
-
-    return default
-
-
 def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-many-locals
     """
     Get the configuration to use.
@@ -73,32 +46,33 @@ def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-m
     :param config_file: config file to use.
     :return: ConfigOptions to use.
     """
-    config_file_data = {}
-    if config_file:
-        with open(config_file) as file_handle:
-            config_file_data = yaml.load(file_handle)
+    config_file_data = read_config.read_config_file(config_file)
 
     num_files = int(
-        _get_config_value("num_files", cmd_line_options, config_file_data, required=True))
+        read_config.get_config_value("num_files", cmd_line_options, config_file_data,
+                                     required=True))
     num_tasks = int(
-        _get_config_value("num_tasks", cmd_line_options, config_file_data, required=True))
-    resmoke_args = _get_config_value("resmoke_args", cmd_line_options, config_file_data, default="")
-    npm_command = _get_config_value("npm_command", cmd_line_options, config_file_data,
-                                    default="jstestfuzz")
-    jstestfuzz_vars = _get_config_value("jstestfuzz_vars", cmd_line_options, config_file_data,
-                                        default="")
-    name = _get_config_value("name", cmd_line_options, config_file_data, required=True)
-    variant = _get_config_value("build_variant", cmd_line_options, config_file_data, required=True)
-    continue_on_failure = _get_config_value("continue_on_failure", cmd_line_options,
-                                            config_file_data, default="false")
-    resmoke_jobs_max = _get_config_value("resmoke_jobs_max", cmd_line_options, config_file_data,
-                                         default="0")
-    should_shuffle = _get_config_value("should_shuffle", cmd_line_options, config_file_data,
-                                       default="false")
-    timeout_secs = _get_config_value("timeout_secs", cmd_line_options, config_file_data,
-                                     default="1800")
-    use_multiversion = _get_config_value("task_path_suffix", cmd_line_options, config_file_data,
-                                         default=False)
+        read_config.get_config_value("num_tasks", cmd_line_options, config_file_data,
+                                     required=True))
+    resmoke_args = read_config.get_config_value("resmoke_args", cmd_line_options, config_file_data,
+                                                default="")
+    npm_command = read_config.get_config_value("npm_command", cmd_line_options, config_file_data,
+                                               default="jstestfuzz")
+    jstestfuzz_vars = read_config.get_config_value("jstestfuzz_vars", cmd_line_options,
+                                                   config_file_data, default="")
+    name = read_config.get_config_value("name", cmd_line_options, config_file_data, required=True)
+    variant = read_config.get_config_value("build_variant", cmd_line_options, config_file_data,
+                                           required=True)
+    continue_on_failure = read_config.get_config_value("continue_on_failure", cmd_line_options,
+                                                       config_file_data, default="false")
+    resmoke_jobs_max = read_config.get_config_value("resmoke_jobs_max", cmd_line_options,
+                                                    config_file_data, default="0")
+    should_shuffle = read_config.get_config_value("should_shuffle", cmd_line_options,
+                                                  config_file_data, default="false")
+    timeout_secs = read_config.get_config_value("timeout_secs", cmd_line_options, config_file_data,
+                                                default="1800")
+    use_multiversion = read_config.get_config_value("task_path_suffix", cmd_line_options,
+                                                    config_file_data, default=False)
 
     return ConfigOptions(num_files, num_tasks, resmoke_args, npm_command, jstestfuzz_vars, name,
                          variant, continue_on_failure, resmoke_jobs_max, should_shuffle,
@@ -131,7 +105,8 @@ def _generate_evg_tasks(options):
     task_specs = []
 
     for task_index in range(options.num_tasks):
-        name = _name_task(options.name, task_index, options.num_tasks) + "_" + options.variant
+        name = taskname.name_generated_task(options.name, task_index, options.num_tasks,
+                                            options.variant)
         task_names.append(name)
         task_specs.append(TaskSpec(name))
         task = evg_config.task(name)
