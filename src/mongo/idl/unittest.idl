@@ -536,7 +536,8 @@ structs:
                 validator: { gte: 0, lt: 256 }
             range_int:
                 type: int
-                validator: { gte: -2147483648, lte: 2147483647 }
+                # Use INT32_MIN+1 for min since MSVC does not like -2147483647 as a constant.
+                validator: { gte: -2147483647, lte: 2147483647 }
 
     double_basic_ranges:
         description: Struct using basic range validators on doubles

@@ -2432,7 +2432,7 @@ TEST(IDLValidatedField, Int_basic_ranges) {
     ASSERT_THROWS(obj0.setByte_range_int(256), AssertionException);
 
     // IDL ints *are* int32_t, so no number we can pass to the func will actually fail.
-    obj0.setRange_int(std::numeric_limits<std::int32_t>::min());
+    obj0.setRange_int(std::numeric_limits<std::int32_t>::min() + 1);
     obj0.setRange_int(-65536);
     obj0.setRange_int(0);
     obj0.setRange_int(65536);
