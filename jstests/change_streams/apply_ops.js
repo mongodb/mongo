@@ -72,7 +72,7 @@
           ns: {db: db.getName(), coll: coll.getName()},
           operationType: "insert",
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           documentKey: {_id: 2},
@@ -80,7 +80,7 @@
           ns: {db: db.getName(), coll: coll.getName()},
           operationType: "insert",
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           documentKey: {_id: 1},
@@ -88,14 +88,14 @@
           operationType: "update",
           updateDescription: {removedFields: [], updatedFields: {a: 1}},
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           documentKey: {_id: kDeletedDocumentId},
           ns: {db: db.getName(), coll: coll.getName()},
           operationType: "delete",
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           operationType: "drop",
@@ -123,7 +123,7 @@
         ns: {db: db.getName(), coll: otherCollName},
         operationType: "insert",
         lsid: session.getSessionId(),
-        txnNumber: NumberLong(session._txnNumber),
+        txnNumber: session.getTxnNumber_forTesting(),
     });
 
     // Verify that a whole-db stream returns the expected sequence of changes, including the insert
@@ -141,7 +141,7 @@
         ns: {db: otherDbName, coll: otherDbCollName},
         operationType: "insert",
         lsid: session.getSessionId(),
-        txnNumber: NumberLong(session._txnNumber),
+        txnNumber: session.getTxnNumber_forTesting(),
     });
 
     // Verify that a whole-cluster stream returns the expected sequence of changes, including the

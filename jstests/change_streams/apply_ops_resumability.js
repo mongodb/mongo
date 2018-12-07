@@ -62,7 +62,7 @@
           ns: {db: db.getName(), coll: coll.getName()},
           operationType: "insert",
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           documentKey: {_id: 2},
@@ -70,7 +70,7 @@
           ns: {db: db.getName(), coll: coll.getName()},
           operationType: "insert",
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           documentKey: {_id: 1},
@@ -78,7 +78,7 @@
           operationType: "update",
           updateDescription: {removedFields: [], updatedFields: {a: 1}},
           lsid: session.getSessionId(),
-          txnNumber: NumberLong(session._txnNumber),
+          txnNumber: session.getTxnNumber_forTesting(),
         },
         {
           documentKey: {_id: 3},
@@ -149,7 +149,7 @@
         ns: {db: db.getName(), coll: otherCollName},
         operationType: "insert",
         lsid: session.getSessionId(),
-        txnNumber: NumberLong(session._txnNumber),
+        txnNumber: session.getTxnNumber_forTesting(),
     });
 
     // Verify that a whole-db stream can be resumed from the middle of the transaction, and that it
@@ -169,7 +169,7 @@
         ns: {db: otherDbName, coll: otherDbCollName},
         operationType: "insert",
         lsid: session.getSessionId(),
-        txnNumber: NumberLong(session._txnNumber),
+        txnNumber: session.getTxnNumber_forTesting(),
     });
 
     // Verify that a whole-cluster stream can be resumed from the middle of the transaction, and
