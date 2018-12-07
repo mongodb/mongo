@@ -1088,6 +1088,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
                                       const AggregationRequest& request,
                                       BSONObjBuilder* result) {
+    uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
     auto executionNsRoutingInfoStatus = getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
     LiteParsedPipeline litePipe(request);
