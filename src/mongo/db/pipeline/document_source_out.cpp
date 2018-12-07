@@ -198,6 +198,15 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     }
 
     if (!_initialized) {
+        // Explain of a $out should never try to actually execute any writes. We only ever expect
+        // getNext() to be called for the 'executionStats' and 'allPlansExecution' explain modes.
+        // This assertion should not be triggered for 'queryPlanner' explain of a $out, which is
+        // perfectly legal.
+        uassert(51028,
+                str::stream() << "explain of $out is not allowed with verbosity: "
+                              << ExplainOptions::verbosityString(*pExpCtx->explain),
+                !pExpCtx->explain);
+
         initializeWriteNs();
         _initialized = true;
     }
