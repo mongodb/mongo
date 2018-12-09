@@ -102,6 +102,7 @@ selector:
   - jstests/sharding/validate_collection.js
   # Enable if SERVER-36966 is backported to v3.6
   - jstests/sharding/mr_output_sharded_validation.js
+  - jstests/sharding/shard_collection_existing_zones.js
 
 executor:
   config:

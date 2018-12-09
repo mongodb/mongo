@@ -105,7 +105,8 @@ public:
         const Timestamp& validAfter,
         const std::vector<TagsType>& tags,
         const StringMap<std::vector<ShardId>>& tagToShards,
-        const std::vector<ShardId>& allShardIds);
+        const std::vector<ShardId>& allShardIds,
+        const bool isEmpty);
 
     /**
      * Creates the first chunks for a newly sharded collection.
@@ -118,6 +119,7 @@ public:
                                                    const std::vector<BSONObj>& splitPoints,
                                                    const std::vector<TagsType>& tags,
                                                    const bool distributeInitialChunks,
+                                                   const bool isEmpty,
                                                    const int numContiguousChunksPerShard = 1);
 
     /**
