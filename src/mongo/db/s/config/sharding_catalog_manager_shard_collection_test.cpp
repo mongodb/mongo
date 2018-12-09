@@ -79,33 +79,29 @@ const NamespaceString kNamespace("db1.foo");
 
 class ShardCollectionTest : public ConfigServerTestFixture {
 public:
-    void expectCount(const HostAndPort& receivingHost,
-                     const NamespaceString& expectedNss,
-                     const BSONObj& expectedQuery,
-                     const StatusWith<long long>& response) {
+    void expectSplitVector(const HostAndPort& shardHost,
+                           const ShardKeyPattern& keyPattern,
+                           const BSONObj& splitPoints) {
         onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(receivingHost, request.target);
+            ASSERT_EQUALS(shardHost, request.target);
             string cmdName = request.cmdObj.firstElement().fieldName();
+            ASSERT_EQUALS("splitVector", cmdName);
+            ASSERT_EQUALS(kNamespace.ns(),
+                          request.cmdObj["splitVector"].String());  // splitVector uses full ns
 
-            ASSERT_EQUALS("count", cmdName);
+            ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
+            ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
+            ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
+            ASSERT_EQUALS(64 * 1024 * 1024ULL,
+                          static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
+            ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
+            ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQUALS(expectedNss, nss);
+            ASSERT_BSONOBJ_EQ(
+                ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+                rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            if (expectedQuery.isEmpty()) {
-                auto queryElem = request.cmdObj["query"];
-                ASSERT_TRUE(queryElem.eoo() || queryElem.Obj().isEmpty());
-            } else {
-                ASSERT_BSONOBJ_EQ(expectedQuery, request.cmdObj["query"].Obj());
-            }
-
-            if (response.isOK()) {
-                return BSON("ok" << 1 << "n" << response.getValue());
-            }
-
-            BSONObjBuilder responseBuilder;
-            CommandHelpers::appendCommandStatusNoThrow(responseBuilder, response.getStatus());
-            return responseBuilder.obj();
+            return BSON("ok" << 1 << "splitKeys" << splitPoints);
         });
     }
 
@@ -186,8 +182,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
                               testPrimaryShard);
     });
 
-    // Report that no documents exist for the given collection on the primary shard
-    expectCount(shardHost, kNamespace, BSONObj(), 0);
+    // Respond to the splitVector command sent to the shard to figure out initial split points.
+    expectSplitVector(shardHost, shardKeyPattern, BSONObj());
 
     // Expect the set shard version for that namespace.
     // We do not check for a specific ChunkVersion, because we cannot easily know the OID that was
@@ -341,50 +337,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
     BSONObj splitPoint2 = BSON("_id" << 200);
     BSONObj splitPoint3 = BSON("_id" << 300);
 
-    ChunkVersion expectedVersion(1, 0, OID::gen());
-
-    ChunkType expectedChunk0;
-    expectedChunk0.setNS(kNamespace);
-    expectedChunk0.setShard(shard.getName());
-    expectedChunk0.setMin(keyPattern.getKeyPattern().globalMin());
-    expectedChunk0.setMax(splitPoint0);
-    expectedChunk0.setVersion(expectedVersion);
-    expectedVersion.incMinor();
-
-    ChunkType expectedChunk1;
-    expectedChunk1.setNS(kNamespace);
-    expectedChunk1.setShard(shard.getName());
-    expectedChunk1.setMin(splitPoint0);
-    expectedChunk1.setMax(splitPoint1);
-    expectedChunk1.setVersion(expectedVersion);
-    expectedVersion.incMinor();
-
-    ChunkType expectedChunk2;
-    expectedChunk2.setNS(kNamespace);
-    expectedChunk2.setShard(shard.getName());
-    expectedChunk2.setMin(splitPoint1);
-    expectedChunk2.setMax(splitPoint2);
-    expectedChunk2.setVersion(expectedVersion);
-    expectedVersion.incMinor();
-
-    ChunkType expectedChunk3;
-    expectedChunk3.setNS(kNamespace);
-    expectedChunk3.setShard(shard.getName());
-    expectedChunk3.setMin(splitPoint2);
-    expectedChunk3.setMax(splitPoint3);
-    expectedChunk3.setVersion(expectedVersion);
-    expectedVersion.incMinor();
-
-    ChunkType expectedChunk4;
-    expectedChunk4.setNS(kNamespace);
-    expectedChunk4.setShard(shard.getName());
-    expectedChunk4.setMin(splitPoint3);
-    expectedChunk4.setMax(keyPattern.getKeyPattern().globalMax());
-    expectedChunk4.setVersion(expectedVersion);
-
-    vector<ChunkType> expectedChunks{
-        expectedChunk0, expectedChunk1, expectedChunk2, expectedChunk3, expectedChunk4};
-
     BSONObj defaultCollation;
 
     // Now start actually sharding the collection.
@@ -403,33 +355,10 @@ TEST_F(ShardCollectionTest, withInitialData) {
                               testPrimaryShard);
     });
 
-    // Report that documents exist for the given collection on the primary shard, so that calling
-    // splitVector is required for calculating the initial split points.
-    expectCount(shardHost, kNamespace, BSONObj(), 1000);
-
-    // Respond to the splitVector command sent to the shard to figure out initial split points
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(shardHost, request.target);
-        string cmdName = request.cmdObj.firstElement().fieldName();
-        ASSERT_EQUALS("splitVector", cmdName);
-        ASSERT_EQUALS(kNamespace.ns(),
-                      request.cmdObj["splitVector"].String());  // splitVector uses full ns
-
-        ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
-        ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
-        ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
-        ASSERT_EQUALS(64 * 1024 * 1024ULL,
-                      static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
-        ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
-        ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
-
-        ASSERT_BSONOBJ_EQ(
-            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
-            rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-        return BSON("ok" << 1 << "splitKeys"
-                         << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));
-    });
+    // Respond to the splitVector command sent to the shard to figure out initial split points.
+    expectSplitVector(shardHost,
+                      keyPattern,
+                      BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));
 
     // Expect the set shard version for that namespace
     // We do not check for a specific ChunkVersion, because we cannot easily know the OID that was

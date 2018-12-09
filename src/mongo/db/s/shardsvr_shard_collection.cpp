@@ -408,7 +408,8 @@ void shardCollection(OperationContext* opCtx,
                      const std::vector<TagsType>& tags,
                      const bool fromMapReduce,
                      const ShardId& dbPrimaryShardId,
-                     const int numContiguousChunksPerShard) {
+                     const int numContiguousChunksPerShard,
+                     const bool isEmpty) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
@@ -450,6 +451,7 @@ void shardCollection(OperationContext* opCtx,
                                                                      splitPoints,
                                                                      tags,
                                                                      distributeChunks,
+                                                                     isEmpty,
                                                                      numContiguousChunksPerShard);
 
     // Create collections on all shards that will receive chunks. We need to do this after we mark
@@ -644,13 +646,7 @@ public:
 
                 if (request.getInitialSplitPoints()) {
                     finalSplitPoints = std::move(*request.getInitialSplitPoints());
-                } else if (!tags.empty()) {
-                    // no need to find split points since we will create chunks based on
-                    // the existing zones
-                    uassert(ErrorCodes::InvalidOptions,
-                            str::stream() << "found existing zones but the collection is not empty",
-                            isEmpty);
-                } else {
+                } else if (tags.empty()) {
                     InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
                         shardKeyPattern,
                         isEmpty,
@@ -691,7 +687,8 @@ public:
                                 tags,
                                 fromMapReduce,
                                 ShardingState::get(opCtx)->shardId(),
-                                numContiguousChunksPerShard);
+                                numContiguousChunksPerShard,
+                                isEmpty);
 
                 status = Status::OK();
             } catch (const DBException& e) {

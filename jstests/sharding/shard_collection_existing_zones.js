@@ -128,6 +128,52 @@
         assert.commandWorked(testDB.runCommand({drop: kCollName}));
     }
 
+    /**
+     * Tests that a non-empty collection associated with zones can be sharded.
+     */
+    function testNonemptyZonedCollection() {
+        var shardKey = {x: 1};
+        var shards = configDB.shards.find().toArray();
+        var testColl = testDB.getCollection(kCollName);
+        var ranges = [
+            {min: {x: 0}, max: {x: 10}},
+            {min: {x: 10}, max: {x: 20}},
+            {min: {x: 20}, max: {x: 40}}
+        ];
+
+        for (let i = 0; i < 40; i++) {
+            assert.writeOK(testColl.insert({x: i}));
+        }
+
+        assert.commandWorked(testColl.createIndex(shardKey));
+
+        for (let i = 0; i < shards.length; i++) {
+            assert.commandWorked(
+                mongos.adminCommand({addShardToZone: shards[i]._id, zone: zoneName + i}));
+            assert.commandWorked(mongos.adminCommand({
+                updateZoneKeyRange: ns,
+                min: ranges[i].min,
+                max: ranges[i].max,
+                zone: zoneName + i
+            }));
+        }
+
+        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
+
+        // Check that there is initially 1 chunk.
+        assert.eq(1, configDB.chunks.count({ns: ns}));
+
+        st.startBalancer();
+
+        // Check that the chunks were moved properly.
+        assert.soon(() => {
+            let res = configDB.chunks.count({ns: ns});
+            return res === 5;
+        }, 'balancer never ran', 10 * 60 * 1000, 1000);
+
+        assert.commandWorked(testDB.runCommand({drop: kCollName}));
+    }
+
     // test that shardCollection checks that a zone is associated with a shard.
     testShardZoneAssociationValidation({x: 1}, false, false);
 
@@ -151,6 +197,8 @@
 
     testChunkSplits(false);
     testChunkSplits(true);
+
+    testNonemptyZonedCollection();
 
     st.stop();
 })();

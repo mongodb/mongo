@@ -47,6 +47,7 @@ selector:
   - jstests/sharding/out_write_concern.js
   - jstests/sharding/restart_transactions.js
   - jstests/sharding/shard7.js
+  # TODO: SERVER-38541 remove from blacklist
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/snapshot_cursor_commands_mongos.js
   - jstests/sharding/transactions_error_labels.js

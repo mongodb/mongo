@@ -203,7 +203,8 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
     const Timestamp& validAfter,
     const std::vector<TagsType>& tags,
     const StringMap<std::vector<ShardId>>& tagToShards,
-    const std::vector<ShardId>& allShardIds) {
+    const std::vector<ShardId>& allShardIds,
+    const bool isEmpty) {
     invariant(!allShardIds.empty());
     invariant(!tags.empty());
 
@@ -214,18 +215,31 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
 
     std::vector<ChunkType> chunks;
 
-    for (const auto& tag : tags) {
-        if (tag.getMinKey().woCompare(lastChunkMax) > 0) {
-            // create a chunk for the hole between zones
-            const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
-            appendChunk(nss, lastChunkMax, tag.getMinKey(), &version, validAfter, shardId, &chunks);
-        }
+    if (!isEmpty) {
+        // For a non-empty collection, create one chunk on the primary shard and leave it to the
+        // balancer to do the final zone partitioning/rebalancing.
+        appendChunk(nss,
+                    keyPattern.globalMin(),
+                    keyPattern.globalMax(),
+                    &version,
+                    validAfter,
+                    allShardIds[0],
+                    &chunks);
+    } else {
+        for (const auto& tag : tags) {
+            if (tag.getMinKey().woCompare(lastChunkMax) > 0) {
+                // create a chunk for the hole between zones
+                const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
+                appendChunk(
+                    nss, lastChunkMax, tag.getMinKey(), &version, validAfter, shardId, &chunks);
+            }
 
-        // check that this tag is associated with a shard and if so create a chunk for the zone.
-        const auto it = tagToShards.find(tag.getTag());
-        invariant(it != tagToShards.end());
-        const auto& shardIdsForChunk = it->second;
-        uassert(50973,
+            // check that this tag is associated with a shard and if so create a chunk for the zone.
+            const auto it = tagToShards.find(tag.getTag());
+            invariant(it != tagToShards.end());
+            const auto& shardIdsForChunk = it->second;
+            uassert(
+                50973,
                 str::stream()
                     << "cannot shard collection "
                     << nss.ns()
@@ -234,21 +248,22 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
                     << " which is not associated with a shard. please add this zone to a shard.",
                 !shardIdsForChunk.empty());
 
-        appendChunk(nss,
-                    tag.getMinKey(),
-                    tag.getMaxKey(),
-                    &version,
-                    validAfter,
-                    shardIdsForChunk[0],
-                    &chunks);
-        lastChunkMax = tag.getMaxKey();
-    }
+            appendChunk(nss,
+                        tag.getMinKey(),
+                        tag.getMaxKey(),
+                        &version,
+                        validAfter,
+                        shardIdsForChunk[0],
+                        &chunks);
+            lastChunkMax = tag.getMaxKey();
+        }
 
-    if (lastChunkMax.woCompare(keyPattern.globalMax()) < 0) {
-        // existing zones do not span to $maxKey so create a chunk for that
-        const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
-        appendChunk(
-            nss, lastChunkMax, keyPattern.globalMax(), &version, validAfter, shardId, &chunks);
+        if (lastChunkMax.woCompare(keyPattern.globalMax()) < 0) {
+            // existing zones do not span to $maxKey so create a chunk for that
+            const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
+            appendChunk(
+                nss, lastChunkMax, keyPattern.globalMax(), &version, validAfter, shardId, &chunks);
+        }
     }
 
     log() << "Created " << chunks.size() << " chunk(s) for: " << nss << " using new epoch "
@@ -265,6 +280,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
     const std::vector<BSONObj>& splitPoints,
     const std::vector<TagsType>& tags,
     const bool distributeInitialChunks,
+    const bool isEmpty,
     const int numContiguousChunksPerShard) {
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
 
@@ -277,22 +293,11 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
         auto primaryShard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
 
-        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-            nss.db().toString(),
-            BSON("count" << nss.coll()),
-            Shard::RetryPolicy::kIdempotent));
-
-        long long numObjects = 0;
-        uassertStatusOK(result.commandStatus);
-        uassertStatusOK(bsonExtractIntegerField(result.response, "n", &numObjects));
-
         // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
         // the splitVector command and affects the number of chunks returned, has been loaded.
         uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->refreshAndCheck(opCtx));
 
-        if (numObjects > 0) {
+        if (!isEmpty) {
             finalSplitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
                 opCtx,
                 primaryShardId,
@@ -305,7 +310,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
 
         // If docs already exist for the collection, must use primary shard,
         // otherwise defer to passed-in distribution option.
-        if (numObjects == 0 && distributeInitialChunks) {
+        if (isEmpty && distributeInitialChunks) {
             Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
         } else {
             shardIds.push_back(primaryShardId);
@@ -344,7 +349,13 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
                                                                    shardIds,
                                                                    numContiguousChunksPerShard)
         : InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
-              nss, shardKeyPattern, validAfter, tags, getTagToShardIds(opCtx, tags), shardIds);
+              nss,
+              shardKeyPattern,
+              validAfter,
+              tags,
+              getTagToShardIds(opCtx, tags),
+              shardIds,
+              isEmpty);
 
     return initialChunks;
 }

@@ -399,8 +399,18 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     }
 
     std::vector<TagsType> tags;
-    const auto initialChunks = InitialSplitPolicy::createFirstChunks(
-        opCtx, nss, fieldsAndOrder, dbPrimaryShardId, splitPoints, tags, distributeInitialChunks);
+    // Since this code runs on the config server, we cannot guarantee that the collection is still
+    // empty by the time the metadata is written so always assume we are sharding a non-empty
+    // collection.
+    bool isEmpty = false;
+    const auto initialChunks = InitialSplitPolicy::createFirstChunks(opCtx,
+                                                                     nss,
+                                                                     fieldsAndOrder,
+                                                                     dbPrimaryShardId,
+                                                                     splitPoints,
+                                                                     tags,
+                                                                     distributeInitialChunks,
+                                                                     isEmpty);
 
     InitialSplitPolicy::writeFirstChunksToConfig(opCtx, initialChunks);
 
