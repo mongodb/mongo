@@ -45,8 +45,8 @@ public:
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern)
-        : _keyPattern(keyPattern.getOwned()) {}
+    explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern, const BSONObj& keyValue)
+        : _keyPattern(keyPattern.getOwned()), _keyValue(keyValue.getOwned()) {}
 
     void serialize(BSONObjBuilder* bob) const override;
 
@@ -60,8 +60,13 @@ public:
         return _keyPattern;
     }
 
+    const BSONObj& getDuplicatedKeyValue() const {
+        return _keyValue;
+    }
+
 private:
-    const BSONObj _keyPattern;
+    BSONObj _keyPattern;
+    BSONObj _keyValue;
 };
 
 }  // namespace mongo

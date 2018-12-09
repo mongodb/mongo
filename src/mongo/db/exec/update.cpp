@@ -37,6 +37,7 @@
 #include <algorithm>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -476,7 +477,8 @@ bool UpdateStage::shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpd
     }
 
     // In order to be retryable, the update equality field paths must be identical to the unique
-    // index key field paths.
+    // index key field paths. Also, the values that triggered the DuplicateKey error must match the
+    // values used in the upsert query predicate.
     pathsupport::EqualityMatches equalities;
     auto status = pathsupport::extractEqualityMatches(*matchExpr, &equalities);
     if (!status.isOK()) {
@@ -488,11 +490,27 @@ bool UpdateStage::shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpd
         return false;
     }
 
-    for (const auto& key : keyPattern) {
-        if (!equalities.count(key.fieldNameStringData())) {
+    auto keyValue = errorInfo.getDuplicatedKeyValue();
+
+    BSONObjIterator keyPatternIter(keyPattern);
+    BSONObjIterator keyValueIter(keyValue);
+    while (keyPatternIter.more() && keyValueIter.more()) {
+        auto keyPatternElem = keyPatternIter.next();
+        auto keyValueElem = keyValueIter.next();
+
+        auto keyName = keyPatternElem.fieldNameStringData();
+        if (!equalities.count(keyName)) {
+            return false;
+        }
+
+        // Comparison which obeys field ordering but ignores field name.
+        BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
+        if (cmp.evaluate(equalities[keyName]->getData() != keyValueElem)) {
             return false;
         }
     }
+    invariant(!keyPatternIter.more());
+    invariant(!keyValueIter.more());
 
     return true;
 }

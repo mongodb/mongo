@@ -44,10 +44,11 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 
 void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("keyPattern", _keyPattern);
+    bob->append("keyValue", _keyValue);
 }
 
 std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj& obj) {
-    return std::make_shared<DuplicateKeyErrorInfo>(obj["keyPattern"].Obj());
+    return std::make_shared<DuplicateKeyErrorInfo>(obj["keyPattern"].Obj(), obj["keyValue"].Obj());
 }
 
 }  // namespace mongo
