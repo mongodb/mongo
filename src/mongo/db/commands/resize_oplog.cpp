@@ -75,7 +75,7 @@ public:
                                const BSONObj& cmdObj) final {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::replSetResizeOplog)) {
+                                                           ActionType::replSetConfigure)) {
             return Status::OK();
         }
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
