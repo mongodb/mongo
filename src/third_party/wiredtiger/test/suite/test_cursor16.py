@@ -44,7 +44,7 @@ class test_cursor16(wttest.WiredTigerTestCase):
     # Returns the number of cursors cached
     def cached_stats(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        cache = stat_cursor[stat.conn.cursors_cached][2]
+        cache = stat_cursor[stat.conn.cursor_cached_count][2]
         stat_cursor.close()
         return cache
 

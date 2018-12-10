@@ -37,6 +37,7 @@ void print_derived_stats(WT_SESSION *);
 void print_file_stats(WT_SESSION *);
 void print_join_cursor_stats(WT_SESSION *);
 void print_overflow_pages(WT_SESSION *);
+void print_session_stats(WT_SESSION *);
 
 static const char *home;
 
@@ -111,6 +112,20 @@ print_join_cursor_stats(WT_SESSION *session)
 
 	error_check(join_cursor->close(join_cursor));
 	error_check(idx_cursor->close(idx_cursor));
+}
+
+void
+print_session_stats(WT_SESSION *session)
+{
+	WT_CURSOR *stat_cursor;
+
+	/*! [statistics session function] */
+	error_check(session->open_cursor(session,
+	    "statistics:session", NULL, NULL, &stat_cursor));
+
+	print_cursor(stat_cursor);
+	error_check(stat_cursor->close(stat_cursor));
+	/*! [statistics session function] */
 }
 
 void
@@ -216,6 +231,8 @@ main(int argc, char *argv[])
 	print_file_stats(session);
 
 	print_join_cursor_stats(session);
+
+	print_session_stats(session);
 
 	print_overflow_pages(session);
 

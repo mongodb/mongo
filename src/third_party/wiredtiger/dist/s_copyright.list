@@ -41,6 +41,7 @@ skip	src/include/flags.h
 skip	src/include/queue.h
 skip	src/log/log_auto.c
 skip	src/support/stat.c
+skip	test/evergreen/evg_cfg.py
 skip	test/packing/intpack-test.c
 skip	test/packing/intpack-test2.c
 skip	test/packing/packing-test.c

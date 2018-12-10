@@ -74,8 +74,8 @@ when the cursor was opened), as well as statistics logging, when it is
 configured.
 
 The following example configures WiredTiger to maintain only relatively
-inexpensive statistics, and to clears statistics after they are gathered
-or logged:
+inexpensive statistics, and to clear statistics after they are gathered or
+logged:
 
 @snippet ex_all.c Statistics clear configuration
 
@@ -87,6 +87,14 @@ The statistics gathered will be organized by reference cursors participating
 in the join (see WT_SESSION::join); the uri of each reference cursor appears
 as a prefix in the description field returned as a value by the statistics
 cursor.
+
+The following example opens a statistics cursor on an open WiredTiger session:
+
+@snippet ex_all.c Statistics cursor session
+
+A reset call on this cursor would reset the session statistics values to zero,
+with or without the statistics configuration \c clear being specified to the
+WT_SESSION::open_cursor method.
 
 @section statistics_log Statistics logging
 

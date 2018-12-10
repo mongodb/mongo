@@ -1,0 +1,14 @@
+  - name: {{task_name}}
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/csuite"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/{{test_dir}}/test_{{test_dir}} 2>&1
+

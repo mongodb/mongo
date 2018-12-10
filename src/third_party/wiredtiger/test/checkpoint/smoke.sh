@@ -6,9 +6,6 @@ set -e
 echo "checkpoint: 3 mixed tables"
 $TEST_WRAPPER ./t -T 3 -t m
 
-# We are done unless long tests are enabled.
-test "$TESTUTIL_ENABLE_LONG_TESTS" = "1" || exit 0
-
 echo "checkpoint: 6 column-store tables"
 $TEST_WRAPPER ./t -T 6 -t c
 

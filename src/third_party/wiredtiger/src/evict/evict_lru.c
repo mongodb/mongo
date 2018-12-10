@@ -2444,6 +2444,7 @@ err:	if (timer) {
 		time_stop = __wt_clock(session);
 		elapsed = WT_CLOCKDIFF_US(time_stop, time_start);
 		WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
+		WT_STAT_SESSION_INCRV(session, cache_time, elapsed);
 		session->cache_wait_us += elapsed;
 		if (cache->cache_max_wait_us != 0 &&
 		    session->cache_wait_us > cache->cache_max_wait_us) {

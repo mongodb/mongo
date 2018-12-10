@@ -97,7 +97,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
 
   # Start of normal make check test tasks
 
@@ -621,7 +621,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_rwlock 2>&1
+            ${test_env_vars|} $(pwd)/test_rwlock 2>&1
 
   - name: csuite-wt2246-col-append-test
     depends_on:
@@ -635,7 +635,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2246_col_append 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2246_col_append 2>&1
 
   - name: csuite-wt2323-join-visibility-test
     depends_on:
@@ -649,7 +649,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2323_join_visibility 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2323_join_visibility 2>&1
 
   - name: csuite-wt2535-insert-race-test
     depends_on:
@@ -663,7 +663,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2535_insert_race 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2535_insert_race 2>&1
 
   - name: csuite-wt2834-join-bloom-fix-test
     depends_on:
@@ -677,7 +677,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2834_join_bloom_fix 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2834_join_bloom_fix 2>&1
 
   - name: csuite-wt2853-perf-test
     depends_on:
@@ -691,7 +691,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2853_perf 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2853_perf 2>&1
 
   - name: csuite-wt2909-checkpoint-integrity-test
     depends_on:
@@ -705,7 +705,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2909_checkpoint_integrity 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2909_checkpoint_integrity 2>&1
 
   - name: csuite-wt3338-partial-update-test
     depends_on:
@@ -719,7 +719,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt3338_partial_update 2>&1
+            ${test_env_vars|} $(pwd)/test_wt3338_partial_update 2>&1
 
   - name: csuite-wt4333-handle-locks-test
     depends_on:
@@ -733,7 +733,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt4333_handle_locks 2>&1
+            ${test_env_vars|} $(pwd)/test_wt4333_handle_locks 2>&1
 
   # End of csuite test tasks
 

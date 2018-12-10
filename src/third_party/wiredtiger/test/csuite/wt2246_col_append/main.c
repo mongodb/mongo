@@ -79,9 +79,6 @@ page_init(uint64_t n)
 	}
 }
 
-/*
- * TODO: Platform specific?
- */
 static void
 onsig(int signo)
 {
@@ -100,10 +97,6 @@ main(int argc, char *argv[])
 	pthread_t idlist[100];
 	uint64_t i, id;
 	char buf[100];
-
-	/* Ignore unless requested */
-	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
-		return (EXIT_SUCCESS);
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));

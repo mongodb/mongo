@@ -38,7 +38,7 @@ cursor types that give access to data managed by WiredTiger:
 	key=<code>string</code>\, value=<code>string</code>\,<br>
 	see @ref metadata for details}
 @row{<tt>statistics:[\<data source URI\>]</tt>,
-	database, data source or join statistics cursor,
+	database, data source, join or session statistics cursor,
 	key=<code>int id</code>\,<br>
 	value=<code>(string description\,
 	string value\, uint64_t value)</code>\,<br>
@@ -106,9 +106,10 @@ WiredTiger database as well as statistics for individual data sources.
 The statistics are at two levels: per-database and per-individual data
 source.  Database-wide statistics are retrieved with the \c "statistics:"
 URI; individual data source statistics are available by specifying
-\c "statistics:<data source URI>".  Additionally, statistics about a
-join cursor can be retrieved by specifying \c "statistics:join" and
-supplying the join cursor as an argument in the SESSION::open_cursor call.
+\c "statistics:<data source URI>". Statistics about a join cursor can be
+retrieved by specifying \c "statistics:join" and supplying the join cursor as an
+argument in the SESSION::open_cursor call. Statistics about a session can be
+retrieved by specifying \c "statistics:session".
 
 The statistic key is an integer from the list of keys in
 @ref_single statistics_keys "Statistics Keys".  Statistics cursors return
@@ -118,7 +119,8 @@ unsigned 64-bit integral value, respectively.
 
 The cursor's statistics values  are loaded when the cursor is opened and
 remain unchanged for the life of the cursor, unless the cursor is reset
-by calling the WT_CURSOR::reset method, which reloads the values.
+by calling the WT_CURSOR::reset method, which reloads the values. A reset call
+on session statistics cursor would set the statistics values to zero.
 
 The following is an example of printing run-time statistics about the
 WiredTiger engine:
@@ -133,7 +135,11 @@ The following is an example of printing statistics about a join cursor:
 
 @snippet ex_stat.c statistics join cursor function
 
-These three examples can use a common display routine that iterates through the
+The following is an example of printing statistics about a session cursor:
+
+@snippet ex_stat.c statistics session function
+
+These four examples can use a common display routine that iterates through the
 statistics until the cursor returns the end of the list.
 
 @snippet ex_stat.c statistics display function

@@ -578,6 +578,11 @@ cursor_statistics(WT_SESSION *session)
 	    "statistics:table:mytable",
 	    NULL, "statistics=(all,clear)", &cursor));
 	/*! [Statistics cursor clear configuration] */
+
+	/*! [Statistics cursor session] */
+	error_check(session->open_cursor(
+	    session, "statistics:session", NULL, NULL, &cursor));
+	/*! [Statistics cursor session] */
 }
 
 static void

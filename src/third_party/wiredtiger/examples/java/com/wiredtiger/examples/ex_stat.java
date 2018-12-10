@@ -119,6 +119,22 @@ public class ex_stat {
     }
 
     int
+    print_session_stats(Session session)
+        throws WiredTigerException
+    {
+        Cursor cursor;
+        int ret;
+
+        /*! [statistics session function] */
+        cursor = session.open_cursor("statistics:session", null, null);
+        ret = print_cursor(cursor);
+        ret = cursor.close();
+        /*! [statistics session function] */
+
+        return (ret);
+    }
+
+    int
     print_overflow_pages(Session session)
         throws WiredTigerException
     {
@@ -263,6 +279,8 @@ public class ex_stat {
         ret = print_file_stats(session);
 
         ret = print_join_cursor_stats(session);
+
+        ret = print_session_stats(session);
 
         ret = print_overflow_pages(session);
 

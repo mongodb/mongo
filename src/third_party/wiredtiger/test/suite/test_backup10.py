@@ -44,10 +44,15 @@ class test_backup10(wttest.WiredTigerTestCase, suite_subprocess):
 
     pfx = 'test_backup'
 
+    scenarios = make_scenarios([
+        ('archiving', dict(archive='true')),
+        ('not-archiving', dict(archive='false')),
+    ])
+
     # Create a large cache, otherwise this test runs quite slowly.
     def conn_config(self):
-        return 'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
-            self.logmax
+        return 'cache_size=1G,log=(archive=%s,' % self.archive + \
+            'enabled,file_max=%s)' % self.logmax
 
     # Run background inserts while running checkpoints repeatedly.
     def test_backup10(self):

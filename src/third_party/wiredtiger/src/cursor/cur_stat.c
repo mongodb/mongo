@@ -270,6 +270,10 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst->notinitialized = cst->notpositioned = true;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
+	/* Reset the session statistics to zero. */
+	if (strcmp(cursor->uri, "statistics:session") == 0)
+		__wt_stat_session_clear_single(&session->stats);
+
 err:	API_END_RET(session, ret);
 }
 
@@ -520,15 +524,6 @@ __curstat_join_init(WT_SESSION_IMPL *session,
 static void
 __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 {
-	/* This is a stub at the moment, initialize the session stats to 0. */
-	session->stats.bytes_read = 0;
-	session->stats.bytes_write = 0;
-	session->stats.cache_time = 0;
-	session->stats.lock_dhandle_wait = 0;
-	session->stats.lock_schema_wait = 0;
-	session->stats.read_time = 0;
-	session->stats.write_time = 0;
-
 	/*
 	 * Copy stats from the session to the cursor. Optionally clear the
 	 * session's statistics.
