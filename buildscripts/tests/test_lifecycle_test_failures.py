@@ -10,7 +10,7 @@ import unittest
 from buildscripts import lifecycle_test_failures as test_failures
 from buildscripts.client import evergreen as evergreen
 
-# pylint: disable=invalid-name,missing-docstring,protected-access
+# pylint: disable=attribute-defined-outside-init,invalid-name,missing-docstring,protected-access
 
 
 class TestReportEntry(unittest.TestCase):
@@ -691,7 +691,8 @@ class mockEvergreenApiV2(object):
     pass
 
 
-def _get_evergreen_apiv2(api_server=None, api_headers=None, num_retries=0):
+def _get_evergreen_apiv2(  # pylint: disable=unused-argument
+        api_server=None, api_headers=None, num_retries=0):
     """Mock function for evergreen.get_evergreen_apiv2."""
     return mockEvergreenApiV2()
 
@@ -706,9 +707,11 @@ class TestHistoryTestCase(unittest.TestCase):
     def dt_to_str(dt):
         return dt.strftime("%Y-%m-%d")
 
-    def _test_stats(self, project, after_date, before_date, group_num_days=None, requester=None,
-                    sort=None, limit=None, tests=None, tasks=None, variants=None, distros=None):
+    def _test_stats(  # pylint: disable=unused-argument,too-many-arguments
+            self, project, after_date, before_date, group_num_days=None, requester=None, sort=None,
+            limit=None, tests=None, tasks=None, variants=None, distros=None):
         return self.my_api_results
+
 
 class TestHistoryTests(TestHistoryTestCase):
     """
@@ -724,14 +727,11 @@ class TestHistoryTests(TestHistoryTestCase):
         my_passes = [11, 6]
         my_fails = [2, 3]
         self.my_api_results = []
-        for i in range(len(my_tests)):
+        for i, _ in enumerate(my_tests):
             self.my_api_results.append({
-                    "test_file": my_tests[i],
-                    "date": my_date,
-                    "num_pass": my_passes[i],
-                    "num_fail": my_fails[i],
-                    "avg_duration_pass": 1.1
-                })
+                "test_file": my_tests[i], "date": my_date, "num_pass": my_passes[i],
+                "num_fail": my_fails[i], "avg_duration_pass": 1.1
+            })
         mockEvergreenApiV2.test_stats = self._test_stats
         history_data = self.test_history.get_history_by_date(my_date, my_date)
         self.assertEqual(len(self.my_api_results), len(history_data))
@@ -754,12 +754,9 @@ class TestHistoryTests(TestHistoryTestCase):
         my_pass = 11
         my_fail = 2
         self.my_api_results = [{
-            "test_file": my_test,
-            "date": my_date,
-            "num_pass": my_pass,
-            "num_fail": my_fail,
+            "test_file": my_test, "date": my_date, "num_pass": my_pass, "num_fail": my_fail,
             "avg_duration_pass": 1.1
-            }]
+        }]
         mockEvergreenApiV2.test_stats = self._test_stats
         history_data = self.test_history.get_history_by_date(my_date, my_date)
         self.assertEqual(1, len(history_data))
@@ -775,13 +772,9 @@ class TestHistoryTests(TestHistoryTestCase):
         my_fail = 2
         my_task = "jsCore"
         self.my_api_results = [{
-            "test_file": my_test,
-            "task_name": my_task,
-            "date": my_date,
-            "num_pass": my_pass,
-            "num_fail": my_fail,
-            "avg_duration_pass": 1.1
-            }]
+            "test_file": my_test, "task_name": my_task, "date": my_date, "num_pass": my_pass,
+            "num_fail": my_fail, "avg_duration_pass": 1.1
+        }]
         mockEvergreenApiV2.test_stats = self._test_stats
         history_data = self.test_history.get_history_by_date(my_date, my_date)
         self.assertEqual(1, len(history_data))
@@ -805,14 +798,9 @@ class TestHistoryTests(TestHistoryTestCase):
         my_fail = 2
         my_task = "jsCore"
         self.my_api_results = [{
-            "test_file": my_test,
-            "task_name": my_task,
-            "variant": my_variant,
-            "date": my_date,
-            "num_pass": my_pass,
-            "num_fail": my_fail,
-            "avg_duration_pass": 1.1
-            }]
+            "test_file": my_test, "task_name": my_task, "variant": my_variant, "date": my_date,
+            "num_pass": my_pass, "num_fail": my_fail, "avg_duration_pass": 1.1
+        }]
         mockEvergreenApiV2.test_stats = self._test_stats
         history_data = self.test_history.get_history_by_date(my_date, my_date)
         self.assertEqual(1, len(history_data))
@@ -838,15 +826,9 @@ class TestHistoryTests(TestHistoryTestCase):
         my_fail = 2
         my_task = "jsCore"
         self.my_api_results = [{
-            "test_file": my_test,
-            "task_name": my_task,
-            "variant": my_variant,
-            "distro": my_distro,
-            "date": my_date1,
-            "num_pass": my_pass,
-            "num_fail": my_fail,
-            "avg_duration_pass": 1.1
-            }]
+            "test_file": my_test, "task_name": my_task, "variant": my_variant, "distro": my_distro,
+            "date": my_date1, "num_pass": my_pass, "num_fail": my_fail, "avg_duration_pass": 1.1
+        }]
         mockEvergreenApiV2.test_stats = self._test_stats
         history_data = self.test_history.get_history_by_date(my_date1, my_date2)
         self.assertEqual(1, len(history_data))
