@@ -230,7 +230,7 @@ env.Library(
 env.Library(
     target='multi_index_block',
     source=[
-        'multi_index_block_impl.cpp',
+        'multi_index_block.cpp',
     ],
     LIBDEPS=[
         'collection',
