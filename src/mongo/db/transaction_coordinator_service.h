@@ -95,6 +95,18 @@ public:
      */
     boost::optional<Future<TransactionCoordinator::CommitDecision>> recoverCommit(
         OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
+
+    /**
+     * Marks the coordinator catalog as stepping up, which blocks all incoming requests for
+     * coordinators, and launches an async task to:
+     * 1. Wait for the coordinators in the catalog to complete (successfully or with an error) and
+     *    be removed from the catalog.
+     * 2. Read all pending commit tasks from the config.transactionCoordinators collection.
+     * 3. Create TransactionCoordinator objects in memory for each pending commit and launch an
+     *    async task to continue coordinating its commit.
+     */
+    void onStepUp(OperationContext* opCtx);
+
     /*
      * TESTING ONLY
      */

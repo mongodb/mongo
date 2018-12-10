@@ -57,6 +57,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
+MONGO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
+MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
+
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 using CommitDecision = TransactionCoordinator::CommitDecision;
@@ -464,6 +468,11 @@ void persistParticipantList(OperationContext* opCtx,
     LOG(0) << "Going to write participant list for lsid: " << lsid.toBSON()
            << ", txnNumber: " << txnNumber;
 
+    if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
+        LOG(0) << "Hit hangBeforeWritingParticipantList failpoint";
+    }
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingParticipantList);
+
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
     sessionInfo.setTxnNumber(txnNumber);
@@ -548,6 +557,11 @@ void persistDecision(OperationContext* opCtx,
                      const boost::optional<Timestamp>& commitTimestamp) {
     LOG(0) << "Going to write decision " << (commitTimestamp ? "commit" : "abort")
            << " for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+
+    if (MONGO_FAIL_POINT(hangBeforeWritingDecision)) {
+        LOG(0) << "Hit hangBeforeWritingDecision failpoint";
+    }
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingDecision);
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
@@ -650,6 +664,11 @@ void persistDecision(OperationContext* opCtx,
 void deleteCoordinatorDoc(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
     LOG(0) << "Going to delete coordinator doc for lsid: " << lsid.toBSON()
            << ", txnNumber: " << txnNumber;
+
+    if (MONGO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
+        LOG(0) << "Hit hangBeforeDeletingCoordinatorDoc failpoint";
+    }
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDeletingCoordinatorDoc);
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);

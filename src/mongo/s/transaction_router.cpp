@@ -47,10 +47,15 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+// TODO (SERVER-37886): Remove this failpoint once failover can be tested on coordinators that
+// have a local participant.
+MONGO_FAIL_POINT_DEFINE(sendCoordinateCommitToConfigServer);
 
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
@@ -565,6 +570,38 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
 
     auto coordinatorShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *_coordinatorId));
+
+    if (MONGO_FAIL_POINT(sendCoordinateCommitToConfigServer)) {
+        LOG(0) << "Sending coordinateCommit for transaction " << *opCtx->getTxnNumber()
+               << " on session " << opCtx->getLogicalSessionId()->toBSON()
+               << " to config server rather than actual coordinator because failpoint is active";
+
+        coordinatorShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+        // Send a fake transaction statement to the config server primary so that the config server
+        // primary sets up state in memory to receive coordinateCommit.
+        auto cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "dummy",
+            coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("distinct"
+                                                                 << "dummy"
+                                                                 << "key"
+                                                                 << "dummy"),
+                                                            true),
+            Shard::RetryPolicy::kIdempotent);
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+
+        // Abort the fake transaction on the config server to release the actual transaction's
+        // resources.
+        cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("abortTransaction" << 1), false),
+            Shard::RetryPolicy::kIdempotent);
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+    }
 
     CoordinateCommitTransaction coordinateCommitCmd;
     coordinateCommitCmd.setDbName("admin");

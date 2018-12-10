@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/s/shard_id.h"
@@ -102,13 +103,8 @@ public:
 
     /**
      * To be used to continue coordinating a transaction on step up.
-     *
-     * TODO (SERVER-36853): Implement this function.
      */
-    Future<CommitDecision> continueCommit() {
-        fassert(ErrorCodes::NotImplemented, "continueCommit not implemented yet");
-        MONGO_UNREACHABLE;
-    }
+    void continueCommit(const TransactionCoordinatorDocument& doc);
 
     /**
      * Returns a future that will be signaled when the transaction has completely finished
@@ -155,8 +151,27 @@ public:
     }
 
 private:
-    // Below are several helper functions that return functions, which will be used as the callbacks
-    // in continuations. Basically they just make the main code prettier.
+    /**
+     * Expects the participant list to already be majority-committed.
+     *
+     * 1. Sends prepare and collect the votes (i.e., responses), retrying requests as needed.
+     * 2. Based on the votes, makes a commit or abort decision.
+     * 3. If the decision is to commit, calculates the commit Timestamp.
+     * 4. Writes the decision and waits for the decision to become majority-committed.
+     */
+    Future<txn::CoordinatorCommitDecision> _runPhaseOne(
+        const std::vector<ShardId>& participantShards);
+
+    /**
+     * Expects the decision to already be majority-committed.
+     *
+     * 1. Send the decision (commit or abort) until receiving all acks (i.e., responses),
+     *    retrying requests as needed.
+     * 2. Delete the coordinator's durable state without waiting for the delete to become
+     *    majority-committed.
+     */
+    Future<void> _runPhaseTwo(const std::vector<ShardId>& participantShards,
+                              const txn::CoordinatorCommitDecision& decision);
 
     /**
     * Asynchronously sends the commit decision to all participants (commit or abort), resolving the
@@ -164,6 +179,11 @@ private:
     */
     Future<void> _sendDecisionToParticipants(const std::vector<ShardId>& participantShards,
                                              txn::CoordinatorCommitDecision coordinatorDecision);
+
+    /**
+     * Helper for handling errors that occur during either phase of commit coordination.
+     */
+    void _handleCompletionStatus(Status s);
 
     /**
      * Notifies all callers of onCompletion that the commit process has completed by fulfilling

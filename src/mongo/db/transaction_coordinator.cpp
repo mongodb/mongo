@@ -75,21 +75,17 @@ TransactionCoordinator::~TransactionCoordinator() {
     invariant(_completionPromises.size() == 0);
 }
 
-
 /**
  * Implements the high-level logic for two-phase commit.
  */
 SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator::runCommit(
     const std::vector<ShardId>& participantShards) {
-
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
         // If another thread has already begun the commit process, return early.
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_state != CoordinatorState::kInit) {
             return _finalDecisionPromise.getFuture();
         }
-
         _state = CoordinatorState::kPreparing;
     }
 
@@ -101,19 +97,34 @@ SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator:
                        opCtx.get(), coordinator->_lsid, coordinator->_txnNumber, participantShards);
                })
         .then([coordinator, participantShards]() {
-            return txn::sendPrepare(coordinator,
-                                    coordinator->_networkExecutor,
-                                    coordinator->_callbackPool,
-                                    participantShards,
-                                    coordinator->_lsid,
-                                    coordinator->_txnNumber);
+            return coordinator->_runPhaseOne(participantShards);
         })
+        .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
+            return coordinator->_runPhaseTwo(participantShards, decision);
+        })
+        .onCompletion([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
+
+    return _finalDecisionPromise.getFuture();
+}
+
+Future<txn::CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
+    const std::vector<ShardId>& participantShards) {
+    auto coordinator = shared_from_this();
+    return txn::sendPrepare(coordinator,
+                            coordinator->_networkExecutor,
+                            coordinator->_callbackPool,
+                            participantShards,
+                            coordinator->_lsid,
+                            coordinator->_txnNumber)
         .then([coordinator, participantShards](txn::PrepareVoteConsensus result) {
             invariant(coordinator->_state == CoordinatorState::kPreparing);
+
             return txn::async(coordinator->_callbackPool, [coordinator, result, participantShards] {
                 auto opCtx = Client::getCurrent()->makeOperationContext();
+
                 const auto decision = makeDecisionFromPrepareVoteConsensus(
                     result, coordinator->_lsid, coordinator->_txnNumber);
+
                 txn::persistDecision(opCtx.get(),
                                      coordinator->_lsid,
                                      coordinator->_txnNumber,
@@ -121,16 +132,15 @@ SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator:
                                      decision.commitTimestamp);
                 return decision;
             });
-        })
-        .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
-            return coordinator->_sendDecisionToParticipants(participantShards, decision)
-                .then([decision] { return decision.decision; });
-        })
-        .then([coordinator](CommitDecision finalDecision) {
+        });
+}
+
+Future<void> TransactionCoordinator::_runPhaseTwo(const std::vector<ShardId>& participantShards,
+                                                  const txn::CoordinatorCommitDecision& decision) {
+    auto coordinator = shared_from_this();
+    return _sendDecisionToParticipants(participantShards, decision)
+        .then([coordinator]() {
             stdx::unique_lock<stdx::mutex> lk(coordinator->_mutex);
-            LOG(3) << "Finished coordinating transaction " << coordinator->_txnNumber
-                   << " on session " << coordinator->_lsid.toBSON() << " with decision "
-                   << finalDecision;
             coordinator->_transitionToDone(std::move(lk));
         })
         .then([coordinator] {
@@ -140,22 +150,38 @@ SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator:
                     opCtx.get(), coordinator->_lsid, coordinator->_txnNumber);
             });
         })
-        .onError([coordinator](Status s) {
+        .then([coordinator]() {
             stdx::unique_lock<stdx::mutex> lk(coordinator->_mutex);
-            LOG(3) << "Two-phase commit failed with error in state " << coordinator->_state
-                   << " for session " << coordinator->_lsid.toBSON() << ", transaction number "
-                   << coordinator->_txnNumber << causedBy(s);
-            // If an error occurred prior to making a decision, set an error on the decision
-            // promise to propagate it to callers of runCommit.
-            if (!coordinator->_finalDecisionPromise.getFuture().isReady()) {
-                invariant(coordinator->_state == CoordinatorState::kPreparing);
-                coordinator->_finalDecisionPromise.setError(s);
-            }
-            coordinator->_transitionToDone(std::move(lk));
-        })
-        .getAsync([](Status s) {});  // "Detach" the future chain, swallowing errors.
+            LOG(3) << "Two-phase commit completed for session " << coordinator->_lsid.toBSON()
+                   << ", transaction number " << coordinator->_txnNumber;
+        });
+}
 
-    return _finalDecisionPromise.getFuture();
+void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument& doc) {
+    _state = CoordinatorState::kPreparing;
+    auto coordinator = shared_from_this();
+    const auto participantShards = doc.getParticipants();
+
+    if (!doc.getDecision()) {
+        _runPhaseOne(participantShards)
+            .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
+                return coordinator->_runPhaseTwo(participantShards, decision);
+            })
+            .onCompletion([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
+        return;
+    }
+
+    txn::CoordinatorCommitDecision decision;
+    if (*doc.getDecision() == "commit") {
+        decision = txn::CoordinatorCommitDecision{TransactionCoordinator::CommitDecision::kCommit,
+                                                  *doc.getCommitTimestamp()};
+    } else if (*doc.getDecision() == "abort") {
+        decision = txn::CoordinatorCommitDecision{TransactionCoordinator::CommitDecision::kAbort,
+                                                  boost::none};
+    }
+    _runPhaseTwo(participantShards, decision).onCompletion([coordinator](Status s) {
+        coordinator->_handleCompletionStatus(s);
+    });
 }
 
 Future<void> TransactionCoordinator::onCompletion() {
@@ -201,6 +227,24 @@ Future<void> TransactionCoordinator::_sendDecisionToParticipants(
     };
     MONGO_UNREACHABLE;
 };
+
+void TransactionCoordinator::_handleCompletionStatus(Status s) {
+    if (s.isOK()) {
+        return;
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    LOG(3) << "Two-phase commit failed with error in state " << _state << " for transaction "
+           << _txnNumber << " on session " << _lsid.toBSON() << causedBy(s);
+
+    // If an error occurred prior to making a decision, set an error on the decision
+    // promise to propagate it to callers of runCommit.
+    if (!_finalDecisionPromise.getFuture().isReady()) {
+        invariant(_state == CoordinatorState::kPreparing);
+        _finalDecisionPromise.setError(s);
+    }
+    _transitionToDone(std::move(lk));
+}
 
 void TransactionCoordinator::_transitionToDone(stdx::unique_lock<stdx::mutex> lk) noexcept {
     _state = CoordinatorState::kDone;

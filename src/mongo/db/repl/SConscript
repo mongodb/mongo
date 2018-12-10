@@ -1612,6 +1612,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/system_index',
+        '$BUILD_DIR/mongo/db/transaction_coordinator',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/util/fail_point',
         'bgsync',

@@ -36,7 +36,11 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -63,36 +67,67 @@ public:
      * is not allowed and will lead to an invariant failure. Users of the catalog must ensure this
      * does not take place.
      */
-    void insert(LogicalSessionId lsid,
+    void insert(OperationContext* opCtx,
+                LogicalSessionId lsid,
                 TxnNumber txnNumber,
-                std::shared_ptr<TransactionCoordinator> coordinator);
+                std::shared_ptr<TransactionCoordinator> coordinator,
+                bool forStepUp = false);
 
     /**
      * Returns the coordinator with the given session id and transaction number, if it exists. If it
      * does not exist, return nullptr.
      */
-    std::shared_ptr<TransactionCoordinator> get(LogicalSessionId lsid, TxnNumber txnNumber);
+    std::shared_ptr<TransactionCoordinator> get(OperationContext* opCtx,
+                                                LogicalSessionId lsid,
+                                                TxnNumber txnNumber);
 
     /**
      * Returns the coordinator with the highest transaction number with the given session id, if it
      * exists. If it does not exist, return boost::none.
      */
     boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
-    getLatestOnSession(LogicalSessionId lsid);
+    getLatestOnSession(OperationContext* opCtx, LogicalSessionId lsid);
 
     /**
      * Removes the coordinator with the given session id and transaction number from the catalog, if
-     * one exists.
+     * one exists, and if this the last coordinator in the catalog, signals that there are no active
+     * coordinators.
      *
      * Note: The coordinator must be in a state suitable for removal (i.e. committed or aborted).
      */
     void remove(LogicalSessionId lsid, TxnNumber txnNumber);
 
+    /**
+     * Waits for the catalog to no longer be marked as in stepup and then marks the catalog as in
+     * stepup and waits for all active coordinators from the previous term to complete (either
+     * successfully or with an error) and be removed from the catalog.
+     */
+    void enterStepUp(OperationContext* opCtx);
+
+    /**
+     * Marks no stepup in progress and signals that no stepup is in progress.
+     */
+    void exitStepUp();
+
+    /**
+     * Returns a string representation of the map from LogicalSessionId to the list of TxnNumbers
+     * with TransactionCoordinators currently in the catalog.
+     */
+    std::string toString();
+
 private:
     /**
-     * Protects the _coordinatorsBySession map.
+     * Protects the state below.
      */
     stdx::mutex _mutex;
+
+    /**
+     * Blocks in an interruptible wait until the catalog is not marked as having a stepup in
+     * progress.
+     */
+    void _waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
+
+    std::string _toString(WithLock wl);
 
     /**
      * Contains TransactionCoordinator objects by session id and transaction number. May contain
@@ -101,6 +136,29 @@ private:
      */
     LogicalSessionIdMap<std::map<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
         _coordinatorsBySession;
+
+    /**
+     * Used only for testing. Contains TransactionCoordinator objects which have completed their
+     * commit coordination and would normally be expunged from memory.
+     */
+    LogicalSessionIdMap<std::map<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
+        _coordinatorsBySessionDefunct;
+
+    /**
+     * Whether a thread is actively executing a stepUp task.
+     */
+    bool _stepUpInProgress{false};
+
+    /**
+     * Notified when the *current* in-progress stepUp task has completed, i.e., _stepUpInProgress
+     * becomes false.
+     */
+    stdx::condition_variable _noStepUpInProgressCv;
+
+    /**
+     * Notified when the last coordinator is removed from the catalog.
+     */
+    stdx::condition_variable _noActiveCoordinatorsCv;
 };
 
 }  // namespace mongo

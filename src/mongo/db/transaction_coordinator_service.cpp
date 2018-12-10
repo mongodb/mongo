@@ -98,7 +98,7 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
                                                       LogicalSessionId lsid,
                                                       TxnNumber txnNumber,
                                                       Date_t commitDeadline) {
-    if (auto latestTxnNumAndCoordinator = _coordinatorCatalog->getLatestOnSession(lsid)) {
+    if (auto latestTxnNumAndCoordinator = _coordinatorCatalog->getLatestOnSession(opCtx, lsid)) {
         auto latestCoordinator = latestTxnNumAndCoordinator.get().second;
         if (txnNumber == latestTxnNumAndCoordinator.get().first) {
             return;
@@ -110,7 +110,7 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
     auto newCoordinator = std::make_shared<TransactionCoordinator>(
         networkExecutor, _threadPool.get(), lsid, txnNumber);
 
-    _coordinatorCatalog->insert(lsid, txnNumber, newCoordinator);
+    _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
 
     // TODO (SERVER-37024): Schedule abort task on executor to execute at commitDeadline.
 }
@@ -121,7 +121,7 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
                                                 TxnNumber txnNumber,
                                                 const std::set<ShardId>& participantList) {
 
-    auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
+    auto coordinator = _coordinatorCatalog->get(opCtx, lsid, txnNumber);
     if (!coordinator) {
         return boost::none;
     }
@@ -142,7 +142,7 @@ boost::optional<Future<TransactionCoordinator::CommitDecision>>
 TransactionCoordinatorService::recoverCommit(OperationContext* opCtx,
                                              LogicalSessionId lsid,
                                              TxnNumber txnNumber) {
-    auto coordinator = _coordinatorCatalog->get(lsid, txnNumber);
+    auto coordinator = _coordinatorCatalog->get(opCtx, lsid, txnNumber);
     if (!coordinator) {
         return boost::none;
     }
@@ -153,6 +153,56 @@ TransactionCoordinatorService::recoverCommit(OperationContext* opCtx,
     // is made durable. Currently the coordinator waits to hear acks because participants in prepare
     // reject requests with a higher transaction number, causing tests to fail.
     // return coordinator.get()->getDecision();
+}
+
+void TransactionCoordinatorService::onStepUp(OperationContext* opCtx) {
+    // Blocks until the stepup task from the last term completes, then marks a new stepup task as
+    // having begun and blocks until all active coordinators complete (are removed from the
+    // catalog).
+    // Note: No other threads can read the catalog while the catalog is marked as having an active
+    // stepup task.
+    _coordinatorCatalog->enterStepUp(opCtx);
+
+    auto scheduleStatus = _threadPool->schedule([this]() {
+        try {
+            // The opCtx destructor handles unsetting itself from the Client
+            auto opCtxPtr = Client::getCurrent()->makeOperationContext();
+            auto opCtx = opCtxPtr.get();
+
+            // TODO (SERVER-37885): Wait for something to be committed in this term.
+
+            auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
+            LOG(0) << "Need to resume coordinating commit for " << coordinatorDocs.size()
+                   << " transactions";
+
+            for (const auto& doc : coordinatorDocs) {
+                LOG(3) << "Going to resume coordinating commit for " << doc.toBSON();
+                const auto lsid = *doc.getId().getSessionId();
+                const auto txnNumber = *doc.getId().getTxnNumber();
+
+                auto networkExecutor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                auto coordinator = std::make_shared<TransactionCoordinator>(
+                    networkExecutor, _threadPool.get(), lsid, txnNumber);
+                _coordinatorCatalog->insert(
+                    opCtx, lsid, txnNumber, coordinator, true /* forStepUp */);
+                coordinator->continueCommit(doc);
+            }
+
+            _coordinatorCatalog->exitStepUp();
+
+            LOG(3) << "Incoming coordinateCommit requests now accepted";
+        } catch (const DBException& e) {
+            LOG(3) << "Failed while executing thread to resume coordinating commit for pending "
+                      "transactions "
+                   << causedBy(e.toStatus());
+            _coordinatorCatalog->exitStepUp();
+        }
+    });
+
+    if (scheduleStatus.code() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(51031, scheduleStatus.isOK());
 }
 
 }  // namespace mongo

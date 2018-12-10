@@ -39,15 +39,24 @@
 
 namespace mongo {
 
+// TODO (SERVER-37886): Remove this failpoint once failover can be tested on coordinators that have
+// a local participant.
+MONGO_FAIL_POINT_DEFINE(doNotForgetCoordinator);
+
 TransactionCoordinatorCatalog::TransactionCoordinatorCatalog() = default;
 
 TransactionCoordinatorCatalog::~TransactionCoordinatorCatalog() = default;
 
-void TransactionCoordinatorCatalog::insert(LogicalSessionId lsid,
+void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
+                                           LogicalSessionId lsid,
                                            TxnNumber txnNumber,
-                                           std::shared_ptr<TransactionCoordinator> coordinator) {
+                                           std::shared_ptr<TransactionCoordinator> coordinator,
+                                           bool forStepUp) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (!forStepUp) {
+        _waitForStepUpToComplete(lk, opCtx);
+    }
 
     // Create a new map for the session if it does not exist
     if (_coordinatorsBySession.find(lsid) == _coordinatorsBySession.end()) {
@@ -71,33 +80,50 @@ void TransactionCoordinatorCatalog::insert(LogicalSessionId lsid,
             catalog->remove(lsid, txnNumber);
         }
     });
+
+    LOG(3) << "Inserting coordinator for transaction " << txnNumber << " on session "
+           << lsid.toBSON() << " into in-memory catalog";
     _coordinatorsBySession[lsid][txnNumber] = std::move(coordinator);
 }
-std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(LogicalSessionId lsid,
-                                                                           TxnNumber txnNumber) {
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(OperationContext* opCtx,
+                                                                           LogicalSessionId lsid,
+                                                                           TxnNumber txnNumber) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _waitForStepUpToComplete(lk, opCtx);
+
+    std::shared_ptr<TransactionCoordinator> coordinatorToReturn;
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
-
-    if (coordinatorsForSessionIter == _coordinatorsBySession.end()) {
-        return nullptr;
+    if (coordinatorsForSessionIter != _coordinatorsBySession.end()) {
+        const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
+        const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
+        if (coordinatorForTxnIter != coordinatorsForSession.end()) {
+            coordinatorToReturn = coordinatorForTxnIter->second;
+        }
     }
 
-    const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
-    const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
-
-    if (coordinatorForTxnIter == coordinatorsForSession.end()) {
-        return nullptr;
+    if (MONGO_FAIL_POINT(doNotForgetCoordinator) && !coordinatorToReturn) {
+        // If the failpoint is on and we couldn't find the coordinator in the main catalog, fall
+        // back to the "defunct" catalog, which stores coordinators that have completed and would
+        // normally be forgotten.
+        const auto& coordinatorsForSessionIter = _coordinatorsBySessionDefunct.find(lsid);
+        if (coordinatorsForSessionIter != _coordinatorsBySession.end()) {
+            const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
+            const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
+            if (coordinatorForTxnIter != coordinatorsForSession.end()) {
+                coordinatorToReturn = coordinatorForTxnIter->second;
+            }
+        }
     }
 
-    return coordinatorForTxnIter->second;
+    return coordinatorToReturn;
 }
 
 boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
-TransactionCoordinatorCatalog::getLatestOnSession(LogicalSessionId lsid) {
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx, LogicalSessionId lsid) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _waitForStepUpToComplete(lk, opCtx);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -118,6 +144,9 @@ TransactionCoordinatorCatalog::getLatestOnSession(LogicalSessionId lsid) {
 void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnNumber) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
+    LOG(3) << "Removing coordinator for transaction " << txnNumber << " on session "
+           << lsid.toBSON() << " from in-memory catalog";
+
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
     if (coordinatorsForSessionIter != _coordinatorsBySession.end()) {
@@ -126,12 +155,77 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
 
         if (coordinatorForTxnIter != coordinatorsForSession.end()) {
             auto coordinator = coordinatorForTxnIter->second;
+
+            if (MONGO_FAIL_POINT(doNotForgetCoordinator)) {
+                _coordinatorsBySessionDefunct[lsid][txnNumber] = std::move(coordinator);
+            }
+
             coordinatorsForSession.erase(coordinatorForTxnIter);
             if (coordinatorsForSession.size() == 0) {
                 _coordinatorsBySession.erase(coordinatorsForSessionIter);
             }
         }
     }
+
+    if (_coordinatorsBySession.empty()) {
+        LOG(3) << "Signaling last active coordinator removed";
+        _noActiveCoordinatorsCv.notify_all();
+    }
+}
+
+void TransactionCoordinatorCatalog::enterStepUp(OperationContext* opCtx) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    // If this node stepped down and stepped back up, the asynchronous stepUp task from the previous
+    // stepUp may still be running, so wait for the previous stepUp task to complete.
+    LOG(3) << "Waiting for coordinator stepup task from previous term, if any, to complete";
+    _waitForStepUpToComplete(lk, opCtx);
+
+    _stepUpInProgress = true;
+
+    LOG(3) << "Waiting for there to be no active coordinators; current coordinator catalog: "
+           << this->_toString(lk);
+    opCtx->waitForConditionOrInterrupt(
+        _noActiveCoordinatorsCv, lk, [this]() { return _coordinatorsBySession.empty(); });
+}
+
+void TransactionCoordinatorCatalog::exitStepUp() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_stepUpInProgress);
+
+    LOG(3) << "Signaling stepup complete";
+    _stepUpInProgress = false;
+    _noStepUpInProgressCv.notify_all();
+}
+
+void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk,
+                                                             OperationContext* opCtx) {
+    invariant(lk.owns_lock());
+    opCtx->waitForConditionOrInterrupt(
+        _noStepUpInProgressCv, lk, [this]() { return !_stepUpInProgress; });
+}
+
+std::string TransactionCoordinatorCatalog::toString() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _toString(lk);
+}
+
+std::string TransactionCoordinatorCatalog::_toString(WithLock wl) {
+    StringBuilder ss;
+    ss << "[";
+    for (auto coordinatorsForSession = _coordinatorsBySession.begin();
+         coordinatorsForSession != _coordinatorsBySession.end();
+         ++coordinatorsForSession) {
+        ss << "\n";
+        ss << coordinatorsForSession->first.toBSON() << ": ";
+        for (auto coordinatorForTxnNumber = coordinatorsForSession->second.begin();
+             coordinatorForTxnNumber != coordinatorsForSession->second.end();
+             ++coordinatorForTxnNumber) {
+            ss << coordinatorForTxnNumber->first << " ";
+        }
+    }
+    ss << "]";
+    return ss.str();
 }
 
 }  // namespace mongo

@@ -382,6 +382,7 @@ selector:
   - jstests/sharding/txn_agg.js
   - jstests/sharding/txn_basic_two_phase_commit.js
   - jstests/sharding/txn_coordinator_commands_basic_requirements.js
+  - jstests/sharding/txn_failover_two_phase_commit.js
   - jstests/sharding/txn_writes_during_movechunk.js
   - jstests/sharding/update_sharded.js
   - jstests/sharding/wildcard_index_banned_for_shard_key.js
