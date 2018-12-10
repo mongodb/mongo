@@ -34,13 +34,13 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
 class Collection;
-class MultiIndexBlock;
 class OperationContext;
 class ServiceContext;
 

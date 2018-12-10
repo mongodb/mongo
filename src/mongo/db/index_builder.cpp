@@ -38,7 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -236,7 +236,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         curOp->setOpDescription_inlock(opDescObj);
     }
 
-    MultiIndexBlockImpl indexer(opCtx, coll);
+    MultiIndexBlock indexer(opCtx, coll);
     indexer.allowInterruption();
     if (allowBackgroundBuilding)
         indexer.allowBackgroundBuilding();

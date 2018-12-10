@@ -45,7 +45,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -203,7 +202,7 @@ public:
             WriteUnitOfWork wunit(opCtx);
             collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-            indexer = std::make_unique<MultiIndexBlockImpl>(opCtx, collection);
+            indexer = std::make_unique<MultiIndexBlock>(opCtx, collection);
 
             swIndexesToRebuild = indexer->init(all);
             uassertStatusOK(swIndexesToRebuild.getStatus());

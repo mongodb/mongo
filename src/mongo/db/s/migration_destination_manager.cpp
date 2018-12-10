@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
@@ -641,7 +640,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
             collection = db->getCollection(opCtx, nss);
         }
 
-        MultiIndexBlockImpl indexer(opCtx, collection);
+        MultiIndexBlock indexer(opCtx, collection);
         indexer.removeExistingIndexes(&donorIndexSpecs);
 
         if (!donorIndexSpecs.empty()) {

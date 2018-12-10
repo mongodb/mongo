@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
@@ -129,7 +128,7 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
 
     CompactStats stats;
 
-    MultiIndexBlockImpl indexer(opCtx, collection);
+    MultiIndexBlock indexer(opCtx, collection);
     indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 

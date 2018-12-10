@@ -32,20 +32,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/multi_index_block_impl.h"
+#include "mongo/db/catalog/multi_index_block.h"
 
 #include <ostream>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer.h"
@@ -53,13 +50,12 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logger/redaction.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -77,10 +73,6 @@ const StringData kCommitReadyMembersFieldName = "commitReadyMembers"_sd;
 }  // namespace
 
 MONGO_EXPORT_SERVER_PARAMETER(useReadOnceCursorsForIndexBuilds, bool, true);
-
-using std::unique_ptr;
-using std::string;
-using std::endl;
 
 MONGO_FAIL_POINT_DEFINE(crashAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
@@ -113,49 +105,10 @@ public:
 } exportedMaxIndexBuildMemoryUsageParameter;
 
 
-/**
- * On rollback sets MultiIndexBlockImpl::_needToCleanup to true.
- */
-class MultiIndexBlockImpl::SetNeedToCleanupOnRollback : public RecoveryUnit::Change {
-public:
-    explicit SetNeedToCleanupOnRollback(MultiIndexBlockImpl* indexer) : _indexer(indexer) {}
+MultiIndexBlock::MultiIndexBlock(OperationContext* opCtx, Collection* collection)
+    : _collection(collection), _opCtx(opCtx) {}
 
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        _indexer->_needToCleanup = true;
-    }
-
-private:
-    MultiIndexBlockImpl* const _indexer;
-};
-
-/**
- * On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean
- * up _indexes manually (since the changes were already rolled back).
- * Due to this, it is thus legal to call init() again after it fails.
- */
-class MultiIndexBlockImpl::CleanupIndexesVectorOnRollback : public RecoveryUnit::Change {
-public:
-    explicit CleanupIndexesVectorOnRollback(MultiIndexBlockImpl* indexer) : _indexer(indexer) {}
-
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        _indexer->_indexes.clear();
-    }
-
-private:
-    MultiIndexBlockImpl* const _indexer;
-};
-
-MultiIndexBlockImpl::MultiIndexBlockImpl(OperationContext* opCtx, Collection* collection)
-    : _collection(collection),
-      _opCtx(opCtx),
-      _buildInBackground(false),
-      _allowInterruption(false),
-      _ignoreUnique(false),
-      _needToCleanup(true) {}
-
-MultiIndexBlockImpl::~MultiIndexBlockImpl() {
+MultiIndexBlock::~MultiIndexBlock() {
     if (!_needToCleanup && !_indexes.empty()) {
         _collection->infoCache()->clearQueryCache();
     }
@@ -205,7 +158,19 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
     }
 }
 
-void MultiIndexBlockImpl::removeExistingIndexes(std::vector<BSONObj>* specs) const {
+void MultiIndexBlock::allowBackgroundBuilding() {
+    _buildInBackground = true;
+}
+
+void MultiIndexBlock::allowInterruption() {
+    _allowInterruption = true;
+}
+
+void MultiIndexBlock::ignoreUniqueConstraint() {
+    _ignoreUnique = true;
+}
+
+void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
     for (size_t i = 0; i < specs->size(); i++) {
         Status status =
             _collection->getIndexCatalog()->prepareSpecForCreate(_opCtx, (*specs)[i]).getStatus();
@@ -217,12 +182,12 @@ void MultiIndexBlockImpl::removeExistingIndexes(std::vector<BSONObj>* specs) con
     }
 }
 
-StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const BSONObj& spec) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const BSONObj& spec) {
     const auto indexes = std::vector<BSONObj>(1, spec);
     return init(indexes);
 }
 
-StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSONObj>& indexSpecs) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -241,9 +206,13 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     WriteUnitOfWork wunit(_opCtx);
 
     invariant(_indexes.empty());
-    _opCtx->recoveryUnit()->registerChange(new CleanupIndexesVectorOnRollback(this));
 
-    const string& ns = _collection->ns().ns();
+    // On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean up
+    // _indexes manually (since the changes were already rolled back).
+    // Due to this, it is thus legal to call init() again after it fails.
+    _opCtx->recoveryUnit()->onRollback([this]() { _indexes.clear(); });
+
+    const auto& ns = _collection->ns().ns();
 
     const auto idxCat = _collection->getIndexCatalog();
     invariant(idxCat);
@@ -361,7 +330,7 @@ void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& do
     }
 }
 
-Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
+Status MultiIndexBlock::insertAllDocumentsInCollection() {
     invariant(_opCtx->lockState()->isNoop() || !_opCtx->lockState()->inAWriteUnitOfWork());
 
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
@@ -514,9 +483,9 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
     return Status::OK();
 }
 
-Status MultiIndexBlockImpl::insert(const BSONObj& doc,
-                                   const RecordId& loc,
-                                   std::vector<BSONObj>* const dupKeysInserted) {
+Status MultiIndexBlock::insert(const BSONObj& doc,
+                               const RecordId& loc,
+                               std::vector<BSONObj>* const dupKeysInserted) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -552,20 +521,20 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc,
     return Status::OK();
 }
 
-Status MultiIndexBlockImpl::dumpInsertsFromBulk() {
+Status MultiIndexBlock::dumpInsertsFromBulk() {
     return _dumpInsertsFromBulk(nullptr, nullptr);
 }
 
-Status MultiIndexBlockImpl::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
+Status MultiIndexBlock::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
     return _dumpInsertsFromBulk(dupRecords, nullptr);
 }
 
-Status MultiIndexBlockImpl::dumpInsertsFromBulk(std::vector<BSONObj>* dupKeysInserted) {
+Status MultiIndexBlock::dumpInsertsFromBulk(std::vector<BSONObj>* dupKeysInserted) {
     return _dumpInsertsFromBulk(nullptr, dupKeysInserted);
 }
 
-Status MultiIndexBlockImpl::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
-                                                 std::vector<BSONObj>* dupKeysInserted) {
+Status MultiIndexBlock::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
+                                             std::vector<BSONObj>* dupKeysInserted) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -597,7 +566,7 @@ Status MultiIndexBlockImpl::_dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
     return Status::OK();
 }
 
-Status MultiIndexBlockImpl::drainBackgroundWritesIfNeeded() {
+Status MultiIndexBlock::drainBackgroundWritesIfNeeded() {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -634,17 +603,17 @@ Status MultiIndexBlockImpl::drainBackgroundWritesIfNeeded() {
 }
 
 
-void MultiIndexBlockImpl::abortWithoutCleanup() {
+void MultiIndexBlock::abortWithoutCleanup() {
     _setStateToAbortedIfNotCommitted("aborted without cleanup"_sd);
     _indexes.clear();
     _needToCleanup = false;
 }
 
-Status MultiIndexBlockImpl::commit() {
+Status MultiIndexBlock::commit() {
     return commit({});
 }
 
-Status MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onCreateFn) {
+Status MultiIndexBlock::commit(stdx::function<void(const BSONObj& spec)> onCreateFn) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -703,39 +672,45 @@ Status MultiIndexBlockImpl::commit(stdx::function<void(const BSONObj& spec)> onC
     // before the WUOW is committed. If the WUOW commits, the final state of this index builder will
     // be Committed. Otherwise, the index builder state will remain as Aborted and further attempts
     // to commit this index build will fail.
-    _opCtx->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));
     _opCtx->recoveryUnit()->onCommit(
-        [this](boost::optional<Timestamp> commitTime) { this->_setState(State::kCommitted); });
+        [this](boost::optional<Timestamp> commitTime) { _setState(State::kCommitted); });
+
+    // On rollback sets MultiIndexBlock::_needToCleanup to true.
+    _opCtx->recoveryUnit()->onRollback([this]() { _needToCleanup = true; });
     _needToCleanup = false;
 
     return Status::OK();
 }
 
-bool MultiIndexBlockImpl::isCommitted() const {
+bool MultiIndexBlock::isCommitted() const {
     return State::kCommitted == _getState();
 }
 
-void MultiIndexBlockImpl::abort(StringData reason) {
+void MultiIndexBlock::abort(StringData reason) {
     _setStateToAbortedIfNotCommitted(reason);
 }
 
 
-MultiIndexBlockImpl::State MultiIndexBlockImpl::getState_forTest() const {
+bool MultiIndexBlock::getBuildInBackground() const {
+    return _buildInBackground;
+}
+
+MultiIndexBlock::State MultiIndexBlock::getState_forTest() const {
     return _getState();
 }
 
-MultiIndexBlockImpl::State MultiIndexBlockImpl::_getState() const {
+MultiIndexBlock::State MultiIndexBlock::_getState() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _state;
 }
 
-void MultiIndexBlockImpl::_setState(State newState) {
+void MultiIndexBlock::_setState(State newState) {
     invariant(State::kAborted != newState);
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _state = newState;
 }
 
-void MultiIndexBlockImpl::_setStateToAbortedIfNotCommitted(StringData reason) {
+void MultiIndexBlock::_setStateToAbortedIfNotCommitted(StringData reason) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (State::kCommitted == _state) {
         return;
@@ -744,7 +719,7 @@ void MultiIndexBlockImpl::_setStateToAbortedIfNotCommitted(StringData reason) {
     _abortReason = reason.toString();
 }
 
-void MultiIndexBlockImpl::_updateCurOpOpDescription(bool isBuildingPhaseComplete) const {
+void MultiIndexBlock::_updateCurOpOpDescription(bool isBuildingPhaseComplete) const {
     BSONObjBuilder builder;
 
     // TODO(SERVER-37980): Replace with index build UUID.
@@ -779,15 +754,15 @@ void MultiIndexBlockImpl::_updateCurOpOpDescription(bool isBuildingPhaseComplete
     curOp->ensureStarted();
 }
 
-std::ostream& operator<<(std::ostream& os, const MultiIndexBlockImpl::State& state) {
+std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state) {
     switch (state) {
-        case MultiIndexBlockImpl::State::kUninitialized:
+        case MultiIndexBlock::State::kUninitialized:
             return os << "Uninitialized";
-        case MultiIndexBlockImpl::State::kRunning:
+        case MultiIndexBlock::State::kRunning:
             return os << "Running";
-        case MultiIndexBlockImpl::State::kCommitted:
+        case MultiIndexBlock::State::kCommitted:
             return os << "Committed";
-        case MultiIndexBlockImpl::State::kAborted:
+        case MultiIndexBlock::State::kAborted:
             return os << "Aborted";
     }
     MONGO_UNREACHABLE;

@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -138,7 +137,7 @@ int createIndexForColl(OperationContext* opCtx, NamespaceString nss, BSONObj ind
     AutoGetCollection autoColl(opCtx, nss, MODE_X);
     auto coll = autoColl.getCollection();
 
-    MultiIndexBlockImpl indexer(opCtx, coll);
+    MultiIndexBlock indexer(opCtx, coll);
     ASSERT_OK(indexer.init(indexSpec).getStatus());
 
     WriteUnitOfWork wunit(opCtx);

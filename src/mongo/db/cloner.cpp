@@ -45,7 +45,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/commands/rename_collection.h"
@@ -394,7 +393,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     // from creation to completion without yielding to ensure the index and the collection
     // matches. It also wouldn't work on non-empty collections so we would need both
     // implementations anyway as long as that is supported.
-    MultiIndexBlockImpl indexer(opCtx, collection);
+    MultiIndexBlock indexer(opCtx, collection);
     indexer.allowInterruption();
 
     indexer.removeExistingIndexes(&indexesToBuild);

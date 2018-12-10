@@ -39,7 +39,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
@@ -105,7 +104,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         invariant(coll);
         wunit.commit();
     }
-    MultiIndexBlockImpl indexer(opCtx, coll);
+    MultiIndexBlock indexer(opCtx, coll);
     Status status = indexer.init(spec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();

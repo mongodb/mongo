@@ -31,7 +31,7 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
@@ -148,7 +148,7 @@ TEST_F(DuplicateKeyTrackerTest, IndexBuild) {
         AutoGetCollection autoColl(opCtx(), collNs, MODE_X);
         auto coll = autoColl.getCollection();
 
-        MultiIndexBlockImpl indexer(opCtx(), coll);
+        MultiIndexBlock indexer(opCtx(), coll);
         // Don't use the bulk builder, which does not insert directly into the IAM for the index.
         indexer.allowBackgroundBuilding();
         // Allow duplicates.
@@ -259,7 +259,7 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
         AutoGetCollection autoColl(opCtx(), collNs, MODE_X);
         auto coll = autoColl.getCollection();
 
-        MultiIndexBlockImpl indexer(opCtx(), coll);
+        MultiIndexBlock indexer(opCtx(), coll);
         // Allow duplicates.
         indexer.ignoreUniqueConstraint();
 

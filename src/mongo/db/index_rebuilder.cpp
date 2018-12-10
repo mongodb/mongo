@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/service_context.h"
@@ -82,7 +82,7 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
         }
 
 
-        MultiIndexBlockImpl indexer(opCtx, collection);
+        MultiIndexBlock indexer(opCtx, collection);
 
         {
             WriteUnitOfWork wunit(opCtx);

@@ -34,8 +34,6 @@
 #include "mongo/db/catalog/index_builds_manager.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
@@ -151,8 +149,7 @@ void IndexBuildsManager::_registerIndexBuild(OperationContext* opCtx,
                                              UUID buildUUID) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    std::shared_ptr<MultiIndexBlockImpl> mib =
-        std::make_shared<MultiIndexBlockImpl>(opCtx, collection);
+    std::shared_ptr<MultiIndexBlock> mib = std::make_shared<MultiIndexBlock>(opCtx, collection);
     invariant(_builders.insert(std::make_pair(buildUUID, mib)).second);
 }
 

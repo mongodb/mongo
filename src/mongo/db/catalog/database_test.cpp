@@ -35,7 +35,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -300,7 +299,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             wuow.commit();
         }
 
-        MultiIndexBlockImpl indexer(opCtx, collection);
+        MultiIndexBlock indexer(opCtx, collection);
         ON_BLOCK_EXIT([&indexer, opCtx] {
             WriteUnitOfWork wuow(opCtx);
             ASSERT_OK(indexer.commit());

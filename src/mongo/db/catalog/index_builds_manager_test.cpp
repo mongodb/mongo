@@ -32,8 +32,6 @@
 #include "mongo/db/catalog/index_builds_manager.h"
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/catalog/multi_index_block_impl.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

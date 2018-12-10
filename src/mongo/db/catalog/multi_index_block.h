@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <memory>
 #include <set>
 #include <string>
@@ -37,16 +38,19 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
-class BackgroundOperation;
-class BSONObj;
 class Collection;
+class MatchExpression;
 class OperationContext;
 
 /**
@@ -61,9 +65,11 @@ class OperationContext;
  * (as it is itself essentially a form of rollback, you don't want to "rollback the rollback").
  */
 class MultiIndexBlock {
+    MONGO_DISALLOW_COPYING(MultiIndexBlock);
+
 public:
-    MultiIndexBlock() = default;
-    virtual ~MultiIndexBlock() = default;
+    MultiIndexBlock(OperationContext* opCtx, Collection* collection);
+    ~MultiIndexBlock();
 
     /**
      * By default we ignore the 'background' flag in specs when building an index. If this is
@@ -73,13 +79,13 @@ public:
      * indexes in the background, but there is a performance benefit to building all in the
      * foreground.
      */
-    virtual void allowBackgroundBuilding() = 0;
+    void allowBackgroundBuilding();
 
     /**
      * Call this before init() to allow the index build to be interrupted.
      * This only affects builds using the insertAllDocumentsInCollection helper.
      */
-    virtual void allowInterruption() = 0;
+    void allowInterruption();
 
     /**
      * By default we enforce the 'unique' flag in specs when building an index by failing.
@@ -88,13 +94,13 @@ public:
      *
      * If this is called, any dupsOut sets passed in will never be filled.
      */
-    virtual void ignoreUniqueConstraint() = 0;
+    void ignoreUniqueConstraint();
 
     /**
      * Removes pre-existing indexes from 'specs'. If this isn't done, init() may fail with
      * IndexAlreadyExists.
      */
-    virtual void removeExistingIndexes(std::vector<BSONObj>* const specs) const = 0;
+    void removeExistingIndexes(std::vector<BSONObj>* const specs) const;
 
     /**
      * Prepares the index(es) for building and returns the canonicalized form of the requested index
@@ -104,9 +110,9 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    virtual StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) = 0;
+    StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs);
 
-    virtual StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) = 0;
+    StatusWith<std::vector<BSONObj>> init(const BSONObj& spec);
 
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.
@@ -120,7 +126,7 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    virtual Status insertAllDocumentsInCollection() = 0;
+    Status insertAllDocumentsInCollection();
 
     /**
      * Call this after init() for each document in the collection. Any duplicate keys inserted will
@@ -130,9 +136,9 @@ public:
      *
      * Should be called inside of a WriteUnitOfWork.
      */
-    virtual Status insert(const BSONObj& wholeDocument,
-                          const RecordId& loc,
-                          std::vector<BSONObj>* const dupKeysInserted = nullptr) = 0;
+    Status insert(const BSONObj& wholeDocument,
+                  const RecordId& loc,
+                  std::vector<BSONObj>* const dupKeysInserted = nullptr);
 
     /**
      * Call this after the last insert(). This gives the index builder a chance to do any
@@ -151,9 +157,9 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    virtual Status dumpInsertsFromBulk() = 0;
-    virtual Status dumpInsertsFromBulk(std::set<RecordId>* const dupRecords) = 0;
-    virtual Status dumpInsertsFromBulk(std::vector<BSONObj>* const dupKeysInserted) = 0;
+    Status dumpInsertsFromBulk();
+    Status dumpInsertsFromBulk(std::set<RecordId>* const dupRecords);
+    Status dumpInsertsFromBulk(std::vector<BSONObj>* const dupKeysInserted);
 
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
@@ -164,7 +170,7 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    virtual Status drainBackgroundWritesIfNeeded() = 0;
+    Status drainBackgroundWritesIfNeeded();
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -177,15 +183,15 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    virtual Status commit() = 0;
-    virtual Status commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
+    Status commit();
+    Status commit(stdx::function<void(const BSONObj& spec)> onCreateFn);
 
     /**
      * Returns true if this index builder was added to the index catalog successfully.
      * In addition to having commit() return without errors, the enclosing WUOW has to be committed
      * for the indexes to show up in the index catalog.
      */
-    virtual bool isCommitted() const = 0;
+    bool isCommitted() const;
 
     /**
      * Signals the index build to abort.
@@ -203,7 +209,7 @@ public:
      *
      * May be called from any thread.
      */
-    virtual void abort(StringData reason) = 0;
+    void abort(StringData reason);
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
@@ -221,9 +227,87 @@ public:
      *
      * Must be called from owning thread.
      */
-    virtual void abortWithoutCleanup() = 0;
+    void abortWithoutCleanup();
 
-    virtual bool getBuildInBackground() const = 0;
+    bool getBuildInBackground() const;
+
+    /**
+     * State transitions:
+     *
+     * Uninitialized --> Running --> Committed
+     *       |              |           ^
+     *       |              |           |
+     *       \--------------+------> Aborted
+     *
+     * It is possible for abort() to skip intermediate states. For example, calling abort() when the
+     * index build has not been initialized will transition from Uninitialized directly to Aborted.
+     *
+     * In the case where we are in the midst of committing the WUOW for a successful commit() call,
+     * we may transition temporarily to Aborted before finally ending at Committed. See comments for
+     * MultiIndexBlock::abort().
+     *
+     * For testing only. Callers should not have to query the state of the MultiIndexBlock directly.
+     */
+    enum class State { kUninitialized, kRunning, kCommitted, kAborted };
+    State getState_forTest() const;
+
+private:
+    struct IndexToBuild {
+        std::unique_ptr<IndexCatalog::IndexBuildBlockInterface> block;
+
+        IndexAccessMethod* real = NULL;           // owned elsewhere
+        const MatchExpression* filterExpression;  // might be NULL, owned elsewhere
+        std::unique_ptr<IndexAccessMethod::BulkBuilder> bulk;
+
+        InsertDeleteOptions options;
+    };
+
+    Status _dumpInsertsFromBulk(std::set<RecordId>* dupRecords,
+                                std::vector<BSONObj>* dupKeysInserted);
+
+    /**
+     * Returns the current state.
+     */
+    State _getState() const;
+
+    /**
+     * Updates the current state to a non-Aborted state.
+     */
+    void _setState(State newState);
+
+    /**
+     * Updates the current state to Aborted with the given reason.
+     */
+    void _setStateToAbortedIfNotCommitted(StringData reason);
+
+    /**
+     * Updates CurOp's 'opDescription' field with the current state of this index build.
+     */
+    void _updateCurOpOpDescription(bool isBuildingPhaseComplete) const;
+
+    std::vector<IndexToBuild> _indexes;
+
+    std::unique_ptr<BackgroundOperation> _backgroundOperation;
+
+    // Pointers not owned here and must outlive 'this'
+    Collection* _collection;
+    OperationContext* _opCtx;
+
+    bool _buildInBackground = false;
+    bool _allowInterruption = false;
+    bool _ignoreUnique = false;
+
+    bool _needToCleanup = true;
+
+    // Protects member variables of this class declared below.
+    mutable stdx::mutex _mutex;
+
+    State _state = State::kUninitialized;
+    std::string _abortReason;
 };
+
+// For unit tests that need to check MultiIndexBlock states.
+// The ASSERT_*() macros use this function to print the value of 'state' when the predicate fails.
+std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state);
 
 }  // namespace mongo
