@@ -112,6 +112,40 @@ void killOperation(OperationContext* opCtx) {
     opCtx->getServiceContext()->killOperation(opCtx);
 }
 
+TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+    auto replCoord = getReplCoord();
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoord->setMyLastAppliedOpTime(OpTimeWithTermOne(100, 1));
+    replCoord->setMyLastDurableOpTime(OpTimeWithTermOne(100, 1));
+    simulateSuccessfulV1Election();
+    ASSERT(replCoord->getMemberState().primary());
+
+    TopologyCoordinator::UpdateTermResult updateTermResult;
+    replCoord->updateTerm_forTest(replCoord->getTerm() + 1, &updateTermResult);
+    ASSERT(TopologyCoordinator::UpdateTermResult::kTriggerStepDown == updateTermResult);
+
+    IsMasterResponse response;
+    replCoord->fillIsMasterForReplSet(&response);
+    ASSERT_TRUE(response.isConfigSet());
+    BSONObj responseObj = response.toBSON();
+    ASSERT_FALSE(responseObj["ismaster"].Bool());
+    ASSERT_FALSE(responseObj["secondary"].Bool());
+    ASSERT_FALSE(responseObj.hasField("isreplicaset"));
+}
+
 TEST_F(ReplCoordTest, NodeEntersStartup2StateWhenStartingUpWithValidLocalConfig) {
     assertStartSuccess(BSON("_id"
                             << "mySet"

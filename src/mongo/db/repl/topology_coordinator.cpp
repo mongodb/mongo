@@ -2217,7 +2217,10 @@ void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* response) {
     }
 
     response->setReplSetVersion(_rsConfig.getConfigVersion());
-    response->setIsMaster(myState.primary());
+    // "ismaster" is false if we are not primary. If we're stepping down, we're waiting for the
+    // Replication State Transition Lock before we can change to secondary, but we should report
+    // "ismaster" false to indicate that we can't accept new writes.
+    response->setIsMaster(myState.primary() && _leaderMode != LeaderMode::kSteppingDown);
     response->setIsSecondary(myState.secondary());
 
     const MemberConfig* curPrimary = _currentPrimaryMember();

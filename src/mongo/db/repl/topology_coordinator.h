@@ -339,8 +339,9 @@ public:
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         OpTime currentCommittedSnapshotOpTime) const;
 
-    // produce a reply to an ismaster request.  It is only valid to call this if we are a
-    // replset.
+    // Produce a reply to an ismaster request.  It is only valid to call this if we are a
+    // replset.  Drivers interpret the isMaster fields according to the Server Discovery and
+    // Monitoring Spec, see the "Parsing an isMaster response" section.
     void fillIsMasterForReplSet(IsMasterResponse* response);
 
     // Produce member data for the serverStatus command and diagnostic logging.
