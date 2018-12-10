@@ -794,7 +794,7 @@ LockResult LockerImpl::lockComplete(OperationContext* opCtx,
     Milliseconds timeout;
     if (deadline == Date_t::max()) {
         timeout = Milliseconds::max();
-    } else if (deadline == Date_t::min()) {
+    } else if (deadline <= Date_t()) {
         timeout = Milliseconds(0);
     } else {
         timeout = deadline - Date_t::now();

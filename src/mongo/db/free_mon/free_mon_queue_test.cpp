@@ -119,12 +119,11 @@ TEST_F(FreeMonQueueTest, TestDeadlinePriority) {
 TEST_F(FreeMonQueueTest, TestFIFO) {
     FreeMonMessageQueue queue;
 
+    queue.enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::RegisterServer, Date_t()));
     queue.enqueue(
-        FreeMonMessage::createWithDeadline(FreeMonMessageType::RegisterServer, Date_t::min()));
-    queue.enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::AsyncRegisterComplete,
-                                                     Date_t::min()));
+        FreeMonMessage::createWithDeadline(FreeMonMessageType::AsyncRegisterComplete, Date_t()));
     queue.enqueue(
-        FreeMonMessage::createWithDeadline(FreeMonMessageType::RegisterCommand, Date_t::min()));
+        FreeMonMessage::createWithDeadline(FreeMonMessageType::RegisterCommand, Date_t()));
 
     auto item = queue.dequeue(_opCtx.get()->getServiceContext()->getPreciseClockSource()).get();
     ASSERT(item->getType() == FreeMonMessageType::RegisterServer);

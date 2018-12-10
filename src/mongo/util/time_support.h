@@ -36,6 +36,7 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <ctime>
 #include <iosfwd>
+#include <limits>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -70,7 +71,7 @@ public:
      * The minimum representable Date_t.
      */
     static constexpr Date_t min() {
-        return fromMillisSinceEpoch(0);
+        return fromMillisSinceEpoch(std::numeric_limits<long long>::min());
     }
 
     /**

@@ -143,7 +143,7 @@ boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
                 }
 
                 auto deadlineMessage = this->_queue.top()->getDeadline();
-                if (deadlineMessage == Date_t::min()) {
+                if (deadlineMessage <= Date_t()) {
                     return true;
                 }
 

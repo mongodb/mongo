@@ -200,7 +200,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
                                    MODE_IX,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
-                                   Date_t::min());
+                                   Date_t());
         },
         Milliseconds(0));
 }

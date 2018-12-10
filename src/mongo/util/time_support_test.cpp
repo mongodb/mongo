@@ -877,17 +877,12 @@ TEST(DateTArithmetic, AdditionOverflowThrows) {
     auto dateToIncrement = Date_t::max();
     ASSERT_THROWS_CODE(
         dateToIncrement += Milliseconds(1), DBException, ErrorCodes::DurationOverflow);
-
-    // TODO (SERVER-38442): Can change Date_t::fromDurationSinceEpoch(Milliseconds::min()) to
-    // Date_t::min() once it's correct.
     ASSERT_THROWS_CODE(Date_t::fromDurationSinceEpoch(Milliseconds::min()) + Milliseconds(-1),
                        DBException,
                        ErrorCodes::DurationOverflow);
 }
 
 TEST(DateTArithmetic, SubtractionOverflowThrows) {
-    // TODO (SERVER-38442): Can change Date_t::fromDurationSinceEpoch(Milliseconds::min()) to
-    // Date_t::min() once it's correct.
     ASSERT_THROWS_CODE(Date_t::fromDurationSinceEpoch(Milliseconds::min()) - Milliseconds(1),
                        DBException,
                        ErrorCodes::DurationOverflow);

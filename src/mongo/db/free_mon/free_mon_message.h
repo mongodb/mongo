@@ -152,7 +152,7 @@ public:
      * Create a message that should processed immediately.
      */
     static std::shared_ptr<FreeMonMessage> createNow(FreeMonMessageType type) {
-        return std::make_shared<FreeMonMessage>(type, Date_t::min());
+        return std::make_shared<FreeMonMessage>(type, Date_t());
     }
 
     /**
@@ -261,7 +261,7 @@ public:
      * Create a message that should processed immediately.
      */
     static std::shared_ptr<FreeMonMessageWithPayload> createNow(payload_type t) {
-        return std::make_shared<FreeMonMessageWithPayload>(t, Date_t::min());
+        return std::make_shared<FreeMonMessageWithPayload>(t, Date_t{});
     }
 
     /**
@@ -364,7 +364,7 @@ public:
      * Create a message that should processed immediately.
      */
     static std::shared_ptr<FreeMonWaitableMessageWithPayload> createNow(payload_type t) {
-        return std::make_shared<FreeMonWaitableMessageWithPayload>(t, Date_t::min());
+        return std::make_shared<FreeMonWaitableMessageWithPayload>(t, Date_t());
     }
 
     /**

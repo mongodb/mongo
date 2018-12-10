@@ -489,7 +489,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     Lock::DBLock lock(_opCtx.get(), nss.db(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     try {
-        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t::min());
+        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t());
         ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
@@ -518,7 +518,7 @@ TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
     ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
     try {
         AutoGetCollectionForReadCommand db(
-            _opCtx.get(), nss, AutoGetCollection::kViewsForbidden, Date_t::min());
+            _opCtx.get(), nss, AutoGetCollection::kViewsForbidden, Date_t());
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }
