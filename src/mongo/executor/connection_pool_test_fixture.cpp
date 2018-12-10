@@ -238,7 +238,7 @@ std::deque<ConnectionImpl*> ConnectionImpl::_refreshQueue;
 size_t ConnectionImpl::_idCounter = 1;
 
 std::shared_ptr<ConnectionPool::ConnectionInterface> PoolImpl::makeConnection(
-    const HostAndPort& hostAndPort, size_t generation) {
+    const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, size_t generation) {
     return std::make_shared<ConnectionImpl>(hostAndPort, generation, this);
 }
 

@@ -224,7 +224,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     // TODO: get rid of this cruft once we have a connection pool that's executor aware.
 
     auto connFuture = [&] {
-        auto conn = _pool->tryGet(request.target);
+        auto conn = _pool->tryGet(request.target, request.sslMode);
 
         if (conn) {
             return Future<ConnectionPool::ConnectionHandle>(std::move(*conn));
@@ -232,8 +232,9 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
         return _reactor
             ->execute([this, state, request, baton] {
-                return makeReadyFutureWith(
-                    [this, request] { return _pool->get(request.target, request.timeout); });
+                return makeReadyFutureWith([this, request] {
+                    return _pool->get(request.target, request.sslMode, request.timeout);
+                });
             })
             .tapError([state](Status error) {
                 LOG(2) << "Failed to get connection from pool for request " << state->request.id

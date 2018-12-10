@@ -41,6 +41,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -150,10 +151,15 @@ public:
                     const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
-    Future<ConnectionHandle> get(const HostAndPort& hostAndPort, Milliseconds timeout);
-    void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
+    Future<ConnectionHandle> get(const HostAndPort& hostAndPort,
+                                 transport::ConnectSSLMode sslMode,
+                                 Milliseconds timeout);
+    void get_forTest(const HostAndPort& hostAndPort,
+                     Milliseconds timeout,
+                     GetConnectionCallback cb);
 
-    boost::optional<ConnectionHandle> tryGet(const HostAndPort& hostAndPort);
+    boost::optional<ConnectionHandle> tryGet(const HostAndPort& hostAndPort,
+                                             transport::ConnectSSLMode sslMode);
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;
 
@@ -249,6 +255,7 @@ public:
      * HostAndPort passed to DependentTypeFactoryInterface::makeConnection.
      */
     virtual const HostAndPort& getHostAndPort() const = 0;
+    virtual transport::ConnectSSLMode getSslMode() const = 0;
 
     /**
      * Check if the connection is healthy using some implementation defined condition.
@@ -320,6 +327,7 @@ public:
      * Makes a new connection given a host and port
      */
     virtual std::shared_ptr<ConnectionInterface> makeConnection(const HostAndPort& hostAndPort,
+                                                                transport::ConnectSSLMode sslMode,
                                                                 size_t generation) = 0;
 
     /**

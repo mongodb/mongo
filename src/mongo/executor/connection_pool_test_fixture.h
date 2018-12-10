@@ -89,6 +89,9 @@ public:
     void resetToUnknown() override;
 
     const HostAndPort& getHostAndPort() const override;
+    transport::ConnectSSLMode getSslMode() const override {
+        return transport::kGlobalSSLMode;
+    }
 
     bool isHealthy() override;
 
@@ -151,7 +154,9 @@ class PoolImpl final : public ConnectionPool::DependentTypeFactoryInterface {
 
 public:
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
-        const HostAndPort& hostAndPort, size_t generation) override;
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        size_t generation) override;
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
 

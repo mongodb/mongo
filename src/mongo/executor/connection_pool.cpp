@@ -99,7 +99,9 @@ public:
         };
     }
 
-    SpecificPool(ConnectionPool* parent, const HostAndPort& hostAndPort);
+    SpecificPool(ConnectionPool* parent,
+                 const HostAndPort& hostAndPort,
+                 transport::ConnectSSLMode sslMode);
     ~SpecificPool();
 
     /**
@@ -179,6 +181,13 @@ public:
         _tags = mutateFunc(_tags);
     }
 
+    void fassertSSLModeIs(transport::ConnectSSLMode desired) const {
+        if (desired != _sslMode) {
+            severe() << "Mixing ssl modes for a single host is not supported";
+            fassertFailedNoTrace(51043);
+        }
+    }
+
 private:
     using OwnedConnection = std::shared_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
@@ -211,6 +220,7 @@ private:
 private:
     ConnectionPool* const _parent;
 
+    const transport::ConnectSSLMode _sslMode;
     const HostAndPort _hostAndPort;
 
     LRUOwnershipPool _readyPool;
@@ -353,33 +363,31 @@ void ConnectionPool::mutateTags(
     pool->mutateTags(lk, mutateFunc);
 }
 
-void ConnectionPool::get(const HostAndPort& hostAndPort,
-                         Milliseconds timeout,
-                         GetConnectionCallback cb) {
-    return get(hostAndPort, timeout).getAsync(std::move(cb));
+void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
+                                 Milliseconds timeout,
+                                 GetConnectionCallback cb) {
+    return get(hostAndPort, transport::kGlobalSSLMode, timeout).getAsync(std::move(cb));
 }
 
 boost::optional<ConnectionPool::ConnectionHandle> ConnectionPool::tryGet(
-    const HostAndPort& hostAndPort) {
-    std::shared_ptr<SpecificPool> pool;
-
+    const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto iter = _pools.find(hostAndPort);
 
     if (iter == _pools.end()) {
-        pool = stdx::make_unique<SpecificPool>(this, hostAndPort);
-        _pools[hostAndPort] = pool;
-    } else {
-        pool = iter->second;
+        return boost::none;
     }
 
+    const auto& pool = iter->second;
     invariant(pool);
+    pool->fassertSSLModeIs(sslMode);
 
     return pool->tryGetConnection(lk);
 }
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& hostAndPort,
+                                                             transport::ConnectSSLMode sslMode,
                                                              Milliseconds timeout) {
     std::shared_ptr<SpecificPool> pool;
 
@@ -388,10 +396,11 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPort& 
     auto iter = _pools.find(hostAndPort);
 
     if (iter == _pools.end()) {
-        pool = stdx::make_unique<SpecificPool>(this, hostAndPort);
+        pool = stdx::make_unique<SpecificPool>(this, hostAndPort, sslMode);
         _pools[hostAndPort] = pool;
     } else {
         pool = iter->second;
+        pool->fassertSSLModeIs(sslMode);
     }
 
     invariant(pool);
@@ -437,8 +446,11 @@ void ConnectionPool::returnConnection(ConnectionInterface* conn) {
     pool->returnConnection(conn, std::move(lk));
 }
 
-ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent, const HostAndPort& hostAndPort)
+ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent,
+                                           const HostAndPort& hostAndPort,
+                                           transport::ConnectSSLMode sslMode)
     : _parent(parent),
+      _sslMode(sslMode),
       _hostAndPort(hostAndPort),
       _readyPool(std::numeric_limits<size_t>::max()),
       _requestTimer(parent->_factory->makeTimer()),
@@ -786,7 +798,7 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
         OwnedConnection handle;
         try {
             // make a new connection and put it in processing
-            handle = _parent->_factory->makeConnection(_hostAndPort, _generation);
+            handle = _parent->_factory->makeConnection(_hostAndPort, _sslMode, _generation);
         } catch (std::system_error& e) {
             severe() << "Failed to construct a new connection object: " << e.what();
             fassertFailed(40336);
