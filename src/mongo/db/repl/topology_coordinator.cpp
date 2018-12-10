@@ -2356,7 +2356,7 @@ void TopologyCoordinator::_stepDownSelfAndReplaceWith(int newPrimary) {
 }
 
 bool TopologyCoordinator::updateLastCommittedOpTime() {
-    // If we're not primary or we're stepping down due to learning of a new term then  we must not
+    // If we're not primary or we're stepping down due to learning of a new term then we must not
     // advance the commit point.  If we are stepping down due to a user request, however, then it
     // is safe to advance the commit point, and in fact we must since the stepdown request may be
     // waiting for the commit point to advance enough to be able to safely complete the step down.

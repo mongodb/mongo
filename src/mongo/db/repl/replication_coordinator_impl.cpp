@@ -3461,12 +3461,10 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
 
     auto now = _replExecutor->now();
     TopologyCoordinator::UpdateTermResult localUpdateTermResult = _topCoord->updateTerm(term, now);
-    {
-        if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
-            _termShadow.store(term);
-            _cancelPriorityTakeover_inlock();
-            _cancelAndRescheduleElectionTimeout_inlock();
-        }
+    if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
+        _termShadow.store(term);
+        _cancelPriorityTakeover_inlock();
+        _cancelAndRescheduleElectionTimeout_inlock();
     }
 
     if (updateTermResult) {
