@@ -53,7 +53,9 @@ public:
         : _reactor(std::move(reactor)), _tl(tl), _onConnectHook(std::move(onConnectHook)) {}
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
-        const HostAndPort& hostAndPort, size_t generation) override;
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        size_t generation) override;
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
 
     Date_t now() override;
@@ -123,6 +125,7 @@ public:
                  transport::ReactorHandle reactor,
                  ServiceContext* serviceContext,
                  HostAndPort peer,
+                 transport::ConnectSSLMode sslMode,
                  size_t generation,
                  NetworkConnectionHook* onConnectHook)
         : ConnectionInterface(generation),
@@ -131,6 +134,7 @@ public:
           _serviceContext(serviceContext),
           _timer(factory->makeTimer()),
           _peer(std::move(peer)),
+          _sslMode(sslMode),
           _onConnectHook(onConnectHook) {}
     ~TLConnection() {
         // Release must be the first expression of this dtor
@@ -142,6 +146,7 @@ public:
     }
 
     const HostAndPort& getHostAndPort() const override;
+    transport::ConnectSSLMode getSslMode() const override;
     bool isHealthy() override;
     AsyncDBClient* client();
     Date_t now() override;
@@ -159,6 +164,7 @@ private:
     std::shared_ptr<ConnectionPool::TimerInterface> _timer;
 
     HostAndPort _peer;
+    transport::ConnectSSLMode _sslMode;
     NetworkConnectionHook* const _onConnectHook;
     AsyncDBClient::Handle _client;
 };

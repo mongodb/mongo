@@ -122,6 +122,10 @@ const HostAndPort& TLConnection::getHostAndPort() const {
     return _peer;
 }
 
+transport::ConnectSSLMode TLConnection::getSslMode() const {
+    return _sslMode;
+}
+
 bool TLConnection::isHealthy() {
     return _client->isStillConnected();
 }
@@ -162,7 +166,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
         }
     });
 
-    AsyncDBClient::connect(_peer, transport::kGlobalSSLMode, _serviceContext, _reactor, timeout)
+    AsyncDBClient::connect(_peer, _sslMode, _serviceContext, _reactor, timeout)
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
         })
@@ -253,11 +257,12 @@ void TLConnection::cancelAsync() {
 }
 
 std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnection(
-    const HostAndPort& hostAndPort, size_t generation) {
+    const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, size_t generation) {
     auto conn = std::make_shared<TLConnection>(shared_from_this(),
                                                _reactor,
                                                getGlobalServiceContext(),
                                                hostAndPort,
+                                               sslMode,
                                                generation,
                                                _onConnectHook.get());
     fasten(conn.get());
