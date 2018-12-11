@@ -163,42 +163,6 @@ selector:
   # Windows debug builds than other builds.
   - jstests/core/insert1.js
 
-  # TODO: SERVER-38121 multi-index writes in transactions hangs secondary
-  - jstests/core/all.js
-  - jstests/core/*array*.js
-  - jstests/core/countc.js
-  - jstests/core/count7.js
-  - jstests/core/distinct_array1.js
-  - jstests/core/distinct_multikey.js
-  - jstests/core/*fts*.js
-  - jstests/core/*geo*.js
-  - jstests/core/in4.js
-  - jstests/core/index1.js
-  - jstests/core/index13.js
-  - jstests/core/indexl.js
-  - jstests/core/indexr.js
-  - jstests/core/indext.js
-  - jstests/core/indexu.js
-  - jstests/core/*multikey*.js
-  - jstests/core/nin.js
-  - jstests/core/nestedarr1.js
-  - jstests/core/not3.js
-  - jstests/core/null_query_semantics.js
-  - jstests/core/or_inexact.js
-  - jstests/core/or4.js
-  - jstests/core/or8.js
-  - jstests/core/ork.js
-  - jstests/core/remove2.js
-  - jstests/core/removeb.js
-  - jstests/core/removec.js
-  - jstests/core/sort7.js
-  - jstests/core/sparse_index_supports_ne_null.js
-  - jstests/core/text_covered_matching.js
-  - jstests/core/type3.js
-  - jstests/core/update_affects_indexes.js
-  - jstests/core/update_setOnInsert.js
-  - jstests/core/wildcard_index*.js
-
   # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
   - jstests/core/type8.js
 
@@ -208,7 +172,14 @@ selector:
   - jstests/core/function_string_representations.js
   - jstests/core/geo_mapreduce2.js
   - jstests/core/mr*.js
+  - jstests/core/or4.js
   - jstests/core/temp_cleanup.js
+
+  # TODO: SERVER-38570 txn_override.js does not check writeError field.
+  - jstests/core/update_setOnInsert.js
+  
+  # TODO: SERVER-38588 Hybrid index builds can miss documents during secondary replication.
+  - jstests/core/background_index_multikey.js
 
   ##
   ## Some aggregation stages don't support snapshot readconcern.
