@@ -76,8 +76,13 @@ template <typename T>
 extern constexpr bool isFuture = false;
 template <typename T>
 extern constexpr bool isFuture<Future<T>> = true;
+
 template <typename T>
-extern constexpr bool isFuture<SharedSemiFuture<T>> = true;
+extern constexpr bool isFutureLike = false;
+template <typename T>
+extern constexpr bool isFutureLike<Future<T>> = true;
+template <typename T>
+extern constexpr bool isFutureLike<SharedSemiFuture<T>> = true;
 
 // This is used to "normalize" void since it can't be used as an argument and it becomes Status
 // rather than StatusWith<void>.
@@ -667,7 +672,8 @@ public:
     static_assert(!std::is_same<T, Status>::value,
                   "Future<Status> is banned. Use Future<void> instead.");
     static_assert(!isStatusWith<T>, "Future<StatusWith<T>> is banned. Just use Future<T> instead.");
-    static_assert(!isFuture<T>, "Future of Future types is banned. Just use Future<T> instead.");
+    static_assert(!isFutureLike<T>,
+                  "Future of Future types is banned. Just use Future<T> instead.");
     static_assert(!std::is_reference<T>::value, "Future<T&> is banned.");
     static_assert(!std::is_const<T>::value, "Future<const T> is banned.");
     static_assert(!std::is_array<T>::value, "Future<T[]> is banned.");
@@ -1490,7 +1496,7 @@ public:
         !isStatusWith<T>,
         "SharedSemiFuture<StatusWith<T>> is banned. Just use SharedSemiFuture<T> instead.");
     static_assert(
-        !isFuture<T>,
+        !isFutureLike<T>,
         "SharedSemiFuture of Future types is banned. Just use SharedSemiFuture<T> instead.");
     static_assert(!std::is_reference<T>::value, "SharedSemiFuture<T&> is banned.");
     static_assert(!std::is_const<T>::value, "SharedSemiFuture<const T> is banned.");
@@ -1499,6 +1505,12 @@ public:
     using value_type = T;
 
     SharedSemiFuture() = default;
+
+    /*implicit*/ SharedSemiFuture(const Future<T>& fut) = delete;
+    /*implicit*/ SharedSemiFuture(Future<T>&& fut) : SharedSemiFuture(std::move(fut).share()) {}
+    /*implicit*/ SharedSemiFuture(T val) : SharedSemiFuture(Future<T>(std::move(val))) {}
+    /*implicit*/ SharedSemiFuture(Status error) : SharedSemiFuture(Future<T>(std::move(error))) {}
+    /*implicit*/ SharedSemiFuture(StatusWith<T> sw) : SharedSemiFuture(Future<T>(std::move(sw))) {}
 
     bool isReady() const {
         return _shared->state.load(std::memory_order_acquire) == SSBState::kFinished;
@@ -1554,6 +1566,12 @@ template <>
 class MONGO_WARN_UNUSED_RESULT_CLASS future_details::SharedSemiFuture<void> {
 public:
     using value_type = void;
+
+    SharedSemiFuture() = default;
+
+    /*implicit*/ SharedSemiFuture(const Future<void>& fut) = delete;
+    /*implicit*/ SharedSemiFuture(Future<void>&& fut) : SharedSemiFuture(std::move(fut).share()) {}
+    /*implicit*/ SharedSemiFuture(Status err) : SharedSemiFuture(Future<void>(std::move(err))) {}
 
     bool isReady() const {
         return _inner.isReady();
