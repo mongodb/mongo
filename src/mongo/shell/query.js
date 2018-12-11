@@ -710,6 +710,9 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
 
     this._batch = cmdResult.cursor.firstBatch.reverse();  // modifies input to allow popping
 
+    // If the command result represents a change stream cursor, update our postBatchResumeToken.
+    this._updatePostBatchResumeToken(cmdResult.cursor);
+
     if (db.getMongo().useReadCommands()) {
         this._useReadCommands = true;
         this._cursorid = cmdResult.cursor.id;
@@ -770,6 +773,18 @@ DBCommandCursor.prototype.close = function() {
     }
 };
 
+// Record the postBatchResumeToken from the given cursor object, if it exists. If the current batch
+// is empty then this function also updates the current resume token to be the postBatchResumeToken.
+DBCommandCursor.prototype._updatePostBatchResumeToken = function(cursorObj) {
+    if (cursorObj.postBatchResumeToken) {
+        this._postBatchResumeToken = cursorObj.postBatchResumeToken;
+        if ((cursorObj.firstBatch || cursorObj.nextBatch).length === 0) {
+            this._resumeToken = this._postBatchResumeToken;
+        }
+        this._isChangeStream = true;
+    }
+};
+
 /**
  * Fills out this._batch by running a getMore command. If the cursor is exhausted, also resets
  * this._cursorid to 0.
@@ -813,6 +828,9 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
                     cmdRes.cursor.id.toString());
     }
 
+    // If the command result represents a change stream cursor, update our postBatchResumeToken.
+    this._updatePostBatchResumeToken(cmdRes.cursor);
+
     // Successfully retrieved the next batch.
     this._batch = cmdRes.cursor.nextBatch.reverse();
 };
@@ -841,8 +859,14 @@ DBCommandCursor.prototype.hasNext = function() {
 
 DBCommandCursor.prototype.next = function() {
     if (this._batch.length) {
-        // $err wouldn't be in _firstBatch since ok was true.
-        return this._batch.pop();
+        // Pop the next result off the batch.
+        const nextDoc = this._batch.pop();
+        if (this._isChangeStream) {
+            // If this is the last result in the batch, the postBatchResumeToken becomes the current
+            // resume token for the cursor. Otherwise, the resume token is the _id of 'nextDoc'.
+            this._resumeToken = (this._batch.length ? nextDoc._id : this._postBatchResumeToken);
+        }
+        return nextDoc;
     } else if (this._useReadCommands) {
         // Have to call hasNext() here, as this is where we may issue a getMore in order to retrieve
         // the next batch of results.
@@ -868,6 +892,10 @@ DBCommandCursor.prototype.objsLeftInBatch = function() {
         return this._cursor.objsLeftInBatch();
     }
 };
+DBCommandCursor.prototype.getResumeToken = function() {
+    // Return the most recent recorded resume token, if such a token exists.
+    return this._resumeToken;
+};
 
 DBCommandCursor.prototype.help = function() {
     // This is the same as the "Cursor Methods" section of DBQuery.help().
@@ -880,6 +908,8 @@ DBCommandCursor.prototype.help = function() {
     print(
         "\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)");
     print("\t.itcount() - iterates through documents and counts them");
+    print(
+        "\t.getResumeToken() - for a change stream cursor, obtains the most recent valid resume token, if it exists.");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
     print("\t.close()");
 };
