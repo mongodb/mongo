@@ -7,6 +7,26 @@ import sys
 
 import gdb
 
+# pylint: disable=invalid-name,wildcard-import
+try:
+    # Try to find and load the C++ pretty-printer library.
+    import glob
+    pp = glob.glob("/opt/mongodbtoolchain/v2/share/gcc-*/python/libstdcxx/v6/printers.py")
+    printers = pp[0]
+    path = os.path.dirname(os.path.dirname(os.path.dirname(printers)))
+    sys.path.insert(0, path)
+    from libstdcxx.v6.printers import *
+    print("Loaded libstdc++ pretty printers from '%s'" % printers)
+except ImportError as e:
+    print("Failed to load the libstdc++ pretty printers: " + str(e))
+# pylint: enable=invalid-name,wildcard-import
+
+if sys.version_info[0] >= 3:
+    # GDB only permits converting a gdb.Value instance to its numerical address when using the
+    # long() constructor in Python 2 and not when using the int() constructor. We define the
+    # 'long' class as an alias for the 'int' class in Python 3 for compatibility.
+    long = int  # pylint: disable=redefined-builtin,invalid-name
+
 
 def get_process_name():
     """Return the main binary we are attached to."""
@@ -49,6 +69,88 @@ def get_current_thread_name():
         return fallback_name
 
 
+def get_global_service_context():
+    """Return the global ServiceContext object."""
+    return gdb.parse_and_eval("'mongo::(anonymous namespace)::globalServiceContext'").dereference()
+
+
+def get_session_catalog():
+    """Return the global SessionCatalog object.
+
+    Returns None if no SessionCatalog could be found.
+    """
+    # The SessionCatalog is a decoration on the ServiceContext.
+    session_catalog_dec = get_decoration(get_global_service_context(), "mongo::SessionCatalog")
+    if session_catalog_dec is None:
+        return None
+    return session_catalog_dec[1]
+
+
+def get_decorations(obj):
+    """Return an iterator to all decorations on a given object.
+
+    Each object returned by the iterator is a tuple whose first element is the type name of the
+    decoration and whose second element is the decoration object itself.
+
+    TODO: De-duplicate the logic between here and DecorablePrinter. This code was copied from there.
+    """
+    type_name = str(obj.type).replace(" ", "")
+    decorable = obj.cast(gdb.lookup_type("mongo::Decorable<{}>".format(type_name)))
+    decl_vector = decorable["_decorations"]["_registry"]["_decorationInfo"]
+    start = decl_vector["_M_impl"]["_M_start"]
+    finish = decl_vector["_M_impl"]["_M_finish"]
+
+    decorable_t = decorable.type.template_argument(0)
+    decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(decorable_t))
+    count = long((long(finish) - long(start)) / decinfo_t.sizeof)
+
+    for i in range(count):
+        descriptor = start[i]
+        dindex = int(descriptor["descriptor"]["_index"])
+
+        type_name = str(descriptor["constructor"])
+        type_name = type_name[0:len(type_name) - 1]
+        type_name = type_name[0:type_name.rindex(">")]
+        type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
+        # get_unique_ptr should be loaded from 'mongo_printers.py'.
+        decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])  # pylint: disable=undefined-variable
+
+        if type_name.endswith('*'):
+            type_name = type_name[0:len(type_name) - 1]
+        type_name = type_name.rstrip()
+        type_t = gdb.lookup_type(type_name)
+        obj = decoration_data[dindex].cast(type_t)
+        yield (type_name, obj)
+
+
+def get_decoration(obj, type_name):
+    """Find a decoration on 'obj' where the string 'type_name' is in the decoration's type name.
+
+    Returns a tuple whose first element is the type name of the decoration and whose
+    second is the decoration itself. If there are multiple such decorations, returns the first one
+    that matches. Returns None if no matching decorations were found.
+    """
+    for dec_type_name, dec in get_decorations(obj):
+        if type_name in dec_type_name:
+            return (dec_type_name, dec)
+    return None
+
+
+def get_boost_optional(optional):
+    """
+    Retrieve the value stored in a boost::optional type, if it is non-empty.
+
+    Returns None if the optional is empty.
+
+    TODO: Import the boost pretty printers instead of using this custom function.
+    """
+    if not optional['m_initialized']:
+        return None
+    value_ref_type = optional.type.template_argument(0).pointer()
+    storage = optional['m_storage']['dummy_']['data']
+    return storage.cast(value_ref_type).dereference()
+
+
 ###################################################################################################
 #
 # Commands
@@ -89,6 +191,140 @@ class DumpGlobalServiceContext(gdb.Command):
 
 # Register command
 DumpGlobalServiceContext()
+
+
+class GetMongoDecoration(gdb.Command):
+    """
+    Search for a decoration on an object by typename and print it e.g.
+
+    (gdb) mongo-decoration opCtx ReadConcernArgs
+
+    would print out a decoration on opCtx whose type name contains the string "ReadConcernArgs".
+    """
+
+    def __init__(self):
+        """Initialize GetMongoDecoration."""
+        RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
+
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use
+        """Invoke GetMongoDecoration."""
+        argarr = args.split(" ")
+        if len(argarr) < 2:
+            raise ValueError("Must provide both an object and type_name argument.")
+
+        # The object that is decorated.
+        expr = argarr[0]
+        # The substring of the decoration type that is to be printed.
+        type_name_substr = argarr[1]
+        dec = get_decoration(gdb.parse_and_eval(expr), type_name_substr)
+        if dec:
+            (type_name, obj) = dec
+            print(type_name, obj)
+        else:
+            print("No decoration found whose type name contains '" + type_name_substr + "'.")
+
+
+# Register command
+GetMongoDecoration()
+
+
+class DumpMongoDSessionCatalog(gdb.Command):
+    """Print out the mongod SessionCatalog, which maintains a table of all Sessions.
+
+    Prints out interesting information from TransactionParticipants too, which are decorations on
+    the Session. If no arguments are provided, dumps out all sessions. Can optionally provide a
+    session id argument. In that case, will only print the session for the specified id, if it is
+    found. e.g.
+
+    (gdb) dump-sessions "32cb9e84-98ad-4322-acf0-e055cad3ef73"
+
+    """
+
+    def __init__(self):
+        """Initialize DumpMongoDSessionCatalog."""
+        RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
+
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals
+        """Invoke DumpMongoDSessionCatalog."""
+        # See if a particular session id was specified.
+        argarr = args.split(" ")
+        lsid_to_find = None
+        if argarr:
+            lsid_to_find = argarr[0]
+
+        # Get the SessionCatalog and the table of sessions.
+        session_catalog = get_session_catalog()
+        if session_catalog is None:
+            print(
+                "No SessionCatalog object was found on the ServiceContext. Not dumping any sessions."
+            )
+            return
+        lsid_map = session_catalog["_sessions"]
+        session_kv_pairs = list(StdHashtableIterator(lsid_map['_M_h']))  # pylint: disable=undefined-variable
+        print("Dumping %d Session objects from the SessionCatalog" % len(session_kv_pairs))
+
+        # Optionally search for a specified session, based on its id.
+        if lsid_to_find:
+            print("Only printing information for session " + lsid_to_find + ", if found.")
+            lsids_to_print = [lsid_to_find]
+        else:
+            lsids_to_print = [str(s['first']['_id']) for s in session_kv_pairs]
+
+        for sess_kv in session_kv_pairs:
+            # The Session is stored inside the SessionRuntimeInfo object.
+            session_runtime_info = sess_kv['second']['_M_ptr'].dereference()
+            session = session_runtime_info['session']
+            # TODO: Add a custom pretty printer for LogicalSessionId.
+            lsid_str = str(session['_sessionId']['_id'])
+
+            # If we are only interested in a specific session, then we print out the entire Session
+            # object, to aid more detailed debugging.
+            if lsid_str == lsid_to_find:
+                print("SessionId", "=", lsid_str)
+                print(session)
+                # Terminate if this is the only session we care about.
+                break
+
+            # Only print info for the necessary sessions.
+            if lsid_str not in lsids_to_print:
+                continue
+
+            # If we are printing multiple sessions, we only print the most interesting fields from
+            # the Session object for the sake of efficiency. We print the session id string first so
+            # the session is easily identifiable.
+            print("Session (" + str(session.address) + "):")
+            print("SessionId", "=", lsid_str)
+            session_fields_to_print = ['_sessionId', '_checkoutOpCtx', '_killRequested']
+            for field in session_fields_to_print:
+                print(field, "=", session[field])
+
+            # Print the information from a TransactionParticipant if a session has one. Otherwise
+            # we just print the session's id and nothing else.
+            txn_part_dec = get_decoration(session, "TransactionParticipant")
+            if txn_part_dec:
+                # Only print the most interesting fields for debugging transactions issues.
+                txn_part = txn_part_dec[1]
+                fields_to_print = ['_txnState', '_activeTxnNumber']
+                print("TransactionParticipant (" + str(txn_part.address) + "):")
+                for field in fields_to_print:
+                    print(field, "=", txn_part[field])
+
+                # The '_txnResourceStash' field is a boost::optional so we unpack it
+                # manually if it is non-empty. We are only interested in its Locker object for now.
+                # TODO: Load the boost pretty printers so the object will be printed clearly
+                # by default, without the need for special unpacking.
+                val = get_boost_optional(txn_part['_txnResourceStash'])
+                if val:
+                    locker_addr = val["_locker"]["_M_t"]['_M_head_impl']
+                    print('_txnResourceStash._locker', "@", locker_addr)
+                else:
+                    print('_txnResourceStash', "=", None)
+            # Separate sessions by a newline.
+            print("")
+
+
+# Register command
+DumpMongoDSessionCatalog()
 
 
 class MongoDBDumpLocks(gdb.Command):
