@@ -65,14 +65,13 @@ private:
         MONGO_DISALLOW_COPYING(PeriodicJobImpl);
 
     public:
+        friend class PeriodicRunnerImpl;
         PeriodicJobImpl(PeriodicJob job, ClockSource* source, ServiceContext* svc);
 
         void start();
         void pause();
         void resume();
         void stop();
-
-        bool isAlive();
 
         enum class ExecutionStatus { NOT_SCHEDULED, RUNNING, PAUSED, CANCELED };
 
