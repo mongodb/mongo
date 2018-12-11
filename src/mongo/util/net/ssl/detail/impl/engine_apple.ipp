@@ -279,6 +279,10 @@ engine::want engine::write(const asio::const_buffer& data,
     if (!verifyConnected(_ssl.get(), &ec)) {
         return want::want_nothing;
     }
+    if (_outbuf.size()) {
+        bytes_transferred = 0;
+        return data.size() ? want::want_output_and_retry : want::want_output;
+    }
     const auto status = ::SSLWrite(_ssl.get(), data.data(), data.size(), &bytes_transferred);
     if (status == ::errSSLWouldBlock) {
         return (bytes_transferred < data.size()) ? want::want_output_and_retry : want::want_nothing;
@@ -286,7 +290,9 @@ engine::want engine::write(const asio::const_buffer& data,
     if (status != ::errSecSuccess) {
         ec = errorCode(status);
     }
-    return _outbuf.size() ? want::want_output : want::want_nothing;
+    // Just in case the next asio output is incomplete,
+    // make sure it comes back into this method for a flush.
+    return _outbuf.size() ? want::want_output_and_retry : want::want_nothing;
 }
 
 asio::mutable_buffer engine::get_output(const asio::mutable_buffer& data) {
