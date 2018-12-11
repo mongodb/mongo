@@ -111,8 +111,9 @@ void PeriodicRunnerEmbedded::shutdown() {
         _running = false;
 
         for (auto& job : _jobs) {
-            if (job->isAlive(lk)) {
-                job->stop();
+            stdx::lock_guard<stdx::mutex> jobLock(job->_mutex);
+            if (job->isAlive(jobLock)) {
+                job->_stopWithMasterAndJobLock(lk, jobLock);
             }
         }
         _jobs.clear();
@@ -225,8 +226,12 @@ void PeriodicRunnerEmbedded::PeriodicJobImpl::stop() {
     // sure the user can invalidate it after this call.
     stdx::lock_guard<stdx::mutex> masterLock(_periodicRunner->_mutex);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(isAlive(lk));
+    _stopWithMasterAndJobLock(masterLock, lk);
+}
 
+void PeriodicRunnerEmbedded::PeriodicJobImpl::_stopWithMasterAndJobLock(WithLock masterLock,
+                                                                        WithLock jobLock) {
+    invariant(isAlive(jobLock));
     _execStatus = PeriodicJobImpl::ExecutionStatus::kCanceled;
 }
 
