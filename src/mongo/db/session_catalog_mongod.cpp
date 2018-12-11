@@ -74,10 +74,48 @@ auto getThreadPool(OperationContext* opCtx) {
     return &sessionTasksExecutor(opCtx->getServiceContext()).threadPool;
 }
 
+void killSessionTokensFunction(OperationContext* opCtx,
+                               std::shared_ptr<std::vector<Session::KillToken>> sessionKillTokens) {
+    if (sessionKillTokens->empty())
+        return;
+
+    uassertStatusOK(getThreadPool(opCtx)->schedule([
+        service = opCtx->getServiceContext(),
+        sessionKillTokens = std::move(sessionKillTokens)
+    ]() mutable {
+        auto uniqueClient = service->makeClient("Kill-Session");
+        auto uniqueOpCtx = uniqueClient->makeOperationContext();
+        const auto opCtx = uniqueOpCtx.get();
+        const auto catalog = SessionCatalog::get(opCtx);
+
+        for (auto& sessionKillToken : *sessionKillTokens) {
+            auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
+
+            auto const txnParticipant = TransactionParticipant::get(session.get());
+            txnParticipant->invalidate();
+        }
+    }));
+}
+
 }  // namespace
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
-    invalidateSessions(opCtx, boost::none);
+    // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk
+    // in case the in-memory state was out of sync.
+    const auto catalog = SessionCatalog::get(opCtx);
+    // The use of shared_ptr here is in order to work around the limitation of stdx::function that
+    // the functor must be copyable.
+    auto sessionKillTokens = std::make_shared<std::vector<Session::KillToken>>();
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    catalog->scanSessions(
+        matcher, [&sessionKillTokens](WithLock sessionCatalogLock, Session* session) {
+            const auto txnParticipant = TransactionParticipant::get(session);
+            if (!txnParticipant->inMultiDocumentTransaction()) {
+                sessionKillTokens->emplace_back(session->kill(sessionCatalogLock));
+            }
+        });
+    killSessionTokensFunction(opCtx, sessionKillTokens);
 
     const size_t initialExtentSize = 0;
     const bool capped = false;
@@ -133,8 +171,8 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
 
     const auto catalog = SessionCatalog::get(opCtx);
 
-    // The use of shared_ptr here is in order to work around the limition of stdx::function that the
-    // functor must be copyable
+    // The use of shared_ptr here is in order to work around the limitation of stdx::function that
+    // the functor must be copyable.
     auto sessionKillTokens = std::make_shared<std::vector<Session::KillToken>>();
 
     if (singleSessionDoc) {
@@ -149,27 +187,8 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
             });
     }
 
-    if (sessionKillTokens->empty())
-        return;
-
-    uassertStatusOK(getThreadPool(opCtx)->schedule([
-        service = opCtx->getServiceContext(),
-        sessionKillTokens = std::move(sessionKillTokens)
-    ]() mutable {
-        auto uniqueClient = service->makeClient("Kill-Session");
-        auto uniqueOpCtx = uniqueClient->makeOperationContext();
-        const auto opCtx = uniqueOpCtx.get();
-        const auto catalog = SessionCatalog::get(opCtx);
-
-        for (auto& sessionKillToken : *sessionKillTokens) {
-            auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
-
-            auto const txnParticipant = TransactionParticipant::get(session.get());
-            txnParticipant->invalidate();
-        }
-    }));
+    killSessionTokensFunction(opCtx, sessionKillTokens);
 }
-
 
 MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)
     : _operationContextSession(opCtx) {
