@@ -72,10 +72,12 @@ class MigrationSourceManager {
     MONGO_DISALLOW_COPYING(MigrationSourceManager);
 
 public:
-    static MigrationSourceManager* get(CollectionShardingRuntime& csr);
-    static MigrationSourceManager* get(CollectionShardingRuntime* csr) {
-        return get(*csr);
-    }
+    /**
+     * Retrieves the MigrationSourceManager pointer that corresponds to the given collection under
+     * a CollectionShardingRuntime that has its ResourceMutex locked.
+     */
+    static MigrationSourceManager* get(CollectionShardingRuntime* csr,
+                                       CollectionShardingRuntimeLock& csrLock);
 
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be

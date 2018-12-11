@@ -60,8 +60,9 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
                                          NamespaceString const& nss,
                                          BSONObj const& docToDelete) {
-    auto css = CollectionShardingRuntime::get(opCtx, nss);
-    auto msm = MigrationSourceManager::get(css);
+    auto csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto csrLock = CollectionShardingRuntimeLock::lock(opCtx, csr);
+    auto msm = MigrationSourceManager::get(csr, csrLock);
     return msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete);
 }
 
@@ -83,9 +84,14 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     if (css) {
         css->checkShardVersionOrThrow(opCtx);
 
-        auto msm = MigrationSourceManager::get(css);
-        if (msm) {
-            msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
+        {
+            auto csr = CollectionShardingRuntime::get(opCtx, nss);
+            auto csrLock = CollectionShardingRuntimeLock::lock(opCtx, csr);
+
+            auto msm = MigrationSourceManager::get(csr, csrLock);
+            if (msm) {
+                msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
+            }
         }
 
         if (inMultiDocumentTransaction &&
@@ -104,9 +110,14 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
     css->checkShardVersionOrThrow(opCtx);
 
-    auto msm = MigrationSourceManager::get(css);
-    if (msm) {
-        msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
+    {
+        auto csr = CollectionShardingRuntime::get(opCtx, nss);
+        auto csrLock = CollectionShardingRuntimeLock::lock(opCtx, csr);
+
+        auto msm = MigrationSourceManager::get(csr, csrLock);
+        if (msm) {
+            msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
+        }
     }
 
     if (inMultiDocumentTransaction && repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
@@ -124,9 +135,14 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     auto* const css = CollectionShardingRuntime::get(opCtx, nss);
     css->checkShardVersionOrThrow(opCtx);
 
-    auto msm = MigrationSourceManager::get(css);
-    if (msm && isMigrating) {
-        msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
+    {
+        auto csr = CollectionShardingRuntime::get(opCtx, nss);
+        auto csrLock = CollectionShardingRuntimeLock::lock(opCtx, csr);
+
+        auto msm = MigrationSourceManager::get(csr, csrLock);
+        if (msm && isMigrating) {
+            msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
+        }
     }
 
     if (inMultiDocumentTransaction && repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
