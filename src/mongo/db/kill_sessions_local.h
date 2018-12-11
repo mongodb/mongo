@@ -61,4 +61,9 @@ void killAllExpiredTransactions(OperationContext* opCtx);
  */
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx);
 
+/**
+ * Run during rollback to abort all in-progress prepared transactions.
+ */
+void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx);
+
 }  // namespace mongo

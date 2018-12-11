@@ -153,4 +153,22 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
                        ErrorCodes::InterruptedAtShutdown);
 }
 
+void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    killSessionsAction(
+        opCtx,
+        matcherAllSessions,
+        [](Session* session) {
+            // Filter for sessions that have a prepared transaction.
+            const auto txnParticipant = TransactionParticipant::get(session);
+            return txnParticipant->transactionIsPrepared();
+        },
+        [](Session* session) {
+            // Abort the prepared transaction and invalidate the session it is
+            // associated with.
+            TransactionParticipant::get(session)->abortPreparedTransactionForRollback();
+        });
+}
+
 }  // namespace mongo

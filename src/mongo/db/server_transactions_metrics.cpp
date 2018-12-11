@@ -304,6 +304,13 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, OperationC
     stats->setOldestActiveOplogEntryTimestamp(oldestActiveOplogEntryTimestamp);
 }
 
+void ServerTransactionsMetrics::clearOpTimes() {
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
+    _oldestActiveOplogEntryOpTime = boost::none;
+    _oldestActiveOplogEntryOpTimes.clear();
+    _oldestNonMajorityCommittedOpTimes.clear();
+}
+
 class TransactionsSSS : public ServerStatusSection {
 public:
     TransactionsSSS() : ServerStatusSection("transactions") {}

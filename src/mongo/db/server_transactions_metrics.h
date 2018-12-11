@@ -143,6 +143,14 @@ public:
      */
     void updateStats(TransactionsStats* stats, OperationContext* opCtx);
 
+    /**
+     * Invalidates the in-memory state of prepared transactions during replication rollback by
+     * clearing oldestActiveOplogEntryOpTime, oldestActiveOplogEntryOpTimes, and
+     * oldestNonMajorityCommittedOpTimes. These variables/data structures should be properly
+     * reconstructed during replication recovery.
+     */
+    void clearOpTimes();
+
 private:
     /**
      * Returns the first and oldest optime in the ordered set of active oplog entry optimes.

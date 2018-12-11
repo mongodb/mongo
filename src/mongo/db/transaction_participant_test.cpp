@@ -2854,11 +2854,13 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
 void buildParametersInfoString(StringBuilder* sb,
                                LogicalSessionId sessionId,
                                const TxnNumber txnNum,
-                               const repl::ReadConcernArgs readConcernArgs) {
+                               const repl::ReadConcernArgs readConcernArgs,
+                               bool autocommitVal) {
     BSONObjBuilder lsidBuilder;
     sessionId.serialize(&lsidBuilder);
+    auto autocommitString = autocommitVal ? "true" : "false";
     (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString() << ", txnNumber: " << txnNum
-          << ", autocommit: false"
+          << ", autocommit: " << autocommitString
           << ", readConcern: " << readConcernArgs.toBSON().getObjectField("readConcern") << " },";
 }
 
@@ -2916,14 +2918,24 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
                                        const LogicalSessionId sessionId,
                                        const TxnNumber txnNum,
                                        const int metricValue,
-                                       const bool wasPrepared) {
+                                       const bool wasPrepared,
+                                       bool autocommitVal = false) {
     // Calling transactionInfoForLog to get the actual transaction info string.
     const auto lockerInfo =
         opCtx->lockState()->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase());
     // Building expected transaction info string.
     StringBuilder parametersInfo;
+    // autocommit must be false for a multi statement transaction, so transactionInfoForLogForTest
+    // should theoretically always print false. In certain unit tests, we compare its output to the
+    // output generated in this function.
+    // Since we clear the state of a transaction on abort, if transactionInfoForLogForTest is
+    // called after a transaction is already aborted, it will encounter boost::none for the
+    // autocommit value. In that case, it will print out true.
+    // In cases where we call transactionInfoForLogForTest after aborting a transaction
+    // and check if the output matches this function's output, we must explicitly set autocommitVal
+    // to true.
     buildParametersInfoString(
-        &parametersInfo, sessionId, txnNum, repl::ReadConcernArgs::get(opCtx));
+        &parametersInfo, sessionId, txnNum, repl::ReadConcernArgs::get(opCtx), autocommitVal);
 
     StringBuilder readTimestampInfo;
     readTimestampInfo
@@ -3090,7 +3102,8 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
                                    *opCtx()->getLogicalSessionId(),
                                    *opCtx()->getTxnNumber(),
                                    metricValue,
-                                   false);
+                                   false,
+                                   true);
 
     ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
 }
@@ -3133,6 +3146,7 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
                                    *opCtx()->getLogicalSessionId(),
                                    *opCtx()->getTxnNumber(),
                                    metricValue,
+                                   true,
                                    true);
 
     ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
@@ -3263,8 +3277,16 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
-    std::string expectedTransactionInfo = "transaction " +
-        txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
+
+    std::string expectedTransactionInfo =
+        buildTransactionInfoString(opCtx(),
+                                   txnParticipant,
+                                   "aborted",
+                                   *opCtx()->getLogicalSessionId(),
+                                   *opCtx()->getTxnNumber(),
+                                   metricValue,
+                                   false);
+
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
@@ -3299,8 +3321,16 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
-    std::string expectedTransactionInfo = "transaction " +
-        txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
+
+    std::string expectedTransactionInfo =
+        buildTransactionInfoString(opCtx(),
+                                   txnParticipant,
+                                   "aborted",
+                                   *opCtx()->getLogicalSessionId(),
+                                   *opCtx()->getTxnNumber(),
+                                   metricValue,
+                                   true);
+
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
@@ -3338,8 +3368,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterExceptionInPrepare) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
-    std::string expectedTransactionInfo = "transaction " +
-        txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
+    std::string expectedTransactionInfo =
+        buildTransactionInfoString(opCtx(),
+                                   txnParticipant,
+                                   "aborted",
+                                   *opCtx()->getLogicalSessionId(),
+                                   *opCtx()->getTxnNumber(),
+                                   metricValue,
+                                   false);
+
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
@@ -3378,8 +3415,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     txnParticipant->abortArbitraryTransaction();
     stopCapturingLogMessages();
 
-    std::string expectedTransactionInfo = "transaction " +
-        txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
+    std::string expectedTransactionInfo = "transaction parameters";
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
@@ -3631,6 +3667,69 @@ TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry
     // earlierOpTime and middleOpTime must have been removed because their finishOpTime are less
     // than or equal to the mock commit point.
     ASSERT_EQ(nonMajorityCommittedOpTime, laterOpTime);
+}
+
+TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
+    auto sessionCheckout = checkOutSession();
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Check that our metrics are initialized to their default values.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime(),
+              boost::none);
+
+    // Perform an insert as a part of a transaction so that we have a transaction operation.
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+    ASSERT_BSONOBJ_EQ(operation.toBSON(),
+                      txnParticipant->transactionOperationsForTest()[0].toBSON());
+
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+
+    // Check that we added a Timestamp to oldestActiveOplogEntryOpTimes.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
+
+    // Check that the oldest active timestamp and the oldest non majority committed timestamp are
+    // equal to the prepareTimestamp because there is only one prepared transaction.
+    auto oldestActiveOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    auto oldestNonMajorityCommittedOpTime =
+        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
+    ASSERT_EQ(oldestActiveOpTime->getTimestamp(), prepareTimestamp);
+    ASSERT_EQ(oldestNonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+
+    // Make sure the state of txnParticipant is populated correctly after a prepared transaction.
+    ASSERT(txnParticipant->transactionIsPrepared());
+    ASSERT_EQ(txnParticipant->transactionOperationsForTest().size(), 1U);
+    ASSERT_EQ(txnParticipant->getPrepareOpTime().getTimestamp(), prepareTimestamp);
+    ASSERT_NE(txnParticipant->getActiveTxnNumber(), kUninitializedTxnNumber);
+
+    txnParticipant->abortPreparedTransactionForRollback();
+    ServerTransactionsMetrics::get(opCtx())->clearOpTimes();
+
+    // After calling abortPreparedTransactionForRollback, the state of txnParticipant should be
+    // invalidated.
+    ASSERT_FALSE(txnParticipant->transactionIsPrepared());
+    ASSERT_EQ(txnParticipant->transactionOperationsForTest().size(), 0U);
+    ASSERT_EQ(txnParticipant->getPrepareOpTime().getTimestamp(), Timestamp());
+    ASSERT_EQ(txnParticipant->getActiveTxnNumber(), kUninitializedTxnNumber);
+
+    // After calling clearOpTimes, we should no longer have an oldestActiveOpTime.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime(),
+              boost::none);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
 }
 
 class RecoverDecisionFromLocalParticipantTest : public TxnParticipantTest {

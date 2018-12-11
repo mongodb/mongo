@@ -1242,7 +1242,6 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
                             &(_txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
                             TransactionState::kAborted,
                             _txnResourceStash->getReadConcernArgs());
-        _txnResourceStash = boost::none;
     } else {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onAbortActive(
@@ -1254,13 +1253,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
             _txnState.isPrepared(lm));
     }
 
-    _transactionOperationBytes = 0;
-    _transactionOperations.clear();
-    _txnState.transitionTo(wl, TransactionState::kAborted);
-    _prepareOpTime = repl::OpTime();
-    _oldestOplogEntryOpTime = boost::none;
-    _finishOpTime = boost::none;
-    _speculativeTransactionReadOpTime = repl::OpTime();
+    _resetTransactionState(wl, TransactionState::kAborted);
 }
 
 void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(
@@ -1594,17 +1587,10 @@ void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnN
     _activeTxnNumber = txnNumber;
 
     // Reset the retryable writes state
-    _activeTxnCommittedStatements.clear();
-    _hasIncompleteHistory = false;
+    _resetRetryableWriteState(wl);
 
     // Reset the transactional state
-    _txnState.transitionTo(wl, TransactionState::kNone);
-    _prepareOpTime = repl::OpTime();
-    _oldestOplogEntryOpTime = boost::none;
-    _finishOpTime = boost::none;
-    _speculativeTransactionReadOpTime = repl::OpTime();
-    _multikeyPathInfo.clear();
-    _autoCommit = boost::none;
+    _resetTransactionState(wl, TransactionState::kNone);
 
     // Reset the transactions metrics
     stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
@@ -1737,6 +1723,47 @@ void TransactionParticipant::onMigrateCompletedOnPrimary(OperationContext* opCtx
         opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
 }
 
+void TransactionParticipant::_invalidate(WithLock) {
+    _activeTxnNumber = kUninitializedTxnNumber;
+    _isValid = false;
+    _numInvalidations++;
+    _lastWrittenSessionRecord.reset();
+
+    // Reset the transactions metrics.
+    stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+    _transactionMetricsObserver.resetSingleTransactionStats(_activeTxnNumber);
+}
+
+void TransactionParticipant::_resetRetryableWriteState(WithLock) {
+    _activeTxnCommittedStatements.clear();
+    _hasIncompleteHistory = false;
+}
+
+void TransactionParticipant::_resetTransactionState(WithLock wl,
+                                                    TransactionState::StateFlag state) {
+    // If we are transitioning to kNone, we are either starting a new transaction or aborting a
+    // prepared transaction for rollback. In the latter case, we will need to relax the invariant
+    // that prevents transitioning from kPrepared to kNone.
+    if (_txnState.isPrepared(wl) && state == TransactionState::kNone) {
+        _txnState.transitionTo(
+            wl, state, TransactionState::TransitionValidation::kRelaxTransitionValidation);
+    } else {
+        _txnState.transitionTo(wl, state);
+    }
+
+    _transactionOperationBytes = 0;
+    _transactionOperations.clear();
+    _prepareOpTime = repl::OpTime();
+    _oldestOplogEntryOpTime = boost::none;
+    _finishOpTime = boost::none;
+    _speculativeTransactionReadOpTime = repl::OpTime();
+    _multikeyPathInfo.clear();
+    _autoCommit = boost::none;
+
+    // Release any locks held by this participant and abort the storage transaction.
+    _txnResourceStash = boost::none;
+}
+
 void TransactionParticipant::invalidate() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
@@ -1745,14 +1772,31 @@ void TransactionParticipant::invalidate() {
             !_txnState.isInSet(
                 lg, TransactionState::kPrepared | TransactionState::kCommittingWithPrepare));
 
-    _isValid = false;
-    _numInvalidations++;
+    // Invalidate the session and clear both the retryable writes and transactional states on
+    // this participant.
+    _invalidate(lg);
+    _resetRetryableWriteState(lg);
+    _resetTransactionState(lg, TransactionState::kNone);
+}
 
-    _lastWrittenSessionRecord.reset();
+void TransactionParticipant::abortPreparedTransactionForRollback() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    _activeTxnNumber = kUninitializedTxnNumber;
-    _activeTxnCommittedStatements.clear();
-    _hasIncompleteHistory = false;
+    // Invalidate the session.
+    _invalidate(lg);
+
+    uassert(51030,
+            str::stream() << "Cannot call abortPreparedTransactionForRollback on unprepared "
+                          << "transaction.",
+            _txnState.isPrepared(lg));
+
+    // It should be safe to clear transactionOperationBytes and transactionOperations because
+    // we only modify these variables when adding an operation to a transaction. Since this
+    // transaction is already prepared, we cannot add more operations to it. We will have this
+    // in the prepare oplog entry.
+    // Both _finishOpTime and _oldestOplogEntryOpTime will be reset to boost::none. With a
+    // prepared transaction, the latter is the same as the prepareOpTime.
+    _resetTransactionState(lg, TransactionState::kNone);
 }
 
 repl::OpTime TransactionParticipant::getLastWriteOpTime(TxnNumber txnNumber) const {

@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -54,6 +55,7 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_recovery.h"
+#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -205,6 +207,14 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     } else {
         log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
     }
+
+    // Before calling recoverToStableTimestamp, we must abort the storage transaction of any
+    // prepared transaction. This will require us to scan all sessions and call
+    // abortPreparedTransactionForRollback() on any txnParticipant with a prepared transaction.
+    killSessionsAbortAllPreparedTransactions(opCtx);
+
+    // Clear the in memory state of prepared transactions in ServerTransactionsMetrics.
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->clearOpTimes();
 
     // Recover to the stable timestamp.
     auto stableTimestampSW = _recoverToStableTimestamp(opCtx);
