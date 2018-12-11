@@ -186,7 +186,9 @@
         if (shouldForceReadConcern) {
             let readConcernLevel;
             if (commandObj.startTransaction === true) {
-                readConcernLevel = "snapshot";
+                readConcernLevel = TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
+                    ? TestData.defaultTransactionReadConcernLevel
+                    : "snapshot";
             } else if (jsTest.options().enableMajorityReadConcern !== false) {
                 readConcernLevel = "majority";
             }

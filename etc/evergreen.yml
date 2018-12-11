@@ -6006,6 +6006,16 @@ tasks:
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
 - <<: *task_template
+  name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=multi_shard_majority_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: parallel
   depends_on:
   - name: jsCore
@@ -8673,6 +8683,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -11949,6 +11960,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
@@ -13013,6 +13025,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
@@ -15406,6 +15419,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
@@ -15599,6 +15613,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion

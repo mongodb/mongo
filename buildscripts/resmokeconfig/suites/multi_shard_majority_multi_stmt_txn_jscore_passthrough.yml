@@ -6,7 +6,7 @@ selector:
   exclude_files:
   # These tests run in the jscore_txn passthrough suites.
   - jstests/core/txns/**/*.js
-  
+
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -36,7 +36,7 @@ selector:
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
@@ -96,8 +96,9 @@ selector:
   ##
   ## Limitations with the way the runner file injects transactions.
   ##
-  
+
   # These tests expects some statements to error, which will cause txns to abort entirely.
+  - jstests/core/and.js
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
@@ -132,7 +133,7 @@ selector:
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
   - jstests/core/remove_undefined.js
-  - jstests/core/set7.js 
+  - jstests/core/set7.js
   - jstests/core/sortb.js
   - jstests/core/sortf.js
   - jstests/core/sortg.js
@@ -150,9 +151,6 @@ selector:
 
   # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
   - jstests/core/opcounters_write_cmd.js
-
-  # SERVER-36311 Remove txn_override.js restriction of snapshot readConcern
-  - jstests/core/read_after_optime.js
 
   # Consecutive writes totalling more than the size upper threshold will cause the txn to
   # abort with a TransactionTooLarge error.
@@ -177,42 +175,25 @@ selector:
 
   # TODO: SERVER-38690 Mongos should throw write targeting errors in a transaction.
   - jstests/core/update_setOnInsert.js
-  
+
   # TODO: SERVER-38588 Hybrid index builds can miss documents during secondary replication.
   - jstests/core/background_index_multikey.js
 
   ##
-  ## Some aggregation stages don't support snapshot readconcern.
+  ## Some aggregation stages aren't allowed in a transaction.
   ##
 
   # $explain (requires read concern local)
   - jstests/core/agg_hint.js
-  - jstests/core/and.js
   - jstests/core/collation.js
   - jstests/core/explain_shell_helpers.js
   - jstests/core/index_partial_read_ops.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
-  - jstests/core/views/views_collation.js
   - jstests/core/wildcard_index_count.js
-
-  # $out
-  - jstests/core/bypass_doc_validation.js
-  - jstests/core/views/views_aggregation.js
-
-  # $listSessions
-  - jstests/core/list_all_local_sessions.js
-  - jstests/core/list_all_sessions.js
-  - jstests/core/list_local_sessions.js
-  - jstests/core/list_sessions.js
 
   # $indexStats
   - jstests/core/index_stats.js
-
-  # $collStats
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/views/views_coll_stats.js
-  - jstests/core/views/views_stats.js
 
   ##
   ## WriteErrors get converted to WriteCommandErrors if part of a txn.
@@ -271,13 +252,6 @@ selector:
   - jstests/core/rename3.js
 
   ##
-  ## Error: Unable to acquire lock within a max lock request timeout of '0ms' milliseconds
-  ##
-
-  # Collection drops done through applyOps are not converted to w:majority
-  - jstests/core/views/invalid_system_views.js
-
-  ##
   ## Misc. reasons.
   ##
 
@@ -285,7 +259,7 @@ selector:
   - jstests/core/exhaust.js
   - jstests/core/validate_cmd_ns.js
 
-  # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
+  # SERVER-34772 Tailable Cursors are not allowed in a transaction.
   - jstests/core/awaitdata_getmore_cmd.js
   - jstests/core/getmore_cmd_maxtimems.js
   - jstests/core/tailable_cursor_invalidation.js
@@ -309,7 +283,6 @@ selector:
   # Creates sessions explicitly, resulting in txns being run through different sessions
   # using a single txnNumber.
   - jstests/core/json_schema/misc_validation.js
-  - jstests/core/views/views_all_commands.js
 
   # Fails with implicit sessions because it will use multiple sessions on the same Mongo connection.
   - jstests/core/dropdb.js
@@ -386,9 +359,12 @@ executor:
         load('jstests/libs/txns/txn_override.js');
       global_vars:
         TestData:
+          defaultTransactionReadConcernLevel: "majority"
           sessionOptions:
-            # Tests in this suite only read from primaries and only one node is electable, so causal
-            # consistency is not required to read your own writes.
+            # Tests in this suite only read from primaries, only one node in each shard is
+            # electable, and use transactions with majority read concern, which speculatively read
+            # non-majority committed data, so causal consistency is not required for them to read
+            # their own writes.
             causalConsistency: false
       readMode: commands
   hooks:
