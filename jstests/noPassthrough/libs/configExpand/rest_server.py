@@ -8,10 +8,19 @@ import logging
 import time
 import urllib.parse
 
+connect_count = 0
+
 class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
     """
     Handle requests from mongod during config expansion.
     """
+
+    protocol_version = 'HTTP/1.1'
+
+    def handle(self):
+        global connect_count
+        connect_count += 1
+        super(ConfigExpandRestHandler, self).handle()
 
     def do_GET(self):
         """Serve a Test GET request."""
@@ -25,26 +34,33 @@ class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
             time.sleep(sleep)
 
         try:
+            response = b''
+            content_type = 'text/plain'
+            connection = 'keep-alive'
+
             if path == '/reflect/string':
                 # Parses 'string' value from query string and echoes it back.
-                self.send_response(code)
-                self.send_header('content-type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(','.join(query['string']).encode())
-                return
-
-            if path == '/reflect/yaml':
+                response = ','.join(query['string']).encode()
+            elif path == '/reflect/yaml':
                 # Parses 'json' value from query string as JSON and reencodes as YAML.
-                self.send_response(code)
-                self.send_header('content-type', 'text/yaml')
-                self.end_headers()
-                self.wfile.write(query['yaml'][0].encode())
-                return
+                response = query['yaml'][0].encode()
+                content_type = 'text/yaml'
+            elif path == '/connect_count':
+                global connect_count
+                response = str(connect_count).encode()
+            elif path == '/connection_close':
+                connection = 'close'
+                response = b'closed'
+            else:
+                code = http.HTTPStatus.NOT_FOUND
+                response = b'Unknown URL'
 
-            self.send_response(http.HTTPStatus.NOT_FOUND)
-            self.send_header('content-type', 'text/plain')
+            self.send_response(code)
+            self.send_header('content-type', content_type)
+            self.send_header('content-length', len(response))
+            self.send_header('connection', connection)
             self.end_headers()
-            self.wfile.write('Unknown URL'.encode())
+            self.wfile.write(response)
 
         except BrokenPipeError as err:
             # Broken pipe is reasonale if we're deliberately going slow.

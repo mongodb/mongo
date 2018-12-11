@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/http_client.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/version.h"
@@ -286,6 +287,21 @@ public:
         }
     }
 } memBase;
+
+class HttpClientServerStatus : public ServerStatusSection {
+public:
+    HttpClientServerStatus() : ServerStatusSection("http_client") {}
+
+    bool includeByDefault() const final {
+        return false;
+    }
+
+    void addRequiredPrivileges(std::vector<Privilege>* out) final {}
+
+    BSONObj generateSection(OperationContext*, const BSONElement& configElement) const final {
+        return HttpClient::getServerStatus();
+    }
+} httpClientServerStatus;
 
 }  // namespace
 

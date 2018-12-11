@@ -36,6 +36,7 @@
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -87,6 +88,11 @@ public:
      * Factory method provided by client implementation.
      */
     static std::unique_ptr<HttpClient> create();
+
+    /**
+     * Content for ServerStatus http_client section.
+     */
+    static BSONObj getServerStatus();
 };
 
 }  // namespace mongo

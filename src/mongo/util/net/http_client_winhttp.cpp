@@ -46,6 +46,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/log.h"
@@ -303,6 +304,11 @@ private:
 
 std::unique_ptr<HttpClient> HttpClient::create() {
     return std::make_unique<WinHttpClient>();
+}
+
+BSONObj HttpClient::getServerStatus() {
+    return BSON("type"
+                << "winhttp");
 }
 
 }  // namespace mongo

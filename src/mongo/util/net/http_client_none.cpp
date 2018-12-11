@@ -36,4 +36,8 @@ std::unique_ptr<HttpClient> HttpClient::create() {
     return nullptr;
 }
 
+BSONObj HttpClient::getServerStatus() {
+    return BSONObj();
+}
+
 }  // namespace mongo

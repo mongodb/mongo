@@ -576,6 +576,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "getLastError",
         "getMore",
         "getParameter",
+        "httpClientRequest",
         "insert",
         "isMaster",
         "killCursors",

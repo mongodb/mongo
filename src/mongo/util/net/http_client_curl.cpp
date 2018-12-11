@@ -43,6 +43,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
@@ -53,13 +55,45 @@ namespace {
 
 class CurlLibraryManager {
 public:
+    // No copying and no moving because we give libcurl the address of our members.
+    // In practice, we'll never want to copy/move this instance anyway,
+    // but if that ever changes, we can write trivial implementations to deal with it.
+    CurlLibraryManager(const CurlLibraryManager&) = delete;
+    CurlLibraryManager& operator=(const CurlLibraryManager&) = delete;
+    CurlLibraryManager(CurlLibraryManager&&) = delete;
+    CurlLibraryManager& operator=(CurlLibraryManager&&) = delete;
+
+    CurlLibraryManager() = default;
     ~CurlLibraryManager() {
+        if (_share) {
+            curl_share_cleanup(_share);
+        }
+        // Ordering matters: curl_global_cleanup() must happen last.
         if (_initialized) {
             curl_global_cleanup();
         }
     }
 
     Status initialize() {
+        auto status = _initializeGlobal();
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _initializeShare();
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
+    CURLSH* getShareHandle() const {
+        return _share;
+    }
+
+private:
+    Status _initializeGlobal() {
         if (_initialized) {
             return Status::OK();
         }
@@ -79,8 +113,35 @@ public:
         return Status::OK();
     }
 
+    Status _initializeShare() {
+        invariant(_initialized);
+        if (_share) {
+            return Status::OK();
+        }
+
+        _share = curl_share_init();
+        curl_share_setopt(_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+        curl_share_setopt(_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
+        curl_share_setopt(_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
+        curl_share_setopt(_share, CURLSHOPT_USERDATA, &this->_shareMutex);
+        curl_share_setopt(_share, CURLSHOPT_LOCKFUNC, _lockShare);
+        curl_share_setopt(_share, CURLSHOPT_UNLOCKFUNC, _unlockShare);
+
+        return Status::OK();
+    }
+
+    static void _lockShare(CURL*, curl_lock_data, curl_lock_access, void* ctx) {
+        reinterpret_cast<stdx::mutex*>(ctx)->lock();
+    }
+
+    static void _unlockShare(CURL*, curl_lock_data, void* ctx) {
+        reinterpret_cast<stdx::mutex*>(ctx)->unlock();
+    }
+
 private:
     bool _initialized = false;
+    CURLSH* _share = nullptr;
+    stdx::mutex _shareMutex;
 } curlLibraryManager;
 
 /**
@@ -152,7 +213,11 @@ public:
         curl_easy_setopt(_handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_easy_setopt(_handle.get(), CURLOPT_NOSIGNAL, 1);
         curl_easy_setopt(_handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+#ifdef CURLOPT_TCP_KEEPALIVE
+        curl_easy_setopt(_handle.get(), CURLOPT_TCP_KEEPALIVE, 1);
+#endif
         curl_easy_setopt(_handle.get(), CURLOPT_TIMEOUT, longSeconds(kTotalRequestTimeout));
+
 #if LIBCURL_VERSION_NUM > 0x072200
         // Requires >= 7.34.0
         curl_easy_setopt(_handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
@@ -224,11 +289,12 @@ private:
     DataBuilder doRequest(CURL* handle, StringData url) const {
         const auto urlString = url.toString();
         curl_easy_setopt(handle, CURLOPT_URL, urlString.c_str());
+        curl_easy_setopt(handle, CURLOPT_SHARE, curlLibraryManager.getShareHandle());
 
         DataBuilder dataBuilder(4096);
         curl_easy_setopt(handle, CURLOPT_WRITEDATA, &dataBuilder);
 
-        curl_slist* chunk = nullptr;
+        curl_slist* chunk = curl_slist_append(nullptr, "Connection: keep-alive");
         for (const auto& header : _headers) {
             chunk = curl_slist_append(chunk, header.c_str());
         }
@@ -271,6 +337,28 @@ Status curlLibraryManager_initialize() {
 std::unique_ptr<HttpClient> HttpClient::create() {
     uassertStatusOK(curlLibraryManager.initialize());
     return std::make_unique<CurlHttpClient>();
+}
+
+BSONObj HttpClient::getServerStatus() {
+
+    BSONObjBuilder info;
+    info.append("type", "curl");
+
+    {
+        BSONObjBuilder v(info.subobjStart("compiled"));
+        v.append("version", LIBCURL_VERSION);
+        v.append("version_num", LIBCURL_VERSION_NUM);
+    }
+
+    {
+        auto* curl_info = curl_version_info(CURLVERSION_NOW);
+
+        BSONObjBuilder v(info.subobjStart("running"));
+        v.append("version", curl_info->version);
+        v.append("version_num", curl_info->version_num);
+    }
+
+    return info.obj();
 }
 
 }  // namespace mongo
