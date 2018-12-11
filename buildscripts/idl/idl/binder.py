@@ -893,6 +893,7 @@ def _bind_server_parameter(ctxt, param):
     ast_param.cpp_varname = param.cpp_varname
     ast_param.condition = _bind_condition(param.condition)
     ast_param.redact = param.redact
+    ast_param.test_only = param.test_only
     ast_param.deprecated_name = param.deprecated_name
 
     standard_optional_fields = ["default", "on_update", "validator"]

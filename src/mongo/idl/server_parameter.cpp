@@ -56,7 +56,11 @@ IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData 
                       name,
                       sp->allowedToChangeAtStartup(),
                       sp->allowedToChangeAtRuntime()),
-      _sp(sp) {}
+      _sp(sp) {
+    if (_sp->isTestOnly()) {
+        setTestOnly();
+    }
+}
 
 Status IDLServerParameter::set(const BSONElement& newValueElement) try {
     if (_fromBSON) {

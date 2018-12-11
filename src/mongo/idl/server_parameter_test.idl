@@ -73,3 +73,9 @@ server_parameters:
     from_string: "customSettingFromString"
     redact: true
 
+  customTestOnlyParameter:
+    set_at: startup
+    description: "That that 'test_only' params get disabled."
+    append_bson: "customSettingAppendBSON"
+    from_string: "customSettingFromString"
+    test_only: true

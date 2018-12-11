@@ -94,10 +94,19 @@ public:
 
     virtual Status setFromString(const std::string& str) = 0;
 
+    bool isTestOnly() const {
+        return _testOnly;
+    }
+
+    void setTestOnly() {
+        _testOnly = true;
+    }
+
 private:
     std::string _name;
     bool _allowedToChangeAtStartup;
     bool _allowedToChangeAtRuntime;
+    bool _testOnly = false;
 };
 
 class ServerParameterSet {
@@ -111,6 +120,8 @@ public:
     }
 
     static ServerParameterSet* getGlobal();
+
+    void disableTestParameters();
 
 private:
     Map _map;

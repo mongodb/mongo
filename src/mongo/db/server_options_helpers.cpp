@@ -291,11 +291,14 @@ Status validateBaseOptions(const moe::Environment& params) {
         std::map<std::string, std::string> parameters =
             params["setParameter"].as<std::map<std::string, std::string>>();
 
-        // Only register failpoint server parameters if enableTestCommands=1.
         auto enableTestCommandsParameter = parameters.find("enableTestCommands");
         if (enableTestCommandsParameter != parameters.end() &&
             enableTestCommandsParameter->second.compare("1") == 0) {
+            // Only register failpoint server parameters if enableTestCommands=1.
             getGlobalFailPointRegistry()->registerAllFailPointsAsServerParameters();
+        } else {
+            // Deregister test-only parameters.
+            ServerParameterSet::getGlobal()->disableTestParameters();
         }
     }
 

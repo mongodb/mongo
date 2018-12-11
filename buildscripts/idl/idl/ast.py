@@ -277,6 +277,7 @@ class ServerParameter(common.SourceLocation):
         self.cpp_varname = None  # type: unicode
         self.condition = None  # type: Condition
         self.redact = False  # type: bool
+        self.test_only = False  # type: bool
         self.deprecated_name = []  # type: List[unicode]
 
         # Only valid if cpp_varname is specified.

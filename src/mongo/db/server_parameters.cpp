@@ -85,4 +85,36 @@ void ServerParameterSet::add(ServerParameter* sp) {
     x = sp;
 }
 
+namespace {
+class DisabledTestParameter : public ServerParameter {
+public:
+    DisabledTestParameter(StringData name, bool startup, bool runtime)
+        : ServerParameter(nullptr, name, startup, runtime) {
+        setTestOnly();
+    }
+
+    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {}
+
+    Status setFromString(const std::string&) final {
+        return {ErrorCodes::BadValue,
+                str::stream() << "setParameter: '" << name()
+                              << "' is only supported with 'enableTestCommands=true'"};
+    }
+
+    Status set(const BSONElement& newValueElement) final {
+        return setFromString("");
+    }
+};
+}  // namespace
+
+void ServerParameterSet::disableTestParameters() {
+    for (auto& spit : _map) {
+        auto*& sp = spit.second;
+        if (sp->isTestOnly()) {
+            sp = new DisabledTestParameter(
+                sp->name(), sp->allowedToChangeAtStartup(), sp->allowedToChangeAtRuntime());
+        }
+    }
+}
+
 }  // namespace mongo

@@ -502,6 +502,7 @@ class ServerParameter(common.SourceLocation):
         self.condition = None  # type: Condition
         self.deprecated_name = []  # type: List[unicode]
         self.redact = False  # type: bool
+        self.test_only = False  # type: bool
 
         # Only valid if cppStorage is specified.
         self.validator = None  # type: Validator

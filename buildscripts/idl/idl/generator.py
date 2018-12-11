@@ -1764,6 +1764,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.redact:
             self._writer.write_line('ret->setRedact();')
 
+        if param.test_only:
+            self._writer.write_line('ret->setTestOnly();')
+
         if param.default is not None:
             self._writer.write_line('uassertStatusOK(ret->setValue(%s));' %
                                     (_get_expression(param.default)))
@@ -1783,6 +1786,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
         elif param.redact:
             self._writer.write_line('ret->setAppendBSON(IDLServerParameter::redactedAppendBSON);')
+
+        if param.test_only:
+            self._writer.write_line('ret->setTestOnly();')
 
         self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
         self._writer.write_line('return ret;')

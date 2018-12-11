@@ -559,6 +559,7 @@ def _parse_server_parameter(ctxt, spec, name, node):
             "condition": _RuleDesc('mapping', mapping_parser_func=_parse_condition),
             "redact": _RuleDesc('bool_scalar'),
             "default": _RuleDesc('scalar_or_mapping', mapping_parser_func=_parse_expression),
+            "test_only": _RuleDesc('bool_scalar'),
             "deprecated_name": _RuleDesc('scalar_or_sequence'),
             "from_bson": _RuleDesc('scalar'),
             "append_bson": _RuleDesc('scalar'),
