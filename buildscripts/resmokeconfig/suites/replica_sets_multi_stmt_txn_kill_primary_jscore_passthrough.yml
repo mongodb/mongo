@@ -372,7 +372,9 @@ executor:
           logRetryAttempts: true
           overrideRetryAttempts: 3
           sessionOptions:
-            causalConsistency: false
+            # Read your own writes is not guaranteed without causal consistency if all nodes are
+            # electable.
+            causalConsistency: true
             retryWrites: true
       # We specify nodb so the shell used by each test will attempt to connect after loading the
       # retry logic in auto_retry_on_network_error.js.

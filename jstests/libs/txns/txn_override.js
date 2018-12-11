@@ -158,12 +158,6 @@
                 shouldForceWriteConcern = false;
             }
         } else if (commandName === "aggregate") {
-            if (OverrideHelpers.isAggregationWithListLocalCursorsStage(commandName, commandObj)) {
-                // The $listLocalCursors stage can only be used with readConcern={level:
-                // "local"}.
-                shouldForceReadConcern = false;
-            }
-
             if (OverrideHelpers.isAggregationWithListLocalSessionsStage(commandName, commandObj)) {
                 // The $listLocalSessions stage can only be used with readConcern={level:
                 // "local"}.
@@ -197,17 +191,29 @@
                 readConcernLevel = "majority";
             }
 
-            if (commandObj.readConcern && commandObj.readConcern.level !== readConcernLevel) {
+            if (commandObj.hasOwnProperty("readConcern") &&
+                commandObj.readConcern.hasOwnProperty("level") &&
+                commandObj.readConcern.level !== readConcernLevel) {
                 throw new Error("refusing to override existing readConcern " +
                                 commandObj.readConcern.level + " with readConcern " +
                                 readConcernLevel);
             } else if (readConcernLevel) {
                 commandObj.readConcern = {level: readConcernLevel};
+            }
 
+            // Only attach afterClusterTime if causal consistency is explicitly enabled. Note, it is
+            // OK to send a readConcern with only afterClusterTime, which is interpreted as local
+            // read concern by the server.
+            if (TestData.hasOwnProperty("sessionOptions") &&
+                TestData.sessionOptions.causalConsistency === true) {
                 const driverSession = conn.getDB(dbName).getSession();
                 const operationTime = driverSession.getOperationTime();
                 if (operationTime !== undefined) {
-                    commandObj.readConcern.afterClusterTime = operationTime;
+                    if (commandObj.hasOwnProperty("readConcern")) {
+                        commandObj.readConcern.afterClusterTime = operationTime;
+                    } else {
+                        commandObj.readConcern = {afterClusterTime: operationTime};
+                    }
                 }
             }
         }
@@ -346,6 +352,21 @@
         // is false, this op is a write command that we are retrying thus this op has already
         // been added to the ops array.
         if (!TestData.retryingOnNetworkError && !retryOp) {
+            // If the command object was created in a causally consistent session but did not
+            // specify a readConcern level, it may have a readConcern object with only
+            // afterClusterTime. The correct read concern options are added in
+            // appendReadAndWriteConcern, so remove the readConcern before saving the operation in
+            // this case.
+            if (cmdObj.hasOwnProperty("readConcern")) {
+                // Only remove the readConcern if it only contains afterClusterTime.
+                const readConcernKeys = Object.keys(cmdObj.readConcern);
+                if (readConcernKeys.length !== 1 || readConcernKeys[0] !== "afterClusterTime") {
+                    throw new Error("Refusing to remove existing readConcern from command: " +
+                                    tojson(cmdObj));
+                }
+                delete cmdObj.readConcern;
+            }
+
             ops.push({dbName, cmdName, cmdObj, makeFuncArgs});
         }
 
