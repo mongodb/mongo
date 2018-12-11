@@ -73,6 +73,8 @@
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -1453,6 +1455,19 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     if (auto validator = LogicalTimeValidator::get(opCtx)) {
         validator->resetKeyManagerCache();
+    }
+
+    // The code below will force the config server to update its shard registry.
+    // Otherwise it may have the stale data that has been just rolled back.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
+            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            ON_BLOCK_EXIT([ argsCopy = readConcernArgs, &readConcernArgs ] {
+                readConcernArgs = std::move(argsCopy);
+            });
+            readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+            shardRegistry->reload(opCtx);
+        }
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the

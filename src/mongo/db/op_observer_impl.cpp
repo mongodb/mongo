@@ -56,6 +56,8 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/durable_view_catalog.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
@@ -1134,6 +1136,19 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
     // Check if the shard identity document rolled back.
     if (rbInfo.shardIdentityRolledBack) {
         fassertFailedNoTrace(50712);
+    }
+
+    // The code below will force the config server to update its shard registry.
+    // Otherwise it may have the stale data that has been just rolled back.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
+            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            ON_BLOCK_EXIT([ argsCopy = readConcernArgs, &readConcernArgs ] {
+                readConcernArgs = std::move(argsCopy);
+            });
+            readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+            shardRegistry->reload(opCtx);
+        }
     }
 }
 
