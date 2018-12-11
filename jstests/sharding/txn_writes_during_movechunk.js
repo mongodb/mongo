@@ -1,4 +1,4 @@
-// @tags: [uses_transactions, uses_single_shard_transaction]
+// @tags: [uses_transactions]
 load('./jstests/libs/chunk_manipulation_util.js');
 
 (function() {

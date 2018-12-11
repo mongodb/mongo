@@ -1,5 +1,5 @@
 // Test TransientTransactionErrors error label in mongos write commands.
-// @tags: [uses_transactions, uses_single_shard_transaction]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 

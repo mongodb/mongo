@@ -1,7 +1,7 @@
 /**
  * Verify writes inside a transaction are not interpreted as retryable writes in a sharded cluster.
  *
- * @tags: [requires_sharding, uses_transactions, uses_single_shard_transaction]
+ * @tags: [requires_sharding, uses_transactions]
  */
 (function() {
     "use strict";

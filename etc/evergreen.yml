@@ -12018,9 +12018,12 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
+  # Ban tests that run prepareTransaction or multi-shard transactions (which use
+  # prepareTransaction). prepareTransaction is rejected on nodes with
+  # enableMajorityReadConcern:"false" (SERVER-37559).
     test_flags: >-
       --majorityReadConcern=off
-      --excludeWithAnyTags=requires_majority_read_concern,uses_change_streams,uses_prepare_transaction,uses_multi_shard_transaction,uses_single_shard_transaction
+      --excludeWithAnyTags=requires_majority_read_concern,uses_change_streams,uses_prepare_transaction,uses_multi_shard_transaction
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
@@ -12205,6 +12208,9 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_jscore_txns
+  - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_0
     distros:
     - rhel62-large
@@ -12555,10 +12561,10 @@ buildvariants:
   tasks:
   # This build variants exists specifically to test that newly added or modified JavaScript tests
   # are correctly tagged with "requires_majority_read_concern", "uses_change_streams",
-  # "uses_prepare_transaction", "uses_multi_shard_transaction", and "uses_single_shard_transaction"
-  # prior to the changes being pushed. It uses the task list from the
-  # enterprise-rhel-62-64-bit-majority-read-concern-off build variant to determine the resmoke.py
-  # YAML suite configurations to run the tests under. Do not add more tasks to this list.
+  # "uses_prepare_transaction", and "uses_multi_shard_transaction" prior to the changes being
+  # pushed. It uses the task list from the enterprise-rhel-62-64-bit-majority-read-concern-off
+  # build variant to determine the resmoke.py YAML suite configurations to run the tests under. Do
+  # not add more tasks to this list.
   - name: compile_TG
     requires:
     - name: burn_in_tests
