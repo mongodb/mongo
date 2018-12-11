@@ -62,7 +62,7 @@ ConnectionString RemoteCommandTargeterRS::connectionString() {
     return uassertStatusOK(ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
-Future<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
+SharedSemiFuture<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _rsMonitor->getHostOrRefresh(readPref, maxWait);
 }

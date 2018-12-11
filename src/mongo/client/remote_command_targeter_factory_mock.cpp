@@ -54,8 +54,8 @@ public:
         return _mock->findHost(opCtx, readPref);
     }
 
-    Future<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                            Milliseconds maxWait) override {
+    SharedSemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                      Milliseconds maxWait) override {
         return _mock->findHostWithMaxWait(readPref, maxWait);
     }
 

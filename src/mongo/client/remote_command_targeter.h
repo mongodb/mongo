@@ -79,8 +79,8 @@ public:
      * DEPRECATED. Prefer findHost(OperationContext*, const ReadPreferenceSetting&), whenever
      * an OperationContext is available.
      */
-    virtual Future<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                    Milliseconds maxWait) = 0;
+    virtual SharedSemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                              Milliseconds maxWait) = 0;
 
     /**
      * Finds a host matching the given read preference, giving up if a match is not found promptly.

@@ -56,8 +56,8 @@ public:
      * Returns the return value last set by setFindHostReturnValue.
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
-    Future<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                            Milliseconds maxWait) override;
+    SharedSemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                      Milliseconds maxWait) override;
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;

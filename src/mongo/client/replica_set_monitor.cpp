@@ -256,8 +256,8 @@ void ReplicaSetMonitor::_doScheduledRefresh(const CallbackHandle& currentHandle)
     _scheduleRefresh(_executor->now() + _state->refreshPeriod);
 }
 
-Future<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria,
-                                                        Milliseconds maxWait) {
+SharedSemiFuture<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(
+    const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
     if (_isRemovedFromManager.load()) {
         return Status(ErrorCodes::ReplicaSetMonitorRemoved,
                       str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
@@ -318,7 +318,7 @@ Future<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSett
         });
     }).detach();
 
-    return std::move(pf.future);
+    return std::move(pf.future).share();
 }
 
 HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
