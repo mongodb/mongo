@@ -106,16 +106,38 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // The use of shared_ptr here is in order to work around the limitation of stdx::function that
     // the functor must be copyable.
     auto sessionKillTokens = std::make_shared<std::vector<Session::KillToken>>();
+
+    // Scan all sessions and reacquire locks for prepared transactions.
+    // There may be sessions that are checked out during this scan, but none of them
+    // can be prepared transactions, since only oplog application can make transactions
+    // prepared on secondaries and oplog application has been stopped at this moment.
+    std::vector<LogicalSessionId> sessionIdToReacquireLocks;
+
     SessionKiller::Matcher matcher(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    catalog->scanSessions(
-        matcher, [&sessionKillTokens](WithLock sessionCatalogLock, Session* session) {
-            const auto txnParticipant = TransactionParticipant::get(session);
-            if (!txnParticipant->inMultiDocumentTransaction()) {
-                sessionKillTokens->emplace_back(session->kill(sessionCatalogLock));
-            }
-        });
+    catalog->scanSessions(matcher, [&](WithLock sessionCatalogLock, Session* session) {
+        const auto txnParticipant = TransactionParticipant::get(session);
+        if (!txnParticipant->inMultiDocumentTransaction()) {
+            sessionKillTokens->emplace_back(session->kill(sessionCatalogLock));
+        }
+
+        if (txnParticipant->transactionIsPrepared()) {
+            sessionIdToReacquireLocks.emplace_back(session->getSessionId());
+        }
+    });
     killSessionTokensFunction(opCtx, sessionKillTokens);
+
+    {
+        // Create a new opCtx because we need an empty locker to refresh the locks.
+        auto newClient = opCtx->getServiceContext()->makeClient("restore-prepared-txn");
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtx = cc().makeOperationContext();
+        for (const auto& sessionId : sessionIdToReacquireLocks) {
+            auto scopedSessionCheckOut = catalog->checkOutSession(newOpCtx.get(), sessionId);
+            auto txnParticipant = TransactionParticipant::get(scopedSessionCheckOut.get());
+            txnParticipant->refreshLocksForPreparedTransaction(newOpCtx.get(), false);
+        }
+    }
 
     const size_t initialExtentSize = 0;
     const bool capped = false;

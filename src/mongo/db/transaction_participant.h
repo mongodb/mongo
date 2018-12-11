@@ -87,11 +87,13 @@ public:
      */
     class TxnResources {
     public:
+        enum class StashStyle { kPrimary, kSecondary, kSideTransaction };
+
         /**
          * Stashes transaction state from 'opCtx' in the newly constructed TxnResources.
          * Ephemerally holds the Client lock associated with opCtx.
          */
-        TxnResources(OperationContext* opCtx, bool keepTicket = false);
+        TxnResources(OperationContext* opCtx, StashStyle stashStyle);
         ~TxnResources();
 
         // Rule of 5: because we have a class-defined destructor, we need to explictly specify
@@ -288,6 +290,11 @@ public:
      * transaction after this is called.
      */
     std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations(OperationContext* opCtx);
+
+    /**
+     * Yield or reacquire locks for prepared transacitons, used on replication state transition.
+     */
+    void refreshLocksForPreparedTransaction(OperationContext* opCtx, bool yieldLocks);
 
     /**
      * May only be called while a multi-document transaction is not committed and adds the multi-key

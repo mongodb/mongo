@@ -507,7 +507,14 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     const auto opTimeToReturn = fassert(28665, loadLastOpTime(opCtx));
 
     _shardingOnTransitionToPrimaryHook(opCtx);
+
+    // This has to go before reaquiring locks for prepared transactions, otherwise this can be
+    // blocked by prepared transactions.
     _dropAllTempCollections(opCtx);
+
+    MongoDSessionCatalog::onStepUp(opCtx);
+
+    notifyFreeMonitoringOnTransitionToPrimary();
 
     // It is only necessary to check the system indexes on the first transition to master.
     // On subsequent transitions to master the indexes will have already been created.
@@ -789,10 +796,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             validator->enableKeyGenerator(opCtx, true);
         }
     }
-
-    MongoDSessionCatalog::onStepUp(opCtx);
-
-    notifyFreeMonitoringOnTransitionToPrimary();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

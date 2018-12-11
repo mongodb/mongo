@@ -246,10 +246,11 @@ protected:
         func(newOpCtx.get());
     }
 
-    std::unique_ptr<MongoDOperationContextSession> checkOutSession() {
+    std::unique_ptr<MongoDOperationContextSession> checkOutSession(
+        boost::optional<bool> startNewTxn = true) {
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, true);
+        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, startNewTxn);
         return opCtxSession;
     }
 
@@ -1550,6 +1551,42 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
     ASSERT_THROWS_CODE(txnParticipant->abortActiveTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::OperationFailed);
+}
+
+TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
+    ASSERT(opCtx()->writesAreReplicated());
+
+    // Prepare a transaction on secondary.
+    {
+        auto sessionCheckout = checkOutSession();
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+
+        // Simulate a transaction on secondary.
+        repl::UnreplicatedWritesBlock uwb(opCtx());
+        ASSERT(!opCtx()->writesAreReplicated());
+
+        txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+        // Simulate the locking of an insert.
+        {
+            Lock::DBLock dbLock(opCtx(), "test", MODE_IX);
+            Lock::CollectionLock collLock(opCtx()->lockState(), "test.foo", MODE_IX);
+        }
+        txnParticipant->prepareTransaction(opCtx(), repl::OpTime({1, 1}, 1));
+        txnParticipant->stashTransactionResources(opCtx());
+        // Secondary yields locks for prepared transactions.
+        ASSERT_FALSE(txnParticipant->getTxnResourceStashLockerForTest()->isLocked());
+    }
+
+    // Step-up will restore the locks of prepared transactions.
+    ASSERT(opCtx()->writesAreReplicated());
+    MongoDSessionCatalog::onStepUp(opCtx());
+    {
+        auto sessionCheckout = checkOutSession({});
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT(txnParticipant->getTxnResourceStashLockerForTest()->isLocked());
+        txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+        txnParticipant->abortActiveTransaction(opCtx());
+    }
 }
 
 /**

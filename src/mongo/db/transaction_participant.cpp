@@ -540,7 +540,7 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
     }
 }
 
-TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
+TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, StashStyle stashStyle) {
     // We must lock the Client to change the Locker on the OperationContext.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
 
@@ -551,13 +551,13 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool
     // Inherit the locking setting from the original one.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
         _locker->shouldConflictWithSecondaryBatchApplication());
-    if (!keepTicket) {
+    if (stashStyle != StashStyle::kSideTransaction) {
         _locker->releaseTicket();
     }
     _locker->unsetThreadId();
 
     // On secondaries, we yield the locks for transactions.
-    if (!opCtx->writesAreReplicated()) {
+    if (stashStyle == StashStyle::kSecondary) {
         _lockSnapshot = std::make_unique<Locker::LockSnapshot>();
         _locker->releaseWriteUnitOfWork(_lockSnapshot.get());
     }
@@ -565,12 +565,12 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
     auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
-    if (opCtx->writesAreReplicated() && maxTransactionLockMillis >= 0) {
+    if (stashStyle != StashStyle::kSecondary && maxTransactionLockMillis >= 0) {
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
 
     // On secondaries, max lock timeout must not be set.
-    invariant(opCtx->writesAreReplicated() || !opCtx->lockState()->hasMaxLockTimeout());
+    invariant(stashStyle != StashStyle::kSecondary || !opCtx->lockState()->hasMaxLockTimeout());
 
     _recoveryUnit = opCtx->releaseRecoveryUnit();
     opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
@@ -632,7 +632,8 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
     if (_opCtx->getWriteUnitOfWork()) {
-        _txnResources = TransactionParticipant::TxnResources(_opCtx, true /* keepTicket*/);
+        _txnResources = TransactionParticipant::TxnResources(
+            _opCtx, TxnResources::StashStyle::kSideTransaction);
     }
 }
 
@@ -659,7 +660,9 @@ void TransactionParticipant::_stashActiveTransaction(WithLock, OperationContext*
     }
 
     invariant(!_txnResourceStash);
-    _txnResourceStash = TxnResources(opCtx);
+    auto stashStyle = opCtx->writesAreReplicated() ? TxnResources::StashStyle::kPrimary
+                                                   : TxnResources::StashStyle::kSecondary;
+    _txnResourceStash = TxnResources(opCtx, stashStyle);
 }
 
 
@@ -798,6 +801,28 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                               opCtx->getServiceContext()->getTickSource());
     }
+}
+
+void TransactionParticipant::refreshLocksForPreparedTransaction(OperationContext* opCtx,
+                                                                bool yieldLocks) {
+    // The opCtx will be used to swap locks, so it cannot hold any lock.
+    invariant(!opCtx->lockState()->isRSTLLocked());
+    invariant(!opCtx->lockState()->isLocked());
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    // The node must have txn resource.
+    invariant(_txnResourceStash);
+    invariant(_txnState.isPrepared(lk));
+
+    // Transfer the txn resource from the stash to the operation context.
+    _txnResourceStash->release(opCtx);
+    _txnResourceStash = boost::none;
+
+    // Transfer the txn resource back from the operation context to the stash.
+    auto stashStyle =
+        yieldLocks ? TxnResources::StashStyle::kSecondary : TxnResources::StashStyle::kPrimary;
+    _txnResourceStash = TxnResources(opCtx, stashStyle);
 }
 
 Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,

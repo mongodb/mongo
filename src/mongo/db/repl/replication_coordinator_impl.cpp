@@ -1006,21 +1006,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
     _externalState->onDrainComplete(opCtx);
 
-    if (MONGO_FAIL_POINT(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock)) {
-        log() << "transition to primary - "
-                 "transitionToPrimaryHangBeforeTakingGlobalExclusiveLock fail point enabled. "
-                 "Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock)) {
-            mongo::sleepsecs(1);
-            {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
-                if (_inShutdown) {
-                    break;
-                }
-            }
-        }
-    }
-
     ReplicationStateTransitionLockGuard transitionGuard(opCtx);
     lk.lock();
 
