@@ -1798,10 +1798,12 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
         // transactions from appearing.
         Timestamp truncTs(lastKeptId.repr());
 
-        if (!serverGlobalParams.enableMajorityReadConcern) {
-            // If majority read concern is disabled, we must set the oldest timestamp along with the
-            // commit timestamp. Otherwise, the commit timestamp might be set behind the oldest
-            // timestamp.
+        if (!serverGlobalParams.enableMajorityReadConcern &&
+            _kvEngine->getOldestTimestamp() > truncTs) {
+            // If majority read concern is disabled, the oldest timestamp can be ahead of 'truncTs'.
+            // In that case, we must set the oldest timestamp along with the commit timestamp.
+            // Otherwise, the commit timestamp will be set behind the oldest timestamp, which is
+            // illegal.
             const bool force = true;
             _kvEngine->setOldestTimestamp(truncTs, force);
         } else {
