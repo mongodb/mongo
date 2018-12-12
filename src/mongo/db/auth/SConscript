@@ -128,6 +128,7 @@ env.Library(
         'authz_manager_external_state.cpp',
         'authz_session_external_state.cpp',
         'user_set.cpp',
+        env.Idlc('authorization_manager_impl_parameters.idl')[0],
     ],
     LIBDEPS=[
         'address_restriction',
@@ -152,6 +153,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/net/ssl_types',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

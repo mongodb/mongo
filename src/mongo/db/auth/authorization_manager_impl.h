@@ -259,4 +259,14 @@ private:
 
     AtomicBool _inUserManagementCommand{false};
 };
+
+extern int authorizationManagerCacheSize;
+
+// Hooks for IDL server parameter 'authorizationManagerPinnedUsers'.
+struct AuthorizationManagerPinnedUsersHooks {
+    static void appendBson(OperationContext* opCtx, BSONObjBuilder* out, StringData name);
+    static Status fromBson(const BSONElement& newValue);
+    static Status fromString(StringData str);
+};
+
 }  // namespace mongo
