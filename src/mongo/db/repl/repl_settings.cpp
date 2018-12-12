@@ -46,7 +46,6 @@ constexpr bool recoverFromOplogAsStandaloneDefault = false;
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverFromOplogAsStandalone,
                                       bool,
                                       recoverFromOplogAsStandaloneDefault);
-
 }  // namespace
 
 std::string ReplSettings::ourSetName() const {

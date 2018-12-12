@@ -1,8 +1,10 @@
+load("jstests/libs/parallelTester.js");  // for ScopedThread.
+
 function backupData(mongo, destinationDirectory) {
     let backupCursor = openBackupCursor(mongo);
-    let metadata = copyCursorFiles(mongo, backupCursor, destinationDirectory);
+    let res = copyBackupCursorFiles(backupCursor, destinationDirectory);
     backupCursor.close();
-    return metadata;
+    return res.metadata;
 }
 
 function openBackupCursor(mongo) {
@@ -17,7 +19,17 @@ function openBackupCursor(mongo) {
     }
 }
 
-function copyCursorFiles(mongo, backupCursor, destinationDirectory) {
+function extendBackupCursor(mongo, backupId, extendTo) {
+    return mongo.getDB("admin").aggregate(
+        [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}], {maxTimeMS: 10000});
+}
+
+/**
+ * Exhaust the backup cursor and copy all the listed files to the destination directory. If `async`
+ * is true, this function will spawn a ScopedThread doing the copy work and return the thread along
+ * with the backup cursor metadata. The caller should `join` the thread when appropriate.
+ */
+function copyBackupCursorFiles(backupCursor, destinationDirectory, async) {
     resetDbpath(destinationDirectory);
     mkdir(destinationDirectory + "/journal");
 
@@ -26,12 +38,21 @@ function copyCursorFiles(mongo, backupCursor, destinationDirectory) {
     assert(doc.hasOwnProperty("metadata"));
     let metadata = doc["metadata"];
 
-    while (backupCursor.hasNext()) {
-        let doc = backupCursor.next();
-        assert(doc.hasOwnProperty("filename"));
-        let dbgDoc = copyFileHelper(doc["filename"], metadata["dbpath"], destinationDirectory);
-        dbgDoc["msg"] = "File copy";
-        jsTestLog(dbgDoc);
+    let copyThread =
+        copyBackupCursorExtendFiles(backupCursor, metadata["dbpath"], destinationDirectory, async);
+
+    return {"metadata": metadata, "copyThread": copyThread};
+}
+
+function copyBackupCursorExtendFiles(cursor, dbpath, destinationDirectory, async) {
+    let files = _cursorToFiles(cursor);
+    let copyThread;
+    if (async) {
+        copyThread =
+            new ScopedThread(_copyFiles, files, dbpath, destinationDirectory, _copyFileHelper);
+        copyThread.start();
+    } else {
+        _copyFiles(files, dbpath, destinationDirectory, _copyFileHelper);
     }
 
     jsTestLog({
@@ -41,10 +62,28 @@ function copyCursorFiles(mongo, backupCursor, destinationDirectory) {
         journal: ls(destinationDirectory + "/journal")
     });
 
-    return metadata;
+    return copyThread;
 }
 
-function copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
+function _cursorToFiles(cursor) {
+    let files = [];
+    while (cursor.hasNext()) {
+        let doc = cursor.next();
+        assert(doc.hasOwnProperty("filename"));
+        files.push(doc.filename);
+    }
+    return files;
+}
+
+function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) {
+    files.forEach((file) => {
+        let dbgDoc = copyFileHelper(file, dbpath, destinationDirectory);
+        dbgDoc["msg"] = "File copy";
+        jsTestLog(dbgDoc);
+    });
+}
+
+function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
     // Ensure the dbpath ends with an OS appropriate slash.
     let lastChar = sourceDbPath[sourceDbPath.length - 1];
     if (lastChar !== '/' && lastChar !== '\\') {

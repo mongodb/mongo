@@ -459,6 +459,11 @@ StatusWith<std::vector<std::string>> getDataFilesFromBackupCursor(WT_CURSOR* cur
     }
     return files;
 }
+
+constexpr bool takeUnstableCheckpointOnShutdownDefault = false;
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(takeUnstableCheckpointOnShutdown,
+                                      bool,
+                                      takeUnstableCheckpointOnShutdownDefault);
 }  // namespace
 
 StringData WiredTigerKVEngine::kTableUriPrefix = "table:"_sd;
@@ -748,6 +753,10 @@ void WiredTigerKVEngine::cleanShutdown() {
         log() << "Downgrading WiredTiger datafiles.";
         LOG(1) << "Downgrade compatibility configuration: " << _fileVersion.getDowngradeString();
         invariantWTOK(_conn->reconfigure(_conn, _fileVersion.getDowngradeString().c_str()));
+    }
+
+    if (takeUnstableCheckpointOnShutdown) {
+        closeConfig += "use_timestamp=false,";
     }
 
     invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
