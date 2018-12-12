@@ -462,7 +462,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnInitialFindReque
     oplogFetcher.join();
 
     // The fetcher should have shut down after its last request timed out.
-    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState->getStatus());
+    ASSERT_TRUE(ErrorCodes::isExceededTimeLimitError(shutdownState->getStatus().code()));
 }
 
 TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnRetriedFindRequests) {
@@ -512,7 +512,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnRetriedFindReque
     oplogFetcher.join();
 
     // The fetcher should have shut down after its last request timed out.
-    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState->getStatus());
+    ASSERT_TRUE(ErrorCodes::isExceededTimeLimitError(shutdownState->getStatus().code()));
 }
 
 bool sharedCallbackStateDestroyed = false;

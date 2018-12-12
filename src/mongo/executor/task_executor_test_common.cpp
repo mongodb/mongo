@@ -487,7 +487,7 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     ASSERT_EQUALS(startTime + Milliseconds(2), net->now());
     net->exitNetwork();
     executor.wait(cbHandle);
-    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, status);
+    ASSERT_EQUALS(ErrorCodes::NetworkInterfaceExceededTimeLimit, status);
 }
 
 COMMON_EXECUTOR_TEST(CallbackHandleComparison) {

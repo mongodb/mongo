@@ -344,7 +344,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp, IsNotActiveAfterUpdatePositionTimeoutExpire
     // Reporter should have shut down.
     ASSERT_FALSE(testReporter.isWaitingToSendReport());
     ASSERT_FALSE(testReporter.isActive());
-    ASSERT_EQUALS(testReporter.getStatus_forTest().code(), ErrorCodes::NetworkTimeout);
+    ASSERT_TRUE(ErrorCodes::isExceededTimeLimitError(testReporter.getStatus_forTest().code()));
 }
 
 // If an error is returned, it should be recorded in the Reporter and not run again.

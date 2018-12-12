@@ -467,7 +467,8 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(
 
     if (timeout != RemoteCommandRequest::kNoTimeout) {
         invariant(timeout >= Milliseconds(0));
-        ResponseStatus rs(ErrorCodes::NetworkTimeout, "Network timeout", Milliseconds(0));
+        ResponseStatus rs(
+            ErrorCodes::NetworkInterfaceExceededTimeLimit, "Network timeout", Milliseconds(0));
         std::vector<NetworkOperationList*> queuesToCheck{&_unscheduled, &_blackHoled, &_scheduled};
         _alarms.emplace(_now_inlock() + timeout, [
             this,
