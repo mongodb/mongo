@@ -592,6 +592,28 @@ TEST(RedactionBSON, SubObjects) {
     ASSERT_BSONOBJ_EQ(res, obj);
 }
 
+TEST(ConfigOption, Opt17) {
+    ASSERT_OPTION_SET<std::int32_t>(
+        moe::startupOptionsParsed, "test.config.opt17", kTestConfigOpt17Default);
+
+    moe::Environment implicitParse;
+    ASSERT_OK(parseArgv({"mongod", "--testConfigOpt17"}, &implicitParse));
+    ASSERT_OPTION_SET<std::int32_t>(implicitParse, "test.config.opt17", kTestConfigOpt17Implicit);
+
+    moe::Environment negativeParse;
+    ASSERT_NOT_OK(
+        parseArgv({"mongod", "--testConfigOpt17", std::to_string(kTestConfigOpt17Minimum - 1)},
+                  &negativeParse));
+    ASSERT_NOT_OK(
+        parseArgv({"mongod", "--testConfigOpt17", std::to_string(kTestConfigOpt17Maximum + 1)},
+                  &negativeParse));
+
+    moe::Environment okParse;
+    ASSERT_OK(parseArgv({"mongod", "--testConfigOpt17", std::to_string(kTestConfigOpt17Minimum)},
+                        &okParse));
+    ASSERT_OPTION_SET<std::int32_t>(okParse, "test.config.opt17", kTestConfigOpt17Minimum);
+}
+
 }  // namespace
 }  // namespace test
 }  // namespace mongo

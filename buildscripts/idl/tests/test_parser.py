@@ -1106,6 +1106,23 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
 
+    def test_scalar_or_mapping_negative(self):
+        # type: () -> None
+        """Negative test for scalar_or_mapping type."""
+
+        # Test for scalar_or_mapping with a sequence.
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                cpp_varname: baz
+                default:
+                - one
+                - two
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE_SCALAR_OR_MAPPING)
+
 
 if __name__ == '__main__':
 

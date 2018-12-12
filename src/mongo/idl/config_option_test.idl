@@ -34,9 +34,6 @@ global:
   configs:
     initializer_name: TestConfigs
 
-imports:
-  - "mongo/idl/basic_types.idl"
-
 configs:
   "test.config.opt1":
     short_name: testConfigOpt1
@@ -187,4 +184,21 @@ configs:
     arg_vartype: String
     source: cli
     redact: true
+
+  "test.config.opt17":
+    description: "Test c++ expressions in default, implicit, validator"
+    short_name: testConfigOpt17
+    arg_vartype: Int
+    source: cli
+    default:
+        expr: kTestConfigOpt17Default
+    implicit:
+        expr: kTestConfigOpt17Implicit
+    validator:
+        gte:
+            expr: kTestConfigOpt17Minimum
+            is_constexpr: false
+        lte:
+            expr: kTestConfigOpt17Maximum
+            is_constexpr: true
 

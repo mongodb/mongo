@@ -31,9 +31,6 @@ global:
   cpp_includes:
   - "mongo/idl/server_parameter_with_storage_test.h"
 
-imports:
-  - "mongo/idl/basic_types.idl"
-
 server_parameters:
   stdIntPreallocated:
     set_at: [ startup, runtime ]
@@ -73,3 +70,14 @@ server_parameters:
     cpp_vartype: "std::string"
     cpp_varname: gStartupStringRedacted
     redact: true
+
+  startupIntWithExpressions:
+    set_at: startup
+    description: "Use of c++ expressions in default and validators"
+    cpp_vartype: "std::int32_t"
+    cpp_varname: gStartupIntWithExpressions
+    default: { expr: kStartupIntWithExpressionsDefault }
+    validator:
+        gte: { expr: kStartupIntWithExpressionsMinimum, is_constexpr: false }
+        lte: { expr: kStartupIntWithExpressionsMaximum, is_constexpr: true }
+

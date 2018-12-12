@@ -36,6 +36,10 @@
 namespace mongo {
 namespace test {
 
+constexpr std::int32_t kStartupIntWithExpressionsDefault = 100;
+constexpr std::int32_t kStartupIntWithExpressionsMinimum = 10;
+constexpr std::int32_t kStartupIntWithExpressionsMaximum = 1000;
+
 // Storage for set parameter defined in server_parameter_with_storage.idl
 extern AtomicInt32 gStdIntPreallocated;
 

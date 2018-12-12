@@ -244,5 +244,19 @@ TEST(IDLServerParameterWithStorage, startupStringRedacted) {
     ASSERT_EQ(obj[sp->name()].String(), "###");
 }
 
+TEST(IDLServerParameterWithStorage, startupIntWithExpressions) {
+    auto* sp = dynamic_cast<IDLServerParameterWithStorage<SPT::kStartupOnly, std::int32_t>*>(
+        getServerParameter("startupIntWithExpressions"));
+    ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsDefault);
+
+    ASSERT_NOT_OK(sp->setValue(test::kStartupIntWithExpressionsMinimum - 1));
+    ASSERT_OK(sp->setValue(test::kStartupIntWithExpressionsMinimum));
+    ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsMinimum);
+
+    ASSERT_NOT_OK(sp->setValue(test::kStartupIntWithExpressionsMaximum + 1));
+    ASSERT_OK(sp->setValue(test::kStartupIntWithExpressionsMaximum));
+    ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsMaximum);
+}
+
 }  // namespace
 }  // namespace mongo

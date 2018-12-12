@@ -518,6 +518,52 @@ def _normalize_method_name(cpp_type_name, cpp_method_name):
     return cpp_method_name
 
 
+def _bind_expression(expr, allow_literal_string=True):
+    # type: (syntax.Expression, bool) -> ast.Expression
+    """Bind an expression."""
+    node = ast.Expression(expr.file_name, expr.line, expr.column)
+
+    if expr.literal is None:
+        node.expr = expr.expr
+        node.validate_constexpr = expr.is_constexpr
+        return node
+
+    node.validate_constexpr = False
+
+    # bool
+    if (expr.literal == "true") or (expr.literal == "false"):
+        node.expr = expr.literal
+        return node
+
+    # int32_t
+    try:
+        intval = int(expr.literal)
+        if (intval >= -0x80000000) and (intval <= 0x7FFFFFFF):
+            node.expr = repr(intval)
+            return node
+    except ValueError:
+        pass
+
+    # float
+    try:
+        node.expr = repr(float(expr.literal))
+        return node
+    except ValueError:
+        pass
+
+    # std::string
+    if allow_literal_string:
+        strval = expr.literal
+        for i in ['\\', '"', "'"]:
+            if i in strval:
+                strval = strval.replace(i, '\\' + i)
+        node.expr = '"' + strval + '"'
+        return node
+
+    # Unable to bind expression.
+    return None
+
+
 def _bind_validator(ctxt, validator):
     # type: (errors.ParserContext, syntax.Validator) -> ast.Validator
     """Bind a validator from the idl.syntax tree."""
@@ -526,21 +572,17 @@ def _bind_validator(ctxt, validator):
 
     # Parse syntax value as numeric if possible.
     for pred in ["gt", "lt", "gte", "lte"]:
-        val = getattr(validator, pred)
-        if val is None:
+        src = getattr(validator, pred)
+        if src is None:
             continue
 
-        try:
-            intval = int(val)
-            if (intval < -0x80000000) or (intval > 0x7FFFFFFF):
-                raise ValueError('IDL ints are limited to int32_t')
-            setattr(ast_validator, pred, intval)
-        except ValueError:
-            try:
-                setattr(ast_validator, pred, float(val))
-            except ValueError:
-                ctxt.add_value_not_numeric_error(ast_validator, pred, val)
-                return None
+        dest = _bind_expression(src, allow_literal_string=False)
+        if dest is None:
+            # This only happens if we have a non-numeric literal.
+            ctxt.add_value_not_numeric_error(ast_validator, pred, src)
+            return None
+
+        setattr(ast_validator, pred, dest)
 
     ast_validator.callback = validator.callback
     return ast_validator
@@ -878,7 +920,10 @@ def _bind_server_parameter(ctxt, param):
             if getattr(param, conflict) is not None:
                 ctxt.add_server_parameter_attr_with_storage(param, conflict)
 
-        ast_param.default = param.default
+        if param.default:
+            ast_param.default = _bind_expression(param.default)
+            if ast_param.default is None:
+                return None
         ast_param.on_update = param.on_update
 
     set_at = 0
@@ -992,8 +1037,12 @@ def _bind_config_option(ctxt, globals_spec, option):
     node.conflicts = option.conflicts
     node.hidden = option.hidden
     node.redact = option.redact
-    node.default = option.default
-    node.implicit = option.implicit
+
+    if option.default:
+        node.default = _bind_expression(option.default)
+
+    if option.implicit:
+        node.implicit = _bind_expression(option.implicit)
 
     # Commonly repeated attributes section and source may be set in globals.
     if globals_spec and globals_spec.configs:

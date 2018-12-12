@@ -110,6 +110,18 @@ class Struct(common.SourceLocation):
         super(Struct, self).__init__(file_name, line, column)
 
 
+class Expression(common.SourceLocation):
+    """Literal of C++ expression representation."""
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct an Expression."""
+        self.expr = None  # type: unicode
+        self.validate_constexpr = True  # type: bool
+
+        super(Expression, self).__init__(file_name, line, column)
+
+
 class Validator(common.SourceLocation):
     """
     An instance of a validator for a field.
@@ -125,10 +137,10 @@ class Validator(common.SourceLocation):
         """Construct a Validator."""
         # Don't lint gt/lt as bad attribute names.
         # pylint: disable=C0103
-        self.gt = None  # type: Optional[Union[int, float]]
-        self.lt = None  # type: Optional[Union[int, float]]
-        self.gte = None  # type: Optional[Union[int, float]]
-        self.lte = None  # type: Optional[Union[int, float]]
+        self.gt = None  # type: Expression
+        self.lt = None  # type: Expression
+        self.gte = None  # type: Expression
+        self.lte = None  # type: Expression
         self.callback = None  # type: Optional[unicode]
 
         super(Validator, self).__init__(file_name, line, column)
@@ -268,7 +280,7 @@ class ServerParameter(common.SourceLocation):
         self.deprecated_name = []  # type: List[unicode]
 
         # Only valid if cpp_varname is specified.
-        self.default = None  # type: unicode
+        self.default = None  # type: Expression
         self.validator = None  # type: Validator
         self.on_update = None  # type: unicode
 
@@ -317,8 +329,8 @@ class ConfigOption(common.SourceLocation):
         self.requires = []  # type: List[unicode]
         self.hidden = False  # type: bool
         self.redact = False  # type: bool
-        self.default = None  # type: unicode
-        self.implicit = None  # type: unicode
+        self.default = None  # type: Expression
+        self.implicit = None  # type: Expression
         self.source = None  # type: unicode
 
         self.duplicates_append = False  # type: bool

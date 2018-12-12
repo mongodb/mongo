@@ -110,6 +110,7 @@ ERROR_ID_MISSING_SHORTNAME_FOR_POSITIONAL = "ID0061"
 ERROR_ID_INVALID_SHORT_NAME = "ID0062"
 ERROR_ID_INVALID_SINGLE_NAME = "ID0063"
 ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME = "ID0064"
+ERROR_ID_IS_NODE_TYPE_SCALAR_OR_MAPPING = "ID0065"
 
 
 class IDLError(Exception):
@@ -301,6 +302,19 @@ class ParserContext(object):
 
         if node.id == "sequence":
             return self.is_scalar_sequence(node, node_name)
+
+        return True
+
+    def is_scalar_or_mapping_node(self, node, node_name):
+        # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], unicode) -> bool
+        # pylint: disable=invalid-name
+        """Return True if the YAML node is a Scalar or Mapping."""
+        if not node.id == "scalar" and not node.id == "mapping":
+            self._add_node_error(
+                node, ERROR_ID_IS_NODE_TYPE_SCALAR_OR_MAPPING,
+                "Illegal node type '%s' for '%s', expected either node type 'scalar' or 'mapping'" %
+                (node.id, node_name))
+            return False
 
         return True
 
