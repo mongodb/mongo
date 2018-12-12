@@ -40,6 +40,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/user_cache_invalidator_job_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
@@ -49,6 +50,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -56,43 +58,58 @@
 namespace mongo {
 namespace {
 
-// How often to check with the config servers whether authorization information has changed.
-AtomicInt32 userCacheInvalidationIntervalSecs(30);  // 30 second default
-stdx::mutex invalidationIntervalMutex;
-stdx::condition_variable invalidationIntervalChangedCondition;
-Date_t lastInvalidationTime;
-
-class ExportedInvalidationIntervalParameter
-    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
-    using Base = ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>;
+class ThreadSleepInterval {
 
 public:
-    ExportedInvalidationIntervalParameter()
-        : Base(ServerParameterSet::getGlobal(),
-               "userCacheInvalidationIntervalSecs",
-               &userCacheInvalidationIntervalSecs) {}
+    explicit ThreadSleepInterval(Seconds interval) : _interval(interval) {}
 
-    // Don't hide Base::set(const BSONElement&)
-    using Base::set;
-
-    Status set(const int& newValue) override {
-        stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-        Status status = Base::set(newValue);
-        invalidationIntervalChangedCondition.notify_all();
-        return status;
+    void setInterval(Seconds interval) {
+        {
+            stdx::lock_guard<stdx::mutex> twiddle(_mutex);
+            MONGO_LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
+            _interval = interval;
+        }
+        _condition.notify_all();
     }
+
+    void start() {
+        _last = Date_t::now();
+    }
+
+    void wait() {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        while (true) {
+            Date_t now = Date_t::now();
+            Date_t expiry = _last + _interval;
+            MONGO_LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
+
+            if (now >= expiry) {
+                _last = now;
+                MONGO_LOG(5) << "wait: done";
+                return;
+            }
+
+            MONGO_LOG(5) << "wait: blocking";
+            MONGO_IDLE_THREAD_BLOCK;
+            _condition.wait_until(lock, expiry.toSystemTimePoint());
+        }
+    }
+
+private:
+    Seconds _interval;
+    stdx::mutex _mutex;
+    stdx::condition_variable _condition;
+    Date_t _last;
 };
 
-MONGO_COMPILER_VARIABLE_UNUSED auto _exportedInterval =
-    (new ExportedInvalidationIntervalParameter())
-        -> withValidator([](const int& potentialNewValue) {
-            if (potentialNewValue < 1 || potentialNewValue > 86400) {
-                return Status(ErrorCodes::BadValue,
-                              "userCacheInvalidationIntervalSecs must be between 1 "
-                              "and 86400 (24 hours)");
-            }
-            return Status::OK();
-        });
+Seconds loadInterval() {
+    return Seconds(userCacheInvalidationIntervalSecs.load());
+}
+
+ThreadSleepInterval* globalInvalidationInterval() {
+    static auto p = new ThreadSleepInterval(loadInterval());
+    return p;
+}
 
 StatusWith<OID> getCurrentCacheGeneration(OperationContext* opCtx) {
     try {
@@ -111,6 +128,11 @@ StatusWith<OID> getCurrentCacheGeneration(OperationContext* opCtx) {
 }
 
 }  // namespace
+
+Status userCacheInvalidationIntervalSecsNotify(const int& value) {
+    globalInvalidationInterval()->setInterval(loadInterval());
+    return Status::OK();
+}
 
 UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
     : _authzManager(authzManager) {}
@@ -142,21 +164,10 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
 
 void UserCacheInvalidator::run() {
     Client::initThread("UserCacheInvalidator");
-    lastInvalidationTime = Date_t::now();
-
+    auto interval = globalInvalidationInterval();
+    interval->start();
     while (true) {
-        stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-        Date_t sleepUntil =
-            lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
-        Date_t now = Date_t::now();
-        while (now < sleepUntil) {
-            MONGO_IDLE_THREAD_BLOCK;
-            invalidationIntervalChangedCondition.wait_until(lock, sleepUntil.toSystemTimePoint());
-            sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
-            now = Date_t::now();
-        }
-        lastInvalidationTime = now;
-        lock.unlock();
+        interval->wait();
 
         if (globalInShutdownDeprecated()) {
             break;
