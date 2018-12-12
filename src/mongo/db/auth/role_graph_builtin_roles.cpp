@@ -209,6 +209,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::applicationMessage  // clusterManager gets this also
         << ActionType::connPoolSync
         << ActionType::cpuProfiler
+        << ActionType::dropConnections
         << ActionType::logRotate
         << ActionType::setParameter
         << ActionType::shutdown
