@@ -44,24 +44,6 @@ namespace mongo {
 
 SASLSSPIGlobalParams saslSSPIGlobalParams;
 
-Status addSASLSSPIOptions(moe::OptionSection* options) {
-    moe::OptionSection sspiOptions("Kerberos Options");
-    sspiOptions
-        .addOptionChaining("security.sspiHostnameCanonicalization",
-                           "sspiHostnameCanonicalization",
-                           moe::String,
-                           "DNS resolution strategy to use for hostname canonicalization. "
-                           "May be one of: {none, forward, forwardAndReverse}")
-        .setDefault(moe::Value(std::string("none")));
-    sspiOptions
-        .addOptionChaining("security.sspiRealmOverride",
-                           "sspiRealmOverride",
-                           moe::String,
-                           "Override the detected realm with the provided string")
-        .hidden();
-    return options->addSection(sspiOptions);
-}
-
 Status storeSASLSSPIOptions(const moe::Environment& params) {
     if (params.count("security.sspiHostnameCanonicalization")) {
         if (params["security.sspiHostnameCanonicalization"].as<std::string>() == "none") {
@@ -77,14 +59,8 @@ Status storeSASLSSPIOptions(const moe::Environment& params) {
                           "Unrecognized sspiHostnameCanonicalization option");
         }
     }
-    if (params.count("security.sspiRealmOverride")) {
-        saslSSPIGlobalParams.realmOverride = params["security.sspiRealmOverride"].as<std::string>();
-    }
+    
     return Status::OK();
-}
-
-MONGO_MODULE_STARTUP_OPTIONS_REGISTER(SASLSSPIOptions)(InitializerContext* context) {
-    return addSASLSSPIOptions(&moe::startupOptions);
 }
 
 MONGO_STARTUP_OPTIONS_STORE(SASLSSPIOptions)(InitializerContext* context) {
