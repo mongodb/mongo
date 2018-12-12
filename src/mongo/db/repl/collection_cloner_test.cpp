@@ -129,14 +129,7 @@ public:
         {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             _resuming = true;
-            _paused = false;
-            _resumedQueryCount = _queryCount;
-            while (_waiting) {
-                lk.unlock();
-                _net->signalWorkAvailable();
-                mongo::sleepmillis(10);
-                lk.lock();
-            }
+            _resume(&lk);
             _resuming = false;
             _cond.notify_all();
         }
@@ -148,10 +141,15 @@ public:
         _cond.wait(lk, [this] { return _waiting; });
     }
 
-    // Waits for the next query to run after resume() is called to complete.
-    void waitForResumedQuery() {
+    // Resumes, then waits for the next query to run after resume() is called to complete.
+    void resumeAndWaitForResumedQuery() {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _resuming = true;
+        _resume(&lk);
+        _cond.notify_all();  // This is to wake up the paused thread.
         _cond.wait(lk, [this] { return _resumedQueryCount != _queryCount; });
+        _resuming = false;
+        _cond.notify_all();  // This potentially wakes up the destructor.
     }
 
 private:
@@ -165,6 +163,18 @@ private:
     int _resumedQueryCount = 0;
     Status _failureForConnect = Status::OK();
     Status _failureForQuery = Status::OK();
+
+    void _resume(stdx::unique_lock<stdx::mutex>* lk) {
+        invariant(lk->owns_lock());
+        _paused = false;
+        _resumedQueryCount = _queryCount;
+        while (_waiting) {
+            lk->unlock();
+            _net->signalWorkAvailable();
+            mongo::sleepmillis(10);
+            lk->lock();
+        }
+    }
 };
 
 // RAII class to pause the client; since tests are very exception-heavy this prevents them
@@ -182,6 +192,12 @@ public:
     void resume() {
         if (_client)
             _client->resume();
+        _client = nullptr;
+    }
+
+    void resumeAndWaitForResumedQuery() {
+        if (_client)
+            _client->resumeAndWaitForResumedQuery();
         _client = nullptr;
     }
 
@@ -1249,8 +1265,7 @@ protected:
 
         _client->waitForPausedQuery();
         ASSERT_TRUE(collectionStats.initCalled);
-        pauser.resume();
-        _client->waitForResumedQuery();
+        pauser.resumeAndWaitForResumedQuery();
     }
 
     /**
