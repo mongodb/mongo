@@ -80,113 +80,112 @@ public:
                        bool repair,
                        bool readOnly);
 
-    virtual ~WiredTigerKVEngine();
+    ~WiredTigerKVEngine();
 
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);
 
-    virtual bool supportsDocLocking() const override;
+    bool supportsDocLocking() const override;
 
-    virtual bool supportsDirectoryPerDB() const override;
+    bool supportsDirectoryPerDB() const override;
 
-    virtual bool isDurable() const override {
+    bool isDurable() const override {
         return _durable;
     }
 
-    virtual bool isEphemeral() const override {
+    bool isEphemeral() const override {
         return _ephemeral;
     }
 
-    virtual RecoveryUnit* newRecoveryUnit() override;
+    RecoveryUnit* newRecoveryUnit() override;
 
-    virtual Status createRecordStore(OperationContext* opCtx,
-                                     StringData ns,
-                                     StringData ident,
-                                     const CollectionOptions& options) override {
+    Status createRecordStore(OperationContext* opCtx,
+                             StringData ns,
+                             StringData ident,
+                             const CollectionOptions& options) override {
         return createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
     }
 
-    virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
-                                                        StringData ns,
-                                                        StringData ident,
-                                                        const CollectionOptions& options) override {
+    std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
+                                                StringData ns,
+                                                StringData ident,
+                                                const CollectionOptions& options) override {
         return getGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
     }
 
-    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                  StringData ident) override;
+    std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+                                                          StringData ident) override;
 
-    virtual Status createSortedDataInterface(OperationContext* opCtx,
-                                             StringData ident,
-                                             const IndexDescriptor* desc) override {
+    Status createSortedDataInterface(OperationContext* opCtx,
+                                     StringData ident,
+                                     const IndexDescriptor* desc) override {
         return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
-    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                        StringData ident,
-                                                        const IndexDescriptor* desc) override {
+    SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                StringData ident,
+                                                const IndexDescriptor* desc) override {
         return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
-    virtual Status createGroupedRecordStore(OperationContext* opCtx,
-                                            StringData ns,
+    Status createGroupedRecordStore(OperationContext* opCtx,
+                                    StringData ns,
+                                    StringData ident,
+                                    const CollectionOptions& options,
+                                    KVPrefix prefix) override;
+
+    std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
+                                                       StringData ns,
+                                                       StringData ident,
+                                                       const CollectionOptions& options,
+                                                       KVPrefix prefix) override;
+
+    Status createGroupedSortedDataInterface(OperationContext* opCtx,
                                             StringData ident,
-                                            const CollectionOptions& options,
+                                            const IndexDescriptor* desc,
                                             KVPrefix prefix) override;
 
-    virtual std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
-                                                               StringData ns,
-                                                               StringData ident,
-                                                               const CollectionOptions& options,
-                                                               KVPrefix prefix) override;
+    SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
+                                                       StringData ident,
+                                                       const IndexDescriptor* desc,
+                                                       KVPrefix prefix) override;
 
-    virtual Status createGroupedSortedDataInterface(OperationContext* opCtx,
-                                                    StringData ident,
-                                                    const IndexDescriptor* desc,
-                                                    KVPrefix prefix) override;
+    Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
-    virtual SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
-                                                               StringData ident,
-                                                               const IndexDescriptor* desc,
-                                                               KVPrefix prefix) override;
+    void alterIdentMetadata(OperationContext* opCtx,
+                            StringData ident,
+                            const IndexDescriptor* desc) override;
 
-    virtual Status dropIdent(OperationContext* opCtx, StringData ident) override;
+    Status okToRename(OperationContext* opCtx,
+                      StringData fromNS,
+                      StringData toNS,
+                      StringData ident,
+                      const RecordStore* originalRecordStore) const override;
 
-    virtual void alterIdentMetadata(OperationContext* opCtx,
-                                    StringData ident,
-                                    const IndexDescriptor* desc) override;
+    int flushAllFiles(OperationContext* opCtx, bool sync) override;
 
-    virtual Status okToRename(OperationContext* opCtx,
-                              StringData fromNS,
-                              StringData toNS,
-                              StringData ident,
-                              const RecordStore* originalRecordStore) const override;
+    Status beginBackup(OperationContext* opCtx) override;
 
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync) override;
+    void endBackup(OperationContext* opCtx) override;
 
-    virtual Status beginBackup(OperationContext* opCtx) override;
+    StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) override;
 
-    virtual void endBackup(OperationContext* opCtx) override;
+    void endNonBlockingBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(
-        OperationContext* opCtx) override;
+    int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;
 
-    virtual void endNonBlockingBackup(OperationContext* opCtx) override;
+    Status repairIdent(OperationContext* opCtx, StringData ident) override;
 
-    virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;
+    Status recoverOrphanedIdent(OperationContext* opCtx,
+                                StringData ns,
+                                StringData ident,
+                                const CollectionOptions& options) override;
 
-    virtual Status repairIdent(OperationContext* opCtx, StringData ident) override;
-
-    virtual Status recoverOrphanedIdent(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options) override;
-
-    virtual bool hasIdent(OperationContext* opCtx, StringData ident) const override;
+    bool hasIdent(OperationContext* opCtx, StringData ident) const override;
 
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const override;
 
-    virtual void cleanShutdown() override;
+    void cleanShutdown() override;
 
     SnapshotManager* getSnapshotManager() const final {
         return &_sessionCache->snapshotManager();
@@ -194,28 +193,28 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
-    virtual void setStableTimestamp(Timestamp stableTimestamp,
-                                    boost::optional<Timestamp> maximumTruncationTimestamp,
-                                    bool force) override;
+    void setStableTimestamp(Timestamp stableTimestamp,
+                            boost::optional<Timestamp> maximumTruncationTimestamp,
+                            bool force) override;
 
-    virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
+    void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
-    virtual void setOldestTimestampFromStable() override;
+    void setOldestTimestampFromStable() override;
 
     /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. If force is true, oldest will be set to the given input value, unmodified, even if
      * it is backwards in time from the last oldest timestamp (accomodating initial sync).
      */
-    virtual void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
+    void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
-    virtual bool supportsRecoverToStableTimestamp() const override;
+    bool supportsRecoverToStableTimestamp() const override;
 
-    virtual bool supportsRecoveryTimestamp() const override;
+    bool supportsRecoveryTimestamp() const override;
 
-    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
-    virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
+    boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
     /**
      * Returns a stable timestamp value that is guaranteed to exist on recoverToStableTimestamp.
@@ -229,11 +228,11 @@ public:
      * or before the last checkpoint. Everything before this value is guaranteed to be persisted on
      * disk. This supports replication recovery on restart.
      */
-    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override;
+    boost::optional<Timestamp> getLastStableRecoveryTimestamp() const override;
 
-    virtual Timestamp getAllCommittedTimestamp() const override;
+    Timestamp getAllCommittedTimestamp() const override;
 
-    virtual Timestamp getOldestOpenReadTimestamp() const override;
+    Timestamp getOldestOpenReadTimestamp() const override;
 
     bool supportsReadConcernSnapshot() const final override;
 
@@ -307,12 +306,9 @@ public:
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
-    /**
-     * These are timestamp access functions for serverStatus to be able to report the actual
-     * snapshot window size.
-     */
-    Timestamp getStableTimestamp() const;
-    Timestamp getOldestTimestamp() const;
+    Timestamp getStableTimestamp() const override;
+    Timestamp getOldestTimestamp() const override;
+    Timestamp getCheckpointTimestamp() const override;
 
     Timestamp getInitialDataTimestamp() const;
 

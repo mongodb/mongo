@@ -1812,6 +1812,10 @@ Timestamp WiredTigerKVEngine::getOldestTimestamp() const {
     return Timestamp(_oldestTimestamp.load());
 }
 
+Timestamp WiredTigerKVEngine::getCheckpointTimestamp() const {
+    return Timestamp(_getCheckpointTimestamp());
+}
+
 Timestamp WiredTigerKVEngine::getInitialDataTimestamp() const {
     return Timestamp(_initialDataTimestamp.load());
 }
