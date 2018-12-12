@@ -1946,7 +1946,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._block('MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {' %
                                  (blockname), '}'):
                     self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
-                    self._writer.write_line('const auto& params = moe::startupOptionsParsed;')
+                    # If all options are guarded by non-passing #ifdefs, then params will be unused.
+                    self._writer.write_line(
+                        'MONGO_COMPILER_VARIABLE_UNUSED const auto& params = moe::startupOptionsParsed;'
+                    )
                     self.write_empty_line()
 
                     for opt in spec.configs:
