@@ -231,6 +231,11 @@ public:
                     opCtx, opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get());
             }
 
+            // Since the coordinator *will* have written the decision from another OperationContext,
+            // and a participant *may* have written the decision on another OperationContext, ensure
+            // waiting for the client's writeConcern of the decision.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
             if (commitDecisionFuture) {
                 // The commit coordination is still ongoing. Block waiting for the decision.
                 auto commitDecision = commitDecisionFuture->get(opCtx);
