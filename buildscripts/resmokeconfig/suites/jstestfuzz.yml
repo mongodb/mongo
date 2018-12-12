@@ -22,7 +22,6 @@ executor:
   fixture:
     class: MongoDFixture
     mongod_options:
-      noprealloc: ''
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
