@@ -102,7 +102,7 @@ SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator:
         .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
             return coordinator->_runPhaseTwo(participantShards, decision);
         })
-        .onCompletion([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
+        .getAsync([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
 
     return _finalDecisionPromise.getFuture();
 }
@@ -167,7 +167,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
             .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
                 return coordinator->_runPhaseTwo(participantShards, decision);
             })
-            .onCompletion([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
+            .getAsync([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
         return;
     }
 
@@ -179,7 +179,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
         decision = txn::CoordinatorCommitDecision{TransactionCoordinator::CommitDecision::kAbort,
                                                   boost::none};
     }
-    _runPhaseTwo(participantShards, decision).onCompletion([coordinator](Status s) {
+    _runPhaseTwo(participantShards, decision).getAsync([coordinator](Status s) {
         coordinator->_handleCompletionStatus(s);
     });
 }
