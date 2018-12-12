@@ -56,14 +56,11 @@ struct ReplIndexBuildState {
     ReplIndexBuildState(const UUID& indexBuildUUID,
                         const UUID& collUUID,
                         const std::vector<std::string> names,
-                        const std::vector<BSONObj>& specs,
-                        Promise<void> promise)
+                        const std::vector<BSONObj>& specs)
         : buildUUID(indexBuildUUID),
           collectionUUID(collUUID),
           indexNames(names),
           indexSpecs(specs) {
-        promises.emplace_back(std::move(promise));
-
         // Verify that the given index names and index specs match.
         invariant(names.size() == specs.size());
         for (auto& spec : specs) {
@@ -106,8 +103,8 @@ struct ReplIndexBuildState {
     std::vector<HostAndPort> commitReadyMembers;
 
     // Communicates the final outcome of the index build to any callers waiting upon the associated
-    // Future(s).
-    std::vector<Promise<void>> promises;
+    // SharedSemiFuture(s).
+    SharedPromise<void> sharedPromise;
 
     // There is a period of time where the index build is registered on the coordinator, but an
     // index builder does not yet exist. Since a signal cannot be set on the index builder at that

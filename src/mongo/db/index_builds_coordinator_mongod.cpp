@@ -78,10 +78,11 @@ void IndexBuildsCoordinatorMongod::shutdown() {
     _threadPool.join();
 }
 
-StatusWith<Future<void>> IndexBuildsCoordinatorMongod::buildIndex(OperationContext* opCtx,
-                                                                  const NamespaceString& nss,
-                                                                  const std::vector<BSONObj>& specs,
-                                                                  const UUID& buildUUID) {
+StatusWith<SharedSemiFuture<void>> IndexBuildsCoordinatorMongod::buildIndex(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& specs,
+    const UUID& buildUUID) {
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
         std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
@@ -99,10 +100,8 @@ StatusWith<Future<void>> IndexBuildsCoordinatorMongod::buildIndex(OperationConte
         return autoColl.getCollection()->uuid().get();
     }();
 
-    auto pf = makePromiseFuture<void>();
-
-    auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, indexNames, specs, std::move(pf.promise));
+    auto replIndexBuildState =
+        std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, indexNames, specs);
 
     Status status = _registerIndexBuild(opCtx, replIndexBuildState);
     if (!status.isOK()) {
@@ -124,15 +123,13 @@ StatusWith<Future<void>> IndexBuildsCoordinatorMongod::buildIndex(OperationConte
         // again.
         _unregisterIndexBuild(lk, opCtx, replIndexBuildState);
 
-        // Set the promises in case another thread already joined the index build.
-        for (auto& promise : replIndexBuildState->promises) {
-            promise.setError(status);
-        }
+        // Set the promise in case another thread already joined the index build.
+        replIndexBuildState->sharedPromise.setError(status);
 
         return status;
     }
 
-    return std::move(pf.future);
+    return replIndexBuildState->sharedPromise.getFuture();
 }
 
 void IndexBuildsCoordinatorMongod::signalChangeToPrimaryMode() {
@@ -190,9 +187,7 @@ void IndexBuildsCoordinatorMongod::_runIndexBuild(OperationContext* opCtx,
 
     _unregisterIndexBuild(lk, opCtx, replState);
 
-    for (auto& promise : replState->promises) {
-        promise.emplaceValue();
-    }
+    replState->sharedPromise.emplaceValue();
 
     return;
 }

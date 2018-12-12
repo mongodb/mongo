@@ -43,7 +43,7 @@ namespace mongo {
 
 void IndexBuildsCoordinatorEmbedded::shutdown() {}
 
-StatusWith<Future<void>> IndexBuildsCoordinatorEmbedded::buildIndex(
+StatusWith<SharedSemiFuture<void>> IndexBuildsCoordinatorEmbedded::buildIndex(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<BSONObj>& specs,
@@ -65,10 +65,8 @@ StatusWith<Future<void>> IndexBuildsCoordinatorEmbedded::buildIndex(
         return autoColl.getCollection()->uuid().get();
     }();
 
-    auto pf = makePromiseFuture<void>();
-
-    auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, indexNames, specs, std::move(pf.promise));
+    auto replIndexBuildState =
+        std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, indexNames, specs);
 
     Status status = _registerIndexBuild(opCtx, replIndexBuildState);
     if (!status.isOK()) {
@@ -77,7 +75,7 @@ StatusWith<Future<void>> IndexBuildsCoordinatorEmbedded::buildIndex(
 
     _runIndexBuild(opCtx, buildUUID);
 
-    return std::move(pf.future);
+    return replIndexBuildState->sharedPromise.getFuture();
 }
 
 void IndexBuildsCoordinatorEmbedded::signalChangeToPrimaryMode() {
@@ -130,9 +128,7 @@ void IndexBuildsCoordinatorEmbedded::_runIndexBuild(OperationContext* opCtx,
 
     _unregisterIndexBuild(lk, opCtx, replState);
 
-    for (auto& promise : replState->promises) {
-        promise.emplaceValue();
-    }
+    replState->sharedPromise.emplaceValue();
 
     return;
 }

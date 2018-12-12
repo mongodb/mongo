@@ -100,7 +100,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
-    Future<void> testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
+    SharedSemiFuture<void> testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
         operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
 
     // Attempt and fail to register an index build on _testFooNss with the same index name, while
@@ -117,12 +117,12 @@ TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
 
 // Incrementally registering index builds and checking both that the registration was successful and
 // that the access functions convey the expected state of the manager.
-TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorRegistration) {
+TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
     UUID testFooUUID = getCollectionUUID(operationContext(), _testFooNss);
-    Future<void> testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
+    SharedSemiFuture<void> testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
         operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.db()), 1);
@@ -136,7 +136,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorRegistration) {
                        ErrorCodes::BackgroundOperationInProgressForDatabase);
 
     // Register a second index build on _testFooNss.
-    Future<void> testFoo2Future = assertGet(_indexBuildsCoord->buildIndex(
+    SharedSemiFuture<void> testFoo2Future = assertGet(_indexBuildsCoord->buildIndex(
         operationContext(), _testFooNss, makeSpecs(_testFooNss, {"c", "d"}), UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.db()), 2);
@@ -151,7 +151,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorRegistration) {
 
     // Register an index build on a different collection _testBarNss.
     UUID testBarUUID = getCollectionUUID(operationContext(), _testBarNss);
-    Future<void> testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
+    SharedSemiFuture<void> testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
         operationContext(), _testBarNss, makeSpecs(_testBarNss, {"x", "y"}), UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testBarNss.db()), 3);
@@ -166,7 +166,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorRegistration) {
 
     // Register an index build on a collection in a different database _othertestFoo.
     UUID othertestFooUUID = getCollectionUUID(operationContext(), _othertestFooNss);
-    Future<void> othertestFooFuture =
+    SharedSemiFuture<void> othertestFooFuture =
         assertGet(_indexBuildsCoord->buildIndex(operationContext(),
                                                 _othertestFooNss,
                                                 makeSpecs(_othertestFooNss, {"r", "s"}),
@@ -204,7 +204,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorRegistration) {
 // functions, checking that they correctly disallow and allow index builds when
 // ScopedStopNewCollectionIndexBuilds and ScopedStopNewDatabaseIndexBuilds are present on a
 // collection or database name.
-TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuildsOnNamespace) {
+TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
     UUID testFooUUID = getCollectionUUID(operationContext(), _testFooNss);
 
     {
@@ -223,9 +223,9 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuilds
                       .getStatus());
 
         // Registering index builds on other collections and databases should still succeed.
-        Future<void> testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
+        SharedSemiFuture<void> testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
             operationContext(), _testBarNss, makeSpecs(_testBarNss, {"c", "d"}), UUID::gen()));
-        Future<void> othertestFooFuture =
+        SharedSemiFuture<void> othertestFooFuture =
             assertGet(_indexBuildsCoord->buildIndex(operationContext(),
                                                     _othertestFooNss,
                                                     makeSpecs(_othertestFooNss, {"e", "f"}),
@@ -239,7 +239,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuilds
 
     {
         // Check that the scoped object correctly cleared.
-        Future<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
+        SharedSemiFuture<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
             operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
         ASSERT_OK(testFooFuture.getNoThrow());
     }
@@ -267,7 +267,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuilds
                       .getStatus());
 
         // Registering index builds on another database should still succeed.
-        Future<void> othertestFooFuture =
+        SharedSemiFuture<void> othertestFooFuture =
             assertGet(_indexBuildsCoord->buildIndex(operationContext(),
                                                     _othertestFooNss,
                                                     makeSpecs(_othertestFooNss, {"e", "f"}),
@@ -280,7 +280,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuilds
 
     {
         // Check that the scoped object correctly cleared.
-        Future<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
+        SharedSemiFuture<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
             operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
         ASSERT_OK(testFooFuture.getNoThrow());
     }
@@ -311,7 +311,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, IndexBuildsCoordinatorDisallowNewBuilds
 
     {
         // Check that the scoped object correctly cleared.
-        Future<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
+        SharedSemiFuture<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
             operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
         ASSERT_OK(testFooFuture.getNoThrow());
     }

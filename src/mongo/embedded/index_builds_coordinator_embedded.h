@@ -56,10 +56,10 @@ public:
      */
     void shutdown() override;
 
-    StatusWith<Future<void>> buildIndex(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const std::vector<BSONObj>& specs,
-                                        const UUID& buildUUID) override;
+    StatusWith<SharedSemiFuture<void>> buildIndex(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const std::vector<BSONObj>& specs,
+                                                  const UUID& buildUUID) override;
 
     /**
      * None of the following functions should ever be called on an embedded server node.
