@@ -67,8 +67,8 @@ var checkLog;
 
                     return expectedCount === count;
                 },
-                'Expected ' + expectedCount + ', but instead saw ' + count +
-                    ' log entries containing the following message: ' + msg,
+                'Expected ' + expectedCount + ' log entries containing the following message: ' +
+                    msg + ' on node ' + conn.name,
                 5 * 60 * 1000,
                 300);
         };
