@@ -208,7 +208,6 @@
         getLog: {skip: "does not return user data"},
         getMore: {skip: "shard version already established"},
         getParameter: {skip: "does not return user data"},
-        getPrevError: {skip: "does not return user data"},
         getShardMap: {skip: "does not return user data"},
         getShardVersion: {skip: "primary only"},
         getnonce: {skip: "does not return user data"},

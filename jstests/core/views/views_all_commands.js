@@ -300,7 +300,6 @@
             }
         },
         getParameter: {skip: isUnrelated},
-        getPrevError: {skip: isUnrelated},
         getShardMap: {skip: isUnrelated},
         getShardVersion: {
             command: {getShardVersion: "test.view"},

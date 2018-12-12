@@ -195,18 +195,6 @@ shellPrint = function(x) {
     it = x;
     if (x != undefined)
         shellPrintHelper(x);
-
-    if (db) {
-        var e = db.getPrevError();
-        if (e.err) {
-            if (e.nPrev <= 1)
-                print("error on last call: " + tojson(e.err));
-            else
-                print("an error " + tojson(e.err) + " occurred " + e.nPrev +
-                      " operations back in the command invocation");
-        }
-        db.resetError();
-    }
 };
 
 print.captureAllOutput = function(fn, args) {

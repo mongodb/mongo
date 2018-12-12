@@ -399,14 +399,6 @@ string DBClientBase::getLastErrorString(const BSONObj& info) {
     }
 }
 
-const BSONObj getpreverrorcmdobj = fromjson("{getpreverror:1}");
-
-BSONObj DBClientBase::getPrevError() {
-    BSONObj info;
-    runCommand("admin", getpreverrorcmdobj, info);
-    return info;
-}
-
 string DBClientBase::createPasswordDigest(const string& username, const string& clearTextPassword) {
     return mongo::createPasswordDigest(username, clearTextPassword);
 }

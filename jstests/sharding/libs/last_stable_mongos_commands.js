@@ -8,6 +8,7 @@ const commandsRemovedFromMongosIn42 = [
     'copydbsaslstart',
     'eval',
     'geoNear',
+    'getPrevError',
     'group',
     'reIndex',
 ];

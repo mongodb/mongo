@@ -14,7 +14,6 @@ selector:
   roots:
   - jstests/gle/core/*.js
   exclude_files:
-  - jstests/gle/core/error1.js  # The getPrevError command is not supported under sharding.
   - jstests/gle/core/remove5.js
   - jstests/gle/core/update4.js
 

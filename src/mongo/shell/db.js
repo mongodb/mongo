@@ -616,7 +616,6 @@ var DB;
         print("\tdb.getMongo() get the server connection object");
         print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
         print("\tdb.getName()");
-        print("\tdb.getPrevError()");
         print("\tdb.getProfilingLevel() - deprecated");
         print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold");
         print("\tdb.getReplicationInfo()");
@@ -847,17 +846,6 @@ var DB;
         return res;
     };
     DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
-
-    /* Return the last error which has occurred, even if not the very last error.
-
-       Returns:
-        { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
-
-       result.err will be null if no error has occurred.
-     */
-    DB.prototype.getPrevError = function() {
-        return this.runCommand({getpreverror: 1});
-    };
 
     DB.prototype._getCollectionInfosCommand = function(
         filter, nameOnly = false, authorizedCollections = false) {

@@ -425,14 +425,6 @@ public:
     */
     static std::string getLastErrorString(const BSONObj& res);
 
-    /** Return the last error which has occurred, even if not the very last operation.
-
-       @return { err : <error message>, nPrev : <how_many_ops_back_occurred>, ok : 1 }
-
-       result.err will be null if no error has occurred.
-    */
-    BSONObj getPrevError();
-
     /** Delete the specified collection.
      *  @param info An optional output parameter that receives the result object the database
      *  returns from the drop command.  May be null if the caller doesn't need that info.

@@ -72,7 +72,7 @@ protected:
         _client.update(ns, Query(q), o, upsert);
     }
     bool error() {
-        return !_client.getPrevError().getField("err").isNull();
+        return !_client.getLastError().empty();
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();

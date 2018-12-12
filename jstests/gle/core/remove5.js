@@ -15,10 +15,6 @@ for (i = 0; i < 10; ++i) {
 }
 f.remove({});
 assert.eq(10, getLastError().n);
-assert.eq(10, db.getPrevError().n);
-assert.eq(1, db.getPrevError().nPrev);
 
 f.findOne();
 assert.eq(0, getLastError().n);
-assert.eq(10, db.getPrevError().n);
-assert.eq(2, db.getPrevError().nPrev);
