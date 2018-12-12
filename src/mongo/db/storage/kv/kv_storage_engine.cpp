@@ -271,8 +271,8 @@ void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
     }
     _dbs.clear();
 
-    _catalog.reset(nullptr);
-    _catalogRecordStore.reset(nullptr);
+    _catalog.reset();
+    _catalogRecordStore.reset();
 }
 
 Status KVStorageEngine::_recoverOrphanedCollection(OperationContext* opCtx,
@@ -465,8 +465,10 @@ void KVStorageEngine::cleanShutdown() {
     }
     _dbs.clear();
 
-    _catalog.reset(NULL);
-    _catalogRecordStore.reset(NULL);
+    _catalog.reset();
+    _catalogRecordStore.reset();
+
+    _timestampMonitor.reset();
 
     _engine->cleanShutdown();
     // intentionally not deleting _engine
@@ -474,12 +476,18 @@ void KVStorageEngine::cleanShutdown() {
 
 KVStorageEngine::~KVStorageEngine() {}
 
-void KVStorageEngine::finishInit() {}
+void KVStorageEngine::finishInit() {
+    if (_engine->supportsRecoveryTimestamp()) {
+        _timestampMonitor = std::make_unique<TimestampMonitor>(
+            _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
+        _timestampMonitor->startup();
+    }
+}
 
 RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
     if (!_engine) {
         // shutdown
-        return NULL;
+        return nullptr;
     }
     return _engine->newRecoveryUnit();
 }
@@ -746,6 +754,77 @@ void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
         rec = cursor->next();
     }
     opCtx->recoveryUnit()->abandonSnapshot();
+}
+
+KVStorageEngine::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
+    : _engine(engine), _running(false), _periodicRunner(runner) {
+    _currentTimestamps.checkpoint = _engine->getCheckpointTimestamp();
+    _currentTimestamps.oldest = _engine->getOldestTimestamp();
+    _currentTimestamps.stable = _engine->getStableTimestamp();
+}
+
+KVStorageEngine::TimestampMonitor::~TimestampMonitor() {
+    log() << "Timestamp monitor shutting down";
+    stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
+    invariant(_listeners.empty());
+}
+
+void KVStorageEngine::TimestampMonitor::startup() {
+    invariant(!_running);
+
+    log() << "Timestamp monitor starting";
+    PeriodicRunner::PeriodicJob job("TimestampMonitor",
+                                    [&](Client* client) {
+                                        Timestamp checkpoint = _engine->getCheckpointTimestamp();
+                                        Timestamp oldest = _engine->getOldestTimestamp();
+                                        Timestamp stable = _engine->getStableTimestamp();
+
+                                        // Notify listeners if the timestamps changed.
+                                        if (_currentTimestamps.checkpoint != checkpoint) {
+                                            _currentTimestamps.checkpoint = checkpoint;
+                                            notifyAll(TimestampType::kCheckpoint, checkpoint);
+                                        }
+
+                                        if (_currentTimestamps.oldest != oldest) {
+                                            _currentTimestamps.oldest = oldest;
+                                            notifyAll(TimestampType::kOldest, oldest);
+                                        }
+
+                                        if (_currentTimestamps.stable != stable) {
+                                            _currentTimestamps.stable = stable;
+                                            notifyAll(TimestampType::kStable, stable);
+                                        }
+                                    },
+                                    Seconds(1));
+    _periodicRunner->scheduleJob(std::move(job));
+    _running = true;
+}
+
+void KVStorageEngine::TimestampMonitor::notifyAll(TimestampType type, Timestamp newTimestamp) {
+    stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
+    for (auto& listener : _listeners) {
+        if (listener->getType() == type) {
+            listener->notify(newTimestamp);
+        }
+    }
+}
+
+void KVStorageEngine::TimestampMonitor::addListener(TimestampListener* listener) {
+    stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
+    if (std::find(_listeners.begin(), _listeners.end(), listener) != _listeners.end()) {
+        bool listenerAlreadyRegistered = true;
+        invariant(!listenerAlreadyRegistered);
+    }
+    _listeners.push_back(listener);
+}
+
+void KVStorageEngine::TimestampMonitor::removeListener(TimestampListener* listener) {
+    stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
+    if (std::find(_listeners.begin(), _listeners.end(), listener) == _listeners.end()) {
+        bool listenerNotRegistered = true;
+        invariant(!listenerNotRegistered);
+    }
+    _listeners.erase(std::remove(_listeners.begin(), _listeners.end(), listener));
 }
 
 

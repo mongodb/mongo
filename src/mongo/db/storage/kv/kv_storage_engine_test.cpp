@@ -41,6 +41,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
@@ -49,7 +50,9 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
 namespace {
@@ -356,5 +359,169 @@ TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {
     NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
     ASSERT(!collectionExists(opCtx.get(), orphanNs));
 }
+
+/**
+ * A test-only mock storage engine supporting timestamps.
+ */
+class TimestampMockKVEngine final : public DevNullKVEngine {
+public:
+    bool supportsRecoveryTimestamp() const override {
+        return true;
+    }
+
+    // Increment the timestamps each time they are called for testing purposes.
+    virtual Timestamp getCheckpointTimestamp() const override {
+        checkpointTimestamp = std::make_unique<Timestamp>(checkpointTimestamp->getInc() + 1);
+        return *checkpointTimestamp;
+    }
+    virtual Timestamp getOldestTimestamp() const override {
+        oldestTimestamp = std::make_unique<Timestamp>(oldestTimestamp->getInc() + 1);
+        return *oldestTimestamp;
+    }
+    virtual Timestamp getStableTimestamp() const override {
+        stableTimestamp = std::make_unique<Timestamp>(stableTimestamp->getInc() + 1);
+        return *stableTimestamp;
+    }
+
+    // Mutable for testing purposes to increment the timestamp.
+    mutable std::unique_ptr<Timestamp> checkpointTimestamp = std::make_unique<Timestamp>();
+    mutable std::unique_ptr<Timestamp> oldestTimestamp = std::make_unique<Timestamp>();
+    mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>();
+};
+
+class TimestampKVEngineTest : public unittest::Test, ScopedGlobalServiceContextForTest {
+public:
+    using TimestampType = KVStorageEngine::TimestampMonitor::TimestampType;
+    using TimestampListener = KVStorageEngine::TimestampMonitor::TimestampListener;
+
+    /**
+     * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
+     */
+    TimestampKVEngineTest() {
+        // Set up the periodic runner for background job execution.
+        auto runner = makePeriodicRunner(getServiceContext());
+        runner->startup();
+        getServiceContext()->setPeriodicRunner(std::move(runner));
+
+        KVStorageEngineOptions options{
+            /*directoryPerDB=*/false, /*directoryForIndexes=*/false, /*forRepair=*/false};
+        _storageEngine = std::make_unique<KVStorageEngine>(new TimestampMockKVEngine, options);
+        _storageEngine->finishInit();
+    }
+
+    ~TimestampKVEngineTest() {
+        _storageEngine->cleanShutdown();
+        _storageEngine.reset();
+
+        // Shut down the background periodic task runner.
+        auto runner = getServiceContext()->getPeriodicRunner();
+        runner->shutdown();
+    }
+
+    std::unique_ptr<KVStorageEngine> _storageEngine;
+
+    TimestampType checkpoint = TimestampType::kCheckpoint;
+    TimestampType oldest = TimestampType::kOldest;
+    TimestampType stable = TimestampType::kStable;
+};
+
+TEST_F(TimestampKVEngineTest, TimestampMonitorRunning) {
+    // The timestamp monitor should only be running if the storage engine supports timestamps.
+    if (!_storageEngine->getEngine()->supportsRecoveryTimestamp())
+        return;
+
+    ASSERT_TRUE(_storageEngine->getTimestampMonitor()->isRunning_forTestOnly());
+}
+
+TEST_F(TimestampKVEngineTest, TimestampListeners) {
+    TimestampListener first(stable, [](Timestamp timestamp) {});
+    TimestampListener second(oldest, [](Timestamp timestamp) {});
+    TimestampListener third(stable, [](Timestamp timestamp) {});
+
+    // Can only register the listener once.
+    _storageEngine->getTimestampMonitor()->addListener(&first);
+
+    _storageEngine->getTimestampMonitor()->removeListener(&first);
+    _storageEngine->getTimestampMonitor()->addListener(&first);
+
+    // Can register all three types of listeners.
+    _storageEngine->getTimestampMonitor()->addListener(&second);
+    _storageEngine->getTimestampMonitor()->addListener(&third);
+
+    _storageEngine->getTimestampMonitor()->removeListener(&first);
+    _storageEngine->getTimestampMonitor()->removeListener(&second);
+    _storageEngine->getTimestampMonitor()->removeListener(&third);
+}
+
+TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
+    unittest::Barrier barrier(2);
+    bool changes[4] = {false, false, false, false};
+
+    TimestampListener first(checkpoint, [&](Timestamp timestamp) {
+        if (!changes[0]) {
+            changes[0] = true;
+            barrier.countDownAndWait();
+        }
+    });
+
+    TimestampListener second(oldest, [&](Timestamp timestamp) {
+        if (!changes[1]) {
+            changes[1] = true;
+            barrier.countDownAndWait();
+        }
+    });
+
+    TimestampListener third(stable, [&](Timestamp timestamp) {
+        if (!changes[2]) {
+            changes[2] = true;
+            barrier.countDownAndWait();
+        }
+    });
+
+    TimestampListener fourth(stable, [&](Timestamp timestamp) {
+        if (!changes[3]) {
+            changes[3] = true;
+            barrier.countDownAndWait();
+        }
+    });
+
+    _storageEngine->getTimestampMonitor()->addListener(&first);
+    _storageEngine->getTimestampMonitor()->addListener(&second);
+    _storageEngine->getTimestampMonitor()->addListener(&third);
+    _storageEngine->getTimestampMonitor()->addListener(&fourth);
+
+    // Wait until all 4 listeners get notified at least once.
+    size_t listenersNotified = 0;
+    while (listenersNotified < 4) {
+        barrier.countDownAndWait();
+        listenersNotified++;
+    }
+
+    _storageEngine->getTimestampMonitor()->removeListener(&first);
+    _storageEngine->getTimestampMonitor()->removeListener(&second);
+    _storageEngine->getTimestampMonitor()->removeListener(&third);
+    _storageEngine->getTimestampMonitor()->removeListener(&fourth);
+}
+
+TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
+    Timestamp previous = Timestamp();
+    int timesNotified = 0;
+
+    TimestampListener listener(stable, [&](Timestamp timestamp) {
+        ASSERT_TRUE(previous < timestamp);
+        previous = timestamp;
+        timesNotified++;
+    });
+    _storageEngine->getTimestampMonitor()->addListener(&listener);
+
+    // Let three rounds of notifications happen while ensuring that each new notification produces
+    // an increasing timestamp.
+    while (timesNotified < 3) {
+        sleepmillis(100);
+    }
+
+    _storageEngine->getTimestampMonitor()->removeListener(&listener);
+}
+
 }  // namespace
 }  // namespace mongo
