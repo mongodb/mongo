@@ -398,6 +398,21 @@ public:
     virtual void replicationBatchIsComplete() const {};
 
     /**
+     * Methods to access the storage engine's timestamps.
+     */
+    virtual Timestamp getCheckpointTimestamp() const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual Timestamp getOldestTimestamp() const {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual Timestamp getStableTimestamp() const {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.
