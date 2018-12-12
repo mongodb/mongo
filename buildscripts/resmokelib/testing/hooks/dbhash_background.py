@@ -36,11 +36,6 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
                              " doesn't support snapshot reads.",
                              server_status["storageEngine"]["name"])
             return
-        if not server_status["storageEngine"].get("supportsCommittedReads", False):
-            self.logger.info("Not enabling the background thread because '%s' storage engine"
-                             " doesn't support committed reads.",
-                             server_status["storageEngine"]["name"])
-            return
         if not server_status["storageEngine"].get("persistent", False):
             self.logger.info("Not enabling the background thread because '%s' storage engine"
                              " is not persistent.", server_status["storageEngine"]["name"])

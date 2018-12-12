@@ -136,14 +136,33 @@
             // doesn't exceed the node's notion of the latest clusterTime.
             session.advanceClusterTime(sessions[0].getClusterTime());
 
-            // We do an afterClusterTime read on a nonexistent collection to wait for the secondary
-            // to have applied up to 'clusterTime' and advanced its majority commit point.
-            assert.commandWorked(db.runCommand({
-                find: 'run_check_repl_dbhash_background',
-                readConcern: {level: 'majority', afterClusterTime: clusterTime},
-                limit: 1,
-                singleBatch: true,
-            }));
+            // We need to make sure the secondary has applied up to 'clusterTime' and advanced its
+            // majority commit point.
+
+            if (jsTest.options().enableMajorityReadConcern !== false) {
+                // If majority reads are supported, we can issue an afterClusterTime read on
+                // a nonexistent collection and wait on it. This has the advantage of being easier
+                // to debug in case of a timeout.
+                assert.commandWorked(db.runCommand({
+                    find: 'run_check_repl_dbhash_background',
+                    readConcern: {level: 'majority', afterClusterTime: clusterTime},
+                    limit: 1,
+                    singleBatch: true,
+                }));
+            } else {
+                // If majority reads are not supported, then our only option is to poll for the
+                // lastOpCommitted on the secondary to catch up.
+                assert.soon(
+                    function() {
+                        const rsStatus =
+                            assert.commandWorked(db.adminCommand({replSetGetStatus: 1}));
+                        const committedOpTime = rsStatus.optimes.lastCommittedOpTime;
+                        return bsonWoCompare(committedOpTime.ts, clusterTime) >= 0;
+                    },
+                    "The majority commit point on secondary " + i + " failed to reach " +
+                        clusterTime,
+                    10 * 60 * 1000);
+            }
         }
     };
 
