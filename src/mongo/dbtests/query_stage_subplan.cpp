@@ -595,6 +595,9 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     QueryPlannerParams params;
     fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
 
+    boost::optional<AutoGetCollectionForReadCommand> collLock;
+    collLock.emplace(opCtx(), nss);
+
     // Create the SubplanStage.
     WorkingSet workingSet;
     SubplanStage subplanStage(opCtx(), collection, &workingSet, params, canonicalQuery.get());
@@ -602,10 +605,12 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     // Mimic a yield by saving the state of the subplan stage. Then, drop an index not being used
     // while yielded.
     subplanStage.saveState();
+    collLock.reset();
     dropIndex(BSON("irrelevant" << 1));
 
     // Attempt to restore state. This should throw due the index drop. As a future improvement, we
     // may wish to make the subplan stage tolerate drops of indices it is not using.
+    collLock.emplace(opCtx(), nss);
     ASSERT_THROWS_CODE(subplanStage.restoreState(), DBException, ErrorCodes::QueryPlanKilled);
 }
 

@@ -126,6 +126,8 @@ public:
 
         virtual CollectionMap& collections() = 0;
         virtual const CollectionMap& collections() const = 0;
+
+        virtual uint64_t epoch() const = 0;
     };
 
 public:
@@ -149,6 +151,7 @@ public:
                                OperationContext* opCtx,
                                StringData name,
                                DatabaseCatalogEntry*,
+                               uint64_t epoch,
                                PrivateTo<Database>)
                                   ->std::unique_ptr<Impl>) makeImpl;
 
@@ -199,8 +202,9 @@ public:
 
     explicit inline Database(OperationContext* const opCtx,
                              const StringData name,
-                             DatabaseCatalogEntry* const dbEntry)
-        : _pimpl(makeImpl(this, opCtx, name, dbEntry, PrivateCall<Database>{})) {
+                             DatabaseCatalogEntry* const dbEntry,
+                             uint64_t epoch)
+        : _pimpl(makeImpl(this, opCtx, name, dbEntry, epoch, PrivateCall<Database>{})) {
         this->_impl().init(opCtx);
     }
 
@@ -381,6 +385,21 @@ public:
      */
     inline void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) {
         return this->_impl().checkForIdIndexesAndDropPendingCollections(opCtx);
+    }
+
+    /**
+     * A database is assigned a new epoch whenever it is closed and re-opened. This involves
+     * deleting and reallocating a new Database object, so the epoch for a particular Database
+     * instance is immutable.
+     *
+     * Callers of this method must hold the global lock in at least MODE_IS.
+     *
+     * This allows callers which drop and reacquire locks to detect an intervening database close.
+     * For example, closing a database must kill all active queries against the database. This is
+     * implemented by checking that the epoch has not changed during query yield recovery.
+     */
+    inline uint64_t epoch() const {
+        return this->_impl().epoch();
     }
 
 private:

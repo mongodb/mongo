@@ -5,7 +5,10 @@
  *  assumes_read_concern_unchanged, requires_majority_read_concern,
  *
  *  # restartCatalog command is not available on embedded
- *  incompatible_with_embedded
+ *  incompatible_with_embedded,
+ *
+ *  # This test assumes that reads happen on the same node as the 'restartCatalog' command.
+ *  assumes_read_preference_unchanged
  * ]
  */
 (function() {
@@ -118,4 +121,18 @@
     // Build a new index on the new collection.
     assert.commandWorked(foodColl.createIndex({category: -1}));
     assert.eq(foodColl.find().hint({category: -1}).toArray(), [doc]);
+
+    // The restartCatalog command kills all cursors. Test that a getMore on a cursor that existed
+    // during restartCatalog fails with the appropriate error code. We insert a second document so
+    // that we can make a query happen in two batches.
+    assert.commandWorked(foodColl.insert({_id: "orange"}));
+    let cursorResponse = assert.commandWorked(
+        secondTestDB.runCommand({find: foodColl.getName(), filter: {}, batchSize: 1}));
+    assert.eq(cursorResponse.cursor.firstBatch.length, 1);
+    assert.neq(cursorResponse.cursor.id, 0);
+    assert.commandWorked(secondTestDB.adminCommand({restartCatalog: 1}));
+    assert.commandFailedWithCode(
+        secondTestDB.runCommand(
+            {getMore: cursorResponse.cursor.id, collection: foodColl.getName()}),
+        ErrorCodes.CursorNotFound);
 }());

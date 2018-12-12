@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/util/uuid.h"
 
@@ -57,6 +59,7 @@ public:
         : PlanStage(stageType, opCtx),
           _collection(coll),
           _collectionUUID(_collection->uuid().get()),
+          _databaseEpoch(getDatabaseEpoch(_collection)),
           _nss(_collection->ns()) {
         invariant(_collection);
     }
@@ -87,8 +90,18 @@ protected:
     }
 
 private:
+    // This can only be called when the plan stage is attached to an operation context. The
+    // collection pointer 'coll' must be non-null and must point to a valid collection.
+    uint64_t getDatabaseEpoch(CollectionT coll) const {
+        invariant(coll);
+        auto db = DatabaseHolder::getDatabaseHolder().get(getOpCtx(), coll->ns().ns());
+        invariant(db);
+        return db->epoch();
+    }
+
     CollectionT _collection;
     const UUID _collectionUUID;
+    const uint64_t _databaseEpoch;
 
     // TODO SERVER-31695: The namespace will no longer be needed once queries can survive collection
     // renames.

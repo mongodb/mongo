@@ -85,9 +85,10 @@ MONGO_REGISTER_SHIM(Database::makeImpl)
  OperationContext* const opCtx,
  const StringData name,
  DatabaseCatalogEntry* const dbEntry,
+ uint64_t epoch,
  PrivateTo<Database>)
     ->std::unique_ptr<Database::Impl> {
-    return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry);
+    return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry, epoch);
 }
 
 namespace {
@@ -275,9 +276,11 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
 DatabaseImpl::DatabaseImpl(Database* const this_,
                            OperationContext* const opCtx,
                            const StringData name,
-                           DatabaseCatalogEntry* const dbEntry)
+                           DatabaseCatalogEntry* const dbEntry,
+                           uint64_t epoch)
     : _name(name.toString()),
       _dbEntry(dbEntry),
+      _epoch(epoch),
       _profileName(_name + ".system.profile"),
       _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()),
       _durableViews(DurableViewCatalogImpl(this_)),

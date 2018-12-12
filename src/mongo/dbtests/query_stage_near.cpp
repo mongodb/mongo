@@ -66,8 +66,8 @@ public:
         directClient.createCollection(kTestNamespace);
         ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace, kTestKeyPattern));
 
-        AutoGetCollectionForRead autoColl(_opCtx, NamespaceString{kTestNamespace});
-        auto* coll = autoColl.getCollection();
+        _autoColl.emplace(_opCtx, NamespaceString{kTestNamespace});
+        auto* coll = _autoColl->getCollection();
         ASSERT(coll);
         _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndCollationSpec(
             _opCtx, kTestKeyPattern, BSONObj{});
@@ -79,6 +79,7 @@ protected:
     OperationContext* const _opCtx = _uniqOpCtx.get();
     DBDirectClient directClient{_opCtx};
 
+    boost::optional<AutoGetCollectionForRead> _autoColl;
     IndexDescriptor* _mockGeoIndex;
 };
 

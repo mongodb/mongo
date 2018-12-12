@@ -111,7 +111,8 @@ public:
     explicit DatabaseImpl(Database* this_,
                           OperationContext* opCtx,
                           StringData name,
-                          DatabaseCatalogEntry* dbEntry);
+                          DatabaseCatalogEntry* dbEntry,
+                          uint64_t epoch);
 
     // must call close first
     ~DatabaseImpl();
@@ -238,6 +239,10 @@ public:
         return _collections;
     }
 
+    uint64_t epoch() const {
+        return _epoch;
+    }
+
 private:
     /**
      * Gets or creates collection instance from existing metadata,
@@ -283,6 +288,8 @@ private:
     const std::string _name;  // "dbname"
 
     DatabaseCatalogEntry* _dbEntry;  // not owned here
+
+    const uint64_t _epoch;
 
     const std::string _profileName;  // "dbname.system.profile"
     const std::string _viewsName;    // "dbname.system.views"

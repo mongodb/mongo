@@ -432,7 +432,9 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
     BSONObj keyPattern = BSON("c" << 1);
     addIndex(keyPattern);
 
-    Collection* collection = AutoGetCollectionForReadCommand{&_opCtx, nss}.getCollection();
+    boost::optional<AutoGetCollectionForReadCommand> readLock;
+    readLock.emplace(&_opCtx, nss);
+    Collection* collection = readLock->getCollection();
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
@@ -461,7 +463,9 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
     // Drop an index while the CachedPlanStage is in a saved state. Restoring should fail, since we
     // may still need the dropped index for plan selection.
     cachedPlanStage.saveState();
+    readLock.reset();
     dropIndex(keyPattern);
+    readLock.emplace(&_opCtx, nss);
     ASSERT_THROWS_CODE(cachedPlanStage.restoreState(), DBException, ErrorCodes::QueryPlanKilled);
 }
 
@@ -470,7 +474,9 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
     BSONObj keyPattern = BSON("c" << 1);
     addIndex(keyPattern);
 
-    Collection* collection = AutoGetCollectionForReadCommand{&_opCtx, nss}.getCollection();
+    boost::optional<AutoGetCollectionForReadCommand> readLock;
+    readLock.emplace(&_opCtx, nss);
+    Collection* collection = readLock->getCollection();
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
@@ -503,7 +509,9 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
     // Drop an index while the CachedPlanStage is in a saved state. We should be able to restore
     // successfully.
     cachedPlanStage.saveState();
+    readLock.reset();
     dropIndex(keyPattern);
+    readLock.emplace(&_opCtx, nss);
     cachedPlanStage.restoreState();
 }
 

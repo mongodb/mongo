@@ -53,6 +53,11 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
             str::stream() << "Collection dropped. UUID " << _collectionUUID << " no longer exists.",
             _collection);
 
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream()
+                << "Database epoch changed due to a database-level event such as 'restartCatalog'.",
+            getDatabaseEpoch(_collection) == _databaseEpoch);
+
     // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing here when
     // a rename has happened during yield.
     uassert(ErrorCodes::QueryPlanKilled,
