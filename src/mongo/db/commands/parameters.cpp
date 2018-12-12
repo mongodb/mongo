@@ -56,6 +56,12 @@ using std::stringstream;
 namespace mongo {
 
 namespace {
+using logger::globalLogDomain;
+using logger::LogComponent;
+using logger::LogComponentSetting;
+using logger::LogSeverity;
+using logger::parseLogComponentSettings;
+
 void appendParameterNames(std::string* help) {
     *help += "supported:\n";
     for (const auto& kv : ServerParameterSet::getGlobal()->getMap()) {
@@ -64,6 +70,126 @@ void appendParameterNames(std::string* help) {
         *help += '\n';
     }
 }
+
+/**
+ * Search document for element corresponding to log component's parent.
+ */
+static mutablebson::Element getParentForLogComponent(mutablebson::Document& doc,
+                                                     LogComponent component) {
+    // Hide LogComponent::kDefault
+    if (component == LogComponent::kDefault) {
+        return doc.end();
+    }
+    LogComponent parentComponent = component.parent();
+
+    // Attach LogComponent::kDefault children to root
+    if (parentComponent == LogComponent::kDefault) {
+        return doc.root();
+    }
+    mutablebson::Element grandParentElement = getParentForLogComponent(doc, parentComponent);
+    return grandParentElement.findFirstChildNamed(parentComponent.getShortName());
+}
+
+/**
+ * Returns current settings as a BSON document.
+ * The "default" log component is an implementation detail. Don't expose this to users.
+ */
+void getLogComponentVerbosity(BSONObj* output) {
+    static const string defaultLogComponentName =
+        LogComponent(LogComponent::kDefault).getShortName();
+
+    mutablebson::Document doc;
+
+    for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
+        LogComponent component = static_cast<LogComponent::Value>(i);
+
+        int severity = -1;
+        if (globalLogDomain()->hasMinimumLogSeverity(component)) {
+            severity = globalLogDomain()->getMinimumLogSeverity(component).toInt();
+        }
+
+        // Save LogComponent::kDefault LogSeverity at root
+        if (component == LogComponent::kDefault) {
+            doc.root().appendInt("verbosity", severity).transitional_ignore();
+            continue;
+        }
+
+        mutablebson::Element element = doc.makeElementObject(component.getShortName());
+        element.appendInt("verbosity", severity).transitional_ignore();
+
+        mutablebson::Element parentElement = getParentForLogComponent(doc, component);
+        parentElement.pushBack(element).transitional_ignore();
+    }
+
+    BSONObj result = doc.getObject();
+    output->swap(result);
+    invariant(!output->hasField(defaultLogComponentName));
+}
+
+/**
+ * Updates component hierarchy log levels.
+ *
+ * BSON Format:
+ * {
+ *     verbosity: 4,  <-- maps to 'default' log component.
+ *     componentA: {
+ *         verbosity: 2,  <-- sets componentA's log level to 2.
+ *         componentB: {
+ *             verbosity: 1, <-- sets componentA.componentB's log level to 1.
+ *         }
+ *         componentC: {
+ *             verbosity: -1, <-- clears componentA.componentC's log level so that
+ *                                its final loglevel will be inherited from componentA.
+ *         }
+ *     },
+ *     componentD : 3  <-- sets componentD's log level to 3 (alternative to
+ *                         subdocument with 'verbosity' field).
+ * }
+ *
+ * For the default component, the log level is read from the top-level
+ * "verbosity" field.
+ * For non-default components, we look up the element using the component's
+ * dotted name. If the "<dotted component name>" field is a number, the log
+ * level will be read from the field's value.
+ * Otherwise, we assume that the "<dotted component name>" field is an
+ * object with a "verbosity" field that holds the log level for the component.
+ * The more verbose format with the "verbosity" field is intended to support
+ * setting of log levels of both parent and child log components in the same
+ * BSON document.
+ *
+ * Ignore elements in BSON object that do not map to a log component's dotted
+ * name.
+ */
+Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
+    StatusWith<std::vector<LogComponentSetting>> parseStatus =
+        parseLogComponentSettings(bsonSettings);
+
+    if (!parseStatus.isOK()) {
+        return parseStatus.getStatus();
+    }
+
+    std::vector<LogComponentSetting> settings = parseStatus.getValue();
+    std::vector<LogComponentSetting>::iterator it = settings.begin();
+    for (; it < settings.end(); ++it) {
+        LogComponentSetting newSetting = *it;
+
+        // Negative value means to clear log level of component.
+        if (newSetting.level < 0) {
+            globalLogDomain()->clearMinimumLoggedSeverity(newSetting.component);
+            continue;
+        }
+        // Convert non-negative value to Log()/Debug(N).
+        LogSeverity newSeverity =
+            (newSetting.level > 0) ? LogSeverity::Debug(newSetting.level) : LogSeverity::Log();
+        globalLogDomain()->setMinimumLoggedSeverity(newSetting.component, newSeverity);
+    }
+
+    return Status::OK();
+}
+
+// for automationServiceDescription
+stdx::mutex autoServiceDescriptorMutex;
+std::string autoServiceDescriptorValue;
 }  // namespace
 
 class CmdGet : public ErrmsgCommandDeprecated {
@@ -259,255 +385,90 @@ public:
     }
 } cmdSet;
 
-namespace {
-using logger::globalLogDomain;
-using logger::LogComponent;
-using logger::LogComponentSetting;
-using logger::LogSeverity;
-using logger::parseLogComponentSettings;
+void appendLogLevelToBSON(OperationContext* opCtx, BSONObjBuilder* builder, StringData name) {
+    builder->append(name, globalLogDomain()->getMinimumLogSeverity().toInt());
+}
 
-class LogLevelSetting : public ServerParameter {
-public:
-    LogLevelSetting() : ServerParameter(ServerParameterSet::getGlobal(), "logLevel") {}
+Status setLogLevelFromBSON(const BSONElement& newValueElement) {
+    int newValue;
+    if (!newValueElement.coerce(&newValue) || newValue < 0)
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "Invalid value for logLevel: "
+                                                << newValueElement);
+    LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
+    globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+    return Status::OK();
+}
 
-    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
-        b << name << globalLogDomain()->getMinimumLogSeverity().toInt();
+Status setLogLevelFromString(StringData strLevel) {
+    int newValue;
+    Status status = parseNumberFromString(strLevel.toString(), &newValue);
+    if (!status.isOK())
+        return status;
+    if (newValue < 0)
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "Invalid value for logLevel: " << newValue);
+    LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
+    globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+    return Status::OK();
+}
+
+void appendLogComponentVerbosityToBSON(OperationContext* opCtx,
+                                       BSONObjBuilder* builder,
+                                       StringData name) {
+    BSONObj currentSettings;
+    getLogComponentVerbosity(&currentSettings);
+    builder->append(name, currentSettings);
+}
+
+Status setLogComponentVerbosityFromBSON(const BSONElement& newValueElement) {
+    if (!newValueElement.isABSONObj()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      mongoutils::str::stream() << "log component verbosity is not a BSON object: "
+                                                << newValueElement);
+    }
+    return setLogComponentVerbosity(newValueElement.Obj());
+}
+
+Status setLogComponentVerbosityFromString(StringData str) {
+    try {
+        return setLogComponentVerbosity(fromjson(str.toString()));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
+void appendAutomationServiceDescriptorToBSON(OperationContext* opCtx,
+                                             BSONObjBuilder* builder,
+                                             StringData name) {
+    const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+    if (!autoServiceDescriptorValue.empty())
+        builder->append(name, autoServiceDescriptorValue);
+}
+
+Status setAutomationServiceDescriptorFromString(StringData str) {
+    auto kMaxSize = 64U;
+    if (str.size() > kMaxSize)
+        return {ErrorCodes::Overflow,
+                mongoutils::str::stream() << "Value for parameter automationServiceDescriptor"
+                                          << " must be no more than "
+                                          << kMaxSize
+                                          << " bytes"};
+
+    {
+        const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+        autoServiceDescriptorValue = str.toString();
     }
 
-    virtual Status set(const BSONElement& newValueElement) {
-        int newValue;
-        if (!newValueElement.coerce(&newValue) || newValue < 0)
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Invalid value for logLevel: "
-                                                    << newValueElement);
-        LogSeverity newSeverity =
-            (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
-        globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
-        return Status::OK();
-    }
+    return Status::OK();
+}
 
-    virtual Status setFromString(const std::string& str) {
-        int newValue;
-        Status status = parseNumberFromString(str, &newValue);
-        if (!status.isOK())
-            return status;
-        if (newValue < 0)
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Invalid value for logLevel: " << newValue);
-        LogSeverity newSeverity =
-            (newValue > 0) ? LogSeverity::Debug(newValue) : LogSeverity::Log();
-        globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
-        return Status::OK();
-    }
-} logLevelSetting;
+Status setAutomationServiceDescriptorFromBSON(const BSONElement& newValueElement) {
+    if (newValueElement.type() != mongo::String)
+        return {ErrorCodes::TypeMismatch,
+                mongoutils::str::stream() << "Value for parameter automationServiceDescriptor"
+                                          << " must be of type 'string'"};
+    return setAutomationServiceDescriptorFromString(newValueElement.String());
+}
 
-/**
- * Log component verbosity.
- * Log levels of log component hierarchy.
- * Negative value for a log component means the default log level will be used.
- */
-class LogComponentVerbositySetting : public ServerParameter {
-    MONGO_DISALLOW_COPYING(LogComponentVerbositySetting);
-
-public:
-    LogComponentVerbositySetting()
-        : ServerParameter(ServerParameterSet::getGlobal(), "logComponentVerbosity") {}
-
-    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
-        BSONObj currentSettings;
-        _get(&currentSettings);
-        b << name << currentSettings;
-    }
-
-    virtual Status set(const BSONElement& newValueElement) {
-        if (!newValueElement.isABSONObj()) {
-            return Status(ErrorCodes::TypeMismatch,
-                          mongoutils::str::stream()
-                              << "log component verbosity is not a BSON object: "
-                              << newValueElement);
-        }
-        return _set(newValueElement.Obj());
-    }
-
-    virtual Status setFromString(const std::string& str) {
-        try {
-            return _set(mongo::fromjson(str));
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }
-
-private:
-    /**
-     * Returns current settings as a BSON document.
-     * The "default" log component is an implementation detail. Don't expose this to users.
-     */
-    void _get(BSONObj* output) const {
-        static const string defaultLogComponentName =
-            LogComponent(LogComponent::kDefault).getShortName();
-
-        mutablebson::Document doc;
-
-        for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
-            LogComponent component = static_cast<LogComponent::Value>(i);
-
-            int severity = -1;
-            if (globalLogDomain()->hasMinimumLogSeverity(component)) {
-                severity = globalLogDomain()->getMinimumLogSeverity(component).toInt();
-            }
-
-            // Save LogComponent::kDefault LogSeverity at root
-            if (component == LogComponent::kDefault) {
-                doc.root().appendInt("verbosity", severity).transitional_ignore();
-                continue;
-            }
-
-            mutablebson::Element element = doc.makeElementObject(component.getShortName());
-            element.appendInt("verbosity", severity).transitional_ignore();
-
-            mutablebson::Element parentElement = _getParentElement(doc, component);
-            parentElement.pushBack(element).transitional_ignore();
-        }
-
-        BSONObj result = doc.getObject();
-        output->swap(result);
-        invariant(!output->hasField(defaultLogComponentName));
-    }
-
-    /**
-     * Updates component hierarchy log levels.
-     *
-     * BSON Format:
-     * {
-     *     verbosity: 4,  <-- maps to 'default' log component.
-     *     componentA: {
-     *         verbosity: 2,  <-- sets componentA's log level to 2.
-     *         componentB: {
-     *             verbosity: 1, <-- sets componentA.componentB's log level to 1.
-     *         }
-     *         componentC: {
-     *             verbosity: -1, <-- clears componentA.componentC's log level so that
-     *                                its final loglevel will be inherited from componentA.
-     *         }
-     *     },
-     *     componentD : 3  <-- sets componentD's log level to 3 (alternative to
-     *                         subdocument with 'verbosity' field).
-     * }
-     *
-     * For the default component, the log level is read from the top-level
-     * "verbosity" field.
-     * For non-default components, we look up the element using the component's
-     * dotted name. If the "<dotted component name>" field is a number, the log
-     * level will be read from the field's value.
-     * Otherwise, we assume that the "<dotted component name>" field is an
-     * object with a "verbosity" field that holds the log level for the component.
-     * The more verbose format with the "verbosity" field is intended to support
-     * setting of log levels of both parent and child log components in the same
-     * BSON document.
-     *
-     * Ignore elements in BSON object that do not map to a log component's dotted
-     * name.
-     */
-    Status _set(const BSONObj& bsonSettings) const {
-        StatusWith<std::vector<LogComponentSetting>> parseStatus =
-            parseLogComponentSettings(bsonSettings);
-
-        if (!parseStatus.isOK()) {
-            return parseStatus.getStatus();
-        }
-
-        std::vector<LogComponentSetting> settings = parseStatus.getValue();
-        std::vector<LogComponentSetting>::iterator it = settings.begin();
-        for (; it < settings.end(); ++it) {
-            LogComponentSetting newSetting = *it;
-
-            // Negative value means to clear log level of component.
-            if (newSetting.level < 0) {
-                globalLogDomain()->clearMinimumLoggedSeverity(newSetting.component);
-                continue;
-            }
-            // Convert non-negative value to Log()/Debug(N).
-            LogSeverity newSeverity =
-                (newSetting.level > 0) ? LogSeverity::Debug(newSetting.level) : LogSeverity::Log();
-            globalLogDomain()->setMinimumLoggedSeverity(newSetting.component, newSeverity);
-        }
-
-        return Status::OK();
-    }
-
-    /**
-     * Search document for element corresponding to log component's parent.
-     */
-    static mutablebson::Element _getParentElement(mutablebson::Document& doc,
-                                                  LogComponent component) {
-        // Hide LogComponent::kDefault
-        if (component == LogComponent::kDefault) {
-            return doc.end();
-        }
-        LogComponent parentComponent = component.parent();
-
-        // Attach LogComponent::kDefault children to root
-        if (parentComponent == LogComponent::kDefault) {
-            return doc.root();
-        }
-        mutablebson::Element grandParentElement = _getParentElement(doc, parentComponent);
-        return grandParentElement.findFirstChildNamed(parentComponent.getShortName());
-    }
-} logComponentVerbositySetting;
-
-ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> QuietSetting(
-    ServerParameterSet::getGlobal(), "quiet", &serverGlobalParams.quiet);
-
-ExportedServerParameter<bool, ServerParameterType::kRuntimeOnly> TraceExceptionsSetting(
-    ServerParameterSet::getGlobal(), "traceExceptions", &DBException::traceExceptions);
-
-class AutomationServiceDescriptor final : public ServerParameter {
-public:
-    static constexpr auto kName = "automationServiceDescriptor"_sd;
-    static constexpr auto kMaxSize = 64U;
-
-    AutomationServiceDescriptor()
-        : ServerParameter(ServerParameterSet::getGlobal(), kName.toString(), true, true) {}
-
-    virtual void append(OperationContext* opCtx,
-                        BSONObjBuilder& builder,
-                        const std::string& name) override {
-        const stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (!_value.empty())
-            builder << name << _value;
-    }
-
-    virtual Status set(const BSONElement& newValueElement) override {
-        if (newValueElement.type() != mongo::String)
-            return {ErrorCodes::TypeMismatch,
-                    mongoutils::str::stream() << "Value for parameter " << kName
-                                              << " must be of type 'string'"};
-        return setFromString(newValueElement.String());
-    }
-
-    virtual Status setFromString(const std::string& str) override {
-        if (str.size() > kMaxSize)
-            return {ErrorCodes::Overflow,
-                    mongoutils::str::stream() << "Value for parameter " << kName
-                                              << " must be no more than "
-                                              << kMaxSize
-                                              << " bytes"};
-
-        {
-            const stdx::lock_guard<stdx::mutex> lock(_mutex);
-            _value = str;
-        }
-
-        return Status::OK();
-    }
-
-private:
-    stdx::mutex _mutex;
-    std::string _value;
-} automationServiceDescriptor;
-
-constexpr decltype(AutomationServiceDescriptor::kName) AutomationServiceDescriptor::kName;
-constexpr decltype(AutomationServiceDescriptor::kMaxSize) AutomationServiceDescriptor::kMaxSize;
-
-}  // namespace
 }  // namespace mongo
