@@ -36,6 +36,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -205,7 +206,15 @@ Future<CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
 Future<void> TransactionCoordinator::_runPhaseTwo(const std::vector<ShardId>& participantShards,
                                                   const CoordinatorCommitDecision& decision) {
     return _sendDecisionToParticipants(participantShards, decision)
-        .then([this] { return _driver.deleteCoordinatorDoc(_lsid, _txnNumber); })
+        .then([this] {
+            if (getGlobalFailPointRegistry()
+                    ->getFailPoint("doNotForgetCoordinator")
+                    ->shouldFail()) {
+                return Future<void>::makeReady();
+            }
+
+            return _driver.deleteCoordinatorDoc(_lsid, _txnNumber);
+        })
         .then([this] {
             LOG(3) << "Two-phase commit completed for session " << _lsid.toBSON()
                    << ", transaction number " << _txnNumber;

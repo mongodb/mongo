@@ -142,7 +142,6 @@ selector:
   - jstests/core/uniqueness.js
   - jstests/core/unset2.js
   - jstests/core/update_addToSet.js
-  - jstests/core/update_array_offset_positional.js
   - jstests/core/update_arrayFilters.js
   - jstests/core/update_find_and_modify_id.js
   - jstests/core/update_modifier_pop.js
@@ -173,11 +172,8 @@ selector:
   - jstests/core/or4.js
   - jstests/core/temp_cleanup.js
 
-  # TODO: SERVER-38690 Mongos should throw write targeting errors in a transaction.
-  - jstests/core/update_setOnInsert.js
-
-  # Reads from system.views.
-  - jstests/core/views/views_drop.js
+  # TODO: SERVER-38588 Hybrid index builds can miss documents during secondary replication.
+  - jstests/core/background_index_multikey.js
 
   ##
   ## Some aggregation stages don't support snapshot readconcern.
@@ -221,7 +217,6 @@ selector:
   - jstests/core/json_schema/additional_properties.js
   - jstests/core/json_schema/bsontype.js
   - jstests/core/json_schema/dependencies.js
-  - jstests/core/json_schema/encrypt.js
   - jstests/core/json_schema/items.js
   - jstests/core/json_schema/logical_keywords.js
   - jstests/core/json_schema/min_max_items.js
@@ -268,13 +263,6 @@ selector:
   - jstests/core/ref3.js
   - jstests/core/update3.js
   - jstests/core/rename3.js
-
-  ##
-  ## Error: Unable to acquire lock within a max lock request timeout of '0ms' milliseconds
-  ##
-
-  # Collection drops done through applyOps are not converted to w:majority
-  - jstests/core/views/invalid_system_views.js
 
   ##
   ## Misc. reasons.
@@ -362,11 +350,51 @@ selector:
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
 
+  # auto_retry_on_network_error.js will timeout with assert.soon and give a different error from
+  # what test expects. Excluding from suite since it doesn't really do any database operations, so
+  # it doesn't provide value here.
+  - jstests/core/connection_string_validation.js
+
   exclude_with_any_tags:
+  ##
+  # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
+  # override when it refuses to run a certain command. Above each tag are the message(s) that cause
+  # the tag to be warranted.
+  ##
+  # "Refusing to run a test that issues a getMore command since if a network error occurs during
+  #   it then we won't know whether the cursor was advanced or not"
+  - requires_getmore
+  # "Refusing to run a test that issues non-retryable write operations since the test likely makes
+  #   assertions on the write results and can lead to spurious failures if a network error occurs"
+  - requires_non_retryable_writes
+  # "Refusing to run a test that issues commands that are not blindly retryable"
+  # "Refusing to run a test that issues an aggregation command with $out because it is not
+  #   retryable"
+  - requires_non_retryable_commands
+  # "Refusing to run a test that issues commands that may return different values after a failover"
+  # "Refusing to run a test that issues an aggregation command with explain because it may return
+  #   incomplete results"
+  # "Refusing to run a test that issues an aggregation command with $listLocalCursors or
+  #   $listLocalSessions because they rely on in-memory state that may not survive failovers"
+  # "Refusing to run a test that issues a mapReduce command, because it calls std::terminate() if
+  #   interrupted by a stepdown"
+  - does_not_support_stepdowns
+
+  ##
+  # The next tags correspond to the special errors thrown by the
+  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+  # warranted.
+  ##
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
+
+  # The next tag corresponds to long running-operations, as they may exhaust their number
+  # of retries and result in a network error being thrown.
+  - operations_longer_than_stepdown_interval
+
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
@@ -374,34 +402,77 @@ selector:
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
 
+  # The next three tags correspond to the special errors thrown by the
+  # fail_unclean_shutdown_incompatible_commands.js override when it refuses to run commands that are
+  # inaccurate after an unclean shutdown. Above each tag is the message that causes the tag to be
+  # warranted.
+  ##
+  # "Cowardly fail if fastcount is run with a mongod that had an unclean shutdown: ..."
+  - requires_fastcount
+  # "Cowardly fail if dbStats is run with a mongod that had an unclean shutdown: ..."
+  - requires_dbstats
+  # "Cowardly fail if collStats is run with a mongod that had an unclean shutdown: ..."
+  - requires_collstats
+  # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
+  - requires_datasize
+
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
+      # Note: fail_unclean_shutdown_incompatible_commands.js not included because it conflicts with
+      # implicitly_shard_accessed_collections.js use of collstats (usage is safe with unclean
+      # shutdown). Workaround by relying on the requires_fastcount/dbstats/collstats/datasize tags
+      # to blacklist tests that uses them unsafely.
       eval: >-
         var testingReplication = true;
-        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
-        load('jstests/libs/override_methods/enable_sessions.js');
+        load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
+        load("jstests/libs/txns/txn_override.js");
+        load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+        db = connect(TestData.connectionString);
+        load("jstests/libs/override_methods/enable_sessions.js");
+        load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
-        load('jstests/libs/txns/txn_override.js');
+        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
       global_vars:
         TestData:
-          defaultReadConcernLevel: "majority"
-          defaultTransactionReadConcernLevel: "snapshot"
-          defaultTransactionWriteConcernW: "majority"
-          defaultWriteConcernW: "majority"
+          logRetryAttempts: true
+          overrideRetryAttempts: 3
+          # TODO: SERVER-39702 remove once it's allowed to stepdown with prepare.
+          skipCheckingCatalogCacheConsistencyWithShardingCatalog: true
           sessionOptions:
-            # Causal consistency is not required because tests in this suite only read from
-            # primaries, only one node is electable in each shard, all writes use majority write
-            # concern, and they use transactions with "snapshot" level read concern, which should
-            # see all majority committed writes.
-            causalConsistency: false
+            # Read your own writes is not guaranteed without causal consistency if all nodes are
+            # electable.
+            causalConsistency: true
+            retryWrites: true
+      # We specify nodb so the shell used by each test will attempt to connect after loading the
+      # retry logic in auto_retry_on_network_error.js.
+      nodb: ""
       readMode: commands
   hooks:
+  # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+  # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+  # too many network errors occur when re-running a transaction we will run out of retries.
+  - class: ContinuousStepdown
+    kill: true
+    stepdown_interval_ms: 15000
+    # TODO: SERVER-39702 change to shard_stepdown true once it's allowed to stepdown with prepare.
+    shard_stepdown: false
+
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
+  - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          checkCollectionCounts: true
   - class: CleanEveryN
     n: 20
   fixture:
@@ -409,7 +480,12 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        # TODO: SERVER-39702 remove after stepdown with prepare works
+        "failpoint.sendCoordinateCommitToConfigServer":
+          mode: alwaysOn
     mongod_options:
+      syncdelay: 5
+      oplogSize: 1024
       set_parameters:
         logComponentVerbosity:
           verbosity: 0
@@ -423,11 +499,26 @@ executor:
             recovery: 2
           transaction: 4
         enableTestCommands: 1
+        enableElectionHandoff: 0
         numInitialSyncAttempts: 1
-        # TODO SERVER-38302: Disable the no-op writer.
-        writePeriodicNoops: true
-        # TODO: SERVER-38588 Hybrid index builds can conflict with prepared transactions on
-        # secondaries and miss documents.
-        enableHybridIndexBuilds: false
-    num_rs_nodes_per_shard: 2
     num_shards: 2
+    num_rs_nodes_per_shard: 3
+    configsvr_options:
+      num_nodes: 3 # TODO: SERVER-39702 change to 1 node when we no longer make configsvr coordinator
+      all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+      voting_secondaries: true
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+          # TODO: SERVER-39702 remove after stepdown with prepare works
+          "failpoint.doNotForgetCoordinator":
+            mode: alwaysOn
+    shard_options:
+      all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+      voting_secondaries: true

@@ -164,9 +164,6 @@ executor:
       global_vars:
         TestData:
           checkCollectionCounts: true
-          # TODO: remove after SERVER-34241
-          skipValidationNamespaces:
-          - config.transactions
   - class: CleanEveryN
     n: 20
   fixture:

@@ -5945,6 +5945,18 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 19
 
+- name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough
+      depends_on: jsCore
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 19
+
 - name: parallel_gen
   depends_on:
   - name: jsCore
@@ -7621,6 +7633,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
+  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -10622,6 +10635,7 @@ buildvariants:
   - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
   - name: noPassthroughWithMongod_gen

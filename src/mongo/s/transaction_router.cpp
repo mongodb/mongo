@@ -613,17 +613,23 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
         coordinatorShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
         if (!_initiatedTwoPhaseCommit) {
+            SharedTransactionOptions options;
+            options.txnNumber = _txnNumber;
+            // Intentionally leave atClusterTime blank since we don't care and to minimize
+            // possibility that storage engine won't have it available.
+            Participant configParticipant(true, 0, options);
+
             // Send a fake transaction statement to the config server primary so that the config
             // server primary sets up state in memory to receive coordinateCommit.
             auto cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 "dummy",
-                coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("distinct"
-                                                                     << "dummy"
-                                                                     << "key"
-                                                                     << "dummy"),
-                                                                true),
+                configParticipant.attachTxnFieldsIfNeeded(BSON("distinct"
+                                                               << "dummy"
+                                                               << "key"
+                                                               << "dummy"),
+                                                          true),
                 Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
 
@@ -633,8 +639,7 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 "admin",
-                coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("abortTransaction" << 1),
-                                                                false),
+                configParticipant.attachTxnFieldsIfNeeded(BSON("abortTransaction" << 1), false),
                 Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }

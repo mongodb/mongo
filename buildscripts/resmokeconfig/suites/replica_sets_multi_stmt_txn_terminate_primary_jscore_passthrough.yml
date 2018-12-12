@@ -111,7 +111,7 @@ selector:
   - jstests/core/views/views_stats.js
 
   ##
-  ## WriteErrors get converted to WriteCommandErrors if part of a txn.
+  ## SERVER-39175 WriteErrors get converted to WriteCommandErrors if part of a txn.
   ##
 
   # The same error code, but with ok:0.
@@ -390,9 +390,6 @@ executor:
       global_vars:
         TestData:
           checkCollectionCounts: true
-          # TODO: remove after SERVER-34241
-          skipValidationNamespaces:
-          - config.transactions
   - class: CleanEveryN
     n: 20
   fixture:

@@ -9,14 +9,27 @@
  */
 
 var ManualInterventionActions = (function() {
+    /**
+     * Remove all the chunk documents from the given namespace. Deletes are performed one at a
+     * time to bypass auto_retry_on_network_error.js multi remove check.
+     */
+    let removeChunks = function(mongosConn, ns) {
+        let stillHasChunks = true;
+
+        while (stillHasChunks) {
+            let writeRes = assert.writeOK(mongosConn.getDB('config').chunks.remove(
+                {ns: ns}, {justOne: true, writeConcern: {w: 'majority'}}));
+            stillHasChunks = writeRes.nRemoved > 0;
+        }
+    };
 
     this.removePartiallyWrittenChunks = function(mongosConn, ns, cmdObj, numAttempts) {
         print("command " + tojson(cmdObj) + " failed after " + numAttempts +
               " attempts due to seeing partially written chunks for collection " + ns +
               ", probably due to a previous failed shardCollection attempt. Manually" +
               " deleting chunks for " + ns + " from config.chunks and retrying the command.");
-        assert.writeOK(
-            mongosConn.getDB("config").chunks.remove({ns: ns}, {writeConcern: {w: "majority"}}));
+
+        removeChunks(mongosConn, ns);
     };
 
     this.removePartiallyWrittenChunksAndDropCollection = function(
@@ -26,8 +39,8 @@ var ManualInterventionActions = (function() {
               ", probably due to a previous failed shardCollection attempt. Manually" +
               " deleting chunks for " + ns + " from config.chunks" +
               ", dropping the collection, and retrying the command.");
-        assert.writeOK(
-            mongosConn.getDB("config").chunks.remove({ns: ns}, {writeConcern: {w: "majority"}}));
+
+        removeChunks(mongosConn, ns);
         const[dbName, collName] = ns.split(".");
         assert.commandWorked(
             mongosConn.getDB(dbName).runCommand({"drop": collName, writeConcern: {w: "majority"}}));
@@ -61,6 +74,9 @@ var ManualInterventionActions = (function() {
                 numAttempts === maxAttempts) {
                 break;
             }
+
+            print("Manual intervention retry attempt# " + numAttempts + " because of error: " +
+                  tojson(res));
 
             if (cmdName === "shardCollection" || cmdName === "shardcollection") {
                 const ns = cmdObj[cmdName];

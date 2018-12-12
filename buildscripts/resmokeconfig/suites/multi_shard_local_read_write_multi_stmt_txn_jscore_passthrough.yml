@@ -194,7 +194,7 @@ selector:
   - jstests/core/index_stats.js
 
   ##
-  ## WriteErrors get converted to WriteCommandErrors if part of a txn.
+  ## SERVER-39175 WriteErrors get converted to WriteCommandErrors if part of a txn.
   ##
 
   # The same error code, but with ok:0.

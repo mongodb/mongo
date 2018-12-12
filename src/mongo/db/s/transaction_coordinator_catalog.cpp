@@ -186,7 +186,6 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
 
             if (MONGO_FAIL_POINT(doNotForgetCoordinator)) {
                 auto decisionFuture = coordinator->getDecision();
-                invariant(decisionFuture.isReady());
                 // Only remember a coordinator that completed successfully. We expect that the
                 // coordinator only completes with an error if the node stepped down or was shut
                 // down while coordinating the commit. If either of these occurred, a
@@ -195,7 +194,7 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
                 // shutdown), or should find no coordinator and instead recover the decision from
                 // the local participant (if the failover or shutdown occurred before any of the
                 // coordinator's state was made durable).
-                if (decisionFuture.getNoThrow().isOK()) {
+                if (decisionFuture.isReady() && decisionFuture.getNoThrow().isOK()) {
                     _coordinatorsBySessionDefunct[lsid][txnNumber] = std::move(coordinator);
                 }
             }

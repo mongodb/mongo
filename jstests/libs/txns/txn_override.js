@@ -378,7 +378,7 @@
     }
 
     function runCommandInTransactionIfNeeded(
-        conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs) {
         let cmdObjUnwrapped = commandObj;
         let cmdNameUnwrapped = commandName;
 
@@ -433,16 +433,17 @@
             }
         }
 
-        let res = func.apply(conn, makeFuncArgs(commandObj));
+        let res = runCmdFunc.apply(conn, makeFuncArgs(commandObj));
 
         if ((res.ok !== 1 || res.writeErrors) &&
-            (conn.txnOverrideState === TransactionStates.kActive)) {
+            (conn.txnOverrideState === TransactionStates.kActive) &&
+            commandName !== 'commitTransaction') {
             abortTransaction(conn, cmdObjUnwrapped.lsid, txnOptions.txnNumber);
             res = retryOnImplicitCollectionCreationIfNeeded(conn,
                                                             dbName,
                                                             cmdNameUnwrapped,
                                                             cmdObjUnwrapped,
-                                                            func,
+                                                            runCmdFunc,
                                                             makeFuncArgs,
                                                             res,
                                                             txnOptions);
@@ -451,7 +452,7 @@
         return res;
     }
 
-    function retryEntireTransaction(conn, lsid, func) {
+    function retryEntireTransaction(conn, lsid, runCmdFunc) {
         let txnOptions = getTxnOptionsForClient(conn);
         let txnNumber = txnOptions.txnNumber;
         jsTestLog("Retrying entire transaction for aborted txn with txnNum: " + txnNumber +
@@ -466,34 +467,56 @@
         let res;
         for (let op of ops) {
             res = runCommandInTransactionIfNeeded(
-                conn, op.dbName, op.cmdName, op.cmdObj, func, op.makeFuncArgs);
+                conn, op.dbName, op.cmdName, op.cmdObj, runCmdFunc, op.makeFuncArgs);
 
             if (isTransientTransactionError(res)) {
-                return retryEntireTransaction(conn, lsid, func);
+                jsTestLog('Encountered error while running command: ' + tojson(op.cmdObj) +
+                          ', will retry entire txn again: ' + tojson(res));
+                return retryEntireTransaction(conn, lsid, runCmdFunc);
             }
         }
 
         return res;
     }
 
-    function retryCommitTransaction(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+    function retryCommitTransaction(
+        conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs) {
         let res;
         let retryCommit = false;
         jsTestLog("Retrying commitTransaction for txnNum: " + commandObj.txnNumber + " and lsid: " +
                   tojson(commandObj.lsid));
+
+        /**
+         * Returns true if the response result from a commitTransaction command meant that the
+         * transaction was aborted.
+         */
+        let wasCommitAborted = function(result) {
+            if (result.ok === 1) {
+                return false;
+            }
+
+            if (ErrorCodes.isVoteAbortError(result.code)) {
+                return true;
+            }
+
+            return false;
+        };
+
         do {
             res = runCommandInTransactionIfNeeded(
-                conn, dbName, "commitTransaction", commandObj, func, makeFuncArgs);
+                conn, dbName, "commitTransaction", commandObj, runCmdFunc, makeFuncArgs);
 
             if (res.writeConcernError) {
                 retryCommit = true;
                 continue;
             }
 
-            if (isTransientTransactionError(res)) {
+            if (wasCommitAborted(res)) {
                 transientErrorToLog = res;
                 retryCommit = true;
-                res = retryEntireTransaction(conn, commandObj.lsid, func);
+                jsTestLog('Encountered error while retrying commit, will retry entire txn again: ' +
+                          tojson(res));
+                res = retryEntireTransaction(conn, commandObj.lsid, runCmdFunc);
             } else if (res.ok === 1) {
                 retryCommit = false;
             }
@@ -503,7 +526,7 @@
     }
 
     function runCommandOnNetworkOrTransientTransactionErrorRetry(
-        conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs) {
         jsTestLog("Retrying command on network error or TransientTransactionError: " +
                   tojsononeline(commandObj));
         transientErrorToLog = null;
@@ -514,37 +537,37 @@
             // txnNum.
             conn.txnOverrideState = TransactionStates.kInactive;
             return runCommandInTransactionIfNeeded(
-                conn, dbName, commandName, commandObj, func, makeFuncArgs);
+                conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs);
         }
 
         if (commandName === "commitTransaction") {
             return retryCommitTransaction(
-                conn, dbName, commandName, commandObj, func, makeFuncArgs);
+                conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs);
         }
 
-        return retryEntireTransaction(conn, commandObj.lsid, func);
+        return retryEntireTransaction(conn, commandObj.lsid, runCmdFunc);
     }
 
     function runCommandWithTransactionRetries(
-        conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs) {
         const driverSession = conn.getDB(dbName).getSession();
         if (driverSession.getSessionId() === null) {
             // Sessions is explicitly disabled for this command. So we skip overriding it to
             // use transactions.
-            return func.apply(conn, makeFuncArgs(commandObj));
+            return runCmdFunc.apply(conn, makeFuncArgs(commandObj));
         }
 
         let res;
         if (!isRetryingOnNetworkOrTransientTransactionError()) {
             res = runCommandInTransactionIfNeeded(
-                conn, dbName, commandName, commandObj, func, makeFuncArgs);
+                conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs);
 
             if (commandName === "commitTransaction") {
                 while (res.writeConcernError) {
                     jsTestLog("Retrying commitTransaction on WCE for txnNum: " +
                               commandObj.txnNumber + " and lsid: " + tojson(commandObj.lsid));
                     res = runCommandInTransactionIfNeeded(
-                        conn, dbName, commandName, commandObj, func, makeFuncArgs);
+                        conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs);
                 }
             }
 
@@ -552,18 +575,18 @@
         }
 
         res = runCommandOnNetworkOrTransientTransactionErrorRetry(
-            conn, dbName, commandName, commandObj, func, makeFuncArgs);
+            conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs);
 
         return res;
     }
 
     function runCommandWithTransientTransactionErrorRetries(
-        conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs) {
         retryingOnTransientTransactionError = false;
         while (true) {
             try {
                 let res = runCommandWithTransactionRetries(
-                    conn, dbName, commandName, commandObj, func, makeFuncArgs);
+                    conn, dbName, commandName, commandObj, runCmdFunc, makeFuncArgs);
 
                 if (isTransientTransactionError(res)) {
                     retryingOnTransientTransactionError = true;

@@ -216,12 +216,18 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         //
 
         failpointDataArr.forEach(function(failpointData) {
-            if (overrideCoordinatorToBeConfigServer &&
-                failpointData.failpoint == "hangWhileTargetingLocalHost") {
-                // If the coordinator is overridden to be the config server, it will never target
-                // itself, so don't test the target local path.
-                return;
+            if (overrideCoordinatorToBeConfigServer) {
+                if (failpointData.failpoint == "hangWhileTargetingLocalHost") {
+                    // If the coordinator is overridden to be the config server, it will never
+                    // target itself, so don't test the target local path.
+                    return;
+                } else if (failpointData.failpoint == "hangBeforeDeletingCoordinatorDoc") {
+                    // If the coordinator is overridden to be the config server, it will never
+                    // delete the coordinator document, so skip this test.
+                    return;
+                }
             }
+
             testCommitProtocol(true /* make a participant abort */,
                                failpointData,
                                true /* expect abort decision */);
@@ -239,7 +245,12 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                     // If the coordinator is overridden to be the config server, it will never
                     // target itself, so don't test the target local path.
                     return;
+                } else if (failpointData.failpoint == "hangBeforeDeletingCoordinatorDoc") {
+                    // If the coordinator is overridden to be the config server, it will never
+                    // delete the coordinator document, so skip this test.
+                    return;
                 }
+
                 // Note: If the coordinator fails over before making the participant list durable,
                 // the transaction will abort even if all participants could have committed. This is
                 // a property of the coordinator only, and would be true even if a participant's

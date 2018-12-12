@@ -157,9 +157,6 @@ selector:
   # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
   - jstests/core/opcounters_write_cmd.js
 
-  # SERVER-36311 Remove txn_override.js restriction of snapshot readConcern
-  - jstests/core/read_after_optime.js
-
   # Consecutive writes totalling more than the size upper threshold will cause the txn to
   # abort with a TransactionTooLarge error.
   - jstests/core/batch_size.js
@@ -180,9 +177,6 @@ selector:
   - jstests/core/mr*.js
   - jstests/core/or4.js
   - jstests/core/temp_cleanup.js
-
-  # TODO: SERVER-38570 txn_override.js does not check writeError field.
-  - jstests/core/update_setOnInsert.js
 
   # TODO: SERVER-38588 Hybrid index builds races with prepare in replication.
   - jstests/core/background_index_multikey.js
@@ -238,7 +232,7 @@ selector:
   - jstests/core/views/views_stats.js
 
   ##
-  ## WriteErrors get converted to WriteCommandErrors if part of a txn.
+  ## TODO: SERVER-39175 WriteErrors get converted to WriteCommandErrors if part of a txn.
   ##
 
   # The same error code, but with ok:0.
