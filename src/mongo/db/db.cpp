@@ -892,7 +892,8 @@ void shutdownTask() {
     // Shut down the global dbclient pool so callers stop waiting for connections.
     globalConnPool.shutdown();
 
-    // Shut down the background periodic task runner
+    // Shut down the background periodic task runner. This must be done before shutting down the
+    // storage engine.
     if (auto runner = serviceContext->getPeriodicRunner()) {
         runner->shutdown();
     }

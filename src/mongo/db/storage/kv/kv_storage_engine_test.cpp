@@ -410,12 +410,12 @@ public:
     }
 
     ~TimestampKVEngineTest() {
-        _storageEngine->cleanShutdown();
-        _storageEngine.reset();
-
-        // Shut down the background periodic task runner.
+        // Shut down the background periodic task runner, before the storage engine.
         auto runner = getServiceContext()->getPeriodicRunner();
         runner->shutdown();
+
+        _storageEngine->cleanShutdown();
+        _storageEngine.reset();
     }
 
     std::unique_ptr<KVStorageEngine> _storageEngine;

@@ -159,7 +159,7 @@ void shutdown(ServiceContext* srvContext) {
 
             LogicalSessionCache::set(serviceContext, nullptr);
 
-            // Shut down the background periodic task runner
+            // Shut down the background periodic task runner, before the storage engine.
             if (auto runner = serviceContext->getPeriodicRunner()) {
                 runner->shutdown();
             }
