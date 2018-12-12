@@ -427,15 +427,6 @@ Status ReplicationCoordinatorEmbedded::stepUpIfEligible(bool skipDryRun) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-ReplSettings::IndexPrefetchConfig ReplicationCoordinatorEmbedded::getIndexPrefetchConfig() const {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
-void ReplicationCoordinatorEmbedded::setIndexPrefetchConfig(
-    const ReplSettings::IndexPrefetchConfig) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::signalDropPendingCollectionsRemovedFromStorage() {
     UASSERT_NOT_IMPLEMENTED;
 }

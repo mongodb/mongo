@@ -1066,7 +1066,7 @@ var ShardingTest = function(params) {
     }
 
     // Allow specifying mixed-type options like this:
-    // { mongos : [ { noprealloc : "" } ],
+    // { mongos : [ { bind_ip : "localhost" } ],
     //   config : [ { nojournal : "" } ],
     //   shards : { rs : true, d : true } }
     if (Array.isArray(numShards)) {

@@ -2231,7 +2231,6 @@ var ReplSetTest = function(opts) {
             oplogSize: this.oplogSize,
             keyFile: this.keyFile,
             port: _useBridge ? _unbridgedPorts[n] : this.ports[n],
-            noprealloc: "",
             replSet: this.useSeedList ? this.getURL() : this.name,
             dbpath: "$set-$node"
         };

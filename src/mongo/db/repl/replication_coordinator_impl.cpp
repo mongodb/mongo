@@ -3632,17 +3632,6 @@ Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
     return Status(ErrorCodes::CommandFailed, "Election failed.");
 }
 
-ReplSettings::IndexPrefetchConfig ReplicationCoordinatorImpl::getIndexPrefetchConfig() const {
-    stdx::lock_guard<stdx::mutex> lock(_indexPrefetchMutex);
-    return _indexPrefetchConfig;
-}
-
-void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
-    const ReplSettings::IndexPrefetchConfig cfg) {
-    stdx::lock_guard<stdx::mutex> lock(_indexPrefetchMutex);
-    _indexPrefetchConfig = cfg;
-}
-
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inlock() {
     if (_topCoord->getRole() != TopologyCoordinator::Role::kCandidate) {
         return {};

@@ -223,9 +223,6 @@ public:
 
     size_t getNumUncommittedSnapshots() override;
 
-    repl::ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
-    void setIndexPrefetchConfig(const repl::ReplSettings::IndexPrefetchConfig) override;
-
     Status stepUpIfEligible(bool skipDryRun) override;
 
     Status abortCatchupIfNeeded() override;

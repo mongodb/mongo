@@ -206,13 +206,6 @@ Status addMongodOptions(moe::OptionSection* options) {
         .incompatibleWith("replication.replSetName");
 
     storage_options
-        .addOptionChaining("noprealloc",
-                           "noprealloc",
-                           moe::Switch,
-                           "disable data file preallocation - will often hurt performance")
-        .setSources(moe::SourceAllLegacy);
-
-    storage_options
         .addOptionChaining("storage.syncPeriodSecs",
                            "syncdelay",
                            moe::Double,
@@ -294,13 +287,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     rs_options.addOptionChaining("replication.replSetName", "", moe::String, "arg is <setname>")
         .setSources(moe::SourceYAMLConfig)
         .format("[^/]+", "[replica set name with no \"/\"]");
-
-    rs_options
-        .addOptionChaining("replication.secondaryIndexPrefetch",
-                           "replIndexPrefetch",
-                           moe::String,
-                           "specify index prefetching behavior (if secondary) [none|_id_only|all]")
-        .format("(:?none)|(:?_id_only)|(:?all)", "(none/_id_only/all)");
 
     // `enableMajorityReadConcern` is enabled by default starting in 3.6.
     rs_options
@@ -866,10 +852,6 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (params.count("replication.replSet")) {
         /* seed list of hosts for the repl set */
         replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
-    }
-    if (params.count("replication.secondaryIndexPrefetch")) {
-        replSettings.setPrefetchIndexMode(
-            params["replication.secondaryIndexPrefetch"].as<std::string>());
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {

@@ -467,13 +467,6 @@ WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptions
     return wc;
 }
 
-ReplSettings::IndexPrefetchConfig ReplicationCoordinatorMock::getIndexPrefetchConfig() const {
-    return ReplSettings::IndexPrefetchConfig();
-}
-
-void ReplicationCoordinatorMock::setIndexPrefetchConfig(
-    const ReplSettings::IndexPrefetchConfig cfg) {}
-
 Status ReplicationCoordinatorMock::stepUpIfEligible(bool skipDryRun) {
     return Status::OK();
 }

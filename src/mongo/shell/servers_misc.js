@@ -14,7 +14,7 @@ ToolTest = function(name, extraOptions) {
 ToolTest.prototype.startDB = function(coll) {
     assert(!this.m, "db already running");
 
-    var options = {port: this.port, dbpath: this.dbpath, noprealloc: "", bind_ip: "127.0.0.1"};
+    var options = {port: this.port, dbpath: this.dbpath, bind_ip: "127.0.0.1"};
 
     Object.extend(options, this.options);
 

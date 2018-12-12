@@ -42,14 +42,6 @@ extern double replElectionTimeoutOffsetLimitFraction;
 
 class ReplSettings {
 public:
-    // Allow index prefetching to be turned on/off
-    enum class IndexPrefetchConfig {
-        UNINITIALIZED = 0,
-        PREFETCH_NONE = 1,
-        PREFETCH_ID_ONLY = 2,
-        PREFETCH_ALL = 3
-    };
-
     std::string ourSetName() const;
     bool usingReplSets() const;
 
@@ -65,31 +57,15 @@ public:
     static bool shouldRecoverFromOplogAsStandalone();
 
     /**
-     * Note: _prefetchIndexMode is initialized to UNINITIALIZED by default.
-     * To check whether _prefetchIndexMode has been set to a valid value, call
-     * isPrefetchIndexModeSet().
-     */
-    IndexPrefetchConfig getPrefetchIndexMode() const;
-
-    /**
-      * Checks that _prefetchIndexMode has been set.
-      */
-    bool isPrefetchIndexModeSet() const;
-
-    /**
      * Setters
      */
     void setOplogSizeBytes(long long oplogSizeBytes);
     void setReplSetString(std::string replSetString);
-    void setPrefetchIndexMode(std::string prefetchIndexModeString);
 
 private:
     long long _oplogSizeBytes = 0;  // --oplogSize
 
     std::string _replSetString;  // --replSet[/<seedlist>]
-
-    // --indexPrefetch
-    IndexPrefetchConfig _prefetchIndexMode = IndexPrefetchConfig::UNINITIALIZED;
 };
 
 }  // namespace repl
