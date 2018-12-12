@@ -45,6 +45,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"

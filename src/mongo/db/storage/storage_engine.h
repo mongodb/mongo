@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -45,7 +46,6 @@ namespace mongo {
 class DatabaseCatalogEntry;
 class JournalListener;
 class OperationContext;
-class TemporaryRecordStore;
 class RecoveryUnit;
 class SnapshotManager;
 struct StorageGlobalParams;

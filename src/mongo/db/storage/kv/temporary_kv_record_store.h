@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/record_store.h"
-
 namespace mongo {
+
+class KVEngine;
+class OperationContext;
 
 /**
  * This is an implementation of an RAII type that manages a temporary RecordStore on a KVEngine.

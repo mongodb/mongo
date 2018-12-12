@@ -29,17 +29,21 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
-#include "mongo/util/log.h"
+
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 TemporaryKVRecordStore::~TemporaryKVRecordStore() {
     auto status = _kvEngine->dropIdent(_opCtx, _rs->getIdent());
-    invariant(status.isOK(),
-              str::stream() << "failed to drop temporary ident: " << _rs->getIdent()
-                            << " with status: "
-                            << status);
+    fassert(
+        51032,
+        status.withContext(str::stream() << "failed to drop temporary ident: " << _rs->getIdent()));
 }
 
 }  // namespace mongo
