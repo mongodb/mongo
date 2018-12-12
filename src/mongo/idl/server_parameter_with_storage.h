@@ -175,7 +175,7 @@ struct storage_wrapper {
 /**
  * Specialization of ServerParameter used by IDL generator.
  */
-template <typename T>
+template <ServerParameterType paramType, typename T>
 class IDLServerParameterWithStorage : public ServerParameter {
 private:
     using SPT = ServerParameterType;
@@ -185,14 +185,14 @@ public:
     static constexpr bool thread_safe = SW::thread_safe;
     using element_type = typename SW::type;
 
-    IDLServerParameterWithStorage(StringData name, T& storage, ServerParameterType paramType)
+    IDLServerParameterWithStorage(StringData name, T& storage)
         : ServerParameter(ServerParameterSet::getGlobal(),
                           name,
                           paramType == SPT::kStartupOnly || paramType == SPT::kStartupAndRuntime,
                           paramType == SPT::kRuntimeOnly || paramType == SPT::kStartupAndRuntime),
           _storage(storage) {
-        invariant(thread_safe || paramType == SPT::kStartupOnly,
-                  "Runtime server parameters must be thread safe");
+        static_assert(thread_safe || paramType == SPT::kStartupOnly,
+                      "Runtime server parameters must be thread safe");
     }
 
     /**
@@ -318,11 +318,10 @@ private:
 
 // MSVC has trouble resolving T=decltype(param) through the above class template.
 // Avoid that by using this proxy factory to infer storage type.
-template <typename T>
-IDLServerParameterWithStorage<T>* makeIDLServerParameterWithStorage(StringData name,
-                                                                    T& storage,
-                                                                    ServerParameterType spt) {
-    return new IDLServerParameterWithStorage<T>(name, storage, spt);
+template <ServerParameterType paramType, typename T>
+IDLServerParameterWithStorage<paramType, T>* makeIDLServerParameterWithStorage(StringData name,
+                                                                               T& storage) {
+    return new IDLServerParameterWithStorage<paramType, T>(name, storage);
 }
 
 }  // namespace mongo

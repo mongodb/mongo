@@ -1737,7 +1737,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if param.cpp_varname is not None:
                 self._writer.write_line(
                     common.template_args(
-                        'auto* ret = makeIDLServerParameterWithStorage(${name}, ${storage}, ${spt});',
+                        'auto* ret = makeIDLServerParameterWithStorage<${spt}>(${name}, ${storage});',
                         storage=param.cpp_varname, spt=param.set_at, name=_encaps(param.name)))
 
                 if param.on_update is not None:

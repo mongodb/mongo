@@ -58,7 +58,7 @@ void doStorageTest(StringData name,
                    const std::vector<std::string>& valid,
                    const std::vector<std::string>& invalid) {
     T val;
-    IDLServerParameterWithStorage<T> param(name, val, spt);
+    IDLServerParameterWithStorage<spt, T> param(name, val);
     using element_type = typename decltype(param)::element_type;
 
     // Check type coersion.
@@ -162,7 +162,7 @@ TEST(ServerParameterWithStorage, BoundsTest) {
     using idl_server_parameter_detail::LT;
 
     int val;
-    IDLServerParameterWithStorage<int> param("BoundsTest", val, SPT::kStartupOnly);
+    IDLServerParameterWithStorage<SPT::kStartupOnly, int> param("BoundsTest", val);
 
     param.addBound<GT>(10);
     auto status = param.setFromString("5");
