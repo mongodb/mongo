@@ -33,10 +33,16 @@
     // This test uses single updates, rather than the multiple updates in the other wt_cache_full.js
     // tests because the refetching logic in the pre-4.0 algorithm depends on which documents were
     // modified, not on the number of modifications to each document.
+    // This test has been observed to hang under some non-standard build platforms so we are
+    // giving ourselves a slightly larger allowance of 5 documents from the theoretical maximum
+    // of documents calculated from the rollback size limit.
+    // Using a numDocs value of (maxDocs - 5) is sufficiently large enough to reproduce the memory
+    // pressure issue in 3.6.5 but small enough for this test to perform uniformly across most of
+    // the platforms in our continuous integration system.
     const rollbackSizeLimitMB = 300;
     const minDocSizeMB = 10;
     const largeString = 'x'.repeat(minDocSizeMB * 1024 * 1024);
-    const numDocs = Math.floor(rollbackSizeLimitMB / minDocSizeMB) - 1;
+    const numDocs = Math.floor(rollbackSizeLimitMB / minDocSizeMB) - 5;
 
     // Operations that will be present on both nodes, before the common point.
     const collName = 'test.t';
