@@ -933,6 +933,33 @@ TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptibleWithLockGuard) {
     result.get();
 }
 
+TEST_F(DConcurrencyTestFixture, LockCompleteInterruptedWhenUncontested) {
+    auto clientOpctxPairs = makeKClientsWithLockers(2);
+    auto opCtx1 = clientOpctxPairs[0].second.get();
+    auto opCtx2 = clientOpctxPairs[1].second.get();
+
+    boost::optional<Lock::GlobalLock> globalWrite;
+    globalWrite.emplace(opCtx1, MODE_IX);
+    ASSERT(globalWrite->isLocked());
+
+    // Attempt to take a conflicting lock, which will fail.
+    LockResult result = opCtx2->lockState()->lockGlobalBegin(opCtx2, MODE_X, Date_t::max());
+    ASSERT_EQ(result, LOCK_WAITING);
+
+    // Release the conflicting lock.
+    globalWrite.reset();
+
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx2->getClient());
+        opCtx2->markKilled();
+    }
+
+    // After the operation has been killed, the lockComplete request should fail, even though the
+    // lock is uncontested.
+    ASSERT_THROWS_CODE(opCtx2->lockState()->lockGlobalComplete(opCtx2, Date_t::max()),
+                       AssertionException,
+                       ErrorCodes::Interrupted);
+}
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
     auto opCtx = makeOperationContext();
@@ -1902,6 +1929,7 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
 
     opCtx->lockState()->endWriteUnitOfWork();
 }
+
 
 }  // namespace
 }  // namespace mongo

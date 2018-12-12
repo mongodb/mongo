@@ -216,10 +216,16 @@ LockResult CondVarLockGrantNotification::wait(Milliseconds timeout) {
 LockResult CondVarLockGrantNotification::wait(OperationContext* opCtx, Milliseconds timeout) {
     invariant(opCtx);
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    return opCtx->waitForConditionOrInterruptFor(
-               _cond, lock, timeout, [this] { return _result != LOCK_INVALID; })
-        ? _result
-        : LOCK_TIMEOUT;
+    if (opCtx->waitForConditionOrInterruptFor(
+            _cond, lock, timeout, [this] { return _result != LOCK_INVALID; })) {
+        // Because waitForConditionOrInterruptFor evaluates the predicate before checking for
+        // interrupt, it is possible that a killed operation can acquire a lock if the request is
+        // granted quickly. For that reason, it is necessary to check if the operation has been
+        // killed at least once before accepting the lock grant.
+        opCtx->checkForInterrupt();
+        return _result;
+    }
+    return LOCK_TIMEOUT;
 }
 
 void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
