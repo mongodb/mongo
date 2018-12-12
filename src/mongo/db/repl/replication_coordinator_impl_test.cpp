@@ -136,7 +136,7 @@ TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
 
     TopologyCoordinator::UpdateTermResult updateTermResult;
     replCoord->updateTerm_forTest(replCoord->getTerm() + 1, &updateTermResult);
-    ASSERT_EQ(TopologyCoordinator::UpdateTermResult::kTriggerStepDown, updateTermResult);
+    ASSERT(TopologyCoordinator::UpdateTermResult::kTriggerStepDown == updateTermResult);
 
     IsMasterResponse response;
     replCoord->fillIsMasterForReplSet(&response);
