@@ -34,17 +34,15 @@
 
 #include <algorithm>
 
-#include "namespace_uuid_cache.h"
+#include "mongo/db/catalog/namespace_uuid_cache.h"
 
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/namespace_uuid_cache_gen.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-// TODO(geert): Enable checks by default
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(debugCollectionUUIDs, bool, false);
 
 const OperationContext::Decoration<NamespaceUUIDCache> NamespaceUUIDCache::get =
     OperationContext::declareDecoration<NamespaceUUIDCache>();

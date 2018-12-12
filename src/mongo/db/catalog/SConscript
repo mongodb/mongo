@@ -281,6 +281,7 @@ env.Library(
     target='uuid_catalog',
     source=[
         'namespace_uuid_cache.cpp',
+        env.Idlc('namespace_uuid_cache.idl')[0],
         'uuid_catalog.cpp',
     ],
     LIBDEPS=[
@@ -290,8 +291,10 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ]
 )
 
 env.CppUnitTest(
