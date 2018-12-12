@@ -37,6 +37,7 @@
 #include <mutex>
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/enable_localhost_auth_bypass_parameter_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/debug_util.h"
@@ -45,7 +46,6 @@
 namespace mongo {
 
 namespace {
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableLocalhostAuthBypass, bool, true);
 std::once_flag checkShouldAllowLocalhostOnceFlag;
 }  // namespace
 

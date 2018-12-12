@@ -1,0 +1,10 @@
+global: 
+  cpp_namespace: "mongo" 
+ 
+server_parameters: 
+  enableLocalhostAuthBypass: 
+    description: "Enable authorization bypass for localhost connections" 
+    set_at: startup 
+    cpp_varname: "enableLocalhostAuthBypass"
+    cpp_vartype: bool
+    default: true

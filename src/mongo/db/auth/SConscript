@@ -262,6 +262,7 @@ env.Library(
     source=[
         'authz_session_external_state_server_common.cpp',
         'sasl_commands.cpp',
+        env.Idlc('enable_localhost_auth_bypass_parameter.idl')[0],
     ],
     LIBDEPS=[
         'auth',
