@@ -1,0 +1,88 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/auth/sasl_options.h"
+  configs:
+    section: "SASL Options"
+    source: [ yaml ]
+
+server_parameters:
+  authenticationMechanisms:
+    description: "The set of accepted authentication mechanisms"
+    set_at: startup
+    default:
+        expr: 'SASLGlobalParams::kDefaultAuthenticationMechanisms'
+        is_constexpr: false
+    on_update: "SASLGlobalParams::onSetAuthenticationMechanism"
+    cpp_varname: "saslGlobalParams.authenticationMechanisms"
+  saslHostName:
+    description: "Overrides the automatically detected hostname used in SASL authentication"
+    set_at: startup
+    on_update: "SASLGlobalParams::onSetHostName"
+    cpp_varname: "saslGlobalParams.hostName"
+  saslServiceName:
+    description: "Override the default service name used in Kerberos authentication"
+    set_at: startup
+    on_update: "SASLGlobalParams::onSetServiceName"
+    cpp_varname: "saslGlobalParams.serviceName"
+  saslauthdPath:
+    description: "The path to a saslauthd Unix domain socket"
+    set_at: startup
+    on_update: "SASLGlobalParams::onSetAuthdPath"
+    cpp_varname: "saslGlobalParams.authdPath"
+  scramIterationCount:
+    description: "The number of times passwords are iteratively hashed for SCRAM-SHA-1"
+    set_at: [startup, runtime]
+    on_update: "SASLGlobalParams::onSetScramSHA1IterationCount"
+    cpp_varname: "saslGlobalParams.scramSHA1IterationCount"
+    default: 10000
+    validator: {gte: 5000}
+  scramSHA256IterationCount:
+    description: "The number of times passwords are iteratively hashed for SCRAM-SHA-256"
+    set_at: [startup, runtime]
+    on_update: "SASLGlobalParams::onSetScramSHA256IterationCount"
+    cpp_varname: "saslGlobalParams.scramSHA256IterationCount"
+    default: 15000
+    validator: {gte: 5000}
+
+configs:
+  "security.authenticationMechanisms":
+    description: "List of supported authentication mechanisms. Default is SCRAM-SHA-1 and MONGODB-X509."
+    arg_vartype: StringVector
+  "security.sasl.hostName":
+    description: "Fully qualified server domain name"
+    arg_vartype: String
+  "security.sasl.serviceName":
+    description: "Registered name of the service using SASL"
+    arg_vartype: String
+  "security.sasl.saslauthdSocketPath":
+    description: "Path to Unix domain socket file for saslauthd"
+    arg_vartype: String

@@ -271,6 +271,7 @@ env.Library(
         'saslauth',
     ],
     LIBDEPS_PRIVATE=[
+        'sasl_options_init',
         '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/commands',
@@ -301,11 +302,24 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_parameters',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
+
+env.Library(
+  target='sasl_options_init',
+  source=[
+      'sasl_options_init.cpp',
+       env.Idlc('sasl_options.idl')[0],
+  ],
+  LIBDEPS=[
+    'sasl_options'
+  ],
+  LIBDEPS_PRIVATE=[
+       '$BUILD_DIR/mongo/util/options_parser/options_parser',
+       '$BUILD_DIR/mongo/util/net/network',
+  ],
+)     
 
 env.Library(
     target='saslauth',

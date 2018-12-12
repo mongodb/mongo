@@ -63,4 +63,9 @@ MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
     }
     return Status::OK();
 }
+
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
+(InitializerContext* context) {
+    return Status::OK();
+}
 }

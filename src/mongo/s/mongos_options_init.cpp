@@ -72,7 +72,7 @@ MONGO_INITIALIZER_GENERAL(MongosOptions,
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(MongosOptions_Store,
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
 (InitializerContext* context) {

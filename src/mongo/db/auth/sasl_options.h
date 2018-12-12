@@ -46,7 +46,11 @@ class Environment;
 
 namespace moe = optionenvironment;
 
+struct SASLGlobalParams;
+extern SASLGlobalParams saslGlobalParams;
 struct SASLGlobalParams {
+    static const std::vector<std::string> kDefaultAuthenticationMechanisms;
+
     std::vector<std::string> authenticationMechanisms;
     std::string hostName;
     std::string serviceName;
@@ -56,9 +60,41 @@ struct SASLGlobalParams {
     AtomicWord<int> authFailedDelay;
 
     SASLGlobalParams();
-};
 
-extern SASLGlobalParams saslGlobalParams;
+    static Status onSetAuthenticationMechanism(const std::vector<std::string>&) {
+        saslGlobalParams.numTimesAuthenticationMechanismsSet++;
+        return Status::OK();
+    }
+
+    static Status onSetHostName(const std::string&) {
+        saslGlobalParams.haveHostName = true;
+        return Status::OK();
+    }
+    static Status onSetServiceName(const std::string&) {
+        saslGlobalParams.haveServiceName = true;
+        return Status::OK();
+    }
+    static Status onSetAuthdPath(const std::string&) {
+        saslGlobalParams.haveAuthdPath = true;
+        return Status::OK();
+    }
+    static Status onSetScramSHA1IterationCount(const int) {
+        saslGlobalParams.numTimesScramSHA1IterationCountSet++;
+        return Status::OK();
+    }
+    static Status onSetScramSHA256IterationCount(const int) {
+        saslGlobalParams.numTimesScramSHA256IterationCountSet++;
+        return Status::OK();
+    }
+
+
+    int numTimesAuthenticationMechanismsSet = 0;
+    bool haveHostName = false;
+    bool haveServiceName = false;
+    bool haveAuthdPath = false;
+    int numTimesScramSHA1IterationCountSet = 0;
+    int numTimesScramSHA256IterationCountSet = 0;
+};
 
 Status addSASLOptions(moe::OptionSection* options);
 
