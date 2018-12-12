@@ -39,6 +39,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -72,38 +73,12 @@ const StringData kCommitReadyMembersFieldName = "commitReadyMembers"_sd;
 
 }  // namespace
 
-MONGO_EXPORT_SERVER_PARAMETER(useReadOnceCursorsForIndexBuilds, bool, true);
-
 MONGO_FAIL_POINT_DEFINE(crashAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(slowBackgroundIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
-
-AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
-
-class ExportedMaxIndexBuildMemoryUsageParameter
-    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
-public:
-    ExportedMaxIndexBuildMemoryUsageParameter()
-        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(),
-              "maxIndexBuildMemoryUsageMegabytes",
-              &maxIndexBuildMemoryUsageMegabytes) {}
-
-    virtual Status validate(const std::int32_t& potentialNewValue) {
-        if (potentialNewValue < 100) {
-            return Status(
-                ErrorCodes::BadValue,
-                "maxIndexBuildMemoryUsageMegabytes must be greater than or equal to 100 MB");
-        }
-
-        return Status::OK();
-    }
-
-} exportedMaxIndexBuildMemoryUsageParameter;
-
 
 MultiIndexBlock::MultiIndexBlock(OperationContext* opCtx, Collection* collection)
     : _collection(collection), _opCtx(opCtx) {}
