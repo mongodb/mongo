@@ -27,6 +27,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
 #include "mongo/bson/oid.h"
 #include "mongo/util/background.h"
@@ -59,5 +60,7 @@ private:
     AuthorizationManager* _authzManager;
     OID _previousCacheGeneration;
 };
+
+Status userCacheInvalidationIntervalSecsNotify(const int& newValue);
 
 }  // namespace mongo
