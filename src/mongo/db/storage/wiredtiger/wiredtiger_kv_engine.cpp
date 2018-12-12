@@ -1520,6 +1520,13 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp, bool forc
     invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
 
+    // set_timestamp above ignores backwards in time unless 'force' is set.
+    if (force) {
+        _oldestTimestamp.store(oldestTimestamp.asULL());
+    } else if (_oldestTimestamp.load() < oldestTimestamp.asULL()) {
+        _oldestTimestamp.store(oldestTimestamp.asULL());
+    }
+
     if (force) {
         LOG(2) << "oldest_timestamp and commit_timestamp force set to " << oldestTimestamp;
     } else {
@@ -1661,6 +1668,10 @@ void WiredTigerKVEngine::haltOplogManager() {
 
 void WiredTigerKVEngine::replicationBatchIsComplete() const {
     _oplogManager->triggerJournalFlush();
+}
+
+Timestamp WiredTigerKVEngine::getOldestTimestamp() const {
+    return Timestamp(_oldestTimestamp.load());
 }
 
 }  // namespace mongo
