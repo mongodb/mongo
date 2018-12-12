@@ -14,7 +14,6 @@
 
     // Commands sent directly to the config server should fail with WC < majority.
     const unacceptableWCsForConfig = [
-        {writeConcern: {w: 0}},
         {writeConcern: {w: 1}},
         {writeConcern: {w: 2}},
         {writeConcern: {w: 3}},

@@ -33,6 +33,16 @@ function resultNOK(result) {
     return !result.ok && typeof(result.code) == 'number' && typeof(result.errmsg) == 'string';
 }
 
+function countEventually(collection, n) {
+    assert.soon(
+        function() {
+            return collection.count() === n;
+        },
+        function() {
+            return "unacknowledged write timed out";
+        });
+}
+
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 
 //
@@ -70,7 +80,7 @@ request = {
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
-assert.eq(0, coll.count());
+countEventually(coll, 0);
 
 var fields = ['ok'];
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
@@ -218,7 +228,7 @@ request = {
 };
 result = coll.runCommand(request);
 assert.commandWorked(result);
-assert.eq(0, coll.count());
+countEventually(coll, 0);
 
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
@@ -235,7 +245,7 @@ request = {
 };
 result = coll.runCommand(request);
 assert.commandWorked(result);
-assert.eq(1, coll.count());
+countEventually(coll, 1);
 
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
@@ -250,4 +260,5 @@ request = {
     ordered: false
 };
 result = coll.runCommand(request);
-assert(resultNOK(result), tojson(result));
+// Unacknowledged writes are always OK
+assert.commandWorked(result);

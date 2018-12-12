@@ -33,9 +33,15 @@
                 verifyResult(args.result, r);
 
                 // Get all the results
-                var results = coll.find({}).sort({_id: 1}).toArray();
-
-                assert.docEq(args.expected, results);
+                assert.soonNoExcept(
+                    function() {
+                        var results = coll.find({}).sort({_id: 1}).toArray();
+                        assert.docEq(args.expected, results);
+                        return true;
+                    },
+                    function() {
+                        return "collection never contained expected documents";
+                    });
             };
         }
 

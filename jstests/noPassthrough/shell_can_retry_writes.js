@@ -112,10 +112,6 @@
         coll.insertOne({_id: "majority"}, {w: "majority"});
     });
 
-    testCommandCanBeRetried(function() {
-        coll.insertOne({_id: 0}, {w: 0});
-    }, false);
-
     //
     // Tests for bulkWrite().
     //

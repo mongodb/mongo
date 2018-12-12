@@ -36,6 +36,16 @@ function resultNOK(result) {
     return !result.ok && typeof(result.code) == 'number' && typeof(result.errmsg) == 'string';
 }
 
+function countEventually(collection, n) {
+    assert.soon(
+        function() {
+            return collection.count() === n;
+        },
+        function() {
+            return "unacknowledged write timed out";
+        });
+}
+
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 
 //
@@ -69,7 +79,7 @@ request = {
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
-assert.eq(coll.count(), 1);
+countEventually(coll, 1);
 
 var fields = ['ok'];
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));

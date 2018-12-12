@@ -110,6 +110,23 @@ DBClientBase* getConnection(JS::CallArgs& args) {
     return getConnectionRef(args).get();
 }
 
+bool isUnacknowledged(const BSONObj& cmdObj) {
+    auto wc = cmdObj["writeConcern"];
+    return wc && wc["w"].isNumber() && wc["w"].safeNumberLong() == 0;
+}
+
+void returnOk(JSContext* cx, JS::CallArgs& args) {
+    ValueReader(cx, args.rval()).fromBSON(BSON("ok" << 1), nullptr, false);
+}
+
+void runFireAndForgetCommand(const std::shared_ptr<DBClientBase>& conn,
+                             const std::string& database,
+                             BSONObj body,
+                             const BSONObj& extraFields = {}) {
+    auto request = OpMsgRequest::fromDBAndBody(database, body, extraFields);
+    conn->runFireAndForgetCommand(request);
+}
+
 void setCursor(MozJSImplScope* scope,
                JS::HandleObject target,
                std::unique_ptr<DBClientCursor> cursor,
@@ -135,6 +152,17 @@ void setCursorHandle(MozJSImplScope* scope,
         scope->trackedNew<CursorHandleInfo::CursorTracker>(std::move(ns), cursorId, *client));
 }
 
+void setHiddenMongo(JSContext* cx, JS::HandleValue value, JS::CallArgs& args) {
+    ObjectWrapper o(cx, args.rval());
+    if (!o.hasField(InternedString::_mongo)) {
+        o.defineProperty(InternedString::_mongo, value, JSPROP_READONLY | JSPROP_PERMANENT);
+    }
+}
+
+void setHiddenMongo(JSContext* cx, JS::CallArgs& args) {
+    setHiddenMongo(cx, args.thisv(), args);
+}
+
 void setHiddenMongo(JSContext* cx,
                     std::shared_ptr<DBClientBase> resPtr,
                     DBClientBase* origConn,
@@ -143,7 +171,7 @@ void setHiddenMongo(JSContext* cx,
     // If the connection that ran the command is the same as conn, then we set a hidden "_mongo"
     // property on the returned object that is just "this" Mongo object.
     if (resPtr.get() == origConn) {
-        o.defineProperty(InternedString::_mongo, args.thisv(), JSPROP_READONLY | JSPROP_PERMANENT);
+        setHiddenMongo(cx, args.thisv(), args);
     } else {
         JS::RootedObject newMongo(cx);
 
@@ -168,8 +196,7 @@ void setHiddenMongo(JSContext* cx,
 
         JS::RootedValue value(cx);
         value.setObjectOrNull(newMongo);
-
-        o.defineProperty(InternedString::_mongo, value, JSPROP_READONLY | JSPROP_PERMANENT);
+        setHiddenMongo(cx, value, args);
     }
 }
 }  // namespace
@@ -212,6 +239,13 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
 
     BSONObj cmdObj = ValueWriter(cx, args.get(1)).toBSON();
 
+    if (isUnacknowledged(cmdObj)) {
+        runFireAndForgetCommand(conn, database, cmdObj);
+        setHiddenMongo(cx, args);
+        returnOk(cx, args);
+        return;
+    }
+
     int queryOptions = ValueWriter(cx, args.get(2)).toInt32();
     BSONObj cmdRes;
     auto resTuple = conn->runCommandWithTarget(database, cmdObj, cmdRes, conn, queryOptions);
@@ -244,6 +278,14 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
     BSONObj commandArgs = ValueWriter(cx, args.get(2)).toBSON();
 
     const auto& conn = getConnectionRef(args);
+
+    if (isUnacknowledged(commandArgs)) {
+        runFireAndForgetCommand(conn, database, commandArgs, metadata);
+        setHiddenMongo(cx, args);
+        returnOk(cx, args);
+        return;
+    }
+
     auto resTuple = conn->runCommandWithTarget(
         OpMsgRequest::fromDBAndBody(database, commandArgs, metadata), conn);
     auto res = std::move(std::get<0>(resTuple));
