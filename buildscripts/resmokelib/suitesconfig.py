@@ -85,6 +85,12 @@ def get_suites(suite_files, test_files):
     return suites
 
 
+def get_suite(suite_file):
+    """Retrieve the Suite instance corresponding to a suite configuration file."""
+    suite_config = _get_suite_config(suite_file)
+    return _suite.Suite(suite_file, suite_config)
+
+
 def _make_suite_roots(files):
     return {"selector": {"roots": files}}
 
