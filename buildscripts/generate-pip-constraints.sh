@@ -34,7 +34,7 @@ do KEY="${1}"
     esac
 done
 
-if [[ ${#ARGS} -eq 0 ]]; then
+if [[ ${#ARGS[@]} -eq 0 ]]; then
     1>&2 echo "No pip arguments given. Failing..."
     exit 2
 fi

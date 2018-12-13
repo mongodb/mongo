@@ -3,3 +3,4 @@
 
 -r components/resmoke.req
 -r components/aws.req
+-r components/idl.req
