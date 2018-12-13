@@ -221,7 +221,7 @@ public:
                     _onStableTimestampChanged(newTimestamp);
             }
 
-            const TimestampType getType() const {
+            TimestampType getType() const {
                 return _type;
             }
 
