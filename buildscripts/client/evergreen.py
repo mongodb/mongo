@@ -115,7 +115,9 @@ class EvergreenApiV2(EvergreenApi):
             read=num_retries,
             connect=num_retries,
             backoff_factor=0.1,  # Enable backoff starting at 0.1s.
-            status_forcelist=[500, 502, 503, 504])
+            status_forcelist=[
+                500, 502, 504
+            ])  # We are not retrying 503 errors as they are used to indicate degraded service
         adapter = requests.adapters.HTTPAdapter(max_retries=retry)
         self.session.mount("{url.scheme}://".format(url=urlparse(api_server)), adapter)
         self.session.headers.update(api_headers)

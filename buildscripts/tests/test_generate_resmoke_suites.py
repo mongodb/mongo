@@ -6,6 +6,8 @@ import datetime
 import math
 import os
 import unittest
+
+import requests
 import yaml
 
 from mock import patch, mock_open, call, Mock
@@ -312,3 +314,59 @@ class GenerateEvgConfigTest(unittest.TestCase):
         self.assertIn(options.variant, task["name"])
         self.assertIn(task["name"], display_task["execution_tasks"])
         self.assertIn(options.suite, task["commands"][1]["vars"]["resmoke_args"])
+
+
+class MainTest(unittest.TestCase):
+    def test_calculate_suites(self):
+        evg = Mock()
+        evg.test_stats.return_value = [{
+            "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
+        } for i in range(100)]
+
+        main = grs.Main(evg)
+        main.options = Mock()
+        main.options.execution_time_minutes = 10
+        main.config_options = grs.ConfigOptions(2, 15, "project", "", 1, True, "task", "suite",
+                                                "variant")
+
+        suites = main.calculate_suites(_DATE, _DATE)
+
+        # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
+        self.assertEqual(10, len(suites))
+        for suite in suites:
+            self.assertEqual(10, len(suite.tests))
+
+    def test_calculate_suites_fallback(self):
+        response = Mock()
+        response.status_code = requests.codes.SERVICE_UNAVAILABLE
+        evg = Mock()
+        evg.test_stats.side_effect = requests.HTTPError(response=response)
+
+        main = grs.Main(evg)
+        main.options = Mock()
+        main.options.execution_time_minutes = 10
+        main.config_options = grs.ConfigOptions(2, 15, "project", "", 1, True, "task", "suite",
+                                                "variant")
+        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
+
+        suites = main.calculate_suites(_DATE, _DATE)
+
+        self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
+        for suite in suites:
+            self.assertEqual(50, len(suite.tests))
+
+    def test_calculate_suites_error(self):
+        response = Mock()
+        response.status_code = requests.codes.INTERNAL_SERVER_ERROR
+        evg = Mock()
+        evg.test_stats.side_effect = requests.HTTPError(response=response)
+
+        main = grs.Main(evg)
+        main.options = Mock()
+        main.options.execution_time_minutes = 10
+        main.config_options = grs.ConfigOptions(2, 15, "project", "", 1, True, "task", "suite",
+                                                "variant")
+        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
+
+        with self.assertRaises(requests.HTTPError):
+            main.calculate_suites(_DATE, _DATE)
