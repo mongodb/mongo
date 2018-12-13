@@ -56,7 +56,7 @@ boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
     if (auto next = _pipeline->getNext()) {
         // While we have more results to return, we track both the timestamp and the resume token of
         // the latest event observed in the oplog, the latter via its sort key metadata field.
-        auto nextBSON = (_includeMetaData ? next->toBsonWithMetaData() : next->toBson());
+        auto nextBSON = _validateAndConvertToBSON(*next);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
         _postBatchResumeToken = next->getSortKeyMetaField();
         _setSpeculativeReadOpTime();
@@ -77,6 +77,29 @@ boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {
         _setSpeculativeReadOpTime();
     }
     return boost::none;
+}
+
+BSONObj ChangeStreamProxyStage::_validateAndConvertToBSON(const Document& event) const {
+    // If we are producing output to be merged on mongoS, then no stages can have modified the _id.
+    if (_includeMetaData) {
+        return event.toBsonWithMetaData();
+    }
+    // Confirm that the document _id field matches the original resume token in the sort key field.
+    auto eventBSON = event.toBson();
+    auto resumeToken = event.getSortKeyMetaField();
+    auto idField = eventBSON.getObjectField("_id");
+    invariant(!resumeToken.isEmpty());
+    uassert(51059,
+            str::stream() << "Encountered an event whose _id field, which contains the resume "
+                             "token, was modified by the pipeline. Modifying the _id field of an "
+                             "event makes it impossible to resume the stream from that point. Only "
+                             "transformations that retain the unmodified _id field are allowed. "
+                             "Expected: "
+                          << BSON("_id" << resumeToken)
+                          << " but found: "
+                          << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
+            idField.binaryEqual(resumeToken));
+    return eventBSON;
 }
 
 void ChangeStreamProxyStage::_setSpeculativeReadOpTime() {

@@ -59,6 +59,24 @@ function assertInvalidateOp({cursor, opType}) {
     return null;
 }
 
+/**
+ * Helper to check whether a change stream event matches the given expected event. Ignores the
+ * resume token and clusterTime unless they are explicitly listed in the expectedEvent.
+ */
+function assertChangeStreamEventEq(actualEvent, expectedEvent) {
+    const testEvent = Object.assign({}, actualEvent);
+    if (expectedEvent._id == null) {
+        delete testEvent._id;  // Remove the resume token, if present.
+    }
+    if (expectedEvent.clusterTime == null) {
+        delete testEvent.clusterTime;  // Remove the cluster time, if present.
+    }
+    assert.docEq(testEvent,
+                 expectedEvent,
+                 "Change did not match expected change. Expected change: " + tojson(expectedEvent) +
+                     ", Actual change: " + tojson(testEvent));
+}
+
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
 
@@ -160,17 +178,8 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     function assertChangeIsExpected(
         expectedChanges, numChangesSeen, observedChanges, expectInvalidate) {
         if (expectedChanges) {
-            const lastObservedChange = Object.assign({}, observedChanges[numChangesSeen]);
-            if (expectedChanges[numChangesSeen]._id == null) {
-                delete lastObservedChange._id;  // Remove the resume token, if present.
-            }
-            if (expectedChanges[numChangesSeen].clusterTime == null) {
-                delete lastObservedChange.clusterTime;  // Remove the cluster time, if present.
-            }
-            assert.docEq(lastObservedChange,
-                         expectedChanges[numChangesSeen],
-                         "Change did not match expected change. Expected changes: " +
-                             tojson(expectedChanges));
+            assertChangeStreamEventEq(observedChanges[numChangesSeen],
+                                      expectedChanges[numChangesSeen]);
         } else if (!expectInvalidate) {
             assert(!isInvalidated(observedChanges[numChangesSeen]),
                    "Change was invalidated when it should not have been. Number of changes seen: " +

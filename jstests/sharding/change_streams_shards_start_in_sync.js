@@ -9,9 +9,6 @@
 (function() {
     "use strict";
 
-    load('jstests/aggregation/extras/utils.js');  // For assertErrorCode().
-    load('jstests/libs/change_stream_util.js');   // For ChangeStreamTest.
-
     // For supportsMajorityReadConcern().
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
 
@@ -51,13 +48,14 @@
         {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
     function checkStream() {
+        load('jstests/libs/change_stream_util.js');  // For assertChangeStreamEventEq.
+
         db = db.getSiblingDB(jsTestName());
         let coll = db[jsTestName()];
-        let changeStream =
-            coll.aggregate([{$changeStream: {}}, {$project: {_id: 0, clusterTime: 0}}]);
+        let changeStream = coll.aggregate([{$changeStream: {}}]);
 
         assert.soon(() => changeStream.hasNext());
-        assert.docEq(changeStream.next(), {
+        assertChangeStreamEventEq(changeStream.next(), {
             documentKey: {_id: -1000},
             fullDocument: {_id: -1000},
             ns: {db: db.getName(), coll: coll.getName()},
@@ -65,7 +63,7 @@
         });
 
         assert.soon(() => changeStream.hasNext());
-        assert.docEq(changeStream.next(), {
+        assertChangeStreamEventEq(changeStream.next(), {
             documentKey: {_id: 1001},
             fullDocument: {_id: 1001},
             ns: {db: db.getName(), coll: coll.getName()},
@@ -73,7 +71,7 @@
         });
 
         assert.soon(() => changeStream.hasNext());
-        assert.docEq(changeStream.next(), {
+        assertChangeStreamEventEq(changeStream.next(), {
             documentKey: {_id: -1002},
             fullDocument: {_id: -1002},
             ns: {db: db.getName(), coll: coll.getName()},

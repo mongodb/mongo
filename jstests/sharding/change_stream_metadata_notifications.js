@@ -87,9 +87,8 @@
     assert(changeStream.isExhausted());
 
     // With an explicit collation, test that we can resume from before the collection drop.
-    changeStream =
-        mongosColl.watch([{$project: {_id: 0}}],
-                         {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
+    changeStream = mongosColl.watch(
+        [], {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();

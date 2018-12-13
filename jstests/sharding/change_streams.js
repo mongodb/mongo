@@ -5,6 +5,7 @@
 
     load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
     load('jstests/aggregation/extras/utils.js');       // For assertErrorCode().
+    load('jstests/libs/change_stream_util.js');        // For assertChangeStreamEventEq.
 
     // For supportsMajorityReadConcern().
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
@@ -49,15 +50,14 @@
     assert.writeOK(mongosColl.insert({_id: -1}));
     assert.writeOK(mongosColl.insert({_id: 1}));
 
-    let changeStream =
-        mongosColl.aggregate([{$changeStream: {}}, {$project: {_id: 0, clusterTime: 0}}]);
+    let changeStream = mongosColl.aggregate([{$changeStream: {}}]);
 
     // Test that a change stream can see inserts on shard 0.
     assert.writeOK(mongosColl.insert({_id: 1000}));
     assert.writeOK(mongosColl.insert({_id: -1000}));
 
     assert.soon(() => changeStream.hasNext(), "expected to be able to see the first insert");
-    assert.docEq(changeStream.next(), {
+    assertChangeStreamEventEq(changeStream.next(), {
         documentKey: {_id: 1000},
         fullDocument: {_id: 1000},
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
@@ -69,7 +69,7 @@
     assert.writeOK(mongosColl.insert({_id: 1001}));
 
     assert.soon(() => changeStream.hasNext(), "expected to be able to see the second insert");
-    assert.docEq(changeStream.next(), {
+    assertChangeStreamEventEq(changeStream.next(), {
         documentKey: {_id: -1000},
         fullDocument: {_id: -1000},
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
@@ -83,7 +83,7 @@
         st.rs1.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true}));
     assert.soon(() => changeStream.hasNext());
 
-    assert.docEq(changeStream.next(), {
+    assertChangeStreamEventEq(changeStream.next(), {
         documentKey: {_id: 1001},
         fullDocument: {_id: 1001},
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
@@ -118,7 +118,7 @@
     // Use { w: "majority" } to deal with journaling correctly, even though we only have one node.
     assert.writeOK(mongosColl.insert({_id: 0, a: 1}, {writeConcern: {w: "majority"}}));
 
-    changeStream = mongosColl.aggregate([{$changeStream: {}}, {$project: {"_id.clusterTime": 0}}]);
+    changeStream = mongosColl.aggregate([{$changeStream: {}}]);
     assert(!changeStream.hasNext());
 
     // Drop the collection and test that we return a "drop" followed by an "invalidate" entry and
@@ -174,8 +174,7 @@
     assert.eq(changeStream.next().operationType, "invalidate");
 
     // With an explicit collation, test that we can resume from before the collection drop.
-    changeStream = mongosColl.watch([{$project: {_id: 0}}],
-                                    {resumeAfter: resumeToken, collation: {locale: "simple"}});
+    changeStream = mongosColl.watch([], {resumeAfter: resumeToken, collation: {locale: "simple"}});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();

@@ -116,7 +116,7 @@ eventFn();`,
     let res = assert.commandWorked(db.runCommand({
         aggregate: changesCollection.getName(),
         // Project out the resume token, since that's subject to change unpredictably.
-        pipeline: [{$changeStream: {}}, {$project: {"_id": 0}}],
+        pipeline: [{$changeStream: {}}],
         cursor: {},
         comment: wholeCollectionStreamComment
     }));

@@ -217,18 +217,15 @@
                 assertDropAndRecreateCollection(db, "change_stream_no_collation");
 
             const cursor = noCollationCollection.watch(
-                [
-                  {$match: {"fullDocument.text": "abc"}},
-                  {$project: {docId: "$documentKey._id", _id: 0}}
-                ],
+                [{$match: {"fullDocument.text": "abc"}}, {$project: {docId: "$documentKey._id"}}],
                 {collation: caseInsensitive});
             assert(!cursor.hasNext());
             assert.writeOK(noCollationCollection.insert({_id: 0, text: "aBc"}));
             assert.writeOK(noCollationCollection.insert({_id: 1, text: "abc"}));
             assert.soon(() => cursor.hasNext());
-            assert.docEq(cursor.next(), {docId: 0});
+            assertChangeStreamEventEq(cursor.next(), {docId: 0});
             assert.soon(() => cursor.hasNext());
-            assert.docEq(cursor.next(), {docId: 1});
+            assertChangeStreamEventEq(cursor.next(), {docId: 1});
             assert(!cursor.hasNext());
         }());
 

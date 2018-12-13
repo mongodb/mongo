@@ -13,13 +13,8 @@
     function checkNextChange(cursor, expected) {
         assert.soon(() => cursor.hasNext());
         const nextObj = cursor.next();
-        const originalObj = Object.assign({}, nextObj);
-
-        delete nextObj._id;
-        delete nextObj.clusterTime;
-        assert.docEq(nextObj, expected);
-
-        return originalObj;
+        assertChangeStreamEventEq(nextObj, expected);
+        return nextObj;
     }
 
     function testCommandIsCalled(testFunc, checkFunc) {
@@ -75,8 +70,7 @@
     assert.docEq(change, expected);
 
     jsTestLog("Testing watch() with pipeline");
-    changeStreamCursor =
-        coll.watch([{$project: {_id: 0, clusterTime: 1, docId: "$documentKey._id"}}]);
+    changeStreamCursor = coll.watch([{$project: {clusterTime: 1, docId: "$documentKey._id"}}]);
 
     // Store the cluster time of the insert as the timestamp to start from.
     const resumeTime =
@@ -94,21 +88,21 @@
 
     jsTestLog("Testing watch() with pipeline and resumeAfter");
     changeStreamCursor =
-        coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
+        coll.watch([{$project: {docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
     checkNextChange(changeStreamCursor, {docId: 1});
 
     jsTestLog("Testing watch() with pipeline and startAfter");
     changeStreamCursor =
-        coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}], {startAfter: resumeToken});
+        coll.watch([{$project: {docId: "$documentKey._id"}}], {startAfter: resumeToken});
     checkNextChange(changeStreamCursor, {docId: 1});
 
     jsTestLog("Testing watch() with pipeline and startAtOperationTime");
-    changeStreamCursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],
-                                    {startAtOperationTime: resumeTime});
+    changeStreamCursor =
+        coll.watch([{$project: {docId: "$documentKey._id"}}], {startAtOperationTime: resumeTime});
     checkNextChange(changeStreamCursor, {docId: 1});
 
     jsTestLog("Testing watch() with updateLookup");
-    changeStreamCursor = coll.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
+    changeStreamCursor = coll.watch([], {fullDocument: "updateLookup"});
 
     assert.writeOK(coll.update({_id: 0}, {$set: {x: 10}}));
     expected = {
@@ -131,9 +125,9 @@
         }
 
         // Only watch the "update" changes of the specific doc since the beginning.
-        changeStreamCursor = coll.watch(
-            [{$match: {documentKey: {_id: 1}, operationType: "update"}}, {$project: {_id: 0}}],
-            {resumeAfter: resumeToken, batchSize: 2});
+        changeStreamCursor =
+            coll.watch([{$match: {documentKey: {_id: 1}, operationType: "update"}}],
+                       {resumeAfter: resumeToken, batchSize: 2});
 
         // Check the first batch.
         assert.eq(changeStreamCursor.objsLeftInBatch(), 2);

@@ -81,8 +81,12 @@ protected:
 
 private:
     /**
-     * Set the speculative majority read optime if we have scanned the oplog up to a certain
-     * timestamp.
+     * Verifies that the docs's resume token has not been modified, then converts the doc to BSON.
+     */
+    BSONObj _validateAndConvertToBSON(const Document& event) const;
+
+    /**
+     * Set the speculative majority read optime if we have scanned up to a certain oplog timestamp.
      */
     void _setSpeculativeReadOpTime();
 

@@ -55,8 +55,7 @@ StatusWith<ClusterQueryResult> RouterStagePipeline::next(RouterExecStage::ExecCo
 
     // Pipeline::getNext will return a boost::optional<Document> or boost::none if EOF.
     if (auto result = _mergePipeline->getNext()) {
-        _validateAndRecordSortKey(*result);
-        return {result->toBson()};
+        return _validateAndConvertToBSON(*result);
     }
 
     // If we reach this point, we have hit EOF.
@@ -111,8 +110,30 @@ BSONObj RouterStagePipeline::_setPostBatchResumeTokenUUID(BSONObj pbrt) const {
     return pbrt;
 }
 
-void RouterStagePipeline::_validateAndRecordSortKey(const Document& doc) {
-    _latestSortKey = doc.getSortKeyMetaField();
+BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
+    // If this is not a change stream pipeline, we have nothing to do except return the BSONObj.
+    if (!_mergePipeline->getContext()->isTailableAwaitData()) {
+        return event.toBson();
+    }
+    // Confirm that the document _id field matches the original resume token in the sort key field.
+    auto eventBSON = event.toBson();
+    auto resumeToken = event.getSortKeyMetaField();
+    auto idField = eventBSON.getObjectField("_id");
+    invariant(!resumeToken.isEmpty());
+    uassert(51060,
+            str::stream() << "Encountered an event whose _id field, which contains the resume "
+                             "token, was modified by the pipeline. Modifying the _id field of an "
+                             "event makes it impossible to resume the stream from that point. Only "
+                             "transformations that retain the unmodified _id field are allowed. "
+                             "Expected: "
+                          << BSON("_id" << resumeToken)
+                          << " but found: "
+                          << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
+            idField.binaryEqual(resumeToken));
+
+    // Record the latest resume token for later comparison, then return the event in BSONObj form.
+    _latestSortKey = resumeToken;
+    return eventBSON;
 }
 
 bool RouterStagePipeline::remotesExhausted() {

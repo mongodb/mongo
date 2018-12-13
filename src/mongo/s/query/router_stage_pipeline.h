@@ -64,13 +64,13 @@ protected:
     void doDetachFromOperationContext() final;
 
 private:
+    BSONObj _validateAndConvertToBSON(const Document& event);
+
     BSONObj _setPostBatchResumeTokenUUID(BSONObj pbrt) const;
-    void _validateAndRecordSortKey(const Document& doc);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
 
-    // May be null if this pipeline is executing exclusively on mongos and will not contact the
-    // shards at all.
+    // May be null if this pipeline runs exclusively on mongos without contacting the shards at all.
     boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursorsStage;
 
     BSONObj _latestSortKey;
