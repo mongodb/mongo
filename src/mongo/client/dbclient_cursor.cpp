@@ -125,6 +125,10 @@ Message DBClientCursor::_assembleInit() {
                                                 nextBatchSize(),
                                                 opts);
         if (qr.isOK() && !qr.getValue()->isExplain()) {
+            if (query.getBoolField("$readOnce")) {
+                // Legacy queries don't handle readOnce.
+                qr.getValue()->setReadOnce(true);
+            }
             BSONObj cmd = _nsOrUuid.uuid() ? qr.getValue()->asFindCommandWithUuid()
                                            : qr.getValue()->asFindCommand();
             if (auto readPref = query["$readPreference"]) {

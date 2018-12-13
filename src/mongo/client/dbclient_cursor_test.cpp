@@ -408,5 +408,37 @@ TEST_F(DBClientCursorTest, DBClientCursorIgnoresExhaustForOpQueryMessages) {
     ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
 }
 
+TEST_F(DBClientCursorTest, DBClientCursorPassesReadOnceFlag) {
+
+    // Set up the DBClientCursor and a mock client connection.
+    DBClientConnectionForTest conn;
+    const NamespaceString nss("test", "coll");
+    DBClientCursor cursor(&conn,
+                          NamespaceStringOrUUID(nss),
+                          QUERY("query" << BSONObj() << "$readOnce" << true).obj,
+                          0,
+                          0,
+                          nullptr,
+                          /*QueryOption*/ 0,
+                          0);
+    cursor.setBatchSize(0);
+
+    // Set up mock 'find' response.
+    const long long cursorId = 42;
+    Message findResponseMsg = mockFindResponse(nss, cursorId, {});
+
+    conn.setCallResponse(findResponseMsg);
+    ASSERT(cursor.init());
+
+    // Verify that the 'find' request was sent with readOnce.
+    auto m = conn.getLastSentMessage();
+    ASSERT(!m.empty());
+    auto msg = OpMsg::parse(m);
+    ASSERT_EQ(OpMsg::flags(m), 0U);
+    ASSERT_EQ(msg.body.getStringField("find"), nss.coll());
+    ASSERT_EQ(msg.body["batchSize"].number(), 0);
+    ASSERT_TRUE(msg.body.getBoolField("readOnce")) << msg.body;
+}
+
 }  // namespace
 }  // namespace mongo
