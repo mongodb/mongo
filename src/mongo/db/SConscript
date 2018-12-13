@@ -1839,6 +1839,7 @@ env.Library(
         'service_context_test_fixture',
     ],
     LIBDEPS_PRIVATE=[
+        'catalog/catalog_impl',
         'commands/mongod',
         'index_builds_coordinator_mongod',
         'service_context_d',
