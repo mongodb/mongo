@@ -594,7 +594,10 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     }
     auto cursorResponseStatus = _parseCursorResponse(response.data, remote);
     if (!cursorResponseStatus.isOK()) {
-        _cleanUpFailedBatch(lk, cursorResponseStatus.getStatus(), remoteIndex);
+        _cleanUpFailedBatch(lk,
+                            cursorResponseStatus.getStatus().withContext(
+                                "Error on remote shard " + remote.shardHostAndPort.toString()),
+                            remoteIndex);
         return;
     }
 
