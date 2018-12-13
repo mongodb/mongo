@@ -98,12 +98,6 @@ public:
     void ignoreUniqueConstraint();
 
     /**
-     * Removes pre-existing indexes from 'specs'. If this isn't done, init() may fail with
-     * IndexAlreadyExists.
-     */
-    void removeExistingIndexes(std::vector<BSONObj>* const specs) const;
-
-    /**
      * Prepares the index(es) for building and returns the canonicalized form of the requested index
      * specifications.
      *

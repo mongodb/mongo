@@ -640,39 +640,39 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
             collection = db->getCollection(opCtx, nss);
         }
 
-        MultiIndexBlock indexer(opCtx, collection);
-        indexer.removeExistingIndexes(&donorIndexSpecs);
 
-        if (!donorIndexSpecs.empty()) {
-            // Only copy indexes if the collection does not have any documents.
-            uassert(ErrorCodes::CannotCreateCollection,
-                    str::stream() << "aborting, shard is missing " << donorIndexSpecs.size()
-                                  << " indexes and "
-                                  << "collection is not empty. Non-trivial "
-                                  << "index creation should be scheduled manually",
-                    collection->numRecords(opCtx) == 0);
-
-            auto indexInfoObjs = indexer.init(donorIndexSpecs);
-            uassert(ErrorCodes::CannotCreateIndex,
-                    str::stream() << "failed to create index before migrating data. "
-                                  << " error: "
-                                  << redact(indexInfoObjs.getStatus()),
-                    indexInfoObjs.isOK());
-
-            WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(indexer.commit());
-
-            for (auto&& infoObj : indexInfoObjs.getValue()) {
-                // make sure to create index on secondaries as well
-                serviceContext->getOpObserver()->onCreateIndex(opCtx,
-                                                               collection->ns(),
-                                                               *(collection->uuid()),
-                                                               infoObj,
-                                                               true /* fromMigrate */);
-            }
-
-            wunit.commit();
+        auto indexCatalog = collection->getIndexCatalog();
+        auto indexSpecs = indexCatalog->removeExistingIndexes(opCtx, donorIndexSpecs);
+        if (indexSpecs.empty()) {
+            return;
         }
+
+        // Only copy indexes if the collection does not have any documents.
+        uassert(ErrorCodes::CannotCreateCollection,
+                str::stream() << "aborting, shard is missing " << indexSpecs.size()
+                              << " indexes and "
+                              << "collection is not empty. Non-trivial "
+                              << "index creation should be scheduled manually",
+                collection->numRecords(opCtx) == 0);
+
+        MultiIndexBlock indexer(opCtx, collection);
+        auto indexInfoObjs = indexer.init(indexSpecs);
+        uassert(ErrorCodes::CannotCreateIndex,
+                str::stream() << "failed to create index before migrating data. "
+                              << "error: "
+                              << redact(indexInfoObjs.getStatus()),
+                indexInfoObjs.isOK());
+
+        WriteUnitOfWork wunit(opCtx);
+        uassertStatusOK(indexer.commit());
+
+        for (auto&& infoObj : indexInfoObjs.getValue()) {
+            // make sure to create index on secondaries as well
+            serviceContext->getOpObserver()->onCreateIndex(
+                opCtx, collection->ns(), *(collection->uuid()), infoObj, true /* fromMigrate */);
+        }
+
+        wunit.commit();
     }
 }
 

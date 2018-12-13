@@ -194,6 +194,10 @@ public:
     StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
                                              const BSONObj& original) const override;
 
+    std::vector<BSONObj> removeExistingIndexes(
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild) const override;
+
     /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the
      * 'includingIdIndex' parameter value. If the 'droppedIndexes' parameter is not null,

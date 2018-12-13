@@ -151,6 +151,12 @@ public:
         return original;
     }
 
+    std::vector<BSONObj> removeExistingIndexes(
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild) const override {
+        return {};
+    }
+
     void dropAllIndexes(OperationContext* opCtx,
                         bool includingIdIndex,
                         stdx::function<void(const IndexDescriptor*)> onDropFn) override {}

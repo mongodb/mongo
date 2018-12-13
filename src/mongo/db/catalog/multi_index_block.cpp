@@ -170,18 +170,6 @@ void MultiIndexBlock::ignoreUniqueConstraint() {
     _ignoreUnique = true;
 }
 
-void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
-    for (size_t i = 0; i < specs->size(); i++) {
-        Status status =
-            _collection->getIndexCatalog()->prepareSpecForCreate(_opCtx, (*specs)[i]).getStatus();
-        if (status.code() == ErrorCodes::IndexAlreadyExists) {
-            specs->erase(specs->begin() + i);
-            i--;
-        }
-        // intentionally ignoring other error codes
-    }
-}
-
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const BSONObj& spec) {
     const auto indexes = std::vector<BSONObj>(1, spec);
     return init(indexes);

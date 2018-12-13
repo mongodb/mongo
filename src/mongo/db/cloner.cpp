@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
@@ -396,11 +397,13 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     MultiIndexBlock indexer(opCtx, collection);
     indexer.allowInterruption();
 
-    indexer.removeExistingIndexes(&indexesToBuild);
-    if (indexesToBuild.empty())
+    auto indexCatalog = collection->getIndexCatalog();
+    auto prunedIndexesToBuild = indexCatalog->removeExistingIndexes(opCtx, indexesToBuild);
+    if (prunedIndexesToBuild.empty()) {
         return;
+    }
 
-    auto indexInfoObjs = uassertStatusOK(indexer.init(indexesToBuild));
+    auto indexInfoObjs = uassertStatusOK(indexer.init(prunedIndexesToBuild));
     uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
     WriteUnitOfWork wunit(opCtx);

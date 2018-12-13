@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -80,9 +81,9 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
             // All writes in CollectionBulkLoaderImpl should be unreplicated.
             // The opCtx is accessed indirectly through _secondaryIndexesBlock.
             UnreplicatedWritesBlock uwb(_opCtx.get());
-            std::vector<BSONObj> specs(secondaryIndexSpecs);
             // This enforces the buildIndexes setting in the replica set configuration.
-            _secondaryIndexesBlock->removeExistingIndexes(&specs);
+            auto indexCatalog = coll->getIndexCatalog();
+            auto specs = indexCatalog->removeExistingIndexes(_opCtx.get(), secondaryIndexSpecs);
             if (specs.size()) {
                 _secondaryIndexesBlock->ignoreUniqueConstraint();
                 auto status = _secondaryIndexesBlock->init(specs).getStatus();

@@ -271,6 +271,20 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
     return fixed;
 }
 
+std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
+    OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const {
+    std::vector<BSONObj> result;
+    for (const auto& spec : indexSpecsToBuild) {
+        auto status = prepareSpecForCreate(opCtx, spec).getStatus();
+        if (status.code() == ErrorCodes::IndexAlreadyExists) {
+            continue;
+        }
+        // Intentionally ignoring other error codes.
+        result.push_back(spec);
+    }
+    return result;
+}
+
 StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationContext* opCtx,
                                                                    BSONObj spec) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));

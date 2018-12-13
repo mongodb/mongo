@@ -328,6 +328,13 @@ public:
                                                      const BSONObj& original) const = 0;
 
     /**
+     * Removes pre-existing indexes from 'indexSpecsToBuild'. If this isn't done, an index build
+     * using 'indexSpecsToBuild' may fail with error code IndexAlreadyExists.
+     */
+    virtual std::vector<BSONObj> removeExistingIndexes(
+        OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
+
+    /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the
      * 'includingIdIndex' parameter value. If 'onDropFn' is provided, it will be called before each
      * index is dropped to allow timestamping each individual drop.
