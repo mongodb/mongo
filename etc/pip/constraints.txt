@@ -7,8 +7,8 @@
 # Common requirements
 asn1crypto==0.24.0
 astroid==1.6.5
-boto3==1.9.64
-botocore==1.12.64
+boto3==1.9.65
+botocore==1.12.65
 certifi==2018.11.29
 cffi==1.11.5
 chardet==3.0.4

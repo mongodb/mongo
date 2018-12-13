@@ -1308,6 +1308,18 @@ functions:
           fi
         fi
 
+  "install pip requirements" : &install_pip_requirements
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        python2 -m pip install -r etc/pip/evgtest-requirements.txt
+
   "determine resmoke jobs" : &determine_resmoke_jobs
     command: shell.exec
     params:
@@ -1456,6 +1468,7 @@ functions:
           if [[ ! -f $venv2_bin/python3 ]]; then ln -sfv "$py3_exe" "$venv2_bin/python3"; fi
 
   "run tests" :
+    - *install_pip_requirements
     - *determine_task_timeout
     - *update_task_timeout_expansions
     - *update_task_timeout
@@ -1484,7 +1497,6 @@ functions:
 
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
-          python2 -m pip install -r etc/pip/evgtest-requirements.txt
 
           # Set the TMPDIR environment variable to be a directory in the task's working
           # directory so that temporary files created by processes spawned by resmoke.py get
