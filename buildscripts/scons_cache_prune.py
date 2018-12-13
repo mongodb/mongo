@@ -17,7 +17,6 @@ import logging
 import os
 import shutil
 
-logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("scons.cache.prune.lru")  # type: ignore
 
 GIGBYTES = 1024 * 1024 * 1024
@@ -106,6 +105,9 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
 
 def main():
     """Execute Main entry."""
+
+    logging.basicConfig(level=logging.INFO)
+
     parser = argparse.ArgumentParser(description="SCons cache pruning tool")
 
     parser.add_argument("--cache-dir", "-d", default=None, help="path to the cache directory.")

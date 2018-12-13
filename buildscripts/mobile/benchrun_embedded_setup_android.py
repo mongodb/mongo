@@ -23,8 +23,6 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts.mobile import adb_monitor
 
 # Initialize the global logger.
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-logging.Formatter.converter = time.gmtime
 LOGGER = logging.getLogger(__name__)
 
 
@@ -94,6 +92,9 @@ def move_sdk_files(adb, sdk_root_dir):
 
 def main():
     """Execute Main program."""
+
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
+    logging.Formatter.converter = time.gmtime
 
     benchrun_root = "/data/local/tmp/benchrun_embedded"
 

@@ -23,8 +23,6 @@ from buildscripts.util import fileops
 from buildscripts.util import runcommand
 
 # Initialize the global logger.
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-logging.Formatter.converter = time.gmtime
 LOGGER = logging.getLogger(__name__)
 
 
@@ -326,6 +324,9 @@ class AdbContinuousResourceMonitor(AdbResourceMonitor):
 
 def main():  #pylint: disable=too-many-statements
     """Execute Main program."""
+
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
+    logging.Formatter.converter = time.gmtime
 
     parser = optparse.OptionParser()
 
