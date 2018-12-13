@@ -64,9 +64,11 @@ def generate_version_expansions():
     if version_parts[0]:
         expansions["suffix"] = "latest"
         expansions["src_suffix"] = "latest"
+        expansions["is_release"] = "false"
     else:
         expansions["suffix"] = version_line
         expansions["src_suffix"] = "r{0}".format(version_line)
+        expansions["is_release"] = "true"
     expansions["version"] = version_line
 
     return expansions

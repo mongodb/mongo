@@ -1152,8 +1152,7 @@ functions:
                 ./gradlew clean :embedded-jar:build :embedded-jar:publishMavenPublicationToLocalRepository
 
                 # Is this a release?
-                echo "${version|-g}" | grep -q -- "-g"
-                if [ $? -eq 1 ]; then
+                if [ "${is_release|false}" = "true" ]; then
                     echo "Releases disabled on master."
                     #source ./artifactory_mobile_creds.sh
                     #./gradlew --info :embedded-jar:artifactoryPublish
@@ -1172,8 +1171,7 @@ functions:
 
                 ./gradlew clean :embedded-android:build
                 # Is this a release?
-                echo "${version|-g}" | grep -q -- "-g"
-                if [ $? -eq 1 ]; then
+                if [ "${is_release|false}" = "true" ]; then
                     echo "Releases disabled on master."
                     #./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
                 fi
