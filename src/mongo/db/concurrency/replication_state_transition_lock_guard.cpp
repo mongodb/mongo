@@ -99,6 +99,5 @@ void ReplicationStateTransitionLockGuard::_unlock() {
     _result = LOCK_INVALID;
 }
 
-
 }  // namespace repl
 }  // namespace mongo

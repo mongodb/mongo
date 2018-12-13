@@ -384,8 +384,8 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     ReplicationStateTransitionLockGuard rstlLock(
         opCtx.get(), ReplicationStateTransitionLockGuard::EnqueueOnly());
-    // Kill all user operations to help us get the global lock faster, as well as to ensure that
-    // operations that are no longer safe to run (like writes) get killed.
+    // Since we are in stepdown, after enqueueing the RSTL we need to kill all user operations to
+    // ensure that operations that are no longer safe to run (like writes) get killed.
     _killOperationsOnStepDown(opCtx.get());
     rstlLock.waitForLockUntil(Date_t::max());
 

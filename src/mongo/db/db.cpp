@@ -65,6 +65,7 @@
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -910,22 +911,39 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        // This can wait a long time while we drain the secondary's apply queue, especially if it
-        // is building an index.
+        // This can wait a long time while we drain the secondary's apply queue, especially if
+        // it is building an index.
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
         ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
 
-        // Destroy all stashed transaction resources, in order to release locks.
-        killSessionsLocalShutdownAllTransactions(opCtx);
+        // Acquire the RSTL in mode X. First we enqueue the lock request, then kill all operations,
+        // destroy all stashed transaction resources in order to release locks, and finally wait
+        // until the lock request is granted.
+        repl::ReplicationStateTransitionLockGuard rstl(
+            opCtx, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+
+        // Kill all operations. After this point, the opCtx will have been marked as killed and will
+        // not be usable other than to kill all transactions directly below.
+        serviceContext->setKillAllOperations();
+
+        {
+            // Make this scope uninterruptible so that we can still abort all transactions even
+            // though the opCtx has been killed. While we don't currently check for an interrupt
+            // before checking out a session, we want to make sure that this completes.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+            // Destroy all stashed transaction resources, in order to release locks.
+            killSessionsLocalShutdownAllTransactions(opCtx);
+
+            rstl.waitForLockUntil(Date_t::max());
+        }
 
         // Interrupts all index builds, leaving the state intact to be recovered when the server
         // restarts. This should be done after replication oplog application finishes, so foreground
         // index builds begun by replication on secondaries do not invariant.
         IndexBuildsCoordinator::get(serviceContext)->shutdown();
     }
-
-    serviceContext->setKillAllOperations();
 
     ReplicaSetMonitor::shutdown();
 
