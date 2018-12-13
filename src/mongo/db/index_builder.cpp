@@ -46,6 +46,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -90,6 +91,13 @@ bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) 
     // the `initialDataTimestamp`.
     const auto memberState = replCoord->getMemberState();
     if (memberState.startup() || memberState.startup2()) {
+        return false;
+    }
+
+    // When in rollback via refetch, it's valid for all writes to be untimestamped. Additionally,
+    // it's illegal to timestamp a write later than the timestamp associated with the node exiting
+    // the rollback state. This condition opts for being conservative.
+    if (!serverGlobalParams.enableMajorityReadConcern && memberState.rollback()) {
         return false;
     }
 

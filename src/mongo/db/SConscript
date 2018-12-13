@@ -976,6 +976,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "logical_clock",
+        "server_options_core",
     ],
 )
 
