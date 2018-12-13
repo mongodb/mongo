@@ -80,9 +80,8 @@ def get_config_options(cmd_line_options, config_file):
     """
     config_file_data = read_config.read_config_file(config_file)
 
-    fallback_num_sub_suites = read_config.get_config_value("fallback_num_sub_suites",
-                                                           cmd_line_options, config_file_data,
-                                                           required=True)
+    fallback_num_sub_suites = read_config.get_config_value(
+        "fallback_num_sub_suites", cmd_line_options, config_file_data, required=True)
     max_sub_suites = read_config.get_config_value("max_sub_suites", cmd_line_options,
                                                   config_file_data)
     project = read_config.get_config_value("project", cmd_line_options, config_file_data,
