@@ -125,7 +125,7 @@ public:
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
         try {
             pipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
-        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             return boost::none;
         }
 
