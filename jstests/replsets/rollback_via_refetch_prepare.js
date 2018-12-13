@@ -3,6 +3,8 @@
  * rollback. The tests mimics the standard PSA rollback setup by using a PSS replica set where the
  * last node effectively acts as an arbiter without formally being one (this is necessary because
  * we disallow the 'prepareTransaction' command in sets with arbiters).
+ *
+ * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
 (function() {
