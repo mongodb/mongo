@@ -12,8 +12,8 @@ import yaml
 
 from mock import patch, mock_open, call, Mock
 
-from buildscripts import generate_resmoke_suites as grs
-from buildscripts.generate_resmoke_suites import render_suite, render_misc_suite, \
+from buildscripts import evergreen_generate_resmoke_tasks as grt
+from buildscripts.evergreen_generate_resmoke_tasks import render_suite, render_misc_suite, \
     prepare_directory_for_suite
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use
@@ -28,7 +28,7 @@ class TestTestStats(unittest.TestCase):
             self._make_evg_result("dir/test2.js", 1, 30),
             self._make_evg_result("dir/test1.js", 2, 25),
         ]
-        test_stats = grs.TestStats(evg_results)
+        test_stats = grt.TestStats(evg_results)
         expected_runtimes = [
             ("dir/test2.js", 30),
             ("dir/test1.js", 20),
@@ -44,7 +44,7 @@ class TestTestStats(unittest.TestCase):
             self._make_evg_result("test3:CleanEveryN", 10, 30),
             self._make_evg_result("test3:CheckReplDBHash", 10, 35),
         ]
-        test_stats = grs.TestStats(evg_results)
+        test_stats = grt.TestStats(evg_results)
         expected_runtimes = [
             ("dir/test3.js", 42.5),
             ("dir/test2.js", 30),
@@ -78,19 +78,19 @@ class DivideRemainingTestsAmongSuitesTest(unittest.TestCase):
         return tests_runtimes
 
     def test_each_suite_gets_one_test(self):
-        suites = [grs.Suite(), grs.Suite(), grs.Suite()]
+        suites = [grt.Suite(), grt.Suite(), grt.Suite()]
         tests_runtimes = self.generate_tests_runtimes(3)
 
-        grs.divide_remaining_tests_among_suites(tests_runtimes, suites)
+        grt.divide_remaining_tests_among_suites(tests_runtimes, suites)
 
         for suite in suites:
             self.assertEqual(suite.get_test_count(), 1)
 
     def test_each_suite_gets_at_least_one_test(self):
-        suites = [grs.Suite(), grs.Suite(), grs.Suite()]
+        suites = [grt.Suite(), grt.Suite(), grt.Suite()]
         tests_runtimes = self.generate_tests_runtimes(5)
 
-        grs.divide_remaining_tests_among_suites(tests_runtimes, suites)
+        grt.divide_remaining_tests_among_suites(tests_runtimes, suites)
 
         total_tests = 0
         for suite in suites:
@@ -109,7 +109,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test3", 3),
         ]
 
-        suites = grs.divide_tests_into_suites(tests_runtimes, max_time)
+        suites = grt.divide_tests_into_suites(tests_runtimes, max_time)
         self.assertEqual(len(suites), 1)
         self.assertEqual(suites[0].get_test_count(), 3)
         self.assertEqual(suites[0].get_runtime(), 12)
@@ -122,7 +122,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test3", 3),
         ]
 
-        suites = grs.divide_tests_into_suites(tests_runtimes, max_time)
+        suites = grt.divide_tests_into_suites(tests_runtimes, max_time)
         self.assertEqual(len(suites), 3)
 
     def test_if_test_is_greater_than_max_it_goes_alone(self):
@@ -133,7 +133,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test3", 3),
         ]
 
-        suites = grs.divide_tests_into_suites(tests_runtimes, max_time)
+        suites = grt.divide_tests_into_suites(tests_runtimes, max_time)
         self.assertEqual(len(suites), 2)
         self.assertEqual(suites[0].get_test_count(), 1)
         self.assertEqual(suites[0].get_runtime(), 15)
@@ -149,7 +149,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
             ("test5", 3),
         ]
 
-        suites = grs.divide_tests_into_suites(tests_runtimes, max_time, max_suites=max_suites)
+        suites = grt.divide_tests_into_suites(tests_runtimes, max_time, max_suites=max_suites)
         self.assertEqual(len(suites), max_suites)
         total_tests = 0
         for suite in suites:
@@ -159,7 +159,7 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
 
 class SuiteTest(unittest.TestCase):
     def test_adding_tests_increases_count_and_runtime(self):
-        suite = grs.Suite()
+        suite = grt.Suite()
         suite.add_test('test1', 10)
         suite.add_test('test2', 12)
         suite.add_test('test3', 7)
@@ -170,7 +170,7 @@ class SuiteTest(unittest.TestCase):
 
 def create_suite(count=3, start=0):
     """ Create a suite with count tests."""
-    suite = grs.Suite()
+    suite = grt.Suite()
     for i in range(start, start + count):
         suite.add_test('test{}'.format(i), 1)
     return suite
@@ -194,7 +194,7 @@ class RenderSuites(unittest.TestCase):
         ]
 
         m = mock_open(read_data=yaml.dump({'selector': {'roots': [], 'excludes': ['fixed']}}))
-        with patch('buildscripts.generate_resmoke_suites.open', m, create=True):
+        with patch('buildscripts.evergreen_generate_resmoke_tasks.open', m, create=True):
             render_suite(suites, 'suite_name')
         handle = m()
 
@@ -202,11 +202,11 @@ class RenderSuites(unittest.TestCase):
         self.assertEquals(len(suites) * 2, handle.write.call_count)
         handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
         calls = [
-            call(os.path.join(grs.TEST_SUITE_DIR, 'suite_name.yml'), 'r')
+            call(os.path.join(grt.TEST_SUITE_DIR, 'suite_name.yml'), 'r')
             for _ in range(len(suites))
         ]
         m.assert_has_calls(calls, any_order=True)
-        filename = os.path.join(grs.CONFIG_DIR, 'suite_name_{{:0{}}}.yml'.format(
+        filename = os.path.join(grt.CONFIG_DIR, 'suite_name_{{:0{}}}.yml'.format(
             int(math.ceil(math.log10(size)))))
         calls = [call(filename.format(i), 'w') for i in range(size)]
         m.assert_has_calls(calls, any_order=True)
@@ -226,7 +226,7 @@ class RenderMiscSuites(unittest.TestCase):
 
         test_list = ['test{}'.format(i) for i in range(10)]
         m = mock_open(read_data=yaml.dump({'selector': {'roots': []}}))
-        with patch('buildscripts.generate_resmoke_suites.open', m, create=True):
+        with patch('buildscripts.evergreen_generate_resmoke_tasks.open', m, create=True):
             render_misc_suite(test_list, 'suite_name')
         handle = m()
 
@@ -246,16 +246,16 @@ class RenderMiscSuites(unittest.TestCase):
   - test9
   roots: []
 """)
-        calls = [call(os.path.join(grs.TEST_SUITE_DIR, 'suite_name.yml'), 'r')]
+        calls = [call(os.path.join(grt.TEST_SUITE_DIR, 'suite_name.yml'), 'r')]
         m.assert_has_calls(calls, any_order=True)
-        filename = os.path.join(grs.CONFIG_DIR, 'suite_name_misc.yml')
+        filename = os.path.join(grt.CONFIG_DIR, 'suite_name_misc.yml')
         calls = [call(filename, 'w')]
         m.assert_has_calls(calls, any_order=True)
 
 
 class PrepareDirectoryForSuite(unittest.TestCase):
     def test_no_directory(self):
-        with patch('buildscripts.generate_resmoke_suites.os') as mock_os:
+        with patch('buildscripts.evergreen_generate_resmoke_tasks.os') as mock_os:
             mock_os.path.exists.return_value = False
             prepare_directory_for_suite('tmp')
 
@@ -269,6 +269,8 @@ class GenerateEvgConfigTest(unittest.TestCase):
         for idx in range(count):
             suite = Mock()
             suite.name = "suite {0}".format(idx)
+            suite.max_runtime = 5.28
+            suite.get_runtime = lambda: 100.874
             suites.append(suite)
 
         return suites
@@ -281,6 +283,7 @@ class GenerateEvgConfigTest(unittest.TestCase):
         options.variant = "buildvariant"
         options.suite = "suite"
         options.task = "suite"
+        options.use_large_distro = None
 
         return options
 
@@ -288,20 +291,20 @@ class GenerateEvgConfigTest(unittest.TestCase):
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
 
-        config = grs.generate_evg_config(suites, options).to_map()
+        config = grt.generate_evg_config(suites, options).to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
-        command1 = config["tasks"][0]["commands"][1]
+        command1 = config["tasks"][0]["commands"][2]
         self.assertIn(options.resmoke_args, command1["vars"]["resmoke_args"])
         self.assertIn(options.run_multiple_jobs, command1["vars"]["run_multiple_jobs"])
-        self.assertEqual("run tests", command1["func"])
+        self.assertEqual("run generated tests", command1["func"])
 
     def test_evg_config_is_created_with_diff_task_and_suite(self):
         options = self.generate_mock_options()
         options.task = "task"
         suites = self.generate_mock_suites(3)
 
-        config = grs.generate_evg_config(suites, options).to_map()
+        config = grt.generate_evg_config(suites, options).to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         display_task = config["buildvariants"][0]["display_tasks"][0]
@@ -313,7 +316,20 @@ class GenerateEvgConfigTest(unittest.TestCase):
         task = config["tasks"][0]
         self.assertIn(options.variant, task["name"])
         self.assertIn(task["name"], display_task["execution_tasks"])
-        self.assertIn(options.suite, task["commands"][1]["vars"]["resmoke_args"])
+        self.assertIn(options.suite, task["commands"][2]["vars"]["resmoke_args"])
+
+    def test_evg_config_can_use_large_distro(self):
+        options = self.generate_mock_options()
+        options.use_large_distro = "true"
+        options.large_distro_name = "large distro name"
+
+        suites = self.generate_mock_suites(3)
+
+        config = grt.generate_evg_config(suites, options).to_map()
+
+        self.assertEqual(len(config["tasks"]), len(suites) + 1)
+        self.assertEqual(options.large_distro_name,
+                         config["buildvariants"][0]["tasks"][0]["distros"][0])
 
 
 class MainTest(unittest.TestCase):
@@ -323,18 +339,19 @@ class MainTest(unittest.TestCase):
             "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
         } for i in range(100)]
 
-        main = grs.Main(evg)
+        main = grt.Main(evg)
         main.options = Mock()
-        main.options.execution_time_minutes = 10
-        main.config_options = grs.ConfigOptions(2, 15, "project", "", 1, True, "task", "suite",
-                                                "variant")
+        main.config_options = grt.ConfigOptions(2, 15, "project", "", 1, 10, True, "task", "suite",
+                                                "variant", False, "")
 
-        suites = main.calculate_suites(_DATE, _DATE)
+        with patch('os.path.exists') as exists_mock:
+            exists_mock.return_value = True
+            suites = main.calculate_suites(_DATE, _DATE)
 
-        # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
-        self.assertEqual(10, len(suites))
-        for suite in suites:
-            self.assertEqual(10, len(suite.tests))
+            # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
+            self.assertEqual(10, len(suites))
+            for suite in suites:
+                self.assertEqual(10, len(suite.tests))
 
     def test_calculate_suites_fallback(self):
         response = Mock()
@@ -342,11 +359,11 @@ class MainTest(unittest.TestCase):
         evg = Mock()
         evg.test_stats.side_effect = requests.HTTPError(response=response)
 
-        main = grs.Main(evg)
+        main = grt.Main(evg)
         main.options = Mock()
         main.options.execution_time_minutes = 10
-        main.config_options = grs.ConfigOptions(2, 15, "project", "", 1, True, "task", "suite",
-                                                "variant")
+        main.config_options = grt.ConfigOptions(2, 15, "project", "", 1, 30, True, "task", "suite",
+                                                "variant", False, "")
         main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
 
         suites = main.calculate_suites(_DATE, _DATE)
@@ -361,12 +378,28 @@ class MainTest(unittest.TestCase):
         evg = Mock()
         evg.test_stats.side_effect = requests.HTTPError(response=response)
 
-        main = grs.Main(evg)
+        main = grt.Main(evg)
         main.options = Mock()
         main.options.execution_time_minutes = 10
-        main.config_options = grs.ConfigOptions(2, 15, "project", "", 1, True, "task", "suite",
-                                                "variant")
+        main.config_options = grt.ConfigOptions(2, 15, "project", "", 1, 30, True, "task", "suite",
+                                                "variant", False, "")
         main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
 
         with self.assertRaises(requests.HTTPError):
             main.calculate_suites(_DATE, _DATE)
+
+    def test_filter_missing_files(self):
+        tests_runtimes = [
+            ("dir1/file1.js", 20.32),
+            ("dir2/file2.js", 24.32),
+            ("dir1/file3.js", 36.32),
+        ]
+
+        with patch("os.path.exists") as exists_mock:
+            exists_mock.side_effect = [False, True, True]
+            filtered_list = grt.Main.filter_existing_tests(tests_runtimes)
+
+            self.assertEqual(2, len(filtered_list))
+            self.assertNotIn(tests_runtimes[0], filtered_list)
+            self.assertIn(tests_runtimes[2], filtered_list)
+            self.assertIn(tests_runtimes[1], filtered_list)

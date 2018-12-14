@@ -734,6 +734,20 @@ functions:
           fi
         done
 
+  "configure evergreen api credentials" : &configure_evergreen_api_credentials
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        # Create the Evergreen API credentials
+        cat > .evergreen.yml <<END_OF_CREDS
+        api_server_host: https://evergreen.mongodb.com/api
+        api_key: "${evergreen_api_key}"
+        user: "${evergreen_api_user}"
+        END_OF_CREDS
+
   "git get project" : &git_get_project
     command: git.get_project
     params:
@@ -1467,6 +1481,230 @@ functions:
           if [[ ! -f $venv2_bin/python2 ]]; then ln -sfv "$py2_exe" "$venv2_bin/python2"; fi
           if [[ ! -f $venv2_bin/python3 ]]; then ln -sfv "$py3_exe" "$venv2_bin/python3"; fi
 
+  "execute resmoke tests" : &execute_resmoke_tests
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+
+        if [[ ${disable_unit_tests|false} = "false" && ! -f ${skip_tests|/dev/null} ]]; then
+
+        # activate the virtualenv if it has been set up
+        ${activate_virtualenv}
+
+        # Set the TMPDIR environment variable to be a directory in the task's working
+        # directory so that temporary files created by processes spawned by resmoke.py get
+        # cleaned up after the task completes. This also ensures the spawned processes
+        # aren't impacted by limited space in the mount point for the /tmp directory.
+        export TMPDIR="${workdir}/tmp"
+        mkdir -p $TMPDIR
+
+        if [ -f /proc/self/coredump_filter ]; then
+          # Set the shell process (and its children processes) to dump ELF headers (bit 4),
+          # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
+          echo 0x13 > /proc/self/coredump_filter
+
+          if [ -f /sbin/sysctl ]; then
+            # Check that the core pattern is set explicitly on our distro image instead
+            # of being the OS's default value. This ensures that coredump names are consistent
+            # across distros and can be picked up by Evergreen.
+            core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
+            if [ "$core_pattern" = "dump_%e.%p.core" ]; then
+              echo "Enabling coredumps"
+              ulimit -c unlimited
+            fi
+          fi
+        fi
+
+        extra_args="$extra_args --jobs=${resmoke_jobs|1}"
+
+        if [ ${should_shuffle|true} = true ]; then
+          extra_args="$extra_args --shuffle"
+        fi
+
+        if [ ${continue_on_failure|true} = true ]; then
+          extra_args="$extra_args --continueOnFailure"
+        fi
+
+        # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
+        # resmoke will assign to the appropriate parameter on storage engines that support it.
+        set +o errexit
+        echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
+        if [ $? -eq 1 ]; then
+          extra_args="$extra_args --storageEngineCacheSizeGB=1"
+        fi
+        set -o errexit
+
+
+        # Reduce the JSHeapLimit for the serial_run task task on Code Coverage builder variant.
+        if [[ "${build_variant}" = "enterprise-rhel-62-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
+          extra_args="$extra_args --mongodSetParameter {'jsHeapLimitMB':10}"
+        fi
+
+        path_value="$PATH"
+        if [ ${variant_path_suffix} ]; then
+          path_value="$path_value:${variant_path_suffix}"
+        fi
+        if [ ${task_path_suffix} ]; then
+          path_value="$path_value:${task_path_suffix}"
+        fi
+
+        if [ "${is_patch}" = "true" ]; then
+          extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
+        else
+          extra_args="$extra_args --tagFile=etc/test_retrial.yml"
+        fi
+
+        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
+        # invocation. It doesn't set any environment variables and should therefore come last in
+        # this list of expansions.
+        set +o errexit
+        PATH="$path_value"                              \
+            AWS_PROFILE=${aws_profile_remote}           \
+            ${gcov_environment}                         \
+            ${lang_environment}                         \
+            ${san_options}                              \
+            ${san_symbolizer}                           \
+            ${snmp_config_path}                         \
+            ${resmoke_wrapper}                          \
+            $python buildscripts/evergreen_run_tests.py \
+                ${resmoke_args}                         \
+                $extra_args                             \
+                ${test_flags}                           \
+                --log=buildlogger                       \
+                --staggerJobs=on                        \
+                --buildId=${build_id}                   \
+                --distroId=${distro_id}                 \
+                --executionNumber=${execution}          \
+                --projectName=${project}                \
+                --gitRevision=${revision}               \
+                --revisionOrderId=${revision_order_id}  \
+                --taskId=${task_id}                     \
+                --taskName=${task_name}                 \
+                --variantName=${build_variant}          \
+                --versionId=${version_id}               \
+                --archiveFile=archive.json              \
+                --reportFile=report.json                \
+                --perfReportFile=perf.json
+        resmoke_exit_code=$?
+        set -o errexit
+
+        # 74 is exit code for IOError on POSIX systems, which is raised when the machine is
+        # shutting down.
+        #
+        # 75 is exit code resmoke.py uses when the log output would be incomplete due to failing
+        # to communicate with logkeeper.
+        if [[ $resmoke_exit_code = 74 || $resmoke_exit_code = 75 ]]; then
+          echo $resmoke_exit_code > run_tests_infrastructure_failure
+          exit 0
+        elif [ $resmoke_exit_code != 0 ]; then
+          # On failure save the resmoke exit code.
+          echo $resmoke_exit_code > resmoke_error_code
+        fi
+        exit $resmoke_exit_code
+        fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]
+
+  "retrieve generated test configuration": &retrieve_generated_test_configuration
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      bucket: mciuploads
+      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task}_gen-${build_id}.tgz
+      local_file: "generate_tasks_config.tgz"
+
+  "extract generated test configuration": &extract_generated_test_configuration
+    command: shell.exec
+    type: test
+    params:
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        target_dir="src/generated_resmoke_config"
+        mkdir -p $target_dir
+        mv generate_tasks_config.tgz $target_dir
+
+        cd $target_dir
+        tar xzf generate_tasks_config.tgz
+        ls
+
+  "generate resmoke tasks":
+    - *git_get_project
+    - *configure_evergreen_api_credentials
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          $python -m pip install -r etc/pip/evgtest-requirements.txt
+          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml
+
+    - command: archive.targz_pack
+      params:
+        target: generate_tasks_config.tgz
+        source_dir: src/generated_resmoke_config
+        include:
+          - "*"
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: generate_tasks_config.tgz
+        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Generated Task Config - Execution ${execution}
+
+    - command: generate.tasks
+      params:
+        files:
+          - src/generated_resmoke_config/${task}.json
+
+  "run generated tests" :
+  - *install_pip_requirements
+  - *retrieve_generated_test_configuration
+  - *extract_generated_test_configuration
+  - command: expansions.update
+    params:
+      updates:
+      - key: aws_key_remote
+        value: ${mongodatafiles_aws_key}
+      - key: aws_profile_remote
+        value: mongodata_aws
+      - key: aws_secret_remote
+        value: ${mongodatafiles_aws_secret}
+  - *set_up_remote_credentials
+  - *determine_resmoke_jobs
+  - *update_resmoke_jobs_expansions
+  - *execute_resmoke_tests
+    # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
+    # directly actionable. We use type=setup rather than type=system or type=test for this command
+    # because we don't intend for any human to look at this failure.
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        if [ -f run_tests_infrastructure_failure ]; then
+          exit $(cat run_tests_infrastructure_failure)
+        fi
+
   "run tests" :
     - *install_pip_requirements
     - *determine_task_timeout
@@ -1484,132 +1722,7 @@ functions:
     - *set_up_remote_credentials
     - *determine_resmoke_jobs
     - *update_resmoke_jobs_expansions
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [[ ${disable_unit_tests|false} = "false" && ! -f ${skip_tests|/dev/null} ]]; then
-
-          # activate the virtualenv if it has been set up
-          ${activate_virtualenv}
-
-          # Set the TMPDIR environment variable to be a directory in the task's working
-          # directory so that temporary files created by processes spawned by resmoke.py get
-          # cleaned up after the task completes. This also ensures the spawned processes
-          # aren't impacted by limited space in the mount point for the /tmp directory.
-          export TMPDIR="${workdir}/tmp"
-          mkdir -p $TMPDIR
-
-          if [ -f /proc/self/coredump_filter ]; then
-            # Set the shell process (and its children processes) to dump ELF headers (bit 4),
-            # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
-            echo 0x13 > /proc/self/coredump_filter
-
-            if [ -f /sbin/sysctl ]; then
-              # Check that the core pattern is set explicitly on our distro image instead
-              # of being the OS's default value. This ensures that coredump names are consistent
-              # across distros and can be picked up by Evergreen.
-              core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
-              if [ "$core_pattern" = "dump_%e.%p.core" ]; then
-                echo "Enabling coredumps"
-                ulimit -c unlimited
-              fi
-            fi
-          fi
-
-          extra_args="$extra_args --jobs=${resmoke_jobs|1}"
-
-          if [ ${should_shuffle|true} = true ]; then
-            extra_args="$extra_args --shuffle"
-          fi
-
-          if [ ${continue_on_failure|true} = true ]; then
-            extra_args="$extra_args --continueOnFailure"
-          fi
-
-          # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
-          # resmoke will assign to the appropriate parameter on storage engines that support it.
-          set +o errexit
-          echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
-          if [ $? -eq 1 ]; then
-            extra_args="$extra_args --storageEngineCacheSizeGB=1"
-          fi
-          set -o errexit
-
-
-          # Reduce the JSHeapLimit for the serial_run task task on Code Coverage builder variant.
-          if [[ "${build_variant}" = "enterprise-rhel-62-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
-            extra_args="$extra_args --mongodSetParameter {'jsHeapLimitMB':10}"
-          fi
-
-          path_value="$PATH"
-          if [ ${variant_path_suffix} ]; then
-            path_value="$path_value:${variant_path_suffix}"
-          fi
-          if [ ${task_path_suffix} ]; then
-            path_value="$path_value:${task_path_suffix}"
-          fi
-
-          if [ "${is_patch}" = "true" ]; then
-            extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
-          else
-            extra_args="$extra_args --tagFile=etc/test_retrial.yml"
-          fi
-
-          # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
-          # invocation. It doesn't set any environment variables and should therefore come last in
-          # this list of expansions.
-          set +o errexit
-          PATH="$path_value"                              \
-              AWS_PROFILE=${aws_profile_remote}           \
-              ${gcov_environment}                         \
-              ${lang_environment}                         \
-              ${san_options}                              \
-              ${san_symbolizer}                           \
-              ${snmp_config_path}                         \
-              ${resmoke_wrapper}                          \
-              $python buildscripts/evergreen_run_tests.py \
-                  ${resmoke_args}                         \
-                  $extra_args                             \
-                  ${test_flags}                           \
-                  --log=buildlogger                       \
-                  --staggerJobs=on                        \
-                  --buildId=${build_id}                   \
-                  --distroId=${distro_id}                 \
-                  --executionNumber=${execution}          \
-                  --projectName=${project}                \
-                  --gitRevision=${revision}               \
-                  --revisionOrderId=${revision_order_id}  \
-                  --taskId=${task_id}                     \
-                  --taskName=${task_name}                 \
-                  --variantName=${build_variant}          \
-                  --versionId=${version_id}               \
-                  --archiveFile=archive.json              \
-                  --reportFile=report.json                \
-                  --perfReportFile=perf.json
-          resmoke_exit_code=$?
-          set -o errexit
-
-          # 74 is exit code for IOError on POSIX systems, which is raised when the machine is
-          # shutting down.
-          #
-          # 75 is exit code resmoke.py uses when the log output would be incomplete due to failing
-          # to communicate with logkeeper.
-          if [[ $resmoke_exit_code = 74 || $resmoke_exit_code = 75 ]]; then
-            echo $resmoke_exit_code > run_tests_infrastructure_failure
-            exit 0
-          elif [ $resmoke_exit_code != 0 ]; then
-            # On failure save the resmoke exit code.
-            echo $resmoke_exit_code > resmoke_error_code
-          fi
-          exit $resmoke_exit_code
-          fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]
-
+    - *execute_resmoke_tests
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
       # because we don't intend for any human to look at this failure.
@@ -6267,6 +6380,16 @@ tasks:
     vars:
       resmoke_args: --suites=sasl --storageEngine=wiredTiger
 
+- name: sharding_gen
+  depends_on: []
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: sharding
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 15
+
 - <<: *task_template
   name: sharding
   commands:
@@ -8232,6 +8355,7 @@ tasks:
   depends_on: []
   commands:
   - func: "git get project"
+  - func: "configure evergreen api credentials"
   - command: shell.exec
     timeout_secs: 14400 # Timeout if there is no output for 4 hours
     type: test
@@ -8255,13 +8379,6 @@ tasks:
         consumer_key: "${testlifecycle_jira_consumer_key}"
         key_cert: |
         $(echo "${testlifecycle_jira_key_certificate}" | sed  's/^/  /')
-        END_OF_CREDS
-
-        # Create the Evergreen API credentials
-        cat > .evergreen.yml <<END_OF_CREDS
-        api_server_host: https://evergreen.mongodb.com/api
-        api_key: "${evergreen_api_key}"
-        user: "${evergreen_api_user}"
         END_OF_CREDS
 
         set -o verbose
@@ -11430,11 +11547,12 @@ buildvariants:
     build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 20
+    large_distro_name: rhel62-large
   display_tasks:
   - *dbtest
   - *replica_sets_auth
   - *replica_sets_ese
-  - *sharding
   - *sharding_auth
   - *sharding_auth_audit
   - *sharding_ese
@@ -11679,54 +11797,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
-  - name: sharding_0
-    distros:
-    - rhel62-large
-  - name: sharding_1
-    distros:
-    - rhel62-large
-  - name: sharding_2
-    distros:
-    - rhel62-large
-  - name: sharding_3
-    distros:
-    - rhel62-large
-  - name: sharding_4
-    distros:
-    - rhel62-large
-  - name: sharding_5
-    distros:
-    - rhel62-large
-  - name: sharding_6
-    distros:
-    - rhel62-large
-  - name: sharding_7
-    distros:
-    - rhel62-large
-  - name: sharding_8
-    distros:
-    - rhel62-large
-  - name: sharding_9
-    distros:
-    - rhel62-large
-  - name: sharding_10
-    distros:
-    - rhel62-large
-  - name: sharding_11
-    distros:
-    - rhel62-large
-  - name: sharding_12
-    distros:
-    - rhel62-large
-  - name: sharding_13
-    distros:
-    - rhel62-large
-  - name: sharding_14
-    distros:
-    - rhel62-large
-  - name: sharding_misc
-    distros:
-    - rhel62-large
+  - name: sharding_gen
   - name: sharding_auth_0
     distros:
     - rhel62-large

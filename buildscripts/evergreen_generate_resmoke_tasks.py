@@ -11,6 +11,7 @@ from __future__ import absolute_import
 import argparse
 import datetime
 import logging
+import math
 import os
 import sys
 from collections import defaultdict
@@ -21,6 +22,7 @@ import yaml
 
 from shrub.config import Configuration
 from shrub.command import CommandDefinition
+from shrub.operations import CmdTimeoutUpdate
 from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
@@ -51,10 +53,13 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "project",
     "resmoke_args",
     "resmoke_jobs_max",
+    "target_resmoke_time",
     "run_multiple_jobs",
     "suite",
     "task",
     "variant",
+    "use_large_distro",
+    "large_distro_name",
 ])
 
 
@@ -90,15 +95,23 @@ def get_config_options(cmd_line_options, config_file):
                                                 default="")
     resmoke_jobs_max = read_config.get_config_value("resmoke_jobs_max", cmd_line_options,
                                                     config_file_data)
+    target_resmoke_time = int(
+        read_config.get_config_value("target_resmoke_time", cmd_line_options, config_file_data,
+                                     default=60))
     run_multiple_jobs = read_config.get_config_value("run_multiple_jobs", cmd_line_options,
                                                      config_file_data, default="true")
     task = read_config.get_config_value("task", cmd_line_options, config_file_data, required=True)
     suite = read_config.get_config_value("suite", cmd_line_options, config_file_data, default=task)
     variant = read_config.get_config_value("build_variant", cmd_line_options, config_file_data,
                                            required=True)
+    use_large_distro = read_config.get_config_value("use_large_distro", cmd_line_options,
+                                                    config_file_data, default=False)
+    large_distro_name = read_config.get_config_value("large_distro_name", cmd_line_options,
+                                                     config_file_data)
 
     return ConfigOptions(fallback_num_sub_suites, max_sub_suites, project, resmoke_args,
-                         resmoke_jobs_max, run_multiple_jobs, suite, task, variant)
+                         resmoke_jobs_max, target_resmoke_time, run_multiple_jobs, suite, task,
+                         variant, use_large_distro, large_distro_name)
 
 
 def divide_remaining_tests_among_suites(remaining_tests_runtimes, suites):
@@ -191,32 +204,46 @@ def generate_evg_config(suites, options):
     task_names = []
     task_specs = []
 
-    def generate_task(sub_suite_name, sub_task_name):
+    def generate_task(sub_suite_name, sub_task_name, max_test_runtime=None,
+                      expected_suite_runtime=None):
         """Generate evergreen config for a resmoke task."""
         task_names.append(sub_task_name)
-        task_specs.append(TaskSpec(sub_task_name))
+        spec = TaskSpec(sub_task_name)
+        if options.use_large_distro:
+            spec.distro(options.large_distro_name)
+        task_specs.append(spec)
         task = evg_config.task(sub_task_name)
 
         target_suite_file = os.path.join(CONFIG_DIR, sub_suite_name)
 
         run_tests_vars = {
-            "resmoke_args": "--suites={0} {1}".format(target_suite_file, options.resmoke_args),
+            "resmoke_args": "--suites={0}.yml {1}".format(target_suite_file, options.resmoke_args),
             "run_multiple_jobs": options.run_multiple_jobs,
+            "task": options.task,
         }
 
         if options.resmoke_jobs_max:
             run_tests_vars["resmoke_jobs_max"] = options.resmoke_jobs_max
 
-        commands = [
+        commands = []
+        if max_test_runtime or expected_suite_runtime:
+            cmd_timeout = CmdTimeoutUpdate()
+            if max_test_runtime:
+                cmd_timeout.timeout(int(math.ceil(max_test_runtime * 3)))
+            if expected_suite_runtime:
+                cmd_timeout.exec_timeout(int(math.ceil(expected_suite_runtime * 3)))
+            commands.append(cmd_timeout.validate().resolve())
+
+        commands += [
             CommandDefinition().function("do setup"),
-            CommandDefinition().function("run tests").vars(run_tests_vars)
+            CommandDefinition().function("run generated tests").vars(run_tests_vars)
         ]
         task.dependency(TaskDependency("compile")).commands(commands)
 
     for idx, suite in enumerate(suites):
         sub_task_name = taskname.name_generated_task(options.task, idx, len(suites),
                                                      options.variant)
-        generate_task(suite.name, sub_task_name)
+        generate_task(suite.name, sub_task_name, suite.max_runtime, suite.get_runtime())
 
     # Add the misc suite
     misc_suite_name = "{0}_misc".format(options.suite)
@@ -298,12 +325,16 @@ class Suite(object):
         """Initialize the object."""
         self.tests = []
         self.total_runtime = 0
+        self.max_runtime = 0
 
     def add_test(self, test_file, runtime):
         """Add the given test to this suite."""
 
         self.tests.append(test_file)
         self.total_runtime += runtime
+
+        if runtime > self.max_runtime:
+            self.max_runtime = runtime
 
     def get_runtime(self):
         """Get the current average runtime of all the tests currently in this suite."""
@@ -334,7 +365,7 @@ class Main(object):
                             help="Location of expansions file generated by evergreen.")
         parser.add_argument("--analysis-duration", dest="duration_days", default=14,
                             help="Number of days to analyze.", type=int)
-        parser.add_argument("--execution-time", dest="execution_time_minutes", default=60, type=int,
+        parser.add_argument("--execution-time", dest="target_resmoke_time", type=int,
                             help="Target execution time (in minutes).")
         parser.add_argument("--max-sub-suites", dest="max_sub_suites", type=int,
                             help="Max number of suites to divide into.")
@@ -353,6 +384,10 @@ class Main(object):
         parser.add_argument("--task-name", dest="task", help="Name of task to split.")
         parser.add_argument("--variant", dest="build_variant",
                             help="Build variant being run against.")
+        parser.add_argument("--use-large-distro", dest="use_large_distro",
+                            help="Should subtasks use large distros.")
+        parser.add_argument("--large_distro_name", dest="large_distro_name",
+                            help="Name of large distro.")
         parser.add_argument("--verbose", dest="verbose", action="store_true", default=False,
                             help="Enable verbose logging.")
 
@@ -366,8 +401,8 @@ class Main(object):
         try:
             evg_stats = self.get_evg_stats(self.config_options.project, start_date, end_date,
                                            self.config_options.task, self.config_options.variant)
-            return self.calculate_suites_from_evg_stats(evg_stats,
-                                                        self.options.execution_time_minutes * 60)
+            target_execution_time_secs = self.config_options.target_resmoke_time * 60
+            return self.calculate_suites_from_evg_stats(evg_stats, target_execution_time_secs)
         except requests.HTTPError as err:
             if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
                 # Evergreen may return a 503 when the service is degraded.
@@ -391,10 +426,15 @@ class Main(object):
     def calculate_suites_from_evg_stats(self, data, execution_time_secs):
         """Divide tests into suites that can be run in less than the specified execution time."""
         test_stats = TestStats(data)
-        tests_runtimes = test_stats.get_tests_runtimes()
+        tests_runtimes = self.filter_existing_tests(test_stats.get_tests_runtimes())
         self.test_list = [info[0] for info in tests_runtimes]
         return divide_tests_into_suites(tests_runtimes, execution_time_secs,
                                         self.options.max_sub_suites)
+
+    @staticmethod
+    def filter_existing_tests(tests_runtimes):
+        """Filter out tests that do not exist in the filesystem."""
+        return [info for info in tests_runtimes if os.path.exists(info[0])]
 
     def calculate_fallback_suites(self):
         """Divide tests into a fixed number of suites."""
