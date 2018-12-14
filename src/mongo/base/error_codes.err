@@ -265,7 +265,7 @@ error_code("TooManyFilesOpen", 264);
 error_code("FailPointSetFailed", 266)
 error_code("DataModifiedByRepair", 269);
 error_code("RepairedReplicaSetNode", 270);
-
+error_code("AlarmAlreadyFulfilled", 277)
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)

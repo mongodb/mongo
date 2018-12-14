@@ -171,6 +171,29 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='alarm',
+    source=[
+        'alarm.cpp',
+        'alarm_runner_background_thread.cpp',
+    ],
+    LIBDEPS=[
+        'clock_sources',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='alarm_test',
+    source=[
+        'alarm_test.cpp',
+    ],
+    LIBDEPS=[
+        'alarm',
+        'clock_source_mock',
+    ]
+)
+
 env.CppUnitTest(
     target='text_test',
     source=[
