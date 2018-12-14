@@ -274,6 +274,7 @@ error_code("ProducerConsumerQueueProducerQueueDepthExceeded", 273)
 error_code("ProducerConsumerQueueConsumed", 274)
 error_code("ExchangePassthrough", 275) # For exchange execution in aggregation. Do not reuse.
 error_code("IndexBuildAborted", 276)
+error_code("AlarmAlreadyFulfilled", 277)
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)
