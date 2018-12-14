@@ -907,6 +907,7 @@ void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
 
 StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     OperationContext* opCtx) {
+    uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
@@ -946,6 +947,7 @@ void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
 
 StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     OperationContext* opCtx) {
+    uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
     invariant(_backupCursor);
 
     WT_CURSOR* cursor = NULL;
