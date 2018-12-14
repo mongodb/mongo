@@ -132,10 +132,16 @@ TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
     simulateSuccessfulV1Election();
     ASSERT(replCoord->getMemberState().primary());
 
+    // Primary begins stepping down due to new term, but cannot finish.
+    getGlobalFailPointRegistry()
+        ->getFailPoint("blockHeartbeatStepdown")
+        ->setMode(FailPoint::alwaysOn);
+
     TopologyCoordinator::UpdateTermResult updateTermResult;
     replCoord->updateTerm_forTest(replCoord->getTerm() + 1, &updateTermResult);
     ASSERT(TopologyCoordinator::UpdateTermResult::kTriggerStepDown == updateTermResult);
 
+    // Test that "ismaster" is immediately false, although "secondary" is not yet true.
     IsMasterResponse response;
     replCoord->fillIsMasterForReplSet(&response, {});
     ASSERT_TRUE(response.isConfigSet());
@@ -143,6 +149,8 @@ TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {
     ASSERT_FALSE(responseObj["ismaster"].Bool());
     ASSERT_FALSE(responseObj["secondary"].Bool());
     ASSERT_FALSE(responseObj.hasField("isreplicaset"));
+
+    getGlobalFailPointRegistry()->getFailPoint("blockHeartbeatStepdown")->setMode(FailPoint::off);
 }
 
 TEST_F(ReplCoordTest, NodeEntersStartup2StateWhenStartingUpWithValidLocalConfig) {
