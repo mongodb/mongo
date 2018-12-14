@@ -333,16 +333,11 @@ env.Library(
     source=[
         'authz_manager_external_state_s.cpp',
         'authz_session_external_state_s.cpp',
-        'user_cache_invalidator_job.cpp',
-        env.Idlc('user_cache_invalidator_job_parameters.idl')[0],
-        ],
+        'user_cache_invalidator_job.cpp'],
     LIBDEPS=[
         'authservercommon',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/coreshard',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
