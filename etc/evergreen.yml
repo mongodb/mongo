@@ -1355,6 +1355,21 @@ functions:
           "$virtualenv_loc" --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
 
   "run tests" :
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # Install any pip modules needed by the scripts or tests
+          ${activate_virtualenv}
+          pip install boto3==1.5.27
+          pip install mock==2.0.0
+          pip install psutil==5.4.3
+
     - *determine_task_timeout
     - *update_task_timeout_expansions
     - *update_task_timeout
@@ -1381,8 +1396,6 @@ functions:
 
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
-          pip install boto3==1.5.27
-          pip install mock==2.0.0
 
           # Set the TMPDIR environment variable to be a directory in the task's working
           # directory so that temporary files created by processes spawned by resmoke.py get
