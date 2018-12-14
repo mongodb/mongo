@@ -776,6 +776,7 @@ Status TransportLayerASIO::start() {
         for (auto& acceptor : _acceptors) {
             acceptor.second.listen(serverGlobalParams.listenBacklog);
             _acceptConnection(acceptor.second);
+            log() << "Listening on " << acceptor.first.getAddr();
         }
 
         _listenerThread = stdx::thread([this] {
