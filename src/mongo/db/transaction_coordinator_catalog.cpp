@@ -157,7 +157,19 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
             auto coordinator = coordinatorForTxnIter->second;
 
             if (MONGO_FAIL_POINT(doNotForgetCoordinator)) {
-                _coordinatorsBySessionDefunct[lsid][txnNumber] = std::move(coordinator);
+                auto decisionFuture = coordinator->getDecision();
+                invariant(decisionFuture.isReady());
+                // Only remember a coordinator that completed successfully. We expect that the
+                // coordinator only completes with an error if the node stepped down or was shut
+                // down while coordinating the commit. If either of these occurred, a
+                // coordinateCommitTransaction retry will either find a new coordinator in the real
+                // catalog (if the coordinator's state was made durable before the failover or
+                // shutdown), or should find no coordinator and instead recover the decision from
+                // the local participant (if the failover or shutdown occurred before any of the
+                // coordinator's state was made durable).
+                if (decisionFuture.getNoThrow().isOK()) {
+                    _coordinatorsBySessionDefunct[lsid][txnNumber] = std::move(coordinator);
+                }
             }
 
             coordinatorsForSession.erase(coordinatorForTxnIter);
