@@ -15,6 +15,12 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
+    // Lower the transaction timeout for participants, since this test exercises the case where the
+    // coordinator fails over before writing the participant list and then checks that the
+    // transaction is aborted on all participants, and the participants will only abort on reaching
+    // the transaction timeout.
+    TestData.transactionLifetimeLimitSeconds = 15;
+
     let st = new ShardingTest({
         shards: 3,
         causallyConsistent: true,
@@ -91,14 +97,14 @@
         }));
     };
 
-    const testCommitProtocol = function(shouldCommit, failpoint) {
-        jsTest.log("Testing two-phase " + (shouldCommit ? "commit" : "abort") +
+    const testCommitProtocol = function(makeAParticipantAbort, failpoint, expectAbortResponse) {
+        jsTest.log("Testing two-phase " + (makeAParticipantAbort ? "commit" : "abort") +
                    " protocol with failover at failpoint: " + failpoint);
 
         txnNumber++;
         setUp();
 
-        if (!shouldCommit) {
+        if (makeAParticipantAbort) {
             // Manually abort the transaction on one of the participants, so that the participant
             // fails to prepare.
             assert.commandWorked(participant2.adminCommand({
@@ -120,10 +126,10 @@
 
         // Run commitTransaction through a parallel shell.
         let awaitResult;
-        if (shouldCommit) {
-            awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
-        } else {
+        if (expectAbortResponse) {
             awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
+        } else {
+            awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
         }
 
         // Wait for the desired failpoint to be hit.
@@ -152,7 +158,7 @@
         coordinatorReplSetTest.restart(coordPrimary);
 
         // Check that the transaction committed or aborted as expected.
-        if (!shouldCommit) {
+        if (expectAbortResponse) {
             jsTest.log("Verify that the transaction was aborted on all shards.");
             assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
         } else {
@@ -170,11 +176,33 @@
         st.s.getDB(dbName).getCollection(collName).drop();
     };
 
-    testCommitProtocol(false /* test abort */, "hangBeforeWritingDecision");
-    testCommitProtocol(false /* test abort */, "hangBeforeDeletingCoordinatorDoc");
+    testCommitProtocol(true /* make a participant abort */,
+                       "hangBeforeWritingParticipantList",
+                       true /* expect abort decision */);
+    testCommitProtocol(true /* make a participant abort */,
+                       "hangBeforeWritingDecision",
+                       true /* expect abort decision */);
+    testCommitProtocol(true /* make a participant abort */,
+                       "hangBeforeDeletingCoordinatorDoc",
+                       true /* expect abort decision */);
 
-    testCommitProtocol(true /* test commit */, "hangBeforeWritingDecision");
-    testCommitProtocol(true /* test commit */, "hangBeforeDeletingCoordinatorDoc");
+    // Note: If the coordinator fails over before making the participant list durable, the
+    // transaction will abort even if all participants could have committed. Further note that this
+    // is a property of the coordinator only - in general, the coordinator is co-located with a
+    // participant and in 4.2, participants abort if they fail over before prepare. This is really
+    // testing that even if the participant's unprepared transaction was able to survive failover at
+    // some future time (for example, in the near future for read-only transactions, or in the far
+    // future if we add support for multi-master), then the transaction would nevertheless abort due
+    // to the design of the coordinator.
+    testCommitProtocol(false /* all participants can commit */,
+                       "hangBeforeWritingParticipantList",
+                       true /* expect abort decision */);
+    testCommitProtocol(false /* all participants can commit */,
+                       "hangBeforeWritingDecision",
+                       false /* expect commit decision */);
+    testCommitProtocol(
+        false /* all participants can commit */, "hangBeforeDeletingCoordinatorDoc", false
+        /* expect commit decision */);
 
     st.stop();
 
