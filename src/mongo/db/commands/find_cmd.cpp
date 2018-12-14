@@ -358,8 +358,8 @@ public:
         // Throw an assertion if query execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             firstBatch.abandon();
-            error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
-                    << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
+            LOG(1) << "Plan executor error during find command: " << PlanExecutor::statestr(state)
+                   << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
             uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
                 "Executor error during find command"));
