@@ -917,7 +917,7 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     auto sessionRaii = stdx::make_unique<WiredTigerSession>(_conn);
     WT_CURSOR* cursor = NULL;
     WT_SESSION* session = sessionRaii->getSession();
-    int wtRet = WT_OP_CHECK(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
+    int wtRet = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
@@ -948,17 +948,22 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     OperationContext* opCtx) {
     invariant(_backupCursor);
 
-    auto sessionRaii = WiredTigerSession(_conn);
-    // This cursor will be closed on exiting this scope.
     WT_CURSOR* cursor = NULL;
-    WT_SESSION* session = sessionRaii.getSession();
-    int wtRet = WT_OP_CHECK(
-        session->open_cursor(session, NULL, _backupCursor, "target=(\"log:\")", &cursor));
+    WT_SESSION* session = _backupSession->getSession();
+    int wtRet = session->open_cursor(session, NULL, _backupCursor, "target=(\"log:\")", &cursor);
     if (wtRet != 0) {
         return wtRCToStatus(wtRet);
     }
 
-    return getDataFilesFromBackupCursor(cursor, _path, "Error extending backup cursor.");
+    auto swFilesToCopy =
+        getDataFilesFromBackupCursor(cursor, _path, "Error extending backup cursor.");
+
+    wtRet = cursor->close(cursor);
+    if (wtRet != 0) {
+        return wtRCToStatus(wtRet);
+    }
+
+    return swFilesToCopy;
 }
 
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
