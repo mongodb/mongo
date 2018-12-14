@@ -551,8 +551,10 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        participant.attachTxnFieldsIfNeeded(commitCmd.toBSON(opCtx->getWriteConcern().toBSON()),
-                                            false),
+        participant.attachTxnFieldsIfNeeded(
+            commitCmd.toBSON(
+                BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON())),
+            false),
         Shard::RetryPolicy::kIdempotent));
 }
 
@@ -614,7 +616,9 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
         coordinatorIter->second.attachTxnFieldsIfNeeded(
-            coordinateCommitCmd.toBSON(opCtx->getWriteConcern().toBSON()), false),
+            coordinateCommitCmd.toBSON(
+                BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON())),
+            false),
         Shard::RetryPolicy::kIdempotent));
 }
 
