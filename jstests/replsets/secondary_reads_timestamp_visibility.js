@@ -35,6 +35,7 @@
     }
 
     replSet.awaitLastOpCommitted();
+    replSet.awaitReplication();
 
     // Sanity check.
     assert.eq(secondaryDB.getCollection(collName).find({x: 0}).itcount(), 100);
