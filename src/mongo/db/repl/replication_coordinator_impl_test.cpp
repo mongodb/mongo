@@ -4042,6 +4042,47 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 }
 
+TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorageDisableMajorityReadConcern) {
+
+    /**
+     * Test that 'setMyLastAppliedOpTime' sets the stable timestamp to the last applied when
+     * enableMajorityReadConcern=false, even if the last committed optime is unset.
+     */
+
+    const auto originalEnableMajorityReadConcern = serverGlobalParams.enableMajorityReadConcern;
+    serverGlobalParams.enableMajorityReadConcern = false;
+    ON_BLOCK_EXIT(
+        [&] { serverGlobalParams.enableMajorityReadConcern = originalEnableMajorityReadConcern; });
+
+    init("mySet/test1:1234,test2:1234,test3:1234");
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion"
+                            << 1
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test3:1234"))),
+                       HostAndPort("test2", 1234));
+
+    getStorageInterface()->supportsDocLockingBool = true;
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Initially the stable timestamp is unset.
+    ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
+
+    // Check that the stable timestamp is updated for the storage engine when we set the applied
+    // optime, even though the last committed optime is unset.
+    getStorageInterface()->allCommittedTimestamp = Timestamp(1, 1);
+    getReplCoord()->setMyLastAppliedOpTime(OpTime({1, 1}, 1));
+    ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());
+}
+
 TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
 
     /**

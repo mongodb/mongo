@@ -1103,13 +1103,10 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
                       opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp());
         }
 
-        if ((consistency == DataConsistency::Consistent &&
-             _readWriteAbility->canAcceptNonLocalWrites(lock) &&
-             _rsConfig.getWriteMajority() == 1) ||
-            !serverGlobalParams.enableMajorityReadConcern) {
+        if (consistency == DataConsistency::Consistent &&
+            _readWriteAbility->canAcceptNonLocalWrites(lock) && _rsConfig.getWriteMajority() == 1) {
             // Single vote primaries may have a lagged stable timestamp due to paring back the
-            // stable timestamp to the all committed timestamp. When majority read concern is
-            // disabled, the stable timestamp is set to lastApplied.
+            // stable timestamp to the all committed timestamp.
             _setStableTimestampForStorage(lock);
         }
     }
@@ -1204,8 +1201,10 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime(WithLock lk,
         invariant(opTime.getTimestamp().getInc() > 0,
                   str::stream() << "Impossible optime received: " << opTime.toString());
         _stableOpTimeCandidates.insert(opTime);
-        // If we are lagged behind the commit optime, set a new stable timestamp here.
-        if (opTime <= _topCoord->getLastCommittedOpTime()) {
+        // If we are lagged behind the commit optime, set a new stable timestamp here. When majority
+        // read concern is disabled, the stable timestamp is set to lastApplied.
+        if (opTime <= _topCoord->getLastCommittedOpTime() ||
+            !serverGlobalParams.enableMajorityReadConcern) {
             _setStableTimestampForStorage(lk);
         }
     } else if (_getMemberState_inlock().startup2()) {
@@ -3249,18 +3248,23 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 
         if (!testingSnapshotBehaviorInIsolation) {
             // Update committed snapshot and wake up any threads waiting on read concern or
-            // write concern. When majority read concern is enabled, the committed snapshot is set
-            // to the new stable optime. When majority read concern is disabled, the stable optime
-            // is ahead of the commit point, so we set the committed snapshot to the commit point.
-            auto committedSnapshot = serverGlobalParams.enableMajorityReadConcern
-                ? stableOpTime.value()
-                : _topCoord->getLastCommittedOpTime();
-            const bool updatedCommittedSnapshot =
-                _updateCommittedSnapshot_inlock(committedSnapshot);
-            if (updatedCommittedSnapshot || !serverGlobalParams.enableMajorityReadConcern) {
-                // Update the stable timestamp for the storage engine. When majority read concern is
-                // disabled, set the stable timestamp regardless of whether the majority commit
-                // point moved forward.
+            // write concern.
+            if (serverGlobalParams.enableMajorityReadConcern) {
+                // When majority read concern is enabled, the committed snapshot is set to the new
+                // stable optime.
+                if (_updateCommittedSnapshot_inlock(stableOpTime.value())) {
+                    // Update the stable timestamp for the storage engine.
+                    _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
+                }
+            } else {
+                // When majority read concern is disabled, the stable optime may be ahead of the
+                // commit point, so we set the committed snapshot to the commit point.
+                const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
+                if (!lastCommittedOpTime.isNull()) {
+                    _updateCommittedSnapshot_inlock(lastCommittedOpTime);
+                }
+                // Set the stable timestamp regardless of whether the majority commit point moved
+                // forward.
                 _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
             }
         }
