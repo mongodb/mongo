@@ -827,11 +827,6 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
     auto shard = std::move(swShard.getValue());
 
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (txnRouter) {
-        txnRouter->computeAndSetAtClusterTimeForUnsharded(opCtx, shardId);
-    }
-
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     BSONObj cmdObj = CommandHelpers::filterCommandRequestForPassthrough(

@@ -431,34 +431,6 @@ void TransactionRouter::onSnapshotError(const Status& errorStatus) {
     _atClusterTime.emplace();
 }
 
-void TransactionRouter::computeAndSetAtClusterTime(OperationContext* opCtx,
-                                                   bool mustRunOnAll,
-                                                   const std::set<ShardId>& shardIds,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj query,
-                                                   const BSONObj collation) {
-    if (!_atClusterTime || !_atClusterTime->canChange(_latestStmtId)) {
-        return;
-    }
-
-    // TODO SERVER-36312: Re-enable algorithm using the cached opTimes of the targeted shards.
-    // TODO SERVER-37549: Use the shard's cached lastApplied opTime instead of lastCommitted.
-    auto computedTime = LogicalClock::get(opCtx)->getClusterTime();
-    _setAtClusterTime(repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(), computedTime);
-}
-
-void TransactionRouter::computeAndSetAtClusterTimeForUnsharded(OperationContext* opCtx,
-                                                               const ShardId& shardId) {
-    if (!_atClusterTime || !_atClusterTime->canChange(_latestStmtId)) {
-        return;
-    }
-
-    // TODO SERVER-36312: Re-enable algorithm using the cached opTimes of the targeted shard.
-    // TODO SERVER-37549: Use the shard's cached lastApplied opTime instead of lastCommitted.
-    auto computedTime = LogicalClock::get(opCtx)->getClusterTime();
-    _setAtClusterTime(repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(), computedTime);
-}
-
 void TransactionRouter::setDefaultAtClusterTime(OperationContext* opCtx) {
     if (!_atClusterTime || !_atClusterTime->canChange(_latestStmtId)) {
         return;

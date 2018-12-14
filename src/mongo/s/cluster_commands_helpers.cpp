@@ -104,18 +104,6 @@ std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForShards(
         cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
     }
 
-    if (shardIds.size() == 1u) {
-        // The commands that support snapshot read concern only send unversioned
-        // requests to unsharded collections, so they should only be targeting
-        // the primary shard.
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter->computeAndSetAtClusterTimeForUnsharded(opCtx, shardIds[0]);
-        }
-    } else {
-        invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
-                  repl::ReadConcernLevel::kSnapshotReadConcern);
-    }
-
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto&& shardId : shardIds)
         requests.emplace_back(std::move(shardId), cmdToSend);
@@ -161,10 +149,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     // The collection is sharded. Target all shards that own chunks that match the query.
     std::set<ShardId> shardIds;
     routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
-
-    if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter->computeAndSetAtClusterTime(opCtx, false, shardIds, nss, query, collation);
-    }
 
     for (const ShardId& shardId : shardIds) {
         requests.emplace_back(shardId,

@@ -518,17 +518,3 @@ env.CppUnitTest(
         'sharding_router_test_fixture',
     ]
 )
-
-env.CppUnitTest(
-    target='compute_at_cluster_time_test',
-    source=[
-        'compute_at_cluster_time_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'catalog_cache_test_fixture',
-        'sharding_router_api',
-    ]
-)

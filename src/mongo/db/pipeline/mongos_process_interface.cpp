@@ -402,11 +402,6 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
     std::set<ShardId> shardIds = getTargetedShards(
         opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
 
-    if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        txnRouter->computeAndSetAtClusterTime(
-            opCtx, mustRunOnAll, shardIds, executionNss, shardQuery, aggRequest.getCollation());
-    }
-
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
     //   is not the primary.

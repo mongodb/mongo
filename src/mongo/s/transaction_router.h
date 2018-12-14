@@ -193,25 +193,6 @@ public:
     void onViewResolutionError(const NamespaceString& nss);
 
     /**
-     * Computes and sets the atClusterTime for the current transaction based on the given query
-     * parameters. Does nothing if the transaction does not have snapshot read concern or an
-     * atClusterTime has already been selected and cannot be changed.
-     */
-    void computeAndSetAtClusterTime(OperationContext* opCtx,
-                                    bool mustRunOnAll,
-                                    const std::set<ShardId>& shardIds,
-                                    const NamespaceString& nss,
-                                    const BSONObj query,
-                                    const BSONObj collation);
-
-    /**
-     * Computes and sets the atClusterTime for the current transaction based on the targeted shard.
-     * Does nothing if the transaction does not have snapshot read concern or an atClusterTime has
-     * already been selected and cannot be changed.
-     */
-    void computeAndSetAtClusterTimeForUnsharded(OperationContext* opCtx, const ShardId& shardId);
-
-    /**
      * Sets the atClusterTime for the current transaction to the latest time in the router's logical
      * clock. Does nothing if the transaction does not have snapshot read concern or an
      * atClusterTime has already been selected and cannot be changed.

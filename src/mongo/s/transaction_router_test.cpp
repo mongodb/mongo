@@ -1537,13 +1537,6 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClu
         txnRouter.setDefaultAtClusterTime(operationContext());
         ASSERT_FALSE(txnRouter.getAtClusterTime());
 
-        txnRouter.computeAndSetAtClusterTime(
-            operationContext(), true, {shard1}, NamespaceString("test.coll"), BSONObj(), BSONObj());
-        ASSERT_FALSE(txnRouter.getAtClusterTime());
-
-        txnRouter.computeAndSetAtClusterTimeForUnsharded(operationContext(), shard1);
-        ASSERT_FALSE(txnRouter.getAtClusterTime());
-
         // Can't continue on snapshot errors.
         ASSERT_THROWS_CODE(txnRouter.onSnapshotError(kDummyStatus),
                            AssertionException,
