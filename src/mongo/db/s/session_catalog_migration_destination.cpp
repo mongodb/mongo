@@ -249,7 +249,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
 
     auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, result.sessionId);
     auto const txnParticipant = TransactionParticipant::get(scopedSession.get());
-    txnParticipant->refreshFromStorageIfNeeded(opCtx);
+    txnParticipant->refreshFromStorageIfNeeded();
 
     if (!txnParticipant->onMigrateBeginOnPrimary(opCtx, result.txnNum, stmtId)) {
         // Don't continue migrating the transaction history

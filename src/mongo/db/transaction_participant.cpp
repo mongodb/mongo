@@ -306,6 +306,13 @@ const LogicalSessionId& TransactionParticipant::_sessionId() const {
     return owningSession->getSessionId();
 }
 
+OperationContext* TransactionParticipant::_opCtx() const {
+    const auto* owningSession = getTransactionParticipant.owner(this);
+    auto* opCtx = owningSession->currentOperation();
+    invariant(opCtx);
+    return opCtx;
+}
+
 void TransactionParticipant::_beginOrContinueRetryableWrite(WithLock wl, TxnNumber txnNumber) {
     if (txnNumber > _activeTxnNumber) {
         // New retryable write.
@@ -697,7 +704,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
             return;
         }
 
-        _checkIsCommandValidWithTxnState(lg, opCtx, cmdName);
+        _checkIsCommandValidWithTxnState(lg, *opCtx->getTxnNumber(), cmdName);
 
         if (_txnResourceStash) {
             // Transaction resources already exist for this transaction.  Transfer them from the
@@ -713,6 +720,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         // If we have no transaction resources then we cannot be prepared. If we're not in progress,
         // we don't do anything else.
         invariant(!_txnState.isPrepared(lg));
+
         if (!_txnState.isInProgress(lg)) {
             // At this point we're either committed and this is a 'commitTransaction' command, or we
             // are in the process of committing.
@@ -1115,6 +1123,7 @@ bool TransactionParticipant::expired() const {
 
 void TransactionParticipant::abortActiveTransaction(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+
     // This function shouldn't throw if the transaction is already aborted.
     _checkIsActiveTransaction(lock, *opCtx->getTxnNumber(), false);
     _abortActiveTransaction(
@@ -1186,9 +1195,11 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
     // unlock the session to run the opObserver onTransactionAbort, which calls back into the
     // session.
     lock.unlock();
+
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
     opObserver->onTransactionAbort(opCtx, abortOplogSlot);
+
     lock.lock();
     // We do not check if the active transaction number is correct here because we handle it below.
 
@@ -1297,17 +1308,17 @@ void TransactionParticipant::_checkIsActiveTransaction(WithLock wl,
 }
 
 void TransactionParticipant::_checkIsCommandValidWithTxnState(WithLock wl,
-                                                              OperationContext* opCtx,
+                                                              const TxnNumber& requestTxnNumber,
                                                               const std::string& cmdName) {
     // Throw NoSuchTransaction error instead of TransactionAborted error since this is the entry
     // point of transaction execution.
     uassert(ErrorCodes::NoSuchTransaction,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
+            str::stream() << "Transaction " << requestTxnNumber << " has been aborted.",
             !_txnState.isAborted(wl));
 
     // Cannot change committed transaction but allow retrying commitTransaction command.
     uassert(ErrorCodes::TransactionCommitted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been committed.",
+            str::stream() << "Transaction " << requestTxnNumber << " has been committed.",
             cmdName == "commitTransaction" || !_txnState.isCommitted(wl));
 
     // Disallow operations other than abort, prepare or commit on a prepared transaction
@@ -1486,7 +1497,7 @@ void TransactionParticipant::_reportTransactionStats(WithLock wl,
 std::string TransactionParticipant::_transactionInfoForLog(
     const SingleThreadedLockStats* lockStats,
     TransactionState::StateFlag terminationCause,
-    repl::ReadConcernArgs readConcernArgs) {
+    repl::ReadConcernArgs readConcernArgs) const {
     invariant(lockStats);
     invariant(terminationCause == TransactionState::kCommitted ||
               terminationCause == TransactionState::kAborted);
@@ -1596,45 +1607,34 @@ void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnN
     _transactionMetricsObserver.resetSingleTransactionStats(txnNumber);
 }
 
-void TransactionParticipant::refreshFromStorageIfNeeded(OperationContext* opCtx) {
-    if (opCtx->getClient()->isInDirectClient()) {
-        return;
-    }
-
+void TransactionParticipant::refreshFromStorageIfNeeded() {
+    const auto opCtx = _opCtx();
+    invariant(!opCtx->getClient()->isInDirectClient());
     invariant(!opCtx->lockState()->isLocked());
 
-    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    if (_isValid)
+        return;
 
-    while (!_isValid) {
-        const int numInvalidations = _numInvalidations;
+    auto activeTxnHistory = fetchActiveTransactionHistory(opCtx, _sessionId());
 
-        ul.unlock();
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-        auto activeTxnHistory = fetchActiveTransactionHistory(opCtx, _sessionId());
+    _lastWrittenSessionRecord = std::move(activeTxnHistory.lastTxnRecord);
 
-        ul.lock();
+    if (_lastWrittenSessionRecord) {
+        _activeTxnNumber = _lastWrittenSessionRecord->getTxnNum();
+        _activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
+        _hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;
 
-        // Protect against concurrent refreshes or invalidations
-        if (!_isValid && _numInvalidations == numInvalidations) {
-            _isValid = true;
-            _lastWrittenSessionRecord = std::move(activeTxnHistory.lastTxnRecord);
-
-            if (_lastWrittenSessionRecord) {
-                _activeTxnNumber = _lastWrittenSessionRecord->getTxnNum();
-                _activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
-                _hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;
-
-                if (activeTxnHistory.transactionCommitted) {
-                    _txnState.transitionTo(
-                        ul,
-                        TransactionState::kCommitted,
-                        TransactionState::TransitionValidation::kRelaxTransitionValidation);
-                }
-            }
-
-            break;
+        if (activeTxnHistory.transactionCommitted) {
+            _txnState.transitionTo(
+                lg,
+                TransactionState::kCommitted,
+                TransactionState::TransitionValidation::kRelaxTransitionValidation);
         }
     }
+
+    _isValid = true;
 }
 
 void TransactionParticipant::onWriteOpCompletedOnPrimary(
@@ -1723,9 +1723,8 @@ void TransactionParticipant::onMigrateCompletedOnPrimary(OperationContext* opCtx
 }
 
 void TransactionParticipant::_invalidate(WithLock) {
-    _activeTxnNumber = kUninitializedTxnNumber;
     _isValid = false;
-    _numInvalidations++;
+    _activeTxnNumber = kUninitializedTxnNumber;
     _lastWrittenSessionRecord.reset();
 
     // Reset the transactions metrics.

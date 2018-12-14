@@ -370,17 +370,16 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
             if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
                 createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
             }
-        }
-
-        if (txnParticipant->inMultiDocumentTransaction() && !sessionOptions.getStartTransaction()) {
+        } else if (txnParticipant->inMultiDocumentTransaction()) {
             const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "Only the first command in a transaction may specify a readConcern",
                     readConcernArgs.isEmpty());
         }
+
+        txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
     }
 
-    txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
         txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
     });

@@ -349,7 +349,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         // Create a session and sync it from disk
         auto session = sessionCatalog->checkOutSession(opCtx.get());
         const auto txnParticipant = TransactionParticipant::get(session.get());
-        txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
+        txnParticipant->refreshFromStorageIfNeeded();
 
         // Simulate a write occurring on that session
         simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);
@@ -398,7 +398,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         // Create a session and sync it from disk
         auto session = sessionCatalog->checkOutSession(opCtx.get());
         const auto txnParticipant = TransactionParticipant::get(session.get());
-        txnParticipant->refreshFromStorageIfNeeded(opCtx.get());
+        txnParticipant->refreshFromStorageIfNeeded();
 
         // Simulate a write occurring on that session
         simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);

@@ -194,7 +194,7 @@ MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* o
     : _operationContextSession(opCtx) {
     if (!opCtx->getClient()->isInDirectClient()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant->refreshFromStorageIfNeeded(opCtx);
+        txnParticipant->refreshFromStorageIfNeeded();
     }
 }
 

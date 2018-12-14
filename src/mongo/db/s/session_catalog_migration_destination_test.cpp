@@ -1589,7 +1589,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         auto scopedSession =
             SessionCatalog::get(opCtx)->checkOutSession(opCtx, *sessionInfo1.getSessionId());
         const auto txnParticipant = TransactionParticipant::get(scopedSession.get());
-        txnParticipant->refreshFromStorageIfNeeded(opCtx);
+        txnParticipant->refreshFromStorageIfNeeded();
         txnParticipant->beginOrContinue(3, boost::none, boost::none);
     }
 

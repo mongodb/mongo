@@ -79,8 +79,7 @@ class OperationContext : public Interruptible, public Decorable<OperationContext
 
 public:
     OperationContext(Client* client, unsigned int opId);
-
-    virtual ~OperationContext() = default;
+    virtual ~OperationContext();
 
     /**
      * Interface for durability.  Caller DOES NOT own pointer.
@@ -164,7 +163,7 @@ public:
     /**
      * Returns the session ID associated with this operation, if there is one.
      */
-    boost::optional<LogicalSessionId> getLogicalSessionId() const {
+    const boost::optional<LogicalSessionId>& getLogicalSessionId() const {
         return _lsid;
     }
 
@@ -407,7 +406,9 @@ private:
 
     friend class WriteUnitOfWork;
     friend class repl::UnreplicatedWritesBlock;
+
     Client* const _client;
+
     const unsigned int _opId;
 
     boost::optional<LogicalSessionId> _lsid;
@@ -447,8 +448,8 @@ private:
 
     WriteConcernOptions _writeConcern;
 
-    Date_t _deadline =
-        Date_t::max();  // The timepoint at which this operation exceeds its time limit.
+    // The timepoint at which this operation exceeds its time limit.
+    Date_t _deadline = Date_t::max();
 
     ErrorCodes::Error _timeoutError = ErrorCodes::ExceededTimeLimit;
     bool _ignoreInterrupts = false;

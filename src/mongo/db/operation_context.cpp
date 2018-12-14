@@ -85,6 +85,8 @@ OperationContext::OperationContext(Client* client, unsigned int opId)
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
+OperationContext::~OperationContext() = default;
+
 void OperationContext::setDeadlineAndMaxTime(Date_t when,
                                              Microseconds maxTime,
                                              ErrorCodes::Error timeoutError) {

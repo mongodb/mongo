@@ -2677,8 +2677,8 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), boost::none, boost::none);
     txnParticipant->unstashTransactionResources(opCtx(), "find");
 
-    // Build a BSONObj containing the details which we expect to see reported when we call
-    // Session::reportUnstashedState. For a retryable write, we should only include the txnNumber.
+    // Build a BSONObj containing the details which we expect to see reported when we invoke
+    // reportUnstashedState. For a retryable write, we should only include the txnNumber.
     BSONObjBuilder reportBuilder;
     BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
     BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
