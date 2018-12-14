@@ -528,12 +528,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::makePipeline(
 
 
 std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceToPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                        PipelineDeleter(expCtx->opCtx));
+
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
     // Generate the command object for the targeted shards.
-    std::vector<BSONObj> rawStages = [pipeline]() {
+    std::vector<BSONObj> rawStages = [&pipeline]() {
         auto serialization = pipeline->serialize();
         std::vector<BSONObj> stages;
         stages.reserve(serialization.size());
@@ -549,12 +552,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceTo
     AggregationRequest aggRequest(expCtx->ns, rawStages);
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto shardDispatchResults = MongoSInterface::dispatchShardPipeline(
-        expCtx,
-        expCtx->ns,
-        aggRequest,
-        liteParsedPipeline,
-        std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx)),
-        expCtx->collation);
+        expCtx, expCtx->ns, aggRequest, liteParsedPipeline, std::move(pipeline), expCtx->collation);
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());

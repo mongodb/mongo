@@ -562,7 +562,10 @@ public:
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                            PipelineDeleter(expCtx->opCtx));
+
         while (_removeLeadingQueryStages && !pipeline->getSources().empty()) {
             if (pipeline->popFrontWithName("$match") || pipeline->popFrontWithName("$sort") ||
                 pipeline->popFrontWithName("$project")) {
@@ -572,7 +575,7 @@ public:
         }
 
         pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
-        return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
+        return pipeline;
     }
 
 private:

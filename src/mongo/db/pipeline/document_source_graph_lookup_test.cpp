@@ -81,9 +81,11 @@ public:
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) final {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                            PipelineDeleter(expCtx->opCtx));
         pipeline->addInitialSource(DocumentSourceMock::create(_results));
-        return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
+        return pipeline;
     }
 
 private:
