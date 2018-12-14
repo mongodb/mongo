@@ -175,11 +175,15 @@ var BackupRestoreTest = function(options) {
             },
             oplogSize: 1024
         });
+
+        // Avoid stepdowns due to heavy workloads on slow machines.
+        var config = rst.getReplSetConfig();
+        config.settings = {electionTimeoutMillis: 60000};
         var nodes = rst.startSet();
+        rst.initiate(config);
 
         // Initialize replica set using default timeout. This should give us sufficient time to
         // allocate 1GB oplogs on slow test hosts.
-        rst.initiate();
         rst.awaitNodesAgreeOnPrimary();
         var primary = rst.getPrimary();
         var secondary = rst.getSecondary();
