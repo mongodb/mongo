@@ -87,7 +87,7 @@ variables:
 
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
-      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 
 - &apply_compile_expansions
   command: expansions.update
@@ -187,7 +187,7 @@ functions:
           extra_args="$extra_args --jobs=$num_jobs_available"
         fi
 
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "cleanup environment" :
     command: shell.exec
@@ -427,7 +427,7 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} core unittests MONGO_VERSION=${version}
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} core unittests MONGO_VERSION=${version}
 
           # Pack up the binaries
           mkdir -p mongodb-binaries/bin
@@ -644,7 +644,7 @@ buildvariants:
   - rhel62-small
   expansions:
     platform: linux
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -664,7 +664,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-compile
+  - windows-64-vs2017-compile
   expansions:
     platform: "windows64"
     exe: ".exe"

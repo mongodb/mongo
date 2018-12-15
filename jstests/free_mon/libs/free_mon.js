@@ -23,7 +23,7 @@ class FreeMonWebServer {
     * @param {bool} disableFaultsOnStartup optionally disable fault on startup
     */
     constructor(fault_type, disableFaultsOnStartup) {
-        this.python = "/opt/mongodbtoolchain/v2/bin/python3";
+        this.python = "/opt/mongodbtoolchain/v3/bin/python3";
         this.disableFaultsOnStartup = disableFaultsOnStartup || false;
         this.fault_type = fault_type;
 

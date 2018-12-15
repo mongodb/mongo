@@ -38,7 +38,7 @@ post:
           # these default values in the distro config in evergreen.
 
           if [ -d "${scons_cache_path}" ]; then
-              ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+              ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
 
@@ -258,7 +258,7 @@ tasks:
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -270,7 +270,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod
+          ${python|/opt/mongodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -523,7 +523,7 @@ buildvariants:
     # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
     # microbenchmarks, since they run on the centos6 boxes.  If we can get proper artifacts directly
     # from that project, we should do that and remove the compile tasks.
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
     mongod_flags: >-

@@ -341,8 +341,8 @@ if test -f /etc/ld.so.conf; then
   done </etc/ld.so.conf >$tmp_ld_so_conf
 
   # Hack to make mongodbtoolchain clang work.
-  echo '/opt/mongodbtoolchain/v2/lib' >> $tmp_ld_so_conf
-  echo '/opt/mongodbtoolchain/v2/lib64' >> $tmp_ld_so_conf
+  echo '/opt/mongodbtoolchain/v3/lib' >> $tmp_ld_so_conf
+  echo '/opt/mongodbtoolchain/v3/lib64' >> $tmp_ld_so_conf
 
   # Work around new directory layout for clang in ubuntu >= 16.10
   if [ -n "$clangprefix" ]; then

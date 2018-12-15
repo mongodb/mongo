@@ -33,7 +33,7 @@ post:
           # these default values in the distro config in evergreen.
 
           if [ -d "${scons_cache_path}" ]; then
-              ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+              ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
 functions:
@@ -210,7 +210,7 @@ tasks:
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -221,7 +221,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
+          ${python|/opt/mongodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
@@ -281,7 +281,7 @@ buildvariants:
   modules: &modules
     - dsi
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v3/bin/objcopy
     setup: shard-longevity
     cluster: longevity
     numShard: 3

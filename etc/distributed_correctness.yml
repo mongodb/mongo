@@ -332,7 +332,7 @@ buildvariants:
     - dsi
     - workloads
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v3/bin/objcopy
     setup: standalone
     cluster: single-correctness
     use_scons_cache: true
