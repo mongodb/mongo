@@ -32,7 +32,8 @@ namespace asio {
 /**
  * @defgroup write asio::write
  *
- * @brief Write a certain amount of data to a stream before returning.
+ * @brief The @c write function is a composed operation that writes a certain
+ * amount of data to a stream before returning.
  */
 /*@{*/
 
@@ -532,8 +533,8 @@ std::size_t write(SyncWriteStream& s, basic_streambuf<Allocator>& b,
 /**
  * @defgroup async_write asio::async_write
  *
- * @brief Start an asynchronous operation to write a certain amount of data to a
- * stream.
+ * @brief The @c async_write function is a composed asynchronous operation that
+ * writes a certain amount of data to a stream before completion.
  */
 /*@{*/
 

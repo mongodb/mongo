@@ -58,7 +58,8 @@ T& win_global()
   {
     win_global_impl<T>::mutex_.init();
     static_mutex::scoped_lock lock(win_global_impl<T>::mutex_);
-    win_global_impl<T>::ptr_ = new T;
+    if (win_global_impl<T>::ptr_ == 0)
+      win_global_impl<T>::ptr_ = new T;
     win_global_impl<T>::tss_ptr_ = win_global_impl<T>::ptr_;
   }
 

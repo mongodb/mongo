@@ -266,11 +266,13 @@ private:
     {
       if (index == heap_.size() - 1)
       {
+        timer.heap_index_ = (std::numeric_limits<std::size_t>::max)();
         heap_.pop_back();
       }
       else
       {
         swap_heap(index, heap_.size() - 1);
+        timer.heap_index_ = (std::numeric_limits<std::size_t>::max)();
         heap_.pop_back();
         if (index > 0 && Time_Traits::less_than(
               heap_[index].time_, heap_[(index - 1) / 2].time_))

@@ -32,8 +32,8 @@ namespace asio {
 /**
  * @defgroup read asio::read
  *
- * @brief Attempt to read a certain amount of data from a stream before
- * returning.
+ * @brief The @c read function is a composed operation that reads a certain
+ * amount of data from a stream before returning.
  */
 /*@{*/
 
@@ -532,8 +532,8 @@ std::size_t read(SyncReadStream& s, basic_streambuf<Allocator>& b,
 /**
  * @defgroup async_read asio::async_read
  *
- * @brief Start an asynchronous operation to read a certain amount of data from
- * a stream.
+ * @brief The @c async_read function is a composed asynchronous operation that
+ * reads a certain amount of data from a stream before completion.
  */
 /*@{*/
 

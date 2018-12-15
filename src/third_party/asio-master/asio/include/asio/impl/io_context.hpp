@@ -247,7 +247,7 @@ void io_context::executor_type::dispatch(
   p.p = new (p.v) op(ASIO_MOVE_CAST(Function)(f), a);
 
   ASIO_HANDLER_CREATION((this->context(), *p.p,
-        "io_context", &this->context(), 0, "post"));
+        "io_context", &this->context(), 0, "dispatch"));
 
   io_context_.impl_.post_immediate_completion(p.p, false);
   p.v = p.p = 0;

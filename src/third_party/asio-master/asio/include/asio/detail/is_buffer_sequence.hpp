@@ -52,22 +52,46 @@ struct buffer_sequence_memfns_check
 };
 
 template <typename>
-char (&begin_memfn_helper(...))[2];
+char (&buffer_sequence_begin_helper(...))[2];
+
+#if defined(ASIO_HAS_DECLTYPE)
 
 template <typename T>
-char begin_memfn_helper(
+char buffer_sequence_begin_helper(T* t,
+    typename enable_if<!is_same<
+      decltype(asio::buffer_sequence_begin(*t)),
+        void>::value>::type*);
+
+#else // defined(ASIO_HAS_DECLTYPE)
+
+template <typename T>
+char buffer_sequence_begin_helper(T* t,
     buffer_sequence_memfns_check<
       void (buffer_sequence_memfns_base::*)(),
       &buffer_sequence_memfns_derived<T>::begin>*);
 
+#endif // defined(ASIO_HAS_DECLTYPE)
+
 template <typename>
-char (&end_memfn_helper(...))[2];
+char (&buffer_sequence_end_helper(...))[2];
+
+#if defined(ASIO_HAS_DECLTYPE)
 
 template <typename T>
-char end_memfn_helper(
+char buffer_sequence_end_helper(T* t,
+    typename enable_if<!is_same<
+      decltype(asio::buffer_sequence_end(*t)),
+        void>::value>::type*);
+
+#else // defined(ASIO_HAS_DECLTYPE)
+
+template <typename T>
+char buffer_sequence_end_helper(T* t,
     buffer_sequence_memfns_check<
       void (buffer_sequence_memfns_base::*)(),
       &buffer_sequence_memfns_derived<T>::end>*);
+
+#endif // defined(ASIO_HAS_DECLTYPE)
 
 template <typename>
 char (&size_memfn_helper(...))[2];
@@ -133,25 +157,25 @@ char consume_memfn_helper(
       &buffer_sequence_memfns_derived<T>::consume>*);
 
 template <typename, typename>
-char (&buffer_element_type_helper(...))[2];
+char (&buffer_sequence_element_type_helper(...))[2];
 
-#if defined(ASIO_HAS_DECL_TYPE)
+#if defined(ASIO_HAS_DECLTYPE)
 
 template <typename T, typename Buffer>
-char buffer_element_type_helper(T* t,
+char buffer_sequence_element_type_helper(T* t,
     typename enable_if<is_convertible<
-      decltype(*buffer_sequence_begin(*t)),
+      decltype(*asio::buffer_sequence_begin(*t)),
         Buffer>::value>::type*);
 
-#else // defined(ASIO_HAS_DECL_TYPE)
+#else // defined(ASIO_HAS_DECLTYPE)
 
 template <typename T, typename Buffer>
-char buffer_element_type_helper(
+char buffer_sequence_element_type_helper(
     typename T::const_iterator*,
     typename enable_if<is_convertible<
       typename T::value_type, Buffer>::value>::type*);
 
-#endif // defined(ASIO_HAS_DECL_TYPE)
+#endif // defined(ASIO_HAS_DECLTYPE)
 
 template <typename>
 char (&const_buffers_type_typedef_helper(...))[2];
@@ -170,9 +194,9 @@ char mutable_buffers_type_typedef_helper(
 template <typename T, typename Buffer>
 struct is_buffer_sequence_class
   : integral_constant<bool,
-      sizeof(begin_memfn_helper<T>(0)) != 1 &&
-      sizeof(end_memfn_helper<T>(0)) != 1 &&
-      sizeof(buffer_element_type_helper<T, Buffer>(0, 0)) == 1>
+      sizeof(buffer_sequence_begin_helper<T>(0)) != 1 &&
+      sizeof(buffer_sequence_end_helper<T>(0)) != 1 &&
+      sizeof(buffer_sequence_element_type_helper<T, Buffer>(0, 0)) == 1>
 {
 };
 

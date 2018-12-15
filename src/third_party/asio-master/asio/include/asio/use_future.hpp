@@ -16,8 +16,9 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
+#include "asio/detail/future.hpp"
 
-#if defined(ASIO_HAS_STD_FUTURE) \
+#if defined(ASIO_HAS_STD_FUTURE_CLASS) \
   || defined(GENERATING_DOCUMENTATION)
 
 #include <memory>
@@ -153,7 +154,7 @@ __declspec(selectany) use_future_t<> use_future;
 
 #include "asio/impl/use_future.hpp"
 
-#endif // defined(ASIO_HAS_STD_FUTURE)
+#endif // defined(ASIO_HAS_STD_FUTURE_CLASS)
        //   || defined(GENERATING_DOCUMENTATION)
 
 #endif // ASIO_USE_FUTURE_HPP
