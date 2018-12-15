@@ -1,4 +1,4 @@
-AC_INIT(asio, [1.12.0])
+AC_INIT(asio, [1.12.2])
 AC_CONFIG_SRCDIR(include/asio.hpp)
 AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE([tar-ustar])
@@ -182,4 +182,5 @@ AC_OUTPUT([
   src/tests/Makefile
   src/examples/cpp03/Makefile
   src/examples/cpp11/Makefile
-  src/examples/cpp14/Makefile])
+  src/examples/cpp14/Makefile
+  src/examples/cpp17/Makefile])

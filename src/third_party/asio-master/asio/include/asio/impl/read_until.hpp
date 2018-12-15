@@ -269,7 +269,9 @@ std::size_t read_until(SyncReadStream& s,
     }
 
     // Need more data.
-    std::size_t bytes_to_read = read_size_helper(b, 65536);
+    std::size_t bytes_to_read = std::min<std::size_t>(
+          std::max<std::size_t>(512, b.capacity() - b.size()),
+          std::min<std::size_t>(65536, b.max_size() - b.size()));
     b.commit(s.read_some(b.prepare(bytes_to_read), ec));
     if (ec)
       return 0;

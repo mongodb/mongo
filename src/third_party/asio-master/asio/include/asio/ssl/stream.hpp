@@ -634,7 +634,8 @@ public:
    *
    * @note The async_write_some operation may not transmit all of the data to
    * the peer. Consider using the @ref async_write function if you need to
-   * ensure that all data is written before the blocking operation completes.
+   * ensure that all data is written before the asynchronous operation
+   * completes.
    */
   template <typename ConstBufferSequence, typename WriteHandler>
   ASIO_INITFN_RESULT_TYPE(WriteHandler,
