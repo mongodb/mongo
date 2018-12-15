@@ -61,38 +61,27 @@ std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj,
 std::pair<IndexEntry, std::unique_ptr<ProjectionExecAgg>> makeWildcardEntry(
     BSONObj keyPattern, const MatchExpression* filterExpr = nullptr) {
     auto projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, {});
-    return {{keyPattern,
-             IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-             false,  // multikey
-             {},
-             {},
-             false,  // sparse
-             false,  // unique
-             IndexEntry::Identifier{"indexName"},
-             filterExpr,
-             BSONObj(),
-             nullptr,
-             projExec.get()},
+    return {IndexEntry(keyPattern,
+                       false,  // multikey
+                       false,  // sparse
+                       false,  // unique
+                       IndexEntry::Identifier{"indexName"},
+                       filterExpr,
+                       BSONObj(),
+                       projExec.get()),
             std::move(projExec)};
 }
 
 // Test sparse index discriminators for a simple sparse index.
 TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                    false,  // multikey
-                    {},
-                    {},
-                    true,                           // sparse
-                    false,                          // unique
-                    IndexEntry::Identifier{"a_1"},  // name
-                    nullptr,                        // filterExpr
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,                          // multikey
+                                           true,                           // sparse
+                                           false,                          // unique
+                                           IndexEntry::Identifier{"a_1"},  // name
+                                           nullptr,                        // filterExpr
+                                           BSONObj())});
 
     auto discriminators = state.getDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
@@ -119,20 +108,13 @@ TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
 // Test sparse index discriminators for a compound sparse index.
 TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1 << "b" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                    false,  // multikey
-                    {},
-                    {},
-                    true,                               // sparse
-                    false,                              // unique
-                    IndexEntry::Identifier{"a_1_b_1"},  // name
-                    nullptr,                            // filterExpr
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
+                                           false,                              // multikey
+                                           true,                               // sparse
+                                           false,                              // unique
+                                           IndexEntry::Identifier{"a_1_b_1"},  // name
+                                           nullptr,                            // filterExpr
+                                           BSONObj())});
 
     {
         auto discriminators = state.getDiscriminators("a");
@@ -166,20 +148,13 @@ TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
     BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
     std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                    false,  // multikey
-                    {},
-                    {},
-                    false,                          // sparse
-                    false,                          // unique
-                    IndexEntry::Identifier{"a_1"},  // name
-                    filterExpr.get(),
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,                          // multikey
+                                           false,                          // sparse
+                                           false,                          // unique
+                                           IndexEntry::Identifier{"a_1"},  // name
+                                           filterExpr.get(),
+                                           BSONObj())});
 
     {
         auto discriminators = state.getDiscriminators("f");
@@ -215,20 +190,13 @@ TEST(PlanCacheIndexabilityTest, PartialIndexAnd) {
     BSONObj filterObj = BSON("f" << 1 << "g" << 1);
     std::unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                    false,  // multikey
-                    {},
-                    {},
-                    false,                          // sparse
-                    false,                          // unique
-                    IndexEntry::Identifier{"a_1"},  // name
-                    filterExpr.get(),
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,                          // multikey
+                                           false,                          // sparse
+                                           false,                          // unique
+                                           IndexEntry::Identifier{"a_1"},  // name
+                                           filterExpr.get(),
+                                           BSONObj())});
 
     {
         auto discriminators = state.getDiscriminators("f");
@@ -276,33 +244,20 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
     std::unique_ptr<MatchExpression> filterExpr2(parseMatchExpression(filterObj2));
 
     PlanCacheIndexabilityState state;
-    auto keyPattern_a = BSON("a" << 1);
-    auto keyPattern_b = BSON("b" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern_a,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern_a)),
-                    false,  // multikey
-                    {},
-                    {},
-                    false,                          // sparse
-                    false,                          // unique
-                    IndexEntry::Identifier{"a_1"},  // name
-                    filterExpr1.get(),
-                    BSONObj(),
-                    nullptr,
-                    nullptr),
-         IndexEntry(keyPattern_b,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern_b)),
-                    false,  // multikey
-                    {},
-                    {},
-                    false,                          // sparse
-                    false,                          // unique
-                    IndexEntry::Identifier{"b_1"},  // name
-                    filterExpr2.get(),
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,                          // multikey
+                                           false,                          // sparse
+                                           false,                          // unique
+                                           IndexEntry::Identifier{"a_1"},  // name
+                                           filterExpr1.get(),
+                                           BSONObj()),
+                                IndexEntry(BSON("b" << 1),
+                                           false,                          // multikey
+                                           false,                          // sparse
+                                           false,                          // unique
+                                           IndexEntry::Identifier{"b_1"},  // name
+                                           filterExpr2.get(),
+                                           BSONObj())});
 
     {
         auto discriminators = state.getDiscriminators("f");
@@ -362,20 +317,13 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
 // collation indexability).
 TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                    false,  // multikey
-                    {},
-                    {},
-                    false,                          // sparse
-                    false,                          // unique
-                    IndexEntry::Identifier{"a_1"},  // name
-                    nullptr,
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                           false,                          // multikey
+                                           false,                          // sparse
+                                           false,                          // unique
+                                           IndexEntry::Identifier{"a_1"},  // name
+                                           nullptr,
+                                           BSONObj())});
     auto discriminators = state.getDiscriminators("a");
     ASSERT_EQ(1U, discriminators.size());
     ASSERT(discriminators.find("a_1") != discriminators.end());
@@ -384,19 +332,13 @@ TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
 // Test discriminator for a simple index with a collation.
 TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollationsAreCompatible) {
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1);
-    IndexEntry entry(keyPattern,
-                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                     false,  // multikey
-                     {},
-                     {},
+    IndexEntry entry(BSON("a" << 1),
+                     false,                          // multikey
                      false,                          // sparse
                      false,                          // unique
                      IndexEntry::Identifier{"a_1"},  // name
                      nullptr,                        // filterExpr
-                     BSONObj(),
-                     nullptr,
-                     nullptr);
+                     BSONObj());
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     entry.collator = &collator;
     state.updateDiscriminators({entry});
@@ -471,20 +413,13 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
 // only encode collation indexability).
 TEST(PlanCacheIndexabilityTest, CompoundIndexCollationDiscriminator) {
     PlanCacheIndexabilityState state;
-    auto keyPattern = BSON("a" << 1 << "b" << 1);
-    state.updateDiscriminators(
-        {IndexEntry(keyPattern,
-                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                    false,  // multikey
-                    {},
-                    {},
-                    false,                              // sparse
-                    false,                              // unique
-                    IndexEntry::Identifier{"a_1_b_1"},  // name
-                    nullptr,
-                    BSONObj(),
-                    nullptr,
-                    nullptr)});
+    state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
+                                           false,                              // multikey
+                                           false,                              // sparse
+                                           false,                              // unique
+                                           IndexEntry::Identifier{"a_1_b_1"},  // name
+                                           nullptr,
+                                           BSONObj())});
 
     auto discriminatorsA = state.getDiscriminators("a");
     ASSERT_EQ(1U, discriminatorsA.size());

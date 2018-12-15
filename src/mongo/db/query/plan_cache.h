@@ -517,7 +517,7 @@ public:
      *
      * Callers must hold the collection lock in exclusive mode when calling this method.
      */
-    void notifyOfIndexUpdates(const std::vector<CoreIndexInfo>& indexCores);
+    void notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries);
 
     /**
      * Iterates over the plan cache. For each entry, serializes the PlanCacheEntry according to

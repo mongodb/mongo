@@ -247,31 +247,13 @@ void assertEquivalent(const char* queryStr,
 std::pair<IndexEntry, std::unique_ptr<ProjectionExecAgg>> makeWildcardEntry(BSONObj keyPattern) {
     auto projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, {});
     return {IndexEntry(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                        false,  // multikey
-                       {},
-                       {},
                        false,  // sparse
                        false,  // unique
                        IndexEntry::Identifier{"indexName"},
                        nullptr,
                        BSONObj(),
-                       nullptr,
                        projExec.get()),
-            std::move(projExec)};
-}
-
-// A version of the above for CoreIndexInfo, used for plan cache update tests.
-std::pair<CoreIndexInfo, std::unique_ptr<ProjectionExecAgg>> makeWildcardUpdate(
-    BSONObj keyPattern) {
-    auto projExec = WildcardKeyGenerator::createProjectionExec(keyPattern, {});
-    return {CoreIndexInfo(keyPattern,
-                          IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                          false,                                // sparse
-                          IndexEntry::Identifier{"indexName"},  // name
-                          nullptr,                              // filterExpr
-                          nullptr,                              // collation
-                          projExec.get()),                      // wildcard
             std::move(projExec)};
 }
 
@@ -890,50 +872,31 @@ protected:
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {
-        params.indices.push_back(
-            IndexEntry(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       multikey,
-                       {},
-                       {},
-                       false,
-                       false,
-                       IndexEntry::Identifier{indexName},
-                       nullptr,
-                       BSONObj(),
-                       nullptr,
-                       nullptr));
+        // The first false means not multikey.
+        // The second false means not sparse.
+        // The NULL means no filter expression.
+        params.indices.push_back(IndexEntry(keyPattern,
+                                            multikey,
+                                            false,
+                                            false,
+                                            IndexEntry::Identifier{indexName},
+                                            NULL,
+                                            BSONObj()));
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
-        params.indices.push_back(
-            IndexEntry(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       multikey,
-                       {},
-                       {},
-                       sparse,
-                       false,
-                       IndexEntry::Identifier{indexName},
-                       nullptr,
-                       BSONObj(),
-                       nullptr,
-                       nullptr));
+        params.indices.push_back(IndexEntry(keyPattern,
+                                            multikey,
+                                            sparse,
+                                            false,
+                                            IndexEntry::Identifier{indexName},
+                                            NULL,
+                                            BSONObj()));
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
-        IndexEntry entry(keyPattern,
-                         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                         false,
-                         {},
-                         {},
-                         false,
-                         false,
-                         IndexEntry::Identifier{indexName},
-                         nullptr,
-                         BSONObj(),
-                         nullptr,
-                         nullptr);
+        IndexEntry entry(
+            keyPattern, false, false, false, IndexEntry::Identifier{indexName}, NULL, BSONObj());
         entry.collator = collator;
         params.indices.push_back(entry);
     }
@@ -1800,12 +1763,13 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
 // whether or not the predicates in the given query can use the index.
 TEST(PlanCacheTest, ComputeKeySparseIndex) {
     PlanCache planCache;
-    const auto keyPattern = BSON("a" << 1);
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       true,                           // sparse
-                       IndexEntry::Identifier{""})});  // name
+    planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
+                                               false,                       // multikey
+                                               true,                        // sparse
+                                               false,                       // unique
+                                               IndexEntry::Identifier{""},  // name
+                                               nullptr,                     // filterExpr
+                                               BSONObj())});
 
     unique_ptr<CanonicalQuery> cqEqNumber(canonicalize("{a: 0}}"));
     unique_ptr<CanonicalQuery> cqEqString(canonicalize("{a: 'x'}}"));
@@ -1833,13 +1797,13 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
     unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
 
     PlanCache planCache;
-    const auto keyPattern = BSON("a" << 1);
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                       // sparse
-                       IndexEntry::Identifier{""},  // name
-                       filterExpr.get())});         // filterExpr
+    planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
+                                               false,                       // multikey
+                                               false,                       // sparse
+                                               false,                       // unique
+                                               IndexEntry::Identifier{""},  // name
+                                               filterExpr.get(),
+                                               BSONObj())});
 
     unique_ptr<CanonicalQuery> cqGtNegativeFive(canonicalize("{f: {$gt: -5}}"));
     unique_ptr<CanonicalQuery> cqGtZero(canonicalize("{f: {$gt: 0}}"));
@@ -1858,14 +1822,15 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
 
     PlanCache planCache;
-    const auto keyPattern = BSON("a" << 1);
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       false,                       // sparse
-                       IndexEntry::Identifier{""},  // name
-                       nullptr,                     // filterExpr
-                       &collator)});                // collation
+    IndexEntry entry(BSON("a" << 1),
+                     false,                       // multikey
+                     false,                       // sparse
+                     false,                       // unique
+                     IndexEntry::Identifier{""},  // name
+                     nullptr,                     // filterExpr
+                     BSONObj());
+    entry.collator = &collator;
+    planCache.notifyOfIndexEntries({entry});
 
     unique_ptr<CanonicalQuery> containsString(canonicalize("{a: 'abc'}"));
     unique_ptr<CanonicalQuery> containsObject(canonicalize("{a: {b: 'abc'}}"));
@@ -1922,10 +1887,10 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
-    auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
+    auto entryProjExecPair = makeWildcardEntry(BSON("a.$**" << 1));
 
     PlanCache planCache;
-    planCache.notifyOfIndexUpdates({entryProjUpdatePair.first});
+    planCache.notifyOfIndexEntries({entryProjExecPair.first});
 
     // Used to check that two queries have the same shape when no indexes are present.
     PlanCache planCacheWithNoIndexes;
@@ -1985,10 +1950,10 @@ TEST(PlanCacheTest, ComputeKeyWildcardIndex) {
 }
 
 TEST(PlanCacheTest, ComputeKeyWildcardIndexDiscriminatesEqualityToEmptyObj) {
-    auto entryProjUpdatePair = makeWildcardUpdate(BSON("a.$**" << 1));
+    auto entryProjExecPair = makeWildcardEntry(BSON("a.$**" << 1));
 
     PlanCache planCache;
-    planCache.notifyOfIndexUpdates({entryProjUpdatePair.first});
+    planCache.notifyOfIndexEntries({entryProjExecPair.first});
 
     // Equality to empty obj and equality to non-empty obj have different plan cache keys.
     std::unique_ptr<CanonicalQuery> equalsEmptyObj(canonicalize("{a: {}}"));
@@ -2014,13 +1979,14 @@ TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
     const auto preIndexStableKey = preIndexKey.getStableKey();
     ASSERT_EQ(preIndexKey.getUnstablePart(), "");
 
-    const auto keyPattern = BSON("a" << 1);
     // Create a sparse index (which requires a discriminator).
-    planCache.notifyOfIndexUpdates(
-        {CoreIndexInfo(keyPattern,
-                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                       true,                           // sparse
-                       IndexEntry::Identifier{""})});  // name
+    planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
+                                               false,                       // multikey
+                                               true,                        // sparse
+                                               false,                       // unique
+                                               IndexEntry::Identifier{""},  // name
+                                               nullptr,                     // filterExpr
+                                               BSONObj())});
 
     const PlanCacheKey postIndexKey = planCache.computeKey(*cq);
     const auto postIndexStableKey = postIndexKey.getStableKey();

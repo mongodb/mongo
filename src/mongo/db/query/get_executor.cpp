@@ -181,26 +181,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             projExec};
 }
 
-CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
-    auto desc = ice.descriptor();
-    invariant(desc);
-
-    auto accessMethod = ice.accessMethod();
-    invariant(accessMethod);
-
-    const ProjectionExecAgg* projExec = nullptr;
-    if (desc->getIndexType() == IndexType::INDEX_WILDCARD)
-        projExec = static_cast<const WildcardAccessMethod*>(accessMethod)->getProjectionExec();
-
-    return {desc->keyPattern(),
-            desc->getIndexType(),
-            desc->isSparse(),
-            IndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
-            ice.getCollator(),
-            projExec};
-}
-
 void fillOutPlannerParams(OperationContext* opCtx,
                           Collection* collection,
                           CanonicalQuery* canonicalQuery,

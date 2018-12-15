@@ -188,7 +188,7 @@ QuerySettings* CollectionInfoCacheImpl::getQuerySettings() const {
 }
 
 void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCtx) {
-    std::vector<CoreIndexInfo> indexCores;
+    std::vector<IndexEntry> indexEntries;
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
@@ -197,10 +197,10 @@ void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCt
         _collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
-        indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
+        indexEntries.emplace_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
     }
 
-    _planCache->notifyOfIndexUpdates(indexCores);
+    _planCache->notifyOfIndexEntries(indexEntries);
 }
 
 void CollectionInfoCacheImpl::init(OperationContext* opCtx) {

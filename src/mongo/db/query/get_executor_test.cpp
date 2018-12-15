@@ -116,51 +116,12 @@ void testAllowedIndices(std::vector<IndexEntry> indexes,
     }
 }
 
-/**
- * Make a minimal IndexEntry from just a key pattern and a name.
- */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp, const std::string& indexName) {
-    return {kp,
-            IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            false,
-            {},
-            {},
-            false,
-            false,
-            CoreIndexInfo::Identifier(indexName),
-            nullptr,
-            {},
-            nullptr,
-            nullptr};
-}
-
-/**
- * Make a minimal IndexEntry from just a key pattern and a name. Include a wildcardProjection which
- * is neccesary for wildcard indicies.
- */
-IndexEntry buildWildcardIndexEntry(const BSONObj& kp,
-                                   const ProjectionExecAgg* projExec,
-                                   const std::string& indexName) {
-    return {kp,
-            IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            false,
-            {},
-            {},
-            false,
-            false,
-            CoreIndexInfo::Identifier(indexName),
-            nullptr,
-            {},
-            nullptr,
-            projExec};
-}
-
 // Use of index filters to select compound index over single key index.
 TEST(GetExecutorTest, GetAllowedIndices) {
     testAllowedIndices(
-        {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-         buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-         buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+        {IndexEntry(fromjson("{a: 1}"), "a_1"),
+         IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+         IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1, b: 1}")}),
         stdx::unordered_set<std::string>{},
         {"a_1_b_1"});
@@ -171,9 +132,9 @@ TEST(GetExecutorTest, GetAllowedIndices) {
 // result in the planner generating a collection scan.
 TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
     testAllowedIndices(
-        {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-         buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-         buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+        {IndexEntry(fromjson("{a: 1}"), "a_1"),
+         IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+         IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{nosuchfield: 1}")}),
         stdx::unordered_set<std::string>{},
         stdx::unordered_set<std::string>{});
@@ -182,17 +143,16 @@ TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
 // This test case shows how to force query execution to use
 // an index that orders items in descending order.
 TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
-    testAllowedIndices({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: -1}"), "a_-1")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
-                       stdx::unordered_set<std::string>{},
-                       {"a_-1"});
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: -1}"), "a_-1")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
+        stdx::unordered_set<std::string>{},
+        {"a_-1"});
 }
 
 TEST(GetExecutorTest, GetAllowedIndicesMatchesByName) {
     testAllowedIndices(
-        {buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-         buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
+        {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
         // BSONObjSet default constructor is explicit, so we cannot copy-list-initialize until
         // C++14.
         SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
@@ -201,64 +161,48 @@ TEST(GetExecutorTest, GetAllowedIndicesMatchesByName) {
 }
 
 TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
-    testAllowedIndices({buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1:en")},
-                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
-                       stdx::unordered_set<std::string>{},
-                       {"a_1", "a_1:en"});
+    testAllowedIndices(
+        {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
+        SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
+        stdx::unordered_set<std::string>{},
+        {"a_1", "a_1:en"});
 }
 
 TEST(GetExecutorTest, GetAllowedWildcardIndicesByKey) {
-    auto projExec = ProjectionExecAgg::create(
-        fromjson("{_id: 0}"),
-        ProjectionExecAgg::DefaultIdPolicy::kExcludeId,
-        ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
-    testAllowedIndices({buildWildcardIndexEntry(BSON("$**" << 1), projExec.get(), "$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+    testAllowedIndices({IndexEntry(BSON("$**" << 1), "$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
                        SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("$**" << 1)}),
                        stdx::unordered_set<std::string>{},
                        {"$**_1"});
 }
 
 TEST(GetExecutorTest, GetAllowedWildcardIndicesByName) {
-    auto projExec = ProjectionExecAgg::create(
-        fromjson("{_id: 0}"),
-        ProjectionExecAgg::DefaultIdPolicy::kExcludeId,
-        ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
-    testAllowedIndices({buildWildcardIndexEntry(BSON("$**" << 1), projExec.get(), "$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+    testAllowedIndices({IndexEntry(BSON("$**" << 1), "$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
                        SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
                        {"$**_1"},
                        {"$**_1"});
 }
 
 TEST(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByKey) {
-    auto projExec = ProjectionExecAgg::create(
-        fromjson("{_id: 0}"),
-        ProjectionExecAgg::DefaultIdPolicy::kExcludeId,
-        ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
-    testAllowedIndices({buildWildcardIndexEntry(BSON("a.$**" << 1), projExec.get(), "a.$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+    testAllowedIndices({IndexEntry(BSON("a.$**" << 1), "a.$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
                        SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("a.$**" << 1)}),
                        stdx::unordered_set<std::string>{},
                        {"a.$**_1"});
 }
 
 TEST(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByName) {
-    auto projExec = ProjectionExecAgg::create(
-        fromjson("{_id: 0}"),
-        ProjectionExecAgg::DefaultIdPolicy::kExcludeId,
-        ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
-    testAllowedIndices({buildWildcardIndexEntry(BSON("a.$**" << 1), projExec.get(), "a.$**_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1}"), "a_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
-                        buildSimpleIndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+    testAllowedIndices({IndexEntry(BSON("a.$**" << 1), "a.$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
                        SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
                        {"a.$**_1"},
                        {"a.$**_1"});

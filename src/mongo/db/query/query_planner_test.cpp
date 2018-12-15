@@ -45,24 +45,6 @@ namespace {
 
 using namespace mongo;
 
-/**
- * Make a minimal IndexEntry from just a key pattern and a name.
- */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp, const std::string& indexName) {
-    return {kp,
-            IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            false,
-            {},
-            {},
-            false,
-            false,
-            CoreIndexInfo::Identifier(indexName),
-            nullptr,
-            {},
-            nullptr,
-            nullptr};
-}
-
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesQuery) {
     params.options = QueryPlannerParams::IS_COUNT;
     addIndex(BSON("x" << 1));
@@ -359,19 +341,13 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchValueSparseMultiKeyIndex) {
 }
 
 TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyAboveElemMatch) {
-    auto keyPattern = BSON("a.b.c.d" << 1);
-    IndexEntry ind(keyPattern,
-                   IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+    IndexEntry ind(BSON("a.b.c.d" << 1),
                    true,
-                   {},
-                   {},
                    true,
                    false,
                    IndexEntry::Identifier{"ind"},
-                   nullptr,  // filterExpr
-                   BSONObj(),
-                   nullptr,
-                   nullptr);
+                   NULL,  // filterExpr
+                   BSONObj());
     ind.multikeyPaths = {{0U, 1U}};
     addIndex(ind);
 
@@ -388,19 +364,13 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyAboveElemMa
 TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMatch) {
     // "a.b.c" being multikey will prevent us from using the index since $elemMatch doesn't do
     // implicit array traversal.
-    auto keyPattern = BSON("a.b.c.d" << 1);
-    IndexEntry ind(keyPattern,
-                   IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+    IndexEntry ind(BSON("a.b.c.d" << 1),
                    true,
-                   {},
-                   {},
                    true,
                    false,
                    IndexEntry::Identifier{"ind"},
-                   nullptr,  // filterExpr
-                   BSONObj(),
-                   nullptr,
-                   nullptr);
+                   NULL,  // filterExpr
+                   BSONObj());
     ind.multikeyPaths = {{2U}};
     addIndex(ind);
 
@@ -4447,7 +4417,7 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     ASSERT_NOT_OK(QueryPlanner::cacheDataFromTaggedTree(NULL, relevantIndices).getStatus());
 
     // No relevant index matching the index tag.
-    relevantIndices.push_back(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
+    relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
 
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString("test.collection"));
     qr->setFilter(BSON("a" << 3));
@@ -4470,7 +4440,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
     std::unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
-    indexTree->setIndexEntry(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
+    indexTree->setIndexEntry(IndexEntry(BSON("a" << 1), "a_1"));
 
     std::map<IndexEntry::Identifier, size_t> indexMap;
 
@@ -4500,7 +4470,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
 
     // Mismatched tree topology.
     PlanCacheIndexTree* child = new PlanCacheIndexTree();
-    child->setIndexEntry(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
+    child->setIndexEntry(IndexEntry(BSON("a" << 1)));
     indexTree->children.push_back(child);
     s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
     ASSERT_NOT_OK(s);
