@@ -183,6 +183,7 @@ clientDriverEnv.Library(
         'dbclient_connection.cpp',
         'dbclient_rs.cpp',
         'global_conn_pool.cpp',
+        env.Idlc('global_conn_pool.idl')[0],
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
     ],
