@@ -11,6 +11,8 @@
     replTest.startSet();
     replTest.initiate();
     var primary = replTest.getPrimary();
+    assert.commandWorked(
+        primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: 3}}));
 
     var firstColl = "hangColl";
     var secondColl = "secondColl";
@@ -47,6 +49,18 @@
         primary.adminCommand({configureFailPoint: 'hangOnInsertObserver', mode: 'off'}));
     awaitInsertShell();
     replTest.awaitSecondaryNodes();
+
+    // The oplog visibility query should use an oplog-optimized plan. Check vaguely for this by
+    // awaiting a characteristic log message for each storage engine - we at least know that *some*
+    // query used the optimal plan around the time of the visibility query.
+    const timeoutSeconds = 30;
+    if (primary.adminCommand("serverStatus").storageEngine.name === "wiredTiger") {
+        jsTestLog("Checking for log message about 'direct oplog seek' query plan.");
+        checkLog.contains(primary, "Using direct oplog seek", timeoutSeconds);
+    } else if (primary.adminCommand("serverStatus").storageEngine.name === "mmapv1") {
+        jsTestLog("Checking for log message about 'Using OplogStart stage'.");
+        checkLog.contains(primary, "Using OplogStart stage", timeoutSeconds);
+    }
 
     replTest.stopSet();
 })();

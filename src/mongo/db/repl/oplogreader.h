@@ -84,8 +84,10 @@ public:
     DBClientConnection* conn() {
         return _conn.get();
     }
-    BSONObj findOne(const char* ns, const Query& q) {
-        return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
+    BSONObj findOne(const char* ns,
+                    const Query& q,
+                    QueryOptions options = static_cast<QueryOptions>(0)) {
+        return conn()->findOne(ns, q, 0, QueryOption_SlaveOk | options);
     }
     BSONObj getLastOp(const std::string& ns) {
         return findOne(ns.c_str(), Query().sort(reverseNaturalObj));

@@ -29,7 +29,7 @@ var checkLog;
          * the provided 'msg' is found in the logs, or 5 minutes have elapsed. Throws an exception
          * on timeout.
          */
-        var contains = function(conn, msg) {
+        var contains = function(conn, msg, timeoutSeconds = 5 * 60) {
             assert.soon(
                 function() {
                     var logMessages = getGlobalLog(conn);
@@ -44,7 +44,7 @@ var checkLog;
                     return false;
                 },
                 'Could not find log entries containing the following message: ' + msg,
-                5 * 60 * 1000,
+                timeoutSeconds * 1000,
                 300);
         };
 

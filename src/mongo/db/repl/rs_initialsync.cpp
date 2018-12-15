@@ -368,7 +368,7 @@ Status _initialSync() {
     BSONObjBuilder queryBob;
     queryBob.append("ts", gte.done());
     const BSONObj& query = queryBob.done();
-    BSONObj lastOpConfirm = r.findOne(rsOplogName.c_str(), query);
+    BSONObj lastOpConfirm = r.findOne(rsOplogName.c_str(), query, QueryOption_OplogReplay);
     invariant(!lastOpConfirm.isEmpty());
 
     OpTime lastOpConfirmTime = fassertStatusOK(40421, OpTime::parseFromOplogEntry(lastOpConfirm));
