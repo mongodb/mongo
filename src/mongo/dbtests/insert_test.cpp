@@ -68,7 +68,7 @@ BSONObj makeNestedObject(size_t depth) {
     return obj;
 }
 
-BSONObj makeNestedArray(size_t depth) {
+BSONArray makeNestedArray(size_t depth) {
     ASSERT_GTE(depth, 1U);
 
     auto obj = BSON_ARRAY(1);
