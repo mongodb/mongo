@@ -99,6 +99,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 
     CursorResponseBuilder responseBuilder(true, &result);
     BSONObj next;
+    bool stashedResult = false;
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
         // do it when batchSize is 0 since that indicates a desire for a fast return.
@@ -115,11 +116,6 @@ bool handleCursorCommand(OperationContext* opCtx,
         }
 
         if (state == PlanExecutor::IS_EOF) {
-            // Set both the latestOplogTimestamp and the postBatchResumeToken on the response.
-            responseBuilder.setLatestOplogTimestamp(
-                cursor->getExecutor()->getLatestOplogTimestamp());
-            responseBuilder.setPostBatchResumeToken(
-                cursor->getExecutor()->getPostBatchResumeToken());
             if (!cursor->isTailable()) {
                 // make it an obvious error to use cursor or executor after this point
                 cursor = nullptr;
@@ -136,6 +132,7 @@ bool handleCursorCommand(OperationContext* opCtx,
         // for later.
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
             cursor->getExecutor()->enqueue(next);
+            stashedResult = true;
             break;
         }
 
@@ -146,6 +143,13 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     if (cursor) {
+        // For empty batches, or in the case where the final result was added to the batch rather
+        // than being stashed, we update the PBRT to ensure that it is the most recent available.
+        const auto* exec = cursor->getExecutor();
+        if (!stashedResult) {
+            responseBuilder.setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+            responseBuilder.setPostBatchResumeToken(exec->getPostBatchResumeToken());
+        }
         // If a time limit was set on the pipeline, remaining time is "rolled over" to the
         // cursor (for use by future getmore ops).
         cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());

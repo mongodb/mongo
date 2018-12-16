@@ -82,7 +82,6 @@ std::pair<Value, Value> encodeInBinDataFormat(const ResumeTokenData& data) {
 
 // Helper function for makeHighWaterMarkResumeToken and isHighWaterMarkResumeToken.
 ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime) {
-    invariant(!clusterTime.isNull());
     ResumeTokenData tokenData;
     tokenData.clusterTime = clusterTime;
     return tokenData;

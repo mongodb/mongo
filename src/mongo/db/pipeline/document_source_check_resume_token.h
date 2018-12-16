@@ -77,15 +77,21 @@ public:
     static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
 
+    static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
+
 private:
     /**
      * Use the create static method to create a DocumentSourceShardCheckResumability.
      */
     DocumentSourceShardCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Timestamp ts);
+                                         ResumeTokenData token);
 
-    Timestamp _resumeTimestamp;
-    bool _verifiedResumability;
+    void _assertOplogHasEnoughHistory(const GetNextResult& nextInput);
+
+    ResumeTokenData _tokenFromClient;
+    bool _verifiedOplogHasEnoughHistory = false;
+    bool _surpassedResumeToken = false;
 };
 
 /**
@@ -98,9 +104,9 @@ public:
     // Used to record the results of comparing the token data extracted from documents in the
     // resumed stream against the client's resume token.
     enum class ResumeStatus {
-        kFoundToken,    // The stream produced a document satisfying the client resume token.
-        kCannotResume,  // The stream's latest document is more recent than the resume token.
-        kCheckNextDoc   // The next document produced by the stream may contain the resume token.
+        kFoundToken,      // The stream produced a document satisfying the client resume token.
+        kSurpassedToken,  // The stream's latest document is more recent than the resume token.
+        kCheckNextDoc     // The next document produced by the stream may contain the resume token.
     };
 
     GetNextResult getNext() final;
@@ -125,8 +131,7 @@ public:
      * pipeline to ensure that each shard has enough oplog history to resume the change stream.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return DocumentSourceShardCheckResumability::create(pExpCtx,
-                                                            _tokenFromClient.getClusterTime());
+        return DocumentSourceShardCheckResumability::create(pExpCtx, _tokenFromClient);
     };
 
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
@@ -147,21 +152,17 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeToken token);
-
-    const ResumeToken& getTokenForTest() {
-        return _tokenFromClient;
-    }
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
 private:
     /**
      * Use the create static method to create a DocumentSourceEnsureResumeTokenPresent.
      */
     DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           ResumeToken token);
+                                           ResumeTokenData token);
 
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
-    ResumeToken _tokenFromClient;
+    ResumeTokenData _tokenFromClient;
 };
 
 }  // namespace mongo

@@ -43,10 +43,13 @@ ChangeStreamProxyStage::ChangeStreamProxyStage(OperationContext* opCtx,
                                                std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                                WorkingSet* ws)
     : PipelineProxyStage(opCtx, std::move(pipeline), ws, kStageType) {
-    invariant(std::any_of(
-        _pipeline->getSources().begin(), _pipeline->getSources().end(), [](const auto& stage) {
-            return stage->constraints().isChangeStreamStage();
-        }));
+    // Set _postBatchResumeToken to the initial PBRT that was added to the expression context during
+    // pipeline construction, and use it to obtain the starting time for _latestOplogTimestamp.
+    invariant(!_pipeline->getContext()->initialPostBatchResumeToken.isEmpty());
+    _postBatchResumeToken = _pipeline->getContext()->initialPostBatchResumeToken.getOwned();
+    if (!_pipeline->getContext()->needsMerge || _pipeline->getContext()->mergeByPBRT) {
+        _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+    }
 }
 
 boost::optional<BSONObj> ChangeStreamProxyStage::getNextBson() {

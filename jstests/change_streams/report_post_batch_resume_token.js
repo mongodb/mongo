@@ -16,15 +16,39 @@
     let docId = 0;  // Tracks _id of documents inserted to ensure that we do not duplicate.
     const batchSize = 2;
 
-    // Test that postBatchResumeToken is present on empty initial aggregate batch.
-    let csCursor = testCollection.watch();
+    // Test that postBatchResumeToken is present on an initial aggregate of batchSize: 0.
+    let csCursor = testCollection.watch([], {cursor: {batchSize: 0}});
     assert.eq(csCursor.objsLeftInBatch(), 0);
     let initialAggPBRT = csCursor.getResumeToken();
     assert.neq(undefined, initialAggPBRT);
 
-    // Test that postBatchResumeToken is present on empty getMore batch.
+    // Test that the PBRT does not advance beyond its initial value for a change stream whose
+    // startAtOperationTime is in the future, even as writes are made to the test collection.
+    const timestampIn2100 = Timestamp(4102444800, 1);
+    csCursor = testCollection.watch([], {startAtOperationTime: timestampIn2100});
+    assert.eq(csCursor.objsLeftInBatch(), 0);
+    initialAggPBRT = csCursor.getResumeToken();
+    assert.neq(undefined, initialAggPBRT);
+
+    // Write some documents to the test collection.
+    for (let i = 0; i < 5; ++i) {
+        assert.commandWorked(testCollection.insert({_id: docId++}));
+    }
+
+    // Verify that no events are returned and the PBRT does not advance or go backwards.
     assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
     let getMorePBRT = csCursor.getResumeToken();
+    assert.eq(bsonWoCompare(initialAggPBRT, getMorePBRT), 0);
+
+    // Test that postBatchResumeToken is present on empty initial aggregate batch.
+    csCursor = testCollection.watch();
+    assert.eq(csCursor.objsLeftInBatch(), 0);
+    initialAggPBRT = csCursor.getResumeToken();
+    assert.neq(undefined, initialAggPBRT);
+
+    // Test that postBatchResumeToken is present on empty getMore batch.
+    assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
+    getMorePBRT = csCursor.getResumeToken();
     assert.neq(undefined, getMorePBRT);
     assert.gte(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 
@@ -45,6 +69,13 @@
     for (let i = 0; i < batchSize * 2; i++) {
         assert.commandWorked(testCollection.insert({_id: docId++}));
     }
+
+    // Test that the PBRT for a resumed stream is the given resume token if no result are returned.
+    csCursor = testCollection.watch([], {resumeAfter: resumeTokenFromDoc, cursor: {batchSize: 0}});
+    assert.eq(csCursor.objsLeftInBatch(), 0);
+    initialAggPBRT = csCursor.getResumeToken();
+    assert.neq(undefined, initialAggPBRT);
+    assert.eq(bsonWoCompare(initialAggPBRT, resumeTokenFromDoc), 0);
 
     // Test that postBatchResumeToken is present on non-empty initial aggregate batch.
     csCursor =

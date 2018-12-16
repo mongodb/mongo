@@ -236,6 +236,9 @@ public:
 
     TailableModeEnum tailableMode = TailableModeEnum::kNormal;
 
+    // For a changeStream aggregation, this is the starting postBatchResumeToken. Empty otherwise.
+    BSONObj initialPostBatchResumeToken;
+
     // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
     size_t subPipelineDepth = 0;
 

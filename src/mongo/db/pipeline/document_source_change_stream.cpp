@@ -364,12 +364,15 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
         // token UUID, and collation.
         assertResumeAllowed(expCtx, tokenData);
 
+        // Store the resume token as the initial postBatchResumeToken for this stream.
+        expCtx->initialPostBatchResumeToken =
+            token.toDocument(ResumeToken::SerializationFormat::kHexString).toBson();
+
         startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge) {
-            resumeStage =
-                DocumentSourceShardCheckResumability::create(expCtx, tokenData.clusterTime);
+            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, tokenData);
         } else {
-            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
+            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, tokenData);
         }
     }
 
@@ -419,6 +422,14 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
         stages.push_back(DocumentSourceOplogMatch::create(
             DocumentSourceChangeStream::buildMatchFilter(expCtx, *startFrom, startFromInclusive),
             expCtx));
+
+        // If we haven't already populated the initial PBRT, then we are starting from a specific
+        // timestamp rather than a resume token. Initialize the PBRT to a high water mark token.
+        if (expCtx->initialPostBatchResumeToken.isEmpty()) {
+            auto format = ResumeToken::SerializationFormat::kHexString;
+            expCtx->initialPostBatchResumeToken =
+                ResumeToken::makeHighWaterMarkResumeToken(*startFrom).toDocument(format).toBson();
+        }
     }
 
     stages.push_back(createTransformationStage(expCtx, elem.embeddedObject(), fcv));
