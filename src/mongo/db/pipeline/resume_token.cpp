@@ -49,7 +49,6 @@ constexpr StringData ResumeToken::kTypeBitsFieldName;
 namespace {
 // Helper function for makeHighWaterMarkResumeToken and isHighWaterMarkResumeToken.
 ResumeTokenData makeHighWaterMarkResumeTokenData(Timestamp clusterTime) {
-    invariant(!clusterTime.isNull());
     ResumeTokenData tokenData;
     tokenData.clusterTime = clusterTime;
     return tokenData;

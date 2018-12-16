@@ -350,6 +350,9 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
         // token UUID, and collation.
         assertResumeAllowed(expCtx, tokenData);
 
+        // Store the resume token as the initial postBatchResumeToken for this stream.
+        expCtx->initialPostBatchResumeToken = token.toDocument().toBson();
+
         startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge) {
             resumeStage =
@@ -384,6 +387,13 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
         stages.push_back(DocumentSourceOplogMatch::create(
             DocumentSourceChangeStream::buildMatchFilter(expCtx, *startFrom, startFromInclusive),
             expCtx));
+
+        // If we haven't already populated the initial PBRT, then we are starting from a specific
+        // timestamp rather than a resume token. Initialize the PBRT to a high water mark token.
+        if (expCtx->initialPostBatchResumeToken.isEmpty()) {
+            expCtx->initialPostBatchResumeToken =
+                ResumeToken::makeHighWaterMarkResumeToken(*startFrom).toDocument().toBson();
+        }
     }
 
     const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
