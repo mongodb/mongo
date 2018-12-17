@@ -55,6 +55,7 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/log.h"
@@ -386,7 +387,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         return {ErrorCodes::InternalError, msg};
     }
 
-    boost::optional<Helpers::RemoveSaver> saver;
+    boost::optional<RemoveSaver> saver;
     if (serverGlobalParams.moveParanoia) {
         saver.emplace("moveChunk", nss.ns(), "cleaning");
     }

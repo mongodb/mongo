@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -973,7 +973,7 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
                                                   UUID uuid,
                                                   NamespaceString nss,
                                                   const SimpleBSONObjUnorderedSet& idSet) {
-    Helpers::RemoveSaver removeSaver(kRollbackRemoveSaverType, nss.ns(), kRollbackRemoveSaverWhy);
+    RemoveSaver removeSaver(kRollbackRemoveSaverType, nss.ns(), kRollbackRemoveSaverWhy);
     log() << "Preparing to write deleted documents to a rollback file for collection " << nss.ns()
           << " with uuid " << uuid.toString() << " to " << removeSaver.file().generic_string();
 

@@ -57,6 +57,7 @@
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -1040,7 +1041,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
-        boost::optional<Helpers::RemoveSaver> rs;
+        boost::optional<RemoveSaver> rs;
         if (serverGlobalParams.moveParanoia) {
             rs.emplace("moveChunk", _nss.ns(), "removedDuring");
         }

@@ -72,6 +72,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -747,7 +748,7 @@ void dropCollection(OperationContext* opCtx,
                     Collection* collection,
                     Database* db) {
     if (RollbackImpl::shouldCreateDataFiles()) {
-        Helpers::RemoveSaver removeSaver("rollback", "", nss.ns());
+        RemoveSaver removeSaver("rollback", "", nss.ns());
 
         // Performs a collection scan and writes all documents in the collection to disk
         // in order to keep an archive of items that were rolled back.
@@ -1259,13 +1260,13 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // while rolling back createCollection operations.
 
         const auto& uuid = nsAndGoodVersionsByDocID.first;
-        unique_ptr<Helpers::RemoveSaver> removeSaver;
+        unique_ptr<RemoveSaver> removeSaver;
         invariant(!fixUpInfo.collectionsToDrop.count(uuid));
 
         NamespaceString nss = catalog.lookupNSSByUUID(uuid);
 
         if (RollbackImpl::shouldCreateDataFiles()) {
-            removeSaver = std::make_unique<Helpers::RemoveSaver>("rollback", "", nss.ns());
+            removeSaver = std::make_unique<RemoveSaver>("rollback", "", nss.ns());
         }
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;

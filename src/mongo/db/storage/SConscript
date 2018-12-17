@@ -341,3 +341,15 @@ env.Benchmark(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+env.Library(
+    target='remove_saver',
+    source=[
+        'remove_saver.cpp',
+    ],
+    LIBDEPS=[
+        'encryption_hooks',
+        'storage_options',
+        '$BUILD_DIR/mongo/base',
+    ]
+)

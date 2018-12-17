@@ -30,18 +30,13 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp>
-#include <memory>
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/data_protector.h"
 
 namespace mongo {
 
 class Collection;
 class Database;
-class DataProtector;
 class OperationContext;
 class QueryRequest;
 
@@ -52,7 +47,6 @@ class QueryRequest;
  * all helpers assume locking is handled above them
  */
 struct Helpers {
-    class RemoveSaver;
 
     /* fetch a single object from collection ns that matches query.
        set your db SavedContext first.
@@ -150,46 +144,6 @@ struct Helpers {
      * Does not oplog the operation.
      */
     static void emptyCollection(OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * for saving deleted bson objects to a flat file
-     */
-    class RemoveSaver {
-        MONGO_DISALLOW_COPYING(RemoveSaver);
-
-    public:
-        RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);
-        ~RemoveSaver();
-
-        /**
-         * Writes document to file. File is created lazily before writing the first document.
-         * Returns error status if the file could not be created or if there were errors writing
-         * to the file.
-         */
-        Status goingToDelete(const BSONObj& o);
-
-        /**
-         * A path object describing the directory containing the file with deleted documents.
-         */
-        const auto& root() const& {
-            return _root;
-        }
-        void root() && = delete;
-
-        /**
-         * A path object describing the actual file containing BSON documents.
-         */
-        const auto& file() const& {
-            return _file;
-        }
-        void file() && = delete;
-
-    private:
-        boost::filesystem::path _root;
-        boost::filesystem::path _file;
-        std::unique_ptr<DataProtector> _protector;
-        std::unique_ptr<std::ostream> _out;
-    };
 };
 
 }  // namespace mongo
