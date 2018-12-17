@@ -1796,31 +1796,21 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_server_parameter(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameter(WithStorage)."""
-        with self._condition(param.condition):
-            if param.cpp_varname is not None:
-                self._gen_server_parameter_with_storage(param)
-            else:
-                self._gen_server_parameter_without_storage(param)
-
-        if param.condition:
-            # Fallback in case any of the provided conditions are false.
-            self._writer.write_line('return nullptr;')
+        if param.cpp_varname is not None:
+            self._gen_server_parameter_with_storage(param)
+        else:
+            self._gen_server_parameter_without_storage(param)
 
     def _gen_server_parameter_deprecated_aliases(self, param_no, param):
         # type: (int, ast.ServerParameter) -> None
         """Generate IDLServerParamterDeprecatedAlias instance."""
 
         for alias_no, alias in enumerate(param.deprecated_name):
-            with self.get_initializer_lambda('auto* scp_%d_%d' % (param_no, alias_no), unused=True,
-                                             return_type='ServerParameter*'):
-                with self._condition(param.condition):
-                    with self._predicate('scp_%d != nullptr' % (param_no)):
-                        self._writer.write_line(
-                            'return new IDLServerParameterDeprecatedAlias(%s, scp_%d);' %
-                            (_encaps(alias), param_no))
-
-                # Fallthrough in case any predicate above fails.
-                self._writer.write_line('return nullptr;')
+            self._writer.write_line(
+                common.template_args(
+                    '${unused} auto* ${alias_var} = new IDLServerParameterDeprecatedAlias(${name}, ${param_var});',
+                    unused='MONGO_COMPILER_VARIABLE_UNUSED', alias_var='scp_%d_%d' %
+                    (param_no, alias_no), name=_encaps(alias), param_var='scp_%d' % (param_no)))
 
     def gen_server_parameters(self, params):
         # type: (List[ast.ServerParameter]) -> None
@@ -1829,20 +1819,24 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         for param in params:
             # Optional storage declarations.
             if (param.cpp_vartype is not None) and (param.cpp_varname is not None):
-                with self._condition(param.condition):
+                with self._condition(param.condition, preprocessor_only=True):
                     self._writer.write_line('%s %s;' % (param.cpp_vartype, param.cpp_varname))
 
-        with self.gen_namespace_block(''):
+        blockname = 'idl_' + uuid.uuid4().hex
+        with self._block('MONGO_SERVER_PARAMETER_REGISTER(%s)(InitializerContext*) {' % (blockname),
+                         '}'):
             # ServerParameter instances.
             for param_no, param in enumerate(params):
                 self.gen_description_comment(param.description)
+                with self._condition(param.condition):
+                    with self.get_initializer_lambda('auto* scp_%d' % (param_no), unused=(len(
+                            param.deprecated_name) == 0), return_type='ServerParameter*'):
+                        self._gen_server_parameter(param)
 
-                with self.get_initializer_lambda('auto* scp_%d' % (param_no), unused=(len(
-                        param.deprecated_name) == 0), return_type='ServerParameter*'):
-                    self._gen_server_parameter(param)
-
-                self._gen_server_parameter_deprecated_aliases(param_no, param)
+                    self._gen_server_parameter_deprecated_aliases(param_no, param)
                 self.write_empty_line()
+
+            self._writer.write_line('return Status::OK();')
 
     def gen_config_option(self, opt, section):
         # type: (ast.ConfigOption, unicode) -> None

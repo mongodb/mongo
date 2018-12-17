@@ -38,10 +38,15 @@
 #include <functional>
 #include <string>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameters.h"
+
+#define MONGO_SERVER_PARAMETER_REGISTER(name) \
+    MONGO_INITIALIZER_GENERAL(                \
+        name, ("BeginServerParameterRegistration"), ("EndServerParameterRegistration"))
 
 namespace mongo {
 

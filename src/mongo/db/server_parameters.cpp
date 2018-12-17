@@ -88,8 +88,12 @@ void ServerParameterSet::add(ServerParameter* sp) {
 namespace {
 class DisabledTestParameter : public ServerParameter {
 public:
-    DisabledTestParameter(StringData name, bool startup, bool runtime)
-        : ServerParameter(nullptr, name, startup, runtime) {
+    DisabledTestParameter() = delete;
+
+    DisabledTestParameter(ServerParameter* sp)
+        : ServerParameter(
+              nullptr, sp->name(), sp->allowedToChangeAtStartup(), sp->allowedToChangeAtRuntime()),
+          _sp(sp) {
         setTestOnly();
     }
 
@@ -104,6 +108,10 @@ public:
     Status set(const BSONElement& newValueElement) final {
         return setFromString("");
     }
+
+private:
+    // Retain the original pointer to avoid ASAN complaining.
+    ServerParameter* _sp;
 };
 }  // namespace
 
@@ -111,8 +119,7 @@ void ServerParameterSet::disableTestParameters() {
     for (auto& spit : _map) {
         auto*& sp = spit.second;
         if (sp->isTestOnly()) {
-            sp = new DisabledTestParameter(
-                sp->name(), sp->allowedToChangeAtStartup(), sp->allowedToChangeAtRuntime());
+            sp = new DisabledTestParameter(sp);
         }
     }
 }
