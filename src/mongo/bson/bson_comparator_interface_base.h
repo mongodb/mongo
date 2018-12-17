@@ -253,6 +253,13 @@ protected:
         return FlatSet(elements.begin(), elements.end(), LessThan(this));
     }
 
+    template <typename InputIterator>
+    FlatSet makeFlatSetFromSortedUnique(InputIterator begin, InputIterator end) const {
+        dassert(std::is_sorted(begin, end, LessThan(this)));
+        dassert(std::adjacent_find(begin, end, EqualTo(this)) == end);
+        return FlatSet(boost::container::ordered_unique_range_t(), begin, end, LessThan(this));
+    }
+
     UnorderedSet makeUnorderedSet(std::initializer_list<T> init = {}) const {
         return UnorderedSet(init, 0, Hasher(this), EqualTo(this));
     }

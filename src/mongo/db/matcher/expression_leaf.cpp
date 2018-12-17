@@ -509,7 +509,10 @@ void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     }
 
     // We need to re-compute '_equalitySet', since our set comparator has changed.
-    _equalitySet = _eltCmp.makeBSONEltFlatSet(_originalEqualityVector);
+    _equalitySet = _eltCmp.makeBSONEltFlatSetFromSortedUniqueRange(
+        _originalEqualityVector.begin(),
+        std::unique(
+            _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeEqualTo()));
 }
 
 Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
@@ -538,7 +541,10 @@ Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
             _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeLessThan());
     }
 
-    _equalitySet = _eltCmp.makeBSONEltFlatSet(_originalEqualityVector);
+    _equalitySet = _eltCmp.makeBSONEltFlatSetFromSortedUniqueRange(
+        _originalEqualityVector.begin(),
+        std::unique(
+            _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeEqualTo()));
 
     return Status::OK();
 }
