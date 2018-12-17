@@ -48,6 +48,11 @@
     // Shard coll2, but leave coll1 unsharded.
     assert.commandWorked(st.s.adminCommand({shardCollection: 'test.coll2', key: {_id: 1}}));
 
+    // Wait for the write to config.collections to be visible in the majority snapshot on all config
+    // secondaries, since the test directly talks to shards and so does not gossip the configOpTime
+    // to those shards.
+    st.configRS.awaitLastOpCommitted();
+
     // Get the primary shard, and the non-primary shard.
     var fromShard = st.getPrimaryShard('test');
     var toShard = st.getOther(fromShard);
@@ -58,10 +63,6 @@
 
     collections.sort(sortByName);
     var coll2uuid = collections[1].info.uuid;
-
-    // Await replication on the config server to guarantee the collections database has been
-    // propagated to all config secondaries.
-    st.configRS.awaitReplication();
 
     // Have the other shard clone the DB from the primary.
     assert.commandWorked(toShard.adminCommand(
@@ -142,10 +143,6 @@
     checkCount(fromShard, 'coll2', 3);
     checkCount(toShard, 'coll1', 3);
     checkCount(toShard, 'coll2', 0);
-
-    // Await replication on the config server to guarantee the collections database has been
-    // propagated to all config secondaries.
-    st.configRS.awaitReplication();
 
     // Check that the command fails without writeConcern majority.
     assert.commandFailedWithCode(
