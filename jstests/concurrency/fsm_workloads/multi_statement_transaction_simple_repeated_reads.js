@@ -3,7 +3,7 @@
 /**
  * Performs repeated reads of the documents in the collection to test snapshot isolation.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

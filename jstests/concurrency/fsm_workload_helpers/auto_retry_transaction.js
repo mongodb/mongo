@@ -31,7 +31,9 @@ var {withTxnAndAutoRetry} = (function() {
      * after the withTxnAndAutoRetry() function returns.
      */
     function withTxnAndAutoRetry(session, func, {
-        txnOptions: txnOptions = {readConcern: {level: 'snapshot'}},
+        txnOptions: txnOptions = {
+            readConcern: {level: TestData.defaultTransactionReadConcernLevel || 'snapshot'}
+        },
         retryOnKilledSession: retryOnKilledSession = false,
         prepareProbability: prepareProbability = 0.0
     } = {}) {

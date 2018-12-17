@@ -3,7 +3,7 @@
 /**
  * Test transactions atomicity and isolation guarantees for transactions across multiple DBs.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

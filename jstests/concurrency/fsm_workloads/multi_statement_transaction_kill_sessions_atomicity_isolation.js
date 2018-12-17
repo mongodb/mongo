@@ -3,7 +3,7 @@
 /**
  * Tests periodically killing sessions that are running transactions.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

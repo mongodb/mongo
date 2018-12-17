@@ -5,7 +5,7 @@
  *  - chooses two accounts and amount of money being transfer
  *  - or checks the balance of each account
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
 // For withTxnAndAutoRetry.

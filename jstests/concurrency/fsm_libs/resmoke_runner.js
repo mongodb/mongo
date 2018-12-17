@@ -105,10 +105,17 @@
                 cluster.awaitReplication();
             }
 
+            // Transactions run at snapshot read concern unless defaultTransactionReadConcernLevel
+            // is set to another level.
+            const transactionsWouldUseSnapshotReadConcern =
+                !TestData.hasOwnProperty("defaultTransactionReadConcernLevel") ||
+                TestData.defaultTransactionReadConcernLevel === "snapshot";
+
             // Synchronize the cluster times across all routers if the tests will be overriden to
             // use transactions, so the earliest global snapshots chosen by each router will include
-            // the effects of each setup function.
-            if (cluster.isSharded() && TestData.runInsideTransaction) {
+            // the effects of each setup function. This is only required for snapshot read concern.
+            if (cluster.isSharded() && TestData.runInsideTransaction &&
+                transactionsWouldUseSnapshotReadConcern) {
                 cluster.synchronizeMongosClusterTimes();
             }
 
@@ -244,12 +251,18 @@
     let workloads = TestData.fsmWorkloads;
 
     let sessionOptions = {};
-    if (TestData.runningWithCausalConsistency) {
-        sessionOptions = Object.assign(
-            sessionOptions, {causalConsistency: true, readPreference: {mode: 'secondary'}});
+    if (TestData.runningWithCausalConsistency !== undefined) {
+        // Explicit sessions are causally consistent by default, so causal consistency has to be
+        // explicitly disabled.
+        sessionOptions.causalConsistency = TestData.runningWithCausalConsistency;
+
+        if (TestData.runningWithCausalConsistency) {
+            sessionOptions.readPreference = {mode: 'secondary'};
+        }
     }
+
     if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns) {
-        sessionOptions = Object.assign(sessionOptions, {retryWrites: true});
+        sessionOptions.retryWrites = true;
     }
 
     const executionOptions = {dbNamePrefix: TestData.dbNamePrefix || ""};
