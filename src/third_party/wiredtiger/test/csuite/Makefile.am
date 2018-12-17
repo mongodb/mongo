@@ -132,4 +132,4 @@ TESTS = $(all_TESTS)
 LOG_COMPILER = $(TEST_WRAPPER)
 
 clean-local:
-	rm -rf WT_TEST.* *.core
+	rm -rf WT_TEST.* core.* *.core

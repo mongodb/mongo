@@ -290,7 +290,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	WT_SPIN_INIT_TRACKED(session, t, name);                         \
 	(t)->stat_session_usecs_off = \
 	    (int16_t)WT_SESSION_STATS_FIELD_TO_OFFSET(                  \
-	    &(session->stats), lock_##name##_wait);                     \
+	    &(session)->stats, lock_##name##_wait);                     \
 } while (0)
 
 /*

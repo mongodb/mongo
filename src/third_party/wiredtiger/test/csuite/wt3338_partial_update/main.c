@@ -232,8 +232,6 @@ compare(WT_ITEM *local, WT_ITEM *library)
 	    local->data, library->data, local->size) == 0);
 }
 
-static int nruns = 10000;
-
 /*
  * modify_run
  *	Run some tests:
@@ -275,7 +273,8 @@ modify_run(bool verbose)
 	memset(&_cursor, 0, sizeof(_cursor));
 	cursor->value_format = "u";
 
-	for (i = 0; i < nruns; ++i) {
+#define	NRUNS	10000
+	for (i = 0; i < NRUNS; ++i) {
 		/* Create an initial value. */
 		len = (size_t)(__wt_random(&rnd) % MAX_REPL_BYTES);
 		testutil_check(__wt_buf_set(NULL, localA, modify_repl, len));
@@ -320,7 +319,7 @@ modify_run(bool verbose)
 			compare(localA, &cursor->value);
 		}
 		if (verbose) {
-			printf("%d (%d%%)\r", i, (i * 100) / nruns);
+			printf("%d (%d%%)\r", i, (i * 100) / NRUNS);
 			fflush(stdout);
 		}
 	}

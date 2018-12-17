@@ -18,4 +18,4 @@ AM_TESTS_ENVIRONMENT = rm -rf WT_TEST ; mkdir WT_TEST ;
 TESTS_ENVIRONMENT = $(AM_TESTS_ENVIRONMENT)
 
 clean-local:
-	rm -rf WT_TEST *.core
+	rm -rf WT_TEST core.* *.core

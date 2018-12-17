@@ -11,4 +11,4 @@ LDFLAGS = -static
 TESTS = smoke.sh
 
 clean-local:
-	rm -rf *.core
+	rm -rf core.* *.core

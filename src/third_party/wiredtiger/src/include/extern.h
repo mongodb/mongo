@@ -717,7 +717,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
  );
 extern int __wt_hazard_clear(WT_SESSION_IMPL *session, WT_REF *ref) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_hazard_close(WT_SESSION_IMPL *session);
-extern WT_HAZARD *__wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref);
+extern WT_HAZARD *__wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_SESSION_IMPL **sessionp);
 extern u_int __wt_hazard_count(WT_SESSION_IMPL *session, WT_REF *ref);
 extern bool __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_fill_hex(const uint8_t *src, size_t src_max, uint8_t *dest, size_t dest_max, size_t *lenp);

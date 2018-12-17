@@ -13,4 +13,4 @@ t_LDFLAGS = -static
 TESTS = smoke.sh
 
 clean-local:
-	rm -rf WT_TEST *.core
+	rm -rf WT_TEST core.* *.core

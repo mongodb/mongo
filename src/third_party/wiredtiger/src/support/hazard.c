@@ -322,7 +322,8 @@ hazard_get_reference(
  *	Return if there's a hazard pointer to the page in the system.
  */
 WT_HAZARD *
-__wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_hazard_check(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_SESSION_IMPL **sessionp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
@@ -366,6 +367,8 @@ __wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref)
 			if (hp->ref == ref) {
 				WT_STAT_CONN_INCRV(session,
 				    cache_hazard_walks, walk_cnt);
+				if (sessionp != NULL)
+					*sessionp = s;
 				goto done;
 			}
 		}
@@ -408,18 +411,22 @@ bool
 __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
 {
 	WT_HAZARD *hp;
+	WT_SESSION_IMPL *s;
 	int i;
 
+	s = NULL;
 	for (i = 0;;) {
-		if ((hp = __wt_hazard_check(session, ref)) == NULL)
+		if ((hp = __wt_hazard_check(session, ref, &s)) == NULL)
 			return (true);
 		if (!waitfor || ++i > 100)
 			break;
 		__wt_sleep(0, 10000);
 	}
 	__wt_errx(session,
-	    "hazard pointer reference to discarded object: (%p: %s, line %d)",
-	    (void *)hp->ref, hp->func, hp->line);
+	    "hazard pointer reference to discarded object: "
+	    "(%p: session %p name %s: %s, line %d)",
+	    (void *)hp->ref, (void *)s,
+	    s->name == NULL ? "UNKNOWN" : s->name, hp->func, hp->line);
 	return (false);
 }
 

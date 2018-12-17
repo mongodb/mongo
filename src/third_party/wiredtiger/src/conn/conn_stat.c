@@ -613,6 +613,9 @@ __statlog_server(void *arg)
 	session = arg;
 	conn = S2C(session);
 
+	WT_CLEAR(path);
+	WT_CLEAR(tmp);
+
 	/*
 	 * We need a temporary place to build a path and an entry prefix.
 	 * The length of the path plus 128 should be more than enough.
@@ -620,10 +623,8 @@ __statlog_server(void *arg)
 	 * We also need a place to store the current path, because that's
 	 * how we know when to close/re-open the file.
 	 */
-	WT_CLEAR(path);
 	WT_ERR(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
 	WT_ERR(__wt_buf_setstr(session, &path, ""));
-	WT_CLEAR(tmp);
 	WT_ERR(__wt_buf_init(session, &tmp, strlen(conn->stat_path) + 128));
 	WT_ERR(__wt_buf_setstr(session, &tmp, ""));
 

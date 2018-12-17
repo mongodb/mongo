@@ -166,7 +166,8 @@ __wt_stats_clear(void *stats_arg, int slot)
 } while (0)
 #define	WT_STAT_DECRV_ATOMIC_BASE(session, stat, fld, value) do {	\
 	if (WT_STAT_ENABLED(session))					\
-		__wt_atomic_subi64(&(stat)->fld, (int64_t)(value));	\
+		(void)							\
+		    __wt_atomic_subi64(&(stat)->fld, (int64_t)(value));	\
 } while (0)
 #define	WT_STAT_INCRV_BASE(session, stat, fld, value) do {		\
 	if (WT_STAT_ENABLED(session))					\
@@ -174,7 +175,8 @@ __wt_stats_clear(void *stats_arg, int slot)
 } while (0)
 #define	WT_STAT_INCRV_ATOMIC_BASE(session, stat, fld, value) do {	\
 	if (WT_STAT_ENABLED(session))					\
-		__wt_atomic_addi64(&(stat)->fld, (int64_t)(value));	\
+		(void)							\
+		    __wt_atomic_addi64(&(stat)->fld, (int64_t)(value));	\
 } while (0)
 
 #define	WT_STAT_DECRV(session, stats, fld, value) do {			\
@@ -265,7 +267,7 @@ __wt_stats_clear(void *stats_arg, int slot)
  * Update per session statistics.
  */
 #define	WT_STAT_SESSION_INCRV(session, fld, value)			\
-       WT_STAT_INCRV_BASE(session, &session->stats, fld, value)
+       WT_STAT_INCRV_BASE(session, &(session)->stats, fld, value)
 
 /*
  * Construct histogram increment functions to put the passed value into the

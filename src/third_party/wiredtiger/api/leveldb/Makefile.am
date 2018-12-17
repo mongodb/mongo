@@ -78,4 +78,4 @@ leveldb_test_LDADD = libwiredtiger_leveldb.la
 TESTS = $(noinst_PROGRAMS)
 
 clean-local:
-	rm -rf WTLDB_HOME
+	rm -rf WTLDB_HOME core.* *.core

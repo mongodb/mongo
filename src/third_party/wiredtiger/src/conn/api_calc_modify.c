@@ -151,7 +151,7 @@ wiredtiger_calc_modify(WT_SESSION *wt_session,
 	 * in the post-image without finding a good match, double the size of
 	 * the gap, update the markers and keep trying.
 	 */
-	h = hstart = hend = 0;
+	hstart = hend = 0;
 	i = gap = 0;
 	for (p1 = cms.used1, p2 = cms.used2, start = true;
 	    p1 + WT_CM_BLOCKSIZE <= cms.e1 && p2 + WT_CM_BLOCKSIZE <= cms.e2;

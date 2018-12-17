@@ -41,10 +41,10 @@ static int
 __win_fs_remove(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, uint32_t flags)
 {
-	DWORD windows_error;
 	WT_DECL_ITEM(name_wide);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	DWORD windows_error;
 
 	WT_UNUSED(file_system);
 	WT_UNUSED(flags);
@@ -74,11 +74,11 @@ static int
 __win_fs_rename(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *from, const char *to, uint32_t flags)
 {
-	DWORD windows_error;
 	WT_DECL_ITEM(from_wide);
 	WT_DECL_ITEM(to_wide);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	DWORD windows_error;
 
 	WT_UNUSED(file_system);
 	WT_UNUSED(flags);
@@ -153,10 +153,10 @@ err:	__wt_scr_free(session, &name_wide);
 static int
 __win_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 {
-	DWORD windows_error;
 	WT_DECL_RET;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
+	DWORD windows_error;
 
 	win_fh = (WT_FILE_HANDLE_WIN *)file_handle;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -201,10 +201,10 @@ static int
 __win_file_lock(
     WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, bool lock)
 {
-	DWORD windows_error;
 	WT_DECL_RET;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
+	DWORD windows_error;
 
 	win_fh = (WT_FILE_HANDLE_WIN *)file_handle;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -329,10 +329,10 @@ __win_file_size(
 static int
 __win_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 {
-	DWORD windows_error;
 	WT_DECL_RET;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
+	DWORD windows_error;
 
 	win_fh = (WT_FILE_HANDLE_WIN *)file_handle;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -466,13 +466,13 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
     const char *name, WT_FS_OPEN_FILE_TYPE file_type, uint32_t flags,
     WT_FILE_HANDLE **file_handlep)
 {
-	DWORD dwCreationDisposition, windows_error;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(name_wide);
 	WT_DECL_RET;
 	WT_FILE_HANDLE *file_handle;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
+	DWORD dwCreationDisposition, windows_error;
 	int desired_access, f;
 
 	WT_UNUSED(file_system);

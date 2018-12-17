@@ -343,51 +343,56 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_op_commit_page_del --
- *	Make the transaction ID and timestamp updates necessary to a ref that
- *      was created by a fast delete truncate operation.
+ * __wt_txn_op_apply_prepare_state --
+ *	Apply the correct prepare state and the timestamp to the ref and to any
+ *      updates in the page del update list.
  */
 static inline void
-__wt_txn_op_commit_page_del(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_txn_op_apply_prepare_state(
+    WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
 {
 	WT_TXN *txn;
 	WT_UPDATE **updp;
+	wt_timestamp_t ts;
 	uint32_t previous_state;
+	uint8_t prepare_state;
 
 	txn = &session->txn;
 
-	/* Avoid locking the page if a previous eviction already cleaned up. */
-	if (ref->page_del->update_list == NULL)
-		return;
-
 	/*
-	 * Lock the ref to ensure we don't race with eviction freeing the
-	 * page deleted update list.
+	 * Lock the ref to ensure we don't race with eviction freeing the page
+	 * deleted update list or with a page instantiate.
 	 */
 	for (;; __wt_yield()) {
 		previous_state = ref->state;
+		WT_ASSERT(session, previous_state != WT_REF_READING);
 		if (previous_state != WT_REF_LOCKED &&
 		    __wt_atomic_casv32(
 		    &ref->state, previous_state, WT_REF_LOCKED))
 			break;
 	}
 
+	if (commit) {
+		ts = txn->commit_timestamp;
+		prepare_state = WT_PREPARE_RESOLVED;
+	} else {
+		ts = txn->prepare_timestamp;
+		prepare_state = WT_PREPARE_INPROGRESS;
+	}
 	for (updp = ref->page_del->update_list;
 	    updp != NULL && *updp != NULL; ++updp) {
-		(*updp)->timestamp = txn->commit_timestamp;
-		if (F_ISSET(txn, WT_TXN_PREPARE))
-			/*
-			 * Holding the ref locked means we have exclusive
-			 * access, so don't need to use the prepare locked
-			 * transition state.
-			 */
-			(*updp)->prepare_state = WT_PREPARE_RESOLVED;
+		(*updp)->timestamp = ts;
+		/*
+		 * Holding the ref locked means we have exclusive access, so if
+		 * we are committing we don't need to use the prepare locked
+		 * transition state.
+		 */
+		(*updp)->prepare_state = prepare_state;
 	}
+	ref->page_del->timestamp = ts;
+	WT_PUBLISH(ref->page_del->prepare_state, prepare_state);
 
-	/*
-	 * Publish to ensure we don't let the page be evicted and the updates
-	 * discarded before being written.
-	 */
+	/* Unlock the page by setting it back to it's previous state */
 	WT_REF_SET_STATE(ref, previous_state);
 }
 
@@ -416,8 +421,13 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 		return;
 
 	if (F_ISSET(txn, WT_TXN_PREPARE)) {
+		/*
+		 * We have a commit timestamp for a prepare transaction, this is
+		 * only possible as part of a transaction commit call.
+		 */
 		if (op->type == WT_TXN_OP_REF_DELETE)
-			__wt_txn_op_commit_page_del(session, op->u.ref);
+			__wt_txn_op_apply_prepare_state(
+			    session, op->u.ref, true);
 		else {
 			upd = op->u.op_upd;
 
