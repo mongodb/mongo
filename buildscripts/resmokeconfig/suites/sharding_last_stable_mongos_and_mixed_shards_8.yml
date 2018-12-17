@@ -51,7 +51,6 @@ selector:
   - jstests/sharding/shard5.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
   - jstests/sharding/trace_missing_docs_test.js
-  - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/noUpdateButN1inAnotherCollection.js
   - jstests/sharding/stats.js
 

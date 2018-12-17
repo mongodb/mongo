@@ -242,57 +242,6 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
 }
 
 /**
- * Throws an exception if the collection is already sharded with different options.
- *
- * If the collection is already sharded with the same options, returns the existing collection's
- * full spec, else returns boost::none.
- */
-boost::optional<CollectionType> checkIfAlreadyShardedWithSameOptions(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ConfigsvrShardCollectionRequest& request) {
-    auto existingColls =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            repl::ReadConcernLevel::kLocalReadConcern,
-                            CollectionType::ConfigNS,
-                            BSON("_id" << nss.ns() << "dropped" << false),
-                            BSONObj(),
-                            1))
-            .docs;
-
-    if (!existingColls.empty()) {
-        auto existingOptions = uassertStatusOK(CollectionType::fromBSON(existingColls.front()));
-
-        CollectionType requestedOptions;
-        requestedOptions.setNs(nss);
-        requestedOptions.setKeyPattern(KeyPattern(request.getKey()));
-        requestedOptions.setDefaultCollation(*request.getCollation());
-        requestedOptions.setUnique(request.getUnique());
-
-        // If the collection is already sharded, fail if the deduced options in this request do not
-        // match the options the collection was originally sharded with.
-        uassert(ErrorCodes::AlreadyInitialized,
-                str::stream() << "sharding already enabled for collection " << nss.ns()
-                              << " with options "
-                              << existingOptions.toString(),
-                requestedOptions.hasSameOptions(existingOptions));
-
-        // We did a local read of the collection entry above and found that this shardCollection
-        // request was already satisfied. However, the data may not be majority committed (a
-        // previous shardCollection attempt may have failed with a writeConcern error).
-        // Since the current Client doesn't know the opTime of the last write to the collection
-        // entry, make it wait for the last opTime in the system when we wait for writeConcern.
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return existingOptions;
-    }
-
-    // Not currently sharded.
-    return boost::none;
-}
-
-/**
  * Compares the proposed shard key with the collection's existing indexes on the primary shard to
  * ensure they are a legal combination.
  *
@@ -743,16 +692,6 @@ public:
         // validated.
         invariant(request.getCollation());
 
-        // Step 2.
-        if (auto existingColl = checkIfAlreadyShardedWithSameOptions(opCtx, nss, request)) {
-            result << "collectionsharded" << nss.ns();
-            if (existingColl->getUUID()) {
-                result << "collectionUUID" << *existingColl->getUUID();
-            }
-            return true;
-        }
-
-        bool isEmpty = (conn->count(nss.ns()) == 0);
         boost::optional<UUID> uuid;
 
         // The primary shard will read the config.tags collection so we need to lock the zone
@@ -798,6 +737,23 @@ public:
 
             return true;
         } else {
+            // Step 2.
+            if (auto existingColl =
+                    InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
+                        opCtx,
+                        nss,
+                        shardsvrShardCollectionRequest,
+                        repl::ReadConcernLevel::kLocalReadConcern)) {
+                result << "collectionsharded" << nss.ns();
+                if (existingColl->getUUID()) {
+                    result << "collectionUUID" << *existingColl->getUUID();
+                }
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                return true;
+            }
+
+            bool isEmpty = (conn->count(nss.ns()) == 0);
 
             // Step 3.
             validateShardKeyAgainstExistingIndexes(

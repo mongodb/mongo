@@ -137,6 +137,22 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
     return appendAllowImplicitCreate(createIndexes.obj(), true);
 }
 
+bool checkIfCollectionAlreadyShardedWithSameOptions(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const ShardsvrShardCollection& request,
+                                                    BSONObjBuilder& result) {
+    if (auto existingColl = InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
+            opCtx, nss, request, repl::ReadConcernLevel::kMajorityReadConcern)) {
+        result << "collectionsharded" << nss.ns();
+        if (existingColl->getUUID()) {
+            result << "collectionUUID" << *existingColl->getUUID();
+        }
+
+        return true;
+    }
+    return false;
+}
+
 /**
  * Compares the proposed shard key with the collection's existing indexes on the primary shard to
  * ensure they are a legal combination.
@@ -608,8 +624,22 @@ public:
             result << "collectionsharded" << nss.ns();
         } else {
             try {
+                if (checkIfCollectionAlreadyShardedWithSameOptions(opCtx, nss, request, result)) {
+                    status = Status::OK();
+                    scopedShardCollection.signalComplete(status);
+
+                    return true;
+                }
+
                 // Take the collection critical section so that no writes can happen.
                 CollectionCriticalSection critSec(opCtx, nss);
+
+                if (checkIfCollectionAlreadyShardedWithSameOptions(opCtx, nss, request, result)) {
+                    status = Status::OK();
+                    scopedShardCollection.signalComplete(status);
+
+                    return true;
+                }
 
                 auto proposedKey(request.getKey().getOwned());
                 ShardKeyPattern shardKeyPattern(proposedKey);

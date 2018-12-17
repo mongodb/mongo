@@ -371,4 +371,37 @@ void InitialSplitPolicy::writeFirstChunksToConfig(
     }
 }
 
+boost::optional<CollectionType> InitialSplitPolicy::checkIfCollectionAlreadyShardedWithSameOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardsvrShardCollection& request,
+    repl::ReadConcernLevel readConcernLevel) {
+    auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
+    auto collStatus = catalogClient->getCollection(opCtx, nss, readConcernLevel);
+    if (collStatus == ErrorCodes::NamespaceNotFound) {
+        // Not currently sharded.
+        return boost::none;
+    }
+
+    uassertStatusOK(collStatus);
+    auto existingOptions = collStatus.getValue().value;
+
+    CollectionType requestedOptions;
+    requestedOptions.setNs(nss);
+    requestedOptions.setKeyPattern(KeyPattern(request.getKey()));
+    requestedOptions.setDefaultCollation(*request.getCollation());
+    requestedOptions.setUnique(request.getUnique());
+
+    // If the collection is already sharded, fail if the deduced options in this request do not
+    // match the options the collection was originally sharded with.
+    uassert(ErrorCodes::AlreadyInitialized,
+            str::stream() << "sharding already enabled for collection " << nss.ns()
+                          << " with options "
+                          << existingOptions.toString(),
+            requestedOptions.hasSameOptions(existingOptions));
+
+    return existingOptions;
+}
+
 }  // namespace mongo

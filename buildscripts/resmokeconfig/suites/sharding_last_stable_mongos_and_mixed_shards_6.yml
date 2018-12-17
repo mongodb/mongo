@@ -13,7 +13,6 @@ selector:
   #   19 minutes to run on enterprise-rhel-62-64-bit
   roots:
   - jstests/sharding/change_stream_enforce_max_time_ms_on_mongos.js
-  - jstests/sharding/shard_collection_basic.js
   - jstests/sharding/autosplit_with_balancer.js
   - jstests/sharding/migrateBig.js
   - jstests/sharding/migrateBig_balancer.js
