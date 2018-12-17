@@ -67,6 +67,7 @@ functions:
         dsi: ${dsi_rev}
         enterprise: ${enterprise_rev}
         linkbench: ${linkbench_rev}
+        genny: ${genny_rev}
         workloads: ${workloads_rev}
         wtdevelop: ${wtdevelop_rev}
 
@@ -202,6 +203,7 @@ functions:
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
           linkbench_dir: ../src/linkbench/linkbench
+          genny_dir: ../src/genny/genny
           authentication: ${authentication}
           EOF
 
@@ -643,6 +645,11 @@ modules:
   repo: git@github.com:10gen/dsi.git
   prefix: dsi
   branch: master
+ 
+- name: genny
+  repo: git@github.com:10gen/genny.git
+  prefix: genny
+  branch: master
 
 - name: workloads
   repo: git@github.com:10gen/workloads.git
@@ -727,6 +734,7 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: &modules
     - dsi
+    - genny
     - workloads
     - linkbench
   expansions:
