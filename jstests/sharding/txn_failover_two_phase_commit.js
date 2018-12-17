@@ -9,7 +9,7 @@
 (function() {
     'use strict';
 
-    load("jstests/libs/check_log.js");
+    load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
     const dbName = "test";
     const collName = "foo";
@@ -20,6 +20,8 @@
     // transaction is aborted on all participants, and the participants will only abort on reaching
     // the transaction timeout.
     TestData.transactionLifetimeLimitSeconds = 15;
+
+    let failpointCounter = 0;
 
     const runTest = function(sameNodeStepsUpAfterFailover) {
 
@@ -152,7 +154,7 @@
             }
 
             // Wait for the desired failpoint to be hit.
-            checkLog.contains(coordPrimary, "Hit " + failpoint + " failpoint");
+            waitForFailpoint("Hit " + failpoint + " failpoint", failpointCounter);
 
             // Induce the coordinator primary to step down.
             const stepDownResult = assert.throws(function() {
@@ -168,11 +170,6 @@
 
             // The router should retry commitTransaction against the new primary.
             awaitResult();
-
-            // Clear RAMLog on this node so that we can use checkLog again. Otherwise, the next
-            // checkLog against this node will see the log line from the previous test case and not
-            // wait for a new log line.
-            coordinatorReplSetTest.restart(coordPrimary);
 
             // Check that the transaction committed or aborted as expected.
             if (expectAbortResponse) {
@@ -193,6 +190,12 @@
             st.s.getDB(dbName).getCollection(collName).drop();
         };
 
+        //
+        // Run through all the failpoints when one participant responds to prepare with vote abort.
+        //
+
+        ++failpointCounter;
+
         testCommitProtocol(true /* make a participant abort */,
                            "hangBeforeWritingParticipantList",
                            true /* expect abort decision */);
@@ -202,6 +205,12 @@
         testCommitProtocol(true /* make a participant abort */,
                            "hangBeforeDeletingCoordinatorDoc",
                            true /* expect abort decision */);
+
+        //
+        // Run through all the failpoints when all participants respond to prepare with vote commit.
+        //
+
+        ++failpointCounter;
 
         // Note: If the coordinator fails over before making the participant list durable, the
         // transaction will abort even if all participants could have committed. Further note that
@@ -214,6 +223,7 @@
         testCommitProtocol(false /* all participants can commit */,
                            "hangBeforeWritingParticipantList",
                            true /* expect abort decision */);
+
         testCommitProtocol(false /* all participants can commit */,
                            "hangBeforeWritingDecision",
                            false /* expect commit decision */);

@@ -40,3 +40,10 @@ function assertNoSuchTransactionOnConn(conn, lsid, txnNumber) {
                                      tojson(lsid) + ", txnNumber: " + tojson(txnNumber) +
                                      ", connection: " + tojson(conn));
 }
+
+function waitForFailpoint(hitFailpointStr, numTimes) {
+    assert.soon(function() {
+        const re = new RegExp(hitFailpointStr, 'g' /* find all occurrences */);
+        return (rawMongoProgramOutput().match(re) || []).length == numTimes;
+    }, 'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times');
+}

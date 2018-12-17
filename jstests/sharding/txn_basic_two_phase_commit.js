@@ -8,7 +8,7 @@
 (function() {
     'use strict';
 
-    load("jstests/libs/check_log.js");
+    load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
     const dbName = "test";
     const collName = "foo";
@@ -195,9 +195,8 @@
         }
 
         // Check that the coordinator wrote the participant list.
-        checkLog.containsWithCount(coordinator,
-                                   "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint",
-                                   txnNumber);
+        waitForFailpoint("Hit hangBeforeWaitingForParticipantListWriteConcern failpoint",
+                         txnNumber);
         checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
         assert.commandWorked(coordinator.adminCommand({
             configureFailPoint: "hangBeforeWaitingForParticipantListWriteConcern",
@@ -205,8 +204,7 @@
         }));
 
         // Check that the coordinator wrote the decision.
-        checkLog.containsWithCount(
-            coordinator, "Hit hangBeforeWaitingForDecisionWriteConcern failpoint", txnNumber);
+        waitForFailpoint("Hit hangBeforeWaitingForDecisionWriteConcern failpoint", txnNumber);
         checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
         checkDecisionIs(coordinator, lsid, txnNumber, (shouldCommit ? "commit" : "abort"));
         assert.commandWorked(coordinator.adminCommand({
