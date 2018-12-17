@@ -288,12 +288,18 @@ Status validateBaseOptions(const moe::Environment& params) {
     }
 
     if (params.count("setParameter")) {
-        std::map<std::string, std::string> parameters =
-            params["setParameter"].as<std::map<std::string, std::string>>();
+        const auto parameters = params["setParameter"].as<std::map<std::string, std::string>>();
 
-        auto enableTestCommandsParameter = parameters.find("enableTestCommands");
-        if (enableTestCommandsParameter != parameters.end() &&
-            enableTestCommandsParameter->second.compare("1") == 0) {
+        const bool enableTestCommandsValue = ([&parameters] {
+            const auto etc = parameters.find("enableTestCommands");
+            if (etc == parameters.end()) {
+                return false;
+            }
+            const auto& val = etc->second;
+            return val.compare("1") || val.compare("true");
+        })();
+
+        if (enableTestCommandsValue) {
             // Only register failpoint server parameters if enableTestCommands=1.
             getGlobalFailPointRegistry()->registerAllFailPointsAsServerParameters();
         } else {
