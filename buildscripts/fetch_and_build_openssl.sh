@@ -11,7 +11,7 @@ PYTHON="$1"   # not needed anymore
 OPENSSL_MAKE_FLAGS="$2"
 OPENSSL_CONFIG_FLAGS="$3"
 
-OPENSSL_VERSION=1.1.0i
+OPENSSL_VERSION=1.1.1a
 OPENSSL_NAME=openssl-${OPENSSL_VERSION}
 OPENSSL_TARBALL=${OPENSSL_NAME}.tar.gz
 
@@ -24,7 +24,7 @@ curl -L -o ${OPENSSL_TARBALL} \
 
 # To regenerate: shasum -a 256 -b $OPENSSL_TARBALL
 shasum -c /dev/fd/0 <<EOF || exit 3
-ebbfc844a8c8cc0ea5dc10b86c9ce97f401837f3fa08c17b2cdadc118253cf99 *$OPENSSL_TARBALL
+fc20130f8b7cbd2fb918b2f14e2f429e109c31ddd0fb38fc5d71d9ffed3f9f41 *$OPENSSL_TARBALL
 EOF
 
 tar -xzf ${OPENSSL_TARBALL}
