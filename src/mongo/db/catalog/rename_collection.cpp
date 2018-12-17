@@ -410,16 +410,18 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // Dismissed on success
     auto tmpCollectionDropper = MakeGuard([&] {
-        // Ensure that we don't trigger an exception when attempting to take locks.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
         BSONObjBuilder unusedResult;
-        auto status =
-            dropCollection(opCtx,
-                           tmpName,
-                           unusedResult,
-                           renameOpTimeFromApplyOps,
-                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+        Status status = Status::OK();
+        try {
+            status =
+                dropCollection(opCtx,
+                               tmpName,
+                               unusedResult,
+                               renameOpTimeFromApplyOps,
+                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+        } catch (...) {
+            status = exceptionToStatus();
+        }
         if (!status.isOK()) {
             // Ignoring failure case when dropping the temporary collection during cleanup because
             // the rename operation has already failed for another reason.
