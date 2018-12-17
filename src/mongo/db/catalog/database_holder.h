@@ -35,6 +35,7 @@
 
 #include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -63,6 +64,13 @@ public:
         virtual void closeAll(OperationContext* opCtx, const std::string& reason) = 0;
 
         virtual std::set<std::string> getNamesWithConflictingCasing(StringData name) = 0;
+
+        virtual std::unique_ptr<Collection> makeCollection(OperationContext* const opCtx,
+                                                           const StringData fullNS,
+                                                           OptionalCollectionUUID uuid,
+                                                           CollectionCatalogEntry* const details,
+                                                           RecordStore* const recordStore,
+                                                           DatabaseCatalogEntry* const dbce) = 0;
     };
 
 public:
@@ -120,6 +128,20 @@ public:
      */
     inline std::set<std::string> getNamesWithConflictingCasing(const StringData name) {
         return this->_impl().getNamesWithConflictingCasing(name);
+    }
+
+    /**
+     * Returns a new Collection.
+     * This function supports rebuilding indexes during the repair process and should not be used
+     * for any other purpose.
+     */
+    inline std::unique_ptr<Collection> makeCollection(OperationContext* const opCtx,
+                                                      const StringData fullNS,
+                                                      OptionalCollectionUUID uuid,
+                                                      CollectionCatalogEntry* const details,
+                                                      RecordStore* const recordStore,
+                                                      DatabaseCatalogEntry* const dbce) {
+        return this->_impl().makeCollection(opCtx, fullNS, uuid, details, recordStore, dbce);
     }
 
 private:

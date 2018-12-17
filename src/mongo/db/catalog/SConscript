@@ -233,6 +233,7 @@ env.Library(
         'database_holder.cpp',
     ],
     LIBDEPS=[
+        'collection',
         '$BUILD_DIR/mongo/base',
     ],
 )

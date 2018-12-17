@@ -121,6 +121,11 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     if (indexSpecs.empty())
         return Status::OK();
 
+    auto dbHolder = &DatabaseHolder::getDatabaseHolder();
+
+    const auto& ns = cce->ns().ns();
+    auto rs = dbce->getRecordStore(ns);
+
     std::unique_ptr<Collection> collection;
     std::unique_ptr<MultiIndexBlock> indexer;
     {
@@ -143,9 +148,8 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
         // Indexes must be dropped before we open the Collection otherwise we could attempt to
         // open a bad index and fail.
         // TODO see if MultiIndexBlock can be made to work without a Collection.
-        const StringData ns = cce->ns().ns();
         const auto uuid = cce->getCollectionOptions(opCtx).uuid;
-        collection.reset(new Collection(opCtx, ns, uuid, cce, dbce->getRecordStore(ns), dbce));
+        collection = dbHolder->makeCollection(opCtx, ns, uuid, cce, rs, dbce);
 
         indexer = std::make_unique<MultiIndexBlock>(opCtx, collection.get());
         Status status = indexer->init(indexSpecs).getStatus();
@@ -164,7 +168,6 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     long long numRecords = 0;
     long long dataSize = 0;
 
-    RecordStore* rs = collection->getRecordStore();
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
     while (record) {

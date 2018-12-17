@@ -86,5 +86,17 @@ public:
     std::set<std::string> getNamesWithConflictingCasing(StringData name) override {
         return std::set<std::string>();
     }
+
+    /**
+     * Returns a new Collection.
+     */
+    std::unique_ptr<Collection> makeCollection(OperationContext* const opCtx,
+                                               const StringData fullNS,
+                                               OptionalCollectionUUID uuid,
+                                               CollectionCatalogEntry* const details,
+                                               RecordStore* const recordStore,
+                                               DatabaseCatalogEntry* const dbce) override {
+        return {};
+    }
 };
 }  // namespace mongo
