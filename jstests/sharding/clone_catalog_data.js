@@ -48,6 +48,11 @@
     // Shard coll2, but leave coll1 unsharded.
     assert.commandWorked(st.s.adminCommand({shardCollection: 'test.coll2', key: {_id: 1}}));
 
+    // Wait for the write to config.collections to be visible in the majority snapshot on all config
+    // secondaries, since the test directly talks to shards and so does not gossip the configOpTime
+    // to those shards.
+    st.configRS.awaitLastOpCommitted();
+
     // Get the primary shard, and the non-primary shard.
     var fromShard = st.getPrimaryShard('test');
     var toShard = st.getOther(fromShard);
