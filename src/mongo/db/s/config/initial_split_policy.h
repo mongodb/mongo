@@ -34,8 +34,11 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -127,5 +130,17 @@ public:
      */
     static void writeFirstChunksToConfig(
         OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks);
+
+    /**
+     * Throws an exception if the collection is already sharded with different options.
+     *
+     * If the collection is already sharded with the same options, returns the existing collection's
+     * full spec, else returns boost::none.
+     */
+    static boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardsvrShardCollection& request,
+        repl::ReadConcernLevel readConcernLevel);
 };
 }  // namespace mongo
