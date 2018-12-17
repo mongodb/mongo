@@ -572,7 +572,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     if (localConfig.getReplSetName() != _settings.ourSetName()) {
         warning() << "Local replica set configuration document reports set name of "
                   << localConfig.getReplSetName() << ", but command line reports "
-                  << _settings.ourSetName() << "; waitng for reconfig or remote heartbeat";
+                  << _settings.ourSetName() << "; waiting for reconfig or remote heartbeat";
         myIndex = StatusWith<int>(-1);
     }
 
@@ -2440,7 +2440,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndex);
 
-    // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
+    // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
     _dropAllSnapshots_inlock();
 
@@ -2695,37 +2695,13 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionNone:
             break;
         case kActionFollowerModeStateChange:
-            // In follower mode, or sub-mode so ensure replication is active
-            _externalState->signalApplierToChooseNewSyncSource();
+            _onFollowerModeStateChange();
             break;
         case kActionCloseAllConnections:
             _externalState->closeConnections();
             _externalState->shardingOnStepDownHook();
             _externalState->stopNoopWriter();
             break;
-        case kActionWinElection: {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
-            invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
-            _electionId = OID::fromTerm(_topCoord->getTerm());
-
-            auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
-            _topCoord->processWinElection(_electionId, ts);
-            const PostMemberStateUpdateAction nextAction =
-                _updateMemberStateFromTopologyCoordinator(lk, nullptr);
-            invariant(nextAction != kActionWinElection);
-            lk.unlock();
-            _performPostMemberStateUpdateAction(nextAction);
-            lk.lock();
-            if (!_getMemberState_inlock().primary()) {
-                break;
-            }
-            // Notify all secondaries of the election win.
-            _restartHeartbeats_inlock();
-            invariant(!_catchupState);
-            _catchupState = stdx::make_unique<CatchupState>(this);
-            _catchupState->start_inlock();
-            break;
-        }
         case kActionStartSingleNodeElection:
             // In protocol version 1, single node replset will run an election instead of
             // kActionWinElection as in protocol version 0.
@@ -2735,6 +2711,30 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             severe() << "Unknown post member state update action " << static_cast<int>(action);
             fassertFailed(26010);
     }
+}
+
+void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
+    invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
+    _electionId = OID::fromTerm(_topCoord->getTerm());
+    auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
+    _topCoord->processWinElection(_electionId, ts);
+    const PostMemberStateUpdateAction nextAction =
+        _updateMemberStateFromTopologyCoordinator(lk, nullptr);
+
+    invariant(nextAction == kActionFollowerModeStateChange,
+              str::stream() << "nextAction == " << static_cast<int>(nextAction));
+    invariant(_getMemberState_inlock().primary());
+    // Clear the sync source.
+    _onFollowerModeStateChange();
+    // Notify all secondaries of the election win.
+    _restartHeartbeats_inlock();
+    invariant(!_catchupState);
+    _catchupState = stdx::make_unique<CatchupState>(this);
+    _catchupState->start_inlock();
+}
+
+void ReplicationCoordinatorImpl::_onFollowerModeStateChange() {
+    _externalState->signalApplierToChooseNewSyncSource();
 }
 
 void ReplicationCoordinatorImpl::CatchupState::start_inlock() {
