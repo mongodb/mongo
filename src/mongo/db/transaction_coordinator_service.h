@@ -53,7 +53,12 @@ public:
     ~TransactionCoordinatorService() = default;
 
     /**
-     * Shuts down the thread pool used for executing commits.
+     * Starts up the thread pool used for executing commits.
+     */
+    void startup();
+
+    /**
+     * Shuts down and joins the thread pool used for executing commits.
      */
     void shutdown();
 
@@ -108,9 +113,10 @@ public:
     void onStepUp(OperationContext* opCtx);
 
     /*
-     * TESTING ONLY
+     * Shuts down and joins the original thread pool, then sets the thread pool to 'pool' and starts
+     * 'pool'.
      */
-    void setThreadPool(std::unique_ptr<ThreadPool> pool);
+    void setThreadPoolForTest(std::unique_ptr<ThreadPool> pool);
 
 private:
     std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;

@@ -72,18 +72,21 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
 
 TransactionCoordinatorService::TransactionCoordinatorService()
     : _coordinatorCatalog(std::make_shared<TransactionCoordinatorCatalog>()),
-      _threadPool(std::make_unique<ThreadPool>(makeDefaultThreadPoolOptions())) {
-    _threadPool->startup();
+      _threadPool(std::make_unique<ThreadPool>(makeDefaultThreadPoolOptions())) {}
+
+void TransactionCoordinatorService::setThreadPoolForTest(std::unique_ptr<ThreadPool> pool) {
+    shutdown();
+    _threadPool = std::move(pool);
+    startup();
 }
 
-void TransactionCoordinatorService::setThreadPool(std::unique_ptr<ThreadPool> pool) {
-    _threadPool->shutdown();
-    _threadPool = std::move(pool);
+void TransactionCoordinatorService::startup() {
     _threadPool->startup();
 }
 
 void TransactionCoordinatorService::shutdown() {
     _threadPool->shutdown();
+    _threadPool->join();
 }
 
 TransactionCoordinatorService* TransactionCoordinatorService::get(OperationContext* opCtx) {
@@ -204,5 +207,10 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx) {
     }
     fassert(51031, scheduleStatus.isOK());
 }
+
+ServiceContext::ConstructorActionRegisterer transactionCoordinatorServiceRegisterer{
+    "TransactionCoordinatorService",
+    [](ServiceContext* service) { TransactionCoordinatorService::get(service)->startup(); },
+    [](ServiceContext* service) { TransactionCoordinatorService::get(service)->shutdown(); }};
 
 }  // namespace mongo
