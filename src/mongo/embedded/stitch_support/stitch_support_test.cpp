@@ -102,13 +102,9 @@ TEST_F(StitchSupportTest, InitializationIsSuccessful) {
 TEST_F(StitchSupportTest, CheckMatchWorksWithDefaults) {
     ASSERT_TRUE(checkMatch("{a: 1}", {"{a: 1, b: 1}", "{a: [0, 1]}"}));
     ASSERT_TRUE(checkMatch(
-        "{'a.b': 1}",
-        {"{a: {b: 1}}", "{a: [{b: 1}]}", "{a: {b: [0, 1]}}", "{a: [{b: [0, 1]}]}"}));
-    ASSERT_TRUE(checkMatch("{'a.0.b': 1}",
-                           {"{a: [{b: 1}]}",
-                            "{a: [{b: [0, 1]}]}"}));
-    ASSERT_TRUE(checkMatch("{'a.1.b': 1}",
-                           {"{a: [{b: [0, 1]}, {b: [0, 1]}]}"}));
+        "{'a.b': 1}", {"{a: {b: 1}}", "{a: [{b: 1}]}", "{a: {b: [0, 1]}}", "{a: [{b: [0, 1]}]}"}));
+    ASSERT_TRUE(checkMatch("{'a.0.b': 1}", {"{a: [{b: 1}]}", "{a: [{b: [0, 1]}]}"}));
+    ASSERT_TRUE(checkMatch("{'a.1.b': 1}", {"{a: [{b: [0, 1]}, {b: [0, 1]}]}"}));
     ASSERT_TRUE(checkMatch("{a: {$size: 1}}", {"{a: [100]}"}));
     ASSERT_FALSE(checkMatch("{a: {$size: 1}}", {"{a: [[100], [101]]}"}));
     ASSERT_TRUE(checkMatch("{'a.b': {$size: 1}}", {"{a: [0, {b: [100]}]}"}));

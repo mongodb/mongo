@@ -408,15 +408,14 @@ void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher*
     static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete matcher; }));
 }
 
-int MONGO_API_CALL
-stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
-                              const char* documentBSON,
-                              bool* isMatch,
-                              stitch_support_v1_status* statusPtr) {
+int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
+                                                 const char* documentBSON,
+                                                 bool* isMatch,
+                                                 stitch_support_v1_status* statusPtr) {
     return enterCXX(statusPtr, [&](stitch_support_v1_status& status) {
-            mongo::BSONObj document(documentBSON);
-            *isMatch = matcher->matcher.matches(document, nullptr);
-        });
+        mongo::BSONObj document(documentBSON);
+        *isMatch = matcher->matcher.matches(document, nullptr);
+    });
 }
 
 }  // extern "C"
