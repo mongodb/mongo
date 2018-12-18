@@ -13,8 +13,8 @@ import buildscripts.resmokelib.testing.hooks.combine_benchmark_results as cbr
 # pylint: disable=missing-docstring,protected-access
 
 _BM_CONTEXT = {
-    "date": "2018/01/30-18:40:25", "num_cpus": 40, "mhz_per_cpu": 4999,
-    "cpu_scaling_enabled": False, "library_build_type": "debug"
+    "date": "2018/01/30-18:40:25", "executable": "./path/to/exe", "num_cpus": 40,
+    "mhz_per_cpu": 4999, "cpu_scaling_enabled": False, "library_build_type": "debug", "caches": []
 }
 
 _BM_REPORT_1 = {

@@ -112,9 +112,12 @@ class _BenchmarkThreadsReport(object):
     {
       "context": {
         "date": "2015/03/17-18:40:25",
+        "execuable": "./build/opt/mongo/db/concurrency/lock_manager_bm"
         "num_cpus": 40,
         "mhz_per_cpu": 2801,
         "cpu_scaling_enabled": false,
+        "caches": [
+        ],
         "library_build_type": "debug"
       },
       "benchmarks": [
@@ -131,7 +134,8 @@ class _BenchmarkThreadsReport(object):
     """
 
     CONTEXT_FIELDS = [
-        "date", "cpu_scaling_enabled", "num_cpus", "mhz_per_cpu", "library_build_type"
+        "date", "cpu_scaling_enabled", "num_cpus", "mhz_per_cpu", "library_build_type",
+        "executable", "caches"
     ]
     Context = collections.namedtuple("Context", CONTEXT_FIELDS)  # type: ignore
 
