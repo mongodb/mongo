@@ -45,6 +45,7 @@ env.Library(
     target='ftdc_server',
     source=[
         'ftdc_server.cpp',
+        env.Idlc('ftdc_server.idl')[0],
         'ftdc_system_stats.cpp',
         'ftdc_system_stats_${TARGET_OS}.cpp',
     ],
@@ -55,6 +56,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/processinfo',
         'ftdc'
     ] + platform_libs,
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
 )
 
 env.Library(
@@ -77,9 +81,11 @@ env.Library(
 env.Library(
     target='ftdc_mongos',
     source=[
+        env.Idlc('ftdc_mongos.idl')[0],
         'ftdc_mongos.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
         'ftdc_server'
     ],
 )

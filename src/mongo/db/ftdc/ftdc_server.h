@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ftdc/collector.h"
+#include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -97,5 +98,41 @@ private:
     std::string _name;
     const OpMsgRequest _request;
 };
+
+/**
+ * FTDC startup parameters.
+ *
+ * Used to provide default values from FTDCConfig to the FTDC set parameters.
+ */
+struct FTDCStartupParams {
+    AtomicBool enabled;
+    AtomicInt32 periodMillis;
+
+    AtomicInt32 maxDirectorySizeMB;
+    AtomicInt32 maxFileSizeMB;
+    AtomicInt32 maxSamplesPerArchiveMetricChunk;
+    AtomicInt32 maxSamplesPerInterimMetricChunk;
+
+    FTDCStartupParams()
+        : enabled(FTDCConfig::kEnabledDefault),
+          periodMillis(FTDCConfig::kPeriodMillisDefault),
+          // Scale the values down since are defaults are in bytes, but the user interface is MB
+          maxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024)),
+          maxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024)),
+          maxSamplesPerArchiveMetricChunk(FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault),
+          maxSamplesPerInterimMetricChunk(FTDCConfig::kMaxSamplesPerInterimMetricChunkDefault) {}
+};
+
+extern FTDCStartupParams ftdcStartupParams;
+
+/**
+ * Server Parameter callbacks
+ */
+Status onUpdateFTDCEnabled(const bool value);
+Status onUpdateFTDCPeriod(const std::int32_t value);
+Status onUpdateFTDCDirectorySize(const std::int32_t value);
+Status onUpdateFTDCFileSize(const std::int32_t value);
+Status onUpdateFTDCSamplesPerChunk(const std::int32_t value);
+Status onUpdateFTDCPerInterimUpdate(const std::int32_t value);
 
 }  // namespace mongo

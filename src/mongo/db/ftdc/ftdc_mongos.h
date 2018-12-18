@@ -30,6 +30,11 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
+
 namespace mongo {
 
 /**
@@ -41,5 +46,11 @@ void startMongoSFTDC();
  * Stop Full Time Data Capture
  */
 void stopMongoSFTDC();
+
+/**
+ * Set Parameters utility methods
+ */
+Status ftdcDirectoryFromString(StringData str);
+void ftdcDirectoryAppendBSON(OperationContext* opCtx, BSONObjBuilder* b, StringData name);
 
 }  // namespace mongo
