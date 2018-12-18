@@ -356,6 +356,17 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: big_update
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "big_update"
+        authentication: disabled
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: industry_benchmarks
   priority: 5
   commands:
@@ -778,6 +789,7 @@ buildvariants:
     - name: linkbench
     - name: tpcc
     - name: genny_workloads
+    - name: big_update
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -807,6 +819,7 @@ buildvariants:
     - name: bestbuy_agg
     - name: bestbuy_agg_out
     - name: bestbuy_query
+    - name: big_update
 
 - name: linux-standalone-audit
   display_name: Linux Standalone Audit
@@ -932,6 +945,7 @@ buildvariants:
     - name: secondary_reads
     - name: tpcc
     - name: linkbench
+    - name: big_update
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
