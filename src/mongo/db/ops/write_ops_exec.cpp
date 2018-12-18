@@ -94,6 +94,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
 MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
+MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -798,6 +799,16 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangDuringBatchRemove,
+        opCtx,
+        "hangDuringBatchRemove",
+        []() {
+            log() << "batch remove - hangDuringBatchRemove fail point enabled. Blocking "
+                     "until fail point is disabled.";
+        },
+        true  // Check for interrupt periodically.
+        );
     if (MONGO_FAIL_POINT(failAllRemoves)) {
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }

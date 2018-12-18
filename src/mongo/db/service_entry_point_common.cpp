@@ -1245,6 +1245,12 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                    << redact(ue);
             debug.errInfo = ue.toStatus();
         }
+        // A NotMaster error can be set either within receivedInsert/receivedUpdate/receivedDelete
+        // or within the AssertionException handler above.  Either way, we want to throw an
+        // exception here, which will cause the client to be disconnected.
+        uassert(ErrorCodes::NotMaster,
+                "Not-master error during legacy fire-and-forget command processing",
+                !LastError::get(opCtx->getClient()).hadNotMasterError());
     }
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
