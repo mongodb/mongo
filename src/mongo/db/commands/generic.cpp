@@ -92,6 +92,10 @@ public:
         help << "{ buildinfo:1 }";
     }
 
+    virtual bool requiresAuth() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& jsobj,
