@@ -106,8 +106,6 @@ void ReplSetDistLockManager::shutDown(OperationContext* opCtx) {
         _execThread.reset();
     }
 
-    // Don't allow interrupts while cleaning up.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     auto status = _catalog->stopPing(opCtx, _processID);
     if (!status.isOK()) {
         warning() << "error encountered while cleaning up distributed ping entry for " << _processID
