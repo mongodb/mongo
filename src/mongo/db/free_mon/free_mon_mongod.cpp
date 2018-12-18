@@ -281,9 +281,9 @@ private:
 
 Status onValidateFreeMonEndpointURL(StringData str) {
     // Check for http, not https here because testEnabled may not be set yet
-    if (!str.startsWith("https"_sd) != 0) {
+    if (!str.startsWith("http"_sd) != 0) {
         return Status(ErrorCodes::BadValue,
-                      "cloudFreeMonitoringEndpointURL only supports https:// URLs");
+                      "cloudFreeMonitoringEndpointURL only supports http:// URLs");
     }
 
     return Status::OK();
