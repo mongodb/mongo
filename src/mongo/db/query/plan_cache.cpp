@@ -650,8 +650,8 @@ size_t PlanCache::size() const {
     return _cache.size();
 }
 
-void PlanCache::notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries) {
-    _indexabilityState.updateDiscriminators(indexEntries);
+void PlanCache::notifyOfIndexUpdates(const std::vector<CoreIndexInfo>& indexCores) {
+    _indexabilityState.updateDiscriminators(indexCores);
 }
 
 std::vector<BSONObj> PlanCache::getMatchingStats(

@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/unittest/unittest.h"
 
@@ -50,20 +51,31 @@ namespace {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
     SimpleBSONObjComparator bsonCmp;
     AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a_1"});
-    IndexEntry a_idx(fromjson("{a:1, b:1}"),
+    auto keyPat = fromjson("{a:1, b:1}");
+    IndexEntry a_idx(keyPat,
+                     mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat)),
                      false,
+                     {},
+                     {},
                      false,
                      false,
                      IndexEntry::Identifier{"a_1"},
                      nullptr,
-                     BSONObj());
-    IndexEntry ab_idx(fromjson("{a:1, b:1}"),
+                     BSONObj(),
+                     nullptr,
+                     nullptr);
+    IndexEntry ab_idx(keyPat,
+                      mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat)),
                       false,
+                      {},
+                      {},
                       false,
                       false,
                       IndexEntry::Identifier{"a_1:2"},
                       nullptr,
-                      BSONObj());
+                      BSONObj(),
+                      nullptr,
+                      nullptr);
 
     ASSERT_TRUE(filter.allows(a_idx));
     ASSERT_FALSE(filter.allows(ab_idx));
@@ -72,15 +84,32 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
     SimpleBSONObjComparator bsonCmp;
     AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a"});
-    IndexEntry a_idx(
-        fromjson("{a:1}"), false, false, false, IndexEntry::Identifier{"foo"}, nullptr, BSONObj());
-    IndexEntry ab_idx(fromjson("{a:1, b:1}"),
+    auto keyPat_a = fromjson("{a:1}");
+    IndexEntry a_idx(keyPat_a,
+                     mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat_a)),
+                     false,
+                     {},
+                     {},
+                     false,
+                     false,
+                     IndexEntry::Identifier{"foo"},
+                     nullptr,
+                     BSONObj(),
+                     nullptr,
+                     nullptr);
+    auto keyPat_ab = fromjson("{a:1, b:1}");
+    IndexEntry ab_idx(keyPat_ab,
+                      mongo::IndexNames::nameToType(mongo::IndexNames::findPluginName(keyPat_ab)),
                       false,
+                      {},
+                      {},
                       false,
                       false,
                       IndexEntry::Identifier{"bar"},
                       nullptr,
-                      BSONObj());
+                      BSONObj(),
+                      nullptr,
+                      nullptr);
 
     ASSERT_TRUE(filter.allows(a_idx));
     ASSERT_FALSE(filter.allows(ab_idx));

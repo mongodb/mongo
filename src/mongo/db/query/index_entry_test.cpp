@@ -40,12 +40,22 @@ namespace mongo {
 namespace {
 
 IndexEntry makeIndexEntry(BSONObj keyPattern, MultikeyPaths multiKeyPaths) {
-    IndexEntry entry{std::move(keyPattern)};
-    entry.multikeyPaths = std::move(multiKeyPaths);
-    entry.multikey = std::any_of(entry.multikeyPaths.cbegin(),
-                                 entry.multikeyPaths.cend(),
-                                 [](const auto& entry) { return !entry.empty(); });
-    return entry;
+    bool multiKey = std::any_of(multiKeyPaths.cbegin(),
+                                multiKeyPaths.cend(),
+                                [](const auto& entry) { return !entry.empty(); });
+
+    return {keyPattern,
+            IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+            multiKey,
+            multiKeyPaths,
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier("test_foo"),
+            nullptr,
+            {},
+            nullptr,
+            nullptr};
 }
 
 TEST(QueryPlannerIXSelectTest, IndexedFieldHasMultikeyComponents) {

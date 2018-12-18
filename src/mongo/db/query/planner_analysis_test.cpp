@@ -42,6 +42,24 @@ using namespace mongo;
 
 namespace {
 
+/**
+ * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
+ */
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
+    return {kp,
+            IndexNames::nameToType(IndexNames::findPluginName(kp)),
+            false,
+            {},
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier("test_foo"),
+            nullptr,
+            {},
+            nullptr,
+            nullptr};
+}
+
 TEST(QueryPlannerAnalysis, GetSortPatternBasic) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: 1}"), QueryPlannerAnalysis::getSortPattern(fromjson("{a: 1}")));
     ASSERT_BSONOBJ_EQ(fromjson("{a: -1}"),
@@ -114,7 +132,7 @@ TEST(QueryPlannerAnalysis, GetSortPatternSpecialIndexTypes) {
 // Test the generation of sort orders provided by an index scan done by
 // IndexScanNode::computeProperties().
 TEST(QueryPlannerAnalysis, IxscanSortOrdersBasic) {
-    IndexScanNode ixscan(IndexEntry(fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")));
+    IndexScanNode ixscan(buildSimpleIndexEntry(fromjson("{a: 1, b: 1, c: 1, d: 1, e: 1}")));
 
     // Bounds are {a: [[1,1]], b: [[2,2]], c: [[3,3]], d: [[1,5]], e:[[1,1],[2,2]]},
     // all inclusive.
@@ -166,11 +184,11 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
     BSONObj unsupportedVersion = fromjson("{'2dsphereIndexVersion': 2}");
     BSONObj supportedVersion = fromjson("{'2dsphereIndexVersion': 3}");
 
-    IndexEntry relevantIndex(fromjson("{'geometry.field': '2dsphere'}"));
-    IndexEntry irrelevantIndex(fromjson("{'geometry.field': 1}"));
-    IndexEntry differentFieldIndex(fromjson("{'geometry.blah': '2dsphere'}"));
-    IndexEntry compoundIndex(fromjson("{'geometry.field': '2dsphere', 'a': -1}"));
-    IndexEntry unsupportedIndex(fromjson("{'geometry.field': '2dsphere'}"));
+    auto relevantIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
+    auto irrelevantIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': 1}"));
+    auto differentFieldIndex = buildSimpleIndexEntry(fromjson("{'geometry.blah': '2dsphere'}"));
+    auto compoundIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere', 'a': -1}"));
+    auto unsupportedIndex = buildSimpleIndexEntry(fromjson("{'geometry.field': '2dsphere'}"));
 
     relevantIndex.infoObj = irrelevantIndex.infoObj = differentFieldIndex.infoObj =
         compoundIndex.infoObj = supportedVersion;
