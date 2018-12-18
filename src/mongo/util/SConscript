@@ -377,6 +377,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         source=[
             'tcmalloc_server_status_section.cpp',
             'tcmalloc_set_parameter.cpp',
+            env.Idlc('tcmalloc_parameters.idl')[0],
             'heap_profiler.cpp',
         ],
         LIBDEPS=[
@@ -385,6 +386,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/commands/server_status',
+            '$BUILD_DIR/mongo/idl/server_parameter',
             'processinfo',
         ],
         PROGDEPS_DEPENDENTS=[

@@ -39,6 +39,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/tcmalloc_parameters_gen.h"
 
 #include <gperftools/malloc_hook.h>
 #include <third_party/murmurhash3/MurmurHash3.h>
@@ -530,7 +531,7 @@ private:
             const size_t objTableSize = objHashTable.memorySizeBytes();
             const size_t stackTableSize = stackHashTable.memorySizeBytes();
             const double MB = 1024 * 1024;
-            log() << "sampleIntervalBytes " << sampleIntervalBytesParameter << "; "
+            log() << "sampleIntervalBytes " << HeapProfilingSampleIntervalBytes << "; "
                   << "maxActiveMemory " << maxActiveMemory / MB << " MB; "
                   << "objTableSize " << objTableSize / MB << " MB; "
                   << "stackTableSize " << stackTableSize / MB << " MB";
@@ -615,12 +616,10 @@ private:
 
 public:
     static HeapProfiler* heapProfiler;
-    static bool enabledParameter;
-    static long long sampleIntervalBytesParameter;
 
     HeapProfiler() {
         // Set sample interval from the parameter.
-        sampleIntervalBytes = sampleIntervalBytesParameter;
+        sampleIntervalBytes = HeapProfilingSampleIntervalBytes;
 
         // This is our only allocator dependency - ifdef and change as
         // appropriate for other allocators, using hooks or shims.
@@ -647,7 +646,7 @@ public:
     HeapProfilerServerStatusSection() : ServerStatusSection("heapProfile") {}
 
     bool includeByDefault() const override {
-        return HeapProfiler::enabledParameter;
+        return HeapProfilingEnabled;
     }
 
     BSONObj generateSection(OperationContext* opCtx,
@@ -663,20 +662,10 @@ public:
 //
 
 HeapProfiler* HeapProfiler::heapProfiler;
-bool HeapProfiler::enabledParameter = false;
-long long HeapProfiler::sampleIntervalBytesParameter = 256 * 1024;
-
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> heapProfilingEnabledParameter(
-    ServerParameterSet::getGlobal(), "heapProfilingEnabled", &HeapProfiler::enabledParameter);
-
-ExportedServerParameter<long long, ServerParameterType::kStartupOnly>
-    heapProfilingSampleIntervalBytes(ServerParameterSet::getGlobal(),
-                                     "heapProfilingSampleIntervalBytes",
-                                     &HeapProfiler::sampleIntervalBytesParameter);
 
 MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
-    if (HeapProfiler::enabledParameter)
+    if (HeapProfilingEnabled)
         HeapProfiler::heapProfiler = new HeapProfiler();
     return Status::OK();
 }
