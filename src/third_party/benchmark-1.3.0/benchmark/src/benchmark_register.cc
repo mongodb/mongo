@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "benchmark_register.h"
+#include "benchmark/benchmark.h"
+#include "benchmark_api_internal.h"
+#include "internal_macros.h"
 
 #ifndef BENCHMARK_OS_WINDOWS
-#ifndef BENCHMARK_OS_FUCHSIA
 #include <sys/resource.h>
-#endif
 #include <sys/time.h>
 #include <unistd.h>
 #endif
@@ -34,17 +34,15 @@
 #include <sstream>
 #include <thread>
 
-#include "benchmark/benchmark.h"
-#include "benchmark_api_internal.h"
 #include "check.h"
 #include "commandlineflags.h"
 #include "complexity.h"
-#include "internal_macros.h"
+#include "statistics.h"
 #include "log.h"
 #include "mutex.h"
 #include "re.h"
-#include "statistics.h"
 #include "string_util.h"
+#include "sysinfo.h"
 #include "timers.h"
 
 namespace benchmark {
@@ -77,7 +75,7 @@ class BenchmarkFamilies {
 
   // Extract the list of benchmark instances that match the specified
   // regular expression.
-  bool FindBenchmarks(std::string re,
+  bool FindBenchmarks(const std::string& re,
                       std::vector<Benchmark::Instance>* benchmarks,
                       std::ostream* Err);
 
@@ -107,18 +105,13 @@ void BenchmarkFamilies::ClearBenchmarks() {
 }
 
 bool BenchmarkFamilies::FindBenchmarks(
-    std::string spec, std::vector<Benchmark::Instance>* benchmarks,
+    const std::string& spec, std::vector<Benchmark::Instance>* benchmarks,
     std::ostream* ErrStream) {
   CHECK(ErrStream);
   auto& Err = *ErrStream;
   // Make regular expression out of command-line flag
   std::string error_msg;
   Regex re;
-  bool isNegativeFilter = false;
-  if(spec[0] == '-') {
-      spec.replace(0, 1, "");
-      isNegativeFilter = true;
-  }
   if (!re.Init(spec, &error_msg)) {
     Err << "Could not compile benchmark re: " << error_msg << std::endl;
     return false;
@@ -178,20 +171,20 @@ bool BenchmarkFamilies::FindBenchmarks(
             const auto& arg_name = family->arg_names_[arg_i];
             if (!arg_name.empty()) {
               instance.name +=
-                  StrFormat("%s:", family->arg_names_[arg_i].c_str());
+                  StringPrintF("%s:", family->arg_names_[arg_i].c_str());
             }
           }
-
-          instance.name += StrFormat("%d", arg);
+          
+          instance.name += StringPrintF("%d", arg);
           ++arg_i;
         }
 
         if (!IsZero(family->min_time_))
-          instance.name += StrFormat("/min_time:%0.3f", family->min_time_);
+          instance.name += StringPrintF("/min_time:%0.3f", family->min_time_);
         if (family->iterations_ != 0)
-          instance.name += StrFormat("/iterations:%d", family->iterations_);
+          instance.name += StringPrintF("/iterations:%d", family->iterations_);
         if (family->repetitions_ != 0)
-          instance.name += StrFormat("/repeats:%d", family->repetitions_);
+          instance.name += StringPrintF("/repeats:%d", family->repetitions_);
 
         if (family->use_manual_time_) {
           instance.name += "/manual_time";
@@ -201,11 +194,10 @@ bool BenchmarkFamilies::FindBenchmarks(
 
         // Add the number of threads used to the name
         if (!family->thread_counts_.empty()) {
-          instance.name += StrFormat("/threads:%d", instance.threads);
+          instance.name += StringPrintF("/threads:%d", instance.threads);
         }
 
-        if ((re.Match(instance.name) && !isNegativeFilter) ||
-            (!re.Match(instance.name) && isNegativeFilter)) {
+        if (re.Match(instance.name)) {
           instance.last_benchmark_instance = (&args == &family->args_.back());
           benchmarks->push_back(std::move(instance));
         }
@@ -253,7 +245,30 @@ Benchmark::Benchmark(const char* name)
 
 Benchmark::~Benchmark() {}
 
-Benchmark* Benchmark::Arg(int64_t x) {
+void Benchmark::AddRange(std::vector<int>* dst, int lo, int hi, int mult) {
+  CHECK_GE(lo, 0);
+  CHECK_GE(hi, lo);
+  CHECK_GE(mult, 2);
+
+  // Add "lo"
+  dst->push_back(lo);
+
+  static const int kint32max = std::numeric_limits<int32_t>::max();
+
+  // Now space out the benchmarks in multiples of "mult"
+  for (int32_t i = 1; i < kint32max / mult; i *= mult) {
+    if (i >= hi) break;
+    if (i > lo) {
+      dst->push_back(i);
+    }
+  }
+  // Add "hi" (if different from "lo")
+  if (hi != lo) {
+    dst->push_back(hi);
+  }
+}
+
+Benchmark* Benchmark::Arg(int x) {
   CHECK(ArgsCnt() == -1 || ArgsCnt() == 1);
   args_.push_back({x});
   return this;
@@ -264,21 +279,20 @@ Benchmark* Benchmark::Unit(TimeUnit unit) {
   return this;
 }
 
-Benchmark* Benchmark::Range(int64_t start, int64_t limit) {
+Benchmark* Benchmark::Range(int start, int limit) {
   CHECK(ArgsCnt() == -1 || ArgsCnt() == 1);
-  std::vector<int64_t> arglist;
+  std::vector<int> arglist;
   AddRange(&arglist, start, limit, range_multiplier_);
 
-  for (int64_t i : arglist) {
+  for (int i : arglist) {
     args_.push_back({i});
   }
   return this;
 }
 
-Benchmark* Benchmark::Ranges(
-    const std::vector<std::pair<int64_t, int64_t>>& ranges) {
+Benchmark* Benchmark::Ranges(const std::vector<std::pair<int, int>>& ranges) {
   CHECK(ArgsCnt() == -1 || ArgsCnt() == static_cast<int>(ranges.size()));
-  std::vector<std::vector<int64_t>> arglists(ranges.size());
+  std::vector<std::vector<int>> arglists(ranges.size());
   std::size_t total = 1;
   for (std::size_t i = 0; i < ranges.size(); i++) {
     AddRange(&arglists[i], ranges[i].first, ranges[i].second,
@@ -289,7 +303,7 @@ Benchmark* Benchmark::Ranges(
   std::vector<std::size_t> ctr(arglists.size(), 0);
 
   for (std::size_t i = 0; i < total; i++) {
-    std::vector<int64_t> tmp;
+    std::vector<int> tmp;
     tmp.reserve(arglists.size());
 
     for (std::size_t j = 0; j < arglists.size(); j++) {
@@ -321,17 +335,17 @@ Benchmark* Benchmark::ArgNames(const std::vector<std::string>& names) {
   return this;
 }
 
-Benchmark* Benchmark::DenseRange(int64_t start, int64_t limit, int step) {
+Benchmark* Benchmark::DenseRange(int start, int limit, int step) {
   CHECK(ArgsCnt() == -1 || ArgsCnt() == 1);
   CHECK_GE(start, 0);
   CHECK_LE(start, limit);
-  for (int64_t arg = start; arg <= limit; arg += step) {
+  for (int arg = start; arg <= limit; arg += step) {
     args_.push_back({arg});
   }
   return this;
 }
 
-Benchmark* Benchmark::Args(const std::vector<int64_t>& args) {
+Benchmark* Benchmark::Args(const std::vector<int>& args) {
   CHECK(ArgsCnt() == -1 || ArgsCnt() == static_cast<int>(args.size()));
   args_.push_back(args);
   return this;
@@ -348,12 +362,14 @@ Benchmark* Benchmark::RangeMultiplier(int multiplier) {
   return this;
 }
 
+
 Benchmark* Benchmark::MinTime(double t) {
   CHECK(t > 0.0);
   CHECK(iterations_ == 0);
   min_time_ = t;
   return this;
 }
+
 
 Benchmark* Benchmark::Iterations(size_t n) {
   CHECK(n > 0);
@@ -432,7 +448,8 @@ Benchmark* Benchmark::DenseThreadRange(int min_threads, int max_threads,
 }
 
 Benchmark* Benchmark::ThreadPerCpu() {
-  thread_counts_.push_back(CPUInfo::Get().num_cpus);
+  static int num_cpus = NumCPUs();
+  thread_counts_.push_back(num_cpus);
   return this;
 }
 

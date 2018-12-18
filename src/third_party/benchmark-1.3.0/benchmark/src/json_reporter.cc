@@ -32,15 +32,15 @@ namespace benchmark {
 namespace {
 
 std::string FormatKV(std::string const& key, std::string const& value) {
-  return StrFormat("\"%s\": \"%s\"", key.c_str(), value.c_str());
+  return StringPrintF("\"%s\": \"%s\"", key.c_str(), value.c_str());
 }
 
 std::string FormatKV(std::string const& key, const char* value) {
-  return StrFormat("\"%s\": \"%s\"", key.c_str(), value);
+  return StringPrintF("\"%s\": \"%s\"", key.c_str(), value);
 }
 
 std::string FormatKV(std::string const& key, bool value) {
-  return StrFormat("\"%s\": %s", key.c_str(), value ? "true" : "false");
+  return StringPrintF("\"%s\": %s", key.c_str(), value ? "true" : "false");
 }
 
 std::string FormatKV(std::string const& key, int64_t value) {
@@ -77,40 +77,12 @@ bool JSONReporter::ReportContext(const Context& context) {
   std::string walltime_value = LocalDateTimeString();
   out << indent << FormatKV("date", walltime_value) << ",\n";
 
-  if (Context::executable_name) {
-    out << indent << FormatKV("executable", Context::executable_name) << ",\n";
-  }
-
-  CPUInfo const& info = context.cpu_info;
-  out << indent << FormatKV("num_cpus", static_cast<int64_t>(info.num_cpus))
+  out << indent << FormatKV("num_cpus", static_cast<int64_t>(context.num_cpus))
       << ",\n";
-  out << indent
-      << FormatKV("mhz_per_cpu",
-                  RoundDouble(info.cycles_per_second / 1000000.0))
+  out << indent << FormatKV("mhz_per_cpu", RoundDouble(context.mhz_per_cpu))
       << ",\n";
-  out << indent << FormatKV("cpu_scaling_enabled", info.scaling_enabled)
+  out << indent << FormatKV("cpu_scaling_enabled", context.cpu_scaling_enabled)
       << ",\n";
-
-  out << indent << "\"caches\": [\n";
-  indent = std::string(6, ' ');
-  std::string cache_indent(8, ' ');
-  for (size_t i = 0; i < info.caches.size(); ++i) {
-    auto& CI = info.caches[i];
-    out << indent << "{\n";
-    out << cache_indent << FormatKV("type", CI.type) << ",\n";
-    out << cache_indent << FormatKV("level", static_cast<int64_t>(CI.level))
-        << ",\n";
-    out << cache_indent
-        << FormatKV("size", static_cast<int64_t>(CI.size) * 1000u) << ",\n";
-    out << cache_indent
-        << FormatKV("num_sharing", static_cast<int64_t>(CI.num_sharing))
-        << "\n";
-    out << indent << "}";
-    if (i != info.caches.size() - 1) out << ",";
-    out << "\n";
-  }
-  indent = std::string(4, ' ');
-  out << indent << "],\n";
 
 #if defined(NDEBUG)
   const char build_type[] = "release";

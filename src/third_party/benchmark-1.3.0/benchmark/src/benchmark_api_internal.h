@@ -17,7 +17,7 @@ struct Benchmark::Instance {
   std::string name;
   Benchmark* benchmark;
   ReportMode report_mode;
-  std::vector<int64_t> arg;
+  std::vector<int> arg;
   TimeUnit time_unit;
   int range_multiplier;
   bool use_real_time;

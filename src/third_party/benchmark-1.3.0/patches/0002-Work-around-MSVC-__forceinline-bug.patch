@@ -1,0 +1,27 @@
+From df74ea738d9a797a2f5596c72ff08a2cd895168f Mon Sep 17 00:00:00 2001
+From: Robert Guo <robert.guo@10gen.com>
+Date: Mon, 22 Jan 2018 18:19:04 -0500
+Subject: [PATCH] Work around MSVC __forceinline bug
+
+---
+ include/benchmark/benchmark.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/include/benchmark/benchmark.h b/include/benchmark/benchmark.h
+index d529e4b..f20787b 100644
+--- a/include/benchmark/benchmark.h
++++ b/include/benchmark/benchmark.h
+@@ -207,7 +207,9 @@ BENCHMARK(BM_test)->Unit(benchmark::kMillisecond);
+ #define BENCHMARK_NOEXCEPT_OP(x) noexcept(x)
+ #elif defined(_MSC_VER) && !defined(__clang__)
+ #define BENCHMARK_UNUSED
+-#define BENCHMARK_ALWAYS_INLINE __forceinline
++// MONGO HACK: SERVER-32908 work around old MSVC bug, which was fixed as of MSVC 1913.
++// See discussion here for more detail: https://github.com/google/benchmark/pull/493
++#define BENCHMARK_ALWAYS_INLINE
+ #if _MSC_VER >= 1900
+ #define BENCHMARK_NOEXCEPT noexcept
+ #define BENCHMARK_NOEXCEPT_OP(x) noexcept(x)
+-- 
+2.14.3 (Apple Git-98)
+

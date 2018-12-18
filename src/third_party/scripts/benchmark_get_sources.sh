@@ -1,6 +1,6 @@
 #!/bin/bash
 # This script downloads and imports Google Benchmark.
-# It can be run on Linux, Mac OS X or Windows WSL.
+# It can be run on Linux or Mac OS X.
 # Actual integration into the build system is not done by this script.
 #
 # Turn on strict error checking, like perl use 'strict'
@@ -12,41 +12,20 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-GIT_EXE=git
-if grep -q Microsoft /proc/version; then
-    GIT_EXE=git.exe
-fi
-
+VERSION=1.3.0
 NAME=benchmark
-VERSION=1.4.1
-if grep -q Microsoft /proc/version; then
-    SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
-    SRC_ROOT+="$(mktemp -u /benchmark.XXXXXX)"
-    mkdir -p $SRC_ROOT
-else
-    SRC_ROOT=$(mktemp -d /tmp/benchmark.XXXXXX)
-fi
-
+SRC_ROOT=$(mktemp -d /tmp/benchmark.XXXXXX)
+#trap "rm -rf $SRC_ROOT" EXIT
 SRC=${SRC_ROOT}/${NAME}-${VERSION}
-CLONE_DEST=$SRC
-if grep -q Microsoft /proc/version; then
-    CLONE_DEST=$(wslpath -m $SRC)
-fi
-DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
-PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION/patches
-if grep -q Microsoft /proc/version; then
-    DEST_DIR=$(wslpath -u "$DEST_DIR")
-    PATCH_DIR=$(wslpath -w $(wslpath -u "$PATCH_DIR"))
-fi
-
-echo "dest: $DEST_DIR"
-echo "patch: $PATCH_DIR"
+DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
+PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION/patches
 
 if [ ! -d $SRC ]; then
-    $GIT_EXE clone git@github.com:google/benchmark.git $CLONE_DEST
+    git clone git@github.com:google/benchmark.git $SRC
 
     pushd $SRC
-    $GIT_EXE checkout v$VERSION
+    git checkout v$VERSION
+    git am $PATCH_DIR/*.patch
     
     popd
 fi
