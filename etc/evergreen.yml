@@ -9169,7 +9169,6 @@ buildvariants:
       --cxx-std=17
       --disable-warnings-as-errors
       --allocator=system
-      CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
       CXXFLAGS="-Wno-register"
     repo_edition: enterprise
     scons_cache_scope: shared
@@ -11281,7 +11280,6 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
       --cxx-std=17
-      CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
       CXXFLAGS="-Wno-register"
     resmoke_jobs_max: 1
     tooltags: "ssl sasl"
@@ -15930,7 +15928,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" MSVC_VERSION=14.1 CXXFLAGS="/wd4834 /wd5033 /wd5041" CPPDEFINES="_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS _HAS_AUTO_PTR_ETC=1" --cxx-std=17 --dynamic-windows --dbg=off --opt=on -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" MSVC_VERSION=14.1 CXXFLAGS="/wd4834 /wd5033 /wd5041" CPPDEFINES="_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS" --cxx-std=17 --dynamic-windows --dbg=off --opt=on -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
