@@ -35,9 +35,9 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import io
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 import yaml
 from yaml import nodes
-from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
 from . import common
 from . import errors
