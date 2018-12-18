@@ -37,6 +37,7 @@ if free_monitoring == "on":
             'free_mon_mongod.cpp',
             env.Idlc('free_mon_mongod.idl')[0],
             'free_mon_options.cpp',
+            env.Idlc('free_mon_options.idl')[0],
             'free_mon_status.cpp',
         ],
         LIBDEPS=[

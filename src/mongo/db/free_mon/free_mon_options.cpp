@@ -75,32 +75,6 @@ StatusWith<EnableCloudStateEnum> EnableCloudState_parse(StringData value) {
     return Status(ErrorCodes::InvalidOptions, "Unrecognized state");
 }
 
-Status addFreeMonitoringOptions(moe::OptionSection* options) {
-    moe::OptionSection freeMonitoringOptions("Free Monitoring options");
-
-    // Command Line: --enableFreeMonitoring=<on|runtime|off>
-    // YAML Name: cloud.monitoring.free=<on|runtime|off>
-    freeMonitoringOptions.addOptionChaining("cloud.monitoring.free.state",
-                                            "enableFreeMonitoring",
-                                            moe::String,
-                                            "Enable Cloud Free Monitoring (on|runtime|off)");
-
-    // Command Line: --enableFreeMonitoringTag=array<string>
-    // YAML Name: cloud.monitoring.free.tag=array<string>
-    freeMonitoringOptions.addOptionChaining("cloud.monitoring.free.tags",
-                                            "freeMonitoringTag",
-                                            moe::StringVector,
-                                            "Cloud Free Monitoring Tags");
-
-    Status ret = options->addSection(freeMonitoringOptions);
-    if (!ret.isOK()) {
-        error() << "Failed to add free monitoring option section: " << ret.toString();
-        return ret;
-    }
-
-    return Status::OK();
-}
-
 Status storeFreeMonitoringOptions(const moe::Environment& params) {
 
     if (params.count("cloud.monitoring.free.state")) {
@@ -118,10 +92,6 @@ Status storeFreeMonitoringOptions(const moe::Environment& params) {
     }
 
     return Status::OK();
-}
-
-MONGO_MODULE_STARTUP_OPTIONS_REGISTER(FreeMonitoringOptions)(InitializerContext* /*unused*/) {
-    return addFreeMonitoringOptions(&moe::startupOptions);
 }
 
 MONGO_STARTUP_OPTIONS_STORE(FreeMonitoringOptions)(InitializerContext* /*unused*/) {
