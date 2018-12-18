@@ -466,6 +466,9 @@ bool runCreateIndexes(OperationContext* opCtx,
     LOG(1) << "performing final index build drain";
     uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
 
+    // This is required before completion.
+    uassertStatusOK(indexer.checkConstraints());
+
     writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 

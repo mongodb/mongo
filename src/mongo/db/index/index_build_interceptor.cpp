@@ -70,6 +70,13 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opC
     return _duplicateKeyTracker->checkConstraints(opCtx);
 }
 
+bool IndexBuildInterceptor::areAllConstraintsChecked(OperationContext* opCtx) const {
+    if (!_duplicateKeyTracker) {
+        return true;
+    }
+    return _duplicateKeyTracker->areAllConstraintsChecked(opCtx);
+}
+
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
@@ -209,7 +216,8 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             return status;
         }
 
-        if (result.dupsInserted.size()) {
+        if (result.dupsInserted.size() &&
+            options.getKeysMode == IndexAccessMethod::GetKeysMode::kEnforceConstraints) {
             status = recordDuplicateKeys(opCtx, result.dupsInserted);
             if (!status.isOK()) {
                 return status;

@@ -271,6 +271,13 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
     }
 
+    // Ignore uniqueness constraint violations when relaxed (on secondaries). Secondaries can
+    // complete index builds in the middle of batches, which creates the potential for finding
+    // duplicate key violations where there otherwise would be none at consistent states.
+    if (_indexConstraints == IndexConstraints::kRelax) {
+        indexer.ignoreUniqueConstraint();
+    }
+
     if (allowBackgroundBuilding) {
         _setBgIndexStarting();
         invariant(dbLock);
@@ -319,6 +326,14 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     status = indexer.drainBackgroundWritesIfNeeded();
     if (!status.isOK()) {
         return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
+    }
+
+    // Only perform constraint checking when enforced (on primaries).
+    if (_indexConstraints == IndexConstraints::kEnforce) {
+        status = indexer.checkConstraints();
+        if (!status.isOK()) {
+            return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
+        }
     }
 
     status = writeConflictRetry(opCtx, "Commit index build", ns.ns(), [opCtx, coll, &indexer, &ns] {

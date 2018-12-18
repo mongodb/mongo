@@ -156,9 +156,8 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
         // An index build should never be completed with writes remaining in the interceptor.
         invariant(_indexBuildInterceptor->areAllWritesApplied(_opCtx));
 
-        // Hybrid indexes must check for any outstanding duplicate key constraint violations when
-        // they finish.
-        uassertStatusOK(_indexBuildInterceptor->checkDuplicateKeyConstraints(_opCtx));
+        // An index build should never be completed without resolving all key constraints.
+        invariant(_indexBuildInterceptor->areAllConstraintsChecked(_opCtx));
     }
 
 

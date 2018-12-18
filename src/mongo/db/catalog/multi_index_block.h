@@ -160,6 +160,15 @@ public:
     Status drainBackgroundWritesIfNeeded();
 
     /**
+     * Check any constraits that may have been temporarily violated during the index build for
+     * background indexes using an IndexBuildInterceptor to capture writes. The caller is
+     * responsible for ensuring that all writes on the collection are visible.
+     *
+     * Must not be in a WriteUnitOfWork.
+     */
+    Status checkConstraints();
+
+    /**
      * Marks the index ready for use. Should only be called as the last method after
      * doneInserting() or insertAllDocumentsInCollection() return success.
      *

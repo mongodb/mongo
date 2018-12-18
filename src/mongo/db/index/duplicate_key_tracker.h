@@ -61,8 +61,16 @@ public:
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
      * resolved for the index. Returns a DuplicateKey error if there are still duplicate key
      * constraint violations on the index.
+     *
+     * Must not be in a WriteUnitOfWork.
      */
     Status checkConstraints(OperationContext* opCtx) const;
+
+    /**
+     * Returns true if all recorded duplicate key constraint violations have been deleted from the
+     * temporary record store.
+     */
+    bool areAllConstraintsChecked(OperationContext* opCtx) const;
 
 private:
     const IndexCatalogEntry* _indexCatalogEntry;

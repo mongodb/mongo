@@ -206,18 +206,17 @@ public:
             coll->getIndexCatalog()->findIndexByName(&_opCtx, "a", true /* includeUnfinished */);
         ASSERT(desc);
 
-        const Status status = indexer.insertAllDocumentsInCollection();
+        Status status = indexer.insertAllDocumentsInCollection();
         if (!coll->getIndexCatalog()->getEntry(desc)->isBuilding()) {
             ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
             return;
         }
 
-        // Hybrid index builds, with an interceptor, do not detect duplicates until they commit.
+        // Hybrid index builds, with an interceptor, check duplicates explicitly.
         ASSERT_OK(status);
 
-        WriteUnitOfWork wunit(&_opCtx);
-        ASSERT_THROWS_CODE(indexer.commit(), AssertionException, ErrorCodes::DuplicateKey);
-        wunit.commit();
+        status = indexer.checkConstraints();
+        ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
     }
 };
 

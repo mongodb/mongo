@@ -90,6 +90,8 @@ Status DuplicateKeyTracker::recordKeys(OperationContext* opCtx, const std::vecto
 }
 
 Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
     auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
     auto record = constraintsCursor->next();
 
@@ -105,12 +107,30 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
         if (!status.isOK())
             return status;
 
+        WriteUnitOfWork wuow(opCtx);
+        _keyConstraintsTable->rs()->deleteRecord(opCtx, record->id);
+
+        constraintsCursor->save();
+        wuow.commit();
+        constraintsCursor->restore();
+
         record = constraintsCursor->next();
     }
 
     log() << "index build resolved " << count << " duplicate key conflicts for unique index: "
           << _indexCatalogEntry->descriptor()->indexName();
     return Status::OK();
+}
+
+bool DuplicateKeyTracker::areAllConstraintsChecked(OperationContext* opCtx) const {
+    auto cursor = _keyConstraintsTable->rs()->getCursor(opCtx);
+    auto record = cursor->next();
+
+    // The table is empty only when there are no more constraints to check.
+    if (!record)
+        return true;
+
+    return false;
 }
 
 }  // namespace mongo

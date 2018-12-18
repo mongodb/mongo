@@ -513,6 +513,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
             return status;
         }
 
+        // Do not record duplicates when explicitly ignored. This may be the case on secondaries.
         auto interceptor = entry->indexBuildInterceptor();
         if (!interceptor || _ignoreUnique) {
             continue;
@@ -564,6 +565,33 @@ Status MultiIndexBlock::drainBackgroundWritesIfNeeded() {
     return Status::OK();
 }
 
+
+Status MultiIndexBlock::checkConstraints() {
+    if (State::kAborted == _getState()) {
+        return {ErrorCodes::IndexBuildAborted,
+                str::stream() << "Index build aborted: " << _abortReason
+                              << ". Cannot complete constraint checking: "
+                              << _collection->ns().ns()
+                              << "("
+                              << *_collection->uuid()
+                              << ")"};
+    }
+
+    // For each index that may be unique, check that no recorded duplicates still exist. This can
+    // only check what is visible on the index. Callers are responsible for ensuring all writes to
+    // the collection are visible.
+    for (size_t i = 0; i < _indexes.size(); i++) {
+        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        if (!interceptor)
+            continue;
+
+        auto status = interceptor->checkDuplicateKeyConstraints(_opCtx);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
 
 void MultiIndexBlock::abortWithoutCleanup() {
     _setStateToAbortedIfNotCommitted("aborted without cleanup"_sd);
