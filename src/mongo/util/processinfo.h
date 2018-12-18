@@ -130,13 +130,6 @@ public:
     }
 
     /**
-     * Determine if file zeroing is necessary for newly allocated data files.
-     */
-    static bool isDataFileZeroingNeeded() {
-        return sysInfo().fileZeroNeeded;
-    }
-
-    /**
      * Determine if we need to workaround slow msync performance on Illumos/Solaris
      */
     static bool preferMsyncOverFSync() {
@@ -205,11 +198,6 @@ private:
         bool hasNuma;
         BSONObj _extraStats;
 
-        // This is an OS specific value, which determines whether files should be zero-filled
-        // at allocation time in order to avoid Microsoft KB 2731284.
-        //
-        bool fileZeroNeeded;
-
         // On non-Solaris (ie, Linux, Darwin, *BSD) kernels, prefer msync.
         // Illumos kernels do O(N) scans in memory of the page table during msync which
         // causes high CPU, Oracle Solaris 11.2 and later modified ZFS to workaround mongodb
@@ -223,7 +211,6 @@ private:
               numCores(0),
               pageSize(0),
               hasNuma(false),
-              fileZeroNeeded(false),
               preferMsyncOverFSync(true) {
             // populate SystemInfo during construction
             collectSystemInfo();

@@ -370,12 +370,6 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         warned = true;
     }
 
-    if (p.isDataFileZeroingNeeded()) {
-        log() << "Hotfix KB2731284 or later update is not installed, will zero-out data files."
-              << startupWarningsLog;
-        warned = true;
-    }
-
 #endif  // #ifdef _WIN32
 
     if (storageParams.engine == "ephemeralForTest") {
