@@ -212,7 +212,7 @@ TEST(SetupOptions, tlsModeRequired) {
     argv.push_back("binaryname");
     argv.push_back("--tlsMode");
     argv.push_back("requireTLS");
-    argv.push_back("--tlsPEMKeyFile");
+    argv.push_back("--tlsCertificateKeyFile");
     argv.push_back(sslPEMKeyFile);
     argv.push_back("--tlsCAFile");
     argv.push_back(sslCAFFile);
@@ -224,7 +224,7 @@ TEST(SetupOptions, tlsModeRequired) {
     argv.push_back("--tlsAllowInvalidCertificates");
     argv.push_back("--tlsWeakCertificateValidation");
     argv.push_back("--tlsFIPSMode");
-    argv.push_back("--tlsPEMKeyPassword");
+    argv.push_back("--tlsCertificateKeyFilePassword");
     argv.push_back("pw1");
     argv.push_back("--tlsClusterPassword");
     argv.push_back("pw2");
@@ -486,7 +486,7 @@ TEST(SetupOptions, RedactionSingleName) {
     const std::vector<std::string> argv({"mongod",
                                          "--tlsMode",
                                          "requireTLS",
-                                         "--tlsPEMKeyPassword=qwerty",
+                                         "--tlsCertificateKeyFilePassword=qwerty",
                                          "--tlsClusterPassword",
                                          "Lose Me.",
                                          "--sslPEMKeyPassword=qwerty",
@@ -495,7 +495,7 @@ TEST(SetupOptions, RedactionSingleName) {
     const std::vector<std::string> expected({"mongod",
                                              "--tlsMode",
                                              "requireTLS",
-                                             "--tlsPEMKeyPassword=<password>",
+                                             "--tlsCertificateKeyFilePassword=<password>",
                                              "--tlsClusterPassword",
                                              "<password>",
                                              "--sslPEMKeyPassword=<password>",
@@ -508,7 +508,7 @@ TEST(SetupOptions, RedactionSingleName) {
 TEST(SetupOptions, RedactionDottedName) {
     auto obj = BSON("net" << BSON("tls" << BSON("mode"
                                                 << "requireTLS"
-                                                << "PEMKeyPassword"
+                                                << "certificateKeyFilePassword"
                                                 << "qwerty"
                                                 << "ClusterPassword"
                                                 << "qwerty")
@@ -522,7 +522,7 @@ TEST(SetupOptions, RedactionDottedName) {
 
     auto res = BSON("net" << BSON("tls" << BSON("mode"
                                                 << "requireTLS"
-                                                << "PEMKeyPassword"
+                                                << "certificateKeyFilePassword"
                                                 << "<password>"
                                                 << "ClusterPassword"
                                                 << "<password>")

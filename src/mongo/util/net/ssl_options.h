@@ -54,8 +54,8 @@ struct SSLParams {
     AtomicInt32 sslMode;            // --tlsMode - the TLS operation mode, see enum SSLModes
     std::string sslPEMTempDHParam;  // --setParameter OpenSSLDiffieHellmanParameters=file : PEM file
                                     // with DH parameters.
-    std::string sslPEMKeyFile;      // --tlsPEMKeyFile
-    std::string sslPEMKeyPassword;  // --tlsPEMKeyPassword
+    std::string sslPEMKeyFile;      // --tlsCertificateKeyFile
+    std::string sslPEMKeyPassword;  // --tlsCertificateKeyFilePassword
     std::string sslClusterFile;     // --tlsInternalKeyFile
     std::string sslClusterPassword;  // --tlsInternalKeyPassword
     std::string sslCAFile;           // --tlsCAFile

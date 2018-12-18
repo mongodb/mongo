@@ -46,17 +46,17 @@ configs:
     deprecated_short_name: ssl
     arg_vartype: Switch
 
-  "tls.PEMKeyFile":
+  "tls.certificateKeyFile":
     description: "PEM certificate/key file for TLS"
-    short_name: tlsPEMKeyFile
+    short_name: tlsCertificateKeyFile
     deprecated_name: "ssl.PEMKeyFile"
     deprecated_short_name: "sslPEMKeyFile"
     arg_vartype: String
     cpp_varname: "sslGlobalParams.sslPEMKeyFile"
     requires: tls
-  "tls.PEMKeyPassword":
+  "tls.tlsCertificateKeyFilePassword":
     description: "Password for key in PEM file for TLS"
-    short_name: tlsPEMKeyPassword
+    short_name: tlsCertificateKeyFilePassword
     deprecated_name: "ssl.PEMKeyPassword"
     deprecated_short_name: sslPEMKeyPassword
     arg_vartype: String

@@ -5,7 +5,7 @@
 
     const mongod = MongoRunner.runMongod({
         tlsOnNormalPorts: '',
-        tlsPEMKeyFile: 'jstests/libs/server.pem',
+        tlsCertificateKeyFile: 'jstests/libs/server.pem',
     });
     assert(mongod);
     assert.commandWorked(mongod.getDB('admin').runCommand({isMaster: 1}));

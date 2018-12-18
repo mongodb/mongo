@@ -28,7 +28,7 @@
 
     const base_options = {
         tlsMode: 'requireTLS',
-        tlsPEMKeyFile: 'jstests/libs/server.pem',
+        tlsCertificateKeyFile: 'jstests/libs/server.pem',
         tlsCAFile: 'jstests/libs/ca.pem',
         tlsAllowInvalidHostnames: '',
         useLogFiles: true,

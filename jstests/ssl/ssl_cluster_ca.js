@@ -34,7 +34,7 @@
         tlsMode: 'requireTLS',
         // Servers present trusted-server.pem to clients and each other for inbound connections.
         // Peers validate trusted-server.pem using trusted-ca.pem when making those connections.
-        tlsPEMKeyFile: 'jstests/libs/trusted-server.pem',
+        tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
         tlsCAFile: 'jstests/libs/trusted-ca.pem',
         // Servers making outbound connections to other servers present server.pem to their peers
         // which their peers validate using ca.pem.
@@ -47,11 +47,11 @@
     testRS(valid_options, true);
 
     const wrong_cluster_file =
-        Object.assign({}, valid_options, {tlsClusterFile: valid_options.tlsPEMKeyFile});
+        Object.assign({}, valid_options, {tlsClusterFile: valid_options.tlsCertificateKeyFile});
     testRS(wrong_cluster_file, false);
 
     const wrong_key_file =
-        Object.assign({}, valid_options, {tlsPEMKeyFile: valid_options.tlsClusterFile});
+        Object.assign({}, valid_options, {tlsCertificateKeyFile: valid_options.tlsClusterFile});
     testRS(wrong_key_file, false);
 
     const mongod = MongoRunner.runMongod(valid_options);
@@ -66,7 +66,7 @@
                                       "--tls",
                                       "--tlsCAFile",
                                       valid_options.tlsCAFile,
-                                      "--tlsPEMKeyFile",
+                                      "--tlsCertificateKeyFile",
                                       cert,
                                       "--eval",
                                       ";");

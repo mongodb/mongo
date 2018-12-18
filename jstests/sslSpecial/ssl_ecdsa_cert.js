@@ -12,7 +12,7 @@ const test = () => {
     print('Testing if platform supports usage of ECDSA certificates');
     const tlsOptions = {
         tlsMode: 'preferTLS',
-        tlsPEMKeyFile: ECDSA_SERVER_CERT,
+        tlsCertificateKeyFile: ECDSA_SERVER_CERT,
         tlsCAFile: ECDSA_CA_CERT,
         ipv6: '',
         bind_ip_all: '',
@@ -51,7 +51,7 @@ const test = () => {
         0,
         runMongoProgram('mongo',
                         '--tls',
-                        '--tlsPEMKeyFile',
+                        '--tlsCertificateKeyFile',
                         ECDSA_CLIENT_CERT,
                         '--tlsCAFile',
                         ECDSA_CA_CERT,

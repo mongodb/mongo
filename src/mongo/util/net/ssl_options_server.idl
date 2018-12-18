@@ -62,15 +62,15 @@ configs:
     conflicts: "net.tls.mode"
     hidden: true
 
-  "net.tls.PEMKeyFile":
-    description: "PEM file for TLS"
-    short_name: tlsPEMKeyFile
+  "net.tls.certificateKeyFile":
+    description: "Certificate and key file for TLS"
+    short_name: tlsCertificateKeyFile
     deprecated_name: "net.ssl.PEMKeyFile"
     deprecated_short_name: sslPEMKeyFile
     arg_vartype: String
-  "net.tls.PEMKeyPassword":
-    description: "PEM file password"
-    short_name: tlsPEMKeyPassword
+  "net.tls.certificateKeyFilePassword":
+    description: "Password to unlock key in the TLS certificate key file"
+    short_name: tlsCertificateKeyFilePassword
     deprecated_name: "net.ssl.PEMKeyPassword"
     deprecated_short_name: sslPEMKeyPassword
     arg_vartype: String
@@ -169,7 +169,7 @@ configs:
     deprecated_name: "net.ssl.certificateSelector"
     deprecated_short_name: sslCertificateSelector
     arg_vartype: String
-    conflicts: [ "net.tls.PEMKeyFile", "net.tls.PEMKeyPassword" ]
+    conflicts: [ "net.tls.certificateKeyFile", "net.tls.certificateKeyFilePassword" ]
     condition:
       preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
   "net.tls.clusterCertificateSelector":
