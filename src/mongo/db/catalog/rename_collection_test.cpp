@@ -37,12 +37,13 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -399,15 +400,15 @@ bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 /**
- * Creates an index using the given index name with a bogus key spec.
+ * Creates an index on an empty collection using the given index name with a bogus key spec.
  */
-void _createIndex(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const std::string& indexName) {
-    writeConflictRetry(opCtx, "_createIndex", nss.ns(), [=] {
+void _createIndexOnEmptyCollection(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const std::string& indexName) {
+    writeConflictRetry(opCtx, "_createIndexOnEmptyCollection", nss.ns(), [=] {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         auto collection = autoColl.getCollection();
-        ASSERT_TRUE(collection) << "Cannot create index in collection " << nss
+        ASSERT_TRUE(collection) << "Cannot create index on empty collection " << nss
                                 << " because collection " << nss.ns() << " does not exist.";
 
         auto indexInfoObj = BSON(
@@ -416,10 +417,9 @@ void _createIndex(OperationContext* opCtx,
                 << "ns"
                 << nss.ns());
 
-        MultiIndexBlock indexer(opCtx, collection);
-        ASSERT_OK(indexer.init(indexInfoObj).getStatus());
+        auto indexCatalog = collection->getIndexCatalog();
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(indexer.commit());
+        ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(opCtx, indexInfoObj).getStatus());
         wuow.commit();
     });
 
@@ -503,7 +503,7 @@ TEST_F(RenameCollectionTest, LongIndexNameAllowedForTargetCollection) {
 
     _createCollection(_opCtx.get(), _sourceNss);
     const std::string indexName(longestIndexNameAllowedForSource, 'a');
-    _createIndex(_opCtx.get(), _sourceNss, indexName);
+    _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, indexName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
@@ -522,7 +522,7 @@ TEST_F(RenameCollectionTest, LongIndexNameAllowedForTemporaryCollectionForRename
 
     _createCollection(_opCtx.get(), _sourceNss);
     const std::string indexName(longestIndexNameAllowedForTarget, 'a');
-    _createIndex(_opCtx.get(), _sourceNss, indexName);
+    _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, indexName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
@@ -1005,7 +1005,7 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
     const std::vector<std::string>& expectedOplogEntries) {
     ASSERT_NOT_EQUALS(sourceNss.db(), targetNss.db());
     _createCollection(opCtx, sourceNss);
-    _createIndex(opCtx, sourceNss, "a_1");
+    _createIndexOnEmptyCollection(opCtx, sourceNss, "a_1");
     _insertDocument(opCtx, sourceNss, BSON("_id" << 0));
     oplogEntries->clear();
     if (forApplyOps) {
@@ -1091,7 +1091,7 @@ TEST_F(RenameCollectionTest,
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseDropsTemporaryCollectionOnException) {
     _createCollection(_opCtx.get(), _sourceNss);
-    _createIndex(_opCtx.get(), _sourceNss, "a_1");
+    _createIndexOnEmptyCollection(_opCtx.get(), _sourceNss, "a_1");
     _insertDocument(_opCtx.get(), _sourceNss, BSON("_id" << 0));
     _opObserver->onInsertsThrows = true;
     _opObserver->oplogEntries.clear();

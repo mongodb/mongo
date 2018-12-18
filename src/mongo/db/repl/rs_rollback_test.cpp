@@ -39,7 +39,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -169,20 +168,17 @@ OplogInterfaceMock::Operation makeOpAndRecordId(long long seconds, long long has
     return std::make_pair(makeOp(seconds, hash), RecordId(++recordId));
 }
 
-// Create an index on the given collection. Returns the number of indexes that exist on the
+// Create an index on an empty collection. Returns the number of indexes that exist on the
 // collection after the given index is created.
-int createIndexForColl(OperationContext* opCtx,
-                       Collection* coll,
-                       NamespaceString nss,
-                       BSONObj indexSpec) {
+int _createIndexOnEmptyCollection(OperationContext* opCtx,
+                                  Collection* coll,
+                                  NamespaceString nss,
+                                  BSONObj indexSpec) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-    MultiIndexBlock indexer(opCtx, coll);
-    ASSERT_OK(indexer.init(indexSpec).getStatus());
-    WriteUnitOfWork wunit(opCtx);
-    ASSERT_OK(indexer.commit());
-    wunit.commit();
     auto indexCatalog = coll->getIndexCatalog();
-    ASSERT(indexCatalog);
+    WriteUnitOfWork wunit(opCtx);
+    ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(opCtx, indexSpec).getStatus());
+    wunit.commit();
     return indexCatalog->numIndexesReady(opCtx);
 }
 
@@ -481,7 +477,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
                                << "name"
                                << "a_1");
 
-    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), collection, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
     auto commonOperation = makeOpAndRecordId(1, 1);
@@ -679,7 +675,7 @@ TEST_F(RSRollbackTest, RollingBackCreateIndexAndRenameWithLongName) {
                                << "name"
                                << longName);
 
-    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), collection, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
     auto commonOperation = makeOpAndRecordId(1, 1);
@@ -734,7 +730,7 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
                                << "name"
                                << "a_1");
 
-    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), collection, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
     auto commonOperation = makeOpAndRecordId(1, 1);
@@ -862,7 +858,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexOnCollectionWithTwoExistingIndexes) {
 
     // Create the necessary indexes. Index 0 is created and dropped in the sequence of ops that will
     // be rolled back, so we only create index 1.
-    int numIndexes = createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "1"));
+    int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, idxSpec(nss, "1"));
     ASSERT_EQUALS(2, numIndexes);
 
     auto commonOp = makeOpAndRecordId(1, 1);
@@ -929,9 +925,9 @@ TEST_F(RSRollbackTest, RollbackMultipleCreateIndexesOnSameCollection) {
     auto commonOp = makeOpAndRecordId(1, 1);
 
     // Create all of the necessary indexes.
-    createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "0"));
-    createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "1"));
-    createIndexForColl(_opCtx.get(), coll, nss, idxSpec(nss, "2"));
+    _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, idxSpec(nss, "0"));
+    _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, idxSpec(nss, "1"));
+    _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, idxSpec(nss, "2"));
     ASSERT_EQUALS(4, numIndexesOnColl(_opCtx.get(), nss, coll));
 
     // The ops that will be rolled back.
@@ -969,7 +965,7 @@ TEST_F(RSRollbackTest, RollbackCreateDropRecreateIndexOnCollection) {
                                << "name"
                                << idxName("0"));
 
-    int numIndexes = createIndexForColl(_opCtx.get(), coll, nss, indexSpec);
+    int numIndexes = _createIndexOnEmptyCollection(_opCtx.get(), coll, nss, indexSpec);
     ASSERT_EQUALS(2, numIndexes);
 
     auto commonOp = makeOpAndRecordId(1, 1);

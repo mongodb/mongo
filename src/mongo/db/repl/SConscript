@@ -277,7 +277,6 @@ env.CppUnitTest(
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )
@@ -587,7 +586,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         'oplog_interface_local',
         'rollback_test_fixture',
         'rs_rollback',

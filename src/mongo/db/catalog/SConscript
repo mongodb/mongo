@@ -477,7 +477,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'catalog_helpers',
-        'multi_index_block',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
