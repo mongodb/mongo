@@ -43,7 +43,7 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoBridgeOptions)(InitializerContext* c
     auto ret = addMessageCompressionOptions(&moe::startupOptions, false);
     if (!ret.isOK())
         return ret;
-    return addMongoBridgeOptions(&moe::startupOptions);
+    return Status::OK();
 }
 
 MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {

@@ -44,21 +44,6 @@ namespace mongo {
 
 MongoBridgeGlobalParams mongoBridgeGlobalParams;
 
-Status addMongoBridgeOptions(moe::OptionSection* options) {
-    options->addOptionChaining("help", "help", moe::Switch, "show this usage information");
-
-    options->addOptionChaining("port", "port", moe::Int, "port to listen on for MongoDB messages");
-
-    options->addOptionChaining("seed", "seed", moe::Long, "random seed to use");
-
-    options->addOptionChaining("dest", "dest", moe::String, "URI of remote MongoDB process");
-
-    options->addOptionChaining("verbose", "verbose", moe::String, "log more verbose output")
-        .setImplicit(moe::Value(std::string("v")));
-
-    return Status::OK();
-}
-
 void printMongoBridgeHelp(std::ostream* out) {
     *out << "Usage: mongobridge --port <port> --dest <dest> [ --seed <seed> ] [ --verbose <vvv> ]"
             " [ --help ]"
@@ -84,9 +69,6 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
     if (!params.count("dest")) {
         return {ErrorCodes::BadValue, "Missing required option: --dest"};
     }
-
-    mongoBridgeGlobalParams.port = params["port"].as<int>();
-    mongoBridgeGlobalParams.destUri = params["dest"].as<std::string>();
 
     if (!params.count("seed")) {
         std::unique_ptr<SecureRandom> seedSource{SecureRandom::create()};
