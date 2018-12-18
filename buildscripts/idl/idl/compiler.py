@@ -201,12 +201,12 @@ def compile_idl(args):
         parsed_doc = parser.parse(file_stream, args.input_file,
                                   CompilerImportResolver(args.import_directories))
 
-        # Stop compiling if we only need to scan import dependencies
-        if args.write_dependencies:
-            _write_dependencies(parsed_doc.spec)
-            return True
-
         if not parsed_doc.errors:
+            # Stop compiling if we only need to scan import dependencies
+            if args.write_dependencies:
+                _write_dependencies(parsed_doc.spec)
+                return True
+
             _update_import_includes(args, parsed_doc.spec, header_file_name)
 
             bound_doc = binder.bind(parsed_doc.spec)

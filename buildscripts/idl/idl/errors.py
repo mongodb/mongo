@@ -183,9 +183,10 @@ class ParserErrorCollection(object):
     def dump_errors(self):
         # type: () -> None
         """Print the list of errors."""
-        ', '.join(self.to_list())
+        print("Errors found while compiling IDL")
         for error_msg in self.to_list():
             print("%s\n\n" % error_msg)
+        print("Found %s errors" % (len(self.to_list())))
 
     def count(self):
         # type: () -> int
