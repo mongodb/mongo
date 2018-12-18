@@ -35,6 +35,7 @@ if free_monitoring == "on":
         source=[
             'free_mon_commands.cpp',
             'free_mon_mongod.cpp',
+            env.Idlc('free_mon_mongod.idl')[0],
             'free_mon_options.cpp',
             'free_mon_status.cpp',
         ],

@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/service_context.h"
 
@@ -57,5 +59,8 @@ void notifyFreeMonitoringOnTransitionToPrimary();
  * Called before free monitoring is started.
  */
 void setupFreeMonitoringOpObserver(OpObserverRegistry* registry);
+
+Status onValidateFreeMonEndpointURL(StringData str);
+
 
 }  // namespace mongo

@@ -50,6 +50,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_message.h"
+#include "mongo/db/free_mon/free_mon_mongod_gen.h"
 #include "mongo/db/free_mon/free_mon_network.h"
 #include "mongo/db/free_mon/free_mon_op_observer.h"
 #include "mongo/db/free_mon/free_mon_options.h"
@@ -74,28 +75,6 @@ namespace mongo {
 namespace {
 
 constexpr Seconds kDefaultMetricsGatherInterval(60);
-
-/**
- * Expose cloudFreeMonitoringEndpointURL set parameter to URL for free monitoring.
- */
-class ExportedFreeMonEndpointURL : public LockedServerParameter<std::string> {
-public:
-    ExportedFreeMonEndpointURL()
-        : LockedServerParameter<std::string>("cloudFreeMonitoringEndpointURL",
-                                             "https://cloud.mongodb.com/freemonitoring/mongo",
-                                             ServerParameterType::kStartupOnly) {}
-
-
-    Status setFromString(const std::string& str) final {
-        // Check for http, not https here because testEnabled may not be set yet
-        if (str.compare(0, 4, "http") != 0) {
-            return Status(ErrorCodes::BadValue,
-                          "ExportedFreeMonEndpointURL only supports https:// URLs");
-        }
-
-        return setLocked(str);
-    }
-} exportedExportedFreeMonEndpointURL;
 
 auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
     ThreadPool::Options tpOptions;
@@ -178,7 +157,7 @@ private:
     Future<DataBuilder> post(StringData path,
                              std::shared_ptr<std::vector<std::uint8_t>> data) const {
         auto pf = makePromiseFuture<DataBuilder>();
-        std::string url(exportedExportedFreeMonEndpointURL.getLocked() + path.toString());
+        std::string url(FreeMonEndpointURL + path.toString());
 
         auto status = _executor->scheduleWork(
             [ promise = std::move(pf.promise), url = std::move(url), data = std::move(data), this ](
@@ -300,6 +279,15 @@ private:
 
 }  // namespace
 
+Status onValidateFreeMonEndpointURL(StringData str) {
+    // Check for http, not https here because testEnabled may not be set yet
+    if (!str.startsWith("https"_sd) != 0) {
+        return Status(ErrorCodes::BadValue,
+                      "cloudFreeMonitoringEndpointURL only supports https:// URLs");
+    }
+
+    return Status::OK();
+}
 
 void registerCollectors(FreeMonController* controller) {
     // These are collected only at registration
@@ -359,7 +347,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
     if (!getTestCommandsEnabled()) {
         uassert(50774,
                 "ExportedFreeMonEndpointURL only supports https:// URLs",
-                exportedExportedFreeMonEndpointURL.getLocked().compare(0, 5, "https") == 0);
+                FreeMonEndpointURL.compare(0, 5, "https") == 0);
     }
 
     auto network = std::unique_ptr<FreeMonNetworkInterface>(new FreeMonNetworkHttp(serviceContext));
