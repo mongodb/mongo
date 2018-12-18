@@ -406,6 +406,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     if (shouldLogOp || (shouldSample && _debug.executionTimeMicros > slowMs * 1000LL)) {
         auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
+        _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
         log(component) << _debug.report(client, *this, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 
@@ -673,6 +674,10 @@ string OpDebug::report(Client* client,
         s << " locks:" << locks.obj().toString();
     }
 
+    if (storageStats) {
+        s << " storage:" << storageStats->toBSON().toString();
+    }
+
     if (iscommand) {
         s << " protocol:" << getProtoString(networkOp);
     }
@@ -745,6 +750,10 @@ void OpDebug::append(const CurOp& curop,
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
         lockStats.report(&locks);
+    }
+
+    if (storageStats) {
+        b.append("storage", storageStats->toBSON());
     }
 
     if (!errInfo.isOK()) {

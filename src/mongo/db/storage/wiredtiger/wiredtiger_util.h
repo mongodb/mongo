@@ -151,14 +151,6 @@ public:
                                     BSONObjBuilder* bob);
 
     /**
-     * Fetches the operation statistics, converts those into a BSONObj and resets the statistics
-     * at the end.
-     */
-    static Status exportOperationStatsInfoToBSON(WT_SESSION* s,
-                                                 const std::string& uri,
-                                                 const std::string& config,
-                                                 BSONObjBuilder* bob);
-    /**
      * Appends information about the storage engine's currently available snapshots and the settings
      * that affect that window of maintained history.
      *
@@ -281,14 +273,14 @@ public:
 
     static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
 
-private:
     /**
      * Casts unsigned 64-bit statistics value to T.
      * If original value exceeds maximum value of T, return max(T).
      */
     template <typename T>
-    static T _castStatisticsValue(uint64_t statisticsValue);
+    static T castStatisticsValue(uint64_t statisticsValue);
 
+private:
     /**
      * Casts unsigned 64-bit statistics value to T.
      * If original value exceeds 'maximumResultType', return 'maximumResultType'.
@@ -354,7 +346,7 @@ StatusWith<ResultType> WiredTigerUtil::getStatisticsValueAs(WT_SESSION* session,
 
 // static
 template <typename ResultType>
-ResultType WiredTigerUtil::_castStatisticsValue(uint64_t statisticsValue) {
+ResultType WiredTigerUtil::castStatisticsValue(uint64_t statisticsValue) {
     return _castStatisticsValue<ResultType>(statisticsValue,
                                             std::numeric_limits<ResultType>::max());
 }

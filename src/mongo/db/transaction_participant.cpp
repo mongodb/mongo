@@ -654,7 +654,9 @@ void TransactionParticipant::_stashActiveTransaction(WithLock, OperationContext*
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         _transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), tickSource);
         _transactionMetricsObserver.onTransactionOperation(
-            opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
+            opCtx->getClient(),
+            CurOp::get(opCtx)->debug().additiveMetrics,
+            CurOp::get(opCtx)->debug().storageStats);
     }
 
     invariant(!_txnResourceStash);
@@ -1083,7 +1085,9 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
                                              &Top::get(getGlobalServiceContext()),
                                              isCommittingWithPrepare);
         _transactionMetricsObserver.onTransactionOperation(
-            opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
+            opCtx->getClient(),
+            CurOp::get(opCtx)->debug().additiveMetrics,
+            CurOp::get(opCtx)->debug().storageStats);
     }
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -1168,7 +1172,9 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
     if (!_txnState.isNone(lock)) {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onTransactionOperation(
-            opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
+            opCtx->getClient(),
+            CurOp::get(opCtx)->debug().additiveMetrics,
+            CurOp::get(opCtx)->debug().storageStats);
     }
 
     // We reserve an oplog slot before aborting the transaction so that no writes that are causally
@@ -1540,6 +1546,9 @@ std::string TransactionParticipant::_transactionInfoForLog(
     BSONObjBuilder locks;
     lockStats->report(&locks);
     s << " locks:" << locks.obj().toString();
+
+    if (singleTransactionStats.getOpDebug()->storageStats)
+        s << " storage:" << singleTransactionStats.getOpDebug()->storageStats->toBSON().toString();
 
     // Total duration of the transaction.
     s << " "

@@ -47,6 +47,36 @@ class BSONObjBuilder;
 class OperationContext;
 
 /**
+ * Storage statistics management class, with interfaces to provide the statistics in the BSON format
+ * and an operator to add the statistics values.
+ */
+class StorageStats {
+    MONGO_DISALLOW_COPYING(StorageStats);
+
+public:
+    StorageStats() = default;
+
+    virtual ~StorageStats(){};
+
+    /**
+     * Provides the storage statistics in the form of a BSONObj.
+     */
+    virtual BSONObj toBSON() = 0;
+
+    /**
+     * Add the statistics values.
+     */
+    virtual StorageStats& operator+=(const StorageStats&) = 0;
+
+    /**
+     * Provides the ability to create an instance of this class outside of the storage integration
+     * layer.
+     */
+    virtual std::shared_ptr<StorageStats> getCopy() = 0;
+};
+
+
+/**
  * A RecoveryUnit is responsible for ensuring that data is persisted.
  * All on-disk information must be mutated through this interface.
  */
@@ -244,8 +274,8 @@ public:
     /**
      * Fetches the storage level statistics.
      */
-    virtual BSONObj getOperationStatistics() const {
-        return {};
+    virtual std::shared_ptr<StorageStats> getOperationStatistics() const {
+        return (nullptr);
     }
 
     /**

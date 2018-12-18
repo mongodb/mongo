@@ -115,10 +115,12 @@ public:
                    TickSource::Tick curTick);
 
     /**
-     * Updates relevant metrics when an operation running on the transaction completes. An operation
-     * may be a read/write operation, or an abort/commit command.
+     * Updates relevant metrics and storage statistics when an operation running on the transaction
+     * completes. An operation may be a read/write operation, or an abort/commit command.
      */
-    void onTransactionOperation(Client* client, OpDebug::AdditiveMetrics additiveMetrics);
+    void onTransactionOperation(Client* client,
+                                OpDebug::AdditiveMetrics additiveMetrics,
+                                std::shared_ptr<StorageStats> storageStats);
 
     /**
      * Returns a read-only reference to the SingleTransactionStats object stored in this
