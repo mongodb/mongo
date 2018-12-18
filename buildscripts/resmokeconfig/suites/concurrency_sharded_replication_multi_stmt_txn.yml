@@ -153,9 +153,6 @@ selector:
   # improved to avoid timeouts on slow variants.
   - jstests/concurrency/fsm_workloads/remove_and_bulk_insert.js
 
-  # TODO SERVER-38628: Diagnose failures in these workoads and update this blacklist.
-  - jstests/concurrency/fsm_workloads/indexed_insert*.js
-
   exclude_with_any_tags:
   - requires_replication
   # The touch command does not exist on mongos, which is enforced before session information is
