@@ -30,66 +30,30 @@
 
 #pragma once
 
-#include <set>
-#include <string>
-
-#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-class Database;
-class OperationContext;
-
-/**
- * Registry of opened databases.
- */
 class DatabaseHolderMock : public DatabaseHolder::Impl {
 public:
     DatabaseHolderMock() = default;
 
-    /**
-     * Retrieves an already opened database or returns nullptr. Must be called with the database
-     * locked in at least IS-mode.
-     */
     Database* get(OperationContext* opCtx, StringData ns) const override {
         return nullptr;
     }
 
-    /**
-     * Retrieves a database reference if it is already opened, or opens it if it hasn't been
-     * opened/created yet. Must be called with the database locked in X-mode.
-     *
-     * justCreated Returns whether the database was newly created (true) or it already
-     * existed (false). Can be nullptr if this information is not necessary.
-     */
     Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override {
         return nullptr;
     }
 
-    /**
-     * Closes the specified database. Must be called with the database locked in X-mode.
-     */
     void close(OperationContext* opCtx, StringData ns, const std::string& reason) override {}
 
-    /**
-     * Closes all opened databases. Must be called with the global lock acquired in X-mode.
-     *
-     * reason The reason for close.
-     */
     void closeAll(OperationContext* opCtx, const std::string& reason) override {}
 
-    /**
-     * Returns the set of existing database names that differ only in casing.
-     */
     std::set<std::string> getNamesWithConflictingCasing(StringData name) override {
         return std::set<std::string>();
     }
 
-    /**
-     * Returns a new Collection.
-     */
     std::unique_ptr<Collection> makeCollection(OperationContext* const opCtx,
                                                const StringData fullNS,
                                                OptionalCollectionUUID uuid,
@@ -99,4 +63,5 @@ public:
         return {};
     }
 };
+
 }  // namespace mongo

@@ -36,15 +36,15 @@
 #include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/string_map.h"
+#include "mongo/db/catalog/collection_options.h"
 
 namespace mongo {
+
+class CollectionCatalogEntry;
 class Database;
+class DatabaseCatalogEntry;
 class OperationContext;
+class RecordStore;
 
 /**
  * Registry of opened databases.
@@ -169,4 +169,5 @@ private:
 
     std::unique_ptr<Impl> _pimpl;
 };
+
 }  // namespace mongo
