@@ -300,8 +300,8 @@ TEST_F(DocumentSourceExchangeTest, RangeExchangeNConsumer) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex = new Exchange(
-        std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex =
+        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
 
     std::vector<boost::intrusive_ptr<DocumentSourceExchange>> prods;
 
@@ -366,8 +366,8 @@ TEST_F(DocumentSourceExchangeTest, RangeShardingExchangeNConsumer) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex = new Exchange(
-        std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex =
+        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
 
     std::vector<boost::intrusive_ptr<DocumentSourceExchange>> prods;
 
@@ -423,8 +423,8 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomExchangeNConsumer) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex = new Exchange(
-        std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex =
+        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
 
     std::vector<boost::intrusive_ptr<DocumentSourceExchange>> prods;
 
@@ -546,8 +546,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
                        std::move(opCtxOwned),
                        new DocumentSourceExchange(
                            new ExpressionContext(opCtx, nullptr), ex, idx, std::move(yielder)),
-                       yielderRaw
-            });
+                       yielderRaw});
     }
 
     std::vector<executor::TaskExecutor::CallbackHandle> handles;
@@ -610,8 +609,8 @@ TEST_F(DocumentSourceExchangeTest, RangeRandomHashExchangeNConsumer) {
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
-    boost::intrusive_ptr<Exchange> ex = new Exchange(
-        std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
+    boost::intrusive_ptr<Exchange> ex =
+        new Exchange(std::move(spec), unittest::assertGet(Pipeline::create({source}, getExpCtx())));
 
     std::vector<boost::intrusive_ptr<DocumentSourceExchange>> prods;
 
