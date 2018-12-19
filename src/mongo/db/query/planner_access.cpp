@@ -723,6 +723,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                            const std::vector<IndexEntry>& indices,
                                            const QueryPlannerParams& params,
                                            std::vector<QuerySolutionNode*>* out) {
+    invariant(out->empty());
     // Initialize the ScanBuildingState.
     ScanBuildingState scanState(root, inArrayOperator, indices);
 
@@ -750,6 +751,9 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             // In most cases this means that we recursively build indexed data
             // access on 'child'.
             if (!processIndexScansSubnode(query, &scanState, params, out)) {
+                for (auto& soln : *out) {
+                    delete soln;  // Clean up any partial solutions.
+                }
                 return false;
             }
             continue;
