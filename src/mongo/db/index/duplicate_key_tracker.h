@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+class IndexCatalogEntry;
+
 /**
  * Records keys that have violated duplicate key constraints on unique indexes. The keys are backed
  * by a temporary table that is created and destroyed by this tracker.

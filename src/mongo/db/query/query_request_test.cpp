@@ -1413,7 +1413,7 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     // Register a UUID/Collection pair in the UUIDCatalog.
     const CollectionUUID uuid = UUID::gen();
     const NamespaceString nss("test.testns");
-    Collection coll(stdx::make_unique<CollectionMock>(nss));
+    CollectionMock coll(nss);
     UUIDCatalog& catalog = UUIDCatalog::get(opCtx.get());
     catalog.onCreateCollection(opCtx.get(), &coll, uuid);
     QueryRequest qr(NamespaceStringOrUUID("test", uuid));

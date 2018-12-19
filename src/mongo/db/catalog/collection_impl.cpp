@@ -79,29 +79,6 @@
 
 namespace mongo {
 
-MONGO_REGISTER_SHIM(Collection::makeImpl)
-(Collection* const _this,
- OperationContext* const opCtx,
- const StringData fullNS,
- OptionalCollectionUUID uuid,
- CollectionCatalogEntry* const details,
- RecordStore* const recordStore,
- DatabaseCatalogEntry* const dbce,
- PrivateTo<Collection>)
-    ->std::unique_ptr<Collection::Impl> {
-    return std::make_unique<CollectionImpl>(_this, opCtx, fullNS, uuid, details, recordStore, dbce);
-}
-
-MONGO_REGISTER_SHIM(Collection::parseValidationLevel)
-(const StringData data)->StatusWith<Collection::ValidationLevel> {
-    return CollectionImpl::parseValidationLevel(data);
-}
-
-MONGO_REGISTER_SHIM(Collection::parseValidationAction)
-(const StringData data)->StatusWith<Collection::ValidationAction> {
-    return CollectionImpl::parseValidationAction(data);
-}
-
 namespace {
 //  This fail point injects insertion failures for all collections unless a collection name is
 //  provided in the optional data object during configuration:
@@ -167,6 +144,45 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
 
     return std::move(collator.getValue());
 }
+
+StatusWith<CollectionImpl::ValidationLevel> _parseValidationLevel(StringData newLevel) {
+    auto status = Collection::parseValidationLevel(newLevel);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (newLevel == "") {
+        // default
+        return CollectionImpl::ValidationLevel::STRICT_V;
+    } else if (newLevel == "off") {
+        return CollectionImpl::ValidationLevel::OFF;
+    } else if (newLevel == "moderate") {
+        return CollectionImpl::ValidationLevel::MODERATE;
+    } else if (newLevel == "strict") {
+        return CollectionImpl::ValidationLevel::STRICT_V;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData newAction) {
+    auto status = Collection::parseValidationAction(newAction);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (newAction == "") {
+        // default
+        return CollectionImpl::ValidationAction::ERROR_V;
+    } else if (newAction == "warn") {
+        return CollectionImpl::ValidationAction::WARN;
+    } else if (newAction == "error") {
+        return CollectionImpl::ValidationAction::ERROR_V;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace
 
 using std::endl;
@@ -176,37 +192,34 @@ using std::vector;
 
 using logger::LogComponent;
 
-CollectionImpl::CollectionImpl(Collection* _this_init,
-                               OperationContext* opCtx,
+CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                StringData fullNS,
                                OptionalCollectionUUID uuid,
                                CollectionCatalogEntry* details,
                                RecordStore* recordStore,
                                DatabaseCatalogEntry* dbce)
-    : _ns(fullNS),
+    : _magic(kMagicNumber),
+      _ns(fullNS),
       _uuid(uuid),
       _details(details),
       _recordStore(recordStore),
       _dbce(dbce),
       _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
-      _infoCache(std::make_unique<CollectionInfoCacheImpl>(_this_init, _ns)),
-      _indexCatalog(std::make_unique<IndexCatalogImpl>(_this_init,
-                                                       getCatalogEntry()->getMaxAllowedIndexes())),
+      _infoCache(std::make_unique<CollectionInfoCacheImpl>(this, _ns)),
+      _indexCatalog(
+          std::make_unique<IndexCatalogImpl>(this, getCatalogEntry()->getMaxAllowedIndexes())),
       _collator(parseCollation(opCtx, _ns, _details->getCollectionOptions(opCtx).collation)),
       _validatorDoc(_details->getCollectionOptions(opCtx).validator.getOwned()),
       _validator(uassertStatusOK(
           parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures))),
       _validationAction(uassertStatusOK(
-          parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
+          _parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
       _validationLevel(uassertStatusOK(
-          parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel))),
+          _parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel))),
       _cursorManager(std::make_unique<CursorManager>(_ns)),
       _cappedNotifier(_recordStore->isCapped() ? stdx::make_unique<CappedInsertNotifier>()
-                                               : nullptr),
-      _this(_this_init) {}
+                                               : nullptr) {
 
-void CollectionImpl::init(OperationContext* opCtx) {
-    _magic = kMagicNumber;
     _indexCatalog->init(opCtx).transitional_ignore();
     if (isCapped())
         _recordStore->setCappedCallback(this);
@@ -224,7 +237,7 @@ CollectionImpl::~CollectionImpl() {
     if (_uuid) {
         if (auto opCtx = cc().getOperationContext()) {
             auto& uuidCatalog = UUIDCatalog::get(opCtx);
-            invariant(uuidCatalog.lookupCollectionByUUID(_uuid.get()) != _this);
+            invariant(uuidCatalog.lookupCollectionByUUID(_uuid.get()) != this);
             auto& cache = NamespaceUUIDCache::get(opCtx);
             // TODO(geert): cache.verifyNotCached(ns(), uuid().get());
             cache.evictNamespace(ns());
@@ -260,7 +273,7 @@ std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext
 
 
 bool CollectionImpl::findDoc(OperationContext* opCtx,
-                             const RecordId& loc,
+                             RecordId loc,
                              Snapshotted<BSONObj>* out) const {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
 
@@ -567,7 +580,7 @@ Status CollectionImpl::aboutToDeleteCapped(OperationContext* opCtx,
 
 void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     StmtId stmtId,
-                                    const RecordId& loc,
+                                    RecordId loc,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
                                     bool noWarn,
@@ -602,7 +615,7 @@ Counter64 moveCounter;
 ServerStatusMetricField<Counter64> moveCounterDisplay("record.moves", &moveCounter);
 
 RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
-                                        const RecordId& oldLocation,
+                                        RecordId oldLocation,
                                         const Snapshotted<BSONObj>& oldDoc,
                                         const BSONObj& newDoc,
                                         bool indexesAffected,
@@ -693,7 +706,7 @@ bool CollectionImpl::updateWithDamagesSupported() const {
 
 StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     OperationContext* opCtx,
-    const RecordId& loc,
+    RecordId loc,
     const Snapshotted<RecordData>& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages,
@@ -717,6 +730,10 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
 
 bool CollectionImpl::isCapped() const {
     return _cappedNotifier.get();
+}
+
+CappedCallback* CollectionImpl::getCappedCallback() {
+    return this;
 }
 
 std::shared_ptr<CappedInsertNotifier> CollectionImpl::getCappedInsertNotifier() const {
@@ -836,36 +853,6 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
     return Status::OK();
 }
 
-auto CollectionImpl::parseValidationLevel(StringData newLevel) -> StatusWith<ValidationLevel> {
-    if (newLevel == "") {
-        // default
-        return ValidationLevel::STRICT_V;
-    } else if (newLevel == "off") {
-        return ValidationLevel::OFF;
-    } else if (newLevel == "moderate") {
-        return ValidationLevel::MODERATE;
-    } else if (newLevel == "strict") {
-        return ValidationLevel::STRICT_V;
-    } else {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "invalid validation level: " << newLevel);
-    }
-}
-
-auto CollectionImpl::parseValidationAction(StringData newAction) -> StatusWith<ValidationAction> {
-    if (newAction == "") {
-        // default
-        return ValidationAction::ERROR_V;
-    } else if (newAction == "warn") {
-        return ValidationAction::WARN;
-    } else if (newAction == "error") {
-        return ValidationAction::ERROR_V;
-    } else {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "invalid validation action: " << newAction);
-    }
-}
-
 StringData CollectionImpl::getValidationLevel() const {
     switch (_validationLevel) {
         case ValidationLevel::STRICT_V:
@@ -891,13 +878,13 @@ StringData CollectionImpl::getValidationAction() const {
 Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData newLevel) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationLevel> status = parseValidationLevel(newLevel);
-    if (!status.isOK()) {
-        return status.getStatus();
+    auto levelSW = _parseValidationLevel(newLevel);
+    if (!levelSW.isOK()) {
+        return levelSW.getStatus();
     }
 
     auto oldValidationLevel = _validationLevel;
-    _validationLevel = status.getValue();
+    _validationLevel = levelSW.getValue();
 
     _details->updateValidator(opCtx, _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
@@ -909,13 +896,13 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
 Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationAction> status = parseValidationAction(newAction);
-    if (!status.isOK()) {
-        return status.getStatus();
+    auto actionSW = _parseValidationAction(newAction);
+    if (!actionSW.isOK()) {
+        return actionSW.getStatus();
     }
 
     auto oldValidationAction = _validationAction;
-    _validationAction = status.getValue();
+    _validationAction = actionSW.getValue();
 
     _details->updateValidator(opCtx, _validatorDoc, getValidationLevel(), getValidationAction());
     opCtx->recoveryUnit()->onRollback(
@@ -953,13 +940,13 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
     }
     _validator = std::move(validatorSW.getValue());
 
-    auto levelSW = parseValidationLevel(newLevel);
+    auto levelSW = _parseValidationLevel(newLevel);
     if (!levelSW.isOK()) {
         return levelSW.getStatus();
     }
     _validationLevel = levelSW.getValue();
 
-    auto actionSW = parseValidationAction(newAction);
+    auto actionSW = _parseValidationAction(newAction);
     if (!actionSW.isOK()) {
         return actionSW.getStatus();
     }
@@ -1190,7 +1177,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
         ValidateResultsMap indexNsResultsMap;
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
         IndexConsistency indexConsistency(
-            opCtx, _this, ns(), _recordStore, std::move(collLk), background);
+            opCtx, this, ns(), _recordStore, std::move(collLk), background);
         RecordStoreValidateAdaptor indexValidator = RecordStoreValidateAdaptor(
             opCtx, &indexConsistency, level, _indexCatalog.get(), &indexNsResultsMap);
 
@@ -1285,7 +1272,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
     OperationContext* opCtx, PlanExecutor::YieldPolicy yieldPolicy, ScanDirection scanDirection) {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
-    return InternalPlanner::collectionScan(opCtx, _ns.ns(), _this, yieldPolicy, direction);
+    return InternalPlanner::collectionScan(opCtx, _ns.ns(), this, yieldPolicy, direction);
 }
 
 void CollectionImpl::setNs(NamespaceString nss) {
@@ -1309,7 +1296,7 @@ void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntr
 }
 
 void CollectionImpl::establishOplogCollectionForLogging(OperationContext* opCtx) {
-    repl::establishOplogCollectionForLogging(opCtx, _this);
+    repl::establishOplogCollectionForLogging(opCtx, this);
 }
 
 }  // namespace mongo

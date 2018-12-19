@@ -203,15 +203,15 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
             cmr.collValidator = e;
         } else if (fieldName == "validationLevel" && !isView) {
-            auto statusW = coll->parseValidationLevel(e.String());
-            if (!statusW.isOK())
-                return statusW.getStatus();
+            auto status = coll->parseValidationLevel(e.String());
+            if (!status.isOK())
+                return status;
 
             cmr.collValidationLevel = e.String();
         } else if (fieldName == "validationAction" && !isView) {
-            auto statusW = coll->parseValidationAction(e.String());
-            if (!statusW.isOK())
-                return statusW.getStatus();
+            auto status = coll->parseValidationAction(e.String());
+            if (!status.isOK())
+                return status;
 
             cmr.collValidationAction = e.String();
         } else if (fieldName == "pipeline") {

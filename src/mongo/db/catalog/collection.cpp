@@ -34,48 +34,9 @@
 
 #include "mongo/db/catalog/collection.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/base/owned_pointer_map.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/background.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/update/update_driver.h"
-
-#include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/log.h"
+#include <sstream>
 
 namespace mongo {
-// Emit the vtable in this TU
-Collection::Impl::~Impl() = default;
-
-MONGO_DEFINE_SHIM(Collection::makeImpl);
-
-MONGO_DEFINE_SHIM(Collection::parseValidationLevel);
-
-MONGO_DEFINE_SHIM(Collection::parseValidationAction);
-
-void Collection::TUHook::hook() noexcept {}
 
 std::string CompactOptions::toString() const {
     std::stringstream ss;
@@ -99,8 +60,6 @@ std::string CompactOptions::toString() const {
 //
 // CappedInsertNotifier
 //
-
-CappedInsertNotifier::CappedInsertNotifier() : _version(0), _dead(false) {}
 
 void CappedInsertNotifier::notifyAll() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -129,5 +88,37 @@ bool CappedInsertNotifier::isDead() {
 }
 
 // ----
+
+// static
+Status Collection::parseValidationLevel(StringData newLevel) {
+    if (newLevel == "") {
+        // default
+        return Status::OK();
+    } else if (newLevel == "off") {
+        return Status::OK();
+    } else if (newLevel == "moderate") {
+        return Status::OK();
+    } else if (newLevel == "strict") {
+        return Status::OK();
+    } else {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "invalid validation level: " << newLevel);
+    }
+}
+
+// static
+Status Collection::parseValidationAction(StringData newAction) {
+    if (newAction == "") {
+        // default
+        return Status::OK();
+    } else if (newAction == "warn") {
+        return Status::OK();
+    } else if (newAction == "error") {
+        return Status::OK();
+    } else {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "invalid validation action: " << newAction);
+    }
+}
 
 }  // namespace mongo

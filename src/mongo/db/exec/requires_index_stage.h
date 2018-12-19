@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 

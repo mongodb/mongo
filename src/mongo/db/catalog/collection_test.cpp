@@ -157,12 +157,12 @@ TEST_F(CollectionTest, HaveCappedWaiters) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
-    ASSERT_FALSE(col->haveCappedWaiters());
+    ASSERT_FALSE(col->getCappedCallback()->haveCappedWaiters());
     {
         auto notifier = col->getCappedInsertNotifier();
-        ASSERT(col->haveCappedWaiters());
+        ASSERT(col->getCappedCallback()->haveCappedWaiters());
     }
-    ASSERT_FALSE(col->haveCappedWaiters());
+    ASSERT_FALSE(col->getCappedCallback()->haveCappedWaiters());
 }
 
 TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
@@ -171,11 +171,11 @@ TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     Collection* col = acfr.getCollection();
-    col->notifyCappedWaitersIfNeeded();
+    col->getCappedCallback()->notifyCappedWaitersIfNeeded();
     {
         auto notifier = col->getCappedInsertNotifier();
         ASSERT_EQ(notifier->getVersion(), 0u);
-        col->notifyCappedWaitersIfNeeded();
+        col->getCappedCallback()->notifyCappedWaitersIfNeeded();
         ASSERT_EQ(notifier->getVersion(), 1u);
     }
 }
@@ -195,7 +195,7 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     stdx::thread thread([before, prevVersion, col] {
         auto after = Date_t::now();
         ASSERT_GTE(after - before, Milliseconds(25));
-        col->notifyCappedWaitersIfNeeded();
+        col->getCappedCallback()->notifyCappedWaitersIfNeeded();
     });
     notifier->waitUntil(prevVersion, before + Seconds(25));
     auto after = Date_t::now();

@@ -1737,7 +1737,7 @@ void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* opl
 void signalOplogWaiters() {
     auto oplog = localOplogInfo(getGlobalServiceContext()).oplog;
     if (oplog) {
-        oplog->notifyCappedWaitersIfNeeded();
+        oplog->getCappedCallback()->notifyCappedWaitersIfNeeded();
     }
 }
 

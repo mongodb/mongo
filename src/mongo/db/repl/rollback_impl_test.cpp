@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -173,12 +174,11 @@ protected:
         ASSERT_OK(_storageInterface->createCollection(opCtx, nss, options));
 
         // Initialize a mock collection.
-        std::unique_ptr<Collection> coll =
-            std::make_unique<Collection>(std::make_unique<CollectionMock>(nss));
+        auto coll = std::make_unique<CollectionMock>(nss);
 
         // Register the UUID to that collection in the UUIDCatalog.
         UUIDCatalog::get(opCtx).registerUUIDCatalogEntry(uuid, coll.get());
-        return coll;
+        return std::move(coll);
     }
 
     /**

@@ -37,7 +37,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
@@ -258,7 +258,7 @@ std::unique_ptr<Collection> DatabaseHolderImpl::makeCollection(
     CollectionCatalogEntry* const details,
     RecordStore* const recordStore,
     DatabaseCatalogEntry* const dbce) {
-    return std::make_unique<Collection>(opCtx, fullNS, uuid, details, recordStore, dbce);
+    return std::make_unique<CollectionImpl>(opCtx, fullNS, uuid, details, recordStore, dbce);
 }
 
 }  // namespace mongo

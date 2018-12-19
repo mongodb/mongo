@@ -41,8 +41,8 @@
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -258,7 +258,7 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     }
 
     // Not registering AddCollectionChange since this is for collections that already exist.
-    Collection* coll = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
+    auto coll = new CollectionImpl(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
     if (uuid) {
         // We are not in a WUOW only when we are called from Database::init(). There is no need
         // to rollback UUIDCatalog changes because we are initializing existing collections.

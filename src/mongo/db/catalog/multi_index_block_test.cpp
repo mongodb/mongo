@@ -77,7 +77,7 @@ void MultiIndexBlockTest::setUp() {
     NamespaceString nss("mydb.mycoll");
     auto collectionMock =
         std::make_unique<CollectionMock>(nss, std::make_unique<IndexCatalogNoop>());
-    _collection = std::make_unique<Collection>(std::move(collectionMock));
+    _collection = std::move(collectionMock);
 
     _indexer = std::make_unique<MultiIndexBlock>(_opCtx.get(), _collection.get());
 }
