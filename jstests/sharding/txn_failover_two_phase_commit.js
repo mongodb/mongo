@@ -3,7 +3,7 @@
  * the transaction completes and the router is able to learn the decision by retrying
  * coordinateCommitTransaction.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
+ * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {
@@ -101,6 +101,9 @@
             assert.commandWorked(
                 st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 
+            // These forced refreshes are not strictly necessary; they just prevent extra TXN log
+            // lines from the shards starting, aborting, and restarting the transaction due to
+            // needing to refresh after the transaction has started.
             assert.commandWorked(participant0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
             assert.commandWorked(participant1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
             assert.commandWorked(participant2.adminCommand({_flushRoutingTableCacheUpdates: ns}));

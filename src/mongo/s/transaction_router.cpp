@@ -584,29 +584,32 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
 
         coordinatorShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-        // Send a fake transaction statement to the config server primary so that the config server
-        // primary sets up state in memory to receive coordinateCommit.
-        auto cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "dummy",
-            coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("distinct"
-                                                                 << "dummy"
-                                                                 << "key"
-                                                                 << "dummy"),
-                                                            true),
-            Shard::RetryPolicy::kIdempotent);
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+        if (!_initiatedTwoPhaseCommit) {
+            // Send a fake transaction statement to the config server primary so that the config
+            // server primary sets up state in memory to receive coordinateCommit.
+            auto cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "dummy",
+                coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("distinct"
+                                                                     << "dummy"
+                                                                     << "key"
+                                                                     << "dummy"),
+                                                                true),
+                Shard::RetryPolicy::kIdempotent);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
 
-        // Abort the fake transaction on the config server to release the actual transaction's
-        // resources.
-        cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("abortTransaction" << 1), false),
-            Shard::RetryPolicy::kIdempotent);
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+            // Abort the fake transaction on the config server to release the actual transaction's
+            // resources.
+            cmdResponse = coordinatorShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                coordinatorIter->second.attachTxnFieldsIfNeeded(BSON("abortTransaction" << 1),
+                                                                false),
+                Shard::RetryPolicy::kIdempotent);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+        }
     }
 
     CoordinateCommitTransaction coordinateCommitCmd;

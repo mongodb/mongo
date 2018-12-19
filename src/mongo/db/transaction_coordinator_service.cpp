@@ -37,9 +37,11 @@
 #include "mongo/db/transaction_coordinator_service.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_util.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -188,7 +190,18 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx) {
             auto opCtxPtr = Client::getCurrent()->makeOperationContext();
             auto opCtx = opCtxPtr.get();
 
-            // TODO (SERVER-37885): Wait for something to be committed in this term.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            const auto lastOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+            LOG(3) << "Going to wait for client's last OpTime " << lastOpTime
+                   << " to become majority committed";
+            WriteConcernResult unusedWCResult;
+            uassertStatusOK(waitForWriteConcern(
+                opCtx,
+                lastOpTime,
+                WriteConcernOptions{WriteConcernOptions::kInternalMajorityNoSnapshot,
+                                    WriteConcernOptions::SyncMode::UNSET,
+                                    WriteConcernOptions::kNoTimeout},
+                &unusedWCResult));
 
             auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
             LOG(0) << "Need to resume coordinating commit for " << coordinatorDocs.size()
