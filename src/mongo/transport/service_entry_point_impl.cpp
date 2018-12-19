@@ -169,7 +169,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
               << connectionCount << word << " now open)";
     }
 
-    ssm->setCleanupHook([ this, ssmIt, session = std::move(session) ] {
+    ssm->setCleanupHook([ this, ssmIt, quiet, session = std::move(session) ] {
         size_t connectionCount;
         auto remote = session->remote();
         {
@@ -179,9 +179,11 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             _currentConnections.store(connectionCount);
         }
         _shutdownCondition.notify_one();
-        const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
-        log() << "end connection " << remote << " (" << connectionCount << word << " now open)";
 
+        if (!quiet) {
+            const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
+            log() << "end connection " << remote << " (" << connectionCount << word << " now open)";
+        }
     });
 
     auto ownership = ServiceStateMachine::Ownership::kOwned;
