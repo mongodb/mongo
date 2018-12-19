@@ -45,6 +45,8 @@ public:
 
     Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override;
 
+    void dropDb(OperationContext* opCtx, Database* db) override;
+
     void close(OperationContext* opCtx, StringData ns, const std::string& reason) override;
 
     void closeAll(OperationContext* opCtx, const std::string& reason) override;

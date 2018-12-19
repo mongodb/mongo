@@ -59,6 +59,8 @@ public:
 
         virtual Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated) = 0;
 
+        virtual void dropDb(OperationContext* opCtx, Database* db) = 0;
+
         virtual void close(OperationContext* opCtx, StringData ns, const std::string& reason) = 0;
 
         virtual void closeAll(OperationContext* opCtx, const std::string& reason) = 0;
@@ -101,6 +103,17 @@ public:
                             const StringData ns,
                             bool* const justCreated = nullptr) {
         return this->_impl().openDb(opCtx, ns, justCreated);
+    }
+
+    /**
+     * Physically drops the specified opened database and removes it from the server's metadata. It
+     * doesn't notify the replication subsystem or do any other consistency checks, so it should
+     * not be used directly from user commands.
+     *
+     * Must be called with the specified database locked in X mode.
+     */
+    inline void dropDb(OperationContext* opCtx, Database* db) {
+        return this->_impl().dropDb(opCtx, db);
     }
 
     /**

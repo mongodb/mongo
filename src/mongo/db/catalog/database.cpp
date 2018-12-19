@@ -42,8 +42,6 @@ MONGO_DEFINE_SHIM(Database::makeImpl);
 
 void Database::TUHook::hook() noexcept {}
 
-MONGO_DEFINE_SHIM(Database::dropDatabase);
-
 MONGO_DEFINE_SHIM(Database::userCreateNS);
 
 MONGO_DEFINE_SHIM(Database::dropAllDatabasesExceptLocal);

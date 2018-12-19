@@ -350,15 +350,6 @@ public:
         return this->_impl().renameCollection(opCtx, fromNS, toNS, stayTemp);
     }
 
-    /**
-     * Physically drops the specified opened database and removes it from the server's metadata. It
-     * doesn't notify the replication subsystem or do any other consistency checks, so it should
-     * not be used directly from user commands.
-     *
-     * Must be called with the specified database locked in X mode.
-     */
-    static MONGO_DECLARE_SHIM((OperationContext * opCtx, Database* db)->void) dropDatabase;
-
     inline const std::string& getSystemViewsName() const {
         return this->_impl().getSystemViewsName();
     }

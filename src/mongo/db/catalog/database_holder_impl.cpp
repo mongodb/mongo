@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/database_holder_impl.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -42,14 +41,13 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -165,7 +163,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(opCtx, dbname);
 
     if (!entry->exists()) {
-        audit::logCreateDatabase(&cc(), dbname);
+        audit::logCreateDatabase(opCtx->getClient(), dbname);
         if (justCreated)
             *justCreated = true;
     }
@@ -181,6 +179,34 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     invariant(_getNamesWithConflictingCasing_inlock(dbname.toString()).empty());
 
     return it->second;
+}
+
+void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
+    invariant(db);
+
+    // Store the name so we have if for after the db object is deleted
+    const string name = db->name();
+
+    LOG(1) << "dropDatabase " << name;
+
+    invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
+
+    BackgroundOperation::assertNoBgOpInProgForDb(name);
+
+    audit::logDropDatabase(opCtx->getClient(), name);
+
+    auto const serviceContext = opCtx->getServiceContext();
+
+    for (auto&& coll : *db) {
+        Top::get(serviceContext).collectionDropped(coll->ns().ns(), true);
+    }
+
+    close(opCtx, name, "database dropped");
+
+    auto const storageEngine = serviceContext->getStorageEngine();
+    writeConflictRetry(opCtx, "dropDatabase", name, [&] {
+        storageEngine->dropDatabase(opCtx, name).transitional_ignore();
+    });
 }
 
 namespace {

@@ -922,34 +922,6 @@ const DatabaseCatalogEntry* DatabaseImpl::getDatabaseCatalogEntry() const {
     return _dbEntry;
 }
 
-void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
-    invariant(db);
-
-    // Store the name so we have if for after the db object is deleted
-    const string name = db->name();
-
-    LOG(1) << "dropDatabase " << name;
-
-    invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
-
-    BackgroundOperation::assertNoBgOpInProgForDb(name);
-
-    audit::logDropDatabase(opCtx->getClient(), name);
-
-    auto const serviceContext = opCtx->getServiceContext();
-
-    for (auto&& coll : *db) {
-        Top::get(serviceContext).collectionDropped(coll->ns().ns(), true);
-    }
-
-    DatabaseHolder::getDatabaseHolder().close(opCtx, name, "database dropped");
-
-    auto const storageEngine = serviceContext->getStorageEngine();
-    writeConflictRetry(opCtx, "dropDatabase", name, [&] {
-        storageEngine->dropDatabase(opCtx, name).transitional_ignore();
-    });
-}
-
 StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
     OperationContext* opCtx, StringData collectionNameModel) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
@@ -1048,10 +1020,6 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
               << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
               << startupWarningsLog;
     }
-}
-
-MONGO_REGISTER_SHIM(Database::dropDatabase)(OperationContext* opCtx, Database* db)->void {
-    return DatabaseImpl::dropDatabase(opCtx, db);
 }
 
 MONGO_REGISTER_SHIM(Database::userCreateNS)
@@ -1178,7 +1146,7 @@ MONGO_REGISTER_SHIM(Database::dropAllDatabasesExceptLocal)(OperationContext* opC
                 if (db == nullptr) {
                     log() << "database disappeared after listDatabases but before drop: " << dbName;
                 } else {
-                    DatabaseImpl::dropDatabase(opCtx, db);
+                    DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
                 }
             });
         }

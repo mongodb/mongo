@@ -59,7 +59,7 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db());
 
     if (db) {
-        Database::dropDatabase(opCtx, db);
+        DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
     }
 }
 bool collectionExists(OldClientContext* ctx, const string& ns) {

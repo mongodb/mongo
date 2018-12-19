@@ -37,6 +37,7 @@
 #include <algorithm>
 
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -62,10 +63,10 @@ namespace {
  * Removes database from catalog and writes dropDatabase entry to oplog.
  */
 Status _finishDropDatabase(OperationContext* opCtx, const std::string& dbName, Database* db) {
-    // If Database::dropDatabase() fails, we should reset the drop-pending state on Database.
+    // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
     auto dropPendingGuard = MakeGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
-    Database::dropDatabase(opCtx, db);
+    DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
     dropPendingGuard.Dismiss();
 
     log() << "dropDatabase " << dbName << " - finished";
