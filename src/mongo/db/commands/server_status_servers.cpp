@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -54,11 +53,13 @@ namespace {
 class Connections : public ServerStatusSection {
 public:
     Connections() : ServerStatusSection("connections") {}
-    virtual bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return true;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         BSONObjBuilder bb;
 
         auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
@@ -73,11 +74,13 @@ public:
 class Network : public ServerStatusSection {
 public:
     Network() : ServerStatusSection("network") {}
-    virtual bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return true;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         BSONObjBuilder b;
         networkCounter.append(b);
         appendMessageCompressionStats(&b);
@@ -96,11 +99,13 @@ public:
 class Security : public ServerStatusSection {
 public:
     Security() : ServerStatusSection("security") {}
-    virtual bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return true;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         BSONObj result;
         if (getSSLManager()) {
             result = getSSLManager()->getSSLConfiguration().getServerStatusBSON();

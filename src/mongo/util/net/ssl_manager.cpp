@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -1000,6 +999,7 @@ std::string escapeRfc2253(StringData str) {
     return ret;
 }
 
+namespace {
 /**
  * Status section of which tls versions connected to MongoDB and completed an SSL handshake.
  * Note: Clients are only not counted if they try to connect to the server with a unsupported TLS
@@ -1010,11 +1010,12 @@ class TLSVersionSatus : public ServerStatusSection {
 public:
     TLSVersionSatus() : ServerStatusSection("transportSecurity") {}
 
-    bool includeByDefault() const final {
+    bool includeByDefault() const override {
         return true;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         auto& counts = TLSVersionCounts::get(opCtx->getServiceContext());
 
         BSONObjBuilder builder;
@@ -1026,6 +1027,8 @@ public:
         return builder.obj();
     }
 } tlsVersionStatus;
+
+}  // namespace
 
 void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
     StringData versionString;

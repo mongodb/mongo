@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -104,12 +103,13 @@ MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
 class TCMallocServerStatusSection : public ServerStatusSection {
 public:
     TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
-    virtual bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         long long verbosity = 1;
         if (configElement) {
             // Relies on the fact that safeNumberLong turns non-numbers into 0.
@@ -228,5 +228,5 @@ private:
     }
 #endif
 } tcmallocServerStatusSection;
-}
-}
+}  // namespace
+}  // namespace mongo

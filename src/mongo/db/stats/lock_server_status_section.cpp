@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -47,12 +46,12 @@ public:
         _started = curTimeMillis64();
     }
 
-    virtual bool includeByDefault() const {
+    bool includeByDefault() const override {
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         std::valarray<int> clientStatusCounts(5);
 
         // This returns the blocked lock states
@@ -110,12 +109,12 @@ class LockStatsServerStatusSection : public ServerStatusSection {
 public:
     LockStatsServerStatusSection() : ServerStatusSection("locks") {}
 
-    virtual bool includeByDefault() const {
+    bool includeByDefault() const override {
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         BSONObjBuilder ret;
 
         SingleThreadedLockStats stats;

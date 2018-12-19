@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -43,14 +42,14 @@ class LogicalSessionSSS : public ServerStatusSection {
 public:
     LogicalSessionSSS() : ServerStatusSection("logicalSessionRecordCache") {}
 
-    virtual ~LogicalSessionSSS() {}
+    ~LogicalSessionSSS() override = default;
 
-    virtual bool includeByDefault() const {
+    bool includeByDefault() const override {
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         auto lsCache = LogicalSessionCache::get(opCtx);
         return lsCache ? lsCache->getStats().toBSON() : BSONObj();
     }

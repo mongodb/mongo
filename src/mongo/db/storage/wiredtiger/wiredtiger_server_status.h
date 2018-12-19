@@ -1,6 +1,3 @@
-// wiredtiger_server_status.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -44,9 +41,9 @@ class WiredTigerKVEngine;
 class WiredTigerServerStatusSection : public ServerStatusSection {
 public:
     WiredTigerServerStatusSection(WiredTigerKVEngine* engine);
-    virtual bool includeByDefault() const;
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const;
+    bool includeByDefault() const override;
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override;
 
 private:
     WiredTigerKVEngine* _engine;

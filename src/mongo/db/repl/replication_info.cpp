@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -150,14 +149,18 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
     }
 }
 
+namespace {
+
 class ReplicationInfoServerStatus : public ServerStatusSection {
 public:
     ReplicationInfoServerStatus() : ServerStatusSection("repl") {}
-    bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return true;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         if (!ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
             return BSONObj();
         }
@@ -180,11 +183,13 @@ public:
 class OplogInfoServerStatus : public ServerStatusSection {
 public:
     OplogInfoServerStatus() : ServerStatusSection("oplog") {}
-    bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return false;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
         if (!replCoord->isReplEnabled()) {
             return BSONObj();
@@ -203,29 +208,35 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMaster : public BasicCommand {
+class CmdIsMaster final : public BasicCommand {
 public:
-    bool requiresAuth() const override {
+    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
+
+    bool requiresAuth() const final {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
+
     std::string help() const override {
         return "Check if this server is primary for a replica set\n"
                "{ isMaster : 1 }";
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
-    virtual bool run(OperationContext* opCtx,
-                     const string&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const final {}  // No auth required
+
+    bool run(OperationContext* opCtx,
+             const string&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.
         */
@@ -384,6 +395,8 @@ public:
 } cmdismaster;
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
+
+}  // namespace
 
 }  // namespace repl
 }  // namespace mongo

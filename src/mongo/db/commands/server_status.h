@@ -1,6 +1,3 @@
-// server_status.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -43,7 +40,7 @@ namespace mongo {
 class ServerStatusSection {
 public:
     ServerStatusSection(const std::string& sectionName);
-    virtual ~ServerStatusSection() {}
+    virtual ~ServerStatusSection() = default;
 
     const std::string& getSectionName() const {
         return _sectionName;
@@ -113,14 +110,15 @@ private:
 class OpCounterServerStatusSection : public ServerStatusSection {
 public:
     OpCounterServerStatusSection(const std::string& sectionName, OpCounters* counters);
-    virtual bool includeByDefault() const {
+
+    bool includeByDefault() const override {
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const;
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override;
 
 private:
     const OpCounters* _counters;
 };
-}
+}  // namespace mongo

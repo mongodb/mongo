@@ -1,6 +1,3 @@
-// storage_engine.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -41,22 +38,20 @@
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
-
-// TODO: Does this belong here?
 namespace {
 
 class StorageSSS : public ServerStatusSection {
 public:
     StorageSSS() : ServerStatusSection("storageEngine") {}
 
-    virtual ~StorageSSS() {}
+    ~StorageSSS() override = default;
 
-    virtual bool includeByDefault() const {
+    bool includeByDefault() const override {
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         auto svcCtx = opCtx->getClient()->getServiceContext();
         auto engine = svcCtx->getStorageEngine();
         auto backupCursorHooks = BackupCursorHooks::get(svcCtx);
