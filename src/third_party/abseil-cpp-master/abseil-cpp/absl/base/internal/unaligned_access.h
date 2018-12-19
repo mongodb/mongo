@@ -108,7 +108,7 @@ inline void UnalignedStore64(void *p, uint64_t v) {
 #define ABSL_INTERNAL_UNALIGNED_STORE64(_p, _val) \
   (absl::base_internal::UnalignedStore64(_p, _val))
 
-#elif defined(UNDEFINED_BEHAVIOR_SANITIZER)
+#elif defined(UNDEFINED_BEHAVIOR_SANITIZER) || defined(ABSL_FORCE_ALIGNED_ACCESS)
 
 namespace absl {
 namespace base_internal {
