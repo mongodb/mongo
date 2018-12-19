@@ -327,15 +327,6 @@ public:
                                      boost::optional<DurableTxnStateEnum> txnState);
 
     /**
-     * Helper function to begin a migration on a primary node.
-     *
-     * Returns whether the specified statement should be migrated at all or skipped.
-     *
-     * Not called with session checked out.
-     */
-    bool onMigrateBeginOnPrimary(OperationContext* opCtx, TxnNumber txnNumber, StmtId stmtId);
-
-    /**
      * Called after an entry for the specified session and transaction has been written to the oplog
      * during chunk migration, while the node is still primary. Must be called while the caller is
      * still in the oplog write's WUOW. Updates the on-disk state of the session to match the
@@ -362,9 +353,7 @@ public:
      *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
-    boost::optional<repl::OplogEntry> checkStatementExecuted(OperationContext* opCtx,
-                                                             TxnNumber txnNumber,
-                                                             StmtId stmtId) const;
+    boost::optional<repl::OplogEntry> checkStatementExecuted(StmtId stmtId) const;
 
     /**
      * Checks whether the given statementId for the specified transaction has already executed
@@ -374,7 +363,7 @@ public:
      *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
-    bool checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtId stmtId) const;
+    bool checkStatementExecutedNoOplogEntryFetch(StmtId stmtId) const;
 
     /**
      * Marks the session as requiring refresh. Used when the session state has been modified
@@ -653,9 +642,7 @@ private:
     // a check that the caller operates on the transaction it thinks it is operating on.
     void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
 
-    boost::optional<repl::OpTime> _checkStatementExecuted(WithLock,
-                                                          TxnNumber txnNumber,
-                                                          StmtId stmtId) const;
+    boost::optional<repl::OpTime> _checkStatementExecuted(StmtId stmtId) const;
 
     UpdateRequest _makeUpdateRequest(WithLock,
                                      TxnNumber newTxnNumber,

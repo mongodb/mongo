@@ -250,10 +250,27 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, result.sessionId);
     auto const txnParticipant = TransactionParticipant::get(scopedSession.get());
     txnParticipant->refreshFromStorageIfNeeded();
+    txnParticipant->beginOrContinue(result.txnNum, boost::none, boost::none);
 
-    if (!txnParticipant->onMigrateBeginOnPrimary(opCtx, result.txnNum, stmtId)) {
-        // Don't continue migrating the transaction history
-        return lastResult;
+    try {
+        if (txnParticipant->checkStatementExecuted(stmtId)) {
+            // Skip the incoming statement because it has already been logged locally
+            return lastResult;
+        }
+    } catch (const DBException& ex) {
+        // If the transaction chain was truncated on the recipient shard, then we are most likely
+        // copying from a session that hasn't been touched on the recipient shard for a very long
+        // time but could be recent on the donor.
+        //
+        // We continue copying regardless to get the entire transaction from the donor.
+        if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
+            throw;
+        }
+
+        if (stmtId == kIncompleteHistoryStmtId) {
+            // No need to log entries for transactions whose history has been truncated
+            return lastResult;
+        }
     }
 
     BSONObj object(result.isPrePostImage

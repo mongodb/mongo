@@ -1150,8 +1150,6 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     {
         // Make it look like we're in a DBDirectClient running a nested operation.
         DirectClientSetter inDirectClient(opCtx());
-        MongoDOperationContextSession innerScopedSession(opCtx());
-
         txnParticipant->stashTransactionResources(opCtx());
 
         // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the

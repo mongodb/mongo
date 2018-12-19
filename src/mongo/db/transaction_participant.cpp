@@ -691,8 +691,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
     {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-        // Always check session's txnNumber and '_txnState', since they can be modified by session
-        // kill and migration, which do not check out the session.
+        _checkValid(lg);
         _checkIsActiveTransaction(lg, *opCtx->getTxnNumber(), false);
 
         // If this is not a multi-document transaction, there is nothing to unstash.
@@ -1641,12 +1640,13 @@ void TransactionParticipant::onWriteOpCompletedOnPrimary(
     Date_t lastStmtIdWriteDate,
     boost::optional<DurableTxnStateEnum> txnState) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(txnNumber == _activeTxnNumber);
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
-        const auto stmtOpTime = _checkStatementExecuted(ul, txnNumber, stmtId);
+        const auto stmtOpTime = _checkStatementExecuted(stmtId);
         if (stmtOpTime) {
             fassertOnRepeatedExecution(
                 _sessionId(), txnNumber, stmtId, *stmtOpTime, lastStmtIdWriteOpTime);
@@ -1665,39 +1665,13 @@ void TransactionParticipant::onWriteOpCompletedOnPrimary(
         opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
 }
 
-bool TransactionParticipant::onMigrateBeginOnPrimary(OperationContext* opCtx,
-                                                     TxnNumber txnNumber,
-                                                     StmtId stmtId) {
-    beginOrContinue(txnNumber, boost::none, boost::none);
-
-    try {
-        if (checkStatementExecuted(opCtx, txnNumber, stmtId)) {
-            return false;
-        }
-    } catch (const DBException& ex) {
-        // If the transaction chain was truncated on the recipient shard, then we are most likely
-        // copying from a session that hasn't been touched on the recipient shard for a very long
-        // time but could be recent on the donor.
-        //
-        // We continue copying regardless to get the entire transaction from the donor.
-        if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
-            throw;
-        }
-
-        if (stmtId == kIncompleteHistoryStmtId) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void TransactionParticipant::onMigrateCompletedOnPrimary(OperationContext* opCtx,
                                                          TxnNumber txnNumber,
                                                          std::vector<StmtId> stmtIdsWritten,
                                                          const repl::OpTime& lastStmtIdWriteOpTime,
                                                          Date_t oplogLastStmtIdWriteDate) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(txnNumber == _activeTxnNumber);
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
@@ -1805,18 +1779,15 @@ repl::OpTime TransactionParticipant::getLastWriteOpTime(TxnNumber txnNumber) con
 }
 
 boost::optional<repl::OplogEntry> TransactionParticipant::checkStatementExecuted(
-    OperationContext* opCtx, TxnNumber txnNumber, StmtId stmtId) const {
-    const auto stmtTimestamp = [&] {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        return _checkStatementExecuted(lg, txnNumber, stmtId);
-    }();
+    StmtId stmtId) const {
+    const auto stmtTimestamp = _checkStatementExecuted(stmtId);
 
     if (!stmtTimestamp)
         return boost::none;
 
     TransactionHistoryIterator txnIter(*stmtTimestamp);
     while (txnIter.hasNext()) {
-        const auto entry = txnIter.next(opCtx);
+        const auto entry = txnIter.next(_opCtx());
         invariant(entry.getStatementId());
         if (*entry.getStatementId() == stmtId)
             return entry;
@@ -1825,10 +1796,8 @@ boost::optional<repl::OplogEntry> TransactionParticipant::checkStatementExecuted
     MONGO_UNREACHABLE;
 }
 
-bool TransactionParticipant::checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber,
-                                                                     StmtId stmtId) const {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    return bool(_checkStatementExecuted(lg, txnNumber, stmtId));
+bool TransactionParticipant::checkStatementExecutedNoOplogEntryFetch(StmtId stmtId) const {
+    return bool(_checkStatementExecuted(stmtId));
 }
 
 void TransactionParticipant::_checkValid(WithLock) const {
@@ -1849,16 +1818,13 @@ void TransactionParticipant::_checkIsActiveTransaction(WithLock, TxnNumber txnNu
             txnNumber == _activeTxnNumber);
 }
 
-boost::optional<repl::OpTime> TransactionParticipant::_checkStatementExecuted(WithLock wl,
-                                                                              TxnNumber txnNumber,
-                                                                              StmtId stmtId) const {
-    _checkValid(wl);
-    _checkIsActiveTransaction(wl, txnNumber);
+boost::optional<repl::OpTime> TransactionParticipant::_checkStatementExecuted(StmtId stmtId) const {
+    invariant(_isValid);
 
     const auto it = _activeTxnCommittedStatements.find(stmtId);
     if (it == _activeTxnCommittedStatements.end()) {
         uassert(ErrorCodes::IncompleteTransactionHistory,
-                str::stream() << "Incomplete history detected for transaction " << txnNumber
+                str::stream() << "Incomplete history detected for transaction " << _activeTxnNumber
                               << " on session "
                               << _sessionId(),
                 !_hasIncompleteHistory);
@@ -1867,7 +1833,7 @@ boost::optional<repl::OpTime> TransactionParticipant::_checkStatementExecuted(Wi
     }
 
     invariant(_lastWrittenSessionRecord);
-    invariant(_lastWrittenSessionRecord->getTxnNum() == txnNumber);
+    invariant(_lastWrittenSessionRecord->getTxnNum() == _activeTxnNumber);
 
     return it->second;
 }

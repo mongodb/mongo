@@ -199,7 +199,7 @@ public:
                                 TxnNumber txnNumber,
                                 StmtId stmtId) {
         const auto txnParticipant = TransactionParticipant::get(session);
-        auto oplog = txnParticipant->checkStatementExecuted(opCtx, txnNumber, stmtId);
+        auto oplog = txnParticipant->checkStatementExecuted(stmtId);
         ASSERT_TRUE(oplog);
     }
 
@@ -209,7 +209,7 @@ public:
                                 StmtId stmtId,
                                 const repl::OplogEntry& expectedOplog) {
         const auto txnParticipant = TransactionParticipant::get(session);
-        auto oplog = txnParticipant->checkStatementExecuted(opCtx, txnNumber, stmtId);
+        auto oplog = txnParticipant->checkStatementExecuted(stmtId);
         ASSERT_TRUE(oplog);
         checkOplogWithNestedOplog(expectedOplog, *oplog);
     }
@@ -1572,7 +1572,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory
 
     checkStatementExecuted(opCtx, session.get(), 2, 23, oplogEntries[0]);
     checkStatementExecuted(opCtx, session.get(), 2, 5, oplogEntries[2]);
-    ASSERT_THROWS(txnParticipant->checkStatementExecuted(opCtx, 2, 38), AssertionException);
+    ASSERT_THROWS(txnParticipant->checkStatementExecuted(38), AssertionException);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest,

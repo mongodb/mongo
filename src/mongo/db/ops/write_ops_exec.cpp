@@ -520,8 +520,7 @@ WriteResult performInserts(OperationContext* opCtx,
             const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
             if (opCtx->getTxnNumber()) {
                 if (!txnParticipant->inMultiDocumentTransaction() &&
-                    txnParticipant->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
-                                                                            stmtId)) {
+                    txnParticipant->checkStatementExecutedNoOplogEntryFetch(stmtId)) {
                     containsRetry = true;
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                     out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
@@ -729,8 +728,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
             if (!txnParticipant->inMultiDocumentTransaction()) {
-                if (auto entry = txnParticipant->checkStatementExecuted(
-                        opCtx, *opCtx->getTxnNumber(), stmtId)) {
+                if (auto entry = txnParticipant->checkStatementExecuted(stmtId)) {
                     containsRetry = true;
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                     out.results.emplace_back(parseOplogEntryForUpdate(*entry));
@@ -869,8 +867,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
             if (!txnParticipant->inMultiDocumentTransaction() &&
-                txnParticipant->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
-                                                                        stmtId)) {
+                txnParticipant->checkStatementExecutedNoOplogEntryFetch(stmtId)) {
                 containsRetry = true;
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());

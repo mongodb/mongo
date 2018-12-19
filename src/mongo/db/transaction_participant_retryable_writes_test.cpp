@@ -384,53 +384,40 @@ TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
     const TxnNumber txnNum = 100;
     txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
 
-    ASSERT(!txnParticipant->checkStatementExecuted(opCtx(), txnNum, 1000));
-    ASSERT(!txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 1000));
+    ASSERT(!txnParticipant->checkStatementExecuted(1000));
+    ASSERT(!txnParticipant->checkStatementExecutedNoOplogEntryFetch(1000));
     const auto firstOpTime = writeTxnRecord(txnNum, 1000, {}, boost::none);
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 1000));
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 1000));
+    ASSERT(txnParticipant->checkStatementExecuted(1000));
+    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(1000));
 
-    ASSERT(!txnParticipant->checkStatementExecuted(opCtx(), txnNum, 2000));
-    ASSERT(!txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 2000));
+    ASSERT(!txnParticipant->checkStatementExecuted(2000));
+    ASSERT(!txnParticipant->checkStatementExecutedNoOplogEntryFetch(2000));
     writeTxnRecord(txnNum, 2000, firstOpTime, boost::none);
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 2000));
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 2000));
+    ASSERT(txnParticipant->checkStatementExecuted(2000));
+    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(2000));
 
     // Invalidate the session and ensure the statements still check out
     txnParticipant->invalidate();
     txnParticipant->refreshFromStorageIfNeeded();
 
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 1000));
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 2000));
+    ASSERT(txnParticipant->checkStatementExecuted(1000));
+    ASSERT(txnParticipant->checkStatementExecuted(2000));
 
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 1000));
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 2000));
+    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(1000));
+    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(2000));
 }
 
-TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecutedForOldTransactionThrows) {
-    const auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant->refreshFromStorageIfNeeded();
-
-    const TxnNumber txnNum = 100;
-    txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
-
-    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecuted(opCtx(), txnNum - 1, 0),
-                       AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
-}
-
-TEST_F(TransactionParticipantRetryableWritesTest,
-       CheckStatementExecutedForInvalidatedTransactionThrows) {
+DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
+             CheckStatementExecutedForInvalidatedTransactionInvariants,
+             "Invariant failure _isValid") {
     const auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->invalidate();
-
-    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecuted(opCtx(), 100, 0),
-                       AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+    txnParticipant->checkStatementExecuted(0);
 }
 
-TEST_F(TransactionParticipantRetryableWritesTest,
-       WriteOpCompletedOnPrimaryForOldTransactionThrows) {
+DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
+             WriteOpCompletedOnPrimaryForOldTransactionInvariants,
+             "Invariant failure txnNumber == _activeTxnNumber") {
     const auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->refreshFromStorageIfNeeded();
 
@@ -453,15 +440,14 @@ TEST_F(TransactionParticipantRetryableWritesTest,
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum - 1, 0);
-        ASSERT_THROWS_CODE(txnParticipant->onWriteOpCompletedOnPrimary(
-                               opCtx(), txnNum - 1, {0}, opTime, Date_t::now(), boost::none),
-                           AssertionException,
-                           ErrorCodes::ConflictingOperationInProgress);
+        txnParticipant->onWriteOpCompletedOnPrimary(
+            opCtx(), txnNum - 1, {0}, opTime, Date_t::now(), boost::none);
     }
 }
 
-TEST_F(TransactionParticipantRetryableWritesTest,
-       WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
+DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
+             WriteOpCompletedOnPrimaryForInvalidatedTransactionInvariants,
+             "Invariant failure txnNumber == _activeTxnNumber") {
     const auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->refreshFromStorageIfNeeded();
 
@@ -474,11 +460,8 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     const auto opTime = logOp(opCtx(), kNss, uuid, *opCtx()->getLogicalSessionId(), txnNum, 0);
 
     txnParticipant->invalidate();
-
-    ASSERT_THROWS_CODE(txnParticipant->onWriteOpCompletedOnPrimary(
-                           opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none),
-                       AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+    txnParticipant->onWriteOpCompletedOnPrimary(
+        opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest,
@@ -503,7 +486,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     }
 
     txnParticipant->refreshFromStorageIfNeeded();
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 0));
+    ASSERT(txnParticipant->checkStatementExecuted(0));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTruncation) {
@@ -561,17 +544,17 @@ TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTru
     const auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->refreshFromStorageIfNeeded();
 
-    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 0),
+    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecuted(0),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 1));
-    ASSERT(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 2));
+    ASSERT(txnParticipant->checkStatementExecuted(1));
+    ASSERT(txnParticipant->checkStatementExecuted(2));
 
-    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 0),
+    ASSERT_THROWS_CODE(txnParticipant->checkStatementExecutedNoOplogEntryFetch(0),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 1));
-    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(txnNum, 2));
+    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(1));
+    ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(2));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
@@ -642,24 +625,24 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     }
 
     {
-        auto oplog = txnParticipant->checkStatementExecuted(opCtx(), txnNum, 1);
+        auto oplog = txnParticipant->checkStatementExecuted(1);
         ASSERT_TRUE(oplog);
         ASSERT_EQ(firstOpTime, oplog->getOpTime());
     }
 
-    ASSERT_THROWS(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 2), AssertionException);
+    ASSERT_THROWS(txnParticipant->checkStatementExecuted(2), AssertionException);
 
     // Should have the same behavior after loading state from storage.
     txnParticipant->invalidate();
     txnParticipant->refreshFromStorageIfNeeded();
 
     {
-        auto oplog = txnParticipant->checkStatementExecuted(opCtx(), txnNum, 1);
+        auto oplog = txnParticipant->checkStatementExecuted(1);
         ASSERT_TRUE(oplog);
         ASSERT_EQ(firstOpTime, oplog->getOpTime());
     }
 
-    ASSERT_THROWS(txnParticipant->checkStatementExecuted(opCtx(), txnNum, 2), AssertionException);
+    ASSERT_THROWS(txnParticipant->checkStatementExecuted(2), AssertionException);
 }
 
 }  // namespace

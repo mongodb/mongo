@@ -192,16 +192,15 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
 
 MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)
     : _operationContextSession(opCtx) {
-    if (!opCtx->getClient()->isInDirectClient()) {
-        const auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant->refreshFromStorageIfNeeded();
-    }
+    invariant(!opCtx->getClient()->isInDirectClient());
+
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant->refreshFromStorageIfNeeded();
 }
 
 MongoDOperationContextSession::~MongoDOperationContextSession() = default;
 
 void MongoDOperationContextSession::checkIn(OperationContext* opCtx) {
-
     if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
         txnParticipant->stashTransactionResources(opCtx);
     }
