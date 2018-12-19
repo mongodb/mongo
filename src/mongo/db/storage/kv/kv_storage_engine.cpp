@@ -735,6 +735,10 @@ bool KVStorageEngine::supportsReadConcernMajority() const {
     return _engine->supportsReadConcernMajority();
 }
 
+bool KVStorageEngine::supportsPendingDrops() const {
+    return enableKVPendingDrops && supportsRecoverToStableTimestamp();
+}
+
 void KVStorageEngine::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }

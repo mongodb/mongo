@@ -77,6 +77,9 @@ public:
     }
     void cleanShutdown() final {}
     void setJournalListener(JournalListener* jl) final {}
+    bool supportsPendingDrops() const final {
+        return false;
+    }
     Timestamp getAllCommittedTimestamp() const final {
         return {};
     }

@@ -63,6 +63,8 @@ public:
 
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
                            << engine->supportsReadConcernMajority()
+                           << "supportsPendingDrops"
+                           << engine->supportsPendingDrops()
                            << "supportsSnapshotReadConcern"
                            << engine->supportsReadConcernSnapshot()
                            << "readOnly"

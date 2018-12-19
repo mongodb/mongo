@@ -355,6 +355,13 @@ public:
     }
 
     /**
+     * Returns true if the storage engine supports deferring collection drops until the the storage
+     * engine determines that the storage layer artifacts for the pending drops are no longer needed
+     * based on the stable and oldest timestamps.
+     */
+    virtual bool supportsPendingDrops() const = 0;
+
+    /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
      * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp
      * used should be one provided by StorageEngine::setStableTimestamp().

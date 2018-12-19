@@ -163,6 +163,8 @@ public:
 
     bool supportsReadConcernMajority() const final;
 
+    bool supportsPendingDrops() const final;
+
     virtual void replicationBatchIsComplete() const override;
 
     SnapshotManager* getSnapshotManager() const final;
