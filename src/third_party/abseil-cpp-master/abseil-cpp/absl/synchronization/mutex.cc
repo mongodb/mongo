@@ -1079,7 +1079,7 @@ void Mutex::TryRemove(PerThreadSynch *s) {
 // if the wait extends past the absolute time specified, even if "s" is still
 // on the mutex queue.  In this case, remove "s" from the queue and return
 // true, otherwise return false.
-void Mutex::Block(PerThreadSynch *s) {
+ABSL_XRAY_LOG_ARGS(1) void Mutex::Block(PerThreadSynch *s) {
   while (s->state.load(std::memory_order_acquire) == PerThreadSynch::kQueued) {
     if (!DecrementSynchSem(this, s, s->waitp->timeout)) {
       // After a timeout, we go into a spin loop until we remove ourselves

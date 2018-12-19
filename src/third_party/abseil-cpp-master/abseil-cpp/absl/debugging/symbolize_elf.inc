@@ -333,7 +333,11 @@ static std::atomic<Symbolizer *> g_cached_symbolizer;
 }  // namespace
 
 static int SymbolizerSize() {
+#if defined(__wasm__) || defined(__asmjs__)
   int pagesize = getpagesize();
+#else
+  int pagesize = sysconf(_SC_PAGESIZE);
+#endif
   return ((sizeof(Symbolizer) - 1) / pagesize + 1) * pagesize;
 }
 

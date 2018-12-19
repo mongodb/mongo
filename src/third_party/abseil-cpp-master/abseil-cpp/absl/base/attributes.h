@@ -402,17 +402,28 @@
 
 // ABSL_MUST_USE_RESULT
 //
-// Tells the compiler to warn about unused return values for functions declared
-// with this macro. The macro must appear as the very first part of a function
-// declaration or definition:
+// Tells the compiler to warn about unused results.
 //
-// Example:
+// When annotating a function, it must appear as the first part of the
+// declaration or definition. The compiler will warn if the return value from
+// such a function is unused:
 //
 //   ABSL_MUST_USE_RESULT Sprocket* AllocateSprocket();
+//   AllocateSprocket();  // Triggers a warning.
 //
-// This placement has the broadest compatibility with GCC, Clang, and MSVC, with
-// both defs and decls, and with GCC-style attributes, MSVC declspec, C++11
-// and C++17 attributes.
+// When annotating a class, it is equivalent to annotating every function which
+// returns an instance.
+//
+//   class ABSL_MUST_USE_RESULT Sprocket {};
+//   Sprocket();  // Triggers a warning.
+//
+//   Sprocket MakeSprocket();
+//   MakeSprocket();  // Triggers a warning.
+//
+// Note that references and pointers are not instances:
+//
+//   Sprocket* SprocketPointer();
+//   SprocketPointer();  // Does *not* trigger a warning.
 //
 // ABSL_MUST_USE_RESULT allows using cast-to-void to suppress the unused result
 // warning. For that, warn_unused_result is used only for clang but not for gcc.

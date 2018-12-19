@@ -39,6 +39,7 @@
 #include "absl/strings/str_cat.h"
 
 #include "absl/strings/internal/numbers_test_common.h"
+#include "absl/strings/internal/pow10_helper.h"
 
 namespace {
 
@@ -871,7 +872,7 @@ TEST_F(SimpleDtoaTest, ExhaustiveDoubleToSixDigits) {
     }
 
     for (int exponent = -324; exponent <= 308; ++exponent) {
-      double powten = pow(10.0, exponent);
+      double powten = absl::strings_internal::Pow10(exponent);
       if (powten == 0) powten = 5e-324;
       if (kFloatNumCases >= 1e9) {
         // The exhaustive test takes a very long time, so log progress.

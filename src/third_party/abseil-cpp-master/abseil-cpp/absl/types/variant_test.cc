@@ -559,9 +559,14 @@ TEST(VariantTest, TestDtor) {
 }
 
 #ifdef ABSL_HAVE_EXCEPTIONS
-
+// See comment in absl/base/config.h
+#if defined(ABSL_INTERNAL_MSVC_2017_DBG_MODE)
+TEST(VariantTest, DISABLED_TestDtorValuelessByException)
+#else
 // Test destruction when in the valueless_by_exception state.
-TEST(VariantTest, TestDtorValuelessByException) {
+TEST(VariantTest, TestDtorValuelessByException)
+#endif
+{
   int counter = 0;
   IncrementInDtor counter_adjuster(&counter);
 

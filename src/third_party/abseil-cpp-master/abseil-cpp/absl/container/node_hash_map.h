@@ -40,6 +40,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "absl/algorithm/container.h"
 #include "absl/container/internal/container_memory.h"
 #include "absl/container/internal/hash_function_defaults.h"  // IWYU pragma: export
 #include "absl/container/internal/node_hash_policy.h"
@@ -71,7 +72,7 @@ class NodeHashMapPolicy;
 // By default, `node_hash_map` uses the `absl::Hash` hashing framework.
 // All fundamental and Abseil types that support the `absl::Hash` framework have
 // a compatible equality operator for comparing insertions into `node_hash_map`.
-// If your type is not yet supported by the `asbl::Hash` framework, see
+// If your type is not yet supported by the `absl::Hash` framework, see
 // absl/hash/hash.h for information on extending Abseil hashing to user-defined
 // types.
 //
@@ -91,7 +92,7 @@ class NodeHashMapPolicy;
 //  std::string search_key = "b";
 //  auto result = ducks.find(search_key);
 //  if (result != ducks.end()) {
-//    std::cout << "Result: " << search_key->second << std::endl;
+//    std::cout << "Result: " << result->second << std::endl;
 //  }
 template <class Key, class Value,
           class Hash = absl::container_internal::hash_default_hash<Key>,
@@ -566,5 +567,16 @@ class NodeHashMapPolicy
   static const Value& value(const value_type* elem) { return elem->second; }
 };
 }  // namespace container_internal
+
+namespace container_algorithm_internal {
+
+// Specialization of trait in absl/algorithm/container.h
+template <class Key, class T, class Hash, class KeyEqual, class Allocator>
+struct IsUnorderedContainer<
+    absl::node_hash_map<Key, T, Hash, KeyEqual, Allocator>> : std::true_type {};
+
+}  // namespace container_algorithm_internal
+
 }  // namespace absl
+
 #endif  // ABSL_CONTAINER_NODE_HASH_MAP_H_

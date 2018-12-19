@@ -15,7 +15,7 @@
 #
 
 load(
-    "//absl:copts.bzl",
+    "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
     "ABSL_TEST_COPTS",
 )
@@ -181,22 +181,8 @@ cc_test(
 
 cc_library(
     name = "leak_check",
-    srcs = select({
-        # The leak checking interface depends on weak function
-        # declarations that may not necessarily have definitions.
-        # Windows doesn't support this, and ios requires
-        # guaranteed definitions for weak symbols.
-        "//absl:ios": [],
-        "//absl:windows": [],
-        "//conditions:default": [
-            "leak_check.cc",
-        ],
-    }),
-    hdrs = select({
-        "//absl:ios": [],
-        "//absl:windows": [],
-        "//conditions:default": ["leak_check.h"],
-    }),
+    srcs = ["leak_check.cc"],
+    hdrs = ["leak_check.h"],
     deps = ["//absl/base:core_headers"],
 )
 

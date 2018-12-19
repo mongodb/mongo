@@ -16,7 +16,9 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <future>
+#include <limits>
 #include <string>
 #include <thread>
 #include <vector>
@@ -925,7 +927,7 @@ TEST(MakeTime, Normalization) {
   EXPECT_EQ(tp, convert(civil_second(2009, 2, 13, 18, 30, 90), tz));   // second
 }
 
-// NOTE: Run this with --copt=-ftrapv to detect overflow problems.
+// NOTE: Run this with -ftrapv to detect overflow problems.
 TEST(MakeTime, SysSecondsLimits) {
   const char RFC3339[] =  "%Y-%m-%dT%H:%M:%S%Ez";
   const time_zone utc = utc_time_zone();
@@ -991,17 +993,105 @@ TEST(MakeTime, SysSecondsLimits) {
   tp = convert(civil_second::min(), west);
   EXPECT_EQ(time_point<absl::time_internal::cctz::seconds>::min(), tp);
 
+  // Some similar checks for the "libc" time-zone implementation.
   if (sizeof(std::time_t) >= 8) {
     // Checks that "tm_year + 1900", as used by the "libc" implementation,
     // can produce year values beyond the range on an int without overflow.
 #if defined(_WIN32) || defined(_WIN64)
-    // localtime_s() and gmtime_s() don't believe in years past 3000.
+    // localtime_s() and gmtime_s() don't believe in years outside [1970:3000].
 #else
-    const time_zone libc_utc = LoadZone("libc:UTC");
-    tp = convert(civil_year(year_t{2147483648}), libc_utc);
-    EXPECT_EQ("2147483648-01-01T00:00:00+00:00", format(RFC3339, tp, libc_utc));
+    const time_zone utc = LoadZone("libc:UTC");
+    const year_t max_tm_year = year_t{std::numeric_limits<int>::max()} + 1900;
+    tp = convert(civil_second(max_tm_year, 12, 31, 23, 59, 59), utc);
+    EXPECT_EQ("2147485547-12-31T23:59:59+00:00", format(RFC3339, tp, utc));
+    const year_t min_tm_year = year_t{std::numeric_limits<int>::min()} + 1900;
+    tp = convert(civil_second(min_tm_year, 1, 1, 0, 0, 0), utc);
+    EXPECT_EQ("-2147481748-01-01T00:00:00+00:00", format(RFC3339, tp, utc));
 #endif
   }
+}
+
+TEST(MakeTime, LocalTimeLibC) {
+  // Checks that cctz and libc agree on transition points in [1970:2037].
+  //
+  // We limit this test case to environments where:
+  //  1) we know how to change the time zone used by localtime()/mktime(),
+  //  2) cctz and localtime()/mktime() will use similar-enough tzdata, and
+  //  3) we have some idea about how mktime() behaves during transitions.
+#if defined(__linux__)
+  const char* const ep = getenv("TZ");
+  std::string tz_name = (ep != nullptr) ? ep : "";
+  for (const char* const* np = kTimeZoneNames; *np != nullptr; ++np) {
+    ASSERT_EQ(0, setenv("TZ", *np, 1));  // change what "localtime" means
+    const auto zi = local_time_zone();
+    const auto lc = LoadZone("libc:localtime");
+    time_zone::civil_transition trans;
+    for (auto tp = zi.lookup(civil_second()).trans;
+         zi.next_transition(tp, &trans);
+         tp = zi.lookup(trans.to).trans) {
+      const auto fcl = zi.lookup(trans.from);
+      const auto tcl = zi.lookup(trans.to);
+      civil_second cs;  // compare cs in zi and lc
+      if (fcl.kind == time_zone::civil_lookup::UNIQUE) {
+        if (tcl.kind == time_zone::civil_lookup::UNIQUE) {
+          // Both unique; must be an is_dst or abbr change.
+          ASSERT_EQ(trans.from, trans.to);
+          const auto trans = fcl.trans;
+          const auto tal = zi.lookup(trans);
+          const auto tprev = trans - absl::time_internal::cctz::seconds(1);
+          const auto pal = zi.lookup(tprev);
+          if (pal.is_dst == tal.is_dst) {
+            ASSERT_STRNE(pal.abbr, tal.abbr);
+          }
+          continue;
+        }
+        ASSERT_EQ(time_zone::civil_lookup::REPEATED, tcl.kind);
+        cs = trans.to;
+      } else {
+        ASSERT_EQ(time_zone::civil_lookup::UNIQUE, tcl.kind);
+        ASSERT_EQ(time_zone::civil_lookup::SKIPPED, fcl.kind);
+        cs = trans.from;
+      }
+      if (cs.year() > 2037) break;  // limit test time (and to 32-bit time_t)
+      const auto cl_zi = zi.lookup(cs);
+      if (zi.lookup(cl_zi.pre).is_dst == zi.lookup(cl_zi.post).is_dst) {
+        // The "libc" implementation cannot correctly classify transitions
+        // that don't change the "tm_isdst" flag.  In Europe/Volgograd, for
+        // example, there is a SKIPPED transition from +03 to +04 with dst=F
+        // on both sides ...
+        //   1540681199 = 2018-10-28 01:59:59 +03:00:00 [dst=F off=10800]
+        //   1540681200 = 2018-10-28 03:00:00 +04:00:00 [dst=F off=14400]
+        // but std::mktime(2018-10-28 02:00:00, tm_isdst=0) fails, unlike,
+        // say, the similar Europe/Chisinau transition from +02 to +03 ...
+        //   1521935999 = 2018-03-25 01:59:59 +02:00:00 [dst=F off=7200]
+        //   1521936000 = 2018-03-25 03:00:00 +03:00:00 [dst=T off=10800]
+        // where std::mktime(2018-03-25 02:00:00, tm_isdst=0) succeeds and
+        // returns 1521936000.
+        continue;
+      }
+      if (cs == civil_second(2037, 10, 4, 2, 0, 0)) {
+        const std::string tzname = *np;
+        if (tzname == "Africa/Casablanca" || tzname == "Africa/El_Aaiun") {
+          // The "libc" implementation gets this transition wrong (at least
+          // until 2018g when it was removed), returning an offset of 3600
+          // instead of 0.  TODO: Revert this when 2018g is ubiquitous.
+          continue;
+        }
+      }
+      const auto cl_lc = lc.lookup(cs);
+      SCOPED_TRACE(testing::Message() << "For " << cs << " in " << *np);
+      EXPECT_EQ(cl_zi.kind, cl_lc.kind);
+      EXPECT_EQ(cl_zi.pre, cl_lc.pre);
+      EXPECT_EQ(cl_zi.trans, cl_lc.trans);
+      EXPECT_EQ(cl_zi.post, cl_lc.post);
+    }
+  }
+  if (ep == nullptr) {
+    ASSERT_EQ(0, unsetenv("TZ"));
+  } else {
+    ASSERT_EQ(0, setenv("TZ", tz_name.c_str(), 1));
+  }
+#endif
 }
 
 TEST(NextTransition, UTC) {

@@ -214,6 +214,9 @@ class SynchronizationStorage {
   // stack) should use this constructor.
   explicit SynchronizationStorage(base_internal::LinkerInitialized) {}
 
+  constexpr explicit SynchronizationStorage(absl::ConstInitType)
+      : is_dynamic_(false), once_(), space_{{0}} {}
+
   SynchronizationStorage(SynchronizationStorage&) = delete;
   SynchronizationStorage& operator=(SynchronizationStorage&) = delete;
 

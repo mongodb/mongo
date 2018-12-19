@@ -101,8 +101,8 @@ class LOCKABLE SpinLock {
   inline void Unlock() UNLOCK_FUNCTION() {
     ABSL_TSAN_MUTEX_PRE_UNLOCK(this, 0);
     uint32_t lock_value = lockword_.load(std::memory_order_relaxed);
-    lockword_.store(lock_value & kSpinLockCooperative,
-                    std::memory_order_release);
+    lock_value = lockword_.exchange(lock_value & kSpinLockCooperative,
+                                    std::memory_order_release);
 
     if ((lock_value & kSpinLockDisabledScheduling) != 0) {
       base_internal::SchedulingGuard::EnableRescheduling(true);

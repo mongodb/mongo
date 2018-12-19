@@ -15,7 +15,7 @@
 #
 
 load(
-    "//absl:copts.bzl",
+    "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
     "ABSL_TEST_COPTS",
     "ABSL_EXCEPTIONS_FLAG",
@@ -287,6 +287,7 @@ cc_test(
     linkopts = ABSL_EXCEPTIONS_FLAG_LINKOPTS,
     deps = [
         ":variant",
+        "//absl/base:config",
         "//absl/base:exception_safety_testing",
         "//absl/memory",
         "@com_google_googletest//:gtest_main",

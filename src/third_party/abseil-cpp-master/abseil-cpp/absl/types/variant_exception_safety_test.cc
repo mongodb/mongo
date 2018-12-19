@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include "absl/types/variant.h"
 
 #include <iostream>
@@ -20,8 +21,11 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/base/config.h"
 #include "absl/base/internal/exception_safety_testing.h"
 #include "absl/memory/memory.h"
+// See comment in absl/base/config.h
+#if !defined(ABSL_INTERNAL_MSVC_2017_DBG_MODE)
 
 namespace absl {
 namespace {
@@ -506,3 +510,5 @@ TEST(VariantExceptionSafetyTest, Swap) {
 
 }  // namespace
 }  // namespace absl
+
+#endif  // !defined(ABSL_INTERNAL_MSVC_2017_DBG_MODE)

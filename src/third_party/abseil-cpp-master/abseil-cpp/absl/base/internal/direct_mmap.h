@@ -75,7 +75,11 @@ inline void* DirectMmap(void* start, size_t length, int prot, int flags, int fd,
   // On these architectures, implement mmap with mmap2.
   static int pagesize = 0;
   if (pagesize == 0) {
+#if defined(__wasm__) || defined(__asmjs__)
     pagesize = getpagesize();
+#else
+    pagesize = sysconf(_SC_PAGESIZE);
+#endif
   }
   if (offset < 0 || offset % pagesize != 0) {
     errno = EINVAL;

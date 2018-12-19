@@ -69,6 +69,7 @@
 #include <winsock2.h>
 #endif
 #include <chrono>  // NOLINT(build/c++11)
+#include <cmath>
 #include <cstdint>
 #include <ctime>
 #include <ostream>
@@ -152,6 +153,16 @@ class Duration {
  public:
   // Value semantics.
   constexpr Duration() : rep_hi_(0), rep_lo_(0) {}  // zero-length duration
+
+  // Copyable.
+#if !defined(__clang__) && defined(_MSC_VER) && _MSC_VER < 1910
+  // Explicitly defining the constexpr copy constructor avoids an MSVC bug.
+  constexpr Duration(const Duration& d)
+      : rep_hi_(d.rep_hi_), rep_lo_(d.rep_lo_) {}
+#else
+  constexpr Duration(const Duration& d) = default;
+#endif
+  Duration& operator=(const Duration& d) = default;
 
   // Compound assignment operators.
   Duration& operator+=(Duration d);
@@ -401,10 +412,12 @@ Duration Milliseconds(T n) {
 }
 template <typename T, time_internal::EnableIfFloat<T> = 0>
 Duration Seconds(T n) {
-  if (n >= 0) {
+  if (n >= 0) {  // Note: `NaN >= 0` is false.
     if (n >= (std::numeric_limits<int64_t>::max)()) return InfiniteDuration();
     return time_internal::MakePosDoubleDuration(n);
   } else {
+    if (std::isnan(n))
+      return std::signbit(n) ? -InfiniteDuration() : InfiniteDuration();
     if (n <= (std::numeric_limits<int64_t>::min)()) return -InfiniteDuration();
     return -time_internal::MakePosDoubleDuration(-n);
   }
@@ -584,7 +597,11 @@ class Time {
   //   absl::Time t = absl::Now();
   //   absl::Time t = absl::TimeFromTimeval(tv);
   //   absl::Time t = absl::InfinitePast();
-  constexpr Time() {}
+  constexpr Time() = default;
+
+  // Copyable.
+  constexpr Time(const Time& t) = default;
+  Time& operator=(const Time& t) = default;
 
   // Assignment operators.
   Time& operator+=(Duration d) {
@@ -826,6 +843,8 @@ class TimeZone {
  public:
   explicit TimeZone(time_internal::cctz::time_zone tz) : cz_(tz) {}
   TimeZone() = default;  // UTC, but prefer UTCTimeZone() to be explicit.
+
+  // Copyable.
   TimeZone(const TimeZone&) = default;
   TimeZone& operator=(const TimeZone&) = default;
 
@@ -1320,9 +1339,12 @@ constexpr Duration MakeNormalizedDuration(int64_t sec, int64_t ticks) {
   return (ticks < 0) ? MakeDuration(sec - 1, ticks + kTicksPerSecond)
                      : MakeDuration(sec, ticks);
 }
+
 // Provide access to the Duration representation.
 constexpr int64_t GetRepHi(Duration d) { return d.rep_hi_; }
 constexpr uint32_t GetRepLo(Duration d) { return d.rep_lo_; }
+
+// Returns true iff d is positive or negative infinity.
 constexpr bool IsInfiniteDuration(Duration d) { return GetRepLo(d) == ~0U; }
 
 // Returns an infinite Duration with the opposite sign.
@@ -1419,10 +1441,10 @@ T ToChronoDuration(Duration d) {
   using Period = typename T::period;
   static_assert(IsValidRep64<Rep>(0), "duration::rep is invalid");
   if (time_internal::IsInfiniteDuration(d))
-    return d < ZeroDuration() ? T::min() : T::max();
+    return d < ZeroDuration() ? (T::min)() : (T::max)();
   const auto v = ToInt64(d, Period{});
-  if (v > (std::numeric_limits<Rep>::max)()) return T::max();
-  if (v < (std::numeric_limits<Rep>::min)()) return T::min();
+  if (v > (std::numeric_limits<Rep>::max)()) return (T::max)();
+  if (v < (std::numeric_limits<Rep>::min)()) return (T::min)();
   return T{v};
 }
 

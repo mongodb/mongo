@@ -56,6 +56,17 @@ MATCHER_P(TimevalMatcher, tv, "") {
   return false;
 }
 
+TEST(Duration, ConstExpr) {
+  constexpr absl::Duration d0 = absl::ZeroDuration();
+  static_assert(d0 == absl::ZeroDuration(), "ZeroDuration()");
+  constexpr absl::Duration d1 = absl::Seconds(1);
+  static_assert(d1 == absl::Seconds(1), "Seconds(1)");
+  static_assert(d1 != absl::ZeroDuration(), "Seconds(1)");
+  constexpr absl::Duration d2 = absl::InfiniteDuration();
+  static_assert(d2 == absl::InfiniteDuration(), "InfiniteDuration()");
+  static_assert(d2 != absl::ZeroDuration(), "InfiniteDuration()");
+}
+
 TEST(Duration, ValueSemantics) {
   // If this compiles, the test passes.
   constexpr absl::Duration a;      // Default construction
@@ -790,6 +801,40 @@ TEST(Duration, DivisionByZero) {
   EXPECT_EQ(dbl_inf, absl::FDivDuration(zero, zero));
   EXPECT_EQ(dbl_inf, absl::FDivDuration(any_dur, zero));
   EXPECT_EQ(-dbl_inf, absl::FDivDuration(-any_dur, zero));
+}
+
+TEST(Duration, NaN) {
+  // Note that IEEE 754 does not define the behavior of a nan's sign when it is
+  // copied, so the code below allows for either + or - InfiniteDuration.
+#define TEST_NAN_HANDLING(NAME, NAN)           \
+  do {                                         \
+    const auto inf = absl::InfiniteDuration(); \
+    auto x = NAME(NAN);                        \
+    EXPECT_TRUE(x == inf || x == -inf);        \
+    auto y = NAME(42);                         \
+    y *= NAN;                                  \
+    EXPECT_TRUE(y == inf || y == -inf);        \
+    auto z = NAME(42);                         \
+    z /= NAN;                                  \
+    EXPECT_TRUE(z == inf || z == -inf);        \
+  } while (0)
+
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  TEST_NAN_HANDLING(absl::Nanoseconds, nan);
+  TEST_NAN_HANDLING(absl::Microseconds, nan);
+  TEST_NAN_HANDLING(absl::Milliseconds, nan);
+  TEST_NAN_HANDLING(absl::Seconds, nan);
+  TEST_NAN_HANDLING(absl::Minutes, nan);
+  TEST_NAN_HANDLING(absl::Hours, nan);
+
+  TEST_NAN_HANDLING(absl::Nanoseconds, -nan);
+  TEST_NAN_HANDLING(absl::Microseconds, -nan);
+  TEST_NAN_HANDLING(absl::Milliseconds, -nan);
+  TEST_NAN_HANDLING(absl::Seconds, -nan);
+  TEST_NAN_HANDLING(absl::Minutes, -nan);
+  TEST_NAN_HANDLING(absl::Hours, -nan);
+
+#undef TEST_NAN_HANDLING
 }
 
 TEST(Duration, Range) {

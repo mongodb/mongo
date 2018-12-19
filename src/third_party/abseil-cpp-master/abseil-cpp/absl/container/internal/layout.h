@@ -232,13 +232,17 @@ struct SizeOf : NotAligned<T>, std::integral_constant<size_t, sizeof(T)> {};
 template <class T, size_t N>
 struct SizeOf<Aligned<T, N>> : std::integral_constant<size_t, sizeof(T)> {};
 
+// Note: workaround for https://gcc.gnu.org/PR88115
 template <class T>
-struct AlignOf : NotAligned<T>, std::integral_constant<size_t, alignof(T)> {};
+struct AlignOf : NotAligned<T> {
+  static constexpr size_t value = alignof(T);
+};
 
 template <class T, size_t N>
-struct AlignOf<Aligned<T, N>> : std::integral_constant<size_t, N> {
+struct AlignOf<Aligned<T, N>> {
   static_assert(N % alignof(T) == 0,
                 "Custom alignment can't be lower than the type's alignment");
+  static constexpr size_t value = N;
 };
 
 // Does `Ts...` contain `T`?
@@ -249,8 +253,10 @@ template <class From, class To>
 using CopyConst =
     typename std::conditional<std::is_const<From>::value, const To, To>::type;
 
+// Note: We're not qualifying this with absl:: because it doesn't compile under
+// MSVC.
 template <class T>
-using SliceType = absl::Span<T>;
+using SliceType = Span<T>;
 
 // This namespace contains no types. It prevents functions defined in it from
 // being found by ADL.
@@ -290,7 +296,7 @@ std::string TypeName() {
 #ifdef ABSL_INTERNAL_HAS_CXA_DEMANGLE
   demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
 #endif
-  if (status == 0 && demangled != nullptr) {  // Demangling succeeeded.
+  if (status == 0 && demangled != nullptr) {  // Demangling succeeded.
     absl::StrAppend(&out, "<", demangled, ">");
     free(demangled);
   } else {
@@ -396,7 +402,7 @@ class LayoutImpl<std::tuple<Elements...>, absl::index_sequence<SizeSeq...>,
     static_assert(N < NumOffsets, "Index out of bounds");
     return adl_barrier::Align(
         Offset<N - 1>() + SizeOf<ElementType<N - 1>>() * size_[N - 1],
-        ElementAlignment<N>());
+        ElementAlignment<N>::value);
   }
 
   // Offset in bytes of the array with the specified element type. There must
@@ -445,7 +451,7 @@ class LayoutImpl<std::tuple<Elements...>, absl::index_sequence<SizeSeq...>,
     return Size<ElementIndex<T>()>();
   }
 
-    // The number of elements of all arrays for which they are known.
+  // The number of elements of all arrays for which they are known.
   constexpr std::array<size_t, NumSizes> Sizes() const {
     return {{Size<SizeSeq>()...}};
   }
@@ -610,7 +616,7 @@ class LayoutImpl<std::tuple<Elements...>, absl::index_sequence<SizeSeq...>,
 #ifdef ADDRESS_SANITIZER
     PoisonPadding<Char, N - 1>(p);
     // The `if` is an optimization. It doesn't affect the observable behaviour.
-    if (ElementAlignment<N - 1>() % ElementAlignment<N>()) {
+    if (ElementAlignment<N - 1>::value % ElementAlignment<N>::value) {
       size_t start =
           Offset<N - 1>() + SizeOf<ElementType<N - 1>>() * size_[N - 1];
       ASAN_POISON_MEMORY_REGION(p + start, Offset<N>() - start);
@@ -690,7 +696,7 @@ class Layout : public internal_layout::LayoutType<sizeof...(Ts), Ts...> {
   //
   // It's allowed to pass fewer array sizes than the number of arrays. E.g.,
   // if all you need is to the offset of the second array, you only need to
-  // pass one argument -- the number of elements in the first arrays.
+  // pass one argument -- the number of elements in the first array.
   //
   //   // int[3] followed by 4 bytes of padding and an unknown number of
   //   // doubles.

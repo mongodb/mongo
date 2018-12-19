@@ -78,8 +78,14 @@ constexpr int64_t kint64min = std::numeric_limits<int64_t>::min();
 
 // Can't use std::isinfinite() because it doesn't exist on windows.
 inline bool IsFinite(double d) {
+  if (std::isnan(d)) return false;
   return d != std::numeric_limits<double>::infinity() &&
          d != -std::numeric_limits<double>::infinity();
+}
+
+inline bool IsValidDivisor(double d) {
+  if (std::isnan(d)) return false;
+  return d != 0.0;
 }
 
 // Can't use std::round() because it is only available in C++11.
@@ -455,7 +461,7 @@ Duration& Duration::operator/=(int64_t r) {
 }
 
 Duration& Duration::operator/=(double r) {
-  if (time_internal::IsInfiniteDuration(*this) || r == 0.0) {
+  if (time_internal::IsInfiniteDuration(*this) || !IsValidDivisor(r)) {
     const bool is_neg = (std::signbit(r) != 0) != (rep_hi_ < 0);
     return *this = is_neg ? -InfiniteDuration() : InfiniteDuration();
   }

@@ -394,7 +394,12 @@ TEST(FormatParse, RoundTrip) {
   // work. On Windows, `absl::ParseTime()` falls back to std::get_time() which
   // appears to fail on "%c" (or at least on the "%c" text produced by
   // `strftime()`). This makes it fail the round-trip test.
-#ifndef _MSC_VER
+  //
+  // Under the emscripten compiler `absl::ParseTime() falls back to
+  // `strptime()`, but that ends up using a different definition for "%c"
+  // compared to `strftime()`, also causing the round-trip test to fail
+  // (see https://github.com/kripken/emscripten/pull/7491).
+#if !defined(_MSC_VER) && !defined(__EMSCRIPTEN__)
   // Even though we don't know what %c will produce, it should roundtrip,
   // but only in the 0-offset timezone.
   {
@@ -403,7 +408,7 @@ TEST(FormatParse, RoundTrip) {
     EXPECT_TRUE(absl::ParseTime("%c", s, &out, &err)) << s << ": " << err;
     EXPECT_EQ(in, out);
   }
-#endif  // _MSC_VER
+#endif  // !_MSC_VER && !__EMSCRIPTEN__
 }
 
 TEST(FormatParse, RoundTripDistantFuture) {

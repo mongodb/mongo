@@ -4,7 +4,7 @@
 # Download the latest googletest from Github master
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt.in
-  googletest-download/CMakeLists.txt
+  ${CMAKE_BINARY_DIR}/googletest-download/CMakeLists.txt
 )
 
 # Configure and build the downloaded googletest source

@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <ctime>
+#include <limits>
 #include <tuple>
 #include <utility>
 
@@ -85,6 +86,76 @@ OffsetAbbr get_offset_abbr(const T& tm, decltype(&T::__tm_gmtoff) = nullptr,
 #endif  // !defined(__tm_gmtoff) && !defined(__tm_zone)
 #endif
 
+inline std::tm* gm_time(const std::time_t *timep, std::tm *result) {
+#if defined(_WIN32) || defined(_WIN64)
+    return gmtime_s(result, timep) ? nullptr : result;
+#else
+    return gmtime_r(timep, result);
+#endif
+}
+
+inline std::tm* local_time(const std::time_t *timep, std::tm *result) {
+#if defined(_WIN32) || defined(_WIN64)
+    return localtime_s(result, timep) ? nullptr : result;
+#else
+    return localtime_r(timep, result);
+#endif
+}
+
+// Converts a civil second and "dst" flag into a time_t and UTC offset.
+// Returns false if time_t cannot represent the requested civil second.
+// Caller must have already checked that cs.year() will fit into a tm_year.
+bool make_time(const civil_second& cs, int is_dst, std::time_t* t, int* off) {
+  std::tm tm;
+  tm.tm_year = static_cast<int>(cs.year() - year_t{1900});
+  tm.tm_mon = cs.month() - 1;
+  tm.tm_mday = cs.day();
+  tm.tm_hour = cs.hour();
+  tm.tm_min = cs.minute();
+  tm.tm_sec = cs.second();
+  tm.tm_isdst = is_dst;
+  *t = std::mktime(&tm);
+  if (*t == std::time_t{-1}) {
+    std::tm tm2;
+    const std::tm* tmp = local_time(t, &tm2);
+    if (tmp == nullptr || tmp->tm_year != tm.tm_year ||
+        tmp->tm_mon != tm.tm_mon || tmp->tm_mday != tm.tm_mday ||
+        tmp->tm_hour != tm.tm_hour || tmp->tm_min != tm.tm_min ||
+        tmp->tm_sec != tm.tm_sec) {
+      // A true error (not just one second before the epoch).
+      return false;
+    }
+  }
+  *off = get_offset_abbr(tm).first;
+  return true;
+}
+
+// Find the least time_t in [lo:hi] where local time matches offset, given:
+// (1) lo doesn't match, (2) hi does, and (3) there is only one transition.
+std::time_t find_trans(std::time_t lo, std::time_t hi, int offset) {
+  std::tm tm;
+  while (lo + 1 != hi) {
+    const std::time_t mid = lo + (hi - lo) / 2;
+    if (std::tm* tmp = local_time(&mid, &tm)) {
+      if (get_offset_abbr(*tmp).first == offset) {
+        hi = mid;
+      } else {
+        lo = mid;
+      }
+    } else {
+      // If std::tm cannot hold some result we resort to a linear search,
+      // ignoring all failed conversions.  Slow, but never really happens.
+      while (++lo != hi) {
+        if (std::tm* tmp = local_time(&lo, &tm)) {
+          if (get_offset_abbr(*tmp).first == offset) break;
+        }
+      }
+      return lo;
+    }
+  }
+  return hi;
+}
+
 }  // namespace
 
 TimeZoneLibC::TimeZoneLibC(const std::string& name)
@@ -93,50 +164,107 @@ TimeZoneLibC::TimeZoneLibC(const std::string& name)
 time_zone::absolute_lookup TimeZoneLibC::BreakTime(
     const time_point<seconds>& tp) const {
   time_zone::absolute_lookup al;
-  std::time_t t = ToUnixSeconds(tp);
-  std::tm tm;
-  if (local_) {
-#if defined(_WIN32) || defined(_WIN64)
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
-    std::tie(al.offset, al.abbr) = get_offset_abbr(tm);
-  } else {
-#if defined(_WIN32) || defined(_WIN64)
-    gmtime_s(&tm, &t);
-#else
-    gmtime_r(&t, &tm);
-#endif
-    al.offset = 0;
-    al.abbr = "UTC";
+  al.offset = 0;
+  al.is_dst = false;
+  al.abbr = "-00";
+
+  const std::int_fast64_t s = ToUnixSeconds(tp);
+
+  // If std::time_t cannot hold the input we saturate the output.
+  if (s < std::numeric_limits<std::time_t>::min()) {
+    al.cs = civil_second::min();
+    return al;
   }
-  al.cs = civil_second(tm.tm_year + year_t{1900}, tm.tm_mon + 1, tm.tm_mday,
-                       tm.tm_hour, tm.tm_min, tm.tm_sec);
-  al.is_dst = tm.tm_isdst > 0;
+  if (s > std::numeric_limits<std::time_t>::max()) {
+    al.cs = civil_second::max();
+    return al;
+  }
+
+  const std::time_t t = static_cast<std::time_t>(s);
+  std::tm tm;
+  std::tm* tmp = local_ ? local_time(&t, &tm) : gm_time(&t, &tm);
+
+  // If std::tm cannot hold the result we saturate the output.
+  if (tmp == nullptr) {
+    al.cs = (s < 0) ? civil_second::min() : civil_second::max();
+    return al;
+  }
+
+  const year_t year = tmp->tm_year + year_t{1900};
+  al.cs = civil_second(year, tmp->tm_mon + 1, tmp->tm_mday,
+                       tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
+  std::tie(al.offset, al.abbr) = get_offset_abbr(*tmp);
+  if (!local_) al.abbr = "UTC";  // as expected by cctz
+  al.is_dst = tmp->tm_isdst > 0;
   return al;
 }
 
 time_zone::civil_lookup TimeZoneLibC::MakeTime(const civil_second& cs) const {
-  time_zone::civil_lookup cl;
-  std::time_t t;
-  if (local_) {
-    // Does not handle SKIPPED/AMBIGUOUS or huge years.
-    std::tm tm;
-    tm.tm_year = static_cast<int>(cs.year() - 1900);
-    tm.tm_mon = cs.month() - 1;
-    tm.tm_mday = cs.day();
-    tm.tm_hour = cs.hour();
-    tm.tm_min = cs.minute();
-    tm.tm_sec = cs.second();
-    tm.tm_isdst = -1;
-    t = std::mktime(&tm);
-  } else {
-    t = cs - civil_second();
+  if (!local_) {
+    // If time_point<seconds> cannot hold the result we saturate.
+    static const civil_second min_tp_cs =
+        civil_second() + ToUnixSeconds(time_point<seconds>::min());
+    static const civil_second max_tp_cs =
+        civil_second() + ToUnixSeconds(time_point<seconds>::max());
+    const time_point<seconds> tp =
+        (cs < min_tp_cs)
+            ? time_point<seconds>::min()
+            : (cs > max_tp_cs) ? time_point<seconds>::max()
+                               : FromUnixSeconds(cs - civil_second());
+    return {time_zone::civil_lookup::UNIQUE, tp, tp, tp};
   }
-  cl.kind = time_zone::civil_lookup::UNIQUE;
-  cl.pre = cl.trans = cl.post = FromUnixSeconds(t);
-  return cl;
+
+  // If tm_year cannot hold the requested year we saturate the result.
+  if (cs.year() < 0) {
+    if (cs.year() < std::numeric_limits<int>::min() + year_t{1900}) {
+      const time_point<seconds> tp = time_point<seconds>::min();
+      return {time_zone::civil_lookup::UNIQUE, tp, tp, tp};
+    }
+  } else {
+    if (cs.year() - year_t{1900} > std::numeric_limits<int>::max()) {
+      const time_point<seconds> tp = time_point<seconds>::max();
+      return {time_zone::civil_lookup::UNIQUE, tp, tp, tp};
+    }
+  }
+
+  // We probe with "is_dst" values of 0 and 1 to try to distinguish unique
+  // civil seconds from skipped or repeated ones.  This is not always possible
+  // however, as the "dst" flag does not change over some offset transitions.
+  // We are also subject to the vagaries of mktime() implementations.
+  std::time_t t0, t1;
+  int offset0, offset1;
+  if (make_time(cs, 0, &t0, &offset0) && make_time(cs, 1, &t1, &offset1)) {
+    if (t0 == t1) {
+      // The civil time was singular (pre == trans == post).
+      const time_point<seconds> tp = FromUnixSeconds(t0);
+      return {time_zone::civil_lookup::UNIQUE, tp, tp, tp};
+    }
+
+    if (t0 > t1) {
+      std::swap(t0, t1);
+      std::swap(offset0, offset1);
+    }
+    const std::time_t tt = find_trans(t0, t1, offset1);
+    const time_point<seconds> trans = FromUnixSeconds(tt);
+
+    if (offset0 < offset1) {
+      // The civil time did not exist (pre >= trans > post).
+      const time_point<seconds> pre = FromUnixSeconds(t1);
+      const time_point<seconds> post = FromUnixSeconds(t0);
+      return {time_zone::civil_lookup::SKIPPED, pre, trans, post};
+    }
+
+    // The civil time was ambiguous (pre < trans <= post).
+    const time_point<seconds> pre = FromUnixSeconds(t0);
+    const time_point<seconds> post = FromUnixSeconds(t1);
+    return {time_zone::civil_lookup::REPEATED, pre, trans, post};
+  }
+
+  // make_time() failed somehow so we saturate the result.
+  const time_point<seconds> tp = (cs < civil_second())
+                                     ? time_point<seconds>::min()
+                                     : time_point<seconds>::max();
+  return {time_zone::civil_lookup::UNIQUE, tp, tp, tp};
 }
 
 bool TimeZoneLibC::NextTransition(const time_point<seconds>& tp,

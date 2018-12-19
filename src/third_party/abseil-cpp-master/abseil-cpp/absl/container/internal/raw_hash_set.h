@@ -91,36 +91,6 @@
 #ifndef ABSL_CONTAINER_INTERNAL_RAW_HASH_SET_H_
 #define ABSL_CONTAINER_INTERNAL_RAW_HASH_SET_H_
 
-#ifndef SWISSTABLE_HAVE_SSE2
-#if defined(__SSE2__) ||  \
-    (defined(_MSC_VER) && \
-     (defined(_M_X64) || (defined(_M_IX86) && _M_IX86_FP >= 2)))
-#define SWISSTABLE_HAVE_SSE2 1
-#else
-#define SWISSTABLE_HAVE_SSE2 0
-#endif
-#endif
-
-#ifndef SWISSTABLE_HAVE_SSSE3
-#ifdef __SSSE3__
-#define SWISSTABLE_HAVE_SSSE3 1
-#else
-#define SWISSTABLE_HAVE_SSSE3 0
-#endif
-#endif
-
-#if SWISSTABLE_HAVE_SSSE3 && !SWISSTABLE_HAVE_SSE2
-#error "Bad configuration!"
-#endif
-
-#if SWISSTABLE_HAVE_SSE2
-#include <emmintrin.h>
-#endif
-
-#if SWISSTABLE_HAVE_SSSE3
-#include <tmmintrin.h>
-#endif
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -139,6 +109,7 @@
 #include "absl/container/internal/container_memory.h"
 #include "absl/container/internal/hash_policy_traits.h"
 #include "absl/container/internal/hashtable_debug_hooks.h"
+#include "absl/container/internal/have_sse.h"
 #include "absl/container/internal/layout.h"
 #include "absl/memory/memory.h"
 #include "absl/meta/type_traits.h"
@@ -403,7 +374,7 @@ struct GroupSse2Impl {
   }
 
   void ConvertSpecialToEmptyAndFullToDeleted(ctrl_t* dst) const {
-    auto msbs = _mm_set1_epi8('\x80');
+    auto msbs = _mm_set1_epi8(static_cast<char>(-128));
     auto x126 = _mm_set1_epi8(126);
 #if SWISSTABLE_HAVE_SSSE3
     auto res = _mm_or_si128(_mm_shuffle_epi8(x126, ctrl), msbs);
@@ -1363,7 +1334,7 @@ class raw_hash_set {
   void rehash(size_t n) {
     if (n == 0 && capacity_ == 0) return;
     if (n == 0 && size_ == 0) return destroy_slots();
-    auto m = NormalizeCapacity(std::max(n, NumSlotsFast(size())));
+    auto m = NormalizeCapacity((std::max)(n, NumSlotsFast(size())));
     // n == 0 unconditionally rehashes as per the standard.
     if (n == 0 || m > capacity_) {
       resize(m);

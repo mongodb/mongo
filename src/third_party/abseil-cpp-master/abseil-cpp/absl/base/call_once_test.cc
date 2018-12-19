@@ -18,6 +18,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "absl/base/attributes.h"
+#include "absl/base/const_init.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 
@@ -25,7 +27,8 @@ namespace absl {
 namespace {
 
 absl::once_flag once;
-Mutex counters_mu;
+
+ABSL_CONST_INIT Mutex counters_mu(absl::kConstInit);
 
 int running_thread_count GUARDED_BY(counters_mu) = 0;
 int call_once_invoke_count GUARDED_BY(counters_mu) = 0;

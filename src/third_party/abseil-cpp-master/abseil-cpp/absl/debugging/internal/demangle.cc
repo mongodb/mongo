@@ -1636,6 +1636,15 @@ static bool ParseExpression(State *state) {
   }
   state->parse_state = copy;
 
+  // Pointer-to-member access expressions.  This parses the same as a binary
+  // operator, but it's implemented separately because "ds" shouldn't be
+  // accepted in other contexts that parse an operator name.
+  if (ParseTwoCharToken(state, "ds") && ParseExpression(state) &&
+      ParseExpression(state)) {
+    return true;
+  }
+  state->parse_state = copy;
+
   // Parameter pack expansion
   if (ParseTwoCharToken(state, "sp") && ParseExpression(state)) {
     return true;

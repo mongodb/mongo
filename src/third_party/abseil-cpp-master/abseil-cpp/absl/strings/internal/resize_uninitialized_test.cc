@@ -24,44 +24,44 @@ struct resizable_string {
   void resize(size_t) { resize_call_count += 1; }
 };
 
-int resize_uninitialized_call_count = 0;
+int resize_default_init_call_count = 0;
 
-struct resize_uninitializable_string {
+struct resize_default_init_string {
   void resize(size_t) { resize_call_count += 1; }
-  void resize_uninitialized(size_t) { resize_uninitialized_call_count += 1; }
+  void __resize_default_init(size_t) { resize_default_init_call_count += 1; }
 };
 
 TEST(ResizeUninit, WithAndWithout) {
   resize_call_count = 0;
-  resize_uninitialized_call_count = 0;
+  resize_default_init_call_count = 0;
   {
     resizable_string rs;
 
     EXPECT_EQ(resize_call_count, 0);
-    EXPECT_EQ(resize_uninitialized_call_count, 0);
+    EXPECT_EQ(resize_default_init_call_count, 0);
     EXPECT_FALSE(
         absl::strings_internal::STLStringSupportsNontrashingResize(&rs));
     EXPECT_EQ(resize_call_count, 0);
-    EXPECT_EQ(resize_uninitialized_call_count, 0);
+    EXPECT_EQ(resize_default_init_call_count, 0);
     absl::strings_internal::STLStringResizeUninitialized(&rs, 237);
     EXPECT_EQ(resize_call_count, 1);
-    EXPECT_EQ(resize_uninitialized_call_count, 0);
+    EXPECT_EQ(resize_default_init_call_count, 0);
   }
 
   resize_call_count = 0;
-  resize_uninitialized_call_count = 0;
+  resize_default_init_call_count = 0;
   {
-    resize_uninitializable_string rus;
+    resize_default_init_string rus;
 
     EXPECT_EQ(resize_call_count, 0);
-    EXPECT_EQ(resize_uninitialized_call_count, 0);
+    EXPECT_EQ(resize_default_init_call_count, 0);
     EXPECT_TRUE(
         absl::strings_internal::STLStringSupportsNontrashingResize(&rus));
     EXPECT_EQ(resize_call_count, 0);
-    EXPECT_EQ(resize_uninitialized_call_count, 0);
+    EXPECT_EQ(resize_default_init_call_count, 0);
     absl::strings_internal::STLStringResizeUninitialized(&rus, 237);
     EXPECT_EQ(resize_call_count, 0);
-    EXPECT_EQ(resize_uninitialized_call_count, 1);
+    EXPECT_EQ(resize_default_init_call_count, 1);
   }
 }
 

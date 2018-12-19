@@ -15,7 +15,7 @@
 #
 
 load(
-    "//absl:copts.bzl",
+    "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
     "ABSL_TEST_COPTS",
     "ABSL_EXCEPTIONS_FLAG",
@@ -413,6 +413,7 @@ cc_test(
     copts = ABSL_TEST_COPTS,
     visibility = ["//visibility:private"],
     deps = [
+        ":pow10_helper",
         ":strings",
         "//absl/base",
         "//absl/base:core_headers",
@@ -471,6 +472,8 @@ cc_test(
     srcs = ["charconv_test.cc"],
     copts = ABSL_TEST_COPTS,
     deps = [
+        ":pow10_helper",
+        ":str_format",
         ":strings",
         "//absl/base",
         "@com_google_googletest//:gtest_main",
@@ -656,6 +659,26 @@ cc_test(
     deps = [
         ":str_format_internal",
         "//absl/base:core_headers",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "pow10_helper",
+    testonly = True,
+    srcs = ["internal/pow10_helper.cc"],
+    hdrs = ["internal/pow10_helper.h"],
+    visibility = ["//visibility:private"],
+)
+
+cc_test(
+    name = "pow10_helper_test",
+    srcs = ["internal/pow10_helper_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    visibility = ["//visibility:private"],
+    deps = [
+        ":pow10_helper",
+        ":str_format",
         "@com_google_googletest//:gtest_main",
     ],
 )

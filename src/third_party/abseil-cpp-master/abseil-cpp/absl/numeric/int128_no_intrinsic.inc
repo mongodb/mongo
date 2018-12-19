@@ -15,4 +15,4 @@
 
 // This file contains :int128 implementation details that depend on internal
 // representation when ABSL_HAVE_INTRINSIC_INT128 is *not* defined. This file
-// is included by int128.h.
+// is included by int128.h and relies on ABSL_INTERNAL_WCHAR_T being defined.

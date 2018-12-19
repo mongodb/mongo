@@ -326,6 +326,37 @@ CONSTEXPR_F fields align(year_tag, fields f) noexcept {
 
 ////////////////////////////////////////////////////////////////////////
 
+namespace impl {
+
+template <typename H>
+H AbslHashValueImpl(second_tag, H h, fields f) {
+  return H::combine(std::move(h), f.y, f.m, f.d, f.hh, f.mm, f.ss);
+}
+template <typename H>
+H AbslHashValueImpl(minute_tag, H h, fields f) {
+  return H::combine(std::move(h), f.y, f.m, f.d, f.hh, f.mm);
+}
+template <typename H>
+H AbslHashValueImpl(hour_tag, H h, fields f) {
+  return H::combine(std::move(h), f.y, f.m, f.d, f.hh);
+}
+template <typename H>
+H AbslHashValueImpl(day_tag, H h, fields f) {
+  return H::combine(std::move(h), f.y, f.m, f.d);
+}
+template <typename H>
+H AbslHashValueImpl(month_tag, H h, fields f) {
+  return H::combine(std::move(h), f.y, f.m);
+}
+template <typename H>
+H AbslHashValueImpl(year_tag, H h, fields f) {
+  return H::combine(std::move(h), f.y);
+}
+
+}  // namespace impl
+
+////////////////////////////////////////////////////////////////////////
+
 template <typename T>
 class civil_time {
  public:
@@ -355,12 +386,12 @@ class civil_time {
       : civil_time(ct.f_) {}
 
   // Factories for the maximum/minimum representable civil_time.
-  static CONSTEXPR_F civil_time max() {
-    const auto max_year = std::numeric_limits<std::int_least64_t>::max();
+  static CONSTEXPR_F civil_time (max)() {
+    const auto max_year = (std::numeric_limits<std::int_least64_t>::max)();
     return civil_time(max_year, 12, 31, 23, 59, 59);
   }
-  static CONSTEXPR_F civil_time min() {
-    const auto min_year = std::numeric_limits<std::int_least64_t>::min();
+  static CONSTEXPR_F civil_time (min)() {
+    const auto min_year = (std::numeric_limits<std::int_least64_t>::min)();
     return civil_time(min_year, 1, 1, 0, 0, 0);
   }
 
@@ -378,7 +409,7 @@ class civil_time {
     return *this;
   }
   CONSTEXPR_M civil_time& operator-=(diff_t n) noexcept {
-    if (n != std::numeric_limits<diff_t>::min()) {
+    if (n != (std::numeric_limits<diff_t>::min)()) {
       f_ = step(T{}, f_, -n);
     } else {
       f_ = step(T{}, step(T{}, f_, -(n + 1)), 1);
@@ -418,8 +449,7 @@ class civil_time {
 
   template <typename H>
   friend H AbslHashValue(H h, civil_time a) {
-    return H::combine(std::move(h), a.f_.y, a.f_.m, a.f_.d,
-                                    a.f_.hh, a.f_.mm, a.f_.ss);
+    return impl::AbslHashValueImpl(T{}, std::move(h), a.f_);
   }
 
  private:
@@ -506,9 +536,11 @@ enum class weekday {
 };
 
 CONSTEXPR_F weekday get_weekday(const civil_day& cd) noexcept {
-  CONSTEXPR_D weekday k_weekday_by_sun_off[7] = {
-      weekday::sunday,     weekday::monday,    weekday::tuesday,
-      weekday::wednesday,  weekday::thursday,  weekday::friday,
+  CONSTEXPR_D weekday k_weekday_by_mon_off[13] = {
+      weekday::monday,    weekday::tuesday,  weekday::wednesday,
+      weekday::thursday,  weekday::friday,   weekday::saturday,
+      weekday::sunday,    weekday::monday,   weekday::tuesday,
+      weekday::wednesday, weekday::thursday, weekday::friday,
       weekday::saturday,
   };
   CONSTEXPR_D int k_weekday_offsets[1 + 12] = {
@@ -517,7 +549,7 @@ CONSTEXPR_F weekday get_weekday(const civil_day& cd) noexcept {
   year_t wd = 2400 + (cd.year() % 400) - (cd.month() < 3);
   wd += wd / 4 - wd / 100 + wd / 400;
   wd += k_weekday_offsets[cd.month()] + cd.day();
-  return k_weekday_by_sun_off[(wd % 7 + 7) % 7];
+  return k_weekday_by_mon_off[wd % 7 + 6];
 }
 
 ////////////////////////////////////////////////////////////////////////

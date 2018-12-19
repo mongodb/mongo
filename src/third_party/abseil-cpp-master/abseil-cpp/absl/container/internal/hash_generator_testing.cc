@@ -39,9 +39,9 @@ class RandomDeviceSeedSeq {
 
 }  // namespace
 
-std::mt19937_64* GetThreadLocalRng() {
+std::mt19937_64* GetSharedRng() {
   RandomDeviceSeedSeq seed_seq;
-  thread_local auto* rng = new std::mt19937_64(seed_seq);
+  static auto* rng = new std::mt19937_64(seed_seq);
   return rng;
 }
 
@@ -51,7 +51,7 @@ std::string Generator<std::string>::operator()() const {
   std::string res;
   res.resize(32);
   std::generate(res.begin(), res.end(),
-                [&]() { return chars(*GetThreadLocalRng()); });
+                [&]() { return chars(*GetSharedRng()); });
   return res;
 }
 
@@ -63,7 +63,7 @@ absl::string_view Generator<absl::string_view>::operator()() const {
   auto& res = arena->back();
   res.resize(32);
   std::generate(res.begin(), res.end(),
-                [&]() { return chars(*GetThreadLocalRng()); });
+                [&]() { return chars(*GetSharedRng()); });
   return res;
 }
 

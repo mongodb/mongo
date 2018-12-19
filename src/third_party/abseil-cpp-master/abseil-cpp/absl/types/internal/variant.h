@@ -15,6 +15,7 @@
 // Implementation details of absl/types/variant.h, pulled into a
 // separate file to avoid cluttering the top of the API header with
 // implementation details.
+//
 
 #ifndef ABSL_TYPES_variant_internal_H_
 #define ABSL_TYPES_variant_internal_H_
@@ -1234,23 +1235,29 @@ using VariantCopyBase = absl::conditional_t<
 // Base that is dependent on whether or not the move-assign can be trivial.
 template <class... T>
 using VariantMoveAssignBase = absl::conditional_t<
-    absl::disjunction<absl::conjunction<absl::is_move_assignable<Union<T...>>,
-                                        std::is_move_constructible<Union<T...>>,
-                                        std::is_destructible<Union<T...>>>,
-                      absl::negation<absl::conjunction<
-                          std::is_move_constructible<T>...,
-                          absl::is_move_assignable<T>...>>>::value,
+    absl::disjunction<
+        absl::conjunction<absl::is_move_assignable<Union<T...>>,
+                          std::is_move_constructible<Union<T...>>,
+                          std::is_destructible<Union<T...>>>,
+        absl::negation<absl::conjunction<std::is_move_constructible<T>...,
+                                         // Note: We're not qualifying this with
+                                         // absl:: because it doesn't compile
+                                         // under MSVC.
+                                         is_move_assignable<T>...>>>::value,
     VariantCopyBase<T...>, VariantMoveAssignBaseNontrivial<T...>>;
 
 // Base that is dependent on whether or not the copy-assign can be trivial.
 template <class... T>
 using VariantCopyAssignBase = absl::conditional_t<
-    absl::disjunction<absl::conjunction<absl::is_copy_assignable<Union<T...>>,
-                                        std::is_copy_constructible<Union<T...>>,
-                                        std::is_destructible<Union<T...>>>,
-                      absl::negation<absl::conjunction<
-                          std::is_copy_constructible<T>...,
-                          absl::is_copy_assignable<T>...>>>::value,
+    absl::disjunction<
+        absl::conjunction<absl::is_copy_assignable<Union<T...>>,
+                          std::is_copy_constructible<Union<T...>>,
+                          std::is_destructible<Union<T...>>>,
+        absl::negation<absl::conjunction<std::is_copy_constructible<T>...,
+                                         // Note: We're not qualifying this with
+                                         // absl:: because it doesn't compile
+                                         // under MSVC.
+                                         is_copy_assignable<T>...>>>::value,
     VariantMoveAssignBase<T...>, VariantCopyAssignBaseNontrivial<T...>>;
 
 template <class... T>

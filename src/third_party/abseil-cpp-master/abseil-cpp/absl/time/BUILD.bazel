@@ -15,7 +15,7 @@
 #
 
 load(
-    "//absl:copts.bzl",
+    "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
     "ABSL_TEST_COPTS",
 )
@@ -110,6 +110,7 @@ cc_test(
         ":test_util",
         ":time",
         "//absl/base",
+        "//absl/hash",
         "@com_github_google_benchmark//:benchmark_main",
     ],
 )

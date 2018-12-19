@@ -52,6 +52,7 @@
 
 #include <atomic>
 
+#include "absl/base/macros.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
 

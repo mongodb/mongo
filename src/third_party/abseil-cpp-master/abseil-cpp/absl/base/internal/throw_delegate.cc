@@ -30,8 +30,8 @@ template <typename T>
 #ifdef ABSL_HAVE_EXCEPTIONS
   throw error;
 #else
-  ABSL_RAW_LOG(ERROR, "%s", error.what());
-  abort();
+  ABSL_RAW_LOG(FATAL, "%s", error.what());
+  std::abort();
 #endif
 }
 }  // namespace

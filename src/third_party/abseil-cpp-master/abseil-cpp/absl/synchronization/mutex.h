@@ -61,6 +61,7 @@
 #include <cstdint>
 #include <string>
 
+#include "absl/base/const_init.h"
 #include "absl/base/internal/identity.h"
 #include "absl/base/internal/low_level_alloc.h"
 #include "absl/base/internal/thread_identity.h"
@@ -136,7 +137,26 @@ struct SynchWaitParams;
 
 class LOCKABLE Mutex {
  public:
+  // Creates a `Mutex` that is not held by anyone. This constructor is
+  // typically used for Mutexes allocated on the heap or the stack.
+  //
+  // To create `Mutex` instances with static storage duration
+  // (e.g. a namespace-scoped or global variable), see
+  // `Mutex::Mutex(absl::kConstInit)` below instead.
   Mutex();
+
+  // Creates a mutex with static storage duration.  A global variable
+  // constructed this way avoids the lifetime issues that can occur on program
+  // startup and shutdown.  (See absl/base/const_init.h.)
+  //
+  // For Mutexes allocated on the heap and stack, instead use the default
+  // constructor, which can interact more fully with the thread sanitizer.
+  //
+  // Example usage:
+  //   namespace foo {
+  //   ABSL_CONST_INIT Mutex mu(absl::kConstInit);
+  //   }
+  explicit constexpr Mutex(absl::ConstInitType);
   ~Mutex();
 
   // Mutex::Lock()
@@ -879,10 +899,12 @@ class SCOPED_LOCKABLE ReleasableMutexLock {
 };
 
 #ifdef ABSL_INTERNAL_USE_NONPROD_MUTEX
+inline constexpr Mutex::Mutex(absl::ConstInitType) : impl_(absl::kConstInit) {}
 #else
 inline Mutex::Mutex() : mu_(0) {
   ABSL_TSAN_MUTEX_CREATE(this, __tsan_mutex_not_static);
 }
+inline constexpr Mutex::Mutex(absl::ConstInitType) : mu_(0) {}
 
 inline CondVar::CondVar() : cv_(0) {}
 #endif

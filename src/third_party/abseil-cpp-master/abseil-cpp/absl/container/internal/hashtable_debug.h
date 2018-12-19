@@ -60,7 +60,7 @@ std::vector<size_t> GetHashtableDebugNumProbesHistogram(const C& container) {
     size_t num_probes = GetHashtableDebugNumProbes(
         container,
         absl::container_internal::hashtable_debug_internal::GetKey<C>(*it, 0));
-    v.resize(std::max(v.size(), num_probes + 1));
+    v.resize((std::max)(v.size(), num_probes + 1));
     v[num_probes]++;
   }
   return v;

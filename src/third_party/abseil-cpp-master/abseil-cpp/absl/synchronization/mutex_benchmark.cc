@@ -12,15 +12,153 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
+#include <mutex>  // NOLINT(build/c++11)
 #include <vector>
 
-#include "benchmark/benchmark.h"
-#include "absl/base/internal/sysinfo.h"
+#include "absl/base/internal/cycleclock.h"
+#include "absl/base/internal/spinlock.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "absl/synchronization/internal/thread_pool.h"
 #include "absl/synchronization/mutex.h"
+#include "benchmark/benchmark.h"
 
 namespace {
+
+void BM_Mutex(benchmark::State& state) {
+  static absl::Mutex* mu = new absl::Mutex;
+  for (auto _ : state) {
+    absl::MutexLock lock(mu);
+  }
+}
+BENCHMARK(BM_Mutex)->UseRealTime()->Threads(1)->ThreadPerCpu();
+
+static void DelayNs(int64_t ns, int* data) {
+  int64_t end = absl::base_internal::CycleClock::Now() +
+                ns * absl::base_internal::CycleClock::Frequency() / 1e9;
+  while (absl::base_internal::CycleClock::Now() < end) {
+    ++(*data);
+    benchmark::DoNotOptimize(*data);
+  }
+}
+
+template <typename MutexType>
+class RaiiLocker {
+ public:
+  explicit RaiiLocker(MutexType* mu) : mu_(mu) { mu_->Lock(); }
+  ~RaiiLocker() { mu_->Unlock(); }
+ private:
+  MutexType* mu_;
+};
+
+template <>
+class RaiiLocker<std::mutex> {
+ public:
+  explicit RaiiLocker(std::mutex* mu) : mu_(mu) { mu_->lock(); }
+  ~RaiiLocker() { mu_->unlock(); }
+ private:
+  std::mutex* mu_;
+};
+
+template <typename MutexType>
+void BM_Contended(benchmark::State& state) {
+  struct Shared {
+    MutexType mu;
+    int data = 0;
+  };
+  static auto* shared = new Shared;
+  int local = 0;
+  for (auto _ : state) {
+    // Here we model both local work outside of the critical section as well as
+    // some work inside of the critical section. The idea is to capture some
+    // more or less realisitic contention levels.
+    // If contention is too low, the benchmark won't measure anything useful.
+    // If contention is unrealistically high, the benchmark will favor
+    // bad mutex implementations that block and otherwise distract threads
+    // from the mutex and shared state for as much as possible.
+    // To achieve this amount of local work is multiplied by number of threads
+    // to keep ratio between local work and critical section approximately
+    // equal regardless of number of threads.
+    DelayNs(100 * state.threads, &local);
+    RaiiLocker<MutexType> locker(&shared->mu);
+    DelayNs(state.range(0), &shared->data);
+  }
+}
+
+BENCHMARK_TEMPLATE(BM_Contended, absl::Mutex)
+    ->UseRealTime()
+    // ThreadPerCpu poorly handles non-power-of-two CPU counts.
+    ->Threads(1)
+    ->Threads(2)
+    ->Threads(4)
+    ->Threads(6)
+    ->Threads(8)
+    ->Threads(12)
+    ->Threads(16)
+    ->Threads(24)
+    ->Threads(32)
+    ->Threads(48)
+    ->Threads(64)
+    ->Threads(96)
+    ->Threads(128)
+    ->Threads(192)
+    ->Threads(256)
+    // Some empirically chosen amounts of work in critical section.
+    // 1 is low contention, 200 is high contention and few values in between.
+    ->Arg(1)
+    ->Arg(20)
+    ->Arg(50)
+    ->Arg(200);
+
+BENCHMARK_TEMPLATE(BM_Contended, absl::base_internal::SpinLock)
+    ->UseRealTime()
+    // ThreadPerCpu poorly handles non-power-of-two CPU counts.
+    ->Threads(1)
+    ->Threads(2)
+    ->Threads(4)
+    ->Threads(6)
+    ->Threads(8)
+    ->Threads(12)
+    ->Threads(16)
+    ->Threads(24)
+    ->Threads(32)
+    ->Threads(48)
+    ->Threads(64)
+    ->Threads(96)
+    ->Threads(128)
+    ->Threads(192)
+    ->Threads(256)
+    // Some empirically chosen amounts of work in critical section.
+    // 1 is low contention, 200 is high contention and few values in between.
+    ->Arg(1)
+    ->Arg(20)
+    ->Arg(50)
+    ->Arg(200);
+
+BENCHMARK_TEMPLATE(BM_Contended, std::mutex)
+    ->UseRealTime()
+    // ThreadPerCpu poorly handles non-power-of-two CPU counts.
+    ->Threads(1)
+    ->Threads(2)
+    ->Threads(4)
+    ->Threads(6)
+    ->Threads(8)
+    ->Threads(12)
+    ->Threads(16)
+    ->Threads(24)
+    ->Threads(32)
+    ->Threads(48)
+    ->Threads(64)
+    ->Threads(96)
+    ->Threads(128)
+    ->Threads(192)
+    ->Threads(256)
+    // Some empirically chosen amounts of work in critical section.
+    // 1 is low contention, 200 is high contention and few values in between.
+    ->Arg(1)
+    ->Arg(20)
+    ->Arg(50)
+    ->Arg(200);
 
 // Measure the overhead of conditions on mutex release (when they must be
 // evaluated).  Mutex has (some) support for equivalence classes allowing
@@ -81,14 +219,5 @@ constexpr int kMaxConditionWaiters = 8192;
 constexpr int kMaxConditionWaiters = 1024;
 #endif
 BENCHMARK(BM_ConditionWaiters)->RangePair(0, 2, 1, kMaxConditionWaiters);
-
-void BM_ContendedMutex(benchmark::State& state) {
-  static absl::Mutex* mu = new absl::Mutex;
-  for (auto _ : state) {
-    absl::MutexLock lock(mu);
-  }
-}
-BENCHMARK(BM_ContendedMutex)->Threads(1);
-BENCHMARK(BM_ContendedMutex)->ThreadPerCpu();
 
 }  // namespace

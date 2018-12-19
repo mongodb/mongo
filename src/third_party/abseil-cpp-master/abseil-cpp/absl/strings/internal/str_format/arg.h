@@ -80,7 +80,7 @@ ConvertResult<Conv::s> FormatConvertImpl(const AbslCord& value,
 
   int precision = conv.precision();
   if (precision >= 0)
-    to_write = std::min(to_write, static_cast<size_t>(precision));
+    to_write = (std::min)(to_write, static_cast<size_t>(precision));
 
   space_remaining = Excess(to_write, space_remaining);
 

@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=abseil-cpp
-REVISION=070f6e47b33a2909d039e620c873204f78809492
+REVISION=111ca7060a6ff50115ca85b59f6b5d8c8c5e9105
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
     SRC_ROOT+="$(mktemp -u /abseil-cpp.XXXXXX)"
@@ -47,8 +47,9 @@ if [ ! -d $SRC ]; then
 
     pushd $SRC
     $GIT_EXE checkout $REVISION
-    $GIT_EXE am $PATCH_DIR/0001-Fix-warning-C4309-argument-truncation-of-constant-va.patch
-    $GIT_EXE am $PATCH_DIR/0002-Use-_umul128-on-Windows-to-improve-performance-of-Mi.patch
+    for p in $(shopt -s nullglob; echo $PATCH_DIR/*.patch); do
+        $GIT_EXE am "$p"
+    done
     
     popd
 fi

@@ -17,6 +17,7 @@
 #include <type_traits>
 
 #include "absl/base/attributes.h"
+#include "absl/base/const_init.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
@@ -72,23 +73,19 @@ void ThreadTwo(absl::Mutex* mutex, absl::CondVar* condvar,
 // Launch thread 1 and thread 2, and block on their completion.
 // If any of 'mutex', 'condvar', or 'notification' is nullptr, use a locally
 // constructed instance instead.
-void RunTests(absl::Mutex* mutex, absl::CondVar* condvar,
-              absl::Notification* notification) {
+void RunTests(absl::Mutex* mutex, absl::CondVar* condvar) {
   absl::Mutex default_mutex;
   absl::CondVar default_condvar;
-  absl::Notification default_notification;
+  absl::Notification notification;
   if (!mutex) {
     mutex = &default_mutex;
   }
   if (!condvar) {
     condvar = &default_condvar;
   }
-  if (!notification) {
-    notification = &default_notification;
-  }
   bool state = false;
-  std::thread thread_one(ThreadOne, mutex, condvar, notification, &state);
-  std::thread thread_two(ThreadTwo, mutex, condvar, notification, &state);
+  std::thread thread_one(ThreadOne, mutex, condvar, &notification, &state);
+  std::thread thread_two(ThreadTwo, mutex, condvar, &notification, &state);
   thread_one.join();
   thread_two.join();
 }
@@ -96,9 +93,12 @@ void RunTests(absl::Mutex* mutex, absl::CondVar* condvar,
 void TestLocals() {
   absl::Mutex mutex;
   absl::CondVar condvar;
-  absl::Notification notification;
-  RunTests(&mutex, &condvar, &notification);
+  RunTests(&mutex, &condvar);
 }
+
+// Normal kConstInit usage
+ABSL_CONST_INIT absl::Mutex const_init_mutex(absl::kConstInit);
+void TestConstInitGlobal() { RunTests(&const_init_mutex, nullptr); }
 
 // Global variables during start and termination
 //
@@ -122,10 +122,53 @@ class OnDestruction {
   Function fn_;
 };
 
+// kConstInit
+// Test early usage.  (Declaration comes first; definitions must appear after
+// the test runner.)
+extern absl::Mutex early_const_init_mutex;
+// (Normally I'd write this +[], to make the cast-to-function-pointer explicit,
+// but in some MSVC setups we support, lambdas provide conversion operators to
+// different flavors of function pointers, making this trick ambiguous.)
+OnConstruction test_early_const_init([] {
+  RunTests(&early_const_init_mutex, nullptr);
+});
+// This definition appears before test_early_const_init, but it should be
+// initialized first (due to constant initialization).  Test that the object
+// actually works when constructed this way.
+ABSL_CONST_INIT absl::Mutex early_const_init_mutex(absl::kConstInit);
+
+// Furthermore, test that the const-init c'tor doesn't stomp over the state of
+// a Mutex.  Really, this is a test that the platform under test correctly
+// supports C++11 constant initialization.  (The constant-initialization
+// constructors of globals "happen at link time"; memory is pre-initialized,
+// before the constructors of either grab_lock or check_still_locked are run.)
+extern absl::Mutex const_init_sanity_mutex;
+OnConstruction grab_lock([]() NO_THREAD_SAFETY_ANALYSIS {
+  const_init_sanity_mutex.Lock();
+});
+ABSL_CONST_INIT absl::Mutex const_init_sanity_mutex(absl::kConstInit);
+OnConstruction check_still_locked([]() NO_THREAD_SAFETY_ANALYSIS {
+  const_init_sanity_mutex.AssertHeld();
+  const_init_sanity_mutex.Unlock();
+});
+
+// Test shutdown usage.  (Declarations come first; definitions must appear after
+// the test runner.)
+extern absl::Mutex late_const_init_mutex;
+// OnDestruction is being used here as a global variable, even though it has a
+// non-trivial destructor.  This is against the style guide.  We're violating
+// that rule here to check that the exception we allow for kConstInit is safe.
+// NOLINTNEXTLINE
+OnDestruction test_late_const_init([] {
+  RunTests(&late_const_init_mutex, nullptr);
+});
+ABSL_CONST_INIT absl::Mutex late_const_init_mutex(absl::kConstInit);
+
 }  // namespace
 
 int main() {
   TestLocals();
+  TestConstInitGlobal();
   // Explicitly call exit(0) here, to make it clear that we intend for the
   // above global object destructors to run.
   std::exit(0);

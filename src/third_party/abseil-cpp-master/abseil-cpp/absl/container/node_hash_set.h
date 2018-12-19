@@ -37,6 +37,7 @@
 
 #include <type_traits>
 
+#include "absl/algorithm/container.h"
 #include "absl/container/internal/hash_function_defaults.h"  // IWYU pragma: export
 #include "absl/container/internal/node_hash_policy.h"
 #include "absl/container/internal/raw_hash_set.h"  // IWYU pragma: export
@@ -67,7 +68,7 @@ struct NodeHashSetPolicy;
 // By default, `node_hash_set` uses the `absl::Hash` hashing framework.
 // All fundamental and Abseil types that support the `absl::Hash` framework have
 // a compatible equality operator for comparing insertions into `node_hash_set`.
-// If your type is not yet supported by the `asbl::Hash` framework, see
+// If your type is not yet supported by the `absl::Hash` framework, see
 // absl/hash/hash.h for information on extending Abseil hashing to user-defined
 // types.
 //
@@ -272,8 +273,7 @@ class node_hash_set
   //
   // The element may be constructed even if there already is an element with the
   // key in the container, in which case the newly constructed element will be
-  // destroyed immediately. Prefer `try_emplace()` unless your key is not
-  // copyable or moveable.
+  // destroyed immediately.
   //
   // If rehashing occurs due to the insertion, all iterators are invalidated.
   using Base::emplace;
@@ -287,8 +287,7 @@ class node_hash_set
   //
   // The element may be constructed even if there already is an element with the
   // key in the container, in which case the newly constructed element will be
-  // destroyed immediately. Prefer `try_emplace()` unless your key is not
-  // copyable or moveable.
+  // destroyed immediately.
   //
   // If rehashing occurs due to the insertion, all iterators are invalidated.
   using Base::emplace_hint;
@@ -475,5 +474,15 @@ struct NodeHashSetPolicy
   static size_t element_space_used(const T*) { return sizeof(T); }
 };
 }  // namespace container_internal
+
+namespace container_algorithm_internal {
+
+// Specialization of trait in absl/algorithm/container.h
+template <class Key, class Hash, class KeyEqual, class Allocator>
+struct IsUnorderedContainer<absl::node_hash_set<Key, Hash, KeyEqual, Allocator>>
+    : std::true_type {};
+
+}  // namespace container_algorithm_internal
 }  // namespace absl
+
 #endif  // ABSL_CONTAINER_NODE_HASH_SET_H_

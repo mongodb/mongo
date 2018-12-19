@@ -43,7 +43,7 @@ struct IsMap<Map, absl::void_t<typename Map::mapped_type>> : std::true_type {};
 
 }  // namespace generator_internal
 
-std::mt19937_64* GetThreadLocalRng();
+std::mt19937_64* GetSharedRng();
 
 enum Enum {
   kEnumEmpty,
@@ -66,7 +66,7 @@ template <class T>
 struct Generator<T, typename std::enable_if<std::is_integral<T>::value>::type> {
   T operator()() const {
     std::uniform_int_distribution<T> dist;
-    return dist(*GetThreadLocalRng());
+    return dist(*GetSharedRng());
   }
 };
 
@@ -76,7 +76,7 @@ struct Generator<Enum> {
     std::uniform_int_distribution<typename std::underlying_type<Enum>::type>
         dist;
     while (true) {
-      auto variate = dist(*GetThreadLocalRng());
+      auto variate = dist(*GetSharedRng());
       if (variate != kEnumEmpty && variate != kEnumDeleted)
         return static_cast<Enum>(variate);
     }
@@ -90,7 +90,7 @@ struct Generator<EnumClass> {
         typename std::underlying_type<EnumClass>::type>
         dist;
     while (true) {
-      EnumClass variate = static_cast<EnumClass>(dist(*GetThreadLocalRng()));
+      EnumClass variate = static_cast<EnumClass>(dist(*GetSharedRng()));
       if (variate != EnumClass::kEmpty && variate != EnumClass::kDeleted)
         return static_cast<EnumClass>(variate);
     }

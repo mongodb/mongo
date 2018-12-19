@@ -15,7 +15,7 @@
 #
 
 load(
-    "//absl:copts.bzl",
+    "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
     "ABSL_TEST_COPTS",
 )
@@ -170,17 +170,30 @@ cc_test(
     ],
 )
 
-cc_test(
-    name = "mutex_benchmark",
+cc_library(
+    name = "mutex_benchmark_common",
+    testonly = 1,
     srcs = ["mutex_benchmark.cc"],
-    copts = ABSL_TEST_COPTS,
-    tags = ["benchmark"],
-    visibility = ["//visibility:private"],
+    copts = ABSL_DEFAULT_COPTS,
+    visibility = [
+        "//absl/synchronization:__pkg__",
+    ],
     deps = [
         ":synchronization",
         ":thread_pool",
         "//absl/base",
         "@com_github_google_benchmark//:benchmark_main",
+    ],
+    alwayslink = 1,
+)
+
+cc_binary(
+    name = "mutex_benchmark",
+    testonly = 1,
+    copts = ABSL_DEFAULT_COPTS,
+    visibility = ["//visibility:private"],
+    deps = [
+        ":mutex_benchmark_common",
     ],
 )
 
