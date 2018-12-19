@@ -616,6 +616,45 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorT
               static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
 }
 
+TEST_F(TransactionCoordinatorServiceTest,
+       CoordinatorIsCanceledIfDeadlinePassesAndHasNotReceivedParticipantList) {
+    auto coordinatorService = TransactionCoordinatorService::get(operationContext());
+    const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
+    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), deadline);
+
+    // Reach the deadline.
+    network()->enterNetwork();
+    network()->runUntil(deadline);
+    network()->exitNetwork();
+
+    // The coordinator should no longer exist.
+    ASSERT(boost::none ==
+           coordinatorService->coordinateCommit(
+               operationContext(), lsid(), txnNumber(), kTwoShardIdSet));
+}
+
+TEST_F(TransactionCoordinatorServiceTest,
+       CoordinatorIsNotCanceledIfDeadlinePassesButHasReceivedParticipantList) {
+    auto coordinatorService = TransactionCoordinatorService::get(operationContext());
+    const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
+    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), deadline);
+
+    // Deliver the participant list before the deadline.
+    ASSERT(boost::none !=
+           coordinatorService->coordinateCommit(
+               operationContext(), lsid(), txnNumber(), kTwoShardIdSet));
+
+    // Reach the deadline.
+    network()->enterNetwork();
+    network()->runUntil(deadline);
+    network()->exitNetwork();
+
+    // The coordinator should still exist.
+    ASSERT(boost::none !=
+           coordinatorService->coordinateCommit(
+               operationContext(), lsid(), txnNumber(), kTwoShardIdSet));
+}
+
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        CoordinateCommitReturnsCorrectCommitDecisionOnAbort) {
 

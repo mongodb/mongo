@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
 
+#include <memory>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/transaction_coordinator_service.h"
@@ -110,12 +112,26 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
     }
 
     auto networkExecutor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto newCoordinator = std::make_shared<TransactionCoordinator>(
+    auto coordinator = std::make_shared<TransactionCoordinator>(
         networkExecutor, _threadPool.get(), lsid, txnNumber);
 
-    _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
+    _coordinatorCatalog->insert(opCtx, lsid, txnNumber, coordinator);
 
-    // TODO (SERVER-37024): Schedule abort task on executor to execute at commitDeadline.
+    // Schedule a task in the future to cancel the commit coordination on the coordinator, so that
+    // the coordinator does not remain in memory forever (in case the particpant list is never
+    // received).
+    auto cbHandle = uassertStatusOK(networkExecutor->scheduleWorkAt(
+        commitDeadline,
+        [coordinatorWeakPtr = std::weak_ptr<TransactionCoordinator>(coordinator)](
+            const mongo::executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+            auto coordinator = coordinatorWeakPtr.lock();
+            if (coordinator) {
+                coordinator->cancelIfCommitNotYetStarted();
+            }
+        }));
+
+    // TODO (SERVER-38715): Store the callback handle in the coordinator, so that the coordinator
+    // can cancel the cancel task on receiving the participant list.
 }
 
 boost::optional<Future<TransactionCoordinator::CommitDecision>>
