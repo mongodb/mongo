@@ -40,6 +40,7 @@
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
+#include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/temporary_record_store.h"
@@ -77,7 +78,7 @@ public:
      * @param engine - ownership passes to me
      */
     KVStorageEngine(KVEngine* engine,
-                    const KVStorageEngineOptions& options = KVStorageEngineOptions(),
+                    KVStorageEngineOptions options = KVStorageEngineOptions(),
                     stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory =
                         defaultDatabaseCatalogEntryFactory);
 
@@ -363,12 +364,15 @@ private:
 
     class RemoveDBChange;
 
-    stdx::function<KVDatabaseCatalogEntryFactory> _databaseCatalogEntryFactory;
-
-    KVStorageEngineOptions _options;
-
     // This must be the first member so it is destroyed last.
     std::unique_ptr<KVEngine> _engine;
+
+    const KVStorageEngineOptions _options;
+
+    stdx::function<KVDatabaseCatalogEntryFactory> _databaseCatalogEntryFactory;
+
+    // Manages drop-pending idents. Requires access to '_engine'.
+    KVDropPendingIdentReaper _dropPendingIdentReaper;
 
     const bool _supportsDocLocking;
     const bool _supportsDBLocking;
@@ -378,13 +382,14 @@ private:
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;
 
-    typedef std::map<std::string, KVDatabaseCatalogEntryBase*> DBMap;
-    DBMap _dbs;
-    mutable stdx::mutex _dbsLock;
-
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;
 
     std::unique_ptr<TimestampMonitor> _timestampMonitor;
+
+    // Protects '_dbs'.
+    mutable stdx::mutex _dbsLock;
+    using DBMap = std::map<std::string, KVDatabaseCatalogEntryBase*>;
+    DBMap _dbs;
 };
 }  // namespace mongo

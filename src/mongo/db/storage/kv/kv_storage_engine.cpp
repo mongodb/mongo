@@ -82,11 +82,12 @@ public:
 
 KVStorageEngine::KVStorageEngine(
     KVEngine* engine,
-    const KVStorageEngineOptions& options,
+    KVStorageEngineOptions options,
     stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory)
-    : _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
-      _options(options),
-      _engine(engine),
+    : _engine(engine),
+      _options(std::move(options)),
+      _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
+      _dropPendingIdentReaper(engine),
       _supportsDocLocking(_engine->supportsDocLocking()),
       _supportsDBLocking(_engine->supportsDBLocking()),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
@@ -346,6 +347,8 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         catalogIdents.insert(vec.begin(), vec.end());
     }
 
+    auto dropPendingIdents = _dropPendingIdentReaper.getAllIdents();
+
     // Drop all idents in the storage engine that are not known to the catalog. This can happen in
     // the case of a collection or index creation being rolled back.
     for (const auto& it : engineIdents) {
@@ -360,6 +363,14 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         // In repair context, any orphaned collection idents from the engine should already be
         // recovered in the catalog in loadCatalog().
         invariant(!(_catalog->isCollectionIdent(it) && _options.forRepair));
+
+        // Leave drop-pending idents alone.
+        // These idents have to be retained as long as the corresponding drops are not part of a
+        // checkpoint.
+        if (dropPendingIdents.find(it) != dropPendingIdents.cend()) {
+            log() << "Not removing ident for uncheckpointed collection or index drop: " << it;
+            continue;
+        }
 
         const auto& toRemove = it;
         log() << "Dropping unknown ident: " << toRemove;
