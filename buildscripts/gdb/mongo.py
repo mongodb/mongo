@@ -294,7 +294,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             # the session is easily identifiable.
             print("Session (" + str(session.address) + "):")
             print("SessionId", "=", lsid_str)
-            session_fields_to_print = ['_sessionId', '_checkoutOpCtx', '_killRequested']
+            session_fields_to_print = ['_sessionId', '_checkoutOpCtx', '_killsRequested']
             for field in session_fields_to_print:
                 print(field, "=", session[field])
 
