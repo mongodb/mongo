@@ -847,7 +847,7 @@ void OpDebug::AdditiveMetrics::incrementPrepareReadConflicts(long long n) {
     *prepareReadConflicts += n;
 }
 
-string OpDebug::AdditiveMetrics::report() {
+string OpDebug::AdditiveMetrics::report() const {
     StringBuilder s;
 
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", keysExamined);

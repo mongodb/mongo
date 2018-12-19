@@ -685,10 +685,7 @@ void TransactionParticipant::stashTransactionResources(OperationContext* opCtx) 
 
 void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx,
                                                          const std::string& cmdName) {
-    if (opCtx->getClient()->isInDirectClient()) {
-        return;
-    }
-
+    invariant(!opCtx->getClient()->isInDirectClient());
     invariant(opCtx->getTxnNumber());
 
     {
@@ -1372,13 +1369,12 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
 
 void TransactionParticipant::reportUnstashedState(OperationContext* opCtx,
                                                   BSONObjBuilder* builder) const {
-    stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
-
     // This method may only take the metrics mutex, as it is called with the Client mutex held.  So
     // we cannot check the stashed state directly.  Instead, a transaction is considered unstashed
     // if it is not actually a transaction (retryable write, no stash used), or is active (not
     // stashed), or has ended (any stash would be cleared).
 
+    stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
     const auto& singleTransactionStats = _transactionMetricsObserver.getSingleTransactionStats();
     if (!singleTransactionStats.isForMultiDocumentTransaction() ||
         singleTransactionStats.isActive() || singleTransactionStats.isEnded()) {
@@ -1489,7 +1485,7 @@ void TransactionParticipant::TransactionState::transitionTo(WithLock,
 void TransactionParticipant::_reportTransactionStats(WithLock wl,
                                                      BSONObjBuilder* builder,
                                                      repl::ReadConcernArgs readConcernArgs) const {
-    auto tickSource = getGlobalServiceContext()->getTickSource();
+    const auto tickSource = getGlobalServiceContext()->getTickSource();
     _transactionMetricsObserver.getSingleTransactionStats().report(
         builder, readConcernArgs, tickSource, tickSource->getTicks());
 }
@@ -1519,7 +1515,7 @@ std::string TransactionParticipant::_transactionInfoForLog(
 
     s << " readTimestamp:" << _speculativeTransactionReadOpTime.getTimestamp().toString() << ",";
 
-    auto singleTransactionStats = _transactionMetricsObserver.getSingleTransactionStats();
+    const auto& singleTransactionStats = _transactionMetricsObserver.getSingleTransactionStats();
 
     s << singleTransactionStats.getOpDebug()->additiveMetrics.report();
 
@@ -1569,7 +1565,7 @@ void TransactionParticipant::_logSlowTransaction(WithLock wl,
                                                  repl::ReadConcernArgs readConcernArgs) {
     // Only log multi-document transactions.
     if (!_txnState.isNone(wl)) {
-        auto tickSource = getGlobalServiceContext()->getTickSource();
+        const auto tickSource = getGlobalServiceContext()->getTickSource();
         // Log the transaction if its duration is longer than the slowMS command threshold.
         if (_transactionMetricsObserver.getSingleTransactionStats().getDuration(
                 tickSource, tickSource->getTicks()) > Milliseconds(serverGlobalParams.slowMS)) {
@@ -1874,16 +1870,6 @@ boost::optional<repl::OpTime> TransactionParticipant::_checkStatementExecuted(Wi
     invariant(_lastWrittenSessionRecord->getTxnNum() == txnNumber);
 
     return it->second;
-}
-
-Date_t TransactionParticipant::_getLastWriteDate(WithLock wl, TxnNumber txnNumber) const {
-    _checkValid(wl);
-    _checkIsActiveTransaction(wl, txnNumber);
-
-    if (!_lastWrittenSessionRecord || _lastWrittenSessionRecord->getTxnNum() != txnNumber)
-        return {};
-
-    return _lastWrittenSessionRecord->getLastWriteDate();
 }
 
 UpdateRequest TransactionParticipant::_makeUpdateRequest(

@@ -185,7 +185,7 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
         return false;
     }
 
-    for (const MultikeyPathInfo& path : txnParticipant->getMultikeyPathInfo()) {
+    for (const MultikeyPathInfo& path : txnParticipant->getUncommittedMultikeyPathInfos()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             return true;
         }
@@ -203,7 +203,7 @@ MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) c
     }
 
     MultikeyPaths ret = _indexMultikeyPaths;
-    for (const MultikeyPathInfo& path : txnParticipant->getMultikeyPathInfo()) {
+    for (const MultikeyPathInfo& path : txnParticipant->getUncommittedMultikeyPathInfos()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
         }
@@ -332,11 +332,8 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // Keep multikey changes in memory to correctly service later reads using this index.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
-        MultikeyPathInfo info;
-        info.nss = _collection->ns();
-        info.indexName = _descriptor->indexName();
-        info.multikeyPaths = paths;
-        txnParticipant->addMultikeyPathInfo(std::move(info));
+        txnParticipant->addUncommittedMultikeyPathInfo(
+            MultikeyPathInfo{_collection->ns(), _descriptor->indexName(), std::move(paths)});
     }
 }
 

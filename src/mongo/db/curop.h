@@ -106,7 +106,7 @@ public:
          * field2, ..., with corresponding values value1, value2, ..., we will output a string in
          * the format: "<field1>:<value1> <field2>:<value2> ...".
          */
-        std::string report();
+        std::string report() const;
 
         boost::optional<long long> keysExamined;
         boost::optional<long long> docsExamined;
