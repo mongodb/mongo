@@ -11,9 +11,44 @@ from . import summary as _summary
 from .. import config as _config
 from .. import selector as _selector
 
+# Map of error codes that could be seen. This is collected from:
+# * dbshell.cpp
+# * exit_code.h
+# * Unix signals
+# * Windows access violation
+EXIT_CODE_MAP = {
+    1: "DB Exception",
+    -6: "SIGABRT",
+    -9: "SIGKILL",
+    -11: "SIGSEGV",
+    -15: "SIGTERM",
+    14: "Exit Abrupt",
+    -3: "Failure executing JS file",
+    253: "Failure executing JS file",
+    -4: "Eval Error",
+    252: "Eval Error",
+    -5: "Mongorc Error",
+    251: "Mongorc Error",
+    250: "Unterminated Process",
+    -7: "Process Termination Error",
+    249: "Process Termination Error",
+    -1073741819: "Windows Access Violation",
+    -1073741571: "Stack Overflow",
+}
+
+
+def translate_exit_code(exit_code):
+    """
+    Convert the given exit code into a human readable string.
+
+    :param exit_code: Exit code to translate.
+    :return: Human readable string.
+    """
+    return EXIT_CODE_MAP.get(exit_code, "UNKNOWN")
+
 
 def synchronized(method):
-    """Provide decorator to enfore instance lock ownership when calling the method."""
+    """Provide decorator to enforce instance lock ownership when calling the method."""
 
     def synced(self, *args, **kwargs):
         """Sync an instance lock."""
@@ -287,7 +322,8 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         if num_failed > 0:
             sb.append("The following tests failed (with exit code):")
             for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
-                sb.append("    %s (%d)" % (test_info.test_file, test_info.return_code))
+                sb.append("    %s (%d %s)" % (test_info.test_file, test_info.return_code,
+                                              translate_exit_code(test_info.return_code)))
 
         if report.num_errored > 0:
             sb.append("The following tests had errors:")
