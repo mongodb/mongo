@@ -117,11 +117,11 @@ public:
                    rpc::ReplyBuilderInterface* result) const override {
         std::string dbname = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
-        // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
-        // of a view, the locks need to be released.
+        // Acquire locks. The RAII object is optional, because in the case of a view, the locks
+        // need to be released.
         boost::optional<AutoGetCollectionForReadCommand> ctx;
         ctx.emplace(opCtx,
-                    CommandHelpers::parseNsOrUUID(dbname, cmdObj),
+                    CommandHelpers::parseNsCollectionRequired(dbname, cmdObj),
                     AutoGetCollection::ViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 

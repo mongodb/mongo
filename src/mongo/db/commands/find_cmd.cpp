@@ -152,11 +152,11 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-            // Acquire locks and resolve possible UUID. The RAII object is optional, because in the
-            // case of a view, the locks need to be released.
+            // Acquire locks. The RAII object is optional, because in the case of a view, the locks
+            // need to be released.
             boost::optional<AutoGetCollectionForReadCommand> ctx;
             ctx.emplace(opCtx,
-                        CommandHelpers::parseNsOrUUID(_dbName, _request.body),
+                        CommandHelpers::parseNsCollectionRequired(_dbName, _request.body),
                         AutoGetCollection::ViewMode::kViewsPermitted);
             const auto nss = ctx->getNss();
 
