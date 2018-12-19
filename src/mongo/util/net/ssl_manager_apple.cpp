@@ -1559,7 +1559,8 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
     return stdx::make_unique<SSLManagerApple>(params, isServer);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("LoadICUData"))(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
+(InitializerContext*) {
     kMongoDBRolesOID = ::CFStringCreateWithCString(
         nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 

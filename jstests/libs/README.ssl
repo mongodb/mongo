@@ -1,3 +1,30 @@
+rollover_*.pem are certificates and a CA used to test rolling over X509 cluster authentication
+
+# Generate the root CA certificate:
+openssl genrsa -out rollover_ca.key 4096
+openssl req -key rollover_ca.key -new -x509 -days 3650 -out rollover_ca.pem \
+    -subj '/CN=Kernel Rollover Test CA/OU=Kernel/O=MongoDB\, Inc./L=New York/ST=New York/C=US' \
+    -addext "keyUsage = critical, digitalSignature, cRLSign, keyCertSign"
+
+cat rollover_ca.pem ca.pem > rollover_ca_merged.pem
+cat rollover_ca.key >> rollover_ca.pem
+rm rollover_ca.key
+
+# Generate the server key and cert:
+openssl genrsa -out rollover_server.key 2048
+openssl req -new -key rollover_server.key -days 3650 -out rollover_server.csr \
+    -subj '/CN=server/OU=Kernel (Rollover)/O=MongoDB\, Inc. (Rollover)/L=New York/ST=New York/C=US/'
+
+# Sign the new server cert and clean up
+openssl x509 -req -days 3650 -in rollover_server.csr -CA rollover_ca.pem -CAcreateserial \
+    -out rollover_server.pem -sha256 -extfile <(printf "subjectAltName=DNS:localhost,DNS:127.0.0.1")
+cat rollover_server.key >> rollover_server.pem
+rm rollover_server.key
+rm rollover_server.csr
+rm rollover_ca.srl
+
+---------------------------
+
 client-self-signed.pem represents the same RDN as client.pem, but using itself as a CA:
 
 openssl req -nodes -new -subj '/CN=client/OU=KernelUser/O=MongoDB/L=New York City/ST=New York/C=US' -out css.csr -keyout css.rsa

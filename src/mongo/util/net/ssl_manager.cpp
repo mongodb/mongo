@@ -288,6 +288,114 @@ constexpr int kASN1TeletexString = 20;
 constexpr int kASN1UniversalString = 28;
 constexpr int kASN1BMPString = 30;
 constexpr int kASN1OctetString = 4;
+
+void canonicalizeClusterDN(std::vector<std::string>* dn) {
+    // remove all RDNs we don't care about
+    for (size_t i = 0; i < dn->size(); i++) {
+        std::string& comp = dn->at(i);
+        boost::algorithm::trim(comp);
+        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
+            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
+            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
+            dn->erase(dn->begin() + i);
+            i--;
+        }
+    }
+    std::stable_sort(dn->begin(), dn->end());
+}
+
+constexpr StringData kOID_DC = "0.9.2342.19200300.100.1.25"_sd;
+constexpr StringData kOID_O = "2.5.4.10"_sd;
+constexpr StringData kOID_OU = "2.5.4.11"_sd;
+
+std::vector<SSLX509Name::Entry> canonicalizeClusterDN(
+    const std::vector<std::vector<SSLX509Name::Entry>>& entries) {
+    std::vector<SSLX509Name::Entry> ret;
+
+    for (const auto& rdn : entries) {
+        for (const auto& entry : rdn) {
+            if ((entry.oid != kOID_DC) && (entry.oid != kOID_O) && (entry.oid != kOID_OU)) {
+                continue;
+            }
+            ret.push_back(entry);
+        }
+    }
+    std::stable_sort(ret.begin(), ret.end());
+    return ret;
+}
+
+class ClusterMemberDNOverride : public ServerParameter {
+public:
+    ClusterMemberDNOverride()
+        : ServerParameter(
+              ServerParameterSet::getGlobal(), "tlsX509ClusterAuthDNOverride", true, true) {}
+
+    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) override {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_value) {
+            return;
+        }
+
+        b.append(name, _value->fullDN.toString());
+    }
+
+    Status set(const BSONElement& newValueElement) override {
+        if (newValueElement.type() != String) {
+            return {ErrorCodes::BadValue, "DN must be a string"};
+        }
+        return setFromString(newValueElement.String());
+    }
+
+    Status setFromString(const std::string& str) override {
+        if (str.empty()) {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            _value = boost::none;
+            return Status::OK();
+        }
+
+        auto swDN = parseDN(str);
+        if (!swDN.isOK()) {
+            return swDN.getStatus();
+        }
+        auto dn = std::move(swDN.getValue());
+        auto status = dn.normalizeStrings();
+        if (!status.isOK()) {
+            return status;
+        }
+
+        DNValue val(std::move(dn));
+        if (val.canonicalized.empty()) {
+            return {ErrorCodes::BadValue,
+                    "Cluster member DN's must contain at least one O, OU, or DC component"};
+        }
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _value = {std::move(val)};
+
+        return Status::OK();
+    }
+
+    boost::optional<std::vector<SSLX509Name::Entry>> getCanonical() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_value) {
+            return boost::none;
+        }
+        return _value->canonicalized;
+    }
+
+private:
+    struct DNValue {
+        explicit DNValue(SSLX509Name dn)
+            : fullDN(std::move(dn)), canonicalized(canonicalizeClusterDN(fullDN.entries())) {}
+
+        SSLX509Name fullDN;
+        std::vector<SSLX509Name::Entry> canonicalized;
+    };
+
+    stdx::mutex _mutex;
+    boost::optional<DNValue> _value;
+} clusterMemberDNOverrideParameter;
+
 }  // namespace
 
 StatusWith<SSLX509Name> parseDN(StringData sd) try {
@@ -537,43 +645,6 @@ std::string SSLX509Name::toString() const {
     return os.str();
 }
 
-namespace {
-void canonicalizeClusterDN(std::vector<std::string>* dn) {
-    // remove all RDNs we don't care about
-    for (size_t i = 0; i < dn->size(); i++) {
-        std::string& comp = dn->at(i);
-        boost::algorithm::trim(comp);
-        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
-            dn->erase(dn->begin() + i);
-            i--;
-        }
-    }
-    std::stable_sort(dn->begin(), dn->end());
-}
-
-constexpr StringData kOID_DC = "0.9.2342.19200300.100.1.25"_sd;
-constexpr StringData kOID_O = "2.5.4.10"_sd;
-constexpr StringData kOID_OU = "2.5.4.11"_sd;
-
-std::vector<SSLX509Name::Entry> canonicalizeClusterDN(
-    const std::vector<std::vector<SSLX509Name::Entry>>& entries) {
-    std::vector<SSLX509Name::Entry> ret;
-
-    for (const auto& rdn : entries) {
-        for (const auto& entry : rdn) {
-            if ((entry.oid != kOID_DC) && (entry.oid != kOID_O) && (entry.oid != kOID_OU)) {
-                continue;
-            }
-            ret.push_back(entry);
-        }
-    }
-    std::stable_sort(ret.begin(), ret.end());
-    return ret;
-}
-}  // namespace
-
 Status SSLConfiguration::setServerSubjectName(SSLX509Name name) {
     auto status = name.normalizeStrings();
     if (!status.isOK()) {
@@ -601,8 +672,16 @@ bool SSLConfiguration::isClusterMember(SSLX509Name subject) const {
     }
 
     auto client = canonicalizeClusterDN(subject.entries());
+    if (client.empty()) {
+        return false;
+    }
 
-    return !client.empty() && (client == _canonicalServerSubjectName);
+    if (client == _canonicalServerSubjectName) {
+        return true;
+    }
+
+    auto altClusterDN = clusterMemberDNOverrideParameter.getCanonical();
+    return (altClusterDN && (client == *altClusterDN));
 }
 
 bool SSLConfiguration::isClusterMember(StringData subjectName) const {

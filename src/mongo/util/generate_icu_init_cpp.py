@@ -101,7 +101,8 @@ alignas(16) const uint8_t kRawData[] = {%(decimal_encoded_data)s};
 
 }  // namespace
 
-MONGO_INITIALIZER(LoadICUData)(InitializerContext* context) {
+MONGO_INITIALIZER_GENERAL(LoadICUData, MONGO_NO_PREREQUISITES, ("BeginStartupOptionHandling"))(
+        InitializerContext* context) {
     UErrorCode status = U_ZERO_ERROR;
     udata_setCommonData(kRawData, &status);
     fassert(40088, U_SUCCESS(status));

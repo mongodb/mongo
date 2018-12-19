@@ -344,7 +344,8 @@ private:
     UniqueCertificate _sslClusterCertificate;
 };
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("LoadICUData"))(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
+(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerWindows(sslGlobalParams, isSSLServer);
