@@ -31,6 +31,7 @@ var $config = (function() {
         // shard. The setup function creates documents with sequential numbering and gives
         // each shard its own numeric range to work with.
         shardKey: {_id: 1},
+        shardKeyField: '_id',
     };
 
     data.makePartition = function makePartition(ns, tid, partitionSize) {
@@ -68,6 +69,8 @@ var $config = (function() {
         // We must split up these cases because MinKey and MaxKey are not fully comparable.
         // This may be due to SERVER-18341, where the Matcher returns false positives in
         // comparison predicates with MinKey/MaxKey.
+        const maxField = 'max.' + this.shardKeyField;
+        const minField = 'min.' + this.shardKeyField;
         if (this.partition.isLowChunk && this.partition.isHighChunk) {
             return coll
                 .aggregate([
@@ -78,14 +81,20 @@ var $config = (function() {
         } else if (this.partition.isLowChunk) {
             return coll
                 .aggregate([
-                    {$match: {ns: this.partition.ns, 'max._id': {$lte: this.partition.chunkUpper}}},
+                    {
+                      $match:
+                          {ns: this.partition.ns, [maxField]: {$lte: this.partition.chunkUpper}}
+                    },
                     {$sample: {size: 1}}
                 ])
                 .toArray()[0];
         } else if (this.partition.isHighChunk) {
             return coll
                 .aggregate([
-                    {$match: {ns: this.partition.ns, 'min._id': {$gte: this.partition.chunkLower}}},
+                    {
+                      $match:
+                          {ns: this.partition.ns, [minField]: {$gte: this.partition.chunkLower}}
+                    },
                     {$sample: {size: 1}}
                 ])
                 .toArray()[0];
@@ -95,8 +104,8 @@ var $config = (function() {
                     {
                       $match: {
                           ns: this.partition.ns,
-                          'min._id': {$gte: this.partition.chunkLower},
-                          'max._id': {$lte: this.partition.chunkUpper}
+                          [minField]: {$gte: this.partition.chunkLower},
+                          [maxField]: {$lte: this.partition.chunkUpper}
                       }
                     },
                     {$sample: {size: 1}}
