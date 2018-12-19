@@ -1384,16 +1384,18 @@ TEST_F(RollbackImplTest, RollbackCallsClearOpTimes) {
     txnMetrics->addActiveOpTime(repl::OpTime(Timestamp(1, 3), 0));
 
     // All three variables should be populated at this time.
-    ASSERT_EQ(txnMetrics->getOldestActiveOpTime(), repl::OpTime(Timestamp(1, 2), 0));
+    ASSERT(txnMetrics->getOldestActiveOpTime());
+    ASSERT_EQ(*txnMetrics->getOldestActiveOpTime(), repl::OpTime(Timestamp(1, 2), 0));
     ASSERT_EQ(txnMetrics->getTotalActiveOpTimes(), 2U);
-    ASSERT_EQ(txnMetrics->getOldestNonMajorityCommittedOpTime(), repl::OpTime(Timestamp(1, 2), 0));
+    ASSERT(txnMetrics->getOldestNonMajorityCommittedOpTime());
+    ASSERT_EQ(*txnMetrics->getOldestNonMajorityCommittedOpTime(), repl::OpTime(Timestamp(1, 2), 0));
 
     // Call runRollback to make sure these variables get cleared.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
-    ASSERT_EQ(txnMetrics->getOldestActiveOpTime(), boost::none);
+    ASSERT_FALSE(txnMetrics->getOldestActiveOpTime());
     ASSERT_EQ(txnMetrics->getTotalActiveOpTimes(), 0U);
-    ASSERT_EQ(txnMetrics->getOldestNonMajorityCommittedOpTime(), boost::none);
+    ASSERT_FALSE(txnMetrics->getOldestNonMajorityCommittedOpTime());
 }
 
 /**

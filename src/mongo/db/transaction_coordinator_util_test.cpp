@@ -70,19 +70,22 @@ protected:
                                std::vector<ShardId> expectedParticipants,
                                boost::optional<std::string> expectedDecision = boost::none,
                                boost::optional<Timestamp> expectedCommitTimestamp = boost::none) {
-        ASSERT_EQUALS(doc.getId().getSessionId(), expectedLsid);
-        ASSERT_EQUALS(doc.getId().getTxnNumber(), expectedTxnNum);
+        ASSERT(doc.getId().getSessionId());
+        ASSERT_EQUALS(*doc.getId().getSessionId(), expectedLsid);
+        ASSERT(doc.getId().getTxnNumber());
+        ASSERT_EQUALS(*doc.getId().getTxnNumber(), expectedTxnNum);
 
         ASSERT(doc.getParticipants() == expectedParticipants);
 
         if (expectedDecision) {
-            ASSERT_EQUALS(expectedDecision, doc.getDecision()->toString());
+            ASSERT_EQUALS(*expectedDecision, doc.getDecision()->toString());
         } else {
             ASSERT(!doc.getDecision());
         }
 
         if (expectedCommitTimestamp) {
-            ASSERT_EQUALS(expectedCommitTimestamp, doc.getCommitTimestamp());
+            ASSERT(doc.getCommitTimestamp());
+            ASSERT_EQUALS(*expectedCommitTimestamp, *doc.getCommitTimestamp());
         } else {
             ASSERT(!doc.getCommitTimestamp());
         }

@@ -940,7 +940,9 @@ TEST_F(FreeMonControllerTest, TestRegister) {
 
     controller.start(RegistrationType::DoNotRegister);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerCommand());
 
@@ -960,7 +962,9 @@ TEST_F(FreeMonControllerTest, TestRegisterTimeout) {
 
     controller.start(RegistrationType::DoNotRegister);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
     controller->turnCrankForTest(Turner().registerCommand(2));
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::pending);
@@ -977,7 +981,9 @@ TEST_F(FreeMonControllerTest, TestRegisterFail) {
 
     controller.start(RegistrationType::DoNotRegister);
 
-    ASSERT_NOT_OK(controller->registerServerCommand(duration_cast<Milliseconds>(Seconds(15))));
+    auto optionalStatus = controller->registerServerCommand(Seconds(15));
+    ASSERT(optionalStatus);
+    ASSERT_NOT_OK(*optionalStatus);
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::disabled);
     ASSERT_EQ(controller.network->getRegistersCalls(), 1);
@@ -994,7 +1000,9 @@ TEST_F(FreeMonControllerTest, TestRegisterHalts) {
 
     controller.start(RegistrationType::DoNotRegister);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
     controller->turnCrankForTest(Turner().registerCommand());
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::disabled);
@@ -1094,7 +1102,9 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegister) {
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().metricsSend().collect(4));
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerCommand().metricsSend().collect(2).metricsSend());
 
@@ -1115,19 +1125,25 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegisterAndRereg
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().metricsSend().collect(4));
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerCommand().collect(2).metricsSend());
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get())->getState() == StorageStateEnum::enabled);
 
-    ASSERT_OK(controller->unregisterServerCommand(Milliseconds::min()));
+    optionalStatus = controller->unregisterServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().unRegisterCommand().collect(3));
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get())->getState() == StorageStateEnum::disabled);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerCommand().metricsSend().collect(2).metricsSend());
 
@@ -1148,7 +1164,9 @@ TEST_F(FreeMonControllerTest, TestMetricsUnregisterCancelsRegister) {
 
     controller.start(RegistrationType::DoNotRegister);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
     controller->turnCrankForTest(Turner().registerCommand(2));
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::pending);
@@ -1156,7 +1174,9 @@ TEST_F(FreeMonControllerTest, TestMetricsUnregisterCancelsRegister) {
     ASSERT_GTE(controller.network->getRegistersCalls(), 2);
     ASSERT_GTE(controller.registerCollector->count(), 2UL);
 
-    ASSERT_OK(controller->unregisterServerCommand(Milliseconds::min()));
+    optionalStatus = controller->unregisterServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().unRegisterCommand());
 
@@ -1241,7 +1261,9 @@ TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
 
     controller->turnCrankForTest(Turner().registerServer().collect(4));
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerCommand().metricsSend());
 
@@ -1263,7 +1285,9 @@ TEST_F(FreeMonControllerTest, TestResendRegistration) {
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(2));
 
@@ -1445,7 +1469,9 @@ TEST_F(FreeMonControllerRSTest, StepdownDuringRegistration) {
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerServer() + 1);
 
@@ -1471,7 +1497,9 @@ TEST_F(FreeMonControllerRSTest, StepdownDuringMetricsSend) {
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
 
-    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+    auto optionalStatus = controller->registerServerCommand(Milliseconds::min());
+    ASSERT(optionalStatus);
+    ASSERT_OK(*optionalStatus);
 
     controller->turnCrankForTest(Turner().registerServer().registerCommand().collect());
 

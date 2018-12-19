@@ -531,7 +531,8 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithUuid) {
     _createCollection(_opCtx.get(), _sourceNss, options);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
-    ASSERT_NOT_EQUALS(options.uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
+    ASSERT(options.uuid);
+    ASSERT_NOT_EQUALS(*options.uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
 }
 
 TEST_F(RenameCollectionTest,
@@ -745,7 +746,8 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
                                                              << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
-    ASSERT_EQUALS(targetUUID, _opObserver->onRenameCollectionDropTarget);
+    ASSERT(_opObserver->onRenameCollectionDropTarget);
+    ASSERT_EQUALS(targetUUID, *_opObserver->onRenameCollectionDropTarget);
 
     auto renameOpTime = _opObserver->renameOpTime;
     ASSERT_GREATER_THAN(renameOpTime, repl::OpTime());

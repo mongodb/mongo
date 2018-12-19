@@ -108,9 +108,11 @@ protected:
         auto txnRecord = SessionTxnRecord::parse(IDLParserErrorContext("parse txn record for test"),
                                                  unittest::assertGet(result));
 
-        ASSERT_EQ(opCtx()->getTxnNumber(), txnRecord.getTxnNum());
+        ASSERT(opCtx()->getTxnNumber());
+        ASSERT_EQ(*opCtx()->getTxnNumber(), txnRecord.getTxnNum());
         ASSERT_EQ(_opObserver->applyOpsOplogEntry->getOpTime(), txnRecord.getLastWriteOpTime());
-        ASSERT_EQ(_opObserver->applyOpsOplogEntry->getWallClockTime(),
+        ASSERT(_opObserver->applyOpsOplogEntry->getWallClockTime());
+        ASSERT_EQ(*_opObserver->applyOpsOplogEntry->getWallClockTime(),
                   txnRecord.getLastWriteDate());
     }
 
@@ -280,7 +282,7 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithOtherUuid) {
     // Collection has a different UUID.
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
-    ASSERT_NOT_EQUALS(doTxnUuid, collectionOptions.uuid);
+    ASSERT_NOT_EQUALS(doTxnUuid, *collectionOptions.uuid);
     ASSERT_OK(_storage->createCollection(opCtx(), nss, collectionOptions));
 
     // The doTxn returns a NamespaceNotFound error because of the failed UUID lookup

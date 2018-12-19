@@ -127,7 +127,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialSucceeds) {
     for (auto result : trialResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
-    ASSERT_EQ(nextResult(trialStage.get()), boost::none);
+    ASSERT_FALSE(nextResult(trialStage.get()));
     ASSERT_TRUE(trialStage->isEOF());
 }
 
@@ -162,7 +162,7 @@ TEST_F(TrialStageTest, AdoptsTrialPlanIfTrialPlanHitsEOF) {
     for (auto result : trialResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
-    ASSERT_EQ(nextResult(trialStage.get()), boost::none);
+    ASSERT_FALSE(nextResult(trialStage.get()));
     ASSERT_TRUE(trialStage->isEOF());
 }
 
@@ -200,7 +200,7 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialDoesNotSucceed) {
     for (auto result : backupResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
-    ASSERT_EQ(nextResult(trialStage.get()), boost::none);
+    ASSERT_FALSE(nextResult(trialStage.get()));
     ASSERT_TRUE(trialStage->isEOF());
 }
 
@@ -240,7 +240,7 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialPlanDies) {
     for (auto result : backupResults) {
         ASSERT_BSONOBJ_EQ(result, *nextResult(trialStage.get()));
     }
-    ASSERT_EQ(nextResult(trialStage.get()), boost::none);
+    ASSERT_FALSE(nextResult(trialStage.get()));
     ASSERT_TRUE(trialStage->isEOF());
 }
 

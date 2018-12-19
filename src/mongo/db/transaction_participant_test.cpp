@@ -480,7 +480,7 @@ TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransac
         ASSERT(commitOplogEntryOpTime);
         ASSERT(commitTimestamp);
 
-        ASSERT_GT(commitTimestamp, prepareTimestamp);
+        ASSERT_GT(*commitTimestamp, prepareTimestamp);
     };
 
     txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
@@ -1091,7 +1091,7 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
 
     txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
     // Check that we removed the prepareTimestamp from the set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
@@ -3508,7 +3508,7 @@ TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
     txnParticipant->abortActiveTransaction(opCtx());
     ASSERT(txnParticipant->transactionIsAborted());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
 }
 
 TEST_F(TxnParticipantTest, ProperlyMaintainOldestNonMajorityCommittedOpTimeSet) {
@@ -3551,7 +3551,7 @@ TEST_F(TxnParticipantTest, ProperlyMaintainOldestNonMajorityCommittedOpTimeSet) 
     // oldestNonMajorityCommittedOpTimes along with the abort/commit oplog entry OpTime
     // associated with the transaction.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
 
     nonMajorityCommittedOpTime =
         ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
@@ -3560,7 +3560,8 @@ TEST_F(TxnParticipantTest, ProperlyMaintainOldestNonMajorityCommittedOpTimeSet) 
     ASSERT_FALSE(nonMajorityCommittedOpTime == boost::none);
     ASSERT_FALSE(nonMajorityCommittedOpTimeFinishOpTime == boost::none);
     ASSERT_EQ(nonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
-    ASSERT_EQ(nonMajorityCommittedOpTimeFinishOpTime, finishOpTime);
+    ASSERT(nonMajorityCommittedOpTimeFinishOpTime);
+    ASSERT_EQ(*nonMajorityCommittedOpTimeFinishOpTime, finishOpTime);
 
     // If we pass in a mock commit point that is greater than the finish timestamp of the
     // oldestNonMajorityCommittedOpTime, it should be removed from the set. This would mean that
@@ -3569,7 +3570,7 @@ TEST_F(TxnParticipantTest, ProperlyMaintainOldestNonMajorityCommittedOpTimeSet) 
         repl::OpTime::max());
     nonMajorityCommittedOpTime =
         ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    ASSERT_EQ(nonMajorityCommittedOpTime, boost::none);
+    ASSERT_FALSE(nonMajorityCommittedOpTime);
 }
 
 TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry) {
@@ -3603,7 +3604,7 @@ TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry
         repl::OpTime::max());
     nonMajorityCommittedOpTime =
         ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    ASSERT_EQ(nonMajorityCommittedOpTime, boost::none);
+    ASSERT_FALSE(nonMajorityCommittedOpTime);
 
     // Test that we can remove only a part of the set by passing in a commit point that is only
     // greater than or equal to two of the optimes.
@@ -3628,7 +3629,8 @@ TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry
 
     // earlierOpTime and middleOpTime must have been removed because their finishOpTime are less
     // than or equal to the mock commit point.
-    ASSERT_EQ(nonMajorityCommittedOpTime, laterOpTime);
+    ASSERT(nonMajorityCommittedOpTime);
+    ASSERT_EQ(*nonMajorityCommittedOpTime, laterOpTime);
 }
 
 TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
@@ -3645,10 +3647,9 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Check that our metrics are initialized to their default values.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime(),
-              boost::none);
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime());
 
     // Perform an insert as a part of a transaction so that we have a transaction operation.
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -3688,9 +3689,8 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     ASSERT_EQ(txnParticipant->getActiveTxnNumber(), kUninitializedTxnNumber);
 
     // After calling clearOpTimes, we should no longer have an oldestActiveOpTime.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime(), boost::none);
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime(),
-              boost::none);
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
+    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
 }
 
