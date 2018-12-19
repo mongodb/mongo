@@ -395,7 +395,7 @@ public:
      *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
      */
-    repl::OpTime getLastWriteOpTime(TxnNumber txnNumber) const;
+    repl::OpTime getLastWriteOpTime() const;
 
     /**
      * Returns the prepare op time that was selected for the transaction, which can be Null if the
@@ -644,15 +644,11 @@ private:
 
     boost::optional<repl::OpTime> _checkStatementExecuted(StmtId stmtId) const;
 
-    UpdateRequest _makeUpdateRequest(WithLock,
-                                     TxnNumber newTxnNumber,
-                                     const repl::OpTime& newLastWriteOpTime,
+    UpdateRequest _makeUpdateRequest(const repl::OpTime& newLastWriteOpTime,
                                      Date_t newLastWriteDate,
                                      boost::optional<DurableTxnStateEnum> newState) const;
 
-    void _registerUpdateCacheOnCommit(OperationContext* opCtx,
-                                      TxnNumber newTxnNumber,
-                                      std::vector<StmtId> stmtIdsWritten,
+    void _registerUpdateCacheOnCommit(std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
     // Called for speculative transactions to fix the optime of the snapshot to read from.
@@ -772,6 +768,9 @@ private:
     // means a new transaction has begun on the session, but it hasn't yet performed any writes.
     TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
 
+    // Caches what is known to be the last optime written for the active transaction.
+    repl::OpTime _lastWriteOpTime;
+
     // Set when a snapshot read / transaction begins. Alleviates cache pressure by limiting how long
     // a snapshot will remain open and available. Checked in combination with _txnState to determine
     // whether the transaction should be aborted.
@@ -826,9 +825,6 @@ private:
     // Set to true if incomplete history is detected. For example, when the oplog to a write was
     // truncated because it was too old.
     bool _hasIncompleteHistory{false};
-
-    // Caches what is known to be the last written transaction record for the session
-    boost::optional<SessionTxnRecord> _lastWrittenSessionRecord;
 
     // For the active txn, tracks which statement ids have been committed and at which oplog
     // opTime. Used for fast retryability check and retrieving the previous write's data without

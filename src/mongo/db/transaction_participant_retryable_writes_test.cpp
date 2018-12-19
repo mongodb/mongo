@@ -242,11 +242,11 @@ protected:
                   txnRecordObj.hasField(SessionTxnRecord::kStateFieldName));
 
         const auto txnParticipant = TransactionParticipant::get(session);
-        ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime(txnNum));
+        ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime());
 
         txnParticipant->invalidate();
         txnParticipant->refreshFromStorageIfNeeded();
-        ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime(txnNum));
+        ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime());
     }
 
 private:
@@ -260,7 +260,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin)
 
     const TxnNumber txnNum = 20;
     txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
-    ASSERT(txnParticipant->getLastWriteOpTime(txnNum).isNull());
+    ASSERT(txnParticipant->getLastWriteOpTime().isNull());
 
     DBDirectClient client(opCtx());
     auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
@@ -292,7 +292,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrit
     ASSERT_EQ(txnNum, txnRecord.getTxnNum());
     ASSERT_EQ(opTime, txnRecord.getLastWriteOpTime());
     ASSERT(!txnRecord.getState());
-    ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime(txnNum));
+    ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime());
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest,
@@ -318,11 +318,11 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     ASSERT_EQ(200, txnRecord.getTxnNum());
     ASSERT_EQ(secondOpTime, txnRecord.getLastWriteOpTime());
     ASSERT(!txnRecord.getState());
-    ASSERT_EQ(secondOpTime, txnParticipant->getLastWriteOpTime(200));
+    ASSERT_EQ(secondOpTime, txnParticipant->getLastWriteOpTime());
 
     txnParticipant->invalidate();
     txnParticipant->refreshFromStorageIfNeeded();
-    ASSERT_EQ(secondOpTime, txnParticipant->getLastWriteOpTime(200));
+    ASSERT_EQ(secondOpTime, txnParticipant->getLastWriteOpTime());
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, TransactionTableUpdatesReplaceEntireDocument) {
@@ -349,7 +349,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {
     ASSERT_THROWS_CODE(txnParticipant->beginOrContinue(txnNum - 1, boost::none, boost::none),
                        AssertionException,
                        ErrorCodes::TransactionTooOld);
-    ASSERT(txnParticipant->getLastWriteOpTime(txnNum).isNull());
+    ASSERT(txnParticipant->getLastWriteOpTime().isNull());
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionNotDefaultCreated) {
@@ -462,31 +462,6 @@ DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
     txnParticipant->invalidate();
     txnParticipant->onWriteOpCompletedOnPrimary(
         opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
-}
-
-TEST_F(TransactionParticipantRetryableWritesTest,
-       WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
-    const auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant->refreshFromStorageIfNeeded();
-
-    const TxnNumber txnNum = 100;
-    txnParticipant->beginOrContinue(txnNum, boost::none, boost::none);
-
-    {
-        AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx());
-        const auto uuid = UUID::gen();
-        const auto opTime = logOp(opCtx(), kNss, uuid, *opCtx()->getLogicalSessionId(), txnNum, 0);
-        txnParticipant->onWriteOpCompletedOnPrimary(
-            opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
-
-        txnParticipant->invalidate();
-
-        wuow.commit();
-    }
-
-    txnParticipant->refreshFromStorageIfNeeded();
-    ASSERT(txnParticipant->checkStatementExecuted(0));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTruncation) {

@@ -521,9 +521,9 @@ protected:
         const auto txnParticipant = TransactionParticipant::get(session());
         if (!opTime.isNull()) {
             ASSERT_EQ(opTime, txnRecord.getLastWriteOpTime());
-            ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime(txnNum));
+            ASSERT_EQ(opTime, txnParticipant->getLastWriteOpTime());
         } else {
-            ASSERT_EQ(txnRecord.getLastWriteOpTime(), txnParticipant->getLastWriteOpTime(txnNum));
+            ASSERT_EQ(txnRecord.getLastWriteOpTime(), txnParticipant->getLastWriteOpTime());
         }
     }
 

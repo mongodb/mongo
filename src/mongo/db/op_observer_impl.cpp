@@ -190,7 +190,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
     if (txnParticipant) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
+        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
     }
 
     OpTimeBundle opTimes;
@@ -254,7 +254,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     if (txnParticipant) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
+        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
     }
 
     OpTimeBundle opTimes;
@@ -940,7 +940,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
 
     const auto txnParticipant = TransactionParticipant::get(opCtx);
-    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
+    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
     // Until we support multiple oplog entries per transaction, prevOpTime should always be null.
     invariant(oplogLink.prevOpTime.isNull());
 
@@ -983,7 +983,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
 
     const auto txnParticipant = TransactionParticipant::get(opCtx);
-    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(*opCtx->getTxnNumber());
+    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
 
     const StmtId stmtId(1);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);

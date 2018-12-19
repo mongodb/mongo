@@ -277,7 +277,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                        ? oplogEntry.getObject()
                        : BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
-    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime(result.txnNum);
+    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
 
     writeConflictRetry(
         opCtx,

@@ -1590,6 +1590,7 @@ void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnN
     }
 
     _activeTxnNumber = txnNumber;
+    _lastWriteOpTime = repl::OpTime();
 
     // Reset the retryable writes state
     _resetRetryableWriteState(wl);
@@ -1614,10 +1615,11 @@ void TransactionParticipant::refreshFromStorageIfNeeded() {
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    _lastWrittenSessionRecord = std::move(activeTxnHistory.lastTxnRecord);
+    const auto& lastTxnRecord = activeTxnHistory.lastTxnRecord;
 
-    if (_lastWrittenSessionRecord) {
-        _activeTxnNumber = _lastWrittenSessionRecord->getTxnNum();
+    if (lastTxnRecord) {
+        _activeTxnNumber = lastTxnRecord->getTxnNum();
+        _lastWriteOpTime = lastTxnRecord->getLastWriteOpTime();
         _activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
         _hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;
 
@@ -1654,15 +1656,14 @@ void TransactionParticipant::onWriteOpCompletedOnPrimary(
     }
 
     const auto updateRequest =
-        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate, txnState);
+        _makeUpdateRequest(lastStmtIdWriteOpTime, lastStmtIdWriteDate, txnState);
 
     ul.unlock();
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     updateSessionEntry(opCtx, updateRequest);
-    _registerUpdateCacheOnCommit(
-        opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
+    _registerUpdateCacheOnCommit(std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
 }
 
 void TransactionParticipant::onMigrateCompletedOnPrimary(OperationContext* opCtx,
@@ -1678,24 +1679,23 @@ void TransactionParticipant::onMigrateCompletedOnPrimary(OperationContext* opCtx
     _checkValid(ul);
     _checkIsActiveTransaction(ul, txnNumber);
 
-    // We do not migrate transaction oplog entries.
-    auto txnState = boost::none;
-    const auto updateRequest = _makeUpdateRequest(
-        ul, txnNumber, lastStmtIdWriteOpTime, oplogLastStmtIdWriteDate, txnState);
+    // We do not migrate transaction oplog entries so don't set the txn state
+    const auto txnState = boost::none;
+    const auto updateRequest =
+        _makeUpdateRequest(lastStmtIdWriteOpTime, oplogLastStmtIdWriteDate, txnState);
 
     ul.unlock();
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     updateSessionEntry(opCtx, updateRequest);
-    _registerUpdateCacheOnCommit(
-        opCtx, txnNumber, std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
+    _registerUpdateCacheOnCommit(std::move(stmtIdsWritten), lastStmtIdWriteOpTime);
 }
 
 void TransactionParticipant::_invalidate(WithLock) {
     _isValid = false;
     _activeTxnNumber = kUninitializedTxnNumber;
-    _lastWrittenSessionRecord.reset();
+    _lastWriteOpTime = repl::OpTime();
 
     // Reset the transactions metrics.
     stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
@@ -1767,15 +1767,9 @@ void TransactionParticipant::abortPreparedTransactionForRollback() {
     _resetTransactionState(lg, TransactionState::kNone);
 }
 
-repl::OpTime TransactionParticipant::getLastWriteOpTime(TxnNumber txnNumber) const {
+repl::OpTime TransactionParticipant::getLastWriteOpTime() const {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _checkValid(lg);
-    _checkIsActiveTransaction(lg, txnNumber);
-
-    if (!_lastWrittenSessionRecord || _lastWrittenSessionRecord->getTxnNum() != txnNumber)
-        return {};
-
-    return _lastWrittenSessionRecord->getLastWriteOpTime();
+    return _lastWriteOpTime;
 }
 
 boost::optional<repl::OplogEntry> TransactionParticipant::checkStatementExecuted(
@@ -1832,15 +1826,10 @@ boost::optional<repl::OpTime> TransactionParticipant::_checkStatementExecuted(St
         return boost::none;
     }
 
-    invariant(_lastWrittenSessionRecord);
-    invariant(_lastWrittenSessionRecord->getTxnNum() == _activeTxnNumber);
-
     return it->second;
 }
 
 UpdateRequest TransactionParticipant::_makeUpdateRequest(
-    WithLock,
-    TxnNumber newTxnNumber,
     const repl::OpTime& newLastWriteOpTime,
     Date_t newLastWriteDate,
     boost::optional<DurableTxnStateEnum> newState) const {
@@ -1849,7 +1838,7 @@ UpdateRequest TransactionParticipant::_makeUpdateRequest(
     const auto updateBSON = [&] {
         SessionTxnRecord newTxnRecord;
         newTxnRecord.setSessionId(_sessionId());
-        newTxnRecord.setTxnNum(newTxnNumber);
+        newTxnRecord.setTxnNum(_activeTxnNumber);
         newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
         newTxnRecord.setLastWriteDate(newLastWriteDate);
         newTxnRecord.setState(newState);
@@ -1863,63 +1852,36 @@ UpdateRequest TransactionParticipant::_makeUpdateRequest(
 }
 
 void TransactionParticipant::_registerUpdateCacheOnCommit(
-    OperationContext* opCtx,
-    TxnNumber newTxnNumber,
-    std::vector<StmtId> stmtIdsWritten,
-    const repl::OpTime& lastStmtIdWriteOpTime) {
-    opCtx->recoveryUnit()->onCommit(
-        [ this, newTxnNumber, stmtIdsWritten = std::move(stmtIdsWritten), lastStmtIdWriteOpTime ](
+    std::vector<StmtId> stmtIdsWritten, const repl::OpTime& lastStmtIdWriteOpTime) {
+    _opCtx()->recoveryUnit()->onCommit(
+        [ this, stmtIdsWritten = std::move(stmtIdsWritten), lastStmtIdWriteOpTime ](
             boost::optional<Timestamp>) {
+            invariant(_isValid);
+
             RetryableWritesStats::get(getGlobalServiceContext())
                 ->incrementTransactionsCollectionWriteCount();
 
             stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-            if (!_isValid)
-                return;
-
             // The cache of the last written record must always be advanced after a write so that
             // subsequent writes have the correct point to start from.
-            if (!_lastWrittenSessionRecord) {
-                _lastWrittenSessionRecord.emplace();
+            _lastWriteOpTime = lastStmtIdWriteOpTime;
 
-                _lastWrittenSessionRecord->setSessionId(_sessionId());
-                _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
-                _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
-            } else {
-                if (newTxnNumber > _lastWrittenSessionRecord->getTxnNum())
-                    _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
+            for (const auto stmtId : stmtIdsWritten) {
+                if (stmtId == kIncompleteHistoryStmtId) {
+                    _hasIncompleteHistory = true;
+                    continue;
+                }
 
-                if (lastStmtIdWriteOpTime > _lastWrittenSessionRecord->getLastWriteOpTime())
-                    _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
-            }
-
-            if (newTxnNumber > _activeTxnNumber) {
-                // This call is necessary in order to advance the txn number and reset the cached
-                // state in the case where just before the storage transaction commits, the cache
-                // entry gets invalidated and immediately refreshed while there were no writes for
-                // newTxnNumber yet. In this case _activeTxnNumber will be less than newTxnNumber
-                // and we will fail to update the cache even though the write was successful.
-                _beginOrContinueRetryableWrite(lg, newTxnNumber);
-            }
-
-            if (newTxnNumber == _activeTxnNumber) {
-                for (const auto stmtId : stmtIdsWritten) {
-                    if (stmtId == kIncompleteHistoryStmtId) {
-                        _hasIncompleteHistory = true;
-                        continue;
-                    }
-
-                    const auto insertRes =
-                        _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
-                    if (!insertRes.second) {
-                        const auto& existingOpTime = insertRes.first->second;
-                        fassertOnRepeatedExecution(_sessionId(),
-                                                   newTxnNumber,
-                                                   stmtId,
-                                                   existingOpTime,
-                                                   lastStmtIdWriteOpTime);
-                    }
+                const auto insertRes =
+                    _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
+                if (!insertRes.second) {
+                    const auto& existingOpTime = insertRes.first->second;
+                    fassertOnRepeatedExecution(_sessionId(),
+                                               _activeTxnNumber,
+                                               stmtId,
+                                               existingOpTime,
+                                               lastStmtIdWriteOpTime);
                 }
             }
         });
@@ -1929,14 +1891,15 @@ void TransactionParticipant::_registerUpdateCacheOnCommit(
 
         const auto closeConnectionElem = data["closeConnection"];
         if (closeConnectionElem.eoo() || closeConnectionElem.Bool()) {
-            opCtx->getClient()->session()->end();
+            _opCtx()->getClient()->session()->end();
         }
 
         const auto failBeforeCommitExceptionElem = data["failBeforeCommitExceptionCode"];
         if (!failBeforeCommitExceptionElem.eoo()) {
             const auto failureCode = ErrorCodes::Error(int(failBeforeCommitExceptionElem.Number()));
             uasserted(failureCode,
-                      str::stream() << "Failing write for " << _sessionId() << ":" << newTxnNumber
+                      str::stream() << "Failing write for " << _sessionId() << ":"
+                                    << _activeTxnNumber
                                     << " due to failpoint. The write must not be reflected.");
         }
     }
