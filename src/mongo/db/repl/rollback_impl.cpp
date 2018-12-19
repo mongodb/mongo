@@ -901,10 +901,18 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 }
 
 void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
+    // TODO(SERVER-38671): Remove this line when drop-pending idents are always supported with this
+    // rolback method. Until then, we should assume that pending drops can be handled by either the
+    // replication subsystem or the storage engine.
     DropPendingCollectionReaper::get(opCtx)->clearDropPendingState();
 
+    // After recovering to a timestamp, the list of drop-pending idents maintained by the storage
+    // engine is no longer accurate and needs to be cleared.
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    storageEngine->clearDropPendingState();
+
     std::vector<std::string> dbNames;
-    opCtx->getServiceContext()->getStorageEngine()->listDatabases(&dbNames);
+    storageEngine->listDatabases(&dbNames);
     for (const auto& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
         Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);

@@ -166,6 +166,8 @@ public:
 
     bool supportsPendingDrops() const final;
 
+    void clearDropPendingState() final;
+
     virtual void replicationBatchIsComplete() const override;
 
     SnapshotManager* getSnapshotManager() const final;

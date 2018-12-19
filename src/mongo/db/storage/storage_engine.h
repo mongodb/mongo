@@ -362,6 +362,12 @@ public:
     virtual bool supportsPendingDrops() const = 0;
 
     /**
+     * Clears list of drop-pending idents in the storage engine.
+     * Used primarily by rollback after recovering to a stable timestamp.
+     */
+    virtual void clearDropPendingState() = 0;
+
+    /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
      * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp
      * used should be one provided by StorageEngine::setStableTimestamp().

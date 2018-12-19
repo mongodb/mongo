@@ -750,6 +750,10 @@ bool KVStorageEngine::supportsPendingDrops() const {
     return enableKVPendingDrops && supportsRecoverToStableTimestamp();
 }
 
+void KVStorageEngine::clearDropPendingState() {
+    _dropPendingIdentReaper.clearDropPendingState();
+}
+
 void KVStorageEngine::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }

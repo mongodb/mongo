@@ -80,6 +80,7 @@ public:
     bool supportsPendingDrops() const final {
         return false;
     }
+    void clearDropPendingState() final {}
     Timestamp getAllCommittedTimestamp() const final {
         return {};
     }
