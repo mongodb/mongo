@@ -535,6 +535,17 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: mongos_large_catalog_workloads
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "mongos_large_catalog"
+        authentication: disabled
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: move_chunk_workloads
   priority: 5
   commands:
@@ -845,6 +856,7 @@ buildvariants:
     - name: smoke_test
     - name: industry_benchmarks_wmajority
     - name: mongos_workloads
+    - name: mongos_large_catalog_workloads
     - name: change_streams_throughput
     - name: change_streams_latency
     - name: change_streams_multi_mongos
@@ -875,6 +887,7 @@ buildvariants:
     - name: industry_benchmarks_wmajority
     - name: mixed_workloads
     - name: mongos_workloads
+    - name: mongos_large_catalog_workloads
     - name: move_chunk_workloads
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
