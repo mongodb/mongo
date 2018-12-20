@@ -3236,6 +3236,7 @@ def doConfigure(myenv):
         CPPDEFINES=[
             "BOOST_SYSTEM_NO_DEPRECATED",
             "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
+            "ABSL_FORCE_ALIGNED_ACCESS",
         ]
     )
 
