@@ -49,7 +49,7 @@ let assertQueryUsesIndex = function(coll, query, indexName) {
  * Assert that running MongoDB with --repair on the provided dbpath exits cleanly.
  */
 let assertRepairSucceeds = function(dbpath, port, opts) {
-    let args = ["mongod", "--repair", "--port", port, "--dbpath", dbpath];
+    let args = ["mongod", "--repair", "--port", port, "--dbpath", dbpath, "--bind_ip_all"];
     for (let a in opts) {
         if (opts.hasOwnProperty(a))
             args.push("--" + a);
