@@ -158,6 +158,12 @@ public:
 
     Status dropView(OperationContext* opCtx, StringData fullns) final;
 
+    Status userCreateNS(OperationContext* opCtx,
+                        const NamespaceString& fullns,
+                        CollectionOptions collectionOptions,
+                        bool createDefaultIndexes,
+                        const BSONObj& idIndex) final;
+
     Collection* createCollection(OperationContext* opCtx,
                                  StringData ns,
                                  const CollectionOptions& options = CollectionOptions(),

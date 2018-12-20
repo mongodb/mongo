@@ -161,16 +161,18 @@ struct Cloner::Fun {
                 CollectionOptions collectionOptions;
                 uassertStatusOK(collectionOptions.parse(
                     from_options, CollectionOptions::ParseKind::parseForCommand));
-                Status s = Database::userCreateNS(
-                    opCtx,
-                    db,
-                    to_collection.toString(),
-                    collectionOptions,
-                    createDefaultIndexes,
-                    fixIndexSpec(to_collection.db().toString(), from_id_index));
-                verify(s.isOK());
+                auto indexSpec = fixIndexSpec(to_collection.db().toString(), from_id_index);
+                invariant(
+                    db->userCreateNS(
+                        opCtx, to_collection, collectionOptions, createDefaultIndexes, indexSpec),
+                    str::stream() << "collection creation failed during clone ["
+                                  << to_collection.ns()
+                                  << "]");
                 wunit.commit();
                 collection = db->getCollection(opCtx, to_collection);
+                invariant(collection,
+                          str::stream() << "Missing collection during clone [" << to_collection.ns()
+                                        << "]");
             });
         }
 
@@ -375,17 +377,21 @@ void Cloner::copyIndexes(OperationContext* opCtx,
             uassertStatusOK(
                 collectionOptions.parse(from_opts, CollectionOptions::ParseKind::parseForCommand));
             const bool createDefaultIndexes = true;
-            Status s = Database::userCreateNS(
-                opCtx,
-                db,
-                to_collection.toString(),
-                collectionOptions,
-                createDefaultIndexes,
-                fixIndexSpec(to_collection.db().toString(), getIdIndexSpec(from_indexes)));
-            invariant(s.isOK());
-            collection = db->getCollection(opCtx, to_collection);
-            invariant(collection);
+            invariant(db->userCreateNS(opCtx,
+                                       to_collection,
+                                       collectionOptions,
+                                       createDefaultIndexes,
+                                       fixIndexSpec(to_collection.db().toString(),
+                                                    getIdIndexSpec(from_indexes))),
+                      str::stream() << "Collection creation failed while copying indexes from "
+                                    << from_collection.ns()
+                                    << " to "
+                                    << to_collection.ns()
+                                    << " (Cloner)");
             wunit.commit();
+            collection = db->getCollection(opCtx, to_collection);
+            invariant(collection,
+                      str::stream() << "Missing collection " << to_collection.ns() << " (Cloner)");
         });
     }
 
@@ -484,8 +490,8 @@ bool Cloner::copyCollection(OperationContext* opCtx,
             CollectionOptions collectionOptions;
             uassertStatusOK(collectionOptions.parse(options, optionsParser));
             const bool createDefaultIndexes = true;
-            Status status = Database::userCreateNS(
-                opCtx, db, ns, collectionOptions, createDefaultIndexes, idIndexSpec);
+            Status status =
+                db->userCreateNS(opCtx, nss, collectionOptions, createDefaultIndexes, idIndexSpec);
             if (!status.isOK()) {
                 errmsg = status.toString();
                 // abort write unit of work
@@ -638,13 +644,9 @@ Status Cloner::createCollectionsForDb(
                 CollectionOptions collectionOptions;
                 uassertStatusOK(collectionOptions.parse(
                     options, CollectionOptions::ParseKind::parseForStorage));
-                Status createStatus =
-                    Database::userCreateNS(opCtx,
-                                           db,
-                                           nss.ns(),
-                                           collectionOptions,
-                                           createDefaultIndexes,
-                                           fixIndexSpec(nss.db().toString(), params.idIndexSpec));
+                auto indexSpec = fixIndexSpec(nss.db().toString(), params.idIndexSpec);
+                Status createStatus = db->userCreateNS(
+                    opCtx, nss, collectionOptions, createDefaultIndexes, indexSpec);
                 if (!createStatus.isOK()) {
                     return createStatus;
                 }

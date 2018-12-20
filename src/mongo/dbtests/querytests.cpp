@@ -1331,8 +1331,8 @@ public:
             ASSERT_OK(
                 collectionOptions.parse(fromjson("{ capped : true, size : 2000, max: 10000 }"),
                                         CollectionOptions::parseForCommand));
-            ASSERT(
-                Database::userCreateNS(&_opCtx, ctx.db(), ns(), collectionOptions, false).isOK());
+            NamespaceString nss(ns());
+            ASSERT(ctx.db()->userCreateNS(&_opCtx, nss, collectionOptions, false).isOK());
             wunit.commit();
         }
 

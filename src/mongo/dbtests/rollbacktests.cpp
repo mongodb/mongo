@@ -76,7 +76,7 @@ void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
         ASSERT(!collectionExists(&ctx, nss.ns()));
         CollectionOptions collectionOptions;
         ASSERT_OK(collectionOptions.parse(BSONObj(), CollectionOptions::parseForCommand));
-        ASSERT_OK(Database::userCreateNS(opCtx, ctx.db(), nss.ns(), collectionOptions, false));
+        ASSERT_OK(ctx.db()->userCreateNS(opCtx, nss, collectionOptions, false));
         ASSERT(collectionExists(&ctx, nss.ns()));
         uow.commit();
     }
@@ -178,8 +178,7 @@ public:
             auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(options, CollectionOptions::parseForCommand));
-            ASSERT_OK(
-                Database::userCreateNS(&opCtx, ctx.db(), ns, collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             ASSERT(collectionExists(&ctx, ns));
             if (!rollback) {
                 uow.commit();
@@ -216,8 +215,7 @@ public:
             auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(options, CollectionOptions::parseForCommand));
-            ASSERT_OK(
-                Database::userCreateNS(&opCtx, ctx.db(), ns, collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             uow.commit();
         }
         ASSERT(collectionExists(&ctx, ns));
@@ -268,8 +266,7 @@ public:
             auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(options, CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), source.ns(), collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, source, collectionOptions, defaultIndexes));
             uow.commit();
         }
         ASSERT(collectionExists(&ctx, source.ns()));
@@ -328,10 +325,9 @@ public:
             auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(options, CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), source.ns(), collectionOptions, defaultIndexes));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), target.ns(), collectionOptions, defaultIndexes));
+            auto db = ctx.db();
+            ASSERT_OK(db->userCreateNS(&opCtx, source, collectionOptions, defaultIndexes));
+            ASSERT_OK(db->userCreateNS(&opCtx, target, collectionOptions, defaultIndexes));
 
             insertRecord(&opCtx, source, sourceDoc);
             insertRecord(&opCtx, target, targetDoc);
@@ -397,8 +393,7 @@ public:
             ASSERT(!collectionExists(&ctx, nss.ns()));
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(BSONObj(), CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), nss.ns(), collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             insertRecord(&opCtx, nss, oldDoc);
             uow.commit();
         }
@@ -419,8 +414,7 @@ public:
             ASSERT(!collectionExists(&ctx, nss.ns()));
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(BSONObj(), CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), nss.ns(), collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             ASSERT(collectionExists(&ctx, nss.ns()));
             insertRecord(&opCtx, nss, newDoc);
             assertOnlyRecord(&opCtx, nss, newDoc);
@@ -458,8 +452,7 @@ public:
 
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(BSONObj(), CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), nss.ns(), collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             ASSERT(collectionExists(&ctx, nss.ns()));
             insertRecord(&opCtx, nss, doc);
             assertOnlyRecord(&opCtx, nss, doc);
@@ -502,8 +495,7 @@ public:
 
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(BSONObj(), CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(
-                &opCtx, ctx.db(), nss.ns(), collectionOptions, defaultIndexes));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, defaultIndexes));
             ASSERT(collectionExists(&ctx, nss.ns()));
             insertRecord(&opCtx, nss, doc);
             assertOnlyRecord(&opCtx, nss, doc);
@@ -764,7 +756,7 @@ public:
             ASSERT(!collectionExists(&ctx, nss.ns()));
             CollectionOptions collectionOptions;
             ASSERT_OK(collectionOptions.parse(BSONObj(), CollectionOptions::parseForCommand));
-            ASSERT_OK(Database::userCreateNS(&opCtx, ctx.db(), nss.ns(), collectionOptions, false));
+            ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, false));
             ASSERT(collectionExists(&ctx, nss.ns()));
             Collection* coll = ctx.db()->getCollection(&opCtx, nss);
             IndexCatalog* catalog = coll->getIndexCatalog();

@@ -119,8 +119,8 @@ Status createCollection(OperationContext* opCtx,
 
         // Create collection.
         const bool createDefaultIndexes = true;
-        Status status = Database::userCreateNS(
-            opCtx, ctx.db(), nss.ns(), std::move(collectionOptions), createDefaultIndexes, idIndex);
+        Status status = ctx.db()->userCreateNS(
+            opCtx, nss, std::move(collectionOptions), createDefaultIndexes, idIndex);
         if (!status.isOK()) {
             return status;
         }

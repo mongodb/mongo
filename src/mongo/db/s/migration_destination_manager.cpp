@@ -633,8 +633,8 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
             uassertStatusOK(collectionOptions.parse(donorOptions,
                                                     CollectionOptions::ParseKind::parseForStorage));
             const bool createDefaultIndexes = true;
-            uassertStatusOK(Database::userCreateNS(
-                opCtx, db, nss.ns(), collectionOptions, createDefaultIndexes, donorIdIndexSpec));
+            uassertStatusOK(db->userCreateNS(
+                opCtx, nss, collectionOptions, createDefaultIndexes, donorIdIndexSpec));
             wuow.commit();
 
             collection = db->getCollection(opCtx, nss);

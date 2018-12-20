@@ -1022,30 +1022,25 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
     }
 }
 
-MONGO_REGISTER_SHIM(Database::userCreateNS)
-(OperationContext* opCtx,
- Database* db,
- StringData ns,
- CollectionOptions collectionOptions,
- bool createDefaultIndexes,
- const BSONObj& idIndex)
-    ->Status {
-    invariant(db);
+Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
+                                  const NamespaceString& fullns,
+                                  CollectionOptions collectionOptions,
+                                  bool createDefaultIndexes,
+                                  const BSONObj& idIndex) {
+    LOG(1) << "create collection " << fullns << ' ' << collectionOptions.toBSON();
 
-    LOG(1) << "create collection " << ns << ' ' << collectionOptions.toBSON();
+    if (!NamespaceString::validCollectionComponent(fullns.ns()))
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << fullns.ns());
 
-    if (!NamespaceString::validCollectionComponent(ns))
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << ns);
-
-    Collection* collection = db->getCollection(opCtx, ns);
+    Collection* collection = getCollection(opCtx, fullns);
 
     if (collection)
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "a collection '" << ns.toString() << "' already exists");
+                      str::stream() << "a collection '" << fullns.ns() << "' already exists");
 
-    if (db->getViewCatalog()->lookup(opCtx, ns))
+    if (getViewCatalog()->lookup(opCtx, fullns.ns()))
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "a view '" << ns.toString() << "' already exists");
+                      str::stream() << "a view '" << fullns.ns() << "' already exists");
 
     // Validate the collation, if there is one.
     std::unique_ptr<CollatorInterface> collator;
@@ -1114,10 +1109,13 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
     }
 
     if (collectionOptions.isView()) {
-        uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
+        uassertStatusOK(createView(opCtx, fullns.ns(), collectionOptions));
     } else {
         invariant(
-            db->createCollection(opCtx, ns, collectionOptions, createDefaultIndexes, idIndex));
+            createCollection(opCtx, fullns.ns(), collectionOptions, createDefaultIndexes, idIndex),
+            str::stream() << "Collection creation failed after validating options: " << fullns.ns()
+                          << ". Options: "
+                          << collectionOptions.toBSON());
     }
 
     return Status::OK();

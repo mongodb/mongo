@@ -458,8 +458,8 @@ public:
                         CollectionOptions collectionOptions;
                         uassertStatusOK(collectionOptions.parse(
                             BSONObj(), CollectionOptions::ParseKind::parseForCommand));
-                        uassertStatusOK(Database::userCreateNS(
-                            opCtx, autoDb->getDb(), nsString.ns(), collectionOptions));
+                        auto db = autoDb->getDb();
+                        uassertStatusOK(db->userCreateNS(opCtx, nsString, collectionOptions));
                         wuow.commit();
 
                         collection = autoDb->getDb()->getCollection(opCtx, nsString);

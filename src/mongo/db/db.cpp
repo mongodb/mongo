@@ -227,8 +227,7 @@ void logStartup(OperationContext* opCtx) {
         CollectionOptions collectionOptions;
         uassertStatusOK(
             collectionOptions.parse(options, CollectionOptions::ParseKind::parseForCommand));
-        uassertStatusOK(
-            Database::userCreateNS(opCtx, db, startupLogCollectionName.ns(), collectionOptions));
+        uassertStatusOK(db->userCreateNS(opCtx, startupLogCollectionName, collectionOptions));
         collection = db->getCollection(opCtx, startupLogCollectionName);
     }
     invariant(collection);

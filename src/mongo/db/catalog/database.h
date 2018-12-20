@@ -94,6 +94,12 @@ public:
 
         virtual Status dropView(OperationContext* opCtx, StringData fullns) = 0;
 
+        virtual Status userCreateNS(OperationContext* opCtx,
+                                    const NamespaceString& fullns,
+                                    CollectionOptions collectionOptions,
+                                    bool createDefaultIndexes,
+                                    const BSONObj& idIndex) = 0;
+
         virtual Collection* createCollection(OperationContext* opCtx,
                                              StringData ns,
                                              const CollectionOptions& options,
@@ -136,13 +142,14 @@ public:
      * indexes, in the case of system collections). Creates the collection's _id index according
      * to 'idIndex', if it is non-empty.  When 'idIndex' is empty, creates the default _id index.
      */
-    static MONGO_DECLARE_SHIM((OperationContext * opCtx,
-                               Database* db,
-                               StringData ns,
+    inline Status userCreateNS(OperationContext* opCtx,
+                               const NamespaceString& fullns,
                                CollectionOptions collectionOptions,
                                bool createDefaultIndexes = true,
-                               const BSONObj& idIndex = BSONObj())
-                                  ->Status) userCreateNS;
+                               const BSONObj& idIndex = BSONObj()) {
+        return this->_impl().userCreateNS(
+            opCtx, fullns, std::move(collectionOptions), createDefaultIndexes, idIndex);
+    }
 
     static MONGO_DECLARE_SHIM((Database * this_,
                                OperationContext* opCtx,

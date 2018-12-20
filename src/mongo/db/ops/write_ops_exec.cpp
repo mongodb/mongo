@@ -209,7 +209,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             CollectionOptions collectionOptions;
             uassertStatusOK(
                 collectionOptions.parse(BSONObj(), CollectionOptions::ParseKind::parseForCommand));
-            uassertStatusOK(Database::userCreateNS(opCtx, db.getDb(), ns.ns(), collectionOptions));
+            uassertStatusOK(db.getDb()->userCreateNS(opCtx, ns, collectionOptions));
             wuow.commit();
         }
     });
