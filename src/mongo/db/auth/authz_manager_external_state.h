@@ -36,6 +36,7 @@
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
@@ -161,6 +162,7 @@ public:
     virtual bool hasAnyPrivilegeDocuments(OperationContext* opCtx) = 0;
 
     virtual void logOp(OperationContext* opCtx,
+                       AuthorizationManagerImpl* authManager,
                        const char* op,
                        const NamespaceString& ns,
                        const BSONObj& o,
@@ -194,6 +196,8 @@ public:
     virtual bool needsLockForUserName(OperationContext* opCtx, const UserName& user) {
         return false;
     }
+
+    virtual void setInUserManagementCommand(OperationContext* opCtx, bool val) {}
 
 protected:
     AuthzManagerExternalState();  // This class should never be instantiated directly.

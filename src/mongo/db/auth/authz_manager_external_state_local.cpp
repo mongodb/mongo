@@ -38,6 +38,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/operation_context.h"
@@ -47,6 +48,11 @@
 #include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
+
+namespace {
+
+const auto inUserManagementCommandsFlag = OperationContext::declareDecoration<bool>();
+}
 
 using std::vector;
 
@@ -529,35 +535,69 @@ public:
     // None of the parameters below (except opCtx and externalState) need to live longer than the
     // instantiations of this class
     AuthzManagerLogOpHandler(OperationContext* opCtx,
+                             AuthorizationManagerImpl* authzManager,
                              AuthzManagerExternalStateLocal* externalState,
                              const char* op,
                              const NamespaceString& nss,
                              const BSONObj& o,
                              const BSONObj* o2)
         : _opCtx(opCtx),
+          _authzManager(authzManager),
           _externalState(externalState),
           _op(op),
           _nss(nss),
           _o(o.getOwned()),
+          _o2(o2 ? boost::optional<BSONObj>(o2->getOwned()) : boost::none),
+          _refreshedPinnedUsers(_invalidateRelevantCacheData()) {}
 
-          _isO2Set(o2 ? true : false),
-          _o2(_isO2Set ? o2->getOwned() : BSONObj()) {}
+    void commit(boost::optional<Timestamp>) final {
+        if (_nss == AuthorizationManager::rolesCollectionNamespace ||
+            _nss == AuthorizationManager::adminCommandNamespace) {
+            _refreshRoleGraph();
+        }
 
-    virtual void commit(boost::optional<Timestamp>) {
+        if (_refreshedPinnedUsers) {
+            _authzManager->setPinnedUsers(std::move(*_refreshedPinnedUsers));
+        }
+    }
+
+    void rollback() final {}
+
+private:
+    // Updates to users in the oplog are done by matching on the _id, which will always have the
+    // form "<dbname>.<username>".  This function extracts the UserName from that string.
+    static StatusWith<UserName> extractUserNameFromIdString(StringData idstr) {
+        size_t splitPoint = idstr.find('.');
+        if (splitPoint == std::string::npos) {
+            return StatusWith<UserName>(ErrorCodes::FailedToParse,
+                                        mongoutils::str::stream()
+                                            << "_id entries for user documents must be of "
+                                               "the form <dbname>.<username>.  Found: "
+                                            << idstr);
+        }
+        return StatusWith<UserName>(
+            UserName(idstr.substr(splitPoint + 1), idstr.substr(0, splitPoint)));
+    }
+
+
+    void _refreshRoleGraph() {
         stdx::lock_guard<stdx::mutex> lk(_externalState->_roleGraphMutex);
         Status status = _externalState->_roleGraph.handleLogOp(
-            _opCtx, _op.c_str(), _nss, _o, _isO2Set ? &_o2 : NULL);
+            _opCtx, _op.c_str(), _nss, _o, _o2 ? &*_o2 : NULL);
 
         if (status == ErrorCodes::OplogOperationUnsupported) {
             _externalState->_roleGraph = RoleGraph();
             _externalState->_roleGraphState = _externalState->roleGraphStateInitial;
             BSONObjBuilder oplogEntryBuilder;
             oplogEntryBuilder << "op" << _op << "ns" << _nss.ns() << "o" << _o;
-            if (_isO2Set)
-                oplogEntryBuilder << "o2" << _o2;
+            if (_o2) {
+                oplogEntryBuilder << "o2" << *_o2;
+            }
             error() << "Unsupported modification to roles collection in oplog; "
                        "restart this process to reenable user-defined roles; "
                     << redact(status) << "; Oplog entry: " << redact(oplogEntryBuilder.done());
+            // If a setParameter is enabled, this condition is fatal.
+            fassert(51152, !roleGraphInvalidationIsFatal);
         } else if (!status.isOK()) {
             warning() << "Skipping bad update to roles collection in oplog. " << redact(status)
                       << " Oplog entry: " << redact(_op);
@@ -574,29 +614,77 @@ public:
         }
     }
 
-    virtual void rollback() {}
+    boost::optional<std::vector<UserHandle>> _invalidateRelevantCacheData() {
+        // When we're doing a user management command we lock the admin DB for the duration
+        // of the command and invalidate the cache at the end of the command, so we don't need
+        // to invalidate it based on calls to logOp().
+        if (inUserManagementCommandsFlag(_opCtx)) {
+            LOG(1) << "Skipping cache invalidation in opObserver because of active user command";
+            return boost::none;
+        }
 
-private:
+        if (_nss == AuthorizationManager::rolesCollectionNamespace ||
+            _nss == AuthorizationManager::versionCollectionNamespace) {
+            return _authzManager->invalidateUserCacheNoPin(_opCtx);
+        }
+
+        if (_op == "i" || _op == "d" || _op == "u") {
+            // If you got into this function isAuthzNamespace() must have returned true, and we've
+            // already checked that it's not the roles or version collection.
+            invariant(_nss == AuthorizationManager::usersCollectionNamespace);
+
+            StatusWith<UserName> userName = (_op == "u")
+                ? extractUserNameFromIdString((*_o2)["_id"].str())
+                : extractUserNameFromIdString(_o["_id"].str());
+
+            if (!userName.isOK()) {
+                warning() << "Invalidating user cache based on user being updated failed, will "
+                             "invalidate the entire cache instead: "
+                          << userName.getStatus();
+                return _authzManager->invalidateUserCacheNoPin(_opCtx);
+            }
+            return _authzManager->invalidateUserByNameNoPin(_opCtx, userName.getValue());
+        } else {
+            return _authzManager->invalidateUserCacheNoPin(_opCtx);
+        }
+    }
+
+
     OperationContext* _opCtx;
+    AuthorizationManagerImpl* _authzManager;
     AuthzManagerExternalStateLocal* _externalState;
     const std::string _op;
     const NamespaceString _nss;
     const BSONObj _o;
+    const boost::optional<BSONObj> _o2;
 
-    const bool _isO2Set;
-    const BSONObj _o2;
+    boost::optional<std::vector<UserHandle>> _refreshedPinnedUsers;
 };
 
 void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
+                                           AuthorizationManagerImpl* authzManager,
                                            const char* op,
                                            const NamespaceString& nss,
                                            const BSONObj& o,
                                            const BSONObj* o2) {
     if (nss == AuthorizationManager::rolesCollectionNamespace ||
+        nss == AuthorizationManager::versionCollectionNamespace ||
+        nss == AuthorizationManager::usersCollectionNamespace ||
         nss == AuthorizationManager::adminCommandNamespace) {
-        opCtx->recoveryUnit()->registerChange(
-            new AuthzManagerLogOpHandler(opCtx, this, op, nss, o, o2));
+
+        auto change = new AuthzManagerLogOpHandler(opCtx, authzManager, this, op, nss, o, o2);
+        // AuthzManagerExternalState's logOp method registers a RecoveryUnit::Change
+        // and to do so we need to have begun a UnitOfWork
+        WriteUnitOfWork wuow(opCtx);
+
+        opCtx->recoveryUnit()->registerChange(change);
+
+        wuow.commit();
     }
+}
+
+void AuthzManagerExternalStateLocal::setInUserManagementCommand(OperationContext* opCtx, bool val) {
+    inUserManagementCommandsFlag(opCtx) = val;
 }
 
 }  // namespace mongo

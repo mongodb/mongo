@@ -3,6 +3,7 @@
 (function() {
     'use strict';
     print("START auth-system-roles-collMod.js");
+    TestData.roleGraphInvalidationIsFatal = false;
     var conn = MongoRunner.runMongod({});
     var db = conn.getDB("test");
 

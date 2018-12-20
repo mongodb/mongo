@@ -10,6 +10,7 @@
     // disable them in this test, to test that transactions on secondaries will be disallowed
     // for production users.
     jsTest.setOption('enableTestCommands', false);
+    TestData.roleGraphInvalidationIsFatal = false;
     TestData.authenticationDatabase = "local";
 
     const dbName = "test";

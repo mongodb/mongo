@@ -430,7 +430,7 @@ TEST_F(AuthorizationManagerLogOpTest, testCreateAnyCollectionAddsNoRecoveryUnits
     ASSERT_EQ(size_t(0), registeredChanges);
 }
 
-TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecoveryUnits) {
+TEST_F(AuthorizationManagerLogOpTest, testRawInsertAddsRecoveryUnits) {
     authzManager->logOp(opCtx.get(),
                         "i",
                         {"admin", "system.profile"},
@@ -445,7 +445,7 @@ TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecovery
                         BSON("_id"
                              << "admin.user"),
                         nullptr);
-    ASSERT_EQ(size_t(0), registeredChanges);
+    ASSERT_EQ(size_t(1), registeredChanges);
 
     authzManager->logOp(opCtx.get(),
                         "i",
@@ -453,7 +453,7 @@ TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecovery
                         BSON("_id"
                              << "admin.user"),
                         nullptr);
-    ASSERT_EQ(size_t(1), registeredChanges);
+    ASSERT_EQ(size_t(2), registeredChanges);
 }
 
 }  // namespace

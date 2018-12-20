@@ -16,3 +16,4 @@ executor:
       global_vars:
         TestData:
           auditDestination: 'console'
+          roleGraphInvalidationIsFatal: true

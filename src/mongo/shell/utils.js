@@ -338,6 +338,7 @@ jsTestOptions = function() {
             setSkipShardingPartsOfPrepareTransactionFailpoint:
                 TestData.setSkipShardingPartsOfPrepareTransactionFailpoint || false,
             retryingOnNetworkError: TestData.retryingOnNetworkError,
+            roleGraphInvalidationIsFatal: TestData.roleGraphInvalidationIsFatal || false,
         });
     }
     return _jsTestOptions;

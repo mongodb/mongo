@@ -142,6 +142,7 @@ env.Library(
     target='role_graph_update',
     source=[
         'role_graph_update.cpp',
+        env.Idlc("auth_options.idl")[0],
     ],
     LIBDEPS=[
         'auth',

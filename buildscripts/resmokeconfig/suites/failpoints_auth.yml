@@ -22,5 +22,6 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
       nodb: ''
       readMode: commands

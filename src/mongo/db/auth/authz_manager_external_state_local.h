@@ -103,11 +103,15 @@ public:
                          const BSONObj& projection,
                          const stdx::function<void(const BSONObj&)>& resultProcessor) = 0;
 
-    virtual void logOp(OperationContext* opCtx,
-                       const char* op,
-                       const NamespaceString& ns,
-                       const BSONObj& o,
-                       const BSONObj* o2);
+    void logOp(OperationContext* opCtx,
+               AuthorizationManagerImpl* authManager,
+               const char* op,
+               const NamespaceString& ns,
+               const BSONObj& o,
+               const BSONObj* o2) final;
+
+
+    void setInUserManagementCommand(OperationContext* opCtx, bool val) final;
 
     /**
      * Takes a user document, and processes it with the RoleGraph, in order to recursively

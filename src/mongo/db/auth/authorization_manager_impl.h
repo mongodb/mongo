@@ -121,13 +121,37 @@ public:
                                                         const UserName& userName,
                                                         const User::UserId& uid) override;
 
+    /**
+     * Invalidate a user, and repin it if necessary.
+     */
     void invalidateUserByName(OperationContext* opCtx, const UserName& user) override;
+    /**
+     * Invalidate a user, and return a full set of pinned users to be later attached to
+     * the AuthorizationManager.
+     */
+    std::vector<UserHandle> invalidateUserByNameNoPin(OperationContext* opCtx,
+                                                      const UserName& user);
 
     void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) override;
 
     Status initialize(OperationContext* opCtx) override;
 
+    /**
+     * Invalidate the user cache, and repin all pinned users.
+     */
     void invalidateUserCache(OperationContext* opCtx) override;
+
+    /**
+     * Invalidate the user cache, without repinning users. Instead return the set
+     * of users which should be later pinned.
+     */
+    std::vector<UserHandle> invalidateUserCacheNoPin(OperationContext* opCtx);
+
+    /**
+     * Attach a set of previously acquired Users to the AuthorizationManager
+     * as pinned users.
+     */
+    void setPinnedUsers(std::vector<UserHandle>);
 
     Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) override;
 
@@ -147,6 +171,12 @@ private:
      */
     class CacheGuard;
     friend class AuthorizationManagerImpl::CacheGuard;
+
+    /**
+     * Attach a set of previously acquired Users to the AuthorizationManager
+     * as pinned users, under the protection of an existing CacheGuard.
+     */
+    void setPinnedUsers_inlock(const CacheGuard&, std::vector<UserHandle>);
 
     /**
      * Invalidates all User objects in the cache and removes them from the cache.
@@ -171,7 +201,7 @@ private:
     void _updateCacheGeneration_inlock(const CacheGuard&);
 
 
-    void _recachePinnedUsers(CacheGuard& guard, OperationContext* opCtx);
+    std::vector<UserHandle> _fetchPinnedUsers(CacheGuard& guard, OperationContext* opCtx);
 
     StatusWith<UserHandle> _acquireUserSlowPath(CacheGuard& guard,
                                                 OperationContext* opCtx,

@@ -109,6 +109,7 @@
     // with enableTestCommands=1.
 
     jsTest.setOption('enableTestCommands', false);
+    TestData.roleGraphInvalidationIsFatal = false;
 
     mongod = MongoRunner.runMongod();
     assertStartupSucceeds(mongod);

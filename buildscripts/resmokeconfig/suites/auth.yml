@@ -11,5 +11,8 @@ selector:
 executor:
   config:
     shell_options:
+      global_vars:
+        TestData:
+            roleGraphInvalidationIsFatal: true
       nodb: ''
       readMode: commands

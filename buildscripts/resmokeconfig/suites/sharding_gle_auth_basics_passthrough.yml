@@ -29,6 +29,7 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
       <<: *authOptions
       readMode: commands

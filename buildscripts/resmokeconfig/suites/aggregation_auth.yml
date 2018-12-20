@@ -23,6 +23,7 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
       authenticationDatabase: local
       authenticationMechanism: SCRAM-SHA-1
