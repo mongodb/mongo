@@ -16,7 +16,7 @@ yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.5'
 timelibSuffix = '-2018.01alpha1'
-tomcryptSuffix = '-1.18.1'
+tomcryptSuffix = '-1.18.2'
 benchmarkSuffix = '-1.4.1'
 sqliteSuffix = '-amalgamation-3190300'
 

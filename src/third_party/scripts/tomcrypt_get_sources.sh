@@ -13,7 +13,7 @@ fi
 
 # how we got the last tom crypt sources
 
-VERSION=1.18.1
+VERSION=1.18.2
 
 cd `git rev-parse --show-toplevel`/src/third_party/tomcrypt-$VERSION
 
