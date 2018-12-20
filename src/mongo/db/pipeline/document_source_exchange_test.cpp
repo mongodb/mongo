@@ -504,7 +504,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
      */
     class MutexYielder : public ResourceYielder {
     public:
-        MutexYielder(stdx::mutex* mutex) : _lock(*mutex, std::defer_lock) {}
+        MutexYielder(stdx::mutex* mutex) : _lock(*mutex, stdx::defer_lock) {}
 
         void yield(OperationContext* opCtx) override {
             _lock.unlock();
