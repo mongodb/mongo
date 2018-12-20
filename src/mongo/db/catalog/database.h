@@ -152,7 +152,6 @@ public:
     }
 
     static MONGO_DECLARE_SHIM((Database * this_,
-                               OperationContext* opCtx,
                                StringData name,
                                DatabaseCatalogEntry*,
                                uint64_t epoch,
@@ -204,13 +203,10 @@ public:
         CollectionMap::const_iterator _it;
     };
 
-    explicit inline Database(OperationContext* const opCtx,
-                             const StringData name,
+    explicit inline Database(const StringData name,
                              DatabaseCatalogEntry* const dbEntry,
                              uint64_t epoch)
-        : _pimpl(makeImpl(this, opCtx, name, dbEntry, epoch, PrivateCall<Database>{})) {
-        this->_impl().init(opCtx);
-    }
+        : _pimpl(makeImpl(this, name, dbEntry, epoch, PrivateCall<Database>{})) {}
 
     // must call close first
     inline ~Database() = default;
@@ -224,6 +220,13 @@ public:
 
     inline iterator end() const {
         return iterator(this->_impl().collections().end());
+    }
+
+    /**
+     * Sets up internal memory structures.
+     */
+    inline void init(OperationContext* opCtx) {
+        this->_impl().init(opCtx);
     }
 
     // closes files and other cleanup see below.

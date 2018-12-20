@@ -92,7 +92,6 @@ public:
     };
 
     explicit DatabaseImpl(Database* this_,
-                          OperationContext* opCtx,
                           StringData name,
                           DatabaseCatalogEntry* dbEntry,
                           uint64_t epoch);

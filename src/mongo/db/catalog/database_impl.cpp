@@ -82,13 +82,12 @@
 namespace mongo {
 MONGO_REGISTER_SHIM(Database::makeImpl)
 (Database* const this_,
- OperationContext* const opCtx,
  const StringData name,
  DatabaseCatalogEntry* const dbEntry,
  uint64_t epoch,
  PrivateTo<Database>)
     ->std::unique_ptr<Database::Impl> {
-    return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry, epoch);
+    return stdx::make_unique<DatabaseImpl>(this_, name, dbEntry, epoch);
 }
 
 namespace {
@@ -274,7 +273,6 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
 }
 
 DatabaseImpl::DatabaseImpl(Database* const this_,
-                           OperationContext* const opCtx,
                            const StringData name,
                            DatabaseCatalogEntry* const dbEntry,
                            uint64_t epoch)

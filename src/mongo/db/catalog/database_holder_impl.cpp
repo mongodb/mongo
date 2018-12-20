@@ -168,7 +168,8 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
             *justCreated = true;
     }
 
-    auto newDb = stdx::make_unique<Database>(opCtx, dbname, entry, ++_epoch);
+    auto newDb = stdx::make_unique<Database>(dbname, entry, ++_epoch);
+    newDb->init(opCtx);
 
     // Finally replace our nullptr entry with the new Database pointer.
     removeDbGuard.Dismiss();
