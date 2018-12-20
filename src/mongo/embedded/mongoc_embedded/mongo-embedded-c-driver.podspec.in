@@ -20,7 +20,8 @@ Pod::Spec.new do |s|
   s.watchos.deployment_target = "4.3"
   s.tvos.deployment_target = "10.2"
 
-  s.source       = { :http => "https://s3.amazonaws.com/mciuploads/mongodb-mongo-master/embedded-sdk/mongo-c-driver-cocoapod-latest.tgz" }
+  s.source       = { :http => "https://downloads.mongodb.org/mobile/apple/mongo-c-driver-@VERSION@-@MONGO_VERSION@.tgz",
+                     :sha256 => "@SHA256@" }
 
   s.ios.vendored_frameworks = "iPhoneOS/Frameworks/bson.framework", "iPhoneOS/Frameworks/mongoc.framework"
   s.osx.vendored_frameworks = "MacOS/Frameworks/bson.framework", "MacOS/Frameworks/mongoc.framework"

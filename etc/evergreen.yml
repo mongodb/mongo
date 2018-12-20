@@ -4271,18 +4271,114 @@ tasks:
         permissions: public-read
         content_type: application/tar
 
+    # If this is not a release build, blow away the file so our subsequent and optional s3.put
+    # doesn't run. That way, we won't overwrite the latest part in our patches.
     - command: shell.exec
       params:
         script: |
           set -o errexit
           set -o verbose
 
-          sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-embedded-c-driver.podspec.in | tee mongo-embedded-c-driver.podspec
-          sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongo_embedded/mongo_embedded.podspec.in | tee mongo_embedded.podspec
-          sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongoc_embedded/mongoc_embedded.podspec.in | tee mongoc_embedded.podspec
+          if [ "${is_release}" != "true" ]; then
+            rm -f mongo-embedded-sdk-${version}.tgz
+            rm -f mongo-embedded-sdk-${version}-mongo-c-driver.tgz
+            rm -f mongo-embedded-sdk-${version}-mongo-embedded.tgz
+            rm -f mongo-embedded-sdk-${version}-mongoc-embedded.tgz
+          fi
 
-          # conditional cocoapods deployment here, pending integration with release process
-          #sudo gem install cocoapods
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}.tgz"
+        remote_file: ${push_path}-STAGE/${push_name}/mongo-${build_variant}-${version}.tgz
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: application/tar
+
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-c-driver.tgz"
+        remote_file: ${push_path}-STAGE/${push_name}/mongo-c-driver-${version}.tgz
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: application/tar
+
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongo-embedded.tgz"
+        remote_file: ${push_path}-STAGE/${push_name}/mongo-embedded-${version}.tgz
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: application/tar
+
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "mongo-embedded-sdk-${version}-mongoc-embedded.tgz"
+        remote_file: ${push_path}-STAGE/${push_name}/mongoc-embedded-${version}.tgz
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: application/tar
+
+    - command: s3Copy.copy
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        optional: true
+        s3_copy_files:
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongoc-embedded-${version}.tgz', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/${push_name}/mongoc-embedded-${version}.tgz', 'bucket': '${push_bucket}'}}
+
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo-embedded-${version}.tgz', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/${push_name}/mongo-embedded-${version}.tgz', 'bucket': '${push_bucket}'}}
+
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo-c-driver-${version}.tgz', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/${push_name}/mongo-c-driver-${version}.tgz', 'bucket': '${push_bucket}'}}
+
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          echo "Releases disabled on master."
+          exit 0
+
+          if [ "${is_release|false}" != "true" ]; then
+              echo "Not a release build"
+              exit 0 
+          fi
+
+          sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-embedded-c-driver.podspec.in | tee mongo-embedded-c-driver.podspec
+          DRIVER_SHA=`shasum -a 256 mongo-embedded-sdk-${version}-mongo-c-driver.tgz  | awk '{ print $1 }'`
+          sed -i '' s/@SHA256@/$DRIVER_SHA/g mongo-embedded-c-driver.podspec
+          sed -i '' s/@MONGO_VERSION@/${version}/g mongo-embedded-c-driver.podspec
+
+          sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongo_embedded/mongo_embedded.podspec.in | tee mongo_embedded.podspec
+          MONGO_SHA=`shasum -a 256 mongo-embedded-sdk-${version}-mongo-embedded.tgz  | awk '{ print $1 }'`
+          sed -i '' s/@SHA256@/$MONGO_SHA/g mongo_embedded.podspec
+
+          sed s/@VERSION@/${version}/g src/src/mongo/embedded/mongoc_embedded/mongoc_embedded.podspec.in | tee mongoc_embedded.podspec
+          MONGOC_SHA=`shasum -a 256 mongo-embedded-sdk-${version}-mongoc-embedded.tgz  | awk '{ print $1 }'`
+          sed -i '' s/@SHA256@/$MONGOC_SHA/g mongoc_embedded.podspec
+
+          pod trunk push mongo-embedded-c-driver.podspec
+          pod trunk push mongo_embedded.podspec
+          pod trunk push mongoc_embedded.podspec
 
 - name: stitch_support_create_lib
   commands:
@@ -10560,10 +10656,13 @@ buildvariants:
 - name: embedded-sdk-apple-multiarch
   display_name: "Embedded SDK - Apple Multiarch"
   run_on:
-  - macos-1012
+  - macos-release
   batchtime: 1440 # 1 day
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
+    push_path: mobile
+    push_name: apple
+    push_bucket: downloads.mongodb.org
   tasks:
   - name: embedded_sdk_multiarch_apple_package
 
