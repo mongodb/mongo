@@ -531,7 +531,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << extraOpenOptions;
     if (_readOnly) {
         invariant(!_durable);
-        ss << "readonly=true,";
+        ss << ",readonly=true,";
     }
     if (!_durable && !_readOnly) {
         // If we started without the journal, but previously used the journal then open with the
