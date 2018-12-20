@@ -79,6 +79,7 @@
         ErrorCodes.InvalidNamespace);
 
     // You cannot create a view with a $out stage, by itself or nested inside of a different stage.
+    const ERROR_CODE_OUT_BANNED_IN_LOOKUP = 51047;
     const outStage = {$out: "nonExistentCollection"};
     assert.commandFailedWithCode(
         viewsDB.runCommand({create: "viewWithOut", viewOn: "collection", pipeline: [outStage]}),
@@ -88,7 +89,7 @@
         viewOn: "collection",
         pipeline: [{$lookup: {from: "other", pipeline: [outStage], as: "result"}}]
     }),
-                                 ErrorCodes.OptionNotSupportedOnView);
+                                 ERROR_CODE_OUT_BANNED_IN_LOOKUP);
     assert.commandFailedWithCode(viewsDB.runCommand({
         create: "viewWithOutInFacet",
         viewOn: "collection",
