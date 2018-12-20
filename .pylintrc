@@ -19,10 +19,11 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 # I0011 - locally-disabled - ignore warnings about disable pylint checks
 # R0204 - redefined-variable-type
 # R0903 - too-few-public-methods - pylint does not always know best
+# R1705 - no-else-return - sometimes an unnecessary else helps readability
 # W0511 - fixme - ignore TODOs in comments
 # W0611 - unused-import - typing module is needed for mypy
 
-disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,redefined-variable-type,too-few-public-methods,unused-import
+disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,no-else-return,redefined-variable-type,too-few-public-methods,unused-import
 
 [IMPORTS]
 known-third-party=boto3,botocore,psutil,yaml,xmlrunner

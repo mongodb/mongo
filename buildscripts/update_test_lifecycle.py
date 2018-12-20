@@ -9,13 +9,12 @@ from __future__ import division
 
 import collections
 import datetime
+import itertools
 import logging
 import multiprocessing.dummy
-import operator
 import optparse
 import os.path
 import posixpath
-import subprocess
 import sys
 import textwrap
 
@@ -31,9 +30,10 @@ from buildscripts import jiraclient
 from buildscripts import resmokelib
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.utils import globstar
-from buildscripts import lifecycle_test_failures as tf
 from buildscripts.ciconfig import evergreen as ci_evergreen
 from buildscripts.ciconfig import tags as ci_tags
+from buildscripts.client import evergreen
+from buildscripts.util import testname
 # pylint: enable=wrong-import-position
 
 # pylint: disable=too-many-lines
@@ -59,16 +59,18 @@ Config = collections.namedtuple("Config", [
 ])
 
 DEFAULT_CONFIG = Config(
-    test_fail_rates=Rates(acceptable=0.1, unacceptable=0.3), task_fail_rates=Rates(
-        acceptable=0.1, unacceptable=0.3),
-    variant_fail_rates=Rates(acceptable=0.2, unacceptable=0.4), distro_fail_rates=Rates(
-        acceptable=0.2,
-        unacceptable=0.4), reliable_min_runs=5, reliable_time_period=datetime.timedelta(weeks=1),
-    unreliable_min_runs=20, unreliable_time_period=datetime.timedelta(weeks=4))
+    test_fail_rates=Rates(acceptable=0.1, unacceptable=0.3),
+    task_fail_rates=Rates(acceptable=0.1, unacceptable=0.3),
+    variant_fail_rates=Rates(acceptable=0.2, unacceptable=0.4),
+    distro_fail_rates=Rates(acceptable=0.2, unacceptable=0.4),
+    reliable_min_runs=5,
+    reliable_time_period=datetime.timedelta(weeks=1),
+    unreliable_min_runs=20,
+    unreliable_time_period=datetime.timedelta(weeks=4))  # yapf: disable
 
 DEFAULT_PROJECT = "mongodb-mongo-master"
 
-DEFAULT_NUM_THREADS = 12
+DEFAULT_NUM_THREADS = 10
 
 MAX_BATCH_SIZE = 50
 
@@ -104,46 +106,216 @@ def get_tests_from_tasks(tasks, test_tasks_membership):
     return tests
 
 
-def create_test_groups(tests):
-    """Return groups of tests by their directory, i.e., jstests/core."""
-    test_groups = collections.defaultdict(list)
-    for test in tests:
-        test_split = test.split("/")
-        # If the test does not have a directory, then ignore it.
-        if len(test_split) <= 1:
-            continue
-        test_dir = test_split[1]
-        test_groups[test_dir].append(test)
-    return test_groups
-
-
-def create_batch_groups(test_groups, batch_size):
-    """Return batch groups list of test_groups."""
-    batch_groups = []
-    for test_group_name in test_groups:
-        test_group = test_groups[test_group_name]
-        while test_group:
-            batch_groups.append(test_group[:batch_size])
-            test_group = test_group[batch_size:]
-    return batch_groups
-
-
-def get_date_range(num_days):
-    """Return a tuple of start_date, end_date, formatted as YYYY-MM-DD.
-
-    The end_date is tomorrow as the test_history API excludes the before_date in the results.
-    The start_date is 'num_days' from tomorrow's date.
+class TestCombination(object):
     """
-    tomorrow_dt = datetime.date.today() + datetime.timedelta(days=1)
-    start_dt = tomorrow_dt - datetime.timedelta(days=num_days)
-    return start_dt.strftime("%Y-%m-%d"), tomorrow_dt.strftime("%Y-%m-%d")
+    Represent a combination of test, task, variant, and distro.
+
+    task, variant and distro may be None. If so the following fields must also be None.
+    """
+
+    GROUP_BY_TEST = "test"
+    GROUP_BY_TASK = "task"
+    GROUP_BY_VARIANT = "variant"
+    GROUP_BY_DISTRO = "distro"
+
+    def __init__(self, test, task=None, variant=None, distro=None):
+        """Initialize the TestCombination with the field values."""
+        self._test = test
+        self._task = task
+        self._variant = variant
+        self._distro = distro
+        self._group_by = self._validate()
+
+    def _validate(self):
+        if self._test is None:
+            raise ValueError("Test cannot be None in a combination")
+        group_by = self.GROUP_BY_DISTRO
+        if self._distro is None:
+            group_by = self.GROUP_BY_VARIANT
+        if self._variant is None:
+            group_by = self.GROUP_BY_TASK
+            if self._distro is not None:
+                raise ValueError("Distro cannot be set if variant is None")
+        if self._task is None:
+            group_by = self.GROUP_BY_TEST
+            if self._variant is not None:
+                raise ValueError("Variant cannot be set if task is None")
+        return group_by
+
+    @property
+    def test(self):
+        """Return the test field value."""
+        return self._test
+
+    @property
+    def task(self):
+        """Return the task field value. May be None."""
+        return self._task
+
+    @property
+    def variant(self):
+        """Return the variant field value. May be None."""
+        return self._variant
+
+    @property
+    def distro(self):
+        """Return the distro field value. May be None."""
+        return self._distro
+
+    @property
+    def group_by(self):
+        """
+        Return how the test combination is grouped.
+
+        The possible values are `GROUP_BY_TEST`, `GROUP_BY_TASK`, `GROUP_BY_VARIANT`,
+        and `GROUP_BY_DISTRO`.
+        """
+        return self._group_by
+
+    @property
+    def tag(self):
+        """Return the unreliable tag matching this test combination."""
+        if self._group_by == self.GROUP_BY_TEST:
+            return "unreliable"
+        elif self._group_by == self.GROUP_BY_TASK:
+            return "unreliable|{}".format(self.task)
+        elif self._group_by == self.GROUP_BY_VARIANT:
+            return "unreliable|{}|{}".format(self.task, self.variant)
+        else:
+            return "unreliable|{}|{}|{}".format(self.task, self.variant, self.distro)
+
+    @staticmethod
+    def from_tag(test, tag):
+        """Create a TestCombination from a test name and an unreliable tag."""
+        elements = _split_tag(tag)
+        return TestCombination(test=test, task=elements[0], variant=elements[1], distro=elements[2])
+
+    def as_tuple(self):
+        """Return this combination as a (test, task, variant, distro) tuple."""
+        return (self.test, self.task, self.variant, self.distro)
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__dict__ == other.__dict__
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __cmp__(self, other):
+        return cmp(self.as_tuple(), other.as_tuple())
+
+    def __hash__(self):
+        return hash(self.as_tuple())
+
+    def __repr__(self):
+        return "%s|%s|%s|%s" % (self.test, self.task, self.variant, self.distro)
 
 
-class TestHistorySource(object):
+class TestHistory(object):
+    """Represent a test execution history over a reliable and unreliable periods."""
+
+    def __init__(self, test):
+        """Initliaze the TestHistory with the test file name."""
+        self.test = test
+        self.reliable_stats = []
+        self.unreliable_stats = []
+
+    def get_reliable_period_rates(self, group_by=None):
+        """
+        Return (TestCombination, failure rate, number of runs) tuples for the reliable period.
+
+        The test combinations are grouped according to the group_by parameter.
+        """
+        return self._get_rates(self.reliable_stats, group_by)
+
+    def get_unreliable_period_rates(self, group_by=None):
+        """
+        Return (TestCombination, failure rate, number of runs) tuples for the unreliable period.
+
+        The test combinations are grouped according to the group_by parameter.
+        """
+        return self._get_rates(self.unreliable_stats, group_by)
+
+    def add_reliable_period_stats(self, test_stats_docs):
+        """Add Evergreen test execution statistics documents that cover the reliable period."""
+        self.reliable_stats.extend(test_stats_docs)
+
+    def add_unreliable_period_stats(self, test_stats_docs):
+        """Add Evergreen test execution statistics documents that cover the unreliable period."""
+        self.unreliable_stats.extend(test_stats_docs)
+
+    def _get_rates(self, stats, group_by=None):
+        results = []
+        if group_by == TestCombination.GROUP_BY_TEST:
+            keyfunc = self._group_by_test_key
+        elif group_by == TestCombination.GROUP_BY_TASK:
+            keyfunc = self._group_by_task_key
+        elif group_by == TestCombination.GROUP_BY_VARIANT:
+            keyfunc = self._group_by_variant_key
+        elif group_by == TestCombination.GROUP_BY_DISTRO or group_by is None:
+            keyfunc = self._group_by_distro_key
+        else:
+            raise ValueError("Invalid group_by value: {}".format(group_by))
+        sorted_stats = sorted(stats, key=keyfunc)
+        groups = itertools.groupby(sorted_stats, keyfunc)
+        for key, group in groups:
+            group = list(group)
+            results.append((key, self._get_failure_rate(group), self._get_num_run(group)))
+        return results
+
+    @staticmethod
+    def _get_failure_rate(test_stats):
+        num_pass = sum([d["num_pass"] for d in test_stats])
+        num_fail = sum([d["num_fail"] for d in test_stats])
+        if (num_pass + num_fail) == 0:
+            return 0
+        return float(num_fail) / (num_pass + num_fail)
+
+    @staticmethod
+    def _get_num_run(test_stats):
+        num_pass = sum([d["num_pass"] for d in test_stats])
+        num_fail = sum([d["num_fail"] for d in test_stats])
+        return num_pass + num_fail
+
+    @staticmethod
+    def _group_by_distro_key(test_stats_doc):
+        return TestCombination(
+            test=testname.normalize_test_file(test_stats_doc["test_file"]),
+            task=test_stats_doc["task_name"],
+            variant=test_stats_doc["variant"],
+            distro=test_stats_doc["distro"])  # yapf: disable
+
+    @staticmethod
+    def _group_by_variant_key(test_stats_doc):
+        return TestCombination(
+            test=testname.normalize_test_file(test_stats_doc["test_file"]),
+            task=test_stats_doc["task_name"],
+            variant=test_stats_doc["variant"],
+            distro=None)  # yapf: disable
+
+    @staticmethod
+    def _group_by_task_key(test_stats_doc):
+        return TestCombination(
+            test=testname.normalize_test_file(test_stats_doc["test_file"]),
+            task=test_stats_doc["task_name"],
+            variant=None,
+            distro=None)  # yapf: disable
+
+    @staticmethod
+    def _group_by_test_key(test_stats_doc):
+        return TestCombination(
+            test=testname.normalize_test_file(test_stats_doc["test_file"]),
+            task=None,
+            variant=None,
+            distro=None)  # yapf: disable
+
+
+class TestHistorySource(object):  # pylint: disable=too-many-instance-attributes
     """A class used to parallelize requests to buildscripts.test_failures.TestHistory."""
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, project, variants, distros, start_date, end_date,
+            self, project, variants, distros, reliable_period, unreliable_period,
             thread_pool_size=DEFAULT_NUM_THREADS):
         """Initialize the TestHistorySource.
 
@@ -151,36 +323,55 @@ class TestHistorySource(object):
             project: the Evergreen project name.
             variants: a list of variant names.
             distros: a list of distro names.
-            start_date: the start date of the history we want to retrieve.
-            end_revision: the end date of the history we want to retrieve.
+            reliable_period: the time delta for the reliable period.
+            unreliable_period: the time delta for the unreliable period.
             thread_pool_size: the size of the thread pool used to make parallel requests.
         """
         self._project = project
         self._variants = variants
         self._distros = distros
-        self._start_date = start_date
-        self._end_date = end_date
+        not_after = datetime.datetime.utcnow()
+
+        self._not_after = not_after.strftime(format="%Y-%m-%d")
+        self._reliable_not_before = (not_after - reliable_period).strftime(format="%Y-%m-%d")
+
+        self._reliable_group_num_days = reliable_period.days
+        self._unreliable_not_before = (not_after - unreliable_period).strftime(format="%Y-%m-%d")
+        self._unreliable_group_num_days = unreliable_period.days
+
         self._thread_pool = multiprocessing.dummy.Pool(thread_pool_size)
+        self._evg_api = evergreen.get_evergreen_apiv2(num_retries=3)
 
-    def get_history_data(self, tests, tasks):
-        """Retrieve the history data for the given tests and tasks.
+    def get_history(self, test_tasks_list):
+        """Return an iterator with the TestHistory for each of the tests provided.
 
-        The requests for each task will be parallelized using the internal thread pool.
+        Args:
+            test_tasks_list: a list of (test, task list) tuples.
         """
-        history_data = []
-        jobs = [
-            self._thread_pool.apply_async(self._get_task_history_data, (tests, task))
-            for task in tasks
-        ]
-        for job in jobs:
-            history_data.extend(job.get())
-        return history_data
+        return self._thread_pool.imap_unordered(self._get_history, test_tasks_list)
 
-    def _get_task_history_data(self, tests, task):
-        test_history = tf.TestHistory(project=self._project, tests=tests, tasks=[task],
-                                      variants=self._variants, distros=self._distros)
-        return test_history.get_history_by_date(start_date=self._start_date,
-                                                end_date=self._end_date)
+    def _get_history(self, test_tasks):
+        try:
+            test, tasks = test_tasks
+            history = TestHistory(test)
+            tests = testname.denormalize_test_file(test)
+            # Get stats for the reliable period.
+            history.add_reliable_period_stats(
+                self._get_test_stats(self._reliable_not_before, self._reliable_group_num_days,
+                                     tests, tasks))
+            # Get stats for the unreliable period.
+            history.add_unreliable_period_stats(
+                self._get_test_stats(self._unreliable_not_before, self._unreliable_group_num_days,
+                                     tests, tasks))
+            return history
+        except Exception:
+            LOGGER.exception("An error occurred while getting test history")
+            raise
+
+    def _get_test_stats(self, not_before, group_num_days, tests, tasks):
+        return self._evg_api.test_stats(self._project, not_before, self._not_after, group_num_days,
+                                        tests=tests, tasks=tasks, variants=self._variants,
+                                        distros=self._distros)
 
 
 def unreliable_test(test_fr, unacceptable_fr, test_runs, min_run):
@@ -201,36 +392,19 @@ def reliable_test(test_fr, acceptable_fr, test_runs, min_run):
     return test_runs < min_run or test_fr <= acceptable_fr
 
 
-def unreliable_tag(task, variant, distro):
-    """Return the unreliable tag."""
-
-    for (component_name, component_value) in (("task", task), ("variant", variant), ("distro",
-                                                                                     distro)):
-        if isinstance(component_value, (tf.Wildcard, tf.Missing)):
-            if component_name == "task":
-                return "unreliable"
-            elif component_name == "variant":
-                return "unreliable|{}".format(task)
-            elif component_name == "distro":
-                return "unreliable|{}|{}".format(task, variant)
-
-    return "unreliable|{}|{}|{}".format(task, variant, distro)
-
-
 def update_lifecycle(  # pylint: disable=too-many-arguments
-        lifecycle_tags_file, report, method_test, add_tags, fail_rate, min_run):
+        lifecycle_tags_file, rates, method_test, add_tags, threshold, min_run):
     """Update the lifecycle object based on the test_method.
 
     The test_method checks unreliable or reliable fail_rates.
     """
-    for summary in report:
-        if method_test(summary.fail_rate, fail_rate, summary.num_pass + summary.num_fail, min_run):
-            update_tag = unreliable_tag(summary.task, summary.variant, summary.distro)
+    for combination, fail_rate, num_run in rates:
+        if method_test(fail_rate, threshold, num_run, min_run):
+            update_tag = combination.tag
             if add_tags:
-                lifecycle_tags_file.add_tag("js_test", summary.test, update_tag, summary.fail_rate)
+                lifecycle_tags_file.add_tag("js_test", combination.test, update_tag, fail_rate)
             else:
-                lifecycle_tags_file.remove_tag("js_test", summary.test, update_tag,
-                                               summary.fail_rate)
+                lifecycle_tags_file.remove_tag("js_test", combination.test, update_tag, fail_rate)
 
 
 def compare_tags(tag_a, tag_b):
@@ -290,113 +464,40 @@ def validate_config(config):  # pylint: disable=too-many-branches
                     name, time_period))
 
 
-def _test_combination_from_entry(entry, components):
-    """Create a test combination tuple from a tf._ReportEntry and target components.
-
-    Return a tuple containing the entry fields specified in components.
-    """
-    combination = []
-    for component in components:
-        combination.append(operator.attrgetter(component)(entry))
-    return tuple(combination)
-
-
-def _test_combination_from_tag(test, tag):
-    """Create a test combination tuple from a test name and a tag.
-
-    Return a tuple containing the test name and the components found in the tag.
-    """
-    combination = [test]
-    for element in _split_tag(tag):
-        if element:
-            combination.append(element)
-    return tuple(combination)
-
-
-def update_tags(lifecycle_tags, config, report, tests):  # pylint: disable=too-many-locals
+def update_tags(lifecycle_tags, config, test_history):  # pylint: disable=too-many-locals
     """Update the tags in 'lifecycle_tags'.
 
     This is based on the historical test failures of tests 'tests'
     mentioned in 'report' according to the model described by 'config'.
     """
 
-    # We initialize 'grouped_entries' to make PyLint not complain about 'grouped_entries' being used
-    # before assignment.
-    grouped_entries = None
     # yapf: disable
-    for (idx, (components, rates)) in enumerate(
-            ((tf.Report.TEST_TASK_VARIANT_DISTRO, config.distro_fail_rates),
-             (tf.Report.TEST_TASK_VARIANT, config.variant_fail_rates),
-             (tf.Report.TEST_TASK, config.task_fail_rates),
-             (tf.Report.TEST, config.test_fail_rates))):
-        # yapf: enable
-        if idx > 0:
-            report = tf.Report(grouped_entries)
+    for (group_by, rates) in [(TestCombination.GROUP_BY_TEST, config.test_fail_rates),
+                              (TestCombination.GROUP_BY_TASK, config.task_fail_rates),
+                              (TestCombination.GROUP_BY_VARIANT, config.variant_fail_rates),
+                              (TestCombination.GROUP_BY_DISTRO, config.distro_fail_rates)]:
 
-        # We reassign the value of 'grouped_entries' to take advantage of how data that is on
-        # (test, task, variant, distro) preserves enough information to be grouped on any subset of
-        # those components, etc.
-        grouped_entries = report.summarize_by(components, time_period=tf.Report.DAILY)
+        reliable_rates = test_history.get_reliable_period_rates(group_by)
+        update_lifecycle(lifecycle_tags, reliable_rates, reliable_test, False,
+                         rates.acceptable, config.unreliable_min_runs)
 
-        # Create the reliable report.
-        # Filter out any test executions from prior to 'config.reliable_time_period'.
-        reliable_start_date = (
-            report.end_date - config.reliable_time_period + datetime.timedelta(days=1))
-        reliable_entries = [
-            entry for entry in grouped_entries if entry.start_date >= reliable_start_date
-        ]
-        if reliable_entries:
-            reliable_report = tf.Report(reliable_entries)
-            reliable_combinations = {
-                _test_combination_from_entry(entry, components)
-                for entry in reliable_entries
-            }
-            reliable_summaries = reliable_report.summarize_by(components)
-        else:
-            reliable_combinations = set()
-            reliable_summaries = []
-
-        # Create the unreliable report.
-        # Filter out any test executions from prior to 'config.unreliable_time_period'.
-        # Also filter out any test that is not present in the reliable_report in order
-        # to avoid tagging as unreliable tests that are no longer running.
-        unreliable_start_date = (
-            report.end_date - config.unreliable_time_period + datetime.timedelta(days=1))
-        unreliable_entries = [
-            entry for entry in grouped_entries
-            if (entry.start_date >= unreliable_start_date
-                and _test_combination_from_entry(entry, components) in reliable_combinations)
-        ]
-        if unreliable_entries:
-            unreliable_report = tf.Report(unreliable_entries)
-            unreliable_summaries = unreliable_report.summarize_by(components)
-        else:
-            unreliable_summaries = []
-
-        # Update the tags using the unreliable report.
-        update_lifecycle(lifecycle_tags, unreliable_summaries, unreliable_test, True,
+        unreliable_rates = test_history.get_unreliable_period_rates(group_by)
+        update_lifecycle(lifecycle_tags, unreliable_rates, unreliable_test, True,
                          rates.unacceptable, config.unreliable_min_runs)
 
-        # Update the tags using the reliable report.
-        update_lifecycle(lifecycle_tags, reliable_summaries, reliable_test, False, rates.acceptable,
-                         config.reliable_min_runs)
-
-        def should_be_removed(test, tag, components, reliable_combinations):
-            """Return True if 'combination' shoud be removed."""
-            combination = _test_combination_from_tag(test, tag)
-            if len(combination) != len(components):
-                # The tag is not for these components.
-                return False
-            return combination not in reliable_combinations
-
-        # Remove the tags that correspond to tests that have not run during the reliable period.
-        for test in tests:
-            tags = lifecycle_tags.lifecycle.get_tags("js_test", test)
-            for tag in tags[:]:
-                if should_be_removed(test, tag, components, reliable_combinations):
-                    LOGGER.info("Removing tag '%s' of test '%s' because the combination did not run"
-                                " during the reliable period", tag, test)
-                    lifecycle_tags.remove_tag("js_test", test, tag, failure_rate=0)
+        # Remove the tags that correspond to combinations that have not run during the reliable
+        # period.
+        test = test_history.test
+        reliable_combinations = {r[0] for r in reliable_rates}
+        tags = lifecycle_tags.lifecycle.get_tags("js_test", test)
+        for tag in tags[:]:
+            tag_combination = TestCombination.from_tag(test, tag)
+            if tag_combination.group_by != group_by:
+                continue
+            if tag_combination not in reliable_combinations:
+                LOGGER.info("Removing tag '%s' of test '%s' because the combination did not run"
+                            " during the reliable period", tag, test)
+                lifecycle_tags.remove_tag("js_test", test, tag, failure_rate=0)
 
 
 def _split_tag(tag):
@@ -409,9 +510,9 @@ def _split_tag(tag):
     length = len(elements)
     if elements[0] != "unreliable" or length < 2 or length > 4:
         return None, None, None
-    # fillout the array
+    # Fill out the array.
     elements.extend([None] * (4 - length))
-    # return as a tuple
+    # Return as a tuple.
     return tuple(elements[1:])
 
 
@@ -840,7 +941,7 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
     parser.add_option_group(data_options)
 
     data_options.add_option("--project", dest="project", metavar="<project-name>",
-                            default=tf.TestHistory.DEFAULT_PROJECT,
+                            default=DEFAULT_PROJECT,
                             help="The Evergreen project to analyze. Defaults to '%default'.")
 
     data_options.add_option(
@@ -965,13 +1066,6 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
                       help=("The YAML file in the metadata repository that contains the revision "
                             "mappings. Defaults to '%default'."))
 
-    parser.add_option("--requestBatchSize", type="int", dest="batch_size", metavar="<batch-size>",
-                      default=10,
-                      help=("The maximum number of tests to query the Evergreen API for in a single"
-                            " request. A higher value for this option will reduce the number of"
-                            " roundtrips between this client and Evergreen. The maximium value is"
-                            " {}. Defaults to %default.".format(MAX_BATCH_SIZE)))
-
     parser.add_option("--requestThreads", type="int", dest="num_request_threads",
                       metavar="<num-request-threads>", default=DEFAULT_NUM_THREADS,
                       help=("The maximum number of threads to use when querying the Evergreen API."
@@ -1019,10 +1113,6 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
 
     (options, tests) = parser.parse_args()
 
-    if options.batch_size < 1 or options.batch_size > MAX_BATCH_SIZE:
-        parser.print_help()
-        parser.error("Invalid --requestBatchSize specified: {}.".format(options.batch_size))
-
     logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=options.log_level,
                         filename=options.log_file)
     evg_conf = ci_evergreen.parse_evergreen_file(options.evergreen_project_config)
@@ -1060,34 +1150,28 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
         if not options.tasks:
             use_test_tasks_membership = True
 
-    start_date, end_date = get_date_range(max(options.reliable_days, options.unreliable_days))
-
-    # For efficiency purposes, group the tests and process in batches of batch_size.
-    test_groups = create_batch_groups(create_test_groups(tests), options.batch_size)
-
-    test_history_source = TestHistorySource(options.project, variants, distros, start_date,
-                                            end_date, options.num_request_threads)
-
-    LOGGER.info("Updating the tags")
-    nb_groups = len(test_groups)
-    count = 0
-    for tests in test_groups:
-        LOGGER.info("Progress: %s %%", 100 * count / nb_groups)
-        count += 1
-        # Find all associated tasks for the test_group if tasks or tests were not specified.
+    test_history_source = TestHistorySource(
+        options.project, variants, distros, config.reliable_time_period,
+        config.unreliable_time_period, options.num_request_threads)
+    test_tasks_list = []
+    for test in tests:
+        # Find all associated tasks for the test if tasks or tests were not specified.
         if use_test_tasks_membership:
-            tasks_set = set()
-            for test in tests:
-                tasks_set = tasks_set.union(test_tasks_membership[test])
-            tasks = list(tasks_set)
+            tasks = test_tasks_membership[test]
         if not tasks:
             LOGGER.warning("No tasks found for tests %s, skipping this group.", tests)
             continue
-        history_data = test_history_source.get_history_data(tests, tasks)
-        if not history_data:
-            continue
-        report = tf.Report(history_data)
-        update_tags(lifecycle_tags_file.changelog_lifecycle, config, report, tests)
+        test_tasks_list.append((test, tasks))
+    results = test_history_source.get_history(test_tasks_list)
+
+    LOGGER.info("Updating the tags")
+    nb_tests = len(test_tasks_list)
+    count = 0
+    for test_history in results:
+        progress = round(100 * count / nb_tests, 2)
+        LOGGER.info("Progress: %s %%", progress)
+        update_tags(lifecycle_tags_file.changelog_lifecycle, config, test_history)
+        count += 1
 
     # Remove tags that are no longer relevant
     clean_up_tags(lifecycle_tags_file.changelog_lifecycle, evg_conf)

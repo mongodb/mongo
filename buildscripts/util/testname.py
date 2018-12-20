@@ -51,3 +51,22 @@ def normalize_test_file(test_file):
         return posix_test_file
 
     return test_file
+
+
+def denormalize_test_file(test_file):
+    """Return a list containing 'test_file' as both a POSIX-style and a Windows-style path.
+
+    The conversion process may involving replacing forward slashes (/) as the path separator
+    with backslashes (\\), as well as adding a ".exe" extension if 'test_file' has no file
+    extension.
+    """
+
+    test_file = normalize_test_file(test_file)
+
+    if "/" in test_file:
+        windows_test_file = test_file.replace("/", "\\")
+        if not os.path.splitext(test_file)[1]:
+            windows_test_file += ".exe"
+        return [test_file, windows_test_file]
+
+    return [test_file]
