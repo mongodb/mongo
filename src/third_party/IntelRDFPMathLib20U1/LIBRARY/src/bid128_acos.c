@@ -123,7 +123,7 @@ BID128_FUNCTION_ARG1 (bid128_acos, x)
 
 // If the input is exactly 1, return a canonical zero with minimal exponent
 // Uses >= 1 instead of == 1 to avoid compiler warnings...
-  if (__bid_f128_ge(abs_xd, c_one.v))
+  if (__bid_f128_ge(xd, c_one.v))
    { 
 	   res = BID128_0;
      BID_RETURN(res);
