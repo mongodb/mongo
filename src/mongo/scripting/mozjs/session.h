@@ -48,9 +48,14 @@ struct SessionInfo : public BaseInfo {
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(end);
         MONGO_DECLARE_JS_FUNCTION(getId);
+        MONGO_DECLARE_JS_FUNCTION(getTxnState);
+        MONGO_DECLARE_JS_FUNCTION(setTxnState);
+        MONGO_DECLARE_JS_FUNCTION(getTxnNumber);
+        MONGO_DECLARE_JS_FUNCTION(setTxnNumber);
+        MONGO_DECLARE_JS_FUNCTION(incrementTxnNumber);
     };
 
-    static const JSFunctionSpec methods[3];
+    static const JSFunctionSpec methods[8];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
