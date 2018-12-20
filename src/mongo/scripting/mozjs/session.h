@@ -54,7 +54,7 @@ struct SessionInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(incrementTxnNumber);
     };
 
-    static const JSFunctionSpec methods[8];
+    static const JSFunctionSpec methods[7];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

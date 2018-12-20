@@ -46,13 +46,12 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec SessionInfo::methods[8] = {
+const JSFunctionSpec SessionInfo::methods[7] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(end, SessionInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getId, SessionInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getTxnState, SessionInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setTxnState, SessionInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getTxnNumber, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setTxnNumber, SessionInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(incrementTxnNumber, SessionInfo),
     JS_FS_END,
 };
@@ -87,8 +86,6 @@ StringData transactionStateName(SessionHolder::TransactionState state) {
         case SessionHolder::TransactionState::kAborted:
             return "aborted"_sd;
     }
-
-    MONGO_UNREACHABLE;
 }
 
 SessionHolder::TransactionState transactionStateEnum(StringData name) {
@@ -203,16 +200,6 @@ void SessionInfo::Functions::getTxnNumber::call(JSContext* cx, JS::CallArgs args
     uassert(ErrorCodes::BadValue, "getTxnNumber takes no arguments", args.length() == 0);
 
     ValueReader(cx, args.rval()).fromInt64(holder->txnNumber);
-}
-
-void SessionInfo::Functions::setTxnNumber::call(JSContext* cx, JS::CallArgs args) {
-    auto holder = getHolder(args);
-    invariant(holder);
-    uassert(ErrorCodes::BadValue, "setTxnNumber takes 1 argument", args.length() == 1);
-
-    auto arg = args.get(0);
-    holder->txnNumber = ValueWriter(cx, arg).toInt64();
-    args.rval().setUndefined();
 }
 
 void SessionInfo::Functions::incrementTxnNumber::call(JSContext* cx, JS::CallArgs args) {

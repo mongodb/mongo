@@ -31,7 +31,7 @@
     assert.writeOK(coll.insert({_id: 1}));
     session.commitTransaction();
     const opTime = session.getOperationTime();
-    const txnNum = session.getTxnNumber_forTesting();
+    const txnNum = NumberLong(session._txnNumber);
     jsTestLog('Successfully committed transaction at operation time ' + tojson(opTime) +
               'with transaction number ' + txnNum);
 

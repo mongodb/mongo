@@ -524,7 +524,7 @@ var {
         };
 
         this.setTxnNumber_forTesting = function setTxnNumber_forTesting(newTxnNumber) {
-            this.handle.setTxnNumber(newTxnNumber);
+            _txnNumber = newTxnNumber;
         };
 
         this.getTxnOptions = function getTxnOptions() {
