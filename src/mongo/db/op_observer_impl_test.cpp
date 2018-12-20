@@ -101,6 +101,90 @@ private:
     }
 };
 
+TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    auto uuid = CollectionUUID::gen();
+    NamespaceString nss("test.coll");
+    UUID indexBuildUUID = UUID::gen();
+
+    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
+                               << "x_1"
+                               << "v"
+                               << 2);
+    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
+                               << "a_1"
+                               << "v"
+                               << 2);
+    std::vector<BSONObj> specs = {specX, specA};
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onStartIndexBuild(
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+        wunit.commit();
+    }
+
+    // Create expected startIndexBuild command.
+    BSONObjBuilder startIndexBuildBuilder;
+    startIndexBuildBuilder.append("startIndexBuild", nss.coll());
+    indexBuildUUID.appendToBuilder(&startIndexBuildBuilder, "indexBuildUUID");
+    BSONArrayBuilder indexesArr(startIndexBuildBuilder.subarrayStart("indexes"));
+    indexesArr.append(specX);
+    indexesArr.append(specA);
+    indexesArr.done();
+    BSONObj startIndexBuildCmd = startIndexBuildBuilder.done();
+
+    // Ensure the startIndexBuild fields were correctly set.
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    auto o = oplogEntry.getObjectField("o");
+    ASSERT_BSONOBJ_EQ(startIndexBuildCmd, o);
+}
+
+TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    auto uuid = CollectionUUID::gen();
+    NamespaceString nss("test.coll");
+    UUID indexBuildUUID = UUID::gen();
+
+    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
+                               << "x_1"
+                               << "v"
+                               << 2);
+    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
+                               << "a_1"
+                               << "v"
+                               << 2);
+    std::vector<BSONObj> specs = {specX, specA};
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onCommitIndexBuild(
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+        wunit.commit();
+    }
+
+    // Create expected commitIndexBuild command.
+    BSONObjBuilder commitIndexBuildBuilder;
+    commitIndexBuildBuilder.append("commitIndexBuild", nss.coll());
+    indexBuildUUID.appendToBuilder(&commitIndexBuildBuilder, "indexBuildUUID");
+    BSONArrayBuilder indexesArr(commitIndexBuildBuilder.subarrayStart("indexes"));
+    indexesArr.append(specX);
+    indexesArr.append(specA);
+    indexesArr.done();
+    BSONObj commitIndexBuildCmd = commitIndexBuildBuilder.done();
+
+    // Ensure the commitIndexBuild fields were correctly set.
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    auto o = oplogEntry.getObjectField("o");
+    ASSERT_BSONOBJ_EQ(commitIndexBuildCmd, o);
+}
+
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();

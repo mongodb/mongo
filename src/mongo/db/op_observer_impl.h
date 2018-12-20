@@ -46,6 +46,26 @@ public:
                        CollectionUUID uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) final;
+
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           bool fromMigrate) final;
+
+    void onCommitIndexBuild(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            CollectionUUID collUUID,
+                            const UUID& indexBuildUUID,
+                            const std::vector<BSONObj>& indexes,
+                            bool fromMigrate) final;
+
+    void onAbortIndexBuild(OperationContext* opCtx,
+                           CollectionUUID collUUID,
+                           const BSONObj& indexInfo,
+                           bool fromMigrate) final;
+
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,

@@ -65,6 +65,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
@@ -254,6 +255,52 @@ void setOplogCollectionName(ServiceContext* service) {
             // leave empty.
             break;
     }
+}
+
+/**
+ * Parse the given BSON array of BSON into a vector of BSON.
+ */
+StatusWith<std::vector<BSONObj>> parseBSONArrayIntoVector(const BSONElement& bsonArrayElem) {
+    invariant(bsonArrayElem.type() == Array);
+    std::vector<BSONObj> vec;
+    for (auto& bsonElem : bsonArrayElem.Obj()) {
+        if (bsonElem.type() != BSONType::Object) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "The elements of '" << bsonArrayElem.fieldName()
+                                  << "' array must be objects, but found "
+                                  << typeName(bsonElem.type())};
+        }
+        BSONObjBuilder builder;
+        builder.append(bsonElem);
+        vec.emplace_back(builder.obj());
+    }
+    return vec;
+}
+
+Status startIndexBuild(OperationContext* opCtx,
+                       const UUID& collUUID,
+                       const UUID& indexBuildUUID,
+                       const BSONElement& indexesElem,
+                       OplogApplication::Mode mode) {
+    auto statusWithIndexes = parseBSONArrayIntoVector(indexesElem);
+    if (!statusWithIndexes.isOK()) {
+        return statusWithIndexes.getStatus();
+    }
+    return IndexBuildsCoordinator::get(opCtx)
+        ->buildIndex(opCtx, collUUID, statusWithIndexes.getValue(), indexBuildUUID)
+        .getStatus();
+}
+
+Status commitIndexBuild(OperationContext* opCtx,
+                        const UUID& indexBuildUUID,
+                        const BSONElement& indexesElem,
+                        OplogApplication::Mode mode) {
+    auto statusWithIndexes = parseBSONArrayIntoVector(indexesElem);
+    if (!statusWithIndexes.isOK()) {
+        return statusWithIndexes.getStatus();
+    }
+    return IndexBuildsCoordinator::get(opCtx)->commitIndexBuild(
+        opCtx, statusWithIndexes.getValue(), indexBuildUUID);
 }
 
 void createIndexForApplyOps(OperationContext* opCtx,
@@ -890,6 +937,126 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists, ErrorCodes::NamespaceNotFound}}},
+    {"startIndexBuild",
+     {[](OperationContext* opCtx,
+         const char* ns,
+         const BSONElement& ui,
+         BSONObj& cmd,
+         const OpTime& opTime,
+         const OplogEntry& entry,
+         OplogApplication::Mode mode) -> Status {
+         // {
+         //     "startIndexBuild" : "coll",
+         //     "indexBuildUUID" : <UUID>,
+         //     "indexes" : [
+         //         {
+         //             "key" : {
+         //                 "x" : 1
+         //             },
+         //             "name" : "x_1",
+         //             "v" : 2
+         //         },
+         //         {
+         //             "key" : {
+         //                 "k" : 1
+         //             },
+         //             "name" : "k_1",
+         //             "v" : 2
+         //         }
+         //     ]
+         // }
+
+         // TODO (SERVER-38701): this must do nothing for applyOps. Pivot can be made on 'mode' to
+         // identify applyOps requests and take no action.
+
+         const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
+
+         auto buildUUIDElem = cmd.getField("indexBuildUUID");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'startIndexBuild' oplog entry, missing required field "
+                 "'indexBuildUUID'.",
+                 buildUUIDElem.eoo());
+         UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
+
+         auto indexesElem = cmd.getField("indexes");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'startIndexBuild' oplog entry, missing required field 'indexes'.",
+                 indexesElem.eoo());
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'startIndexBuild' oplog entry, field 'indexes' must be an array.",
+                 indexesElem.type() == Array);
+
+         auto collUUID = uassertStatusOK(UUID::parse(ui));
+
+         return startIndexBuild(opCtx, collUUID, indexBuildUUID, indexesElem, mode);
+     }}},
+    {"commitIndexBuild",
+     {[](OperationContext* opCtx,
+         const char* ns,
+         const BSONElement& ui,
+         BSONObj& cmd,
+         const OpTime& opTime,
+         const OplogEntry& entry,
+         OplogApplication::Mode mode) -> Status {
+         // {
+         //     "commitIndexBuild" : "coll",
+         //     "indexBuildUUID" : <UUID>,
+         //     "indexes" : [
+         //         {
+         //             "key" : {
+         //                 "x" : 1
+         //             },
+         //             "name" : "x_1",
+         //             "v" : 2
+         //         },
+         //         {
+         //             "key" : {
+         //                 "k" : 1
+         //             },
+         //             "name" : "k_1",
+         //             "v" : 2
+         //         }
+         //     ]
+         // }
+
+         // TODO this must work for applyOps, which doesn't provide collection or build UUIDs. Pivot
+         // can be made on 'mode' to identify applyOps requests. (SERVER-38701).
+
+         // Ensure the collection name is specified
+         BSONElement first = cmd.firstElement();
+         invariant(first.fieldNameStringData() == "commitIndexBuild");
+         uassert(ErrorCodes::InvalidNamespace,
+                 "createIndexes value must be a string",
+                 first.type() == mongo::String);
+
+         auto buildUUIDElem = cmd.getField("indexBuildUUID");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'commitIndexBuild' oplog entry, missing required field "
+                 "'indexBuildUUID'.",
+                 buildUUIDElem.eoo());
+         UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
+
+         auto indexesElem = cmd.getField("indexes");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'commitIndexBuild' oplog entry, missing required field 'indexes'.",
+                 indexesElem.eoo());
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'commitIndexBuild' oplog entry, field 'indexes' must be an array.",
+                 indexesElem.type() == Array);
+
+         return commitIndexBuild(opCtx, indexBuildUUID, indexesElem, mode);
+     }}},
+    {"abortIndexBuild",
+     {[](OperationContext* opCtx,
+         const char* ns,
+         const BSONElement& ui,
+         BSONObj& cmd,
+         const OpTime& opTme,
+         const OplogEntry& entry,
+         OplogApplication::Mode mode) -> Status {
+         // TODO (SERVER-39067): Not yet implemented.
+         return Status::OK();
+     }}},
     {"collMod",
      {[](OperationContext* opCtx,
          const char* ns,

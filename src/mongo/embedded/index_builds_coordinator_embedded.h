@@ -65,6 +65,9 @@ public:
     /**
      * None of the following functions should ever be called on an embedded server node.
      */
+    Status commitIndexBuild(OperationContext* opCtx,
+                            const std::vector<BSONObj>& specs,
+                            const UUID& buildUUID) override;
     void signalChangeToPrimaryMode() override;
     void signalChangeToSecondaryMode() override;
     void signalChangeToInitialSyncMode() override;

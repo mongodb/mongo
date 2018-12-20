@@ -127,6 +127,13 @@ IndexBuildsCoordinatorMongod::buildIndex(OperationContext* opCtx,
     return replIndexBuildState->sharedPromise.getFuture();
 }
 
+Status IndexBuildsCoordinatorMongod::commitIndexBuild(OperationContext* opCtx,
+                                                      const std::vector<BSONObj>& specs,
+                                                      const UUID& buildUUID) {
+    // TODO: not yet implemented.
+    return Status::OK();
+}
+
 void IndexBuildsCoordinatorMongod::signalChangeToPrimaryMode() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _replMode = ReplState::Primary;

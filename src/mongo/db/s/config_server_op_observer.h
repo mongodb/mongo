@@ -52,6 +52,25 @@ public:
                        BSONObj indexDoc,
                        bool fromMigrate) override {}
 
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CollectionUUID collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
+                           bool fromMigrate) override {}
+
+    void onCommitIndexBuild(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            CollectionUUID collUUID,
+                            const UUID& indexBuildUUID,
+                            const std::vector<BSONObj>& indexes,
+                            bool fromMigrate) override {}
+
+    void onAbortIndexBuild(OperationContext* opCtx,
+                           CollectionUUID collUUID,
+                           const BSONObj& indexInfo,
+                           bool fromMigrate) override {}
+
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,

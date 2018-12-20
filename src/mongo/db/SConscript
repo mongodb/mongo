@@ -986,6 +986,7 @@ env.Library(
     LIBDEPS=[
         'db_raii',
         'index/index_access_methods',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
     ],

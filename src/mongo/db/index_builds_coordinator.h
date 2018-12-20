@@ -109,6 +109,15 @@ public:
                                  const std::vector<BSONObj>& indexSpecs);
 
     /**
+     * Commits the index build identified by 'buildUUID'.
+     *
+     * TODO: not yet implemented.
+     */
+    virtual Status commitIndexBuild(OperationContext* opCtx,
+                                    const std::vector<BSONObj>& specs,
+                                    const UUID& buildUUID) = 0;
+
+    /**
      * Signals all the index builds to stop and then waits for them to finish. Leaves the index
      * builds in a recoverable state.
      *

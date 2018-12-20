@@ -75,6 +75,13 @@ public:
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID) override;
 
+    /**
+     * TODO: not yet implemented.
+     */
+    Status commitIndexBuild(OperationContext* opCtx,
+                            const std::vector<BSONObj>& specs,
+                            const UUID& buildUUID) override;
+
     void signalChangeToPrimaryMode() override;
     void signalChangeToSecondaryMode() override;
     void signalChangeToInitialSyncMode() override;

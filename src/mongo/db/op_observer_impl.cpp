@@ -360,6 +360,87 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                  OplogSlot());
 }
 
+void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       CollectionUUID collUUID,
+                                       const UUID& indexBuildUUID,
+                                       const std::vector<BSONObj>& indexes,
+                                       bool fromMigrate) {
+    BSONObjBuilder oplogEntryBuilder;
+    oplogEntryBuilder.append("startIndexBuild", nss.coll());
+
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+
+    BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
+    for (auto indexDoc : indexes) {
+        BSONObjBuilder builder;
+        for (const auto& e : indexDoc) {
+            if (e.fieldNameStringData() != "ns"_sd)
+                builder.append(e);
+        }
+        indexesArr.append(builder.obj());
+    }
+    indexesArr.done();
+
+    logOperation(opCtx,
+                 "c",
+                 nss.getCommandNS(),
+                 collUUID,
+                 oplogEntryBuilder.done(),
+                 nullptr,
+                 fromMigrate,
+                 getWallClockTimeForOpLog(opCtx),
+                 {},
+                 kUninitializedStmtId,
+                 {},
+                 false /* prepare */,
+                 OplogSlot());
+}
+
+void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        CollectionUUID collUUID,
+                                        const UUID& indexBuildUUID,
+                                        const std::vector<BSONObj>& indexes,
+                                        bool fromMigrate) {
+    BSONObjBuilder oplogEntryBuilder;
+    oplogEntryBuilder.append("commitIndexBuild", nss.coll());
+
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+
+    BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
+    for (auto indexDoc : indexes) {
+        BSONObjBuilder builder;
+        for (const auto& e : indexDoc) {
+            if (e.fieldNameStringData() != "ns"_sd)
+                builder.append(e);
+        }
+        indexesArr.append(builder.obj());
+    }
+    indexesArr.done();
+
+    logOperation(opCtx,
+                 "c",
+                 nss.getCommandNS(),
+                 collUUID,
+                 oplogEntryBuilder.done(),
+                 nullptr,
+                 fromMigrate,
+                 getWallClockTimeForOpLog(opCtx),
+                 {},
+                 kUninitializedStmtId,
+                 {},
+                 false /* prepare */,
+                 OplogSlot());
+}
+
+void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
+                                       CollectionUUID collUUID,
+                                       const BSONObj& indexInfo,
+                                       bool fromMigrate) {
+    // TODO (SERVER-39067): Not yet implemented.
+}
+
 void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
