@@ -486,10 +486,17 @@ var {
     // The server session maintains the state of a transaction, a monotonically increasing txn
     // number, and a transaction's read/write concerns.
     function ServerSession(client) {
+        // The default txnState is `inactive` until we call startTransaction.
+        let _txnState = ServerSession.TransactionStates.kInactive;
+
         let _txnOptions;
 
         // Keep track of the next available statement id of a transaction.
         let _nextStatementId = 0;
+
+        // _txnNumber starts at -1 because when we increment it, the first transaction
+        // and retryable write will both have a txnNumber of 0.
+        let _txnNumber = -1;
         let _lastUsed = new Date();
 
         this.client = new SessionAwareClient(client);
@@ -504,11 +511,8 @@ var {
                 wireVersion <= client.getMaxWireVersion();
         }
 
-        const hasTxnState = ((name) => this.handle.getTxnState() === name);
-        const setTxnState = ((name) => this.handle.setTxnState(name));
-
         this.isTxnActive = function isTxnActive() {
-            return hasTxnState("active");
+            return _txnState === ServerSession.TransactionStates.kActive;
         };
 
         this.isFirstStatement = function isFirstStatement() {
@@ -520,7 +524,7 @@ var {
         };
 
         this.getTxnNumber = function getTxnNumber() {
-            return this.handle.getTxnNumber();
+            return _txnNumber;
         };
 
         this.setTxnNumber_forTesting = function setTxnNumber_forTesting(newTxnNumber) {
@@ -573,8 +577,11 @@ var {
             }
 
             if (!cmdObjUnwrapped.hasOwnProperty("txnNumber")) {
-                this.handle.incrementTxnNumber();
-                cmdObjUnwrapped.txnNumber = this.handle.getTxnNumber();
+                // Since there's no native support for adding NumberLong instances and getting back
+                // another NumberLong instance, converting from a 64-bit floating-point value to a
+                // 64-bit integer value will overflow at 2**53.
+                _txnNumber++;
+                cmdObjUnwrapped.txnNumber = new NumberLong(_txnNumber);
             }
 
             return cmdObj;
@@ -668,21 +675,22 @@ var {
         this.assignTxnInfo = function assignTxnInfo(cmdObj) {
             // We will want to reset the transaction state to 'inactive' if a normal operation
             // follows a committed or aborted transaction.
-            if ((hasTxnState("aborted")) ||
-                (hasTxnState("committed") && Object.keys(cmdObj)[0] !== "commitTransaction")) {
-                setTxnState("inactive");
+            if ((_txnState === ServerSession.TransactionStates.kAborted) ||
+                (_txnState === ServerSession.TransactionStates.kCommitted &&
+                 Object.keys(cmdObj)[0] !== "commitTransaction")) {
+                _txnState = ServerSession.TransactionStates.kInactive;
             }
 
             // If we're not in an active transaction or performing a retry on commitTransaction,
             // return early.
-            if (hasTxnState("inactive")) {
+            if (_txnState === ServerSession.TransactionStates.kInactive) {
                 return cmdObj;
             }
 
             // If we reconnect to a 3.6 server in the middle of a transaction, we
             // catch it here.
             if (!serverSupports(kWireVersionSupportingMultiDocumentTransactions)) {
-                setTxnState("inactive");
+                _txnState = ServerSession.TransactionStates.kInactive;
                 throw new Error(
                     "Transactions are only supported on server versions 4.0 and greater.");
             }
@@ -699,7 +707,10 @@ var {
             }
 
             if (!cmdObjUnwrapped.hasOwnProperty("txnNumber")) {
-                cmdObjUnwrapped.txnNumber = this.handle.getTxnNumber();
+                // Since there's no native support for adding NumberLong instances and getting back
+                // another NumberLong instance, converting from a 64-bit floating-point value to a
+                // 64-bit integer value will overflow at 2**53.
+                cmdObjUnwrapped.txnNumber = new NumberLong(_txnNumber);
             }
 
             // All operations of a multi-statement transaction must specify autocommit=false.
@@ -749,18 +760,18 @@ var {
                     "Transactions are only supported on server versions 4.0 and greater.");
             }
             _txnOptions = new TransactionOptions(txnOptsObj);
-            setTxnState("active");
+            _txnState = ServerSession.TransactionStates.kActive;
             _nextStatementId = 0;
-            this.handle.incrementTxnNumber();
+            _txnNumber++;
         };
 
         this.commitTransaction = function commitTransaction(driverSession) {
             // If the transaction state is already 'aborted' we cannot try to commit it.
-            if (hasTxnState("aborted")) {
+            if (_txnState === ServerSession.TransactionStates.kAborted) {
                 throw new Error("Cannot call commitTransaction after calling abortTransaction.");
             }
             // If the session has no active transaction, raise an error.
-            if (hasTxnState("inactive")) {
+            if (_txnState === ServerSession.TransactionStates.kInactive) {
                 throw new Error("There is no active transaction to commit on this session.");
             }
             // run commitTxn command
@@ -769,15 +780,15 @@ var {
 
         this.abortTransaction = function abortTransaction(driverSession) {
             // If the transaction state is already 'aborted' we cannot try to abort it again.
-            if (hasTxnState("aborted")) {
+            if (_txnState === ServerSession.TransactionStates.kAborted) {
                 throw new Error("Cannot call abortTransaction twice.");
             }
             // We cannot attempt to abort a transaction that has already been committed.
-            if (hasTxnState("committed")) {
+            if (_txnState === ServerSession.TransactionStates.kCommitted) {
                 throw new Error("Cannot call abortTransaction after calling commitTransaction.");
             }
             // If the session has no active transaction, raise an error.
-            if (hasTxnState("inactive")) {
+            if (_txnState === ServerSession.TransactionStates.kInactive) {
                 throw new Error("There is no active transaction to abort on this session.");
             }
             // run abortTxn command
@@ -790,14 +801,14 @@ var {
             // transaction as 'committed' or 'aborted' accordingly.
             if (this.isFirstStatement()) {
                 if (commandName === "commitTransaction") {
-                    setTxnState("committed");
+                    _txnState = ServerSession.TransactionStates.kCommitted;
                 } else {
-                    setTxnState("aborted");
+                    _txnState = ServerSession.TransactionStates.kAborted;
                 }
                 return {"ok": 1};
             }
 
-            let cmd = {[commandName]: 1, txnNumber: this.handle.getTxnNumber()};
+            let cmd = {[commandName]: 1, txnNumber: NumberLong(_txnNumber)};
             // writeConcern should only be specified on commit or abort. If a writeConcern is
             // not specified from the default transaction options, it will be inherited from
             // the session.
@@ -815,14 +826,25 @@ var {
                 res = this.client.runCommand(driverSession, "admin", cmd, 0);
             } finally {
                 if (commandName === "commitTransaction") {
-                    setTxnState("committed");
+                    _txnState = ServerSession.TransactionStates.kCommitted;
                 } else {
-                    setTxnState("aborted");
+                    _txnState = ServerSession.TransactionStates.kAborted;
                 }
             }
             return res;
         };
     }
+
+    // TransactionStates represents the state of the current transaction. The default state
+    // is 'inactive' until startTransaction is called and changes the state to 'active'.
+    // Calling abortTransaction or commitTransaction will change the state to 'aborted' or
+    // 'committed' respectively, even on error.
+    ServerSession.TransactionStates = {
+        kActive: 'active',
+        kInactive: 'inactive',
+        kCommitted: 'committed',
+        kAborted: 'aborted',
+    };
 
     function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         var driverSessionConstructor = function(client, options = defaultOptions) {
