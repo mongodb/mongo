@@ -490,7 +490,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
         {
             stdx::mutex m;
             stdx::condition_variable cond;
-            stdx::unique_lock<std::mutex> lock(m);
+            stdx::unique_lock<stdx::mutex> lock(m);
             ASSERT_EQ(ErrorCodes::InternalError,
                       _opCtx->waitForConditionOrInterruptNoAssert(cond, lock));
         }
