@@ -777,7 +777,7 @@ OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* 
             // after the initial sync is complete.
             return OpTimeWithHash(0);
         }
-    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
+    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
         throw;
     } catch (const DBException& ex) {
         severe() << "Problem reading " << NamespaceString::kRsOplogNamespace.ns() << ": "
