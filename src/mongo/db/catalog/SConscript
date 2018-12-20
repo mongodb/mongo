@@ -196,23 +196,12 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='database',
-    source=[
-        "database.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
 env.CppUnitTest(
     target='database_test',
     source=[
         'database_test.cpp',
     ],
     LIBDEPS=[
-        'database',
         'multi_index_block',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -286,7 +275,6 @@ env.Library(
     ],
     LIBDEPS=[
         'collection',
-        'database',
         'database_holder',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -337,7 +325,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'collection',
-        'database',
         'uuid_catalog',
         '$BUILD_DIR/mongo/db/repair_database',
         '$BUILD_DIR/mongo/db/service_context',
@@ -372,7 +359,6 @@ env.Library(
     LIBDEPS=[
         'collection',
         'collection_options',
-        'database',
         'database_holder',
         'health_log',
         'index_catalog',
@@ -428,7 +414,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/write_ops',
         'collection_options',
         'collection',
-        'database',
         'index_catalog',
         'index_key_validate',
         'multi_index_block',

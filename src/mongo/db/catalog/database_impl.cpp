@@ -80,15 +80,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(Database::makeImpl)
-(Database* const this_,
- const StringData name,
- DatabaseCatalogEntry* const dbEntry,
- uint64_t epoch,
- PrivateTo<Database>)
-    ->std::unique_ptr<Database::Impl> {
-    return stdx::make_unique<DatabaseImpl>(this_, name, dbEntry, epoch);
-}
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
@@ -197,7 +188,7 @@ void DatabaseImpl::close(OperationContext* opCtx, const std::string& reason) {
     invariant(opCtx->lockState()->isW());
 
     // Clear cache of oplog Collection pointer.
-    repl::oplogCheckCloseDatabase(opCtx, this->_this);
+    repl::oplogCheckCloseDatabase(opCtx, this);
 
     for (auto&& pair : _collections) {
         auto* coll = pair.second;
@@ -272,8 +263,7 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     return coll;
 }
 
-DatabaseImpl::DatabaseImpl(Database* const this_,
-                           const StringData name,
+DatabaseImpl::DatabaseImpl(const StringData name,
                            DatabaseCatalogEntry* const dbEntry,
                            uint64_t epoch)
     : _name(name.toString()),
@@ -281,9 +271,8 @@ DatabaseImpl::DatabaseImpl(Database* const this_,
       _epoch(epoch),
       _profileName(_name + ".system.profile"),
       _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()),
-      _durableViews(DurableViewCatalogImpl(this_)),
-      _views(&_durableViews),
-      _this(this_) {}
+      _durableViews(DurableViewCatalogImpl(this)),
+      _views(&_durableViews) {}
 
 void DatabaseImpl::init(OperationContext* const opCtx) {
     Status status = validateDBName(_name);
@@ -370,7 +359,7 @@ Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
                       "the storage engine doesn't support profiling.");
     }
 
-    Status status = createProfileCollection(opCtx, this->_this);
+    Status status = createProfileCollection(opCtx, this);
 
     if (!status.isOK()) {
         return status;

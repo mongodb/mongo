@@ -33,7 +33,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -59,104 +58,17 @@ class Database : public Decorable<Database> {
 public:
     typedef StringMap<Collection*> CollectionMap;
 
-    class Impl {
-    public:
-        virtual ~Impl() = 0;
-
-        virtual void init(OperationContext* opCtx) = 0;
-
-        virtual void close(OperationContext* opCtx, const std::string& reason) = 0;
-
-        virtual const std::string& name() const = 0;
-
-        virtual void clearTmpCollections(OperationContext* opCtx) = 0;
-
-        virtual Status setProfilingLevel(OperationContext* opCtx, int newLevel) = 0;
-
-        virtual int getProfilingLevel() const = 0;
-
-        virtual const char* getProfilingNS() const = 0;
-
-        virtual void setDropPending(OperationContext* opCtx, bool dropPending) = 0;
-
-        virtual bool isDropPending(OperationContext* opCtx) const = 0;
-
-        virtual void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) = 0;
-
-        virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
-
-        virtual Status dropCollection(OperationContext* opCtx,
-                                      StringData fullns,
-                                      repl::OpTime dropOpTime) = 0;
-        virtual Status dropCollectionEvenIfSystem(OperationContext* opCtx,
-                                                  const NamespaceString& fullns,
-                                                  repl::OpTime dropOpTime) = 0;
-
-        virtual Status dropView(OperationContext* opCtx, StringData fullns) = 0;
-
-        virtual Status userCreateNS(OperationContext* opCtx,
-                                    const NamespaceString& fullns,
-                                    CollectionOptions collectionOptions,
-                                    bool createDefaultIndexes,
-                                    const BSONObj& idIndex) = 0;
-
-        virtual Collection* createCollection(OperationContext* opCtx,
-                                             StringData ns,
-                                             const CollectionOptions& options,
-                                             bool createDefaultIndexes,
-                                             const BSONObj& idIndex) = 0;
-
-        virtual Status createView(OperationContext* opCtx,
-                                  StringData viewName,
-                                  const CollectionOptions& options) = 0;
-
-        virtual Collection* getCollection(OperationContext* opCtx, StringData ns) const = 0;
-
-        virtual ViewCatalog* getViewCatalog() = 0;
-
-        virtual Collection* getOrCreateCollection(OperationContext* opCtx,
-                                                  const NamespaceString& nss) = 0;
-
-        virtual Status renameCollection(OperationContext* opCtx,
-                                        StringData fromNS,
-                                        StringData toNS,
-                                        bool stayTemp) = 0;
-
-        virtual const std::string& getSystemViewsName() const = 0;
-
-        virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
-            OperationContext* opCtx, StringData collectionNameModel) = 0;
-
-        virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) = 0;
-
-        virtual CollectionMap& collections() = 0;
-        virtual const CollectionMap& collections() const = 0;
-
-        virtual uint64_t epoch() const = 0;
-    };
-
-public:
     /**
      * Creates the namespace 'ns' in the database 'db' according to 'options'. If
      * 'createDefaultIndexes' is true, creates the _id index for the collection (and the system
      * indexes, in the case of system collections). Creates the collection's _id index according
      * to 'idIndex', if it is non-empty.  When 'idIndex' is empty, creates the default _id index.
      */
-    inline Status userCreateNS(OperationContext* opCtx,
-                               const NamespaceString& fullns,
-                               CollectionOptions collectionOptions,
-                               bool createDefaultIndexes = true,
-                               const BSONObj& idIndex = BSONObj()) {
-        return this->_impl().userCreateNS(
-            opCtx, fullns, std::move(collectionOptions), createDefaultIndexes, idIndex);
-    }
-
-    static MONGO_DECLARE_SHIM((Database * this_,
-                               StringData name,
-                               DatabaseCatalogEntry*,
-                               uint64_t epoch,
-                               PrivateTo<Database>)
-                                  ->std::unique_ptr<Impl>) makeImpl;
+    virtual Status userCreateNS(OperationContext* opCtx,
+                                const NamespaceString& fullns,
+                                CollectionOptions collectionOptions,
+                                bool createDefaultIndexes = true,
+                                const BSONObj& idIndex = BSONObj()) = 0;
 
     /**
      * Iterating over a Database yields Collection* pointers.
@@ -203,44 +115,28 @@ public:
         CollectionMap::const_iterator _it;
     };
 
-    explicit inline Database(const StringData name,
-                             DatabaseCatalogEntry* const dbEntry,
-                             uint64_t epoch)
-        : _pimpl(makeImpl(this, name, dbEntry, epoch, PrivateCall<Database>{})) {}
+    Database() = default;
 
     // must call close first
-    inline ~Database() = default;
+    virtual ~Database() = default;
 
     inline Database(Database&&) = delete;
     inline Database& operator=(Database&&) = delete;
 
-    inline iterator begin() const {
-        return iterator(this->_impl().collections().begin());
-    }
-
-    inline iterator end() const {
-        return iterator(this->_impl().collections().end());
-    }
+    virtual iterator begin() const = 0;
+    virtual iterator end() const = 0;
 
     /**
      * Sets up internal memory structures.
      */
-    inline void init(OperationContext* opCtx) {
-        this->_impl().init(opCtx);
-    }
+    virtual void init(OperationContext* opCtx) = 0;
 
     // closes files and other cleanup see below.
-    inline void close(OperationContext* const opCtx, const std::string& reason) {
-        return this->_impl().close(opCtx, reason);
-    }
+    virtual void close(OperationContext* const opCtx, const std::string& reason) = 0;
 
-    inline const std::string& name() const {
-        return this->_impl().name();
-    }
+    virtual const std::string& name() const = 0;
 
-    inline void clearTmpCollections(OperationContext* const opCtx) {
-        return this->_impl().clearTmpCollections(opCtx);
-    }
+    virtual void clearTmpCollections(OperationContext* const opCtx) = 0;
 
     /**
      * Sets a new profiling level for the database and returns the outcome.
@@ -248,17 +144,11 @@ public:
      * @param opCtx Operation context which to use for creating the profiling collection.
      * @param newLevel New profiling level to use.
      */
-    inline Status setProfilingLevel(OperationContext* const opCtx, const int newLevel) {
-        return this->_impl().setProfilingLevel(opCtx, newLevel);
-    }
+    virtual Status setProfilingLevel(OperationContext* const opCtx, const int newLevel) = 0;
 
-    inline int getProfilingLevel() const {
-        return this->_impl().getProfilingLevel();
-    }
+    virtual int getProfilingLevel() const = 0;
 
-    inline const char* getProfilingNS() const {
-        return this->_impl().getProfilingNS();
-    }
+    virtual const char* getProfilingNS() const = 0;
 
     /**
      * Sets the 'drop-pending' state of this Database.
@@ -268,27 +158,19 @@ public:
      * state.
      * The database must be locked in MODE_X when calling this function.
      */
-    inline void setDropPending(OperationContext* opCtx, bool dropPending) {
-        this->_impl().setDropPending(opCtx, dropPending);
-    }
+    virtual void setDropPending(OperationContext* opCtx, bool dropPending) = 0;
 
     /**
      * Returns the 'drop-pending' state of this Database.
      * The database must be locked in MODE_X when calling this function.
      */
-    inline bool isDropPending(OperationContext* opCtx) const {
-        return this->_impl().isDropPending(opCtx);
-    }
+    virtual bool isDropPending(OperationContext* opCtx) const = 0;
 
-    inline void getStats(OperationContext* const opCtx,
-                         BSONObjBuilder* const output,
-                         const double scale = 1) {
-        return this->_impl().getStats(opCtx, output, scale);
-    }
+    virtual void getStats(OperationContext* const opCtx,
+                          BSONObjBuilder* const output,
+                          const double scale = 1) = 0;
 
-    inline const DatabaseCatalogEntry* getDatabaseCatalogEntry() const {
-        return this->_impl().getDatabaseCatalogEntry();
-    }
+    virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
 
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
@@ -297,69 +179,47 @@ public:
      * If we are applying a 'drop' oplog entry on a secondary, 'dropOpTime' will contain the optime
      * of the oplog entry.
      */
-    inline Status dropCollection(OperationContext* const opCtx,
-                                 const StringData fullns,
-                                 repl::OpTime dropOpTime = {}) {
-        return this->_impl().dropCollection(opCtx, fullns, dropOpTime);
-    }
-    inline Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
-                                             const NamespaceString& fullns,
-                                             repl::OpTime dropOpTime = {}) {
-        return this->_impl().dropCollectionEvenIfSystem(opCtx, fullns, dropOpTime);
-    }
+    virtual Status dropCollection(OperationContext* const opCtx,
+                                  const StringData fullns,
+                                  repl::OpTime dropOpTime = {}) = 0;
+    virtual Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
+                                              const NamespaceString& fullns,
+                                              repl::OpTime dropOpTime = {}) = 0;
 
-    inline Status dropView(OperationContext* const opCtx, const StringData fullns) {
-        return this->_impl().dropView(opCtx, fullns);
-    }
+    virtual Status dropView(OperationContext* const opCtx, const StringData fullns) = 0;
 
-    inline Collection* createCollection(OperationContext* const opCtx,
-                                        StringData ns,
-                                        const CollectionOptions& options = CollectionOptions(),
-                                        const bool createDefaultIndexes = true,
-                                        const BSONObj& idIndex = BSONObj()) {
-        return this->_impl().createCollection(opCtx, ns, options, createDefaultIndexes, idIndex);
-    }
+    virtual Collection* createCollection(OperationContext* const opCtx,
+                                         StringData ns,
+                                         const CollectionOptions& options = CollectionOptions(),
+                                         const bool createDefaultIndexes = true,
+                                         const BSONObj& idIndex = BSONObj()) = 0;
 
-    inline Status createView(OperationContext* const opCtx,
-                             const StringData viewName,
-                             const CollectionOptions& options) {
-        return this->_impl().createView(opCtx, viewName, options);
-    }
+    virtual Status createView(OperationContext* const opCtx,
+                              const StringData viewName,
+                              const CollectionOptions& options) = 0;
 
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
-    inline Collection* getCollection(OperationContext* opCtx, const StringData ns) const {
-        return this->_impl().getCollection(opCtx, ns);
-    }
+    virtual Collection* getCollection(OperationContext* opCtx, const StringData ns) const = 0;
 
-    inline Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const {
-        return this->_impl().getCollection(opCtx, ns.ns());
-    }
+    virtual Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const = 0;
 
     /**
      * Get the view catalog, which holds the definition for all views created on this database. You
      * must be holding a database lock to use this accessor.
      */
-    inline ViewCatalog* getViewCatalog() {
-        return this->_impl().getViewCatalog();
-    }
+    virtual ViewCatalog* getViewCatalog() = 0;
 
-    inline Collection* getOrCreateCollection(OperationContext* const opCtx,
-                                             const NamespaceString& nss) {
-        return this->_impl().getOrCreateCollection(opCtx, nss);
-    }
+    virtual Collection* getOrCreateCollection(OperationContext* const opCtx,
+                                              const NamespaceString& nss) = 0;
 
-    inline Status renameCollection(OperationContext* const opCtx,
-                                   const StringData fromNS,
-                                   const StringData toNS,
-                                   const bool stayTemp) {
-        return this->_impl().renameCollection(opCtx, fromNS, toNS, stayTemp);
-    }
+    virtual Status renameCollection(OperationContext* const opCtx,
+                                    const StringData fromNS,
+                                    const StringData toNS,
+                                    const bool stayTemp) = 0;
 
-    inline const std::string& getSystemViewsName() const {
-        return this->_impl().getSystemViewsName();
-    }
+    virtual const std::string& getSystemViewsName() const = 0;
 
     /**
      * Generates a collection namespace suitable for creating a temporary collection.
@@ -371,19 +231,15 @@ public:
      *
      * The database must be locked in MODE_X when calling this function.
      */
-    inline StatusWith<NamespaceString> makeUniqueCollectionNamespace(
-        OperationContext* opCtx, StringData collectionNameModel) {
-        return this->_impl().makeUniqueCollectionNamespace(opCtx, collectionNameModel);
-    }
+    virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
+        OperationContext* opCtx, StringData collectionNameModel) = 0;
 
     /**
      * If we are in a replset, every replicated collection must have an _id index.  As we scan each
      * database, we also gather a list of drop-pending collection namespaces for the
      * DropPendingCollectionReaper to clean up eventually.
      */
-    inline void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) {
-        return this->_impl().checkForIdIndexesAndDropPendingCollections(opCtx);
-    }
+    virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) = 0;
 
     /**
      * A database is assigned a new epoch whenever it is closed and re-opened. This involves
@@ -396,33 +252,7 @@ public:
      * For example, closing a database must kill all active queries against the database. This is
      * implemented by checking that the epoch has not changed during query yield recovery.
      */
-    inline uint64_t epoch() const {
-        return this->_impl().epoch();
-    }
-
-private:
-    // This structure exists to give us a customization point to decide how to force users of this
-    // class to depend upon the corresponding `database.cpp` Translation Unit (TU).  All public
-    // forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
-    struct TUHook {
-        static void hook() noexcept;
-
-        explicit inline TUHook() noexcept {
-            if (kDebugBuild)
-                this->hook();
-        }
-    };
-
-    inline const Impl& _impl() const {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-    inline Impl& _impl() {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-    std::unique_ptr<Impl> _pimpl;
+    virtual uint64_t epoch() const = 0;
 };
+
 }  // namespace mongo

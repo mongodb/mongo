@@ -698,7 +698,6 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         'catalog/collection',
         'catalog/database_holder',
-        'catalog/database',
         'catalog/uuid_catalog',
         'commands/test_commands_enabled',
         'commands/txn_cmd_request',
@@ -1032,7 +1031,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/database',
         'rw_concern_d',
         'background',
         'logical_clock',
@@ -1146,7 +1144,6 @@ env.Library(
         'background',
         'bson/dotted_path_support',
         'catalog/collection',
-        'catalog/database',
         'catalog/document_validation',
         'catalog/index_catalog_entry',
         'catalog/index_catalog',
