@@ -262,7 +262,7 @@ class PrepareDirectoryForSuite(unittest.TestCase):
         mock_os.makedirs.assert_called_once_with('tmp')
 
 
-class GenerateEvgConfigTest(unittest.TestCase):
+class EvergreenConfigGeneratorTest(unittest.TestCase):
     @staticmethod
     def generate_mock_suites(count):
         suites = []
@@ -284,6 +284,8 @@ class GenerateEvgConfigTest(unittest.TestCase):
         options.suite = "suite"
         options.task = "suite"
         options.use_large_distro = None
+        options.use_multiversion = False
+        options.is_patch = True
 
         return options
 
@@ -291,7 +293,7 @@ class GenerateEvgConfigTest(unittest.TestCase):
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
 
-        config = grt.generate_evg_config(suites, options).to_map()
+        config = grt.EvergreenConfigGenerator(suites, options).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         command1 = config["tasks"][0]["commands"][2]
@@ -304,7 +306,7 @@ class GenerateEvgConfigTest(unittest.TestCase):
         options.task = "task"
         suites = self.generate_mock_suites(3)
 
-        config = grt.generate_evg_config(suites, options).to_map()
+        config = grt.EvergreenConfigGenerator(suites, options).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         display_task = config["buildvariants"][0]["display_tasks"][0]
@@ -325,7 +327,7 @@ class GenerateEvgConfigTest(unittest.TestCase):
 
         suites = self.generate_mock_suites(3)
 
-        config = grt.generate_evg_config(suites, options).to_map()
+        config = grt.EvergreenConfigGenerator(suites, options).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         self.assertEqual(options.large_distro_name,
@@ -333,6 +335,13 @@ class GenerateEvgConfigTest(unittest.TestCase):
 
 
 class MainTest(unittest.TestCase):
+    @staticmethod
+    def get_mock_options():
+        options = Mock()
+        options.target_resmoke_time = 10
+        options.fallback_num_sub_suites = 2
+        return options
+
     def test_calculate_suites(self):
         evg = Mock()
         evg.test_stats.return_value = [{
@@ -341,8 +350,7 @@ class MainTest(unittest.TestCase):
 
         main = grt.Main(evg)
         main.options = Mock()
-        main.config_options = grt.ConfigOptions(2, 15, "project", "", 1, 10, True, "task", "suite",
-                                                "variant", False, "")
+        main.config_options = self.get_mock_options()
 
         with patch('os.path.exists') as exists_mock:
             exists_mock.return_value = True
@@ -362,8 +370,7 @@ class MainTest(unittest.TestCase):
         main = grt.Main(evg)
         main.options = Mock()
         main.options.execution_time_minutes = 10
-        main.config_options = grt.ConfigOptions(2, 15, "project", "", 1, 30, True, "task", "suite",
-                                                "variant", False, "")
+        main.config_options = self.get_mock_options()
         main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
 
         suites = main.calculate_suites(_DATE, _DATE)
@@ -381,8 +388,7 @@ class MainTest(unittest.TestCase):
         main = grt.Main(evg)
         main.options = Mock()
         main.options.execution_time_minutes = 10
-        main.config_options = grt.ConfigOptions(2, 15, "project", "", 1, 30, True, "task", "suite",
-                                                "variant", False, "")
+        main.config_options = self.get_mock_options()
         main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
 
         with self.assertRaises(requests.HTTPError):

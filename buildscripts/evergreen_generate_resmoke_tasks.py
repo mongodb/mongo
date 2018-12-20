@@ -60,6 +60,10 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "variant",
     "use_large_distro",
     "large_distro_name",
+    "use_multiversion",
+    "is_patch",
+    "depends_on",
+    "requires",
 ])
 
 
@@ -73,6 +77,13 @@ def enable_logging():
     )
 
 
+def split_if_exists(str_to_split):
+    """Split the given string on ',' if it is not None."""
+    if str_to_split:
+        return str_to_split.split(',')
+    return None
+
+
 def get_config_options(cmd_line_options, config_file):
     """
     Get the configuration to use for generated tests.
@@ -83,6 +94,7 @@ def get_config_options(cmd_line_options, config_file):
     :param config_file: config file to use.
     :return: ConfigOptions to use.
     """
+    # pylint: disable=too-many-locals
     config_file_data = read_config.read_config_file(config_file)
 
     fallback_num_sub_suites = read_config.get_config_value(
@@ -108,10 +120,18 @@ def get_config_options(cmd_line_options, config_file):
                                                     config_file_data, default=False)
     large_distro_name = read_config.get_config_value("large_distro_name", cmd_line_options,
                                                      config_file_data)
+    use_multiversion = read_config.get_config_value("use_multiversion", cmd_line_options,
+                                                    config_file_data)
+    is_patch = read_config.get_config_value("is_patch", cmd_line_options, config_file_data)
+    depends_on = split_if_exists(
+        read_config.get_config_value("depends_on", cmd_line_options, config_file_data))
+    requires = split_if_exists(
+        read_config.get_config_value("requires", cmd_line_options, config_file_data))
 
     return ConfigOptions(fallback_num_sub_suites, max_sub_suites, project, resmoke_args,
                          resmoke_jobs_max, target_resmoke_time, run_multiple_jobs, suite, task,
-                         variant, use_large_distro, large_distro_name)
+                         variant, use_large_distro, large_distro_name, use_multiversion, is_patch,
+                         depends_on, requires)
 
 
 def divide_remaining_tests_among_suites(remaining_tests_runtimes, suites):
@@ -173,6 +193,9 @@ def generate_subsuite_file(source_suite_name, target_suite_name, roots=None, exc
         out.write(HEADER_TEMPLATE.format(file=__file__, suite_file=source_file))
         if roots:
             suite_config['selector']['roots'] = roots
+
+        if 'exclude_files' in suite_config['selector']:
+            del suite_config['selector']['exclude_files']
         if excludes:
             suite_config['selector']['exclude_files'] = excludes
         out.write(yaml.dump(suite_config, default_flow_style=False, Dumper=yaml.SafeDumper))
@@ -197,35 +220,38 @@ def prepare_directory_for_suite(directory):
         os.makedirs(directory)
 
 
-def generate_evg_config(suites, options):
-    """Generate evergreen configuration for the given suites."""
-    evg_config = Configuration()
+class EvergreenConfigGenerator(object):
+    """Generate evergreen configurations."""
 
-    task_names = []
-    task_specs = []
+    def __init__(self, suites, options):
+        """Create new EvergreenConfigGenerator object."""
+        self.suites = suites
+        self.options = options
+        self.evg_config = Configuration()
+        self.task_specs = []
+        self.task_names = []
 
-    def generate_task(sub_suite_name, sub_task_name, max_test_runtime=None,
-                      expected_suite_runtime=None):
-        """Generate evergreen config for a resmoke task."""
-        task_names.append(sub_task_name)
-        spec = TaskSpec(sub_task_name)
-        if options.use_large_distro:
-            spec.distro(options.large_distro_name)
-        task_specs.append(spec)
-        task = evg_config.task(sub_task_name)
+    def _set_task_distro(self, task_spec):
+        if self.options.use_large_distro and self.options.large_distro_name:
+            task_spec.distro(self.options.large_distro_name)
 
-        target_suite_file = os.path.join(CONFIG_DIR, sub_suite_name)
-
-        run_tests_vars = {
-            "resmoke_args": "--suites={0}.yml {1}".format(target_suite_file, options.resmoke_args),
-            "run_multiple_jobs": options.run_multiple_jobs,
-            "task": options.task,
+    def _get_run_tests_vars(self, suite_file):
+        variables = {
+            "resmoke_args": "--suites={0}.yml {1}".format(suite_file, self.options.resmoke_args),
+            "run_multiple_jobs": self.options.run_multiple_jobs,
+            "task": self.options.task,
         }
 
-        if options.resmoke_jobs_max:
-            run_tests_vars["resmoke_jobs_max"] = options.resmoke_jobs_max
+        if self.options.resmoke_jobs_max:
+            variables["resmoke_jobs_max"] = self.options.resmoke_jobs_max
 
-        commands = []
+        if self.options.use_multiversion:
+            variables["task_path_suffix"] = self.options.use_multiversion
+
+        return variables
+
+    @staticmethod
+    def _add_timeout_command(commands, max_test_runtime, expected_suite_runtime):
         if max_test_runtime or expected_suite_runtime:
             cmd_timeout = CmdTimeoutUpdate()
             if max_test_runtime:
@@ -234,26 +260,69 @@ def generate_evg_config(suites, options):
                 cmd_timeout.exec_timeout(int(math.ceil(expected_suite_runtime * 3)))
             commands.append(cmd_timeout.validate().resolve())
 
-        commands += [
-            CommandDefinition().function("do setup"),
-            CommandDefinition().function("run generated tests").vars(run_tests_vars)
-        ]
-        task.dependency(TaskDependency("compile")).commands(commands)
+    def _add_dependencies(self, task):
+        task.dependency(TaskDependency("compile"))
+        if not self.options.is_patch:
+            # Don't worry about task dependencies in patch builds, only mainline.
+            if self.options.depends_on:
+                for dep in self.options.depends_on:
+                    task.dependency(TaskDependency(dep))
+            if self.options.requires:
+                for dep in self.options.requires:
+                    task.requires(TaskDependency(dep))
 
-    for idx, suite in enumerate(suites):
-        sub_task_name = taskname.name_generated_task(options.task, idx, len(suites),
-                                                     options.variant)
-        generate_task(suite.name, sub_task_name, suite.max_runtime, suite.get_runtime())
+        return task
 
-    # Add the misc suite
-    misc_suite_name = "{0}_misc".format(options.suite)
-    generate_task(misc_suite_name, "{0}_misc_{1}".format(options.task, options.variant))
+    def _generate_task(self, sub_suite_name, sub_task_name, max_test_runtime=None,
+                       expected_suite_runtime=None):
+        """Generate evergreen config for a resmoke task."""
+        spec = TaskSpec(sub_task_name)
+        self._set_task_distro(spec)
+        self.task_specs.append(spec)
 
-    dt = DisplayTaskDefinition(options.task).execution_tasks(task_names) \
-        .execution_task("{0}_gen".format(options.task))
-    evg_config.variant(options.variant).tasks(task_specs).display_task(dt)
+        self.task_names.append(sub_task_name)
+        task = self.evg_config.task(sub_task_name)
 
-    return evg_config
+        target_suite_file = os.path.join(CONFIG_DIR, sub_suite_name)
+        run_tests_vars = self._get_run_tests_vars(target_suite_file)
+
+        commands = []
+        self._add_timeout_command(commands, max_test_runtime, expected_suite_runtime)
+        commands.append(CommandDefinition().function("do setup"))
+        if self.options.use_multiversion:
+            commands.append(CommandDefinition().function("do multiversion setup"))
+        commands.append(CommandDefinition().function("run generated tests").vars(run_tests_vars))
+
+        self._add_dependencies(task).commands(commands)
+
+    def _generate_all_tasks(self):
+        for idx, suite in enumerate(self.suites):
+            sub_task_name = taskname.name_generated_task(self.options.task, idx, len(self.suites),
+                                                         self.options.variant)
+            self._generate_task(suite.name, sub_task_name, suite.max_runtime, suite.get_runtime())
+
+        # Add the misc suite
+        misc_suite_name = "{0}_misc".format(self.options.suite)
+        self._generate_task(misc_suite_name, "{0}_misc_{1}".format(self.options.task,
+                                                                   self.options.variant))
+
+    def _generate_display_task(self):
+        dt = DisplayTaskDefinition(self.options.task)\
+            .execution_tasks(self.task_names) \
+            .execution_task("{0}_gen".format(self.options.task))
+        return dt
+
+    def _generate_variant(self):
+        self._generate_all_tasks()
+
+        self.evg_config.variant(self.options.variant)\
+            .tasks(self.task_specs)\
+            .display_task(self._generate_display_task())
+
+    def generate_config(self):
+        """Generate evergreen configuration."""
+        self._generate_variant()
+        return self.evg_config
 
 
 class TestStats(object):
@@ -386,8 +455,15 @@ class Main(object):
                             help="Build variant being run against.")
         parser.add_argument("--use-large-distro", dest="use_large_distro",
                             help="Should subtasks use large distros.")
-        parser.add_argument("--large_distro_name", dest="large_distro_name",
+        parser.add_argument("--large-distro-name", dest="large_distro_name",
                             help="Name of large distro.")
+        parser.add_argument("--use-multiversion", dest="use_multiversion",
+                            help="Task path suffix for multiversion generated tasks.")
+        parser.add_argument("--is-patch", dest="is_patch", help="Is this part of a patch build.")
+        parser.add_argument("--depends-on", dest="depends_on",
+                            help="Generate depends on for these tasks.")
+        parser.add_argument("--requires", dest="requires",
+                            help="Generate requires for these tasks.")
         parser.add_argument("--verbose", dest="verbose", action="store_true", default=False,
                             help="Enable verbose logging.")
 
@@ -451,7 +527,7 @@ class Main(object):
 
     def write_evergreen_configuration(self, suites, task):
         """Generate the evergreen configuration for the new suite and write it to disk."""
-        evg_config = generate_evg_config(suites, self.config_options)
+        evg_config = EvergreenConfigGenerator(suites, self.config_options).generate_config()
 
         with open(os.path.join(CONFIG_DIR, task + ".json"), "w") as file_handle:
             file_handle.write(evg_config.to_json())

@@ -7,8 +7,8 @@
 # Common requirements
 asn1crypto==0.24.0
 astroid==1.6.5
-boto3==1.9.65
-botocore==1.12.65
+boto3==1.9.69
+botocore==1.12.69
 certifi==2018.11.29
 cffi==1.11.5
 chardet==3.0.4
@@ -39,7 +39,7 @@ requests-oauth==0.4.1
 requests-oauthlib==1.0.0
 requests-toolbelt==0.8.0
 s3transfer==0.1.13
-shrub.py==0.1.0
+shrub.py==0.2.0
 six==1.12.0
 snowballstemmer==1.2.1
 typing==3.6.6
@@ -62,7 +62,7 @@ singledispatch==3.4.0.3; python_version < "3"
 
 # Python3 requirements
 mypy==0.580; python_version > "3"
-typed-ast==1.1.0; python_version > "3"
+typed-ast==1.1.1; python_version > "3"
 
 # Platform-specific components
 pypiwin32==219; sys_platform == "win32" and python_version < "3"
