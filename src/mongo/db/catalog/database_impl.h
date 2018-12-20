@@ -32,26 +32,9 @@
 
 #include "mongo/db/catalog/database.h"
 
-#include <memory>
-#include <string>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/views/view.h"
-#include "mongo/db/views/view_catalog.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/string_map.h"
+#include "mongo/platform/random.h"
 
 namespace mongo {
-
-class Collection;
-class DatabaseCatalogEntry;
-class IndexCatalog;
-class OperationContext;
-class PseudoRandom;
 
 /**
  * Represents a logical database containing Collections.
@@ -312,11 +295,6 @@ private:
     DurableViewCatalogImpl _durableViews;  // interface for system.views operations
     ViewCatalog _views;                    // in-memory representation of _durableViews
     Database* _this;                       // Pointer to wrapper, for external caller compatibility.
-
-    friend class Collection;
-    friend class IndexCatalog;
 };
-
-void dropAllDatabasesExceptLocalImpl(OperationContext* opCtx);
 
 }  // namespace mongo

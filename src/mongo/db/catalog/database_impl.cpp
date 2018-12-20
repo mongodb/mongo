@@ -1123,33 +1123,4 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
     return Status::OK();
 }
 
-MONGO_REGISTER_SHIM(Database::dropAllDatabasesExceptLocal)(OperationContext* opCtx)->void {
-    Lock::GlobalWrite lk(opCtx);
-
-    vector<string> n;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    storageEngine->listDatabases(&n);
-
-    if (n.size() == 0)
-        return;
-    log() << "dropAllDatabasesExceptLocal " << n.size();
-
-    repl::ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
-
-    for (const auto& dbName : n) {
-        if (dbName != "local") {
-            writeConflictRetry(opCtx, "dropAllDatabasesExceptLocal", dbName, [&opCtx, &dbName] {
-                Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
-
-                // This is needed since dropDatabase can't be rolled back.
-                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed
-                if (db == nullptr) {
-                    log() << "database disappeared after listDatabases but before drop: " << dbName;
-                } else {
-                    DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
-                }
-            });
-        }
-    }
-}
 }  // namespace mongo

@@ -41,14 +41,13 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+class DatabaseCatalogEntry;
+class OperationContext;
 
 /**
  * Represents a logical database containing Collections.
@@ -131,8 +130,6 @@ public:
     };
 
 public:
-    static MONGO_DECLARE_SHIM((OperationContext * opCtx)->void) dropAllDatabasesExceptLocal;
-
     /**
      * Creates the namespace 'ns' in the database 'db' according to 'options'. If
      * 'createDefaultIndexes' is true, creates the _id index for the collection (and the system
