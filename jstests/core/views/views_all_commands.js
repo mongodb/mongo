@@ -217,7 +217,6 @@
         drop: {command: {drop: "view"}},
         dropAllRolesFromDatabase: {skip: isUnrelated},
         dropAllUsersFromDatabase: {skip: isUnrelated},
-        dropConnections: {skip: isUnrelated},
         dropDatabase: {command: {dropDatabase: 1}},
         dropIndexes: {command: {dropIndexes: "view"}, expectFailure: true},
         dropRole: {

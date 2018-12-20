@@ -134,8 +134,6 @@ env.Library(
         "conn_pool_stats.cpp",
         "conn_pool_sync.cpp",
         "connection_status.cpp",
-        "drop_connections_command.cpp",
-        env.Idlc('drop_connections.idl')[0],
         "generic_servers.cpp",
         "isself.cpp",
         "mr_common.cpp",
