@@ -7,7 +7,7 @@ import sys
 
 import gdb
 
-# pylint: disable=invalid-name,wildcard-import
+# pylint: disable=invalid-name,wildcard-import,broad-except
 try:
     # Try to find and load the C++ pretty-printer library.
     import glob
@@ -17,7 +17,7 @@ try:
     sys.path.insert(0, path)
     from libstdcxx.v6.printers import *
     print("Loaded libstdc++ pretty printers from '%s'" % printers)
-except ImportError as e:
+except Exception as e:
     print("Failed to load the libstdc++ pretty printers: " + str(e))
 # pylint: enable=invalid-name,wildcard-import
 
@@ -151,6 +151,11 @@ def get_boost_optional(optional):
     return storage.cast(value_ref_type).dereference()
 
 
+def get_field_names(value):
+    """Return a list of all field names on a given GDB value."""
+    return [typ.name for typ in value.type.fields()]
+
+
 ###################################################################################################
 #
 # Commands
@@ -244,7 +249,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
         """Initialize DumpMongoDSessionCatalog."""
         RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches
         """Invoke DumpMongoDSessionCatalog."""
         # See if a particular session id was specified.
         argarr = args.split(" ")
@@ -296,7 +301,11 @@ class DumpMongoDSessionCatalog(gdb.Command):
             print("SessionId", "=", lsid_str)
             session_fields_to_print = ['_sessionId', '_checkoutOpCtx', '_killsRequested']
             for field in session_fields_to_print:
-                print(field, "=", session[field])
+                # Skip fields that aren't found on the object.
+                if field in get_field_names(session):
+                    print(field, "=", session[field])
+                else:
+                    print("Could not find field '%s' on the Session object." % field)
 
             # Print the information from a TransactionParticipant if a session has one. Otherwise
             # we just print the session's id and nothing else.
@@ -307,7 +316,11 @@ class DumpMongoDSessionCatalog(gdb.Command):
                 fields_to_print = ['_txnState', '_activeTxnNumber']
                 print("TransactionParticipant (" + str(txn_part.address) + "):")
                 for field in fields_to_print:
-                    print(field, "=", txn_part[field])
+                    # Skip fields that aren't found on the object.
+                    if field in get_field_names(txn_part):
+                        print(field, "=", txn_part[field])
+                    else:
+                        print("Could not find field '%s' on the TransactionParticipant" % field)
 
                 # The '_txnResourceStash' field is a boost::optional so we unpack it
                 # manually if it is non-empty. We are only interested in its Locker object for now.
