@@ -27,7 +27,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
 #include "mongo_embedded/mongo_embedded.h"
@@ -38,6 +37,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "api_common.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
@@ -58,46 +58,22 @@
 #define MONGO_API_CALL
 #endif
 
-struct mongo_embedded_v1_status {
-    mongo_embedded_v1_status() noexcept = default;
-    mongo_embedded_v1_status(const mongo_embedded_v1_error e, const int ec, std::string w)
-        : error(e), exception_code(ec), what(std::move(w)) {}
-
-    void clean() noexcept {
-        error = MONGO_EMBEDDED_V1_SUCCESS;
-    }
-
-    mongo_embedded_v1_error error = MONGO_EMBEDDED_V1_SUCCESS;
-    int exception_code = 0;
-    std::string what;
-};
-
 namespace mongo {
-namespace {
-class MobileException : public std::exception {
-public:
-    explicit MobileException(const mongo_embedded_v1_error code, std::string m)
-        : _mesg(std::move(m)), _code(code) {}
+using MongoEmbeddedStatusImpl = StatusForAPI<mongo_embedded_v1_error>;
 
-    mongo_embedded_v1_error mobileCode() const noexcept {
-        return this->_code;
-    }
-
-    const char* what() const noexcept final {
-        return this->_mesg.c_str();
-    }
-
-private:
-    std::string _mesg;
-    mongo_embedded_v1_error _code;
-};
-
-mongo_embedded_v1_status translateException() try { throw; } catch (const MobileException& ex) {
-    return {ex.mobileCode(), mongo::ErrorCodes::InternalError, ex.what()};
+/**
+ * C interfaces that use enterCXX() must provide a translateException() function that converts any
+ * possible exception into a StatusForAPI<> object.
+ */
+static MongoEmbeddedStatusImpl translateException(
+    stdx::type_identity<MongoEmbeddedStatusImpl>) try {
+    throw;
 } catch (const ExceptionFor<ErrorCodes::ReentrancyNotAllowed>& ex) {
     return {MONGO_EMBEDDED_V1_ERROR_REENTRANCY_NOT_ALLOWED, ex.code(), ex.what()};
 } catch (const DBException& ex) {
     return {MONGO_EMBEDDED_V1_ERROR_EXCEPTION, ex.code(), ex.what()};
+} catch (const ExceptionForAPI<mongo_embedded_v1_error>& ex) {
+    return {ex.statusCode(), mongo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::bad_alloc& ex) {
     return {MONGO_EMBEDDED_V1_ERROR_ENOMEM, mongo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::exception& ex) {
@@ -105,35 +81,28 @@ mongo_embedded_v1_status translateException() try { throw; } catch (const Mobile
 } catch (...) {
     return {MONGO_EMBEDDED_V1_ERROR_UNKNOWN,
             mongo::ErrorCodes::InternalError,
-            "Unknown error encountered in performing requested mongo_embedded_v1 operation"};
+            "Unknown error encountered in performing requested stitch_support_v1 operation"};
 }
 
-std::nullptr_t handleException(mongo_embedded_v1_status& status) noexcept {
-    try {
-        status = translateException();
-    } catch (...) {
-        status.error = MONGO_EMBEDDED_V1_ERROR_IN_REPORTING_ERROR;
-
-        try {
-            status.exception_code = -1;
-
-            status.what.clear();
-
-            // Expected to be small enough to fit in the capacity that string always has.
-            const char severeErrorMessage[] = "Severe Error";
-
-            if (status.what.capacity() > sizeof(severeErrorMessage)) {
-                status.what = severeErrorMessage;
-            }
-        } catch (...) /* Ignore any errors at this point. */
-        {
-        }
-    }
-    return nullptr;
+/**
+ * C interfaces that use enterCXX() must provide a tranlsateExceptionFallback() function that
+ * populates a StatusForAPI<> object to indicate a double-fault error during error reporting. The
+ * translateExceptionFallback() function gets called when translateException() throws, and it should
+ * not include any code that may itself throw.
+ *
+ * We use an out param instead of returning the StatusForAPI<> object so as to avoid a std::string
+ * copy that may allocate memory.
+ */
+static void translateExceptionFallback(MongoEmbeddedStatusImpl& status) noexcept {
+    status.error = MONGO_EMBEDDED_V1_ERROR_IN_REPORTING_ERROR;
+    status.exception_code = -1;
+    setErrorMessageNoAlloc(status.what);
 }
-
-}  // namespace
 }  // namespace mongo
+
+struct mongo_embedded_v1_status {
+    mongo::MongoEmbeddedStatusImpl statusImpl;
+};
 
 struct mongo_embedded_v1_lib {
     ~mongo_embedded_v1_lib() {
@@ -160,6 +129,8 @@ struct mongo_embedded_v1_lib {
 
 namespace mongo {
 namespace {
+using MobileException = ExceptionForAPI<mongo_embedded_v1_error>;
+
 struct ServiceContextDestructor {
     void operator()(mongo::ServiceContext* const serviceContext) const noexcept {
         ::mongo::embedded::shutdown(serviceContext);
@@ -227,28 +198,6 @@ namespace {
 
 std::unique_ptr<mongo_embedded_v1_lib> library;
 
-class ReentrancyGuard {
-private:
-    thread_local static bool inLibrary;
-
-public:
-    explicit ReentrancyGuard() {
-        uassert(ErrorCodes::ReentrancyNotAllowed,
-                str::stream() << "Reentry into mongo_embedded_v1 library is not allowed",
-                !inLibrary);
-        inLibrary = true;
-    }
-
-    ~ReentrancyGuard() {
-        inLibrary = false;
-    }
-
-    ReentrancyGuard(ReentrancyGuard const&) = delete;
-    ReentrancyGuard& operator=(ReentrancyGuard const&) = delete;
-};
-
-thread_local bool ReentrancyGuard::inLibrary = false;
-
 void registerLogCallback(mongo_embedded_v1_lib* const lib,
                          const mongo_embedded_v1_log_callback logCallback,
                          void* const logUserData) {
@@ -261,8 +210,7 @@ void registerLogCallback(mongo_embedded_v1_lib* const lib,
             logCallback, logUserData, std::make_unique<MessageEventUnadornedEncoder>()));
 }
 
-mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params,
-                                     mongo_embedded_v1_status& status) try {
+mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params) try {
     if (library) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_LIBRARY_ALREADY_INITIALIZED,
@@ -304,7 +252,7 @@ mongo_embedded_v1_lib* capi_lib_init(mongo_embedded_v1_init_params const* params
     throw;
 }
 
-void capi_lib_fini(mongo_embedded_v1_lib* const lib, mongo_embedded_v1_status& status) {
+void capi_lib_fini(mongo_embedded_v1_lib* const lib) {
     if (!lib) {
         throw MobileException{
             MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE,
@@ -335,8 +283,7 @@ void capi_lib_fini(mongo_embedded_v1_lib* const lib, mongo_embedded_v1_status& s
 }
 
 mongo_embedded_v1_instance* instance_new(mongo_embedded_v1_lib* const lib,
-                                         const char* const yaml_config,
-                                         mongo_embedded_v1_status& status) {
+                                         const char* const yaml_config) {
     if (!library) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
                               "Cannot create a new database handle when the MongoDB Embedded "
@@ -360,7 +307,7 @@ mongo_embedded_v1_instance* instance_new(mongo_embedded_v1_lib* const lib,
     return lib->onlyDB.get();
 }
 
-void instance_destroy(mongo_embedded_v1_instance* const db, mongo_embedded_v1_status& status) {
+void instance_destroy(mongo_embedded_v1_instance* const db) {
     if (!library) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
                               "Cannot destroy a database handle when the MongoDB Embedded Library "
@@ -388,8 +335,7 @@ void instance_destroy(mongo_embedded_v1_instance* const db, mongo_embedded_v1_st
     library->onlyDB = nullptr;
 }
 
-mongo_embedded_v1_client* client_new(mongo_embedded_v1_instance* const db,
-                                     mongo_embedded_v1_status& status) {
+mongo_embedded_v1_client* client_new(mongo_embedded_v1_instance* const db) {
     if (!library) {
         throw MobileException{MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
                               "Cannot create a new client handle when the MongoDB Embedded Library "
@@ -411,7 +357,7 @@ mongo_embedded_v1_client* client_new(mongo_embedded_v1_instance* const db,
     return new mongo_embedded_v1_client(db);
 }
 
-void client_destroy(mongo_embedded_v1_client* const client, mongo_embedded_v1_status& status) {
+void client_destroy(mongo_embedded_v1_client* const client) {
     if (!library) {
         throw MobileException(MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED,
                               "Cannot destroy a database handle when the MongoDB Embedded Library "
@@ -448,8 +394,7 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
                               const void* input,
                               const size_t input_size,
                               void** const output,
-                              size_t* const output_size,
-                              mongo_embedded_v1_status& status) {
+                              size_t* const output_size) {
     ClientGuard clientGuard(client);
 
     auto opCtx = cc().makeOperationContext();
@@ -489,130 +434,53 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
 
 int capi_status_get_error(const mongo_embedded_v1_status* const status) noexcept {
     invariant(status);
-    return status->error;
+    return status->statusImpl.error;
 }
 
 const char* capi_status_get_what(const mongo_embedded_v1_status* const status) noexcept {
     invariant(status);
-    return status->what.c_str();
+    return status->statusImpl.what.c_str();
 }
 
 int capi_status_get_code(const mongo_embedded_v1_status* const status) noexcept {
     invariant(status);
-    return status->exception_code;
+    return status->statusImpl.exception_code;
 }
-
-template <typename Function,
-          typename ReturnType =
-              decltype(std::declval<Function>()(*std::declval<mongo_embedded_v1_status*>()))>
-struct enterCXXImpl;
-
-template <typename Function>
-struct enterCXXImpl<Function, void> {
-    template <typename Callable>
-    static int call(Callable&& function, mongo_embedded_v1_status& status) noexcept {
-        try {
-            ReentrancyGuard singleEntrant;
-            function(status);
-        } catch (...) {
-            handleException(status);
-        }
-        return status.error;
-    }
-};
-
-
-template <typename Function, typename Pointer>
-struct enterCXXImpl<Function, Pointer*> {
-    template <typename Callable>
-    static Pointer* call(Callable&& function, mongo_embedded_v1_status& status) noexcept try {
-        ReentrancyGuard singleEntrant;
-        return function(status);
-    } catch (...) {
-        return handleException(status);
-    }
-};
 }  // namespace
 }  // namespace mongo
-
-namespace {
-struct StatusGuard {
-private:
-    mongo_embedded_v1_status* status;
-    mongo_embedded_v1_status fallback;
-
-public:
-    explicit StatusGuard(mongo_embedded_v1_status* const statusPtr) noexcept : status(statusPtr) {
-        if (status)
-            status->clean();
-    }
-
-    mongo_embedded_v1_status& get() noexcept {
-        return status ? *status : fallback;
-    }
-
-    const mongo_embedded_v1_status& get() const noexcept {
-        return status ? *status : fallback;
-    }
-
-    operator mongo_embedded_v1_status&() & noexcept {
-        return this->get();
-    }
-    operator mongo_embedded_v1_status&() && noexcept {
-        return this->get();
-    }
-};
-
-template <typename Callable>
-auto enterCXX(mongo_embedded_v1_status* const statusPtr, Callable&& c) noexcept
-    -> decltype(mongo::enterCXXImpl<Callable>::call(std::forward<Callable>(c), *statusPtr)) {
-    StatusGuard status(statusPtr);
-    return mongo::enterCXXImpl<Callable>::call(std::forward<Callable>(c), status);
-}
-}  // namespace
 
 extern "C" {
 mongo_embedded_v1_lib* MONGO_API_CALL mongo_embedded_v1_lib_init(
     const mongo_embedded_v1_init_params* const params, mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
-        return mongo::capi_lib_init(params, status);
-    });
+    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::capi_lib_init(params); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* const lib,
                                               mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
-        return mongo::capi_lib_fini(lib, status);
-    });
+    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::capi_lib_fini(lib); });
 }
 
 mongo_embedded_v1_instance* MONGO_API_CALL
 mongo_embedded_v1_instance_create(mongo_embedded_v1_lib* lib,
                                   const char* const yaml_config,
                                   mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
-        return mongo::instance_new(lib, yaml_config, status);
-    });
+    return enterCXX(&statusPtr->statusImpl,
+                    [&]() { return mongo::instance_new(lib, yaml_config); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* const db,
                                                       mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
-        return mongo::instance_destroy(db, status);
-    });
+    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::instance_destroy(db); });
 }
 
 mongo_embedded_v1_client* MONGO_API_CALL mongo_embedded_v1_client_create(
     mongo_embedded_v1_instance* const db, mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(
-        statusPtr, [&](mongo_embedded_v1_status& status) { return mongo::client_new(db, status); });
+    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::client_new(db); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* const client,
                                                     mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
-        return mongo::client_destroy(client, status);
-    });
+    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::client_destroy(client); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* const client,
@@ -621,9 +489,8 @@ int MONGO_API_CALL mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* con
                                                    void** const output,
                                                    size_t* const output_size,
                                                    mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
-        return mongo::client_wire_protocol_rpc(
-            client, input, input_size, output, output_size, status);
+    return enterCXX(&statusPtr->statusImpl, [&]() {
+        return mongo::client_wire_protocol_rpc(client, input, input_size, output, output_size);
     });
 }
 

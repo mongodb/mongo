@@ -32,6 +32,7 @@
 
 #include "stitch_support/stitch_support.h"
 
+#include "api_common.h"
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
@@ -49,44 +50,22 @@
 #define MONGO_API_CALL
 #endif
 
-struct stitch_support_v1_status {
-    stitch_support_v1_status() noexcept = default;
-    stitch_support_v1_status(const stitch_support_v1_error e, const int ec, std::string w)
-        : error(e), exception_code(ec), what(std::move(w)) {}
-
-    void clean() noexcept {
-        error = STITCH_SUPPORT_V1_SUCCESS;
-    }
-
-    stitch_support_v1_error error = STITCH_SUPPORT_V1_SUCCESS;
-    int exception_code = 0;
-    std::string what;
-};
-
 namespace mongo {
-namespace {
 
-class StitchSupportException : public std::exception {
-public:
-    explicit StitchSupportException(const stitch_support_v1_error code, std::string m)
-        : _mesg(std::move(m)), _code(code) {}
+using StitchSupportStatusImpl = StatusForAPI<stitch_support_v1_error>;
 
-    stitch_support_v1_error statusCode() const noexcept {
-        return this->_code;
-    }
-
-    const char* what() const noexcept final {
-        return this->_mesg.c_str();
-    }
-
-private:
-    std::string _mesg;
-    stitch_support_v1_error _code;
-};
-
-stitch_support_v1_status translateException() try { throw; } catch (const DBException& ex) {
+/**
+ * C interfaces that use enterCXX() must provide a translateException() function that converts any
+ * possible exception into a StatusForAPI<> object.
+ */
+static StitchSupportStatusImpl translateException(
+    stdx::type_identity<StitchSupportStatusImpl>) try {
+    throw;
+} catch (const ExceptionFor<ErrorCodes::ReentrancyNotAllowed>& ex) {
+    return {STITCH_SUPPORT_V1_ERROR_REENTRANCY_NOT_ALLOWED, ex.code(), ex.what()};
+} catch (const DBException& ex) {
     return {STITCH_SUPPORT_V1_ERROR_EXCEPTION, ex.code(), ex.what()};
-} catch (const StitchSupportException& ex) {
+} catch (const ExceptionForAPI<stitch_support_v1_error>& ex) {
     return {ex.statusCode(), mongo::ErrorCodes::InternalError, ex.what()};
 } catch (const std::bad_alloc& ex) {
     return {STITCH_SUPPORT_V1_ERROR_ENOMEM, mongo::ErrorCodes::InternalError, ex.what()};
@@ -98,29 +77,31 @@ stitch_support_v1_status translateException() try { throw; } catch (const DBExce
             "Unknown error encountered in performing requested stitch_support_v1 operation"};
 }
 
-std::nullptr_t handleException(stitch_support_v1_status& status) noexcept {
-    try {
-        status = translateException();
-    } catch (...) {
-        status.error = STITCH_SUPPORT_V1_ERROR_IN_REPORTING_ERROR;
-
-        try {
-            status.exception_code = -1;
-
-            status.what.clear();
-
-            // Expected to be small enough to fit in the capacity that string always has.
-            const char severeErrorMessage[] = "Severe Error";
-
-            if (status.what.capacity() > sizeof(severeErrorMessage)) {
-                status.what = severeErrorMessage;
-            }
-        } catch (...) /* Ignore any errors at this point. */
-        {
-        }
-    }
-    return nullptr;
+/**
+ * C interfaces that use enterCXX() must provide a tranlsateExceptionFallback() function that
+ * populates a StatusForAPI<> object to indicate a double-fault error during error reporting. The
+ * translateExceptionFallback() function gets called when translateException() throws, and it should
+ * not include any code that may itself throw.
+ *
+ * We use an out param instead of returning the StatusForAPI<> object so as to avoid a std::string
+ * copy that may allocate memory.
+ */
+static void translateExceptionFallback(StitchSupportStatusImpl& status) noexcept {
+    status.error = STITCH_SUPPORT_V1_ERROR_IN_REPORTING_ERROR;
+    status.exception_code = -1;
+    setErrorMessageNoAlloc(status.what);
 }
+
+}  // namespace mongo
+
+struct stitch_support_v1_status {
+    mongo::StitchSupportStatusImpl statusImpl;
+};
+
+namespace mongo {
+namespace {
+
+using StitchSupportException = ExceptionForAPI<stitch_support_v1_error>;
 
 ServiceContext* initialize() {
     srand(static_cast<unsigned>(curTimeMicros64()));
@@ -201,7 +182,7 @@ stitch_support_v1_lib* stitch_lib_init() {
     return library.get();
 }
 
-void stitch_lib_fini(stitch_support_v1_lib* const lib, stitch_support_v1_status& status) {
+void stitch_lib_fini(stitch_support_v1_lib* const lib) {
     if (!lib) {
         throw StitchSupportException{
             STITCH_SUPPORT_V1_ERROR_INVALID_LIB_HANDLE,
@@ -261,102 +242,33 @@ stitch_support_v1_matcher* matcher_create(stitch_support_v1_lib* const lib,
         lib->serviceContext->makeClient("stitch_support"), filter.getOwned(), collator);
 }
 
-template <typename Function,
-          typename ReturnType =
-              decltype(std::declval<Function>()(*std::declval<stitch_support_v1_status*>()))>
-struct enterCXXImpl;
-
-template <typename Function>
-struct enterCXXImpl<Function, void> {
-    template <typename Callable>
-    static int call(Callable&& function, stitch_support_v1_status& status) noexcept {
-        try {
-            function(status);
-        } catch (...) {
-            handleException(status);
-        }
-        return status.error;
-    }
-};
-
-template <typename Function, typename Pointer>
-struct enterCXXImpl<Function, Pointer*> {
-    template <typename Callable>
-    static Pointer* call(Callable&& function, stitch_support_v1_status& status) noexcept try {
-        return function(status);
-    } catch (...) {
-        return handleException(status);
-    }
-};
-
 int capi_status_get_error(const stitch_support_v1_status* const status) noexcept {
     invariant(status);
-    return status->error;
+    return status->statusImpl.error;
 }
 
 const char* capi_status_get_what(const stitch_support_v1_status* const status) noexcept {
     invariant(status);
-    return status->what.c_str();
+    return status->statusImpl.what.c_str();
 }
 
 int capi_status_get_code(const stitch_support_v1_status* const status) noexcept {
     invariant(status);
-    return status->exception_code;
+    return status->statusImpl.exception_code;
 }
 
 }  // namespace
 }  // namespace mongo
 
-namespace {
-
-struct StatusGuard {
-private:
-    stitch_support_v1_status* status;
-    stitch_support_v1_status fallback;
-
-public:
-    explicit StatusGuard(stitch_support_v1_status* const statusPtr) noexcept : status(statusPtr) {
-        if (status)
-            status->clean();
-    }
-
-    stitch_support_v1_status& get() noexcept {
-        return status ? *status : fallback;
-    }
-
-    const stitch_support_v1_status& get() const noexcept {
-        return status ? *status : fallback;
-    }
-
-    operator stitch_support_v1_status&() & noexcept {
-        return this->get();
-    }
-    operator stitch_support_v1_status&() && noexcept {
-        return this->get();
-    }
-};
-
-template <typename Callable>
-auto enterCXX(stitch_support_v1_status* const statusPtr, Callable&& c) noexcept
-    -> decltype(mongo::enterCXXImpl<Callable>::call(std::forward<Callable>(c), *statusPtr)) {
-    StatusGuard status(statusPtr);
-    return mongo::enterCXXImpl<Callable>::call(std::forward<Callable>(c), status);
-}
-
-}  // namespace
-
 extern "C" {
 
 stitch_support_v1_lib* MONGO_API_CALL stitch_support_v1_init(stitch_support_v1_status* status) {
-    return enterCXX(status,
-                    [&](stitch_support_v1_status& status) { return mongo::stitch_lib_init(); });
+    return enterCXX(&status->statusImpl, [&]() { return mongo::stitch_lib_init(); });
 }
 
 int MONGO_API_CALL stitch_support_v1_fini(stitch_support_v1_lib* const lib,
                                           stitch_support_v1_status* const status) {
-    return enterCXX(status, [&](stitch_support_v1_status& status) {
-        return mongo::stitch_lib_fini(lib, status);
-    });
+    return enterCXX(&status->statusImpl, [&]() { return mongo::stitch_lib_fini(lib); });
 }
 
 int MONGO_API_CALL
@@ -378,19 +290,20 @@ stitch_support_v1_status* MONGO_API_CALL stitch_support_v1_status_create(void) {
 }
 
 void MONGO_API_CALL stitch_support_v1_status_destroy(stitch_support_v1_status* const status) {
-    static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete status; }));
+    delete status;
 }
 
 stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
     stitch_support_v1_lib* lib, const char* collationBSON, stitch_support_v1_status* const status) {
-    return enterCXX(status, [&](stitch_support_v1_status& status) {
+    return enterCXX(&status->statusImpl, [&]() {
         mongo::BSONObj collationSpecExpr(collationBSON);
         return mongo::collator_create(lib, collationSpecExpr);
     });
 }
 
 void MONGO_API_CALL stitch_support_v1_collator_destroy(stitch_support_v1_collator* const collator) {
-    static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete collator; }));
+    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete collator; }));
 }
 
 stitch_support_v1_matcher* MONGO_API_CALL
@@ -398,21 +311,22 @@ stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
                                  const char* filterBSON,
                                  stitch_support_v1_collator* collator,
                                  stitch_support_v1_status* const statusPtr) {
-    return enterCXX(statusPtr, [&](stitch_support_v1_status& status) {
+    return enterCXX(&statusPtr->statusImpl, [&]() {
         mongo::BSONObj filter(filterBSON);
         return mongo::matcher_create(lib, filter, collator);
     });
 }
 
 void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher) {
-    static_cast<void>(enterCXX(nullptr, [=](stitch_support_v1_status&) { delete matcher; }));
+    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete matcher; }));
 }
 
 int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
                                                  const char* documentBSON,
                                                  bool* isMatch,
                                                  stitch_support_v1_status* statusPtr) {
-    return enterCXX(statusPtr, [&](stitch_support_v1_status& status) {
+    return enterCXX(&statusPtr->statusImpl, [&]() {
         mongo::BSONObj document(documentBSON);
         *isMatch = matcher->matcher.matches(document, nullptr);
     });

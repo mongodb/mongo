@@ -99,6 +99,14 @@ TEST_F(StitchSupportTest, InitializationIsSuccessful) {
     ASSERT(lib);
 }
 
+TEST_F(StitchSupportTest, DoubleInitializationFails) {
+    auto lib2 = stitch_support_v1_init(status);
+
+    ASSERT(!lib2);
+    ASSERT_EQ(STITCH_SUPPORT_V1_ERROR_LIBRARY_ALREADY_INITIALIZED,
+              stitch_support_v1_status_get_error(status));
+}
+
 TEST_F(StitchSupportTest, CheckMatchWorksWithDefaults) {
     ASSERT_TRUE(checkMatch("{a: 1}", {"{a: 1, b: 1}", "{a: [0, 1]}"}));
     ASSERT_TRUE(checkMatch(
