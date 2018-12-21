@@ -94,7 +94,9 @@ void S2Loop::Init(vector<S2Point> const& vertices) {
     vertices_ = NULL;
   } else {
     vertices_ = new S2Point[num_vertices_];
-    memcpy(vertices_, &vertices[0], num_vertices_ * sizeof(vertices_[0]));
+    // mongodb: void* casts to silence a -Wclass-memaccess warning.
+    memcpy(static_cast<void*>(vertices_), static_cast<const void*>(&vertices[0]),
+           num_vertices_ * sizeof(vertices_[0]));
   }
   owns_vertices_ = true;
   bound_ = S2LatLngRect::Full();
@@ -265,7 +267,9 @@ S2Loop::S2Loop(S2Loop const* src)
     depth_(src->depth_),
     index_(this),
     num_find_vertex_calls_(0) {
-  memcpy(vertices_, src->vertices_, num_vertices_ * sizeof(vertices_[0]));
+  // mongodb: void* casts to silence a -Wclass-memaccess warning.
+  memcpy(static_cast<void*>(vertices_), static_cast<const void*>(src->vertices_),
+         num_vertices_ * sizeof(vertices_[0]));
 }
 
 S2Loop* S2Loop::Clone() const {

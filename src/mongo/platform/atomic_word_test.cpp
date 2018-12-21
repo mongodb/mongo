@@ -65,6 +65,18 @@ void testAtomicWordBasicOperations() {
     ASSERT_EQUALS(WordType(0), w.load());
 }
 
+enum TestEnum { E0, E1, E2, E3 };
+
+TEST(AtomicWordTests, BasicOperationsEnum) {
+    MONGO_STATIC_ASSERT(sizeof(AtomicWord<TestEnum>) == sizeof(TestEnum));
+    AtomicWord<TestEnum> w;
+    ASSERT_EQUALS(E0, w.load());
+    ASSERT_EQUALS(E0, w.compareAndSwap(E0, E1));
+    ASSERT_EQUALS(E1, w.load());
+    ASSERT_EQUALS(E1, w.compareAndSwap(E0, E2));
+    ASSERT_EQUALS(E1, w.load());
+}
+
 TEST(AtomicWordTests, BasicOperationsUnsigned32Bit) {
     typedef AtomicUInt32::WordType WordType;
     testAtomicWordBasicOperations<AtomicUInt32>();
@@ -159,32 +171,6 @@ struct Chars {
 
 std::ostream& operator<<(std::ostream& os, const Chars& chars) {
     return (os << chars._storage.data());
-}
-
-TEST(AtomicWordTests, BasicOperationsComplex) {
-    using WordType = Chars;
-
-    AtomicWord<WordType> checkZero(AtomicWord<WordType>::ZeroInitTag{});
-    ASSERT_EQUALS(WordType(""), checkZero.load());
-
-    AtomicWord<WordType> w;
-
-    ASSERT_EQUALS(WordType(), w.load());
-
-    w.store("b");
-    ASSERT_EQUALS(WordType("b"), w.load());
-
-    ASSERT_EQUALS(WordType("b"), w.swap("c"));
-    ASSERT_EQUALS(WordType("c"), w.load());
-
-    ASSERT_EQUALS(WordType("c"), w.compareAndSwap("a", "b"));
-    ASSERT_EQUALS(WordType("c"), w.load());
-    ASSERT_EQUALS(WordType("c"), w.compareAndSwap("c", "b"));
-    ASSERT_EQUALS(WordType("b"), w.load());
-
-    w.store("foo");
-    ASSERT_EQUALS(WordType("foo"), w.compareAndSwap("foo", "bar"));
-    ASSERT_EQUALS(WordType("bar"), w.load());
 }
 
 template <typename T>

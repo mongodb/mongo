@@ -83,10 +83,7 @@ public:
     // constructor. Much code relies on every byte being predictably initialized to zero.
 
     // This is a "missing" Value
-    ValueStorage() {
-        zero();
-        type = EOO;
-    }
+    ValueStorage() : ValueStorage(EOO) {}
 
     explicit ValueStorage(BSONType t) {
         zero();
@@ -165,12 +162,12 @@ public:
     }
 
     ValueStorage(const ValueStorage& rhs) {
-        memcpy(this, &rhs, sizeof(*this));
+        memcpy(bytes, rhs.bytes, sizeof(bytes));
         memcpyed();
     }
 
     ValueStorage(ValueStorage&& rhs) noexcept {
-        memcpy(this, &rhs, sizeof(*this));
+        memcpy(bytes, rhs.bytes, sizeof(bytes));
         rhs.zero();  // Reset rhs to the missing state. TODO consider only doing this if refCounter.
     }
 
@@ -178,7 +175,7 @@ public:
         DEV verifyRefCountingIfShould();
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);
-        DEV memset(this, 0xee, sizeof(*this));
+        DEV memset(bytes, 0xee, sizeof(bytes));
     }
 
     ValueStorage& operator=(const ValueStorage& rhs) {
@@ -193,7 +190,7 @@ public:
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);
 
-        memmove(this, &rhs, sizeof(*this));
+        memmove(bytes, rhs.bytes, sizeof(bytes));
         return *this;
     }
 
@@ -202,17 +199,17 @@ public:
         if (refCounter)
             intrusive_ptr_release(genericRCPtr);
 
-        memmove(this, &rhs, sizeof(*this));
+        memmove(bytes, rhs.bytes, sizeof(bytes));
         rhs.zero();  // Reset rhs to the missing state. TODO consider only doing this if refCounter.
         return *this;
     }
 
     void swap(ValueStorage& rhs) {
         // Don't need to update ref-counts because they will be the same in the end
-        char temp[sizeof(ValueStorage)];
-        memcpy(temp, this, sizeof(*this));
-        memcpy(this, &rhs, sizeof(*this));
-        memcpy(&rhs, temp, sizeof(*this));
+        char temp[sizeof(bytes)];
+        memcpy(temp, bytes, sizeof(bytes));
+        memcpy(bytes, rhs.bytes, sizeof(bytes));
+        memcpy(rhs.bytes, temp, sizeof(bytes));
     }
 
     /// Call this after memcpying to update ref counts if needed
@@ -299,37 +296,34 @@ public:
     }
 
     void zero() {
-        memset(this, 0, sizeof(*this));
-    }
-
-    // Byte-for-byte identical
-    bool identical(const ValueStorage& other) const {
-        return (i64[0] == other.i64[0] && i64[1] == other.i64[1]);
+        memset(bytes, 0, sizeof(bytes));
     }
 
     void verifyRefCountingIfShould() const;
 
     // This data is public because this should only be used by Value which would be a friend
     union {
+        // cover the whole ValueStorage
+        uint8_t bytes[16];
 #pragma pack(1)
         struct {
-            // byte 1
+            // bytes[0]
             signed char type;
 
-            // byte 2
+            // bytes[1]
             struct {
-                bool refCounter : 1;  // true if we need to refCount
-                bool shortStr : 1;    // true if we are using short strings
-                // reservedFlags: 6;
+                uint8_t refCounter : 1;  // bit 0: true if we need to refCount
+                uint8_t shortStr : 1;    // bit 1: true if we are using short strings
+                uint8_t reservedFlags : 6;
             };
 
-            // bytes 3-16;
+            // bytes[2:15]
             union {
                 unsigned char oid[12];
 
                 struct {
                     char shortStrSize;  // TODO Consider moving into flags union (4 bits)
-                    char shortStrStorage[16 /*total bytes*/ - 3 /*offset*/ - 1 /*NUL byte*/];
+                    char shortStrStorage[sizeof(bytes) - 3 /*offset*/ - 1 /*NUL byte*/];
                     union {
                         char nulTerminator;
                     };
@@ -357,14 +351,17 @@ public:
         };
 #pragma pack()
 
-        // covers the whole ValueStorage
-        long long i64[2];
-
-        // Forces the ValueStorage type to have at least pointer alignment. Can't use alignas on the
-        // type since that causes issues on MSVC.
-        void* forcePointerAlignment;
+        // Select void* alignment without interfering with any active pack directives. Can't use
+        // alignas(void*) on this union because that would prohibit ValueStorage from being tightly
+        // packed into a packed struct (though GCC does the tight packing anyway).
+        //
+        // Note that MSVC's behavior is GCC-incompatible. It obeys alignas even when a pack pragma
+        // is active. That causes padding on MSVC when ValueStorage is used as a member of class
+        // Value, which in turn is used as a member of packed class ValueElement.
+        // http://lists.llvm.org/pipermail/cfe-dev/2014-July/thread.html#38174
+        void* pointerAlignment;
     };
 };
 MONGO_STATIC_ASSERT(sizeof(ValueStorage) == 16);
 MONGO_STATIC_ASSERT(alignof(ValueStorage) >= alignof(void*));
-}
+}  // namespace mongo

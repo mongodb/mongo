@@ -54,7 +54,9 @@ void S2Polyline::Init(vector<S2Point> const& vertices) {
   vertices_ = new S2Point[num_vertices_];
   // Check (num_vertices_ > 0) to avoid invalid reference to vertices[0].
   if (num_vertices_ > 0) {
-    memcpy(vertices_, &vertices[0], num_vertices_ * sizeof(vertices_[0]));
+    // mongodb: void* casts to silence a -Wclass-memaccess warning.
+    memcpy(static_cast<void*>(vertices_), static_cast<const void*>(&vertices[0]),
+           num_vertices_ * sizeof(vertices_[0]));
   }
 }
 
@@ -103,7 +105,9 @@ bool S2Polyline::IsValid(vector<S2Point> const& v, string* err) {
 S2Polyline::S2Polyline(S2Polyline const* src)
   : num_vertices_(src->num_vertices_),
     vertices_(new S2Point[num_vertices_]) {
-  memcpy(vertices_, src->vertices_, num_vertices_ * sizeof(vertices_[0]));
+  // mongodb: void* casts to silence a -Wclass-memaccess warning.
+  memcpy(static_cast<void*>(vertices_), static_cast<const void*>(src->vertices_),
+         num_vertices_ * sizeof(vertices_[0]));
 }
 
 S2Polyline* S2Polyline::Clone() const {

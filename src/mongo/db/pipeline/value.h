@@ -84,7 +84,8 @@ public:
 
     /** Construct a Value
      *
-     *  All types not listed will be rejected rather than converted (see private for why)
+     *  All types not listed will be rejected rather than converted, to prevent unexpected implicit
+     *  conversions to the accepted argument types (e.g. bool accepts any pointer).
      *
      *  Note: Currently these are all explicit conversions.
      *        I'm not sure if we want implicit or not.
@@ -122,8 +123,17 @@ public:
         : _storage(BinData,
                    BSONBinData(uuid.toCDR().data(), uuid.toCDR().length(), BinDataType::newUUID)) {}
 
-    explicit Value(const char*) = delete;  // Use StringData instead to prevent accidentally
-                                           // terminating the string at the first null byte.
+    /**
+     *  Force the use of StringData to prevent accidental NUL-termination.
+     */
+    explicit Value(const char*) = delete;
+
+    /**
+     *  Prevent implicit conversions to the accepted argument types.
+     */
+    template <typename InvalidArgumentType>
+    explicit Value(const InvalidArgumentType&) = delete;
+
 
     // TODO: add an unsafe version that can share storage with the BSONElement
     /// Deep-convert from BSONElement to Value
@@ -353,14 +363,6 @@ public:
     static Value deserializeForIDL(const BSONElement& element);
 
 private:
-    /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
-     *  types. bool is especially bad since without this it will accept any pointer.
-     *
-     *  Template argument name was chosen to make produced error easier to read.
-     */
-    template <typename InvalidArgumentType>
-    explicit Value(const InvalidArgumentType& invalidArgument);
-
     explicit Value(const ValueStorage& storage) : _storage(storage) {}
 
     // May contain embedded NUL bytes, does not check the type.
