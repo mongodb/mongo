@@ -129,6 +129,10 @@ struct mongo_embedded_v1_lib {
 
 namespace mongo {
 namespace {
+MongoEmbeddedStatusImpl* getStatusImpl(mongo_embedded_v1_status* status) {
+    return status ? &status->statusImpl : nullptr;
+}
+
 using MobileException = ExceptionForAPI<mongo_embedded_v1_error>;
 
 struct ServiceContextDestructor {
@@ -452,35 +456,37 @@ int capi_status_get_code(const mongo_embedded_v1_status* const status) noexcept 
 extern "C" {
 mongo_embedded_v1_lib* MONGO_API_CALL mongo_embedded_v1_lib_init(
     const mongo_embedded_v1_init_params* const params, mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::capi_lib_init(params); });
+    return enterCXX(mongo::getStatusImpl(statusPtr),
+                    [&]() { return mongo::capi_lib_init(params); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* const lib,
                                               mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::capi_lib_fini(lib); });
+    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() { return mongo::capi_lib_fini(lib); });
 }
 
 mongo_embedded_v1_instance* MONGO_API_CALL
 mongo_embedded_v1_instance_create(mongo_embedded_v1_lib* lib,
                                   const char* const yaml_config,
                                   mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl,
+    return enterCXX(mongo::getStatusImpl(statusPtr),
                     [&]() { return mongo::instance_new(lib, yaml_config); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* const db,
                                                       mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::instance_destroy(db); });
+    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() { return mongo::instance_destroy(db); });
 }
 
 mongo_embedded_v1_client* MONGO_API_CALL mongo_embedded_v1_client_create(
     mongo_embedded_v1_instance* const db, mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::client_new(db); });
+    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() { return mongo::client_new(db); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* const client,
                                                     mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() { return mongo::client_destroy(client); });
+    return enterCXX(mongo::getStatusImpl(statusPtr),
+                    [&]() { return mongo::client_destroy(client); });
 }
 
 int MONGO_API_CALL mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* const client,
@@ -489,7 +495,7 @@ int MONGO_API_CALL mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* con
                                                    void** const output,
                                                    size_t* const output_size,
                                                    mongo_embedded_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() {
+    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() {
         return mongo::client_wire_protocol_rpc(client, input, input_size, output, output_size);
     });
 }

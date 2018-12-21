@@ -101,6 +101,10 @@ struct stitch_support_v1_status {
 namespace mongo {
 namespace {
 
+StitchSupportStatusImpl* getStatusImpl(stitch_support_v1_status* status) {
+    return status ? &status->statusImpl : nullptr;
+}
+
 using StitchSupportException = ExceptionForAPI<stitch_support_v1_error>;
 
 ServiceContext* initialize() {
@@ -263,12 +267,12 @@ int capi_status_get_code(const stitch_support_v1_status* const status) noexcept 
 extern "C" {
 
 stitch_support_v1_lib* MONGO_API_CALL stitch_support_v1_init(stitch_support_v1_status* status) {
-    return enterCXX(&status->statusImpl, [&]() { return mongo::stitch_lib_init(); });
+    return enterCXX(mongo::getStatusImpl(status), [&]() { return mongo::stitch_lib_init(); });
 }
 
 int MONGO_API_CALL stitch_support_v1_fini(stitch_support_v1_lib* const lib,
                                           stitch_support_v1_status* const status) {
-    return enterCXX(&status->statusImpl, [&]() { return mongo::stitch_lib_fini(lib); });
+    return enterCXX(mongo::getStatusImpl(status), [&]() { return mongo::stitch_lib_fini(lib); });
 }
 
 int MONGO_API_CALL
@@ -295,7 +299,7 @@ void MONGO_API_CALL stitch_support_v1_status_destroy(stitch_support_v1_status* c
 
 stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
     stitch_support_v1_lib* lib, const char* collationBSON, stitch_support_v1_status* const status) {
-    return enterCXX(&status->statusImpl, [&]() {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
         mongo::BSONObj collationSpecExpr(collationBSON);
         return mongo::collator_create(lib, collationSpecExpr);
     });
@@ -311,7 +315,7 @@ stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
                                  const char* filterBSON,
                                  stitch_support_v1_collator* collator,
                                  stitch_support_v1_status* const statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() {
+    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() {
         mongo::BSONObj filter(filterBSON);
         return mongo::matcher_create(lib, filter, collator);
     });
@@ -326,7 +330,7 @@ int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matc
                                                  const char* documentBSON,
                                                  bool* isMatch,
                                                  stitch_support_v1_status* statusPtr) {
-    return enterCXX(&statusPtr->statusImpl, [&]() {
+    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() {
         mongo::BSONObj document(documentBSON);
         *isMatch = matcher->matcher.matches(document, nullptr);
     });
