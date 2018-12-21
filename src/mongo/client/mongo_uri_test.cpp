@@ -47,9 +47,9 @@
 namespace mongo {
 namespace {
 using transport::ConnectSSLMode;
-using transport::ConnectSSLMode::kEnableSSL;
-using transport::ConnectSSLMode::kDisableSSL;
-using transport::ConnectSSLMode::kGlobalSSLMode;
+constexpr auto kEnableSSL = ConnectSSLMode::kEnableSSL;
+constexpr auto kDisableSSL = ConnectSSLMode::kDisableSSL;
+constexpr auto kGlobalSSLMode = ConnectSSLMode::kGlobalSSLMode;
 
 struct URITestCase {
     std::string URI;
