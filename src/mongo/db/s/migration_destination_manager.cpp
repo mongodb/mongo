@@ -860,7 +860,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                       "admin",
                                       migrateCloneRequest,
-                                      Shard::RetryPolicy::kIdempotent),
+                                      Shard::RetryPolicy::kNoRetry),
                 "_migrateClone failed: ");
 
             uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
@@ -897,7 +897,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                       "admin",
                                       xferModsRequest,
-                                      Shard::RetryPolicy::kIdempotent),
+                                      Shard::RetryPolicy::kNoRetry),
                 "_transferMods failed: ");
 
             uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
