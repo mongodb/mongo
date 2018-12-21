@@ -330,7 +330,6 @@ class GDBDumper(object):
         mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
             (process_name, pid)
         mongodb_javascript_stack = "mongodb-javascript-stack"
-        mongod_dump_sessions = "mongod-dump-sessions"
 
         # The following MongoDB python extensions do not run on Solaris.
         if sys.platform.startswith("sunos"):
@@ -343,7 +342,6 @@ class GDBDumper(object):
             mongodb_show_locks = ""
             mongodb_waitsfor_graph = ""
             mongodb_javascript_stack = ""
-            mongod_dump_sessions = ""
 
         if not logger.mongo_process_filename:
             raw_stacks_commands = []
@@ -380,8 +378,6 @@ class GDBDumper(object):
             mongodb_show_locks,
             mongodb_waitsfor_graph,
             mongodb_javascript_stack,
-            # Disable for now until we can inspect new abseil hash map implementation in GDB.
-            # mongod_dump_sessions,
             "set confirm off",
             "quit",
         ]
