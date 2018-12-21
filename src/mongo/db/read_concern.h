@@ -41,6 +41,7 @@ template <typename T>
 class StatusWith;
 namespace repl {
 class ReadConcernArgs;
+class SpeculativeMajorityReadInfo;
 }
 
 
@@ -60,5 +61,14 @@ extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
  * current primary is still the true primary of the replica set.
  */
 extern MONGO_DECLARE_SHIM((OperationContext * opCtx)->Status) waitForLinearizableReadConcern;
+
+/**
+ * Waits to satisfy a "speculative" majority read.
+ *
+ * This method must only be called if the operation is a speculative majority read.
+ */
+extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
+                           repl::SpeculativeMajorityReadInfo speculativeReadInfo)
+                              ->Status) waitForSpeculativeMajorityReadConcern;
 
 }  // namespace mongo

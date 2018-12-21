@@ -39,6 +39,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/implicit_create_collection.h"
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -83,6 +84,15 @@ public:
             uassertStatusOK(rcStatus);
         }
     }
+
+    void waitForSpeculativeMajorityReadConcern(OperationContext* opCtx) const override {
+        auto speculativeReadInfo = repl::SpeculativeMajorityReadInfo::get(opCtx);
+        if (!speculativeReadInfo.isSpeculativeRead()) {
+            return;
+        }
+        uassertStatusOK(mongo::waitForSpeculativeMajorityReadConcern(opCtx, speculativeReadInfo));
+    }
+
 
     void waitForWriteConcern(OperationContext* opCtx,
                              const CommandInvocation* invocation,

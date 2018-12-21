@@ -125,6 +125,11 @@ public:
     MajorityReadMechanism getMajorityReadMechanism() const;
 
     /**
+     * Returns whether the read concern is speculative 'majority'.
+     */
+    bool isSpeculativeMajority() const;
+
+    /**
      * Appends level and afterOpTime.
      */
     void appendInfo(BSONObjBuilder* builder) const;

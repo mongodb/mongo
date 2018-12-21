@@ -233,6 +233,10 @@ Status ReplicationCoordinatorMock::waitUntilOpTimeForReadUntil(OperationContext*
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::awaitOpTimeCommitted(OperationContext* opCtx, OpTime opTime) {
+    return Status::OK();
+}
+
 OID ReplicationCoordinatorMock::getElectionId() {
     // TODO
     return OID();

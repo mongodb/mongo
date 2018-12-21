@@ -64,6 +64,14 @@ struct ServiceEntryPointCommon {
         virtual void waitForReadConcern(OperationContext* opCtx,
                                         const CommandInvocation* invocation,
                                         const OpMsgRequest& request) const = 0;
+        /**
+         * Waits to satisfy a speculative majority read, if necessary.
+         *
+         * Speculative reads block after a query has executed to ensure that any data read satisfies
+         * the appropriate durability properties e.g. "majority" read concern. If the operation is
+         * not a speculative read, then this method does nothing.
+         */
+        virtual void waitForSpeculativeMajorityReadConcern(OperationContext* opCtx) const = 0;
         virtual void waitForWriteConcern(OperationContext* opCtx,
                                          const CommandInvocation* invocation,
                                          const repl::OpTime& lastOpBeforeRun,

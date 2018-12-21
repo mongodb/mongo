@@ -239,6 +239,11 @@ Status ReplicationCoordinatorEmbedded::waitUntilOpTimeForReadUntil(OperationCont
     UASSERT_NOT_IMPLEMENTED;
 }
 
+Status ReplicationCoordinatorEmbedded::awaitOpTimeCommitted(OperationContext* opCtx,
+                                                            OpTime opTime) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorEmbedded::awaitReplication(
     OperationContext*, const OpTime&, const WriteConcernOptions&) {
     UASSERT_NOT_IMPLEMENTED;

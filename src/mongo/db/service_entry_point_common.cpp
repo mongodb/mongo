@@ -65,6 +65,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -504,6 +505,9 @@ bool runCommandImpl(OperationContext* opCtx,
     }
 
     behaviors.waitForLinearizableReadConcern(opCtx);
+
+    // Wait for data to satisfy the read concern level, if necessary.
+    behaviors.waitForSpeculativeMajorityReadConcern(opCtx);
 
     const bool ok = [&] {
         auto body = replyBuilder->getBodyBuilder();

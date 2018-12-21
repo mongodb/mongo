@@ -28,36 +28,55 @@
  *    it in the license file.
  */
 
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/read_concern_args.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+namespace repl {
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
-(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs, bool allowAfterClusterTime)
-    ->Status {
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
-        return {ErrorCodes::NotImplemented, "linearizable read concern not supported on embedded"};
-    } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return {ErrorCodes::NotImplemented, "snapshot read concern not supported on embedded"};
-    } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
-        return {ErrorCodes::NotImplemented, "majority read concern not supported on embedded"};
-    } else if (readConcernArgs.getArgsAfterClusterTime()) {
-        return {ErrorCodes::NotImplemented, "afterClusterTime is not supported on embedded"};
-    } else if (readConcernArgs.getArgsOpTime()) {
-        return {ErrorCodes::NotImplemented, "afterOpTime is not supported on embedded"};
+/**
+ * An instance of SpeculativeReadInfo is stored as a decoration on the OperationContext, so that
+ * each operation can optionally utilize this structure to perform speculative reads.
+ */
+const OperationContext::Decoration<SpeculativeMajorityReadInfo> handle =
+    OperationContext::declareDecoration<SpeculativeMajorityReadInfo>();
+
+SpeculativeMajorityReadInfo& SpeculativeMajorityReadInfo::get(OperationContext* opCtx) {
+    return handle(opCtx);
+}
+
+void SpeculativeMajorityReadInfo::setIsSpeculativeRead() {
+    _isSpeculativeRead = true;
+}
+
+bool SpeculativeMajorityReadInfo::isSpeculativeRead() const {
+    return _isSpeculativeRead;
+}
+
+void SpeculativeMajorityReadInfo::setSpeculativeReadOpTime(const OpTime& opTime) {
+    invariant(_isSpeculativeRead);
+    if (!_speculativeReadOpTime) {
+        // Set the read optime for the first time.
+        _speculativeReadOpTime = opTime;
+    } else {
+        // If an optime was already provided, only an optime >= the previous one is allowed.
+        invariant(opTime >= _speculativeReadOpTime);
+        _speculativeReadOpTime = opTime;
     }
-
-    return Status::OK();
-}
-MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
-(OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo)->Status {
-    return Status::OK();
 }
 
-MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)(OperationContext* opCtx)->Status {
-    return Status::OK();
+boost::optional<OpTime> SpeculativeMajorityReadInfo::getSpeculativeReadOpTime() {
+    invariant(_isSpeculativeRead);
+    return _speculativeReadOpTime;
 }
 
+}  // namespace repl
 }  // namespace mongo

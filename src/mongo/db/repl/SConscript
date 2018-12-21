@@ -1006,6 +1006,15 @@ env.Library('read_concern_args',
                 'optime',
             ])
 
+env.Library('speculative_majority_read_info',
+            [
+                'speculative_majority_read_info.cpp'
+            ],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+                'optime',
+            ])
+
 env.Library('replica_set_messages',
             [
                 'is_master_response.cpp',
@@ -1370,6 +1379,16 @@ env.CppUnitTest(
     LIBDEPS=[
         'replica_set_messages',
         '$BUILD_DIR/mongo/db/logical_time',
+   ],
+)
+
+env.CppUnitTest(
+    target='speculative_majority_read_info_test',
+    source=[
+        'speculative_majority_read_info_test.cpp',
+    ],
+    LIBDEPS=[
+        'speculative_majority_read_info',
    ],
 )
 

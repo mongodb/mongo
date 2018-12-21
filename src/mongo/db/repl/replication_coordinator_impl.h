@@ -165,7 +165,7 @@ public:
 
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                           const ReadConcernArgs& readConcern) override;
-
+    Status awaitOpTimeCommitted(OperationContext* opCtx, OpTime opTime) override;
     virtual OID getElectionId() override;
 
     virtual int getMyId() const override;

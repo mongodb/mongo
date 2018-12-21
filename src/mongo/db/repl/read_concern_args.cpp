@@ -272,6 +272,11 @@ ReadConcernArgs::MajorityReadMechanism ReadConcernArgs::getMajorityReadMechanism
     return _majorityReadMechanism;
 }
 
+bool ReadConcernArgs::isSpeculativeMajority() const {
+    return _level && *_level == ReadConcernLevel::kMajorityReadConcern &&
+        _majorityReadMechanism == MajorityReadMechanism::kSpeculative;
+}
+
 Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
     if (_level && *_level != ReadConcernLevel::kSnapshotReadConcern &&
         *_level != ReadConcernLevel::kMajorityReadConcern &&

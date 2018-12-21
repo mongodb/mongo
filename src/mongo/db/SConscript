@@ -1000,6 +1000,7 @@ env.Library(
         "curop",
         "repl/read_concern_args",
         "repl/repl_coordinator_interface",
+        "repl/speculative_majority_read_info",
         "stats/timer_stats",
         "storage/storage_options",
     ],
@@ -1019,6 +1020,7 @@ env.Library(
         "catalog_raii",
         "curop",
         "repl/repl_coordinator_interface",
+        "repl/speculative_majority_read_info",
         "s/sharding_api_d",
     ],
 )

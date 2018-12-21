@@ -4523,6 +4523,38 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
     pseudoLogOp.get();
 }
 
+
+TEST_F(ReplCoordTest, WaitUntilOpTimeforReadRejectsUnsupportedMajorityReadConcern) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0))),
+                       HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+
+    // A valid majority read concern level should return immediately.
+    auto rcArgs = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
+    auto status = getReplCoord()->waitUntilOpTimeForRead(opCtx.get(), rcArgs);
+    ASSERT_OK(status);
+
+    // Simulate disabling storage support for majority reads.
+    disableReadConcernMajoritySupport();
+    rcArgs = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
+    status = getReplCoord()->waitUntilOpTimeForRead(opCtx.get(), rcArgs);
+    ASSERT_EQ(status, ErrorCodes::ReadConcernMajorityNotEnabled);
+
+    // Even without storage engine support, speculative majority reads should be allowed.
+    rcArgs = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
+    rcArgs.setMajorityReadMechanism(ReadConcernArgs::MajorityReadMechanism::kSpeculative);
+    status = getReplCoord()->waitUntilOpTimeForRead(opCtx.get(), rcArgs);
+    ASSERT_OK(status);
+}
+
 TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatchOurs) {
     // Ensure that we do not process ReplSetMetadata when ConfigVersions do not match.
     assertStartSuccess(BSON("_id"

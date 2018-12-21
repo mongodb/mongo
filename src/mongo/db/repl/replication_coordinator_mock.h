@@ -137,6 +137,7 @@ public:
     virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
                                                const ReadConcernArgs& settings,
                                                boost::optional<Date_t> deadline) override;
+    virtual Status awaitOpTimeCommitted(OperationContext* opCtx, OpTime opTime);
     virtual OID getElectionId();
 
     virtual OID getMyRID() const;

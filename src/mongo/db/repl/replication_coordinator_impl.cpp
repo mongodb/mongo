@@ -1253,7 +1253,12 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                 "readConcern level 'snapshot' is required when specifying atClusterTime"};
     }
 
+    // We cannot support read concern 'majority' by means of reading from a historical snapshot if
+    // the storage layer doesn't support it. In this case, we can support it by using "speculative"
+    // majority reads instead.
     if (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
+        readConcern.getMajorityReadMechanism() ==
+            ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot &&
         !_externalState->isReadCommittedSupportedByStorageEngine(opCtx)) {
         return {ErrorCodes::ReadConcernMajorityNotEnabled,
                 str::stream() << "Storage engine does not support read concern: "
@@ -1422,8 +1427,15 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
 
     // We don't set isMajorityCommittedRead for kSnapshotReadConcern because snapshots are always
     // speculative; we wait for majority when the transaction commits.
+    //
+    // Speculative majority reads do not need to wait for the commit point to advance to satisfy
+    // afterClusterTime reads. Waiting for the lastApplied to advance past the given target optime
+    // ensures the recency guarantee for the afterClusterTime read. At the end of the command, we
+    // will wait for the lastApplied optime to become majority committed, which then satisfies the
+    // durability guarantee.
     const bool isMajorityCommittedRead =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
+        !readConcern.isSpeculativeMajority();
 
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime, deadline);
 }
@@ -1437,6 +1449,17 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
 
     const auto targetOpTime = readConcern.getArgsOpTime().value_or(OpTime());
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime);
+}
+
+Status ReplicationCoordinatorImpl::awaitOpTimeCommitted(OperationContext* opCtx, OpTime opTime) {
+    // The optime given to this method is required to be an optime in this node's local oplog.
+    // Furthermore, the execution of this method must not span rollbacks, so the oplog at the start
+    // of the waiting period will be a prefix of the oplog at the end of the waiting period. This
+    // makes it valid to compare optimes from this node's oplog based on their timestamps alone, and
+    // so allows this method to determine if an optime is committed by comparing its timestamp to
+    // the timestamp of the last committed optime.
+    const bool isMajorityCommittedRead = true;
+    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, opTime);
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTime_inlock() const {
