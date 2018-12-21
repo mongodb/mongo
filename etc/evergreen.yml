@@ -5281,7 +5281,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=disk_mmapv1 --storageEngine=mmapv1
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: disk_mobile
@@ -5308,7 +5308,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=durability
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: dur_jscore_passthrough
@@ -5319,7 +5318,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=dur_jscore_passthrough
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: ese
@@ -5560,7 +5558,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_initsync_static_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: replica_sets_kill_primary_jscore_passthrough
@@ -7289,7 +7286,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=watchdog --storageEngine=mmapv1
-      run_multiple_jobs: false
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: watchdog_wiredtiger
