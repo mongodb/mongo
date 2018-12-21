@@ -59,6 +59,17 @@ post:
           fi
 
 functions:
+  "git get project": &git_get_project
+    command: git.get_project
+    params:
+      directory: src
+      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+        dsi: ${dsi_rev}
+        enterprise: ${enterprise_rev}
+        linkbench: ${linkbench_rev}
+        workloads: ${workloads_rev}
+        wtdevelop: ${wtdevelop_rev}
+
   "compile mongodb":
     - command: shell.exec
       params:
@@ -150,7 +161,6 @@ functions:
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
 
-  # NOTE: Unlike evergreen.yml, there's no conditional here. If called, this is never a noop!
   "use WiredTiger develop" :
     command: shell.exec
     params:
@@ -158,11 +168,13 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-        cd src/third_party
-        for wtdir in api dist examples ext lang src test tools ; do
-          rm -rf wiredtiger/$wtdir
-          mv wtdevelop/$wtdir wiredtiger/
-        done
+        if [ "${compile-variant|}" = "-wtdevelop" ]; then
+          cd src/third_party
+          for wtdir in api dist examples ext lang src test tools ; do
+            rm -rf wiredtiger/$wtdir
+            mv wtdevelop/$wtdir wiredtiger/
+          done
+        fi
 
   "prepare environment":
     - command: shell.exec
@@ -172,13 +184,9 @@ functions:
           mkdir src
           mkdir work
     - command: manifest.load
-    - command: git.get_project
-      params:
-        directory: src
-        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-          dsi: ${dsi_rev}
-          workloads: ${workloads_rev}
-          linkbench: ${linkbench_rev}
+    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
+    # the repositories defined in the build variant's "modules" section.
+    - *git_get_project
     - command: shell.exec
       params:
         working_dir: work
@@ -308,38 +316,9 @@ tasks:
 - name: compile
   commands:
     - command: manifest.load
-    - command: git.get_project
-      params:
-        directory: src
+    - func: "git get project"
+    - func: "use WiredTiger develop" # noop if ${compile-variant|} is not "-wtdevelop"
     - func: "compile mongodb"
-
-- name: compile_enterprise
-  commands:
-    - command: manifest.load
-    - command: git.get_project
-      # In addition to mongo repo, checkout enterprise as module
-      params:
-        revisions:
-          enterprise: ${enterprise_rev}
-        directory: src
-    - func: "compile mongodb"
-      vars:
-        compile-variant: -enterprise
-
-- name: compile_wtdevelop
-  commands:
-    - command: manifest.load
-    - command: git.get_project
-      # In addition to mongo repo, checkout wtdevelop as module
-      params:
-        revisions:
-          wtdevelop: ${wtdevelop_rev}
-      params:
-        directory: src
-    - func: "use WiredTiger develop"
-    - func: "compile mongodb"
-      vars:
-        compile-variant: -wtdevelop
 
 - name: linkbench
   priority: 5
@@ -661,9 +640,7 @@ buildvariants:
 - name: compile-rhel70
   display_name: Compile on rhel70
   batchtime: 10080 # 7 days
-  modules:
-    - wtdevelop
-  expansions:
+  expansions: &compile-rhel70-expansions
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     platform: linux
     project_dir: &project_dir dsi
@@ -678,17 +655,20 @@ buildvariants:
   display_name: Compile enterprise on Amazon 2
   modules:
     - enterprise
+  batchtime: 10080 # 7 days
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    platform: linux
-    project_dir: &project_dir dsi
-    tooltags: ""
-    use_scons_cache: true
+    <<: *compile-rhel70-expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --release
+      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile-variant: -enterprise
   run_on:
       - "amazon2-build"
   tasks:
-    - name: compile_enterprise
+    - name: compile
 
 #######################################
 #         Linux Buildvariants         #
@@ -771,7 +751,7 @@ buildvariants:
   run_on:
       - "rhel70-perf-single"
   depends_on:
-      - name: compile_enterprise
+      - name: compile
         variant: compile-amazon2
   tasks: &standalonetasks
     - name: industry_benchmarks
