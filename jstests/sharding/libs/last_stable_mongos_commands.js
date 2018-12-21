@@ -14,4 +14,4 @@ const commandsRemovedFromMongosIn42 = [
 // These commands were added in mongos 4.2, so will not appear in the listCommands output of a 4.0
 // mongos. We will allow these commands to have a test defined without always existing on the mongos
 // being used.
-const commandsAddedToMongosIn42 = ['abortTransaction', 'commitTransaction'];
+const commandsAddedToMongosIn42 = ['abortTransaction', 'commitTransaction', 'dropConnections'];

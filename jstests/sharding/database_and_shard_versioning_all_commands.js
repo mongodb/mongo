@@ -181,6 +181,7 @@
         },
         dropAllRolesFromDatabase: {skip: "always targets the config server"},
         dropAllUsersFromDatabase: {skip: "always targets the config server"},
+        dropConnections: {skip: "not on a user database"},
         dropDatabase: {skip: "drops the database from the cluster, changing the UUID"},
         dropIndexes: {
             sendsDbVersion: true,

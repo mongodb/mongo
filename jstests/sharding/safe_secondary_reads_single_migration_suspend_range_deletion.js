@@ -167,6 +167,7 @@
         drop: {skip: "primary only"},
         dropAllRolesFromDatabase: {skip: "primary only"},
         dropAllUsersFromDatabase: {skip: "primary only"},
+        dropConnections: {skip: "does not return user data"},
         dropDatabase: {skip: "primary only"},
         dropIndexes: {skip: "primary only"},
         dropRole: {skip: "primary only"},
