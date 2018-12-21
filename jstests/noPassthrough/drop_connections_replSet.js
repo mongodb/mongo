@@ -1,4 +1,7 @@
-// verify dropConnections command works for replica sets
+/**
+ * verify dropConnections command works for replica sets
+ * @tags: [requires_replication]
+ */
 
 (function() {
     "use strict";
