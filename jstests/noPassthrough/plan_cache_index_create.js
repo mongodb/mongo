@@ -13,13 +13,12 @@
     function indexBuildIsRunning(testDB, indexName) {
         const primaryIndexBuildFilter = {
             "command.createIndexes": collName,
-            "command.indexes.0.name": indexName
+            "command.indexes.0.name": indexName,
+            "msg": /^Index Build/
         };
         // TODO SERVER-34830: Add command name filter for secondaries once available.
-        const secondaryIndexBuildFilter = {
-            ns: dbName + ".system.indexes",
-            "command.name": indexName
-        };
+        const secondaryIndexBuildFilter =
+            {ns: dbName + ".system.indexes", "command.name": indexName, "msg": /^Index Build/};
         const curOp = testDB.getSiblingDB("admin").aggregate([
             {$currentOp: {}},
             {$match: {$or: [primaryIndexBuildFilter, secondaryIndexBuildFilter]}}
