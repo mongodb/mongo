@@ -380,7 +380,8 @@ class GDBDumper(object):
             mongodb_show_locks,
             mongodb_waitsfor_graph,
             mongodb_javascript_stack,
-            mongod_dump_sessions,
+            # Disable for now until we can inspect new abseil hash map implementation in GDB.
+            # mongod_dump_sessions,
             "set confirm off",
             "quit",
         ]
