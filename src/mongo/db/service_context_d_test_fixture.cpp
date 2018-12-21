@@ -36,7 +36,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/catalog_control.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
@@ -78,6 +78,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     storageGlobalParams.dbpath = _tempDir.path();
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
+
+    DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
 

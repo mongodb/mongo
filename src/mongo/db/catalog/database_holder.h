@@ -33,7 +33,6 @@
 #include <set>
 #include <string>
 
-#include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -51,8 +50,11 @@ class RecordStore;
  */
 class DatabaseHolder {
 public:
-    static MONGO_DECLARE_SHIM(()->DatabaseHolder&) getDatabaseHolder;
+    // Operation Context binding.
+    static DatabaseHolder* get(ServiceContext* service);
+    static DatabaseHolder* get(ServiceContext& service);
     static DatabaseHolder* get(OperationContext* opCtx);
+    static void set(ServiceContext* service, std::unique_ptr<DatabaseHolder> databaseHolder);
 
     virtual ~DatabaseHolder() = default;
 

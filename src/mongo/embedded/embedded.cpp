@@ -36,7 +36,7 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/config.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -97,6 +97,10 @@ void initWireSpec() {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     return Status::OK();
+}
+
+void setUpCatalog(ServiceContext* serviceContext) {
+    DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
 }
 
 // Create a minimalistic replication coordinator to provide a limited interface for users. Not
@@ -229,6 +233,7 @@ ServiceContext* initialize(const char* yaml_config) {
     serviceContext->setPeriodicRunner(std::move(periodicRunner));
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kAllowNoLockFile);
+    setUpCatalog(serviceContext);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
     // configuration file/environment.

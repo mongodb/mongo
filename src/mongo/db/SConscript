@@ -745,7 +745,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'auth/authmocks',
-        'catalog/database_holder_mock',
         'catalog_raii',
         'service_context_test_fixture',
         'stats/fill_locker_info',

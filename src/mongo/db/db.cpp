@@ -53,7 +53,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -796,6 +796,10 @@ void startupConfigActions(const std::vector<std::string>& args) {
 #endif
 }
 
+void setUpCatalog(ServiceContext* serviceContext) {
+    DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
+}
+
 auto makeReplicationExecutor(ServiceContext* serviceContext) {
     ThreadPool::Options tpOptions;
     tpOptions.poolName = "replexec";
@@ -1015,6 +1019,7 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
     }
 
     auto service = getGlobalServiceContext();
+    setUpCatalog(service);
     setUpReplication(service);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 

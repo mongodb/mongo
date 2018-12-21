@@ -38,6 +38,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -104,6 +105,7 @@ int runDbTests(int argc, char** argv) {
     globalServiceContext->setPeriodicRunner(std::move(runner));
 
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
+    DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
     auto registry = stdx::make_unique<OpObserverRegistry>();
     registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     globalServiceContext->setOpObserver(std::move(registry));

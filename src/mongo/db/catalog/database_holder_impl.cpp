@@ -52,17 +52,6 @@
 namespace mongo {
 namespace {
 
-const auto dbHolderStorage = ServiceContext::declareDecoration<DatabaseHolderImpl>();
-
-}  // namespace
-
-MONGO_REGISTER_SHIM(DatabaseHolder::getDatabaseHolder)
-()->DatabaseHolder& {
-    return dbHolderStorage(getGlobalServiceContext());
-}
-
-namespace {
-
 StringData _todb(StringData ns) {
     std::size_t i = ns.find('.');
     if (i == std::string::npos) {

@@ -34,10 +34,28 @@
 
 namespace mongo {
 
-MONGO_DEFINE_SHIM(DatabaseHolder::getDatabaseHolder);
+namespace {
+
+const auto getDatabaseHolderFromServiceContext =
+    ServiceContext::declareDecoration<std::unique_ptr<DatabaseHolder>>();
+
+}  // namespace
+
+DatabaseHolder* DatabaseHolder::get(ServiceContext* service) {
+    return getDatabaseHolderFromServiceContext(service).get();
+}
+
+DatabaseHolder* DatabaseHolder::get(ServiceContext& service) {
+    return getDatabaseHolderFromServiceContext(service).get();
+}
 
 DatabaseHolder* DatabaseHolder::get(OperationContext* opCtx) {
-    return &getDatabaseHolder();
+    return get(opCtx->getServiceContext());
+}
+
+void DatabaseHolder::set(ServiceContext* service, std::unique_ptr<DatabaseHolder> databaseHolder) {
+    auto& holder = getDatabaseHolderFromServiceContext(service);
+    holder = std::move(databaseHolder);
 }
 
 }  // namespace mongo

@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/catalog_control.h"
 
+#include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
@@ -108,6 +109,7 @@ void CatalogControlTest::setUp() {
         auto serviceContext = ServiceContext::make();
         auto storageEngine = std::make_unique<MockStorageEngine>();
         serviceContext->setStorageEngine(std::move(storageEngine));
+        DatabaseHolder::set(serviceContext.get(), std::make_unique<DatabaseHolderMock>());
         setGlobalServiceContext(std::move(serviceContext));
     }
 
