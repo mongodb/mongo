@@ -124,8 +124,10 @@ public:
         }
 
         bool allowsSpeculativeMajorityReads() const override {
-            // TODO (SERVER-37560): Support this for change stream update lookup queries.
-            return false;
+            // Find queries are only allowed to use speculative behavior if the 'allowsSpeculative'
+            // flag is passed. The find command will check for this flag internally and fail if
+            // necessary.
+            return true;
         }
 
         NamespaceString ns() const override {
@@ -233,6 +235,12 @@ public:
                 NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body)),
                 _request.body,
                 isExplain));
+
+            // Only allow speculative majority for internal commands that specify the correct flag.
+            uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
+                    "Majority read concern is not enabled.",
+                    !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
+                      !qr->allowSpeculativeMajorityRead()));
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto txnParticipant = TransactionParticipant::get(opCtx);

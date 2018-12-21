@@ -403,7 +403,8 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "noCursorTimeout: true,"
         "awaitData: true,"
         "allowPartialResults: true,"
-        "readOnce: true}");
+        "readOnce: true,"
+        "allowSpeculativeMajorityRead: true}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
@@ -417,6 +418,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(qr->isTailableAndAwaitData());
     ASSERT(qr->isAllowPartialResults());
     ASSERT(qr->isReadOnce());
+    ASSERT(qr->allowSpeculativeMajorityRead());
 }
 
 TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
@@ -1317,6 +1319,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
 TEST(QueryRequestTest, ConvertToAggregationWithReadOnceFails) {
     QueryRequest qr(testns);
     qr.setReadOnce(true);
+    const auto aggCmd = qr.asAggregationCommand();
+    ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithAllowSpeculativeMajorityReadFails) {
+    QueryRequest qr(testns);
+    qr.setAllowSpeculativeMajorityRead(true);
     const auto aggCmd = qr.asAggregationCommand();
     ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
 }

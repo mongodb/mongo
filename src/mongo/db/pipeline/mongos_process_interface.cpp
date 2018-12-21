@@ -581,7 +581,8 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
     const NamespaceString& nss,
     UUID collectionUUID,
     const Document& filter,
-    boost::optional<BSONObj> readConcern) {
+    boost::optional<BSONObj> readConcern,
+    bool allowSpeculativeMajorityRead) {
     auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID);
 
     // Create the find command to be dispatched to the shard in order to return the post-change
@@ -598,6 +599,9 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
     cmdBuilder.append("comment", expCtx->comment);
     if (readConcern) {
         cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
+    }
+    if (allowSpeculativeMajorityRead) {
+        cmdBuilder.append("allowSpeculativeMajorityRead", true);
     }
 
     auto shardResult = std::vector<RemoteCursor>();

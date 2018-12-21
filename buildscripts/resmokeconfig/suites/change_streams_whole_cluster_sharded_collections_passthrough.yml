@@ -31,11 +31,14 @@ executor:
         TestData:
           defaultReadConcernLevel: null
           enableMajorityReadConcern: ''
+      # Enable causal consistency for change streams suites using 1 node replica sets. See
+      # change_streams.yml for detailed explanation.
       eval: >-
         var testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         load('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');
+        load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       readMode: commands
   hooks:
   - class: CheckReplDBHash

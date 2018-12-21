@@ -81,8 +81,10 @@ public:
         }
 
         bool allowsSpeculativeMajorityReads() const override {
-            // TODO (SERVER-37560): Support this for change stream queries.
-            return false;
+            // Currently only change stream aggregation queries are allowed to use speculative
+            // majority. The aggregation command itself will check this internally and fail if
+            // necessary.
+            return true;
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {

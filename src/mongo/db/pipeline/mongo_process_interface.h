@@ -258,7 +258,8 @@ public:
         const NamespaceString& nss,
         UUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) = 0;
+        boost::optional<BSONObj> readConcern,
+        bool allowSpeculativeMajorityRead = false) = 0;
 
     /**
      * Returns a vector of all idle (non-pinned) local cursors.

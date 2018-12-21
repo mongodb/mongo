@@ -12437,7 +12437,7 @@ buildvariants:
   # enableMajorityReadConcern:"false" (SERVER-37559).
     test_flags: >-
       --majorityReadConcern=off
-      --excludeWithAnyTags=requires_majority_read_concern,uses_change_streams,uses_prepare_transaction,uses_multi_shard_transaction
+      --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
@@ -12480,6 +12480,19 @@ buildvariants:
   - name: auth_audit
   - name: buildscripts_test
   - name: bulk_gle_passthrough
+  - name: change_streams
+  - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
+  - name: change_streams_secondary_reads
+  - name: change_streams_sharded_collections_passthrough
+  - name: change_streams_whole_db_passthrough
+  - name: change_streams_whole_db_mongos_passthrough
+  - name: change_streams_whole_db_secondary_reads_passthrough
+  - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: causally_consistent_jscore_passthrough
   - name: causally_consistent_jscore_passthrough_auth
   - name: sharded_causally_consistent_jscore_passthrough

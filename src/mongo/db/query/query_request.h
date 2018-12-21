@@ -386,6 +386,14 @@ public:
         _readOnce = readOnce;
     }
 
+    void setAllowSpeculativeMajorityRead(bool allowSpeculativeMajorityRead) {
+        _allowSpeculativeMajorityRead = allowSpeculativeMajorityRead;
+    }
+
+    bool allowSpeculativeMajorityRead() const {
+        return _allowSpeculativeMajorityRead;
+    }
+
     /**
      * Return options as a bit vector.
      */
@@ -511,6 +519,7 @@ private:
     bool _exhaust = false;
     bool _allowPartialResults = false;
     bool _readOnce = false;
+    bool _allowSpeculativeMajorityRead = false;
 
     boost::optional<long long> _replicationTerm;
 };

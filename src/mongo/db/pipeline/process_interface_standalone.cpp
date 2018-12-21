@@ -401,9 +401,13 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     const NamespaceString& nss,
     UUID collectionUUID,
     const Document& documentKey,
-    boost::optional<BSONObj> readConcern) {
+    boost::optional<BSONObj> readConcern,
+    bool allowSpeculativeMajorityRead) {
     invariant(!readConcern);  // We don't currently support a read concern on mongod - it's only
                               // expected to be necessary on mongos.
+    invariant(!allowSpeculativeMajorityRead);  // We don't expect 'allowSpeculativeMajorityRead' on
+                                               // mongod - it's only expected to be necessary on
+                                               // mongos.
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     try {

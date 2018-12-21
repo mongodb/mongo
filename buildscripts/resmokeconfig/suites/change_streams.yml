@@ -25,7 +25,18 @@ executor:
         TestData:
           defaultReadConcernLevel: null
           enableMajorityReadConcern: ''
-      eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
+      # Enable causal consistency for change streams suites using 1 node replica sets. Some tests
+      # rely on the assumption that a w:majority write will be visible immediately in a subsequently
+      # opened change stream. In 1 node replica sets, an operation that majority commits at
+      # timestamp T will force the majority snapshot to advance to T, but the oplog visibility point
+      # may not have advanced to T yet. Subsequent majority snapshot reads will see this write in
+      # the oplog, but speculative majority reads may not, since they read from a local snapshot and
+      # are bound to the oplog visibility rules. Using causal consistency forces the visibility
+      # point to advance to the timestamp of the last write before doing a new read.
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

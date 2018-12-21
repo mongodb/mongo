@@ -135,8 +135,19 @@ public:
      * that each stage is compatible, and throws a UserException if not.
      */
     void assertSupportsReadConcern(OperationContext* opCtx,
-                                   boost::optional<ExplainOptions::Verbosity> explain) const {
+                                   boost::optional<ExplainOptions::Verbosity> explain,
+                                   bool enableMajorityReadConcern) const {
         auto readConcern = repl::ReadConcernArgs::get(opCtx);
+
+        // Reject non change stream aggregation queries that try to use "majority" read concern when
+        // enableMajorityReadConcern=false.
+        if (!hasChangeStream() && !enableMajorityReadConcern &&
+            (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+             repl::ReadConcernLevel::kMajorityReadConcern)) {
+            uasserted(ErrorCodes::ReadConcernMajorityNotEnabled,
+                      "Only change stream aggregation queries support 'majority' read concern when "
+                      "enableMajorityReadConcern=false");
+        }
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "Explain for the aggregate command cannot run with a readConcern "

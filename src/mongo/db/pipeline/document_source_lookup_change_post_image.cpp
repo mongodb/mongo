@@ -116,9 +116,19 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
                                         << "afterClusterTime"
                                         << resumeToken.getData().clusterTime))
         : boost::none;
+
+
+    // Update lookup queries sent from mongoS to shards are allowed to use speculative majority
+    // reads.
+    const auto allowSpeculativeMajorityRead = pExpCtx->inMongos;
     invariant(resumeToken.getData().uuid);
-    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
-        pExpCtx, nss, *resumeToken.getData().uuid, documentKey, readConcern);
+    auto lookedUpDoc =
+        pExpCtx->mongoProcessInterface->lookupSingleDocument(pExpCtx,
+                                                             nss,
+                                                             *resumeToken.getData().uuid,
+                                                             documentKey,
+                                                             readConcern,
+                                                             allowSpeculativeMajorityRead);
 
     // Check whether the lookup returned any documents. Even if the lookup itself succeeded, it may
     // not have returned any results if the document was deleted in the time since the update op.

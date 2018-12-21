@@ -156,7 +156,8 @@ public:
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) {
+        boost::optional<BSONObj> readConcern,
+        bool allowSpeculativeMajorityRead) {
         MONGO_UNREACHABLE;
     }
 

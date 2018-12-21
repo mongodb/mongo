@@ -102,6 +102,7 @@ const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
 const char kReadOnceField[] = "readOnce";
+const char kAllowSpeculativeMajorityReadField[] = "allowSpeculativeMajorityRead";
 
 // Field names for sorting options.
 const char kNaturalSortField[] = "$natural";
@@ -374,6 +375,12 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             }
 
             qr->_readOnce = el.boolean();
+        } else if (fieldName == kAllowSpeculativeMajorityReadField) {
+            Status status = checkFieldType(el, Bool);
+            if (!status.isOK()) {
+                return status;
+            }
+            qr->_allowSpeculativeMajorityRead = el.boolean();
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -537,6 +544,10 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
 
     if (_readOnce) {
         cmdBuilder->append(kReadOnceField, true);
+    }
+
+    if (_allowSpeculativeMajorityRead) {
+        cmdBuilder->append(kAllowSpeculativeMajorityReadField, true);
     }
 }
 
@@ -1025,6 +1036,12 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_readOnce) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kReadOnceField << " not supported in aggregation."};
+    }
+
+    if (_allowSpeculativeMajorityRead) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kAllowSpeculativeMajorityReadField
+                              << " not supported in aggregation."};
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.

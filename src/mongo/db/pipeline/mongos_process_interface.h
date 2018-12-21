@@ -131,7 +131,8 @@ public:
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) final;
+        boost::optional<BSONObj> readConcern,
+        bool allowSpeculativeMajorityRead = false) final;
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;

@@ -52,8 +52,10 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
@@ -128,6 +130,30 @@ void validateTxnNumber(OperationContext* opCtx,
                           << *opCtx->getTxnNumber(),
             !opCtx->getTxnNumber() || !cursor->getTxnNumber() ||
                 (*opCtx->getTxnNumber() == *cursor->getTxnNumber()));
+}
+
+/**
+ * Apply the read concern from the cursor to this operation.
+ */
+void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArgs) {
+    const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+    if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
+        rcArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+        switch (rcArgs.getMajorityReadMechanism()) {
+            case repl::ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot: {
+                // Make sure we read from the majority snapshot.
+                opCtx->recoveryUnit()->setTimestampReadSource(
+                    RecoveryUnit::ReadSource::kMajorityCommitted);
+                uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
+                break;
+            }
+            case repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative: {
+                // Mark the operation as speculative.
+                repl::SpeculativeMajorityReadInfo::get(opCtx).setIsSpeculativeRead();
+                break;
+            }
+        }
+    }
 }
 
 /**
@@ -372,15 +398,8 @@ public:
             // On early return, get rid of the cursor.
             ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &ccPin);
 
-            const auto replicationMode =
-                repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
-            if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-                cursor->getReadConcernArgs().getLevel() ==
-                    repl::ReadConcernLevel::kMajorityReadConcern) {
-                opCtx->recoveryUnit()->setTimestampReadSource(
-                    RecoveryUnit::ReadSource::kMajorityCommitted);
-                uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
-            }
+            // We must respect the read concern from the cursor.
+            applyCursorReadConcern(opCtx, cursor->getReadConcernArgs());
 
             const bool disableAwaitDataFailpointActive =
                 MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);

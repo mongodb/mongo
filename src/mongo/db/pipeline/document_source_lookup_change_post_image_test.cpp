@@ -119,7 +119,8 @@ public:
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) {
+        boost::optional<BSONObj> readConcern,
+        bool allowSpeculativeMajorityRead) {
         // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
         // case of a change stream on a whole database so we need to make a copy of the
         // ExpressionContext with the new namespace.
