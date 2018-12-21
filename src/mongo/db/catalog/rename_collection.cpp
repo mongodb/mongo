@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -258,12 +257,13 @@ Status renameCollectionCommon(OperationContext* opCtx,
         }
     }
 
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+
     auto sourceUUID = sourceColl->uuid();
     // If we are renaming in the same database, just rename the namespace and we're done.
     if (sourceDB == targetDB) {
         return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            auto opObserver = getGlobalServiceContext()->getOpObserver();
             if (!targetColl) {
                 // Target collection does not exist.
                 auto stayTemp = options.stayTemp;
@@ -433,9 +433,6 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // Copy the index descriptions from the source collection, adjusting the ns field.
     {
-        MultiIndexBlock indexer(opCtx, tmpColl);
-        indexer.allowInterruption();
-
         std::vector<BSONObj> indexesToCopy;
         std::unique_ptr<IndexCatalog::IndexIterator> sourceIndIt =
             sourceColl->getIndexCatalog()->getIndexIterator(opCtx, true);
@@ -459,25 +456,30 @@ Status renameCollectionCommon(OperationContext* opCtx,
             indexesToCopy.push_back(newIndex.obj());
         }
 
-        status = indexer.init(indexesToCopy).getStatus();
-        if (!status.isOK()) {
-            return status;
-        }
-
-        status = indexer.dumpInsertsFromBulk();
-        if (!status.isOK()) {
-            return status;
-        }
-
+        // Create indexes using the namespace-adjusted index specs on the empty temporary collection
+        // that was just created. Since each index build is possibly replicated to downstream nodes,
+        // each createIndex oplog entry must have a distinct timestamp to support correct rollback
+        // operation. This is achieved by writing the createIndexes oplog entry *before* creating
+        // the index. Using IndexCatalog::createIndexOnEmptyCollection() for the index creation
+        // allows us to add and commit the index within a single WriteUnitOfWork and avoids the
+        // possibility of seeing the index in an unfinished state. For more information on assigning
+        // timestamps to multiple index builds, please see SERVER-35780 and SERVER-35070.
         status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            auto status = indexer.commit([opCtx, &tmpName, tmpColl](const BSONObj& spec) {
-                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, tmpName, *(tmpColl->uuid()), spec, false);
-            });
-            if (!status.isOK()) {
-                return status;
-            }
+            auto tmpIndexCatalog = tmpColl->getIndexCatalog();
+            for (const auto& indexToCopy : indexesToCopy) {
+                opObserver->onCreateIndex(opCtx,
+                                          tmpName,
+                                          *(tmpColl->uuid()),
+                                          indexToCopy,
+                                          false  // fromMigrate
+                                          );
+                auto indexResult =
+                    tmpIndexCatalog->createIndexOnEmptyCollection(opCtx, indexToCopy);
+                if (!indexResult.isOK()) {
+                    return indexResult.getStatus();
+                }
+            };
             wunit.commit();
             return Status::OK();
         });

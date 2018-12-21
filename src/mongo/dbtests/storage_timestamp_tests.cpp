@@ -110,10 +110,16 @@ private:
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
+void assertIndexMetaDataMissing(const BSONCollectionCatalogEntry::MetaData& collMetaData,
+                                StringData indexName) {
+    const auto idxOffset = collMetaData.findIndexOffset(indexName);
+    ASSERT_EQUALS(-1, idxOffset) << indexName << ". Collection Metdata: " << collMetaData.toBSON();
+}
+
 BSONCollectionCatalogEntry::IndexMetaData getIndexMetaData(
     const BSONCollectionCatalogEntry::MetaData& collMetaData, StringData indexName) {
     const auto idxOffset = collMetaData.findIndexOffset(indexName);
-    invariant(idxOffset > -1);
+    ASSERT_GT(idxOffset, -1) << indexName;
     return collMetaData.indexes[idxOffset];
 }
 
@@ -2023,11 +2029,11 @@ public:
             renamedNss.db(),
             createIndexesString.substr(filterString.size(),
                                        createIndexesString.size() - filterString.size() - 1));
-        const std::string createIndexMsg = "Creating indexes. Coll: " + tmpName.ns();
+
         const Timestamp indexCreateInitTs = queryOplog(BSON("op"
-                                                            << "n"
-                                                            << "o.msg"
-                                                            << createIndexMsg))["ts"]
+                                                            << "c"
+                                                            << "o.create"
+                                                            << tmpName.coll()))["ts"]
                                                 .timestamp();
 
         const Timestamp indexAComplete = createIndexesDocument["ts"].timestamp();
@@ -2039,26 +2045,22 @@ public:
                                                          << "b_1"))["ts"]
                                              .timestamp();
 
-        // We expect one new collection ident and three new index idents (including the _id index)
-        // during this rename. The a_1 and b_1 index idents are created and persisted with the
-        // "ready: false" write.
+        // We expect one new collection ident and one new index ident (the _id index) during this
+        // rename.
         assertRenamedCollectionIdentsAtTimestamp(
-            kvCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexCreateInitTs);
+            kvCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexCreateInitTs);
 
-        ASSERT_FALSE(
-            getIndexMetaData(getMetaDataAtTime(kvCatalog, renamedNss, indexCreateInitTs), "a_1")
-                .ready);
-        ASSERT_FALSE(
-            getIndexMetaData(getMetaDataAtTime(kvCatalog, renamedNss, indexCreateInitTs), "b_1")
-                .ready);
+        // We expect one new collection ident and three new index idents (including the _id index)
+        // after this rename. The a_1 and b_1 index idents are created and persisted with the
+        // "ready: true" write.
+        assertRenamedCollectionIdentsAtTimestamp(
+            kvCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexBComplete);
 
         // Assert the `a_1` index becomes ready at the next oplog entry time.
         ASSERT_TRUE(
             getIndexMetaData(getMetaDataAtTime(kvCatalog, renamedNss, indexAComplete), "a_1")
                 .ready);
-        ASSERT_FALSE(
-            getIndexMetaData(getMetaDataAtTime(kvCatalog, renamedNss, indexAComplete), "b_1")
-                .ready);
+        assertIndexMetaDataMissing(getMetaDataAtTime(kvCatalog, renamedNss, indexAComplete), "b_1");
 
         // Assert the `b_1` index becomes ready at the last oplog entry time.
         ASSERT_TRUE(
