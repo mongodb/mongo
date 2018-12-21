@@ -495,10 +495,9 @@ bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
     // the catalog.
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
-    const auto* collection = [&]() -> Collection* {
-        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db());
-        return db ? db->getCollection(opCtx, nss) : nullptr;
-    }();
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->getDb(opCtx, nss.db());
+    auto collection = db ? db->getCollection(opCtx, nss) : nullptr;
     if (!collection) {
         return uniqueKeyPaths == std::set<FieldPath>{"_id"};
     }

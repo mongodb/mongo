@@ -77,11 +77,12 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
 
     // If the admin database, which contains the server configuration collection with the
     // featureCompatibilityVersion document, does not exist, create it.
-    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, fcvNss.db());
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->getDb(opCtx, fcvNss.db());
     if (!db) {
         log() << "Re-creating admin database that was dropped.";
     }
-    db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, fcvNss.db());
+    db = databaseHolder->openDb(opCtx, fcvNss.db());
     invariant(db);
 
     // If the server configuration collection, which contains the FCV document, does not exist, then
@@ -134,8 +135,9 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  */
 Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                                      const std::vector<std::string>& dbNames) {
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     for (const auto& dbName : dbNames) {
-        Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
@@ -262,6 +264,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     bool repairVerifiedAllCollectionsHaveUUIDs = false;
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     if (storageGlobalParams.repair) {
         invariant(!storageGlobalParams.readOnly);
 
@@ -286,7 +289,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // Attempt to restore the featureCompatibilityVersion document if it is missing.
         NamespaceString fcvNSS(NamespaceString::kServerConfigurationNamespace);
 
-        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, fcvNSS.db());
+        auto db = databaseHolder->getDb(opCtx, fcvNSS.db());
         Collection* versionColl;
         BSONObj featureCompatibilityVersion;
         if (!db || !(versionColl = db->getCollection(opCtx, fcvNSS)) ||
@@ -317,7 +320,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // "local" database and populate the catalog entries because we won't attempt to drop the
         // temporary collections anyway.
         Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
-        DatabaseHolder::getDatabaseHolder().openDb(opCtx, kSystemReplSetCollection.db());
+        databaseHolder->openDb(opCtx, kSystemReplSetCollection.db());
     }
 
     if (storageGlobalParams.repair) {
@@ -367,7 +370,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
         LOG(1) << "    Recovering database: " << dbName;
 
-        Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
 
         // First thing after opening the database is to check for file compatibility,

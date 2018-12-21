@@ -36,4 +36,8 @@ namespace mongo {
 
 MONGO_DEFINE_SHIM(DatabaseHolder::getDatabaseHolder);
 
+DatabaseHolder* DatabaseHolder::get(OperationContext* opCtx) {
+    return &getDatabaseHolder();
+}
+
 }  // namespace mongo

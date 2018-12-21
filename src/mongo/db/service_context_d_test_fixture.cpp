@@ -95,7 +95,8 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     {
         auto opCtx = getClient()->makeOperationContext();
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
-        DatabaseHolder::getDatabaseHolder().closeAll(opCtx.get(), "all databases dropped");
+        auto databaseHolder = DatabaseHolder::get(opCtx.get());
+        databaseHolder->closeAll(opCtx.get(), "all databases dropped");
     }
 
     IndexBuildsCoordinator::get(getServiceContext())->shutdown();

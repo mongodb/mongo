@@ -56,10 +56,11 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::GlobalWrite globalWriteLock(opCtx);
-    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db());
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->getDb(opCtx, nss.db());
 
     if (db) {
-        DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
+        databaseHolder->dropDb(opCtx, db);
     }
 }
 bool collectionExists(OldClientContext* ctx, const string& ns) {
@@ -88,20 +89,20 @@ Status renameCollection(OperationContext* opCtx,
     return renameCollection(opCtx, source, target, {});
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     return coll->truncate(opCtx);
 }
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(data), nullOpDebug, false));
 }
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     auto cursor = coll->getCursor(opCtx);
 
     auto record = cursor->next();
@@ -111,18 +112,18 @@ void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const
     ASSERT(!cursor->next());
 }
 void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     ASSERT(!coll->getCursor(opCtx)->next());
 }
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != NULL;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != NULL;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
@@ -130,8 +131,8 @@ size_t getNumIndexEntries(OperationContext* opCtx,
                           const string& idxName) {
     size_t numEntries = 0;
 
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     IndexCatalog* catalog = coll->getIndexCatalog();
     auto desc = catalog->findIndexByName(opCtx, idxName, false);
 
@@ -147,8 +148,8 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 }
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    Collection* coll =
-        DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto coll = databaseHolder->getDb(opCtx, nss.db())->getCollection(opCtx, nss);
     auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
     ASSERT_OK(coll->getIndexCatalog()->dropIndex(opCtx, desc));

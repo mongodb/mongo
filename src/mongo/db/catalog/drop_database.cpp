@@ -66,7 +66,8 @@ Status _finishDropDatabase(OperationContext* opCtx, const std::string& dbName, D
     // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
     auto dropPendingGuard = MakeGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
-    DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    databaseHolder->dropDb(opCtx, db);
     dropPendingGuard.Dismiss();
 
     log() << "dropDatabase " << dbName << " - finished";

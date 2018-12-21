@@ -52,16 +52,17 @@ class RecordStore;
 class DatabaseHolder {
 public:
     static MONGO_DECLARE_SHIM(()->DatabaseHolder&) getDatabaseHolder;
+    static DatabaseHolder* get(OperationContext* opCtx);
 
     virtual ~DatabaseHolder() = default;
 
     DatabaseHolder() = default;
 
     /**
-     * Retrieves an already opened database or returns NULL. Must be called with the database
+     * Retrieves an already opened database or returns nullptr. Must be called with the database
      * locked in at least IS-mode.
      */
-    virtual Database* get(OperationContext* const opCtx, const StringData ns) const = 0;
+    virtual Database* getDb(OperationContext* const opCtx, const StringData ns) const = 0;
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been

@@ -55,7 +55,8 @@ void uassertLockTimeout(std::string resourceName, LockMode lockMode, bool isLock
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
     : _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           uassertLockTimeout(str::stream() << "database " << dbName, mode, _dbLock.isLocked());
-          return DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+          auto databaseHolder = DatabaseHolder::get(opCtx);
+          return databaseHolder->getDb(opCtx, dbName);
       }()) {
     if (_db) {
         DatabaseShardingState::get(_db).checkDbVersion(opCtx);
@@ -166,7 +167,8 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
             _autoDb.emplace(opCtx, dbName, MODE_X, deadline);
         }
 
-        _db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName, &_justCreated);
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        _db = databaseHolder->openDb(opCtx, dbName, &_justCreated);
     }
 
     DatabaseShardingState::get(_db).checkDbVersion(opCtx);

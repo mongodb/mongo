@@ -38,7 +38,7 @@ class DatabaseHolderMock : public DatabaseHolder {
 public:
     DatabaseHolderMock() = default;
 
-    Database* get(OperationContext* opCtx, StringData ns) const override {
+    Database* getDb(OperationContext* opCtx, StringData ns) const override {
         return nullptr;
     }
 

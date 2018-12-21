@@ -158,7 +158,8 @@ void IndexBuilder::run() {
     NamespaceString ns(_index["ns"].String());
 
     Lock::DBLock dlk(opCtx.get(), ns.db(), MODE_X);
-    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx.get(), ns.db().toString());
+    auto databaseHolder = DatabaseHolder::get(opCtx.get());
+    auto db = databaseHolder->getDb(opCtx.get(), ns.db().toString());
 
     // This background index build can only be interrupted at shutdown.
     // For the duration of the OperationContext::runWithoutInterruption() invocation, any kill
@@ -359,7 +360,8 @@ Status IndexBuilder::_build(OperationContext* opCtx,
                                 << ns.ns()
                                 << ": "
                                 << _index);
-        Database* reloadDb = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        auto reloadDb = databaseHolder->getDb(opCtx, ns.db());
         fassert(28553, reloadDb);
         fassert(28554, reloadDb->getCollection(opCtx, ns));
     }

@@ -381,7 +381,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
 
     ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
 
-    auto dbHolder = &DatabaseHolder::getDatabaseHolder();
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     auto hasLocalDatabase = false;
     for (const auto& dbName : dbNames) {
         if (dbName == "local") {
@@ -389,8 +389,8 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
             continue;
         }
         writeConflictRetry(opCtx, "dropReplicatedDatabases", dbName, [&] {
-            if (auto db = dbHolder->get(opCtx, dbName)) {
-                dbHolder->dropDb(opCtx, db);
+            if (auto db = databaseHolder->getDb(opCtx, dbName)) {
+                databaseHolder->dropDb(opCtx, db);
             } else {
                 // This is needed since dropDatabase can't be rolled back.
                 // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed.

@@ -155,7 +155,8 @@ void shutdown(ServiceContext* srvContext) {
         {
             UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());
             Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
-            DatabaseHolder::getDatabaseHolder().closeAll(shutdownOpCtx.get(), "shutdown");
+            auto databaseHolder = DatabaseHolder::get(shutdownOpCtx.get());
+            databaseHolder->closeAll(shutdownOpCtx.get(), "shutdown");
 
             LogicalSessionCache::set(serviceContext, nullptr);
 

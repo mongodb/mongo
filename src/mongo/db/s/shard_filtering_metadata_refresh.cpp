@@ -237,11 +237,12 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     // First, check under a shared lock if another thread already updated the cached version.
     // This is a best-effort optimization to make as few threads as possible to convoy on the
     // exclusive lock below.
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     {
         // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call
         // into checkDbVersion().
         Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-        const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+        auto db = databaseHolder->getDb(opCtx, dbName);
         if (!db) {
             log() << "Database " << dbName
                   << " has been dropped; not caching the refreshed databaseVersion";
@@ -261,7 +262,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
 
     // The cached version is older than the refreshed version; update the cached version.
     Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-    const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+    auto db = databaseHolder->getDb(opCtx, dbName);
     if (!db) {
         log() << "Database " << dbName
               << " has been dropped; not caching the refreshed databaseVersion";

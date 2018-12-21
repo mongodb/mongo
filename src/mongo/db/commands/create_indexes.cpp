@@ -316,9 +316,10 @@ bool runCreateIndexes(OperationContext* opCtx,
     // not allow locks or re-locks to be interrupted.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->getDb(opCtx, ns.db());
     if (!db) {
-        db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, ns.db());
+        db = databaseHolder->openDb(opCtx, ns.db());
     }
     DatabaseShardingState::get(db).checkDbVersion(opCtx);
 
@@ -451,7 +452,7 @@ bool runCreateIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         dbLock.relockWithMode(MODE_X);
 
-        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
+        auto db = databaseHolder->getDb(opCtx, ns.db());
         if (db) {
             DatabaseShardingState::get(db).checkDbVersion(opCtx);
         }

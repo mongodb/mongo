@@ -201,7 +201,8 @@ void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
     // dropDatabase can call awaitReplication more than once, so do not attempt to drop the database
     // twice.
     if (db) {
-        DatabaseHolder::getDatabaseHolder().dropDb(opCtx, db);
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        databaseHolder->dropDb(opCtx, db);
     }
 }
 

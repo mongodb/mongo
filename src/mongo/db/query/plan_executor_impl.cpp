@@ -456,7 +456,8 @@ std::shared_ptr<CappedInsertNotifier> PlanExecutorImpl::_getCappedInsertNotifier
     // We can only wait if we have a collection; otherwise we should retry immediately when
     // we hit EOF.
     dassert(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IS));
-    auto db = DatabaseHolder::getDatabaseHolder().get(_opCtx, _nss.db());
+    auto databaseHolder = DatabaseHolder::get(_opCtx);
+    auto db = databaseHolder->getDb(_opCtx, _nss.db());
     invariant(db);
     auto collection = db->getCollection(_opCtx, _nss);
     invariant(collection);

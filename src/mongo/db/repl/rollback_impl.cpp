@@ -913,9 +913,10 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
 
     std::vector<std::string> dbNames;
     storageEngine->listDatabases(&dbNames);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     for (const auto& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-        Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         db->checkForIdIndexesAndDropPendingCollections(opCtx);
     }
 }

@@ -153,8 +153,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;
 
-    auto* const serviceContext = opCtx->getServiceContext();
-    auto* const db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto* const db = databaseHolder->getDb(opCtx, dbName);
 
     // If a UUID is given, see if we need to rename a collection out of the way, and whether the
     // collection already exists under a different name. If so, rename it into place. As this is
@@ -177,7 +177,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
 
                 auto& catalog = UUIDCatalog::get(opCtx);
                 const auto currentName = catalog.lookupNSSByUUID(uuid);
-                OpObserver* const opObserver = serviceContext->getOpObserver();
+                auto serviceContext = opCtx->getServiceContext();
+                auto opObserver = serviceContext->getOpObserver();
                 if (currentName == newCollName)
                     return Result(Status::OK());
 

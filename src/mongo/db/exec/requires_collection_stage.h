@@ -94,7 +94,8 @@ private:
     // collection pointer 'coll' must be non-null and must point to a valid collection.
     uint64_t getDatabaseEpoch(CollectionT coll) const {
         invariant(coll);
-        auto db = DatabaseHolder::getDatabaseHolder().get(getOpCtx(), coll->ns().ns());
+        auto databaseHolder = DatabaseHolder::get(getOpCtx());
+        auto db = databaseHolder->getDb(getOpCtx(), coll->ns().ns());
         invariant(db);
         return db->epoch();
     }

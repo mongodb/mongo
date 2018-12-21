@@ -41,7 +41,7 @@ class DatabaseHolderImpl : public DatabaseHolder {
 public:
     DatabaseHolderImpl() = default;
 
-    Database* get(OperationContext* opCtx, StringData ns) const override;
+    Database* getDb(OperationContext* opCtx, StringData ns) const override;
 
     Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override;
 

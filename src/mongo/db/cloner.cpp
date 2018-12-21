@@ -142,7 +142,8 @@ struct Cloner::Fun {
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 
         // Make sure database still exists after we resume from the temp release
-        Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, _dbName);
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        auto db = databaseHolder->openDb(opCtx, _dbName);
 
         bool createdCollection = false;
         Collection* collection = NULL;
@@ -205,7 +206,7 @@ struct Cloner::Fun {
                 }
 
                 // TODO: SERVER-16598 abort if original db or collection is gone.
-                db = DatabaseHolder::getDatabaseHolder().get(opCtx, _dbName);
+                db = databaseHolder->getDb(opCtx, _dbName);
                 uassert(28593,
                         str::stream() << "Database " << _dbName << " dropped while cloning",
                         db != NULL);
@@ -365,7 +366,8 @@ void Cloner::copyIndexes(OperationContext* opCtx,
 
     // We are under lock here again, so reload the database in case it may have disappeared
     // during the temp release
-    Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, toDBName);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->openDb(opCtx, toDBName);
 
     Collection* collection = db->getCollection(opCtx, to_collection);
     if (!collection) {
@@ -480,7 +482,8 @@ bool Cloner::copyCollection(OperationContext* opCtx,
             !opCtx->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
-    Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->openDb(opCtx, dbname);
 
     if (shouldCreateCollection) {
         bool result = writeConflictRetry(opCtx, "createCollection", ns, [&] {
@@ -570,7 +573,8 @@ Status Cloner::createCollectionsForDb(
     const std::vector<CreateCollectionParams>& createCollectionParams,
     const std::string& dbName,
     const CloneOptions& opts) {
-    Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->openDb(opCtx, dbName);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     auto collCount = 0;

@@ -83,7 +83,7 @@ StringData _todb(StringData ns) {
 }  // namespace
 
 
-Database* DatabaseHolderImpl::get(OperationContext* opCtx, StringData ns) const {
+Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) const {
     const StringData db = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS));
 

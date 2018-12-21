@@ -52,9 +52,9 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     std::vector<std::string> allDbs;
     opCtx->getServiceContext()->getStorageEngine()->listDatabases(&allDbs);
 
-    const auto& databaseHolder = DatabaseHolder::getDatabaseHolder();
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     for (auto&& dbName : allDbs) {
-        const auto db = databaseHolder.get(opCtx, dbName);
+        const auto db = databaseHolder->getDb(opCtx, dbName);
         for (Collection* coll : *db) {
             OptionalCollectionUUID uuid = coll->uuid();
             boost::optional<Timestamp> minVisible = coll->getMinimumVisibleSnapshot();
@@ -81,7 +81,7 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     // Close all databases.
     log() << "closeCatalog: closing all databases";
     constexpr auto reason = "closing databases for closeCatalog";
-    DatabaseHolder::getDatabaseHolder().closeAll(opCtx, reason);
+    databaseHolder->closeAll(opCtx, reason);
 
     // Close the storage engine's catalog.
     log() << "closeCatalog: closing storage engine catalog";
@@ -169,11 +169,12 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     // Open all databases and repopulate the UUID catalog.
     log() << "openCatalog: reopening all databases";
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<std::string> databasesToOpen;
     storageEngine->listDatabases(&databasesToOpen);
     for (auto&& dbName : databasesToOpen) {
         LOG(1) << "openCatalog: dbholder reopening database " << dbName;
-        auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
 
         std::list<std::string> collections;

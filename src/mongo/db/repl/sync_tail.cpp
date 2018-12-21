@@ -524,7 +524,8 @@ private:
         CollectionProperties collProperties;
 
         Lock::DBLock dbLock(opCtx, nsToDatabaseSubstring(ns), MODE_IS);
-        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns);
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        auto db = databaseHolder->getDb(opCtx, ns);
         if (!db) {
             return collProperties;
         }
