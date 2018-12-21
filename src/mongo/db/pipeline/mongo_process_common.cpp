@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
@@ -84,33 +85,24 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
 
         for (auto&& cursor : getIdleCursors(expCtx, userMode)) {
             BSONObjBuilder cursorObj;
-            auto ns = cursor.getNs();
-            auto lsid = cursor.getLsid();
             cursorObj.append("type", "idleCursor");
             cursorObj.append("host", getHostNameCachedAndPort());
+            // First, extract fields which need to go at the top level out of the GenericCursor.
+            auto ns = cursor.getNs();
             cursorObj.append("ns", ns->toString());
-            // If in legacy read mode, lsid is not present.
-            if (lsid) {
+            if (auto lsid = cursor.getLsid()) {
                 cursorObj.append("lsid", lsid->toBSON());
             }
-            cursor.setNs(boost::none);
-            cursor.setLsid(boost::none);
-            // On mongos, planSummary is not present.
-            auto planSummaryData = cursor.getPlanSummary();
-            if (planSummaryData) {
-                auto planSummaryText = planSummaryData->toString();
-                // Plan summary has to appear in the top level object, not the cursor object.
-                // We remove it, create the op, then put it back.
-                cursor.setPlanSummary(boost::none);
-                cursorObj.append("planSummary", planSummaryText);
-                cursorObj.append("cursor", cursor.toBSON());
-                cursor.setPlanSummary(StringData(planSummaryText));
-            } else {
-                cursorObj.append("cursor", cursor.toBSON());
+            if (auto planSummaryData = cursor.getPlanSummary()) {  // Not present on mongos.
+                cursorObj.append("planSummary", *planSummaryData);
             }
+
+            // Next, append the stripped-down version of the generic cursor. This will avoid
+            // duplicating information reported at the top level.
+            cursorObj.append("cursor",
+                             CurOp::truncateAndSerializeGenericCursor(&cursor, boost::none));
+
             ops.emplace_back(cursorObj.obj());
-            cursor.setNs(ns);
-            cursor.setLsid(lsid);
         }
     }
 

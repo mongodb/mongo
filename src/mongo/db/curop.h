@@ -246,6 +246,14 @@ public:
                                          BSONObjBuilder* infoBuilder);
 
     /**
+     * Serializes the fields of a GenericCursor which do not appear elsewhere in the currentOp
+     * output. If 'maxQuerySize' is given, truncates the cursor's originatingCommand but preserves
+     * the comment.
+     */
+    static BSONObj truncateAndSerializeGenericCursor(GenericCursor* cursor,
+                                                     boost::optional<size_t> maxQuerySize);
+
+    /**
      * Constructs a nested CurOp at the top of the given "opCtx"'s CurOp stack.
      */
     explicit CurOp(OperationContext* opCtx);
