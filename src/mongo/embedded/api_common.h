@@ -151,7 +151,7 @@ struct enterCXXImpl;
 template <typename Status, typename Function>
 struct enterCXXImpl<Status, Function, void> {
     template <typename Callable>
-    static int call(Callable&& function, Status& status, ReentrancyGuard = {}) noexcept {
+    static int call(Callable&& function, Status& status, const ReentrancyGuard& = {}) noexcept {
         try {
             function();
         } catch (...) {
@@ -165,7 +165,9 @@ struct enterCXXImpl<Status, Function, void> {
 template <typename Status, typename Function, typename Pointer>
 struct enterCXXImpl<Status, Function, Pointer*> {
     template <typename Callable>
-    static Pointer* call(Callable&& function, Status& status, ReentrancyGuard = {}) noexcept try {
+    static Pointer* call(Callable&& function,
+                         Status& status,
+                         const ReentrancyGuard& = {}) noexcept try {
         return function();
     } catch (...) {
         return handleException(status);
