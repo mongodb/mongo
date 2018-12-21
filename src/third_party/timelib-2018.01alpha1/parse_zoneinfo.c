@@ -101,7 +101,8 @@ static int is_valid_tzfile(const struct stat *st, int fd)
  * length of the mapped data is placed in *length. */
 static char *read_tzfile(const char *directory, const char *timezone, size_t *length)
 {
-	char fname[MAXPATHLEN];
+	char *fname;
+	size_t fname_len;
 	char *buffer;
 	struct stat st;
 	int fd;
@@ -115,9 +116,16 @@ static char *read_tzfile(const char *directory, const char *timezone, size_t *le
 		return NULL;
 	}
 
-	snprintf(fname, sizeof(fname), "%s%s%s", directory, TIMELIB_DIR_SEPARATOR, timezone /* canonical_tzname(timezone) */);
+	fname_len = strlen(directory) + strlen(TIMELIB_DIR_SEPARATOR) + strlen(timezone) + 1;
+	fname = malloc(fname_len);
+	if (snprintf(fname, fname_len, "%s%s%s", directory, TIMELIB_DIR_SEPARATOR, timezone) < 0) {
+		free(fname);
+		return NULL;
+	}
 
 	fd = open(fname, O_RDONLY);
+	free(fname);
+
 	if (fd == -1) {
 		return NULL;
 	} else if (fstat(fd, &st) != 0 || !is_valid_tzfile(&st, fd)) {

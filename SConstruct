@@ -2235,7 +2235,6 @@ def doConfigure(myenv):
         AddToCCFLAGSIfSupported(myenv, "-Wno-exceptions")
 
         # These warnings begin in gcc-8.2 and we should get rid of these disables at some point.
-        AddToCCFLAGSIfSupported(env, '-Wno-format-truncation')
         AddToCXXFLAGSIfSupported(env, '-Wno-class-memaccess')
 
 
