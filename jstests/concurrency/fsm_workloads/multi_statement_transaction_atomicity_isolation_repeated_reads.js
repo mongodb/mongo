@@ -24,8 +24,11 @@ var $config = extendWorkload($config, function($config, $super) {
             let prevDocuments = undefined;
             for (let i = 0; i < this.numReads; i++) {
                 const collectionDocs = collection.find().batchSize(batchSize).toArray();
-                assertWhenOwnColl.eq(
-                    this.numDocs, collectionDocs.length, () => tojson(collectionDocs));
+                assertWhenOwnColl.eq(this.numDocs, collectionDocs.length, () => {
+                    return "txnNumber: " + tojson(this.session.getTxnNumber_forTesting()) +
+                        ", session id: " + tojson(this.session.getSessionId()) + ", read number: " +
+                        i + ", collection docs: " + tojson(collectionDocs);
+                });
                 if (prevDocuments) {
                     assertAlways.sameMembers(prevDocuments,
                                              collectionDocs,
