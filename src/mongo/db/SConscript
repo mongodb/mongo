@@ -836,6 +836,21 @@ env.Library(
 )
 
 env.Library(
+    target="op_observer_util",
+    source=[
+        "op_observer_util.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        'catalog/collection_options',
+        'index/index_descriptor',
+    ],
+)
+
+
+env.Library(
     target="op_observer_impl",
     source=[
         "op_observer_impl.cpp",
@@ -843,6 +858,7 @@ env.Library(
     LIBDEPS=[
         'catalog/collection_options',
         'op_observer',
+        'op_observer_util',
         'repl/oplog',
         's/sharding_api_d',
         'views/views_mongod',

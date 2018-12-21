@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/db_raii.h"
@@ -375,45 +374,6 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         const auto txnParticipant = TransactionParticipant::get(session.get());
         ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(stmtId));
     }
-}
-
-TEST_F(OpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolledBack) {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
-    auto authMgr = AuthorizationManager::get(getServiceContext());
-    auto initCacheGen = authMgr->getCacheGeneration();
-
-    // Verify that the rollback op observer invalidates the user cache for each auth namespace by
-    // checking that the cache generation changes after a call to the rollback observer method.
-    auto nss = AuthorizationManager::rolesCollectionNamespace;
-    OpObserver::RollbackObserverInfo rbInfo;
-    rbInfo.rollbackNamespaces = {AuthorizationManager::rolesCollectionNamespace};
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
-
-    initCacheGen = authMgr->getCacheGeneration();
-    rbInfo.rollbackNamespaces = {AuthorizationManager::usersCollectionNamespace};
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
-
-    initCacheGen = authMgr->getCacheGeneration();
-    rbInfo.rollbackNamespaces = {AuthorizationManager::versionCollectionNamespace};
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
-}
-
-TEST_F(OpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespaceRolledBack) {
-    OpObserverImpl opObserver;
-    auto opCtx = cc().makeOperationContext();
-    auto authMgr = AuthorizationManager::get(getServiceContext());
-    auto initCacheGen = authMgr->getCacheGeneration();
-
-    // Verify that the rollback op observer doesn't invalidate the user cache.
-    auto nss = AuthorizationManager::rolesCollectionNamespace;
-    OpObserver::RollbackObserverInfo rbInfo;
-    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
-    auto newCacheGen = authMgr->getCacheGeneration();
-    ASSERT_EQ(newCacheGen, initCacheGen);
 }
 
 TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {

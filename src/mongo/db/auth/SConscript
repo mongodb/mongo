@@ -58,6 +58,36 @@ env.Library(
 )
 
 env.Library(
+    target='auth_op_observer',
+    source=[
+        "auth_op_observer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        'auth',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/op_observer_util',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+    ]
+)
+
+env.CppUnitTest(
+    target='auth_op_observer_test',
+    source='auth_op_observer_test.cpp',
+    LIBDEPS=[
+        'authmocks',
+        'auth_op_observer',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.Library(
     target='user',
     source=[
         'user.cpp',

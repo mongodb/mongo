@@ -47,6 +47,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/catalog/collection.h"
@@ -279,6 +280,7 @@ ExitCode _initAndListen(int listenPort) {
     auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
     opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+    opObserverRegistry->addObserver(stdx::make_unique<AuthOpObserver>());
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         opObserverRegistry->addObserver(stdx::make_unique<ShardServerOpObserver>());

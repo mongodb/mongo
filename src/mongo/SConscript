@@ -316,6 +316,7 @@ mongod = env.Program(
         '$BUILD_DIR/third_party/shim_snappy',
         'base',
         'db/auth/authmongod',
+        'db/auth/auth_op_observer',
         'db/background',
         'db/bson/dotted_path_support',
         'db/catalog/catalog_impl',
