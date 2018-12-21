@@ -51,16 +51,14 @@ class test_backup07(wttest.WiredTigerTestCase, suite_subprocess):
         return 'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
             self.logmax
 
-    # Run background inserts while running checkpoints and incremental backups
-    # repeatedly.
+    # Run background inserts while running checkpoints repeatedly.
     def test_backup07(self):
         log2 = "WiredTigerLog.0000000002"
 
         self.session.create(self.uri, "key_format=S,value_format=S")
 
         # Insert small amounts of data at a time stopping just after we
-        # cross into log file 2.  That way we can add more operations into
-        # log file 2 during the full backup.
+        # cross into log file 2.
         loop = 0
         c = self.session.open_cursor(self.uri)
         while not os.path.exists(log2):
@@ -74,9 +72,7 @@ class test_backup07(wttest.WiredTigerTestCase, suite_subprocess):
         # Test a potential bug in full backups and creates.
         # We allow creates during backup because the file doesn't exist
         # when the backup metadata is created on cursor open and the newly
-        # created file is not in the cursor list.  However, if using logging
-        # and the create and inserts/updates appear in a log file copied,
-        # then currently there will be an error opening the backup directory.
+        # created file is not in the cursor list.
 
         # Open up the backup cursor, create and add data to a new table
         # and then copy the files.
@@ -94,13 +90,14 @@ class test_backup07(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
         self.session.log_flush('sync=on')
 
-        # Now copy the files returned by the backup cursor.  This will
-        # include the log file that has updates for the newly created table.
+        # Now copy the files returned by the backup cursor. This should not
+        # include the newly created table.
         while True:
             ret = bkup_c.next()
             if ret != 0:
                 break
             newfile = bkup_c.get_key()
+            self.assertNotEqual(newfile, self.newuri)
             sz = os.path.getsize(newfile)
             self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
             shutil.copy(newfile, self.dir)

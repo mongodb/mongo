@@ -62,8 +62,6 @@
 #define	HELIUM_PATH							\
 	EXTPATH "datasources/helium/.libs/libwiredtiger_helium.so"
 
-#define	LZO_PATH	".libs/lzo_compress.so"
-
 #undef	M
 #define	M(v)		((v) * WT_MILLION)	/* Million */
 #undef	KILOBYTE
@@ -257,12 +255,9 @@ typedef struct {
 
 #define	COMPRESS_NONE			1
 #define	COMPRESS_LZ4			2
-#define	COMPRESS_LZ4_NO_RAW		3
-#define	COMPRESS_LZO			4
-#define	COMPRESS_SNAPPY			5
-#define	COMPRESS_ZLIB			6
-#define	COMPRESS_ZLIB_NO_RAW		7
-#define	COMPRESS_ZSTD			8
+#define	COMPRESS_SNAPPY			3
+#define	COMPRESS_ZLIB			4
+#define	COMPRESS_ZSTD			5
 	u_int c_compression_flag;		/* Compression flag value */
 	u_int c_logging_compression_flag;	/* Log compression flag value */
 

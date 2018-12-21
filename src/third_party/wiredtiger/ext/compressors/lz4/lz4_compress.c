@@ -62,6 +62,10 @@ typedef struct {
  * decompressed, not the number of bytes decompressed; store that value in the
  * destination buffer as well.
  *
+ * (Since raw compression has been removed from WiredTiger, the lz4 compression
+ * code no longer calls LZ4_compress_destSize. Some support remains to support
+ * existing compressed objects.)
+ *
  * Use fixed-size, 4B values (WiredTiger never writes buffers larger than 4GB).
  *
  * The unused field is available for a mode flag if one is needed in the future,
@@ -210,6 +214,9 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * other words, our caller doesn't know how many bytes will result from
 	 * decompression, likely hasn't provided us a large enough buffer, and
 	 * we have to allocate a scratch buffer.
+	 *
+	 * Even though raw compression has been removed from WiredTiger, this
+	 * code remains for backward compatibility with existing objects.
 	 */
 	if (dst_len < prefix.uncompressed_len) {
 		if ((dst_tmp = wt_api->scr_alloc(
@@ -235,102 +242,6 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	return (
 	    lz4_error(compressor, session, "LZ4 decompress error", decoded));
-}
-
-/*
- * lz4_find_slot --
- *	Find the slot containing the target offset (binary search).
- */
-static inline uint32_t
-lz4_find_slot(int target_arg, uint32_t *offsets, uint32_t slots)
-{
-	uint32_t base, indx, limit, target;
-
-	indx = 1;					/* -Wuninitialized */
-
-	target = (uint32_t)target_arg;			/* Type conversion */
-
-	/* Fast check if we consumed it all, it's a likely result. */
-	if (target >= offsets[slots])
-		return (slots);
-
-	/*
-	 * Figure out which slot we got to: binary search. Note the test of
-	 * offset (slot + 1), that's (end-byte + 1) for slot.
-	 */
-	for (base = 0, limit = slots; limit != 0; limit >>= 1) {
-		indx = base + (limit >> 1);
-		if (target > offsets[indx + 1]) {
-			base = indx + 1;
-			--limit;
-		}
-	}
-
-	return (indx);
-}
-
-/*
- * lz4_compress_raw --
- *	Pack records into a specified on-disk page size.
- */
-static int
-lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    size_t page_max, int split_pct, size_t extra,
-    uint8_t *src, uint32_t *offsets, uint32_t slots,
-    uint8_t *dst, size_t dst_len, int final,
-    size_t *result_lenp, uint32_t *result_slotsp)
-{
-	LZ4_PREFIX prefix;
-	uint32_t slot;
-	int lz4_len, sourceSize, targetDestSize;
-
-	(void)compressor;				/* Unused parameters */
-	(void)session;
-	(void)split_pct;
-	(void)final;
-
-	/*
-	 * Set the source and target sizes. The target size is complicated: we
-	 * don't want to exceed the smaller of the maximum page size or the
-	 * destination buffer length, and in both cases we have to take into
-	 * account the space for our overhead and the extra bytes required by
-	 * our caller.
-	 */
-	sourceSize = (int)offsets[slots];
-	targetDestSize = (int)(page_max < dst_len ? page_max : dst_len);
-	targetDestSize -= (int)(sizeof(LZ4_PREFIX) + extra);
-
-	/* Compress, starting after the prefix bytes. */
-	lz4_len = LZ4_compress_destSize((const char *)src,
-	    (char *)dst + sizeof(LZ4_PREFIX), &sourceSize, targetDestSize);
-
-	/*
-	 * If compression succeeded and the compressed length is smaller than
-	 * the original size, return success.
-	 */
-	if (lz4_len != 0) {
-		/* Find the first slot we didn't compress. */
-		slot = lz4_find_slot(sourceSize, offsets, slots);
-
-		if ((size_t)lz4_len + sizeof(LZ4_PREFIX) < offsets[slot]) {
-			prefix.compressed_len = (uint32_t)lz4_len;
-			prefix.uncompressed_len = (uint32_t)sourceSize;
-			prefix.useful_len = offsets[slot];
-			prefix.unused = 0;
-#ifdef WORDS_BIGENDIAN
-			lz4_prefix_swap(&prefix);
-#endif
-			memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
-
-			*result_slotsp = slot;
-			*result_lenp = (size_t)lz4_len + sizeof(LZ4_PREFIX);
-			return (0);
-		}
-	}
-
-	*result_slotsp = 0;
-	*result_lenp = 1;
-	return (0);
 }
 
 /*
@@ -372,20 +283,15 @@ lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
  *	Add a LZ4 compressor.
  */
 static int
-lz_add_compressor(WT_CONNECTION *connection, bool raw, const char *name)
+lz_add_compressor(WT_CONNECTION *connection, const char *name)
 {
 	LZ4_COMPRESSOR *lz4_compressor;
 	int ret;
 
-	/*
-	 * There are two almost identical LZ4 compressors: one using raw
-	 * compression to target a specific block size, and one without.
-	 */
 	if ((lz4_compressor = calloc(1, sizeof(LZ4_COMPRESSOR))) == NULL)
 		return (errno);
 
 	lz4_compressor->compressor.compress = lz4_compress;
-	lz4_compressor->compressor.compress_raw = raw ? lz4_compress_raw : NULL;
 	lz4_compressor->compressor.decompress = lz4_decompress;
 	lz4_compressor->compressor.pre_size = lz4_pre_size;
 	lz4_compressor->compressor.terminate = lz4_terminate;
@@ -416,9 +322,11 @@ lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	(void)config;    				/* Unused parameters */
 
-	if ((ret = lz_add_compressor(connection, true, "lz4")) != 0)
+	if ((ret = lz_add_compressor(connection, "lz4")) != 0)
 		return (ret);
-	if ((ret = lz_add_compressor(connection, false, "lz4-noraw")) != 0)
+
+	/* Raw compression API backward compatibility. */
+	if ((ret = lz_add_compressor(connection, "lz4-noraw")) != 0)
 		return (ret);
 	return (0);
 }

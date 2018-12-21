@@ -1,0 +1,24 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+toplevel_dir=$(git rev-parse --show-toplevel)
+program=${toplevel_dir}/test/evergreen/evg_cfg.py
+
+# Run checking program to identify missing tests in Evergreen configuration
+${program} check >$t 2>&1
+e=$?
+
+test -s $t && {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo "$0: $program check"
+	cat $t
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+	# Don't exit non-zero unless the python script did, the script
+	# requires python modules that are commonly not installed, and
+	# in that case it exits 0. Post the complaint, but don't fail.
+	exit $e
+}
+exit 0

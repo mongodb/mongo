@@ -296,7 +296,8 @@ connection_stats = [
     ##########################################
     # Cursor operations
     ##########################################
-    CursorStat('cursors_cached', 'cursors currently cached', 'no_clear,no_scale'),
+    CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
+    CursorStat('cursor_cached_count', 'cached cursor count', 'no_clear,no_scale'),
     CursorStat('cursor_cache', 'cursor close calls that result in cache'),
     CursorStat('cursor_create', 'cursor create calls'),
     CursorStat('cursor_insert', 'cursor insert calls'),
@@ -469,7 +470,6 @@ connection_stats = [
     ##########################################
     # Session operations
     ##########################################
-    SessionOpStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
     SessionOpStat('session_open', 'open session count', 'no_clear,no_scale'),
     SessionOpStat('session_query_ts', 'session query timestamp calls'),
     SessionOpStat('session_table_alter_fail', 'table alter failed calls', 'no_clear,no_scale'),
@@ -690,9 +690,6 @@ dsrc_stats = [
     ##########################################
     # Compression statistics
     ##########################################
-    CompressStat('compress_raw_fail', 'raw compression call failed, no additional data available'),
-    CompressStat('compress_raw_fail_temporary', 'raw compression call failed, additional data available'),
-    CompressStat('compress_raw_ok', 'raw compression call succeeded'),
     CompressStat('compress_read', 'compressed pages read'),
     CompressStat('compress_write', 'compressed pages written'),
     CompressStat('compress_write_fail', 'page written failed to compress'),
@@ -701,6 +698,7 @@ dsrc_stats = [
     ##########################################
     # Cursor operations
     ##########################################
+    CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
     CursorStat('cursor_cache', 'close calls that result in cache'),
     CursorStat('cursor_create', 'create calls'),
     CursorStat('cursor_insert', 'insert calls'),
@@ -759,8 +757,6 @@ dsrc_stats = [
     # Session operations
     ##########################################
     SessionOpStat('session_compact', 'object compaction'),
-    SessionOpStat('session_cursors_cached', 'cached cursor count', 'no_clear,no_scale'),
-    SessionOpStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
 
     ##########################################
     # Transaction statistics

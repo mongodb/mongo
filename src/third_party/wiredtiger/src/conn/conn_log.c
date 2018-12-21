@@ -289,6 +289,10 @@ __logmgr_config(
 		WT_STAT_CONN_SET(session, log_max_filesize, conn->log_file_max);
 	}
 
+	WT_RET(__wt_config_gets(session, cfg, "log.os_cache_dirty_pct", &cval));
+	if (cval.val != 0)
+		conn->log_dirty_max = (conn->log_file_max * cval.val) / 100;
+
 	/*
 	 * If pre-allocation is configured, set the initial number to a few.
 	 * We'll adapt as load dictates.

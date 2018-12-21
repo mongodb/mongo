@@ -16,11 +16,11 @@ int
 __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
     void *mapped_regionp, size_t *lenp, void *mapped_cookiep)
 {
-	DWORD windows_error;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
-	size_t len;
 	wt_off_t file_size;
+	DWORD windows_error;
+	size_t len;
 	void *map, *mapped_cookie;
 
 	win_fh = (WT_FILE_HANDLE_WIN *)file_handle;
@@ -77,10 +77,10 @@ int
 __wt_win_unmap(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
     void *mapped_region, size_t length, void *mapped_cookie)
 {
-	DWORD windows_error;
 	WT_DECL_RET;
 	WT_FILE_HANDLE_WIN *win_fh;
 	WT_SESSION_IMPL *session;
+	DWORD windows_error;
 
 	win_fh = (WT_FILE_HANDLE_WIN *)file_handle;
 	session = (WT_SESSION_IMPL *)wt_session;

@@ -357,6 +357,7 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %ignore __wt_modify::position;
 %ignore __wt_modify::size;
 %ignore __wt_cursor::modify;
+%ignore wiredtiger_calc_modify;
 
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;

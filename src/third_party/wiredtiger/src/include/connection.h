@@ -341,6 +341,7 @@ struct __wt_connection_impl {
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
 	uint32_t	 log_cursors;	/* Log cursor count */
+	wt_off_t	 log_dirty_max;	/* Log dirty system cache max size */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	 log_prealloc;	/* Log file pre-allocation */

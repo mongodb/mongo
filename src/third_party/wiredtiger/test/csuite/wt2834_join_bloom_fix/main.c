@@ -59,10 +59,6 @@ main(int argc, char *argv[])
 	char posturi[256];
 	const char *tablename;
 
-	/* Ignore unless requested */
-	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
-		return (EXIT_SUCCESS);
-
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
 	testutil_check(testutil_parse_opts(argc, argv, opts));

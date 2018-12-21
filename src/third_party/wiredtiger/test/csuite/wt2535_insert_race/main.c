@@ -38,6 +38,8 @@
 
 void *thread_insert_race(void *);
 
+static uint64_t ready_counter;
+
 int
 main(int argc, char *argv[])
 {
@@ -49,14 +51,10 @@ main(int argc, char *argv[])
 	uint64_t current_value;
 	int i;
 
-	/* Ignore unless requested */
-	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
-		return (EXIT_SUCCESS);
-
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
-	opts->nthreads = 10;
-	opts->nrecords = 1000;
+	opts->nthreads = 20;
+	opts->nrecords = 100000;
 	opts->table_type = TABLE_ROW;
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
@@ -119,16 +117,25 @@ thread_insert_race(void *arg)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION *session;
-	uint64_t i, value;
+	uint64_t i, value, ready_counter_local;
 
 	opts = (TEST_OPTS *)arg;
 	conn = opts->conn;
+
+	printf("Running insert thread\n");
 
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	testutil_check(session->open_cursor(
 	    session, opts->uri, NULL, NULL, &cursor));
 
-	printf("Running insert thread\n");
+	/* Wait until all the threads are ready to go. */
+	(void)__wt_atomic_add64(&ready_counter, 1);
+	for (;; __wt_yield()) {
+		WT_ORDERED_READ(ready_counter_local, ready_counter);
+		if (ready_counter_local >= opts->nthreads)
+			break;
+	}
+
 	for (i = 0; i < opts->nrecords; ++i) {
 		testutil_check(
 		    session->begin_transaction(session, "isolation=snapshot"));

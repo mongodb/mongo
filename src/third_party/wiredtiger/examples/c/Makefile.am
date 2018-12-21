@@ -39,4 +39,4 @@ AM_TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_HOME.XXXX` ; export WIREDTI
 LOG_COMPILER = $(TEST_WRAPPER)
 
 clean-local:
-	rm -rf WT_HOME* *.core backup_full.* backup_incr.*
+	rm -rf WT_HOME* core.* *.core backup_full.* backup_incr.*

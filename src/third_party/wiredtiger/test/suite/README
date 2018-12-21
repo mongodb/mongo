@@ -1,0 +1,13 @@
+The test/suite directory includes a collection of Python unit tests 
+that are expected to be executed when code change is introduced in this repo.  
+
+These Python tests are broken down and grouped into multiple buckets/tasks
+in Evergreen (CI system) configuration. See test/evergreen.yml for details.
+
+There is a plan to implement a mechanism to auto-group tests into buckets/tasks
+based on history runtime of each test, and generate the Evergreen configuration
+dynamically before each Evergreen build variant run, so that no mental overhead
+is required when new tests is introduced into test/suite. (WT-4441)
+
+Before the above mentioned mechansim is put into place, please double check
+test/evergreen.yml and test run logs to make sure new test are covered.

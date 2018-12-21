@@ -1,0 +1,12 @@
+The 'test/csuite' directory includes a collection of sanity tests written in C.
+They are expected to be executed as part of 'make check' testing.
+
+Each sub directory of 'test/csuite' include source code of one csuite test, and 
+should have one corresponding task in the Evergreen (CI system) configuration file. 
+See 'test/evergreen.yml' for details.
+
+When a new csuite test is introduced, a corresponding new Evergreen task should be 
+crafted and put into the Evergreen configuration file. We have a utility program 
+'test/evergreen/evg_cfg.py' to help with identifying and auto-generating the
+Evergreen configuration for new or missing csuite tests. The program checking
+has been bound into developer workflow through 'dist/s_evergreen'. 

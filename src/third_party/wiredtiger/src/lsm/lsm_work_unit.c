@@ -37,6 +37,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	/* Take a copy of the current state of the LSM tree. */
 	nchunks = old_chunks ? lsm_tree->nold_chunks : lsm_tree->nchunks;
 	alloc = old_chunks ? lsm_tree->old_alloc : lsm_tree->chunk_alloc;
+	WT_ASSERT(session, alloc > 0 && nchunks > 0);
 
 	/*
 	 * If the tree array of active chunks is larger than our current buffer,

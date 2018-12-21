@@ -211,16 +211,22 @@ struct __wt_logslot {
 	WT_ITEM  slot_buf;		/* Buffer for grouped writes */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_SLOT_CLOSEFH		0x1u		/* Close old fh on release */
-#define	WT_SLOT_FLUSH		0x2u		/* Wait for write */
-#define	WT_SLOT_SYNC		0x4u		/* Needs sync on release */
-#define	WT_SLOT_SYNC_DIR	0x8u		/* Directory sync on release */
+#define	WT_SLOT_CLOSEFH		0x01u	/* Close old fh on release */
+#define	WT_SLOT_FLUSH		0x02u	/* Wait for write */
+#define	WT_SLOT_SYNC		0x04u	/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x08u	/* Directory sync on release */
+#define	WT_SLOT_SYNC_DIRTY	0x10u	/* Sync system buffers on release */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 	WT_CACHE_LINE_PAD_END
 };
 
 #define	WT_SLOT_INIT_FLAGS	0
+
+#define	WT_SLOT_SYNC_FLAGS						\
+	(WT_SLOT_SYNC |							\
+	 WT_SLOT_SYNC_DIR |						\
+	 WT_SLOT_SYNC_DIRTY)
 
 #define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
@@ -267,6 +273,7 @@ struct __wt_log {
 	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
 	WT_LSN		bg_sync_lsn;	/* Latest background sync LSN */
 	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
+	WT_LSN		dirty_lsn;	/* LSN of last non-synced write */
 	WT_LSN		first_lsn;	/* First LSN */
 	WT_LSN		sync_dir_lsn;	/* LSN of the last directory sync */
 	WT_LSN		sync_lsn;	/* LSN of the last sync */

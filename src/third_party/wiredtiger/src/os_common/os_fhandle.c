@@ -128,16 +128,46 @@ __handle_search(
 }
 
 /*
+ * __open_verbose_file_type_tag --
+ *	Return a string describing a file type.
+ */
+static const char *
+__open_verbose_file_type_tag(WT_FS_OPEN_FILE_TYPE file_type)
+{
+
+	/*
+	 * WT_FS_OPEN_FILE_TYPE is an enum and the switch exhaustively lists the
+	 * cases, but clang, lint and gcc argue over whether or not the switch
+	 * is exhaustive, or if a temporary variable inserted into the mix is
+	 * set but never read. Break out of the switch, returning some value in
+	 * all cases, just to shut everybody up.
+	 */
+	switch (file_type) {
+	case WT_FS_OPEN_FILE_TYPE_CHECKPOINT:
+		return ("checkpoint");
+	case WT_FS_OPEN_FILE_TYPE_DATA:
+		return ("data");
+	case WT_FS_OPEN_FILE_TYPE_DIRECTORY:
+		return ("directory");
+	case WT_FS_OPEN_FILE_TYPE_LOG:
+		return ("log");
+	case WT_FS_OPEN_FILE_TYPE_REGULAR:
+		break;
+	}
+	return ("regular");
+}
+
+/*
  * __open_verbose --
  *	Optionally output a verbose message on handle open.
  */
 static inline int
-__open_verbose(
-    WT_SESSION_IMPL *session, const char *name, int file_type, u_int flags)
+__open_verbose(WT_SESSION_IMPL *session,
+    const char *name, WT_FS_OPEN_FILE_TYPE file_type, u_int flags)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	const char *file_type_tag, *sep;
+	const char *sep;
 
 	if (!WT_VERBOSE_ISSET(session, WT_VERB_FILEOPS))
 		return (0);
@@ -146,28 +176,6 @@ __open_verbose(
 	 * It's useful to track file opens when debugging platforms, take some
 	 * effort to output good tracking information.
 	 */
-
-	switch (file_type) {
-	case WT_FS_OPEN_FILE_TYPE_CHECKPOINT:
-		file_type_tag = "checkpoint";
-		break;
-	case WT_FS_OPEN_FILE_TYPE_DATA:
-		file_type_tag = "data";
-		break;
-	case WT_FS_OPEN_FILE_TYPE_DIRECTORY:
-		file_type_tag = "directory";
-		break;
-	case WT_FS_OPEN_FILE_TYPE_LOG:
-		file_type_tag = "log";
-		break;
-	case WT_FS_OPEN_FILE_TYPE_REGULAR:
-		file_type_tag = "regular";
-		break;
-	default:
-		file_type_tag = "unknown open type";
-		break;
-	}
-
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 	sep = " (";
 #define	WT_FS_OPEN_VERBOSE_FLAG(f, name)				\
@@ -188,7 +196,8 @@ __open_verbose(
 
 	__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: file-open: type %s%s",
-	    name, file_type_tag, tmp->size == 0 ? "" : (char *)tmp->data);
+	    name, __open_verbose_file_type_tag(file_type),
+	    tmp->size == 0 ? "" : (char *)tmp->data);
 
 err:	__wt_scr_free(session, &tmp);
 	return (ret);

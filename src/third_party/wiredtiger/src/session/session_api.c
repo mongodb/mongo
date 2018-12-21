@@ -493,7 +493,7 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri,
 	case 'b':
 		if (WT_PREFIX_MATCH(uri, "backup:"))
 			WT_RET(__wt_curbackup_open(
-			    session, uri, cfg, cursorp));
+			    session, uri, other, cfg, cursorp));
 		break;
 	case 's':
 		if (WT_PREFIX_MATCH(uri, "statistics:"))
@@ -570,10 +570,11 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	bool statjoin;
+	bool dup_backup, statjoin;
 
 	cursor = *cursorp = NULL;
 
+	dup_backup = false;
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
@@ -589,11 +590,19 @@ __session_open_cursor(WT_SESSION *wt_session,
 		if ((ret = __wt_cursor_cache_get(
 		    session, uri, to_dup, cfg, &cursor)) == 0)
 			goto done;
+
+		/*
+		 * Detect if we're duplicating a backup cursor specifically.
+		 * That needs special handling.
+		 */
+		if (to_dup != NULL && strcmp(to_dup->uri, "backup:") == 0)
+			dup_backup = true;
 		WT_ERR_NOTFOUND_OK(ret);
 
 		if (to_dup != NULL) {
 			uri = to_dup->uri;
-			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+			if (!WT_PREFIX_MATCH(uri, "backup:") &&
+			    !WT_PREFIX_MATCH(uri, "colgroup:") &&
 			    !WT_PREFIX_MATCH(uri, "index:") &&
 			    !WT_PREFIX_MATCH(uri, "file:") &&
 			    !WT_PREFIX_MATCH(uri, "lsm:") &&
@@ -605,10 +614,10 @@ __session_open_cursor(WT_SESSION *wt_session,
 	}
 
 	WT_ERR(__session_open_cursor_int(session, uri, NULL,
-	    statjoin ? to_dup : NULL, cfg, &cursor));
+	    statjoin || dup_backup ? to_dup : NULL, cfg, &cursor));
 
 done:
-	if (to_dup != NULL && !statjoin)
+	if (to_dup != NULL && !statjoin && !dup_backup)
 		WT_ERR(__wt_cursor_dup_position(to_dup, cursor));
 
 	*cursorp = cursor;

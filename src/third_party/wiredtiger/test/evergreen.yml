@@ -97,7 +97,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
+            ${test_env_vars|} ${make_command|make} VERBOSE=1 check ${smp_command|} 2>&1
 
   # Start of normal make check test tasks
 
@@ -621,7 +621,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_rwlock 2>&1
+            ${test_env_vars|} $(pwd)/test_rwlock 2>&1
 
   - name: csuite-wt2246-col-append-test
     depends_on:
@@ -635,7 +635,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2246_col_append 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2246_col_append 2>&1
 
   - name: csuite-wt2323-join-visibility-test
     depends_on:
@@ -649,7 +649,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2323_join_visibility 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2323_join_visibility 2>&1
 
   - name: csuite-wt2535-insert-race-test
     depends_on:
@@ -663,7 +663,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2535_insert_race 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2535_insert_race 2>&1
 
   - name: csuite-wt2834-join-bloom-fix-test
     depends_on:
@@ -677,7 +677,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2834_join_bloom_fix 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2834_join_bloom_fix 2>&1
 
   - name: csuite-wt2853-perf-test
     depends_on:
@@ -691,7 +691,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2853_perf 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2853_perf 2>&1
 
   - name: csuite-wt2909-checkpoint-integrity-test
     depends_on:
@@ -705,7 +705,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt2909_checkpoint_integrity 2>&1
+            ${test_env_vars|} $(pwd)/test_wt2909_checkpoint_integrity 2>&1
 
   - name: csuite-wt3338-partial-update-test
     depends_on:
@@ -719,7 +719,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt3338_partial_update 2>&1
+            ${test_env_vars|} $(pwd)/test_wt3338_partial_update 2>&1
 
   - name: csuite-wt4333-handle-locks-test
     depends_on:
@@ -733,9 +733,11 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 $(pwd)/test_wt4333_handle_locks 2>&1
+            ${test_env_vars|} $(pwd)/test_wt4333_handle_locks 2>&1
 
   # End of csuite test tasks
+
+  # Start of Python unit test tasks
 
   - name: unit-test
     depends_on:
@@ -749,21 +751,141 @@ tasks:
             set -o errexit
             set -o verbose
 
-            if [ "Windows_NT" = "$OS" ]; then
-              ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
-            elif [ "$(uname -s)" == "Darwin" ]; then
-              # Avoid /usr/bin/python, at least on macOS: with System Integrity
-              # Protection enabled, it ignores DYLD_LIBRARY_PATH and hence
-              # doesn't find the WiredTiger library in the local tree.
-              ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
-            else # Ubuntu
-              # Change directory to where the local installed 'wt' binary is located, 
-              # to avoid libtool generated 'wt' script from being selected by run.py,
-              # which invokes relink_command that tries to changing to a non-existed 
-              # /data/mci/<uniq> directory, as 'make' is done by a separate 'compile' task.
-              cd .libs
-              ${python_test_env_vars|} python ../test/suite/run.py -v 2 ${smp_command|} 2>&1
-            fi
+            # Only Windows and OS X variants are expected to run this task
+            #
+            # Avoid /usr/bin/python, at least on macOS: with System Integrity
+            # Protection enabled, it ignores DYLD_LIBRARY_PATH and hence
+            # doesn't find the WiredTiger library in the local tree.
+            ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
+
+  # Break out Python unit tests into multiple buckets/tasks based on test name and runtime
+  # The test/suite/run.py script can work out test names by casting each command argument
+  # with "test_" prefix and "*.py" postfix. 
+  #
+  # One example: 
+  # "test/suite/run.py [ab]" will be translated to testing "test_a*.py" and "test_b*.py"
+
+  - name: unit-test-bucket00
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket01
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket02
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket03
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket04
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket05
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket06
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
+
+  - name: unit-test-bucket07
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            cd .libs
+            ${python_test_env_vars|} python ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
+
+  # End of Python unit test tasks
 
   - name: compile-windows-alt
     depends_on:
@@ -884,7 +1006,14 @@ buildvariants:
     - name: csuite-wt2909-checkpoint-integrity-test
     - name: csuite-wt3338-partial-update-test
     - name: csuite-wt4333-handle-locks-test
-    - name: unit-test
+    - name: unit-test-bucket00
+    - name: unit-test-bucket01
+    - name: unit-test-bucket02
+    - name: unit-test-bucket03
+    - name: unit-test-bucket04
+    - name: unit-test-bucket05
+    - name: unit-test-bucket06
+    - name: unit-test-bucket07
     - name: fops
 
 - name: large-scale-test

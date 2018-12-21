@@ -992,9 +992,8 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_STAT_CONN_INCR(session, txn_prepared_updates_count);
 			break;
 		case WT_TXN_OP_REF_DELETE:
-			op->u.ref->page_del->timestamp = ts;
-			WT_PUBLISH(op->u.ref->page_del->prepare_state,
-			    WT_PREPARE_INPROGRESS);
+			__wt_txn_op_apply_prepare_state(
+			    session, op->u.ref, false);
 			break;
 		case WT_TXN_OP_TRUNCATE_COL:
 		case WT_TXN_OP_TRUNCATE_ROW:

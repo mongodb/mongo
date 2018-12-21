@@ -145,6 +145,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_STAT_DATA_INCR(session, compress_read);
 	WT_STAT_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
 	WT_STAT_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
+	WT_STAT_SESSION_INCRV(session, bytes_read, dsk->mem_size);
 	(void)__wt_atomic_add64(
 	    &S2C(session)->cache->bytes_read, dsk->mem_size);
 
@@ -185,7 +186,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_PAGE_HEADER *dsk;
 	size_t dst_len, len, result_len, size, src_len;
-	uint64_t time_start, time_stop;
+	uint64_t time_diff, time_start, time_stop;
 	uint8_t *dst, *src;
 	int compression_failed;		/* Extension API, so not a bool. */
 	bool data_checksum, encrypted, timer;
@@ -388,15 +389,17 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	/* Update some statistics now that the write is done */
 	if (timer) {
 		time_stop = __wt_clock(session);
+		time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
 		WT_STAT_CONN_INCR(session, cache_write_app_count);
-		WT_STAT_CONN_INCRV(session, cache_write_app_time,
-		    WT_CLOCKDIFF_US(time_stop, time_start));
+		WT_STAT_CONN_INCRV(session, cache_write_app_time, time_diff);
+		WT_STAT_SESSION_INCRV(session, write_time, time_diff);
 	}
 
 	WT_STAT_CONN_INCR(session, cache_write);
 	WT_STAT_DATA_INCR(session, cache_write);
 	WT_STAT_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
 	WT_STAT_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
+	WT_STAT_SESSION_INCRV(session, bytes_write, dsk->mem_size);
 	(void)__wt_atomic_add64(
 	    &S2C(session)->cache->bytes_written, dsk->mem_size);
 

@@ -92,10 +92,6 @@ main(int argc, char *argv[])
 	TEST_OPTS *opts, _opts;
 	const char *tablename;
 
-	/* Ignore unless requested */
-	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
-		return (EXIT_SUCCESS);
-
 	opts = &_opts;
 	sharedopts = &_sharedopts;
 	memset(opts, 0, sizeof(*opts));
@@ -318,7 +314,8 @@ thread_insert(void *arg)
 	return (NULL);
 }
 
-static void *thread_join(void *arg)
+static void *
+thread_join(void *arg)
 {
 	SHARED_OPTS *sharedopts;
 	TEST_OPTS *opts;

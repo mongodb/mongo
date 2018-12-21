@@ -94,14 +94,15 @@ class test_bug019(wttest.WiredTigerTestCase):
             older = newer
             self.session.checkpoint()
 
-        # Wait for up to 30 seconds for pre-allocate to drop in an idle system
+        # Wait for a long time for pre-allocate to drop in an idle system
         # it should usually be fast, but on slow systems can take time.
-        for sleepcount in range(1,30):
+        max_wait_time = 90
+        for sleepcount in range(1,max_wait_time):
             new_prealloc = self.get_prealloc_stat()
             if new_prealloc < self.max_prealloc:
                 break
             time.sleep(1.0)
-        self.assertTrue(sleepcount < 30)
+        self.assertTrue(sleepcount < max_wait_time)
 
 if __name__ == '__main__':
     wttest.run()

@@ -315,62 +315,51 @@ main(int argc, char *argv[])
 	static const struct {
 		u_int workers;
 		u_int uris;
+		bool  cache_cursors;
 	} runs[] = {
-		{  1,   1},
-		{  8,   1},
-		{ 16,   1},
-		{ 16,   WT_ELEMENTS(uri_list)},
-		{200, 100},
-		{300, 100},
-		{200, WT_ELEMENTS(uri_list)},
-		{600, WT_ELEMENTS(uri_list)},
+		{  1,   1, false},
+		{  1,   1, true},
+		{  8,   1, false},
+		{  8,   1, true},
+		{ 16,   1, false},
+		{ 16,   1, true},
+		{ 16,   WT_ELEMENTS(uri_list), false},
+		{ 16,   WT_ELEMENTS(uri_list), true},
+		{200, 100, false},
+		{200, 100, true},
+		{200, WT_ELEMENTS(uri_list), false},
+		{200, WT_ELEMENTS(uri_list), true},
+		{300, 100, false},
+		{300, 100, true},
+		{600, WT_ELEMENTS(uri_list), false},
+		{600, WT_ELEMENTS(uri_list), true},
 	};
+	WT_RAND_STATE rnd;
 	u_int i, n;
 	int ch;
-	bool run_long;
 
 	(void)testutil_set_progname(argv);
+	__wt_random_init_seed(NULL, &rnd);
 
-	run_long = false;
-	while ((ch = __wt_getopt(argv[0], argc, argv, "av")) != EOF) {
+	while ((ch = __wt_getopt(argv[0], argc, argv, "v")) != EOF) {
 		switch (ch) {
-		case 'a':
-			run_long = true;
-			break;
 		case 'v':
 			verbose = true;
 			break;
 		default:
-			fprintf(stderr, "usage: %s -a", argv[0]);
+			fprintf(stderr, "usage: %s [-v]\n", argv[0]);
 			return (EXIT_FAILURE);
 		}
 	}
 
-	/* Ignore unless requested */
-	if (!run_long &&
-	    !testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
-		return (EXIT_SUCCESS);
-
 	(void)signal(SIGALRM, on_alarm);
 
-	/*
-	 * This test takes 2 minutes per slot in the runs table, only do the
-	 * first 2 and last 2 slots, unless specifically requested.
-	 */
-	n = WT_ELEMENTS(runs);
-	for (i = 0; i < 2; ++i) {
-		workers = runs[i].workers;
-		uris = runs[i].uris;
-		run(true);
-		run(false);
-	}
-	if (!run_long)
-		i = n - 2;
-	for (; i < n; ++i) {
-		workers = runs[i].workers;
-		uris = runs[i].uris;
-		run(true);
-		run(false);
+	/* Each test in the table runs for a minute, run 5 tests at random. */
+	for (i = 0; i < 5; ++i) {
+		n = __wt_random(&rnd) % WT_ELEMENTS(runs);
+		workers = runs[n].workers;
+		uris = runs[n].uris;
+		run(runs[n].cache_cursors);
 	}
 
 	uri_teardown();

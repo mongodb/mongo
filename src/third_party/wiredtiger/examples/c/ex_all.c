@@ -578,6 +578,11 @@ cursor_statistics(WT_SESSION *session)
 	    "statistics:table:mytable",
 	    NULL, "statistics=(all,clear)", &cursor));
 	/*! [Statistics cursor clear configuration] */
+
+	/*! [Statistics cursor session] */
+	error_check(session->open_cursor(
+	    session, "statistics:session", NULL, NULL, &cursor));
+	/*! [Statistics cursor session] */
 }
 
 static void
@@ -1349,6 +1354,26 @@ main(int argc, char *argv[])
 	printf("WiredTiger version is %d, %d (patch %d)\n",
 	    major_v, minor_v, patch);
 	/*! [Get the WiredTiger library version #2] */
+	}
+
+	{
+	/*! [Calculate a modify operation] */
+	WT_MODIFY mod[3];
+	int nmod = 3;
+	WT_ITEM prev, newv;
+	prev.data = "the quick brown fox jumped over the lazy dog. " \
+		"THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG. " \
+		"the quick brown fox jumped over the lazy dog. " \
+		"THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG. ";
+	prev.size = strlen(prev.data);
+	newv.data = "A quick brown fox jumped over the lazy dog. " \
+		"THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG. " \
+		"then a quick brown fox jumped over the lazy dog. " \
+		"THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG. " \
+		"then what?";
+	newv.size = strlen(newv.data);
+	error_check(wiredtiger_calc_modify(NULL, &prev, &newv, 20, mod, &nmod));
+	/*! [Calculate a modify operation] */
 	}
 
 	{

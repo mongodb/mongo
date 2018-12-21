@@ -170,7 +170,6 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 * Heap memory (not static), because it can support multiple databases.
 	 */
 	nop_compressor->compressor.compress = nop_compress;
-	nop_compressor->compressor.compress_raw = NULL;
 	nop_compressor->compressor.decompress = nop_decompress;
 	nop_compressor->compressor.pre_size = nop_pre_size;
 	nop_compressor->compressor.terminate = nop_terminate;

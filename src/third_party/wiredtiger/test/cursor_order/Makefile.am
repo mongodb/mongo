@@ -12,4 +12,4 @@ cursor_order_LDFLAGS = -static
 TESTS = $(noinst_PROGRAMS)
 
 clean-local:
-	rm -rf WT_TEST *.core
+	rm -rf WT_TEST core.* *.core

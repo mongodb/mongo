@@ -45,20 +45,11 @@ compressor(uint32_t compress_flag)
 	case COMPRESS_LZ4:
 		p ="lz4";
 		break;
-	case COMPRESS_LZ4_NO_RAW:
-		p ="lz4-noraw";
-		break;
-	case COMPRESS_LZO:
-		p ="LZO1B-6";
-		break;
 	case COMPRESS_SNAPPY:
 		p ="snappy";
 		break;
 	case COMPRESS_ZLIB:
 		p ="zlib";
-		break;
-	case COMPRESS_ZLIB_NO_RAW:
-		p ="zlib-noraw";
 		break;
 	case COMPRESS_ZSTD:
 		p ="zstd";
@@ -269,10 +260,9 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	CONFIG_APPEND(p,
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
-	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",

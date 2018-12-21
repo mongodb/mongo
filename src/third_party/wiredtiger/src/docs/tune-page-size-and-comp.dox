@@ -107,7 +107,7 @@ trade-off between frequency of exclusive access to the pages (for reconciliation
 or splitting pages into smaller pages) versus the duration that the exclusive
 access is required.
  - Configuration:
-\n Specified as memory_page_max configuration option to WT_SESSION::create(). An
+\n Specified as memory_page_max configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:
 
 <pre>
@@ -141,7 +141,7 @@ number of keys that can be stored in an internal page, which is
 internal_page_max divided by key size. Applications should choose an appropriate
 internal_page_max size that avoids the B-Tree from getting too deep.
  - Configuration:
-\n Specified as internal_page_max configuration option to WT_SESSION::create().
+\n Specified as internal_page_max configuration option to WT_SESSION::create.
 An example of such a configuration string is as follows:
 
 <pre>
@@ -167,7 +167,7 @@ increase leaf_page_max to transfer more data per I/O.
    - Applications focused on read/write amplification might decrease the page
 size to better match the underlying storage block size.
  - Configuration:
-\n Specified as leaf_page_max configuration option to WT_SESSION::create(). An
+\n Specified as leaf_page_max configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:
 
 <pre>
@@ -193,7 +193,7 @@ on the platform (4KB for most common server platforms)
 18,000 bytes requires 5 allocation units and wastes about 2KB of space. If the
 allocation size is 16KB, the same overflow item would waste more than 10KB.
  - Configuration:
-\n Specified as allocation_size configuration option to WT_SESSION::create(). An
+\n Specified as allocation_size configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:
 
 <pre>
@@ -260,7 +260,7 @@ size will be ignored when the larger keys and values are being written, and a
 larger page will be created as necessary.
  - Configuration:
 \n Specified as internal_key_max, leaf_key_max and leaf_value_max configuration
-options to WT_SESSION::create(). An example of configuration string for a large
+options to WT_SESSION::create. An example of configuration string for a large
 leaf overflow value:
 
 <pre>
@@ -287,7 +287,7 @@ pages grow to 1MB over and over. The default value for split_pct is 75%,
 intended to keep large pages relatively large, while still giving split pages
 room to grow.
  - Configuration:
-\n Specified as split_pct configuration option to WT_SESSION::create(). An
+\n Specified as split_pct configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:
 
 <pre>
@@ -297,11 +297,11 @@ example of such a configuration string is as follows:
 @section compression_considerations Compression considerations
 WiredTiger compresses data at several stages to preserve memory and disk space.
 Applications can configure these different compression algorithms to tailor
-their requirements between memory, disk and CPU consumption. Compression
+their requirements between memory, disk and CPU consumption.  Compression
 algorithms other than block compression work by modifying how the keys and
-values are represented, and hence reduce data size in-memory and on-disk. Block
-compression on the other hand compress the data in its binary representation
-while saving it on the disk.
+values are represented, and will reduce data size both in-memory and on-disk.
+Block compression compresses the data in its binary representation while
+saving it on the disk, and so only reduces the data size on-disk.
 
 Configuring compression may change application throughput. For example, in
 applications using solid-state drives (where I/O is less expensive), turning
@@ -310,102 +310,90 @@ applications where I/O costs are more expensive, turning on compression may
 increase application performance by reducing the overall number of I/O
 operations.
 
-WiredTiger uses some internal algorithms to compress the amount of data stored
-that are not configurable, but always on.  For example, run-length reduces the
-size requirement by storing sequential, duplicate values in the store only a
-single time (with an associated count).
+WiredTiger uses some internal algorithms to compress the amount of data
+stored that are not configurable, but always on.  For example, run-length
+encoding reduces in-memory and on-disk size requirements by storing
+sequential, duplicate values in a column-store object only a single time.
 
 Different compression options available with WiredTiger:
- - Key-prefix
-   - Reduces the size requirement by storing any identical key prefix only once
-per page. The cost is additional CPU and memory when operating on the in-memory
-tree. Specifically, reverse sequential cursor movement (but not forward) through
-a prefix-compressed page or the random lookup of a key/value pair will allocate
-sufficient memory to hold some number of uncompressed keys. So, for example, if
-key prefix compression only saves a small number of bytes per key, the
-additional memory cost of instantiating the uncompressed key may mean prefix
-compression is not worthwhile. Further, in cases where the on-disk cost is the
-primary concern, block compression may mean prefix compression is less useful.
-   - Configuration:
-\n Specified as prefix_compression configuration option to
-WT_SESSION::create(). Applications may limit the use of prefix compression by
-configuring the minimum number of bytes that must be gained before prefix
-compression is used with prefix_compression_min configuration option. An example
-of such a configuration string is as follows:
-
+- Key-prefix
+\n
+Reduces the size requirement by storing any identical key prefix
+only once per page. The cost is additional CPU and memory when operating on
+the in-memory tree. Specifically, reverse sequential cursor movement (but not
+forward) through a prefix-compressed page or the random lookup of a key/value
+pair will allocate sufficient memory to hold some number of uncompressed keys.
+So, for example, if key prefix compression only saves a small number of bytes
+per key, the additional memory cost of instantiating the uncompressed key may
+mean prefix compression is not worthwhile. Further, in cases where the on-disk
+cost is the primary concern, block compression may mean prefix compression is
+less useful.
+\n\n
+Key-prefix configuration:
+\n
+Specified using \c the prefix_compression configuration option to
+WT_SESSION::create. Applications may limit the use of prefix compression
+by configuring the minimum number of bytes that must be gained before
+prefix compression is used with the \c prefix_compression_min configuration
+option. An example of such a configuration string is as follows:
 <pre>
-          "key_format=S,value_format=S,prefix_compression=true,prefix_compression_min=7"
+"key_format=S,value_format=S,prefix_compression=true,prefix_compression_min=7"
 </pre>
 
- - Dictionary
-   - Reduces the size requirement by storing any identical value only once per
-page.
-   - Configuration:
-\n Specified as dictionary configuration configuration option to
-WT_SESSION::create(), which specifies the maximum number of unique values
+- Dictionary
+\n
+Reduces the size requirement by storing any identical value only once per page.
+\n\n
+Dictionary configuration:
+\n
+Specified using the \c dictionary configuration configuration option to
+WT_SESSION::create, which specifies the maximum number of unique values
 remembered in the B-Tree row-store leaf page value dictionary. An example of
 such a configuration string is as follows:
-
 <pre>
-          "key_format=S,value_format=S,dictionary=1000"
+"key_format=S,value_format=S,dictionary=1000"
 </pre>
 
- - Huffman
-   - Reduces the size requirement by compressing individual key/value items, and
-can be separately configured either or both keys and values. The additional CPU
-cost of Huffman encoding can be high, and should be considered. (See Huffman
-Encoding for details.)
-   - Configuration:
-\n Specified as huffman_key and/or huffman_value configuration option to
-WT_SESSION::create(). These options can take values of "english" (to use a
-built-in English language frequency table), "utf8<file>" or "utf16<file>" (to
-use a custom utf8 or utf16 symbol frequency table file). An example of such a
-configuration string is as follows:
-
+- Huffman
+\n
+Reduces the size requirement by compressing individual key/value items, and
+can be separately configured either or both keys and values. The additional
+CPU cost of Huffman encoding can be high, and should be considered. (See @ref
+huffman for details.)
+\n\n
+Huffman configuration:
+\n
+Specified using the \c huffman_key and \c huffman_value configuration
+options to WT_SESSION::create. These options can take values of "english"
+(to use a built-in English language frequency table), "utf8<file>" or
+"utf16<file>" (to use a custom UTF-8 or UTF-16 symbol frequency table file).
+An example of such a configuration string is as follows:
 <pre>
-          "key_format=S,value_format=S,huffman_key=english,huffman_value=english"
+"key_format=S,value_format=S,huffman_key=english,huffman_value=english"
 </pre>
 
- - Block Compression
-   - Reduces the size requirement of on-disk objects by compressing blocks of
+- Block Compression
+\n
+Reduces the size requirement of on-disk objects by compressing blocks of
 the backing object's file. The additional CPU cost of block compression can be
 high, and should be considered. When block compression has been configured,
 configured page sizes will not match the actual size of the page on disk.
-   - WiredTiger provides two methods of compressing your data when using block
-compression: the raw and noraw methods. These methods change how WiredTiger
-works to fit data into the blocks that are stored on disk. Applications needing
-to write specific sized blocks may want to consider implementing a
-WT_COMPRESSOR::compress_raw function.
-   - Noraw compression:
-\n A fixed amount of data is given to the compression system, then turned into
-a compressed block of data. The amount of data chosen to compress is the data
-needed to fill the uncompressed block. Thus when compressed, the block will be
-smaller than the normal data size and the sizes written to disk will often vary
-depending on how compressible the data being stored is. Algorithms using noraw
-compression include zlib-noraw, lz4-noraw and snappy.
-Noraw compression is better suited for workloads with random access patterns
-because each block will tend to be smaller and require less work to read and
-decompress.
-   - Raw compression:
-\n WiredTiger's raw compression takes advantage of compressors that provide a
-streaming compression API. Using the streaming API WiredTiger will try to fit as
-much data as possible into one block. This means that blocks created with raw
-compression should be of similar size. Using a streaming compression method
-should also make for less overhead in compression, as the setup and initial work
-for compressing is done fewer times compared to the amount of data stored.
-Algorithms using raw compression include zlib, lz4.
-Compared to noraw, raw compression provides more compression while using more
-CPU. Raw compression may provide a performance advantage in workloads where data
-is accessed sequentially. That is because more data is generally packed into
-each block on disk.
-   - Configuration:
-\n Specified as the block_compressor configuration option to
-WT_SESSION::create(). If WiredTiger has builtin support for "lz4", "snappy",
-"zlib" or "zstd" compression, these names are available as the value to the
-option. An example of such a configuration string is as follows:
-
+\n
+When block compression is configured, chunks of data are given to the
+compression system, then returned as a compressed block of data. The amount of
+data chosen to compress is based on previous compression results.  When
+compressed, the size written to disk will vary depending on the compressibility
+of the stored data.
+\n\n
+Block compression configuration:
+\n
+Specified using the \c block_compressor configuration option to
+WT_SESSION::create.  If WiredTiger was built with support for "lz4", "snappy",
+"zlib" or "zstd" compression, these names are available as the value to
+the configuration option. An example of such a configuration string is as
+follows:
 <pre>
-          "key_format=S,value_format=S,block_compressor=snappy"
+"key_format=S,value_format=S,block_compressor=snappy"
 </pre>
 
 See @ref compression for further information on how to configure and enable

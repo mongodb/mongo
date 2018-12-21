@@ -128,7 +128,7 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PACK pack;
 	const uint8_t *p, *end;
-	const char *retp, *sep;
+	const char *sep;
 
 	p = (const uint8_t *)buffer;
 	end = p + size;
@@ -188,9 +188,13 @@ err:	__wt_scr_free(session, &tmp);
 	if (ret == 0)
 		return ((const char *)buf->data);
 
-	retp = "failed to create printable output";
-	__wt_err(session, ret, "%s", retp);
-	return (retp);
+	/*
+	 * The byte string may not match the format (it happens if a formatted,
+	 * internal row-store key is truncated, and then passed here by a page
+	 * debugging routine). Our current callers aren't interested in error
+	 * handling in such cases, return a byte string instead.
+	 */
+	return (__wt_buf_set_printable(session, buffer, size, buf));
 }
 
 /*

@@ -11,13 +11,6 @@ set -e
 # assumption that other factors of the environment will influence the execution
 # time by less than 20%.
 
-
-# need to enable long tests to run test_rwlock 
-export TESTUTIL_ENABLE_LONG_TESTS=1
-
-# We will run only when long tests are enabled.
-test "$TESTUTIL_ENABLE_LONG_TESTS" = "1" || exit 0
-
 EXIT_SUCCESS=0
 EXIT_FAILURE=1
 

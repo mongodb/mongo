@@ -24,6 +24,6 @@ install-exec-local:
 # clean up both.  Don't rely on "setup.py clean" -- everything that should
 # be removed is created under the build directory.
 clean-local:
-	rm -rf build _wiredtiger.so wiredtiger_wrap.o WT_TEST
+	rm -rf build _wiredtiger.so wiredtiger_wrap.o WT_TEST core.* *.core
 
 TESTS = run-ex_access

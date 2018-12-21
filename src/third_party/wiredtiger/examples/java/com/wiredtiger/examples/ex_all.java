@@ -492,6 +492,11 @@ cursor_statistics(Session session)
         null, "statistics=(all,clear)");
     /*! [Statistics cursor clear configuration] */
 
+    /*! [Statistics cursor session] */
+    cursor = session.open_cursor(
+        "statistics:session", null, null);
+    /*! [Statistics cursor session] */
+
     return (true);
 }
 

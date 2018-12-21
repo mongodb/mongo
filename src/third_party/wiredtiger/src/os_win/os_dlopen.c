@@ -15,9 +15,9 @@
 int
 __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 {
-	DWORD windows_error;
 	WT_DECL_RET;
 	WT_DLH *dlh;
+	DWORD windows_error;
 
 	WT_RET(__wt_calloc_one(session, &dlh));
 	WT_ERR(__wt_strdup(session, path, &dlh->name));
@@ -80,8 +80,8 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 int
 __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 {
-	DWORD windows_error;
 	WT_DECL_RET;
+	DWORD windows_error;
 
 	if (FreeLibrary(dlh->handle) == FALSE) {
 		windows_error = __wt_getlasterror();

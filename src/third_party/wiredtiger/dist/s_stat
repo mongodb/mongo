@@ -30,6 +30,7 @@ lock_commit_timestamp_wait_application
 lock_commit_timestamp_wait_internal
 lock_commit_timestamp_write_count
 lock_dhandle_read_count
+lock_dhandle_wait
 lock_dhandle_wait_application
 lock_dhandle_wait_internal
 lock_dhandle_write_count
@@ -41,6 +42,7 @@ lock_read_timestamp_wait_application
 lock_read_timestamp_wait_internal
 lock_read_timestamp_write_count
 lock_schema_count
+lock_schema_wait
 lock_schema_wait_application
 lock_schema_wait_internal
 lock_table_read_count
