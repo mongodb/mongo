@@ -655,21 +655,20 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
                               << "index creation should be scheduled manually",
                 collection->numRecords(opCtx) == 0);
 
-        MultiIndexBlock indexer(opCtx, collection);
-        auto indexInfoObjs = indexer.init(indexSpecs);
-        uassert(ErrorCodes::CannotCreateIndex,
-                str::stream() << "failed to create index before migrating data. "
-                              << "error: "
-                              << redact(indexInfoObjs.getStatus()),
-                indexInfoObjs.isOK());
-
         WriteUnitOfWork wunit(opCtx);
-        uassertStatusOK(indexer.commit());
 
-        for (auto&& infoObj : indexInfoObjs.getValue()) {
-            // make sure to create index on secondaries as well
+        for (const auto& spec : indexSpecs) {
+            // Make sure to create index on secondaries as well. Oplog entry must be written before
+            // the index is added to the index catalog for correct rollback operation.
+            // See SERVER-35780 and SERVER-35070.
             serviceContext->getOpObserver()->onCreateIndex(
-                opCtx, collection->ns(), *(collection->uuid()), infoObj, true /* fromMigrate */);
+                opCtx, collection->ns(), *(collection->uuid()), spec, true /* fromMigrate */);
+
+            // Since the collection is empty, we can add and commit the index catalog entry within
+            // a single WUOW.
+            uassertStatusOKWithContext(
+                indexCatalog->createIndexOnEmptyCollection(opCtx, spec),
+                str::stream() << "failed to create index before migrating data: " << redact(spec));
         }
 
         wunit.commit();
