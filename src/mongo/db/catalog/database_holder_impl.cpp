@@ -52,7 +52,7 @@
 namespace mongo {
 namespace {
 
-const auto dbHolderStorage = ServiceContext::declareDecoration<DatabaseHolder>();
+const auto dbHolderStorage = ServiceContext::declareDecoration<DatabaseHolderImpl>();
 
 }  // namespace
 
@@ -61,20 +61,10 @@ MONGO_REGISTER_SHIM(DatabaseHolder::getDatabaseHolder)
     return dbHolderStorage(getGlobalServiceContext());
 }
 
-MONGO_REGISTER_SHIM(DatabaseHolder::makeImpl)
-(PrivateTo<DatabaseHolder>)->std::unique_ptr<DatabaseHolder::Impl> {
-    return std::make_unique<DatabaseHolderImpl>();
-}
-
-using std::set;
-using std::size_t;
-using std::string;
-using std::stringstream;
-
 namespace {
 
 StringData _todb(StringData ns) {
-    size_t i = ns.find('.');
+    std::size_t i = ns.find('.');
     if (i == std::string::npos) {
         uassert(13074, "db name can't be empty", ns.size());
         return ns;
@@ -186,7 +176,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     invariant(db);
 
     // Store the name so we have if for after the db object is deleted
-    const string name = db->name();
+    auto name = db->name();
 
     LOG(1) << "dropDatabase " << name;
 
@@ -252,15 +242,13 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx, const std::string& re
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
-    set<string> dbs;
+    std::set<std::string> dbs;
     for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
         BackgroundOperation::assertNoBgOpInProgForDb(i->first);
         dbs.insert(i->first);
     }
 
-    for (set<string>::iterator i = dbs.begin(); i != dbs.end(); ++i) {
-        string name = *i;
-
+    for (const auto& name : dbs) {
         LOG(2) << "DatabaseHolder::closeAll name:" << name;
 
         Database* db = _dbs[name];

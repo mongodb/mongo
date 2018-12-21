@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class DatabaseHolderMock : public DatabaseHolder::Impl {
+class DatabaseHolderMock : public DatabaseHolder {
 public:
     DatabaseHolderMock() = default;
 

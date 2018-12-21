@@ -28,19 +28,12 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/database_holder.h"
 
 namespace mongo {
 
-DatabaseHolder::Impl::~Impl() = default;
-
-void DatabaseHolder::TUHook::hook() noexcept {}
-
-MONGO_DEFINE_SHIM(DatabaseHolder::makeImpl);
 MONGO_DEFINE_SHIM(DatabaseHolder::getDatabaseHolder);
 
 }  // namespace mongo

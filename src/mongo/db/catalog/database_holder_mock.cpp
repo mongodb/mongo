@@ -30,20 +30,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/catalog/database_holder_mock.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 MONGO_REGISTER_SHIM(DatabaseHolder::getDatabaseHolder)()->DatabaseHolder& {
-    static DatabaseHolder _dbHolder;
+    static DatabaseHolderMock _dbHolder;
     return _dbHolder;
-}
-
-MONGO_REGISTER_SHIM(DatabaseHolder::makeImpl)
-(PrivateTo<DatabaseHolder>)->std::unique_ptr<DatabaseHolder::Impl> {
-    return stdx::make_unique<DatabaseHolderMock>();
 }
 
 }  // namespace mongo

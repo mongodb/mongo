@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class DatabaseHolderImpl : public DatabaseHolder::Impl {
+class DatabaseHolderImpl : public DatabaseHolder {
 public:
     DatabaseHolderImpl() = default;
 
