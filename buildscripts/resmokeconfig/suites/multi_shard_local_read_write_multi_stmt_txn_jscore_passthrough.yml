@@ -359,12 +359,15 @@ executor:
         load('jstests/libs/txns/txn_override.js');
       global_vars:
         TestData:
-          defaultTransactionReadConcernLevel: "majority"
+          defaultReadConcernLevel: "local"
+          defaultTransactionReadConcernLevel: "local"
+          defaultTransactionWriteConcernW: 1
+          defaultWriteConcernW: 1
           sessionOptions:
-            # Tests in this suite only read from primaries, only one node in each shard is
-            # electable, and use transactions with majority read concern, which speculatively read
-            # non-majority committed data, so causal consistency is not required for them to read
-            # their own writes.
+            # Causal consistency is not required because tests in this suite only read from
+            # primaries, only one node is electable in each shard, and they use transactions with
+            # "local" level read concern, which should see all applied writes, including those that
+            # have not been majority replicated.
             causalConsistency: false
       readMode: commands
   hooks:

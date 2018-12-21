@@ -6075,14 +6075,14 @@ tasks:
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
 - <<: *task_template
-  name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   depends_on:
   - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=multi_shard_majority_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --suites=multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
   name: parallel
@@ -6260,21 +6260,21 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: concurrency_sharded_replication_majority_multi_stmt_txn
+  name: concurrency_sharded_replication_local_read_write_multi_stmt_txn
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication_majority_multi_stmt_txn --storageEngine=wiredTiger
+      resmoke_args: --suites=concurrency_sharded_replication_local_read_write_multi_stmt_txn --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer
+  name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer --storageEngine=wiredTiger
+      resmoke_args: --suites=concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -8680,10 +8680,10 @@ buildvariants:
   - name: concurrency_sharded_replication
     distros:
     - rhel62-large
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
     distros:
     - rhel62-large
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
     distros:
     - rhel62-large
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
@@ -8750,8 +8750,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -8787,7 +8787,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
-  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -9030,8 +9030,8 @@ buildvariants:
     - ubuntu1404-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -9138,8 +9138,8 @@ buildvariants:
     - ubuntu1804-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -9405,8 +9405,8 @@ buildvariants:
     - ubuntu1604-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -9503,8 +9503,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -9640,8 +9640,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -9720,8 +9720,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -10166,8 +10166,8 @@ buildvariants:
     - linux-64-amzn-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -10365,8 +10365,8 @@ buildvariants:
     - amazon2-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -10495,10 +10495,10 @@ buildvariants:
   - name: concurrency_sharded_replication
     distros:
     - windows-64-vs2017-compile
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
     distros:
     - windows-64-vs2017-compile
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
     distros:
     - windows-64-vs2017-compile
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
@@ -10981,8 +10981,8 @@ buildvariants:
     - windows-64-vs2017-compile
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -11230,8 +11230,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -12051,8 +12051,8 @@ buildvariants:
     - rhel62-large
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -12118,7 +12118,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
-  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
@@ -13159,8 +13159,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -13194,7 +13194,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
-  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
@@ -13460,8 +13460,8 @@ buildvariants:
     - rhel62-large
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -13570,10 +13570,10 @@ buildvariants:
   - name: concurrency_sharded_replication
     distros:
     - rhel70
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
     distros:
     - rhel70
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
     distros:
     - rhel70
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
@@ -13662,8 +13662,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -13788,8 +13788,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -13908,8 +13908,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -14308,8 +14308,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -14454,8 +14454,8 @@ buildvariants:
     - suse12-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -14620,8 +14620,8 @@ buildvariants:
     - debian81-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -14787,8 +14787,8 @@ buildvariants:
     - debian92-build
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -15593,8 +15593,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
@@ -15638,7 +15638,7 @@ buildvariants:
   - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   - name: mongosTest
-  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
@@ -15832,7 +15832,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
-  - name: multi_shard_majority_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
   - name: multiversion_auth
   - name: multiversion
@@ -15963,8 +15963,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-  #- name: concurrency_sharded_replication_majority_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer

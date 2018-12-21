@@ -120,6 +120,10 @@ selector:
   # TODO SERVER-38299: Killing an operation preparing a transaction can crash.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
 
+  # Expects reads to die with a particular error, but other errors are possible if the read is part
+  # of a transaction (e.g. ErrorCodes.LockTimeout).
+  - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
+
   ##
   # Blacklists from concurrency_replication_multi_stmt_txn
   ##
@@ -129,10 +133,6 @@ selector:
   - jstests/concurrency/fsm_workloads/create_index_background.js
   - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
   - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
-
-  # Expects reads to die with a particular error, but other errors are possible if the read is part
-  # of a transaction (e.g. ErrorCodes.LockTimeout).
-  - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
 
   ##
   # Blacklists from concurrency_sharded_replication_multi_stmt_txn
@@ -154,6 +154,7 @@ selector:
   - jstests/concurrency/fsm_workloads/remove_and_bulk_insert.js
 
   exclude_with_any_tags:
+  - assumes_balancer_off
   - requires_replication
   # The touch command does not exist on mongos, which is enforced before session information is
   # parsed, causing state functions in these workloads to fail before starting a transaction despite
@@ -180,14 +181,15 @@ executor:
       readMode: commands
       global_vars:
         TestData:
-          defaultTransactionReadConcernLevel: "majority"
+          # Reads and writes outside of transactions will not have their read or write concerns
+          # changed.
+          defaultTransactionReadConcernLevel: "local"
+          defaultTransactionWriteConcernW: 1
           runInsideTransaction: true
-          runningWithAutoSplit: false
-          runningWithBalancer: false
-          # Tests in this suite only read from primaries, only one node in each shard is
-          # electable, and use transactions with majority read concern, which speculatively read
-          # non-majority committed data, so neither majority write concern nor causal consistency is
-          # required for them to read their own writes.
+          # Neither causal consistency nor majority write concern is required because tests in this
+          # suite only read from primaries, only one node is electable in each shard, and they use
+          # transactions with "local" level read concern, which should see all applied writes,
+          # including those that have not been majority replicated.
           runningWithCausalConsistency: false
           runningWithSessions: true
           traceExceptions: false
@@ -198,8 +200,6 @@ executor:
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
-    enable_balancer: false
-    enable_autosplit: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1

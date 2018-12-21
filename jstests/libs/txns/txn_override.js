@@ -68,6 +68,36 @@
     // the entire transaction. For help with debugging.
     let transientErrorToLog;
 
+    // Default read concern level to use for transactions.
+    const kDefaultTransactionReadConcernLevel =
+        TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
+        ? TestData.defaultTransactionReadConcernLevel
+        : "snapshot";
+
+    const kDefaultTransactionWriteConcernW =
+        TestData.hasOwnProperty("defaultTransactionWriteConcernW")
+        ? TestData.defaultTransactionWriteConcernW
+        : "majority";
+
+    // Default read concern level to use for commands that are not transactions.
+    const kDefaultReadConcernLevel = (function() {
+        if (TestData.hasOwnProperty("defaultReadConcernLevel")) {
+            return TestData.defaultReadConcernLevel;
+        }
+
+        // Use majority if the suite didn't specify a level, unless the variant doesn't support it.
+        return TestData.enableMajorityReadConcern !== false ? "majority" : "local";
+    })();
+
+    // Default write concern w to use for both transactions and non-transactions.
+    const kDefaultWriteConcernW = TestData.hasOwnProperty("defaultWriteConcernW")
+        ? TestData.defaultWriteConcernW
+        : "majority";
+
+    // Use a "signature" value that won't typically match a value assigned in normal use. This way
+    // the wtimeout set by this override is distinguishable in the server logs.
+    const kDefaultWtimeout = 5 * 60 * 1000 + 456;
+
     function logFailedCommandAndError(cmdObj, cmdName, res) {
         if (cmdObj !== lastLoggedOp) {
             try {
@@ -186,11 +216,9 @@
         if (shouldForceReadConcern) {
             let readConcernLevel;
             if (commandObj.startTransaction === true) {
-                readConcernLevel = TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
-                    ? TestData.defaultTransactionReadConcernLevel
-                    : "snapshot";
-            } else if (jsTest.options().enableMajorityReadConcern !== false) {
-                readConcernLevel = "majority";
+                readConcernLevel = kDefaultTransactionReadConcernLevel;
+            } else {
+                readConcernLevel = kDefaultReadConcernLevel;
             }
 
             if (commandObj.hasOwnProperty("readConcern") &&
@@ -199,7 +227,7 @@
                 throw new Error("refusing to override existing readConcern " +
                                 commandObj.readConcern.level + " with readConcern " +
                                 readConcernLevel);
-            } else if (readConcernLevel) {
+            } else {
                 commandObj.readConcern = {level: readConcernLevel};
             }
 
@@ -211,11 +239,8 @@
                 const driverSession = conn.getDB(dbName).getSession();
                 const operationTime = driverSession.getOperationTime();
                 if (operationTime !== undefined) {
-                    if (commandObj.hasOwnProperty("readConcern")) {
-                        commandObj.readConcern.afterClusterTime = operationTime;
-                    } else {
-                        commandObj.readConcern = {afterClusterTime: operationTime};
-                    }
+                    // The command object should always have a readConcern by this point.
+                    commandObj.readConcern.afterClusterTime = operationTime;
                 }
             }
         }
@@ -225,16 +250,20 @@
                 let writeConcern = commandObj.writeConcern;
                 if (typeof writeConcern !== "object" || writeConcern === null ||
                     (writeConcern.hasOwnProperty("w") &&
-                     bsonWoCompare({_: writeConcern.w}, {_: "majority"}) !== 0)) {
+                     bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcernW}) !== 0)) {
                     throw new Error("Cowardly refusing to override write concern of command: " +
                                     tojson(commandObj));
                 }
             }
 
-            // Use a "signature" value that won't typically match a value assigned in normal
-            // use. This way the wtimeout set by this override is distinguishable in the server
-            // logs.
-            commandObj.writeConcern = {w: "majority", wtimeout: 5 * 60 * 1000 + 456};
+            if (kCommandsSupportingWriteConcernInTransaction.has(commandName)) {
+                commandObj.writeConcern = {
+                    w: kDefaultTransactionWriteConcernW,
+                    wtimeout: kDefaultWtimeout
+                };
+            } else {
+                commandObj.writeConcern = {w: kDefaultWriteConcernW, wtimeout: kDefaultWtimeout};
+            }
         }
     }
 
@@ -308,6 +337,7 @@
         const res = conn.adminCommand({
             commitTransaction: 1,
             autocommit: false, lsid, txnNumber,
+            writeConcern: {w: kDefaultWriteConcernW, wtimeout: kDefaultWtimeout},
         });
         assert.commandWorked(res);
         conn.txnOverrideState = TransactionStates.kInactive;
@@ -319,15 +349,15 @@
     function abortTransaction(conn, lsid, txnNumber) {
         // If there's been an error, we abort the transaction. It doesn't matter if the
         // abort call succeeds or not.
-        runCommandOriginal.call(conn,
-                                'admin',
-                                {
-                                  abortTransaction: 1,
-                                  autocommit: false,
-                                  lsid: lsid,
-                                  txnNumber: txnNumber,
-                                },
-                                0);
+        runCommandOriginal.call(
+            conn,
+            'admin',
+            {
+              abortTransaction: 1,
+              autocommit: false, lsid, txnNumber,
+              writeConcern: {w: kDefaultWriteConcernW, wtimeout: kDefaultWtimeout},
+            },
+            0);
         conn.txnOverrideState = TransactionStates.kInactive;
     }
 
