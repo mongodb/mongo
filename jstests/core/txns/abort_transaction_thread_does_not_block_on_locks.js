@@ -4,11 +4,6 @@
 // require taking further locks that would queue up behind the drop cmd's database exclusive lock
 // request.
 //
-// Specifically testing that transaction cursor cleanup, which takes intent locks after aborting a
-// transaction, does not block the transaction aborter thread when another active transaction still
-// holds intent locks and there is a exclusive lock request already queued up. The aborter thread
-// should just abandon the cursor cleanup and continue: best-effort.
-//
 // @tags: [uses_transactions]
 (function() {
     "use strict";
@@ -80,30 +75,10 @@
         assert(cursorRes2.hasOwnProperty("cursor"), tojson(cursorRes2));
         assert.neq(0, cursorRes2.cursor.id, tojson(cursorRes2));
 
-        // Start the drop.
-
-        jsTest.log("Starting a drop operation, which will block until both transactions finish");
-        let awaitDrop = startParallelShell(function() {
-            db.getSiblingDB("test")["abort_transaction_thread_does_not_block_on_locks"].drop(
-                {writeConcern: {w: "majority"}});
-        });
-
-        assert.soon(function() {
-            // Wait for the drop to have a pending MODE_X lock on the database, which will block
-            // MODE_IS lock requests behind it.
-            let res = testDB.runCommand({find: collName, maxTimeMS: 100});
-            if (res.code == ErrorCodes.MaxTimeMSExpired) {
-                return true;
-            }
-            assert.commandWorked(res);
-            return false;
-        });
-
-        // Should take 'transactionLifeTime' plus the period of the transaction aborter thread,
-        // which is transactionLifeTime / 2 (or a max of 1 minute).
-        jsTest.log("Waiting for transactions to expire and drop to finish. Should take " +
-                   transactionLifeTime * 1.5 + " seconds or less.");
-        awaitDrop();
+        jsTest.log("Perform a drop. This will block until both transactions finish. The " +
+                   "transactions should expire in " + transactionLifeTime * 1.5 +
+                   " seconds or less.");
+        assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 
         // Verify and cleanup.
 
