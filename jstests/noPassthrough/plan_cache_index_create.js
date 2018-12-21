@@ -11,17 +11,13 @@
 
     // Returns whether there is an active index build.
     function indexBuildIsRunning(testDB, indexName) {
-        const primaryIndexBuildFilter = {
+        const indexBuildFilter = {
             "command.createIndexes": collName,
             "command.indexes.0.name": indexName,
             "msg": /^Index Build/
         };
-        // TODO SERVER-34830: Add command name filter for secondaries once available.
-        const secondaryIndexBuildFilter = {"command.name": indexName, "msg": /^Index Build/};
-        const curOp = testDB.getSiblingDB("admin").aggregate([
-            {$currentOp: {}},
-            {$match: {$or: [primaryIndexBuildFilter, secondaryIndexBuildFilter]}}
-        ]);
+        const curOp =
+            testDB.getSiblingDB("admin").aggregate([{$currentOp: {}}, {$match: indexBuildFilter}]);
         return curOp.hasNext();
     }
 
