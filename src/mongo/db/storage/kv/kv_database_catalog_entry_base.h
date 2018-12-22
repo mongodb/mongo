@@ -38,12 +38,12 @@
 
 namespace mongo {
 
-class KVStorageEngine;
+class KVStorageEngineInterface;
 class KVCollectionCatalogEntry;
 
 class KVDatabaseCatalogEntryBase : public DatabaseCatalogEntry {
 public:
-    KVDatabaseCatalogEntryBase(StringData db, KVStorageEngine* engine);
+    KVDatabaseCatalogEntryBase(StringData db, KVStorageEngineInterface* engine);
     ~KVDatabaseCatalogEntryBase() override;
 
     bool exists() const override;
@@ -94,7 +94,7 @@ protected:
     typedef std::map<std::string, KVCollectionCatalogEntry*> CollectionMap;
 
 
-    KVStorageEngine* const _engine;  // not owned here
+    KVStorageEngineInterface* const _engine;  // not owned here
     CollectionMap _collections;
 };
 }  // namespace mongo

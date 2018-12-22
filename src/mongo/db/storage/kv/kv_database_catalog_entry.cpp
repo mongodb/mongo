@@ -49,7 +49,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
-auto mongo::defaultDatabaseCatalogEntryFactory(const StringData name, KVStorageEngine* const engine)
+auto mongo::defaultDatabaseCatalogEntryFactory(const StringData name,
+                                               KVStorageEngineInterface* const engine)
     -> std::unique_ptr<KVDatabaseCatalogEntryBase> {
     return stdx::make_unique<KVDatabaseCatalogEntry>(name, engine);
 }

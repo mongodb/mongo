@@ -60,6 +60,21 @@ struct KVStorageEngineOptions {
     bool forRepair = false;
 };
 
+/**
+ * Minimal interface for KVDatabaseCatalogEntryBase to access KVStorageEngine.
+ */
+class KVStorageEngineInterface {
+public:
+    KVStorageEngineInterface() = default;
+    virtual ~KVStorageEngineInterface() = default;
+    virtual StorageEngine* getStorageEngine() = 0;
+    virtual KVEngine* getEngine() = 0;
+    virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
+                                     const NamespaceString& nss,
+                                     StringData ident) = 0;
+    virtual KVCatalog* getCatalog() = 0;
+};
+
 /*
  * The actual definition for this function is in
  * `src/mongo/db/storage/kv/kv_database_catalog_entry.cpp` This unusual forward declaration is to
@@ -68,11 +83,11 @@ struct KVStorageEngineOptions {
  * `KVDatabaseCatalogEntry` code.
  */
 std::unique_ptr<KVDatabaseCatalogEntryBase> defaultDatabaseCatalogEntryFactory(
-    const StringData name, KVStorageEngine* const engine);
+    const StringData name, KVStorageEngineInterface* const engine);
 
 using KVDatabaseCatalogEntryFactory = decltype(defaultDatabaseCatalogEntryFactory);
 
-class KVStorageEngine final : public StorageEngine {
+class KVStorageEngine final : public KVStorageEngineInterface, public StorageEngine {
 public:
     /**
      * @param engine - ownership passes to me
@@ -300,12 +315,20 @@ public:
         std::vector<TimestampListener*> _listeners;
     };
 
+    StorageEngine* getStorageEngine() override {
+        return this;
+    }
+
     KVEngine* getEngine() {
         return _engine.get();
     }
     const KVEngine* getEngine() const {
         return _engine.get();
     }
+
+    void addDropPendingIdent(const Timestamp& dropTimestamp,
+                             const NamespaceString& nss,
+                             StringData ident) override;
 
     KVCatalog* getCatalog() {
         return _catalog.get();

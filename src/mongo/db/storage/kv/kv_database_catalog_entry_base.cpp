@@ -143,7 +143,8 @@ private:
     const NamespaceString _toNs;
 };
 
-KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase(StringData db, KVStorageEngine* engine)
+KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase(StringData db,
+                                                       KVStorageEngineInterface* engine)
     : DatabaseCatalogEntry(db), _engine(engine) {}
 
 KVDatabaseCatalogEntryBase::~KVDatabaseCatalogEntryBase() {

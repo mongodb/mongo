@@ -47,5 +47,5 @@ public:
 };
 
 std::unique_ptr<KVDatabaseCatalogEntryMock> kvDatabaseCatalogEntryMockFactory(
-    StringData name, KVStorageEngine* engine);
+    StringData name, KVStorageEngineInterface* engine);
 }  // namespace mongo

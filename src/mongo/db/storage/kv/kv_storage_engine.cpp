@@ -789,6 +789,12 @@ void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
     opCtx->recoveryUnit()->abandonSnapshot();
 }
 
+void KVStorageEngine::addDropPendingIdent(const Timestamp& dropTimestamp,
+                                          const NamespaceString& nss,
+                                          StringData ident) {
+    _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident);
+}
+
 void KVStorageEngine::_onOldestTimestampChanged(const Timestamp& oldestTimestamp) {
     if (oldestTimestamp.isNull()) {
         return;
