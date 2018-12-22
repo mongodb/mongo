@@ -37,6 +37,7 @@
 #include <algorithm>
 
 #include "mongo/db/catalog/catalog_control.h"
+#include "mongo/db/client.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
@@ -88,6 +89,9 @@ KVStorageEngine::KVStorageEngine(
       _options(std::move(options)),
       _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
       _dropPendingIdentReaper(engine),
+      _oldestTimestampListener(
+          TimestampMonitor::TimestampType::kOldest,
+          [this](Timestamp timestamp) { _onOldestTimestampChanged(timestamp); }),
       _supportsDocLocking(_engine->supportsDocLocking()),
       _supportsDBLocking(_engine->supportsDBLocking()),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
@@ -472,6 +476,10 @@ std::string KVStorageEngine::getFilesystemPathForDb(const std::string& dbName) c
 }
 
 void KVStorageEngine::cleanShutdown() {
+    if (_timestampMonitor) {
+        _timestampMonitor->removeListener(&_oldestTimestampListener);
+    }
+
     for (DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it) {
         delete it->second;
     }
@@ -493,6 +501,7 @@ void KVStorageEngine::finishInit() {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
         _timestampMonitor->startup();
+        _timestampMonitor->addListener(&_oldestTimestampListener);
     }
 }
 
@@ -778,6 +787,21 @@ void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
         rec = cursor->next();
     }
     opCtx->recoveryUnit()->abandonSnapshot();
+}
+
+void KVStorageEngine::_onOldestTimestampChanged(const Timestamp& oldestTimestamp) {
+    if (oldestTimestamp.isNull()) {
+        return;
+    }
+    // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
+    if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
+        if (oldestTimestamp > *earliestDropTimestamp) {
+            log() << "Removing drop-pending idents with drop timestamps before: "
+                  << oldestTimestamp;
+            auto opCtx = cc().makeOperationContext();
+            _dropPendingIdentReaper.dropIdentsOlderThan(opCtx.get(), oldestTimestamp);
+        }
+    }
 }
 
 KVStorageEngine::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)

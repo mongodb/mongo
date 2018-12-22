@@ -364,6 +364,11 @@ private:
 
     void _dumpCatalog(OperationContext* opCtx);
 
+    /**
+     * Called when the oldest timestamp advances in the KVEngine.
+     */
+    void _onOldestTimestampChanged(const Timestamp& oldestTimestamp);
+
     class RemoveDBChange;
 
     // This must be the first member so it is destroyed last.
@@ -375,6 +380,9 @@ private:
 
     // Manages drop-pending idents. Requires access to '_engine'.
     KVDropPendingIdentReaper _dropPendingIdentReaper;
+
+    // Listener for oldest timestamp changes.
+    TimestampMonitor::TimestampListener _oldestTimestampListener;
 
     const bool _supportsDocLocking;
     const bool _supportsDBLocking;
