@@ -25,7 +25,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
     def __init__(  # pylint: disable=too-many-arguments
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-            stepdown_duration_secs=10, stepdown_interval_ms=8000, terminate=False, kill=False,
+            stepdown_interval_ms=8000, terminate=False, kill=False,
             use_stepdown_permitted_file=False, use_stepping_down_file=False,
             wait_for_mongos_retarget=False):
         """Initialize the ContinuousStepdown.
@@ -35,7 +35,6 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             fixture: the target fixture (a replica set or sharded cluster).
             config_stepdown: whether to stepdown the CSRS.
             shard_stepdown: whether to stepdown the shard replica sets in a sharded cluster.
-            stepdown_duration_secs: the number of seconds to step down the primary.
             stepdown_interval_ms: the number of milliseconds between stepdowns.
             terminate: shut down the node cleanly as a means of stepping it down.
             kill: With a 50% probability, kill the node instead of shutting it down cleanly.
@@ -53,7 +52,6 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._fixture = fixture
         self._config_stepdown = config_stepdown
         self._shard_stepdown = shard_stepdown
-        self._stepdown_duration_secs = stepdown_duration_secs
         self._stepdown_interval_secs = float(stepdown_interval_ms) / 1000
         self._wait_for_mongos_retarget = wait_for_mongos_retarget
 
@@ -88,8 +86,8 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         utils.remove_if_exists(self._stepping_down_file)
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
-            self._stepdown_duration_secs, self._terminate, self._kill,
-            self._stepdown_permitted_file, self._stepping_down_file, self._wait_for_mongos_retarget)
+            self._terminate, self._kill, self._stepdown_permitted_file, self._stepping_down_file,
+            self._wait_for_mongos_retarget)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -142,9 +140,8 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
-            self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs,
-            stepdown_duration_secs, terminate, kill, stepdown_permitted_file, stepping_down_file,
-            wait_for_mongos_retarget):
+            self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
+            stepdown_permitted_file, stepping_down_file, wait_for_mongos_retarget):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -152,7 +149,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._mongos_fixtures = mongos_fixtures
         self._rs_fixtures = rs_fixtures
         self._stepdown_interval_secs = stepdown_interval_secs
-        self._stepdown_duration_secs = stepdown_duration_secs
+        # We set the self._stepdown_duration_secs to a very long time, to ensure that the former
+        # primary will not step back up on its own and the stepdown thread will cause it step up via
+        # replSetStepUp.
+        self._stepdown_duration_secs = 24 * 60 * 60  # 24 hours
         self._terminate = terminate
         self._kill = kill
         self._stepdown_permitted_file = stepdown_permitted_file
@@ -293,14 +293,6 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             except pymongo.errors.AutoReconnect:
                 # AutoReconnect exceptions are expected as connections are closed during stepdown.
                 pass
-            except pymongo.errors.ExecutionTimeout as err:
-                # ExecutionTimeout exceptions are expected when the election attempt fails due to
-                # not being able to acquire the global X lock within self._stepdown_duration_secs
-                # seconds. We'll try again after self._stepdown_interval_secs seconds.
-                self.logger.info(
-                    "Failed to step down the primary on port %d of replica set '%s': %s",
-                    primary.port, rs_fixture.replset_name, err)
-                return
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
                     "Error while stepping down the primary on port %d of replica set '%s'.",
