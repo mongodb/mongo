@@ -27,7 +27,7 @@ class ContinuousStepdown(interface.CustomBehavior):  # pylint: disable=too-many-
 
     def __init__(  # pylint: disable=too-many-arguments
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-            stepdown_duration_secs=10, stepdown_interval_ms=8000, kill=False):
+            stepdown_interval_ms=8000, kill=False):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -35,7 +35,6 @@ class ContinuousStepdown(interface.CustomBehavior):  # pylint: disable=too-many-
             fixture: the target fixture (a replica set or sharded cluster).
             config_stepdown: whether to stepdown the CSRS.
             shard_stepdown: whether to stepdown the shard replica sets in a sharded cluster.
-            stepdown_duration_secs: the number of seconds to step down the primary.
             stepdown_interval_ms: the number of milliseconds between stepdowns.
         """
         interface.CustomBehavior.__init__(self, hook_logger, fixture,
@@ -44,7 +43,6 @@ class ContinuousStepdown(interface.CustomBehavior):  # pylint: disable=too-many-
         self._fixture = fixture
         self._config_stepdown = config_stepdown
         self._shard_stepdown = shard_stepdown
-        self._stepdown_duration_secs = stepdown_duration_secs
         self._stepdown_interval_secs = float(stepdown_interval_ms) / 1000
 
         self._rs_fixtures = []
@@ -55,8 +53,7 @@ class ContinuousStepdown(interface.CustomBehavior):  # pylint: disable=too-many-
         if not self._rs_fixtures:
             self._add_fixture(self._fixture)
         self._stepdown_thread = _StepdownThread(self.logger, self._rs_fixtures,
-                                                self._stepdown_interval_secs,
-                                                self._stepdown_duration_secs, self._kill)
+                                                self._stepdown_interval_secs, self._kill)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -102,14 +99,17 @@ class ContinuousStepdown(interface.CustomBehavior):  # pylint: disable=too-many-
 
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
-            self, logger, rs_fixtures, stepdown_interval_secs, stepdown_duration_secs, kill):
+            self, logger, rs_fixtures, stepdown_interval_secs, kill):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
         self.logger = logger
         self._rs_fixtures = rs_fixtures
         self._stepdown_interval_secs = stepdown_interval_secs
-        self._stepdown_duration_secs = stepdown_duration_secs
+        # We set the self._stepdown_duration_secs to a very long time, to ensure that the former
+        # primary will not step back up on its own and the stepdown thread will cause it step up via
+        # replSetStepUp.
+        self._stepdown_duration_secs = 24 * 60 * 60  # 24 hours
         self._kill = kill
 
         self._last_exec = time.time()
@@ -227,14 +227,6 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             except pymongo.errors.AutoReconnect:
                 # AutoReconnect exceptions are expected as connections are closed during stepdown.
                 pass
-            except pymongo.errors.ExecutionTimeout as err:
-                # ExecutionTimeout exceptions are expected when the election attempt fails due to
-                # not being able to acquire the global X lock within self._stepdown_duration_secs
-                # seconds. We'll try again after self._stepdown_interval_secs seconds.
-                self.logger.info(
-                    "Failed to step down the primary on port %d of replica set '%s': %s",
-                    primary.port, rs_fixture.replset_name, err)
-                return
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
                     "Error while stepping down the primary on port %d of replica set '%s'.",
