@@ -103,8 +103,9 @@ public:
 
     /**
      * Returns the nil UUID; that is, a UUID composed entirely of zeroes.
+     * Used in change streams only.
      */
-    static UUID nil();
+    static UUID makeDefaultForChangeStream();
 
     /**
      * Parses a BSON document of the form { uuid: BinData(4, "...") }.

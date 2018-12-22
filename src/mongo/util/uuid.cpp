@@ -89,7 +89,7 @@ UUID UUID::parse(const BSONObj& obj) {
     return res.getValue();
 }
 
-UUID UUID::nil() {
+UUID UUID::makeDefaultForChangeStream() {
     return UUID{};
 }
 

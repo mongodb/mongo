@@ -193,7 +193,7 @@ TEST(UUIDTest, toBSONUsingBSONMacro) {
 TEST(UUIDTest, NilUUID) {
     // Test that UUID::nil() returns an all-zero UUID.
     auto nilUUID = UUID::parse("00000000-0000-0000-0000-000000000000");
-    ASSERT_EQUALS(UUID::nil(), unittest::assertGet(nilUUID));
+    ASSERT_EQUALS(UUID::makeDefaultForChangeStream(), unittest::assertGet(nilUUID));
 }
 
 }  // namespace

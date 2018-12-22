@@ -1460,15 +1460,17 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
 
     // Drop database entry has a nil UUID.
     Document expectedDropDatabase{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, UUID::nil())},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, UUID::makeDefaultForChangeStream())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
-         makeResumeToken(
-             kDefaultTs, UUID::nil(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+         makeResumeToken(kDefaultTs,
+                         UUID::makeDefaultForChangeStream(),
+                         Value(),
+                         ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };

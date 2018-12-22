@@ -350,7 +350,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     } else {
         // Fill in a dummy UUID for invalidate and dropDatabase, to ensure that they sort after
         // high-water-mark tokens. Their sorting relative to other events remains unchanged.
-        uuid = Value(UUID::nil());
+        uuid = Value(UUID::makeDefaultForChangeStream());
     }
 
     // Note that 'documentKey' and/or 'uuid' might be missing, in which case they will not appear
