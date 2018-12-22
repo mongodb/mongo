@@ -979,7 +979,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
                                       ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                       "admin",
                                       xferModsRequest,
-                                      Shard::RetryPolicy::kIdempotent),
+                                      Shard::RetryPolicy::kNoRetry),
                 "_transferMods failed in STEADY STATE: ");
 
             uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
