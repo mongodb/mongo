@@ -52,20 +52,14 @@ public:
     AddCollectionChange(OperationContext* opCtx,
                         KVDatabaseCatalogEntryBase* dce,
                         StringData collection,
-                        StringData ident,
-                        bool dropOnRollback)
-        : _opCtx(opCtx),
-          _dce(dce),
-          _collection(collection.toString()),
-          _ident(ident.toString()),
-          _dropOnRollback(dropOnRollback) {}
+                        StringData ident)
+        : _opCtx(opCtx), _dce(dce), _collection(collection.toString()), _ident(ident.toString()) {}
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        if (_dropOnRollback) {
-            // Intentionally ignoring failure
-            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident).transitional_ignore();
-        }
+        // Intentionally ignoring failure
+        MONGO_COMPILER_VARIABLE_UNUSED auto status =
+            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident);
 
         const CollectionMap::iterator it = _dce->_collections.find(_collection);
         if (it != _dce->_collections.end()) {
@@ -78,7 +72,6 @@ public:
     KVDatabaseCatalogEntryBase* const _dce;
     const std::string _collection;
     const std::string _ident;
-    const bool _dropOnRollback;
 };
 
 class KVDatabaseCatalogEntryBase::RemoveCollectionChange : public RecoveryUnit::Change {
@@ -87,22 +80,19 @@ public:
                            KVDatabaseCatalogEntryBase* dce,
                            StringData collection,
                            StringData ident,
-                           KVCollectionCatalogEntry* entry,
-                           bool dropOnCommit)
+                           KVCollectionCatalogEntry* entry)
         : _opCtx(opCtx),
           _dce(dce),
           _collection(collection.toString()),
           _ident(ident.toString()),
-          _entry(entry),
-          _dropOnCommit(dropOnCommit) {}
+          _entry(entry) {}
 
     virtual void commit(boost::optional<Timestamp>) {
         delete _entry;
 
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // collection, we should never see it again anyway.
-        if (_dropOnCommit)
-            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident).transitional_ignore();
+        _dce->_engine->getEngine()->dropIdent(_opCtx, _ident).transitional_ignore();
     }
 
     virtual void rollback() {
@@ -114,7 +104,6 @@ public:
     const std::string _collection;
     const std::string _ident;
     KVCollectionCatalogEntry* const _entry;
-    const bool _dropOnCommit;
 };
 
 class KVDatabaseCatalogEntryBase::RenameCollectionChange final : public RecoveryUnit::Change {
@@ -259,7 +248,7 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
         }
     }
 
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns, ident, true));
+    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns, ident));
 
     auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, options, prefix);
     invariant(rs);
@@ -392,7 +381,7 @@ Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, Strin
     // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to
     // drop the collection only on WUOW::commit().
     opCtx->recoveryUnit()->registerChange(
-        new RemoveCollectionChange(opCtx, this, ns, ident, it->second, true));
+        new RemoveCollectionChange(opCtx, this, ns, ident, it->second));
 
     _collections.erase(ns.toString());
 
