@@ -17,6 +17,8 @@
 (function() {
     "use strict";
 
+    load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
+
     // Returns a list of all collections in a given database. Use 'args' as the
     // 'listCollections' command arguments.
     function listCollections(database, args) {
@@ -103,13 +105,21 @@
         },
         'Primary ' + primary.host + ' failed to prepare two phase drop of collection ' +
             collToDrop.getFullName());
-    var dropPendingCollections = listDropPendingCollections(dbToDrop);
-    assert.eq(1,
-              dropPendingCollections.length,
-              "Collection was not found in the 'system.drop' namespace. " +
-                  "Full drop-pending collection list: " + tojson(dropPendingCollections));
-    jsTestLog('Primary ' + primary.host + ' successfully started two phase drop of collection ' +
-              collToDrop.getFullName());
+
+    // 'collToDrop' is no longer visible with its original name. If 'system.drop' two phase drops
+    // are supported by the storage engine, check for the drop-pending namespace using
+    // listCollections.
+    const supportsDropPendingNamespaces =
+        TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest);
+    if (supportsDropPendingNamespaces) {
+        var dropPendingCollections = listDropPendingCollections(dbToDrop);
+        assert.eq(1,
+                  dropPendingCollections.length,
+                  "Collection was not found in the 'system.drop' namespace. " +
+                      "Full drop-pending collection list: " + tojson(dropPendingCollections));
+        jsTestLog('Primary ' + primary.host +
+                  ' successfully started two phase drop of collection ' + collToDrop.getFullName());
+    }
 
     // Commands that manipulate the database being dropped or perform destructive catalog operations
     // should fail with the DatabaseDropPending error code while the database is in a drop-pending
@@ -118,10 +128,20 @@
         dbToDrop.createCollection('collectionToCreateWhileDroppingDatabase'),
         ErrorCodes.DatabaseDropPending,
         'collection creation should fail while we are in the process of dropping the database');
-    assert.commandFailedWithCode(
-        dbToDrop.adminCommand('restartCatalog'),
-        ErrorCodes.DatabaseDropPending,
-        'restartCatalog should fail if any databases are marked drop-pending');
+
+    // restartCatalog can only detect that a database is in a drop-pending state when 'system.drop'
+    // namespaces are supported. Since 4.2, dropped collections are managed internally by the
+    // storage engine. See serverStatus().
+    if (supportsDropPendingNamespaces) {
+        assert.commandFailedWithCode(
+            dbToDrop.adminCommand('restartCatalog'),
+            ErrorCodes.DatabaseDropPending,
+            'restartCatalog should fail if any databases are marked drop-pending');
+    } else {
+        // Drop-pending idents are known only to the storage engine and will be ignored by
+        // restartCatalog.
+        assert.commandWorked(dbToDrop.adminCommand('restartCatalog'));
+    }
 
     /**
      * DROP DATABASE 'Database' PHASE

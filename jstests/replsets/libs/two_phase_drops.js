@@ -36,6 +36,27 @@ class TwoPhaseDropCollectionTest {
     }
 
     /**
+     * Returns true if the replica set supports two phase drops that use 'system.drop' namespaces.
+     * Since 4.2, 'system.drop' drop pending collections will be disabled on storage engines that
+     * support drop pending idents natively. See serverStatus().storageEngine.supportsPendingDrops.
+     */
+    static supportsDropPendingNamespaces(replSetTest) {
+        const primaryDB = replSetTest.getPrimary().getDB('admin');
+        const serverStatus = assert.commandWorked(primaryDB.serverStatus());
+        const storageEngineSection = serverStatus.storageEngine;
+        TwoPhaseDropCollectionTest._testLog('Storage engine features (from serverStatus()): ' +
+                                            tojson(storageEngineSection));
+        return !storageEngineSection.supportsPendingDrops;
+    }
+
+    /**
+     * Instance method version of supportsDropPendingNamespaces().
+     */
+    supportsDropPendingNamespaces() {
+        return TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(this.replTest);
+    }
+
+    /**
      * Pause oplog application on a specified node.
      */
     pauseOplogApplication(node) {

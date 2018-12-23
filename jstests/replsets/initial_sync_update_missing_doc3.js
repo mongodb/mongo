@@ -15,6 +15,7 @@
 
 (function() {
     load("jstests/libs/check_log.js");
+    load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
 
     var name = 'initial_sync_update_missing_doc3';
     var replSet = new ReplSetTest({
@@ -25,6 +26,13 @@
     replSet.startSet();
     replSet.initiate();
     var primary = replSet.getPrimary();
+
+    // Check for 'system.drop' two phase drop support.
+    if (!TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replSet)) {
+        jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
+        replSet.stopSet();
+        return;
+    }
 
     var coll = primary.getDB('test').getCollection(name);
     assert.writeOK(coll.insert({_id: 0, x: 1}));

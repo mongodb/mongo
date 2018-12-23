@@ -23,6 +23,14 @@
 
     // Initialize replica set.
     let replTest = twoPhaseDropTest.initReplSet();
+
+    // Check for 'system.drop' two phase drop support.
+    if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
+        jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
+        twoPhaseDropTest.stop();
+        return;
+    }
+
     let primaryDB = replTest.getPrimary().getDB(dbName);
 
     // Create the collection that will be dropped.
