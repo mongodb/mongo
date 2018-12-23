@@ -1730,8 +1730,14 @@ public:
         // ident for `kvDropDatabase` still exists.
         const Timestamp postRenameTime = _clock->reserveTicks(1).asTimestamp();
 
-        // The namespace has changed, but the ident still exists as-is after the rename.
-        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
+        // If the storage engine is managing drops internally, the ident should not be visible after
+        // a drop.
+        if (kvStorageEngine->supportsPendingDrops()) {
+            assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
+        } else {
+            // The namespace has changed, but the ident still exists as-is after the rename.
+            assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
+        }
 
         const Timestamp dropTime = _clock->reserveTicks(1).asTimestamp();
         if (SimulatePrimary) {
