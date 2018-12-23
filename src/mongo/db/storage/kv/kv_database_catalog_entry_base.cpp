@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -41,6 +43,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -87,12 +90,21 @@ public:
           _ident(ident.toString()),
           _entry(entry) {}
 
-    virtual void commit(boost::optional<Timestamp>) {
+    virtual void commit(boost::optional<Timestamp> commitTimestamp) {
         delete _entry;
 
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // collection, we should never see it again anyway.
-        _dce->_engine->getEngine()->dropIdent(_opCtx, _ident).transitional_ignore();
+        auto engine = _dce->_engine;
+        auto storageEngine = engine->getStorageEngine();
+        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
+            log() << "Deferring ident drop for " << _ident << " (" << _collection
+                  << ") with commit timestamp: " << commitTimestamp->toBSON();
+            engine->addDropPendingIdent(*commitTimestamp, NamespaceString(_collection), _ident);
+        } else {
+            auto kvEngine = engine->getEngine();
+            MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
+        }
     }
 
     virtual void rollback() {

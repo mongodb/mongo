@@ -529,12 +529,13 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     audit::logDropCollection(&cc(), fullns.toString());
 
-    Top::get(opCtx->getServiceContext()).collectionDropped(fullns.toString());
+    auto serviceContext = opCtx->getServiceContext();
+    Top::get(serviceContext).collectionDropped(fullns.toString());
 
     // Drop unreplicated collections immediately.
     // If 'dropOpTime' is provided, we should proceed to rename the collection.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    auto opObserver = serviceContext->getOpObserver();
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, fullns);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
         auto status = _finishDropCollection(opCtx, fullns, collection);
@@ -545,6 +546,12 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             opCtx, fullns, uuid, OpObserver::CollectionDropType::kOnePhase);
         return Status::OK();
     }
+
+    // Starting in 4.2, pending collection drops will be maintained in the storage engine and will
+    // no longer be visible at the catalog layer with 3.6-style <db>.system.drop.* namespaces.
+    auto supportsPendingDrops = serviceContext->getStorageEngine()->supportsPendingDrops();
+    auto collectionDropType = supportsPendingDrops ? OpObserver::CollectionDropType::kOnePhase
+                                                   : OpObserver::CollectionDropType::kTwoPhase;
 
     // Replicated collections will be renamed with a special drop-pending namespace and dropped when
     // the replica set optime reaches the drop optime.
@@ -587,8 +594,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
         // Log oplog entry for collection drop and proceed to complete rest of two phase drop
         // process.
-        dropOpTime = opObserver->onDropCollection(
-            opCtx, fullns, uuid, OpObserver::CollectionDropType::kTwoPhase);
+        dropOpTime = opObserver->onDropCollection(opCtx, fullns, uuid, collectionDropType);
 
         // The OpObserver should have written an entry to the oplog with a particular op time.
         // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
@@ -603,13 +609,20 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         // in the context of applying an oplog entry on a secondary.
         // OpObserver::onDropCollection() should be returning a null OpTime because we should not be
         // writing to the oplog.
-        auto opTime = opObserver->onDropCollection(
-            opCtx, fullns, uuid, OpObserver::CollectionDropType::kTwoPhase);
+        auto opTime = opObserver->onDropCollection(opCtx, fullns, uuid, collectionDropType);
         if (!opTime.isNull()) {
             severe() << "dropCollection: " << fullns << " (" << uuidString
                      << ") - unexpected oplog entry written to the oplog with optime " << opTime;
             fassertFailed(40468);
         }
+    }
+
+    if (supportsPendingDrops) {
+        auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
+        log() << "dropCollection: " << fullns << " (" << uuidString
+              << ") - storage engine will take ownership of drop-pending collection with optime "
+              << dropOpTime << " and commit timestamp " << commitTimestamp.toBSON();
+        return _finishDropCollection(opCtx, fullns, collection);
     }
 
     auto dpns = fullns.makeDropPendingNamespace(dropOpTime);
