@@ -69,25 +69,18 @@ SharedSemiFuture<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
 
 StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCtx,
                                                           const ReadPreferenceSetting& readPref) {
-    auto clock = opCtx->getServiceContext()->getFastClockSource();
-    auto startDate = clock->now();
-    while (true) {
-        const auto interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (!interruptStatus.isOK()) {
-            return interruptStatus;
-        }
-        auto host = _rsMonitor->getHostOrRefresh(readPref, Milliseconds::zero()).getNoThrow();
-        if (host.getStatus() != ErrorCodes::FailedToSatisfyReadPreference) {
-            return host;
-        }
-        // Enforce a 20-second ceiling on the time spent looking for a host. This conforms with the
-        // behavior used throughout mongos prior to version 3.4, but is not fundamentally desirable.
-        // See comment in remote_command_targeter.h for details.
-        if (clock->now() - startDate > Seconds{20}) {
-            return host;
-        }
-        sleepFor(Milliseconds{500});
+    const auto interruptStatus = opCtx->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return interruptStatus;
     }
+
+    // Enforce a 20-second ceiling on the time spent looking for a host. This conforms with the
+    // behavior used throughout mongos prior to version 3.4, but is not fundamentally desirable.
+    // See comment in remote_command_targeter.h for details.
+    return _rsMonitor
+        ->getHostOrRefresh(readPref,
+                           std::min<Milliseconds>(opCtx->getRemainingMaxTimeMillis(), Seconds(20)))
+        .getNoThrow(opCtx);
 }
 
 void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host, const Status& status) {

@@ -299,9 +299,7 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
                       str::stream() << "Could not find shard " << shardId);
     }
 
-    auto findHostStatus =
-        shard->getTargeter()->findHostWithMaxWait(readPref, Seconds{20}).getNoThrow(ars->_opCtx);
-
+    auto findHostStatus = shard->getTargeter()->findHost(ars->_opCtx, readPref);
     if (findHostStatus.isOK())
         shardHostAndPort = std::move(findHostStatus.getValue());
 

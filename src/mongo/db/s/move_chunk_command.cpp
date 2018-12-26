@@ -198,8 +198,8 @@ private:
             auto recipientShard =
                 uassertStatusOK(shardRegistry->getShard(opCtx, moveChunkRequest.getToShardId()));
 
-            return recipientShard->getTargeter()->findHostNoWait(
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+            return recipientShard->getTargeter()->findHost(
+                opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         }());
 
         std::string unusedErrMsg;

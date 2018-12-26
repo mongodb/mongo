@@ -288,8 +288,9 @@ SharedSemiFuture<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(
     if (!out.empty())
         return {std::move(out)};
 
-    // TODO early return if maxWait <= 0? Need to figure out if anyone is relying on the current
-    // behavior where this finishes the scan before doing so.
+    // Fail early without doing any more work if the timeout has already expired.
+    if (maxWait <= Milliseconds(0))
+        return _state->makeUnsatisfedReadPrefError(criteria);
 
     // TODO look into putting all PrimaryOnly waiters on a single SharedPromise. The tricky part is
     // dealing with maxWait.
@@ -1282,17 +1283,20 @@ void SetState::notify(bool finishedScan) {
                    (it->deadline <= cachedNow || areRefreshRetriesDisabledForTest.load())) {
             // To preserve prior behavior, we only examine deadlines at the end of a scan.
             // This ensures that we only report failure after trying to contact all hosts.
-            it->promise.setError(Status(ErrorCodes::FailedToSatisfyReadPreference,
-                                        str::stream()
-                                            << "Could not find host matching read preference "
-                                            << it->criteria.toString()
-                                            << " for set "
-                                            << name));
+            it->promise.setError(makeUnsatisfedReadPrefError(it->criteria));
             waiters.erase(it++);
         } else {
             it++;
         }
     }
+}
+
+Status SetState::makeUnsatisfedReadPrefError(const ReadPreferenceSetting& criteria) const {
+    return Status(ErrorCodes::FailedToSatisfyReadPreference,
+                  str::stream() << "Could not find host matching read preference "
+                                << criteria.toString()
+                                << " for set "
+                                << name);
 }
 
 void SetState::checkInvariants() const {

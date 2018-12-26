@@ -74,16 +74,13 @@ const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
  * Finds the host and port for a shard.
  */
 HostAndPort targetHost(const ShardId& shardId, const ReadPreferenceSetting& readPref) {
-    auto opCtx = cc().makeOperationContext();
-    auto shardRegistry = Grid::get(opCtx->getServiceContext())->shardRegistry();
-    auto swShard = shardRegistry->getShard(opCtx.get(), shardId);
-    uassertStatusOK(swShard);
-    auto shard = swShard.getValue();
-    auto swHostAndPort = shard->getTargeter()->findHostNoWait(readPref);
-    uassertStatusOKWithContext(swHostAndPort.getStatus(),
-                               str::stream() << "Could not find shard " << shardId);
-
-    return swHostAndPort.getValue();
+    const auto opCtxHolder = cc().makeOperationContext();
+    const auto opCtx = opCtxHolder.get();
+    auto shard = uassertStatusOK(
+        Grid::get(opCtx->getServiceContext())->shardRegistry()->getShard(opCtx, shardId));
+    // TODO SERVER-35678 return a SemiFuture<HostAndPort> rather than using a blocking call to
+    // get().
+    return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
 }
 
 /**

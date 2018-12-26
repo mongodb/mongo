@@ -59,6 +59,11 @@ public:
      * Structure used to configure an instance of ThreadPool.
      */
     struct Options {
+        // Set maxThreads to this if you don't want to limit the number of threads in the pool.
+        // Note: the value used here is high enough that it will never be reached, but low enough
+        // that it won't cause overflows if mixed with signed ints or math.
+        static constexpr size_t kUnlimited = 1'000'000'000;
+
         // Name of the thread pool. If this string is empty, the pool will be assigned a
         // name unique to the current process.
         std::string poolName;

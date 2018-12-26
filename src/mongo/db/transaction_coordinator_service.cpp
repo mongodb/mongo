@@ -63,7 +63,7 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     ThreadPool::Options options;
     options.poolName = "TransactionCoordinatorService";
     options.minThreads = 0;
-    options.maxThreads = 16;
+    options.maxThreads = ThreadPool::Options::kUnlimited;
 
     // Ensure all threads have a client
     options.onCreateThread = [](const std::string& threadName) {

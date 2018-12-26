@@ -199,6 +199,8 @@ public:
         return executor ? executor->now() : Date_t::now();
     }
 
+    Status makeUnsatisfedReadPrefError(const ReadPreferenceSetting& criteria) const;
+
     /**
      * Before unlocking, do DEV checkInvariants();
      */

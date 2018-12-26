@@ -83,19 +83,6 @@ public:
                                                               Milliseconds maxWait) = 0;
 
     /**
-     * Finds a host matching the given read preference, giving up if a match is not found promptly.
-     *
-     * This method may still engage in blocking networking calls, but will attempt contact every
-     * member of the replica set at most one time.
-     *
-     * TODO(schwerin): Change this implementation to not perform any networking, once existing
-     * callers have been shown to be safe with this behavior or changed to call findHost.
-     */
-    StatusWith<HostAndPort> findHostNoWait(const ReadPreferenceSetting& readPref) {
-        return findHostWithMaxWait(readPref, Milliseconds::zero()).getNoThrow();
-    }
-
-    /**
      * Reports to the targeter that a 'status' indicating a not master error was received when
      * communicating with 'host', and so it should update its bookkeeping to avoid giving out the
      * host again on a subsequent request for the primary.
