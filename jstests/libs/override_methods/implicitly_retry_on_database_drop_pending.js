@@ -142,6 +142,18 @@
                 // yet have generated the oplog entry for the "dropDatabase" operation while it is
                 // dropping each intermediate collection.
                 awaitLatestOperationMajorityConfirmed(conn);
+
+                if (TestData.skipDropDatabaseOnDatabaseDropPending &&
+                    commandName === "dropDatabase") {
+                    // We avoid retrying the "dropDatabase" command when another "dropDatabase"
+                    // command was already in progress for the database. This reduces the likelihood
+                    // that other clients would observe another DatabaseDropPending error response
+                    // when they go to retry, and therefore reduces the risk that repeatedly
+                    // retrying an individual operation would take longer than the 'defaultTimeout'
+                    // period.
+                    res = {ok: 1, dropped: dbName};
+                    return true;
+                }
             },
             "timed out while retrying '" + commandName +
                 "' operation on DatabaseDropPending error response for '" + dbName + "' database",
