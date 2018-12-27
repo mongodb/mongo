@@ -207,7 +207,7 @@ __wt_ovfl_remove(WT_SESSION_IMPL *session,
  *	Discard an on-page overflow value, and reset the page's cell.
  */
 int
-__wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
+__wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -217,7 +217,7 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	bm = btree->bm;
 	unpack = &_unpack;
 
-	__wt_cell_unpack(cell, unpack);
+	__wt_cell_unpack(page, cell, unpack);
 
 	/*
 	 * Finally remove overflow key/value objects, called when reconciliation

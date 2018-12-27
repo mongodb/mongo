@@ -2,6 +2,9 @@
 
 set -e
 
+# Bypass this test for valgrind
+test "$TESTUTIL_BYPASS_VALGRIND" = "1" && exit 0
+
 # Smoke-test checkpoints as part of running "make check".
 echo "checkpoint: 3 mixed tables"
 $TEST_WRAPPER ./t -T 3 -t m

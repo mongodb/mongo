@@ -18,14 +18,18 @@ struct __wt_process {
 
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
-	WT_CACHE_POOL *cache_pool;
-#define	WT_TSC_DEFAULT_RATIO	1.0
-	double	 tsc_nsec_ratio;	/* rdtsc ticks to nanoseconds */
-	bool use_epochtime;		/* use expensive time */
+
+	bool page_version_ts;		/* timestamp version page formats */
 
 					/* Checksum function */
 #define	__wt_checksum(chunk, len)	__wt_process.checksum(chunk, len)
 	uint32_t (*checksum)(const void *, size_t);
+
+#define	WT_TSC_DEFAULT_RATIO	1.0
+	double	 tsc_nsec_ratio;	/* rdtsc ticks to nanoseconds */
+	bool use_epochtime;		/* use expensive time */
+
+	WT_CACHE_POOL *cache_pool;	/* shared cache information */
 };
 extern WT_PROCESS __wt_process;
 

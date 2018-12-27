@@ -96,6 +96,7 @@ DIRECTIO
 DNE
 DOI
 DONTNEED
+DSK
 DUPLICATEV
 DataSet
 DbCursor
@@ -378,6 +379,7 @@ ThreadList
 ThreadListWrapper
 Timespec
 Timestamp
+Timestamps
 TryCV
 TxnID
 UDF
@@ -398,10 +400,12 @@ UnmapViewOfFile
 Unmarshall
 Unordered
 Uryyb
+VALGRIND
 VARCHAR
 VLDB
 VMSG
 VR
+VRFY
 VX
 Vc
 Vfprintf

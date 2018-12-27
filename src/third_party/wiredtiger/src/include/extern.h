@@ -155,7 +155,7 @@ extern const char *__wt_addr_string(WT_SESSION_IMPL *session, const uint8_t *add
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store, bool *decoded) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_ovfl_discard_remove(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, bool evicting) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

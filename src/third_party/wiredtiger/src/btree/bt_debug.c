@@ -521,19 +521,15 @@ static int
 __debug_dsk_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
-	uint32_t i;
+	WT_CELL_UNPACK unpack;
 
 	WT_ASSERT(ds->session, S2BT_SAFE(ds->session) != NULL);
 
 	btree = S2BT(ds->session);
-	unpack = &_unpack;
 
-	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
-		WT_RET(__debug_cell(ds, dsk, unpack));
-	}
+	WT_CELL_FOREACH_BEGIN(btree, dsk, unpack, false) {
+		WT_RET(__debug_cell(ds, dsk, &unpack));
+	} WT_CELL_FOREACH_END;
 	return (0);
 }
 
@@ -1001,7 +997,7 @@ __debug_page_col_var(WT_DBG *ds, WT_REF *ref)
 			unpack = NULL;
 			rle = 1;
 		} else {
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(page, cell, unpack);
 			rle = __wt_cell_rle(unpack);
 		}
 		WT_RET(__wt_snprintf(
@@ -1209,7 +1205,7 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 		else
 			WT_RET(ds->f(ds, "\t" "txn id %" PRIu64, upd->txnid));
 
-		if (upd->timestamp != 0) {
+		if (upd->timestamp != WT_TS_NONE) {
 			__wt_timestamp_to_hex_string(
 			    hex_timestamp, upd->timestamp);
 			WT_RET(ds->f(ds, ", stamp %s", hex_timestamp));
@@ -1275,6 +1271,7 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	char hex_ts_start[WT_TS_HEX_SIZE], hex_ts_stop[WT_TS_HEX_SIZE];
 	const char *type;
 
 	session = ds->session;
@@ -1311,6 +1308,12 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 			break;
 		}
 		break;
+	}
+
+	if (unpack->start_ts != WT_TS_NONE || unpack->stop_ts != WT_TS_NONE) {
+		__wt_timestamp_to_hex_string(hex_ts_start, unpack->start_ts);
+		__wt_timestamp_to_hex_string(hex_ts_stop, unpack->stop_ts);
+		WT_RET(ds->f(ds, ", ts %s-%s", hex_ts_start, hex_ts_stop));
 	}
 
 	/* Dump addresses. */
@@ -1366,6 +1369,12 @@ __debug_cell_data(WT_DBG *ds,
 	 */
 	if (unpack == NULL)
 		return (__debug_item(ds, tag, "deleted", strlen("deleted")));
+
+	/*
+	 * Row-store references to empty cells return a NULL on-page reference.
+	 */
+	if (unpack->cell == NULL)
+		return (__debug_item(ds, tag, "", 0));
 
 	switch (unpack->raw) {
 	case WT_CELL_ADDR_DEL:

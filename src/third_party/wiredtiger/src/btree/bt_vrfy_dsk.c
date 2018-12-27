@@ -39,6 +39,18 @@ static int __verify_dsk_row(
 } while (0)
 
 /*
+ * WT_CELL_FOREACH_VRFY --
+ *	Iterate through each cell on a page. Verify-specific version of the
+ * WT_CELL_FOREACH macro, created because the loop can't simply unpack cells,
+ * verify has to do additional work to ensure that unpack is safe.
+ */
+#define	WT_CELL_FOREACH_VRFY(btree, dsk, cell, unpack, i)		\
+	for ((cell) =							\
+	    WT_PAGE_HEADER_BYTE(btree, dsk), (i) = (dsk)->u.entries;	\
+	    (i) > 0;							\
+	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
+
+/*
  * __wt_verify_dsk_image --
  *	Verify a single block as read from disk.
  */
@@ -48,7 +60,6 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 {
 	uint8_t flags;
 	const uint8_t *p, *end;
-	u_int i;
 
 	/* Check the page type. */
 	switch (dsk->type) {
@@ -114,12 +125,22 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 		    "page at %s has invalid flags set: 0x%" PRIx8,
 		    tag, flags);
 
-	/* Unused bytes */
-	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
-		if (*p != '\0')
-			WT_RET_VRFY(session,
-			    "page at %s has non-zero unused page header bytes",
-			    tag);
+	/* Check the unused byte. */
+	if (dsk->unused != 0)
+		WT_RET_VRFY(session,
+		    "page at %s has non-zero unused page header bytes",
+		    tag);
+
+	/* Check the page version. */
+	switch (dsk->version) {
+	case WT_PAGE_VERSION_ORIG:
+	case WT_PAGE_VERSION_TS:
+		break;
+	default:
+		WT_RET_VRFY(session,
+		    "page at %s has an invalid version of %" PRIu8,
+		    tag, dsk->version);
+	}
 
 	/*
 	 * Any bytes after the data chunk should be nul bytes; ignore if the
@@ -226,11 +247,11 @@ __verify_dsk_row(
 	last_cell_type = FIRST;
 	cell_num = 0;
 	key_cnt = 0;
-	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+	WT_CELL_FOREACH_VRFY(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, dsk, end) != 0) {
+		if (__wt_cell_unpack_safe(dsk, cell, unpack, end) != 0) {
 			ret = __err_cell_corrupt(session, cell_num, tag);
 			goto err;
 		}
@@ -499,11 +520,11 @@ __verify_dsk_col_int(
 	end = (uint8_t *)dsk + dsk->mem_size;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+	WT_CELL_FOREACH_VRFY(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, dsk, end) != 0)
+		if (__wt_cell_unpack_safe(dsk, cell, unpack, end) != 0)
 			return (__err_cell_corrupt(session, cell_num, tag));
 
 		/* Check the raw and collapsed cell types. */
@@ -570,11 +591,11 @@ __verify_dsk_col_var(
 	last_deleted = false;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+	WT_CELL_FOREACH_VRFY(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, dsk, end) != 0)
+		if (__wt_cell_unpack_safe(dsk, cell, unpack, end) != 0)
 			return (__err_cell_corrupt(session, cell_num, tag));
 
 		/* Check the raw and collapsed cell types. */

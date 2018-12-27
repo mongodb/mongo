@@ -425,7 +425,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 */
 	kpack = &_kpack;
 	memset(kpack, 0, sizeof(*kpack));
-	__wt_cell_unpack(cell, kpack);
+	__wt_cell_unpack(page, cell, kpack);
 	if (kpack->type == WT_CELL_KEY &&
 	    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
 		WT_ASSERT(session, cbt->row_key->size >= kpack->prefix);
@@ -495,8 +495,23 @@ __cursor_check_prepared_update(WT_CURSOR_BTREE *cbt, bool *visiblep)
 
 	/* The update that returned prepared conflict is now visible. */
 	F_CLR(cbt, WT_CBT_ITERATE_RETRY_NEXT | WT_CBT_ITERATE_RETRY_PREV);
-	if (*visiblep)
-		WT_RET(__cursor_kv_return(session, cbt, upd));
+	if (*visiblep) {
+		/*
+		 * The underlying key-return function uses a comparison value
+		 * of 0 to indicate the search function has pre-built the key
+		 * we want to return. That's not the case, don't take that path.
+		 */
+		cbt->compare = 1;
+		/*
+		 * If a prepared delete operation is resolved, it will be
+		 * visible, but key is not valid. The update will be null in
+		 * that case and we continue with cursor navigation.
+		 */
+		if (upd != NULL)
+			WT_RET(__cursor_kv_return(session, cbt, upd));
+		else
+			*visiblep = false;
+	}
 
 	return (0);
 }

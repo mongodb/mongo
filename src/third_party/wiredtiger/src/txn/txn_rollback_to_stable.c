@@ -104,7 +104,8 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		 * strict timestamp checking, assert that all more recent
 		 * updates were also rolled back.
 		 */
-		if (upd->txnid == WT_TXN_ABORTED || upd->timestamp == 0) {
+		if (upd->txnid == WT_TXN_ABORTED ||
+		    upd->timestamp == WT_TS_NONE) {
 			if (upd == first_upd)
 				first_upd = upd->next;
 		} else if (rollback_timestamp < upd->timestamp) {

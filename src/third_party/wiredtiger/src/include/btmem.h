@@ -80,12 +80,12 @@ struct __wt_page_header {
 #define	WT_PAGE_LAS_UPDATE	0x10u	/* Page updates in lookaside store */
 	uint8_t flags;			/* 25: flags */
 
-	/*
-	 * End the structure with 2 bytes of padding: it wastes space, but it
-	 * leaves the structure 32-bit aligned and having a few bytes to play
-	 * with in the future can't hurt.
-	 */
-	uint8_t unused[2];		/* 26-27: unused padding */
+	/* A byte of padding, positioned to be added to the flags. */
+	uint8_t unused;			/* 26: unused padding */
+
+#define	WT_PAGE_VERSION_ORIG	0	/* Original version */
+#define	WT_PAGE_VERSION_TS	1	/* Timestamps added */
+	uint8_t version;		/* 27: version */
 };
 /*
  * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if

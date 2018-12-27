@@ -1048,13 +1048,13 @@ __wt_row_leaf_value_cell(
 		    page, copy, NULL, &kcell, &key, &size) && kcell == NULL)
 			vcell = (WT_CELL *)((uint8_t *)key + size);
 		else {
-			__wt_cell_unpack(kcell, &unpack);
+			__wt_cell_unpack(page, kcell, &unpack);
 			vcell = (WT_CELL *)((uint8_t *)
 			    unpack.cell + __wt_cell_total_len(&unpack));
 		}
 	}
 
-	__wt_cell_unpack(__wt_cell_leaf_value_parse(page, vcell), vpack);
+	__wt_cell_unpack(page, __wt_cell_leaf_value_parse(page, vcell), vpack);
 }
 
 /*
@@ -1091,9 +1091,11 @@ __wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_PAGE *page;
 
 	addr = ref->addr;
 	unpack = &_unpack;
+	page = ref->home;
 
 	/*
 	 * If NULL, there is no location.
@@ -1107,7 +1109,7 @@ __wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 		*sizep = 0;
 		if (typep != NULL)
 			*typep = 0;
-	} else if (__wt_off_page(ref->home, addr)) {
+	} else if (__wt_off_page(page, addr)) {
 		*addrp = addr->addr;
 		*sizep = addr->size;
 		if (typep != NULL)
@@ -1126,7 +1128,7 @@ __wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 				break;
 			}
 	} else {
-		__wt_cell_unpack((WT_CELL *)addr, unpack);
+		__wt_cell_unpack(page, (WT_CELL *)addr, unpack);
 		*addrp = unpack->data;
 		*sizep = unpack->size;
 		if (typep != NULL)
@@ -1364,7 +1366,7 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    mod->last_eviction_id != __wt_txn_oldest_id(session))
 		return (true);
 
-	if (mod->last_eviction_timestamp == 0)
+	if (mod->last_eviction_timestamp == WT_TS_NONE)
 		return (true);
 
 	__wt_txn_pinned_timestamp(session, &pinned_ts);

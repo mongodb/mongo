@@ -643,7 +643,7 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 			 * Check timestamps are used in order.
 			 */
 			op_zero_ts = !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT);
-			upd_zero_ts = upd->timestamp == 0;
+			upd_zero_ts = upd->timestamp == WT_TS_NONE;
 			if (op_zero_ts != upd_zero_ts)
 				WT_RET_MSG(session, EINVAL,
 				    "per-key timestamps used inconsistently");
@@ -660,7 +660,7 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 			 * Only if the update structure doesn't have a timestamp
 			 * then use the one in the transaction structure.
 			 */
-			if (op_timestamp == 0)
+			if (op_timestamp == WT_TS_NONE)
 				op_timestamp = txn->commit_timestamp;
 			if (op_timestamp < upd->timestamp)
 				WT_RET_MSG(session, EINVAL,
@@ -1177,7 +1177,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	checkpoint_timestamp = txn_global->checkpoint_timestamp;
 	commit_timestamp = txn_global->commit_timestamp;
 	pinned_timestamp = txn_global->pinned_timestamp;
-	if (checkpoint_timestamp != 0 &&
+	if (checkpoint_timestamp != WT_TS_NONE &&
 	    checkpoint_timestamp < pinned_timestamp)
 		pinned_timestamp = checkpoint_timestamp;
 	WT_STAT_SET(session, stats, txn_pinned_timestamp,

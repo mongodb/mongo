@@ -199,7 +199,7 @@ bool
 testutil_is_flag_set(const char *flag)
 {
 	const char *res;
-	bool enable_long_tests;
+	bool flag_being_set;
 
 	if (__wt_getenv(NULL, flag, &res) != 0 || res == NULL)
 		return (false);
@@ -208,11 +208,11 @@ testutil_is_flag_set(const char *flag)
 	 * This is a boolean test. So if the environment variable is set to any
 	 * value other than 0, we return success.
 	 */
-	enable_long_tests = res[0] != '0';
+	flag_being_set = res[0] != '0';
 
 	free((void *)res);
 
-	return (enable_long_tests);
+	return (flag_being_set);
 }
 
 /*

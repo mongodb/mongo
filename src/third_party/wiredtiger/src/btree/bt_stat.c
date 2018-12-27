@@ -165,7 +165,7 @@ __stat_page_col_var(
 			++deleted_cnt;
 		} else {
 			orig_deleted = false;
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(page, cell, unpack);
 			if (unpack->type == WT_CELL_DEL)
 				orig_deleted = true;
 			else {
@@ -230,9 +230,8 @@ __stat_page_row_int(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
-	uint32_t i, ovfl_cnt;
+	uint32_t ovfl_cnt;
 
 	btree = S2BT(session);
 	ovfl_cnt = 0;
@@ -245,11 +244,10 @@ __stat_page_row_int(
 	 * a reference to the original cell.
 	 */
 	if (page->dsk != NULL)
-		WT_CELL_FOREACH(btree, page->dsk, cell, &unpack, i) {
-			__wt_cell_unpack(cell, &unpack);
-			if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+		WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, false) {
+			if (__wt_cell_type(unpack.cell) == WT_CELL_KEY_OVFL)
 				++ovfl_cnt;
-		}
+		} WT_CELL_FOREACH_END;
 
 	WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }
@@ -263,15 +261,15 @@ __stat_page_row_leaf(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_INSERT *ins;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
-	uint32_t entry_cnt, i, ovfl_cnt;
+	uint32_t empty_values, entry_cnt, i, ovfl_cnt;
+	bool key;
 
 	btree = S2BT(session);
-	entry_cnt = ovfl_cnt = 0;
+	empty_values = entry_cnt = ovfl_cnt = 0;
 
 	WT_STAT_INCR(session, stats, btree_row_leaf);
 
@@ -311,14 +309,33 @@ __stat_page_row_leaf(
 	 * Overflow keys are hard: we have to walk the disk image to count them,
 	 * the in-memory representation of the page doesn't necessarily contain
 	 * a reference to the original cell.
+	 *
+	 * Zero-length values are the same, we have to look at the disk image to
+	 * know. They aren't stored but we know they exist if there are two keys
+	 * in a row, or a key as the last item.
 	 */
-	if (page->dsk != NULL)
-		WT_CELL_FOREACH(btree, page->dsk, cell, &unpack, i) {
-			__wt_cell_unpack(cell, &unpack);
-			if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+	if (page->dsk != NULL) {
+		key = false;
+		WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, false) {
+			switch (__wt_cell_type(unpack.cell)) {
+			case WT_CELL_KEY_OVFL:
 				++ovfl_cnt;
-		}
+				/* FALLTHROUGH */
+			case WT_CELL_KEY:
+				if (key)
+					++empty_values;
+				key = true;
+				break;
+			default:
+				key = false;
+				break;
+			}
+		} WT_CELL_FOREACH_END;
+		if (key)
+			++empty_values;
+	}
 
+	WT_STAT_INCRV(session, stats, btree_row_empty_values, empty_values);
 	WT_STAT_INCRV(session, stats, btree_entries, entry_cnt);
 	WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }

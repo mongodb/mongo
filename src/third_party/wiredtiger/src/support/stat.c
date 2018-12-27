@@ -41,6 +41,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"btree: number of key/value pairs",
 	"btree: overflow pages",
 	"btree: pages rewritten by compaction",
+	"btree: row-store empty values",
 	"btree: row-store internal pages",
 	"btree: row-store leaf pages",
 	"cache: bytes currently in the cache",
@@ -223,6 +224,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->btree_entries = 0;
 	stats->btree_overflow = 0;
 	stats->btree_compact_rewrite = 0;
+	stats->btree_row_empty_values = 0;
 	stats->btree_row_internal = 0;
 	stats->btree_row_leaf = 0;
 		/* not clearing cache_bytes_inuse */
@@ -390,6 +392,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->btree_entries += from->btree_entries;
 	to->btree_overflow += from->btree_overflow;
 	to->btree_compact_rewrite += from->btree_compact_rewrite;
+	to->btree_row_empty_values += from->btree_row_empty_values;
 	to->btree_row_internal += from->btree_row_internal;
 	to->btree_row_leaf += from->btree_row_leaf;
 	to->cache_bytes_inuse += from->cache_bytes_inuse;
@@ -578,6 +581,8 @@ __wt_stat_dsrc_aggregate(
 	to->btree_overflow += WT_STAT_READ(from, btree_overflow);
 	to->btree_compact_rewrite +=
 	    WT_STAT_READ(from, btree_compact_rewrite);
+	to->btree_row_empty_values +=
+	    WT_STAT_READ(from, btree_row_empty_values);
 	to->btree_row_internal += WT_STAT_READ(from, btree_row_internal);
 	to->btree_row_leaf += WT_STAT_READ(from, btree_row_leaf);
 	to->cache_bytes_inuse += WT_STAT_READ(from, cache_bytes_inuse);

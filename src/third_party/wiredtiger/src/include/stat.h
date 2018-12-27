@@ -736,6 +736,7 @@ struct __wt_dsrc_stats {
 	int64_t btree_entries;
 	int64_t btree_overflow;
 	int64_t btree_compact_rewrite;
+	int64_t btree_row_empty_values;
 	int64_t btree_row_internal;
 	int64_t btree_row_leaf;
 	int64_t cache_bytes_inuse;

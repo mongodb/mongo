@@ -41,7 +41,10 @@
 #define	WT_SESSION_IS_CHECKPOINT(s)					\
 	((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
 
-#define	WT_TS_NONE	0		/* No timestamp */
+#define	WT_TS_NONE	0		/* No (or earliest) timestamp) */
+#define	WT_TS_FIXME	37		/* Fake timestamp */
+#define	WT_TS_MAX	UINT64_MAX	/* Valid after start time */
+
 					/* Bytes to hold a hex timestamp */
 #define	WT_TS_HEX_SIZE	(2 * sizeof(wt_timestamp_t) + 1)
 

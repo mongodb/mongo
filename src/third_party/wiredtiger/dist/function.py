@@ -90,8 +90,10 @@ def function_args(name, line):
     line = re.sub("^static ", "", line)
     line = re.sub("^volatile ", "", line)
 
-    # Let WT_UNUSED terminate the parse. It often appears at the beginning
-    # of the function and looks like a WT_XXX variable declaration.
+    # Let WT_ASSERT and WT_UNUSED terminate the parse. The often appear at the
+    # beginning of the function and looks like a WT_XXX variable declaration.
+    if re.search('^WT_ASSERT', line):
+        return False,0
     if re.search('^WT_UNUSED', line):
         return False,0
 

@@ -616,6 +616,7 @@ dsrc_stats = [
     BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_overflow', 'overflow pages', 'no_scale,tree_walk'),
+    BtreeStat('btree_row_empty_values', 'row-store empty values', 'no_scale,tree_walk'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,tree_walk'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,tree_walk'),
 

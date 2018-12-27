@@ -765,7 +765,7 @@ __txn_checkpoint_can_skip(WT_SESSION_IMPL *session,
 	 * more that could be written.
 	 */
 	if (use_timestamp && txn_global->has_stable_timestamp &&
-	    txn_global->last_ckpt_timestamp != 0 &&
+	    txn_global->last_ckpt_timestamp != WT_TS_NONE &&
 	    txn_global->last_ckpt_timestamp == txn_global->stable_timestamp) {
 		*can_skipp = true;
 		return (0);

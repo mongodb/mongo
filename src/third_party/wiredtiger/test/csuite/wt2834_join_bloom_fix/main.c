@@ -163,9 +163,7 @@ main(int argc, char *argv[])
 	testutil_assert(count == 0);
 
 	testutil_progress(opts, "cleanup starting");
-#if 0
 	testutil_cleanup(opts);
-#endif
 	return (EXIT_SUCCESS);
 }
 

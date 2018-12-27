@@ -12,11 +12,11 @@ WT_PROCESS __wt_process;			/* Per-process structure */
 static int __wt_pthread_once_failed;		/* If initialization failed */
 
 /*
- * __wt_endian_check --
+ * __endian_check --
  *	Check the build matches the machine.
  */
 static int
-__wt_endian_check(void)
+__endian_check(void)
 {
 	uint64_t v;
 	const char *e;
@@ -103,11 +103,11 @@ __global_calibrate_ticks(void)
 }
 
 /*
- * __wt_global_once --
+ * __global_once --
  *	Global initialization, run once.
  */
 static void
-__wt_global_once(void)
+__global_once(void)
 {
 	WT_DECL_RET;
 
@@ -117,10 +117,17 @@ __wt_global_once(void)
 		return;
 	}
 
-	__wt_process.checksum = wiredtiger_crc32c_func();
-	__global_calibrate_ticks();
-
 	TAILQ_INIT(&__wt_process.connqh);
+
+#if defined(HAVE_PAGE_VERSION_TS)
+	__wt_process.page_version_ts = true;
+#else
+	__wt_process.page_version_ts = false;
+#endif
+
+	__wt_process.checksum = wiredtiger_crc32c_func();
+
+	__global_calibrate_ticks();
 }
 
 /*
@@ -134,7 +141,7 @@ __wt_library_init(void)
 	WT_DECL_RET;
 
 	/* Check the build matches the machine. */
-	WT_RET(__wt_endian_check());
+	WT_RET(__endian_check());
 
 	/*
 	 * Do per-process initialization once, before anything else, but only
@@ -143,7 +150,7 @@ __wt_library_init(void)
 	 * static and only using that function to avoid a race.
 	 */
 	if (first) {
-		if ((ret = __wt_once(__wt_global_once)) != 0)
+		if ((ret = __wt_once(__global_once)) != 0)
 			__wt_pthread_once_failed = ret;
 		first = false;
 	}

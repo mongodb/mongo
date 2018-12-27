@@ -123,7 +123,7 @@ __wt_txn_parse_timestamp(WT_SESSION_IMPL *session, const char *name,
     wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval)
 {
 	WT_RET(__wt_txn_parse_timestamp_raw(session, name, timestamp, cval));
-	if (cval->len != 0 && *timestamp == 0)
+	if (cval->len != 0 && *timestamp == WT_TS_NONE)
 		WT_RET_MSG(session, EINVAL,
 		    "Failed to parse %s timestamp '%.*s': zero not permitted",
 		    name, (int)cval->len, cval->str);
@@ -160,7 +160,7 @@ __txn_get_pinned_timestamp(
 
 	/* Check for a running checkpoint */
 	if (LF_ISSET(WT_TXN_TS_INCLUDE_CKPT) &&
-	    txn_global->checkpoint_timestamp != 0 &&
+	    txn_global->checkpoint_timestamp != WT_TS_NONE &&
 	    (tmp_ts == 0 || txn_global->checkpoint_timestamp < tmp_ts))
 		tmp_ts = txn_global->checkpoint_timestamp;
 	if (!txn_has_write_lock)

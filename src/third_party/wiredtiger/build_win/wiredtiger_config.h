@@ -79,6 +79,9 @@
 /* Define to 1 to disable any crc32 hardware support. */
 /* #undef HAVE_NO_CRC32_HARDWARE */
 
+/* Define to 1 to enable writing timestamp version page formats. */
+/* #undef HAVE_PAGE_VERSION_TS */
+
 /* Define to 1 if pthread condition variables support monotonic clocks. */
 /* #undef HAVE_PTHREAD_COND_MONOTONIC */
 

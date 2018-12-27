@@ -441,7 +441,7 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 		 */
 		timestamp = op->type == WT_TXN_OP_REF_DELETE ?
 		    &op->u.ref->page_del->timestamp : &op->u.op_upd->timestamp;
-		if (*timestamp == 0)
+		if (*timestamp == WT_TS_NONE)
 			*timestamp = txn->commit_timestamp;
 	}
 }

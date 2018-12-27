@@ -416,7 +416,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				++recno;
 			else {
-				__wt_cell_unpack(cell, unpack);
+				__wt_cell_unpack(page, cell, unpack);
 				recno += __wt_cell_rle(unpack);
 			}
 		vs->record_total += recno;
@@ -436,7 +436,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 
 	/* If it's not the root page, unpack the parent cell. */
 	if (!__wt_ref_is_root(ref)) {
-		__wt_cell_unpack(ref->addr, unpack);
+		__wt_cell_unpack(ref->home, ref->addr, unpack);
 
 		/* Compare the parent cell against the page type. */
 		switch (page->type) {
@@ -533,7 +533,8 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			--vs->depth;
 			WT_RET(ret);
 
-			__wt_cell_unpack(child_ref->addr, unpack);
+			__wt_cell_unpack(
+			    child_ref->home, child_ref->addr, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
 		} WT_INTL_FOREACH_END;
@@ -563,7 +564,8 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			--vs->depth;
 			WT_RET(ret);
 
-			__wt_cell_unpack(child_ref->addr, unpack);
+			__wt_cell_unpack(
+			    child_ref->home, child_ref->addr, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
 		} WT_INTL_FOREACH_END;
@@ -690,16 +692,14 @@ __verify_overflow_cell(
     WT_SESSION_IMPL *session, WT_REF *ref, bool *found, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_CELL_UNPACK unpack;
 	WT_DECL_RET;
 	const WT_PAGE_HEADER *dsk;
-	uint32_t cell_num, i;
+	uint32_t cell_num;
 
 	*found = false;
 
 	btree = S2BT(session);
-	unpack = &_unpack;
 
 	/*
 	 * If a tree is empty (just created), it won't have a disk image;
@@ -710,18 +710,17 @@ __verify_overflow_cell(
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
 	cell_num = 0;
-	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+	WT_CELL_FOREACH_BEGIN(btree, dsk, unpack, false) {
 		++cell_num;
-		__wt_cell_unpack(cell, unpack);
-		switch (unpack->type) {
+		switch (unpack.type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
 			*found = true;
 			WT_ERR(__verify_overflow(
-			    session, unpack->data, unpack->size, vs));
+			    session, unpack.data, unpack.size, vs));
 			break;
 		}
-	}
+	} WT_CELL_FOREACH_END;
 
 	return (0);
 
@@ -730,7 +729,7 @@ err:	WT_RET_MSG(session, ret,
 	    "that failed verification",
 	    cell_num - 1,
 	    __wt_page_addr_string(session, ref, vs->tmp1),
-	    __wt_addr_string(session, unpack->data, unpack->size, vs->tmp2));
+	    __wt_addr_string(session, unpack.data, unpack.size, vs->tmp2));
 }
 
 /*
