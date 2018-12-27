@@ -74,6 +74,7 @@ selector:
   - jstests/sharding/sessions_collection_auto_healing.js
   - jstests/sharding/shard_config_db_collections.js
   - jstests/sharding/time_zone_info_mongos.js
+  - jstests/sharding/verify_sessions_expiration_sharded.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
   - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js
   - jstests/sharding/uuid_propagated_to_shards_on_setFCV_3_6.js
