@@ -31,10 +31,13 @@
 #include <string>
 #include <utility>
 
+#include "stitch_support/stitch_support.h"
+
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/quick_exit.h"
 
-#include "stitch_support/stitch_support.h"
+namespace {
 
 using mongo::fromjson;
 
@@ -144,4 +147,19 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithCollation) {
         lib, fromjson("{locale: 'en', strength: 2}").objdata(), nullptr);
     ASSERT_TRUE(checkMatch("{a: 'word'}", {"{a: 'WORD', b: 'other'}"}, collator));
     stitch_support_v1_collator_destroy(collator);
+}
+
+}  // namespace
+
+// Define main function as an entry to these tests.
+//
+// Note that we don't use the main() defined for most other unit tests so that we can avoid double
+// calling runGlobalInitializers(), which is called both from the regular unit test main() and from
+// the Stitch Support Library intializer function that gets tested here.
+int main(const int argc, const char* const* const argv) {
+    const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+
+    // This is the standard exit path for Mongo processes. See the mongo::quickExit() declaration
+    // for more information.
+    mongo::quickExit(result);
 }

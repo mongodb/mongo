@@ -9,9 +9,10 @@ env = env.Clone()
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'share/doc/stitch_support',
+        '.',
         source=[
             '#/LICENSE-Community.txt',
+            '#/distsrc/THIRD-PARTY-NOTICES',
         ],
         INSTALL_ALIAS=[
             'stitch-support',
@@ -71,12 +72,13 @@ if get_option('install-mode') == 'hygienic':
 
 if get_option('link-model') != 'dynamic-sdk':
     stitchSupportTestEnv = env.Clone()
-    unitTest = stitchSupportTestEnv.CppUnitTest(
+    unitTest = stitchSupportTestEnv.Program(
         target="stitch_support_test",
         source=[
             "stitch_support_test.cpp",
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/unittest/unittest',
             'stitch_support',
         ],
         INSTALL_ALIAS=[
