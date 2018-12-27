@@ -1684,6 +1684,52 @@ class TestBinder(testcase.IDLTestcase):
                     lt: 255
             """))
 
+        # Specialized SCPs.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                cpp_class: baz
+        """))
+
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                cpp_class:
+                    name: baz
+        """))
+
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                cpp_class:
+                    name: baz
+                    data: bling
+                    override_set: true
+                    override_ctor: false
+        """))
+
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                cpp_class: baz
+                condition: { expr: "true" }
+                redact: true
+                test_only: true
+                deprecated_name: bling
+        """))
+
     def test_server_parameter_negative(self):
         # type: () -> None
         """Negative server parameter test cases."""
@@ -1697,7 +1743,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: bar
                 append_bson: baz
                 from_bson: buzz
-            """), idl.errors.ERROR_ID_SERVER_PARAM_MISSING_METHOD)
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR)
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -1707,7 +1753,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: bar
                 from_bson: buzz
                 from_string: qux
-            """), idl.errors.ERROR_ID_SERVER_PARAM_MISSING_METHOD)
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR)
 
         # server parameter without storage may not have storage fields.
         self.assert_bind_fail(
@@ -1720,7 +1766,7 @@ class TestBinder(testcase.IDLTestcase):
                 from_bson: buzz
                 from_string: qux
                 default: 42
-            """), idl.errors.ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE)
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -1732,7 +1778,7 @@ class TestBinder(testcase.IDLTestcase):
                 from_bson: buzz
                 from_string: qux
                 on_update: flip
-            """), idl.errors.ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE)
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -1744,7 +1790,7 @@ class TestBinder(testcase.IDLTestcase):
                 from_bson: buzz
                 from_string: qux
                 validator: { gt: 0 }
-            """), idl.errors.ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE)
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
 
         # server parameter with storage may not have set/get methodsa
         for callback in ["append_bson", "from_bson", "from_string"]:
@@ -1756,7 +1802,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: bar
                     cpp_varname: baz
                     %s: buzz
-                """ % (callback)), idl.errors.ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE)
+                """ % (callback)), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
 
         # Invalid set_at values.
         self.assert_bind_fail(
@@ -1767,6 +1813,40 @@ class TestBinder(testcase.IDLTestcase):
                     description: bar
                     cpp_varname: baz
             """), idl.errors.ERROR_ID_BAD_SETAT_SPECIFIER)
+
+        # Mix of specialized with bound storage.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: startup
+                    description: bar
+                    cpp_class: baz
+                    cpp_varname: bling
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Mix of specialized with unbound.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: startup
+                    description: bar
+                    cpp_class: baz
+                    append_bson: bling
+                    from_string: blong
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+
+        # Default without data.
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            server_parameters:
+                foo:
+                    set_at: startup
+                    description: bar
+                    cpp_class: baz
+                    default: blong
+            """), idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR)
 
     def test_config_option_positive(self):
         # type: () -> None

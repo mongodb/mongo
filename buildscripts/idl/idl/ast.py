@@ -263,6 +263,21 @@ class Condition(common.SourceLocation):
         super(Condition, self).__init__(file_name, line, column)
 
 
+class ServerParameterClass(common.SourceLocation):
+    """ServerParameter as C++ class specialization."""
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a ServerParameterClass."""
+
+        self.name = None  # type: unicode
+        self.data = None  # type: unicode
+        self.override_ctor = False  # type: bool
+        self.override_set = False  # type: bool
+
+        super(ServerParameterClass, self).__init__(file_name, line, column)
+
+
 class ServerParameter(common.SourceLocation):
     """IDL ServerParameter setting."""
 
@@ -274,6 +289,7 @@ class ServerParameter(common.SourceLocation):
         self.name = None  # type: unicode
         self.set_at = None  # type: unicode
         self.description = None  # type: unicode
+        self.cpp_class = None  # type: ServerParameterClass
         self.cpp_vartype = None  # type: unicode
         self.cpp_varname = None  # type: unicode
         self.condition = None  # type: Condition
@@ -281,8 +297,10 @@ class ServerParameter(common.SourceLocation):
         self.test_only = False  # type: bool
         self.deprecated_name = []  # type: List[unicode]
 
-        # Only valid if cpp_varname is specified.
+        # Only valid if cpp_varname or cpp_class is specified.
         self.default = None  # type: Expression
+
+        # Only valid if cpp_varname is specified.
         self.validator = None  # type: Validator
         self.on_update = None  # type: unicode
 

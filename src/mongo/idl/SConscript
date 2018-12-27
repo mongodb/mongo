@@ -47,6 +47,8 @@ env.CppUnitTest(
         env.Idlc('server_parameter_test.idl')[0],
         'server_parameter_with_storage_test.cpp',
         env.Idlc('server_parameter_with_storage_test.idl')[0],
+        'server_parameter_specialized_test.cpp',
+        env.Idlc('server_parameter_specialized_test.idl')[0],
     ],
     LIBDEPS=[
         'server_parameter',

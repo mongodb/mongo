@@ -99,9 +99,6 @@ ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT = "ID0050"
 ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER = "ID0051"
 ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS = "ID0052"
 ERROR_ID_VALUE_NOT_NUMERIC = "ID0053"
-ERROR_ID_SERVER_PARAM_MISSING_METHOD = "ID0054"
-ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE = "ID0055"
-ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE = "ID0056"
 ERROR_ID_BAD_SETAT_SPECIFIER = "ID0057"
 ERROR_ID_BAD_SOURCE_SPECIFIER = "ID0058"
 ERROR_ID_BAD_DUPLICATE_BEHAVIOR_SPECIFIER = "ID0059"
@@ -111,6 +108,9 @@ ERROR_ID_INVALID_SHORT_NAME = "ID0062"
 ERROR_ID_INVALID_SINGLE_NAME = "ID0063"
 ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME = "ID0064"
 ERROR_ID_IS_NODE_TYPE_SCALAR_OR_MAPPING = "ID0065"
+ERROR_ID_SERVER_PARAMETER_INVALID_ATTR = "ID0066"
+ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR = "ID0067"
+ERROR_ID_SERVER_PARAMETER_INVALID_METHOD_OVERRIDE = "ID0068"
 
 
 class IDLError(Exception):
@@ -721,29 +721,29 @@ class ParserContext(object):
                         ("'%s' requires a numeric value, but %s can not be cast") % (attrname,
                                                                                      value))
 
-    def add_missing_server_parameter_method(self, location, attrname):
-        # type: (common.SourceLocation, unicode) -> None
-        """Add an error about missing server_parameter method."""
+    def add_server_parameter_invalid_attr(self, location, attrname, conflicts):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about invalid fields in a server parameter definition."""
         # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_SERVER_PARAM_MISSING_METHOD,
-                        ("'%s' required in server parameter definition without storage") %
-                        (attrname))
+        self._add_error(location, ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
+                        ("'%s' attribute not permitted with '%s' server parameter") % (attrname,
+                                                                                       conflicts))
 
-    def add_server_parameter_attr_without_storage(self, location, attrname):
-        # type: (common.SourceLocation, unicode) -> None
-        """Add an error about unexpected attribute on server_parameter without storage."""
+    def add_server_parameter_required_attr(self, location, attrname, required, dependant=None):
+        # type: (common.SourceLocation, unicode, unicode, unicode) -> None
+        """Add an error about missing fields in a server parameter definition."""
         # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_SERVER_PARAM_ATTR_NO_STORAGE,
-                        ("'%s' conflicts with server parameter definition without storage") %
-                        (attrname))
+        qualifier = '' if dependant is None else (" when using '%s' attribute" % (dependant))
+        self._add_error(location, ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR,
+                        ("'%s' attribute required%s with '%s' server parameter") %
+                        (attrname, qualifier, required))
 
-    def add_server_parameter_attr_with_storage(self, location, attrname):
+    def add_server_parameter_invalid_method_override(self, location, method):
         # type: (common.SourceLocation, unicode) -> None
-        """Add an error about unexpected attribute on server_paramter with storage."""
+        """Add an error about invalid method override in SCP method override."""
         # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_SERVER_PARAM_ATTR_WITH_STORAGE,
-                        ("'%s' conflicts with server parameter definition with storage") %
-                        (attrname))
+        self._add_error(location, ERROR_ID_SERVER_PARAMETER_INVALID_METHOD_OVERRIDE,
+                        ("No such method to override in server parameter class: '%s'") % (method))
 
     def add_bad_source_specifier(self, location, value):
         # type: (common.SourceLocation, unicode) -> None

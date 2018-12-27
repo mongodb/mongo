@@ -31,6 +31,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
+import copy
 import io
 import os
 import re
@@ -775,6 +776,42 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if idents:
             self.write_empty_line()
 
+    def gen_server_parameter_class(self, scp):
+        # type: (ast.ServerParameter) -> None
+        """Generate a C++ class definition for a ServerParameter."""
+        if scp.cpp_class is None:
+            return
+
+        cls = scp.cpp_class
+
+        with self._block('class %s : public ServerParameter {' % (cls.name), '};'):
+            self._writer.write_unindented_line('public:')
+            if scp.default is not None:
+                self._writer.write_line('static constexpr auto kDataDefault = %s;' %
+                                        (scp.default.expr))
+
+            if cls.override_ctor:
+                # Explicit custom constructor.
+                self._writer.write_line(cls.name + '(StringData name, ServerParameterType spt);')
+            else:
+                #Inherit base constructor.
+                self._writer.write_line('using ServerParameter::ServerParameter;')
+            self.write_empty_line()
+
+            self._writer.write_line(
+                'void append(OperationContext*, BSONObjBuilder&, const std::string&) final;')
+            self._writer.write_line('Status set(const BSONElement&) final;')
+            self._writer.write_line('Status setFromString(const std::string&) final;')
+
+            if cls.data is not None:
+                self.write_empty_line()
+                if scp.default is not None:
+                    self._writer.write_line('%s _data{kDataDefault};' % (cls.data))
+                else:
+                    self._writer.write_line('%s _data;' % (cls.data))
+
+        self.write_empty_line()
+
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
@@ -815,7 +852,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             header_list.append('mongo/util/options_parser/option_description.h')
 
         if spec.server_parameters:
-            header_list.append('mongo/util/synchronized_value.h')
+            header_list.append('mongo/idl/server_parameter.h')
+            header_list.append('mongo/idl/server_parameter_with_storage.h')
 
         header_list.sort()
 
@@ -905,8 +943,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
             for scp in spec.server_parameters:
-                self._gen_exported_constexpr(scp.name, 'Default', scp.default, scp.condition)
+                if scp.cpp_class is None:
+                    self._gen_exported_constexpr(scp.name, 'Default', scp.default, scp.condition)
                 self._gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
+                self.gen_server_parameter_class(scp)
 
             for opt in spec.configs:
                 self._gen_exported_constexpr(opt.name, 'Default', opt.default, opt.condition)
@@ -1763,6 +1803,43 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 common.template_args('${class_name}::kCommandName,', class_name=common.title_case(
                     struct.cpp_name)))
 
+    def _gen_server_parameter_specialized(self, param):
+        # type: (ast.ServerParameter) -> None
+        """Generate a specialized ServerParameter."""
+        self._writer.write_line('return new %s(%s, %s);' % (param.cpp_class.name,
+                                                            _encaps(param.name), param.set_at))
+
+    def _gen_server_parameter_class_definitions(self, param):
+        # type: (ast.ServerParameter) -> None
+        """Generate storage for default and/or append method for a specialized ServerParameter."""
+        cls = param.cpp_class
+
+        if param.default or param.redact or not cls.override_set:
+            self.gen_description_comment("%s: %s" % (param.name, param.description))
+
+        if param.default:
+            self._writer.write_line('constexpr decltype(%s::kDataDefault) %s::kDataDefault;' %
+                                    (cls.name, cls.name))
+            self.write_empty_line()
+
+        if param.redact:
+            with self._block(
+                    'void %s::append(OperationContext*, BSONObjBuilder& b, const std::string& name) {'
+                    % (cls.name), '}'):
+                self._writer.write_line('b << name << "###";')
+            self.write_empty_line()
+
+        if not cls.override_set:
+            with self._block('Status %s::set(const BSONElement& newValueElement) try {' %
+                             (cls.name), '}'):
+                self._writer.write_line('return setFromString(newValueElement.String());')
+            with self._block('catch (const AssertionException& ex) {', '}'):
+                value = '###' if param.redact else '" << newValueElement << "'
+                self._writer.write_line(
+                    'return {ErrorCodes::BadValue, str::stream() << "Invalid value \'' + value +
+                    '\' for setParameter \'" << name() << "\': " << ex.what()};')
+            self.write_empty_line()
+
     def _gen_server_parameter_with_storage(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameterWithStorage."""
@@ -1786,9 +1863,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.redact:
             self._writer.write_line('ret->setRedact();')
 
-        if param.test_only:
-            self._writer.write_line('ret->setTestOnly();')
-
         if param.default is not None:
             self._writer.write_line('uassertStatusOK(ret->setValue(%s));' %
                                     (_get_expression(param.default)))
@@ -1809,16 +1883,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         elif param.redact:
             self._writer.write_line('ret->setAppendBSON(IDLServerParameter::redactedAppendBSON);')
 
-        if param.test_only:
-            self._writer.write_line('ret->setTestOnly();')
-
         self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
         self._writer.write_line('return ret;')
 
     def _gen_server_parameter(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameter(WithStorage)."""
-        if param.cpp_varname is not None:
+        if param.cpp_class is not None:
+            self._gen_server_parameter_specialized(param)
+        elif param.cpp_varname is not None:
             self._gen_server_parameter_with_storage(param)
         else:
             self._gen_server_parameter_without_storage(param)
@@ -1839,8 +1912,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate IDLServerParameter instances."""
 
         for param in params:
+            # Definitions for specialized server parameters.
+            if param.cpp_class:
+                self._gen_server_parameter_class_definitions(param)
+
             # Optional storage declarations.
-            if (param.cpp_vartype is not None) and (param.cpp_varname is not None):
+            elif (param.cpp_vartype is not None) and (param.cpp_varname is not None):
                 with self._condition(param.condition, preprocessor_only=True):
                     init = ('{%s}' % (param.default.expr)) if param.default else ''
                     self._writer.write_line('%s %s%s;' % (param.cpp_vartype, param.cpp_varname,
@@ -1853,9 +1930,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             for param_no, param in enumerate(params):
                 self.gen_description_comment(param.description)
                 with self._condition(param.condition):
-                    with self.get_initializer_lambda('auto* scp_%d' % (param_no), unused=(len(
-                            param.deprecated_name) == 0), return_type='ServerParameter*'):
+                    unused = not (param.test_only or param.deprecated_name)
+                    with self.get_initializer_lambda('auto* scp_%d' % (param_no), unused=unused,
+                                                     return_type='ServerParameter*'):
                         self._gen_server_parameter(param)
+
+                    if param.test_only:
+                        self._writer.write_line('scp_%d->setTestOnly();' % (param_no))
 
                     self._gen_server_parameter_deprecated_aliases(param_no, param)
                 self.write_empty_line()

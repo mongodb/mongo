@@ -541,6 +541,26 @@ def _parse_command(ctxt, spec, name, node):
     spec.symbols.add_command(ctxt, command)
 
 
+def _parse_server_parameter_class(ctxt, node):
+    # type: (errors.ParserContext, Union[yaml.nodes.ScalarNode,yaml.nodes.MappingNode]) -> syntax.ServerParameterClass
+    """Parse a server_parameter.cpp_class as either a scalar or a mapping."""
+    spc = syntax.ServerParameterClass(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+
+    if node.id == 'scalar':
+        spc.name = node.value
+        return spc
+
+    _generic_parser(
+        ctxt, node, "cpp_class", spc, {
+            "name": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "data": _RuleDesc('scalar'),
+            "override_ctor": _RuleDesc('bool_scalar'),
+            "override_set": _RuleDesc('bool_scalar'),
+        })
+
+    return spc
+
+
 def _parse_server_parameter(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, unicode, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a server_parameters section in the IDL file."""
@@ -549,6 +569,9 @@ def _parse_server_parameter(ctxt, spec, name, node):
 
     param = syntax.ServerParameter(ctxt.file_name, node.start_mark.line, node.start_mark.column)
     param.name = name
+
+    # Declare as local to avoid ugly formatting with long line.
+    map_class = _parse_server_parameter_class
 
     _generic_parser(
         ctxt, node, "server_parameters", param, {
@@ -566,6 +589,7 @@ def _parse_server_parameter(ctxt, spec, name, node):
             "from_string": _RuleDesc('scalar'),
             "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),
             "on_update": _RuleDesc("scalar"),
+            "cpp_class": _RuleDesc('scalar_or_mapping', mapping_parser_func=map_class),
         })
 
     spec.server_parameters.append(param)
