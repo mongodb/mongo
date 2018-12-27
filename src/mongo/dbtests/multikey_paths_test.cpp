@@ -33,7 +33,6 @@
 #include <iostream>
 #include <string>
 
-#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
