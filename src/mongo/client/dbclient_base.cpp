@@ -857,7 +857,7 @@ void DBClientBase::dropIndex(const string& ns, BSONObj keys) {
 void DBClientBase::dropIndex(const string& ns, const string& indexName) {
     BSONObj info;
     if (!runCommand(nsToDatabase(ns),
-                    BSON("deleteIndexes" << nsToCollectionSubstring(ns) << "index" << indexName),
+                    BSON("dropIndexes" << nsToCollectionSubstring(ns) << "index" << indexName),
                     info)) {
         LOG(_logLevel) << "dropIndex failed: " << info << endl;
         uassert(10007, "dropIndex failed", 0);
@@ -869,8 +869,8 @@ void DBClientBase::dropIndexes(const string& ns) {
     uassert(10008,
             "dropIndexes failed",
             runCommand(nsToDatabase(ns),
-                       BSON("deleteIndexes" << nsToCollectionSubstring(ns) << "index"
-                                            << "*"),
+                       BSON("dropIndexes" << nsToCollectionSubstring(ns) << "index"
+                                          << "*"),
                        info));
 }
 
