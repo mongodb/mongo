@@ -898,7 +898,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 break;
             }
 
-            _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, res, &lastOpApplied);
+            if (_applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, res, &lastOpApplied)) {
+                continue;
+            }
 
             const int maxIterations = 3600 * 50;
 
