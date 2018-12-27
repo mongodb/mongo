@@ -34,7 +34,7 @@
 
 #include "mongo/db/transaction_coordinator_catalog.h"
 
-#include "mongo/db/transaction_coordinator.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -58,15 +58,12 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
         _waitForStepUpToComplete(lk, opCtx);
     }
 
-    // Create a new map for the session if it does not exist
-    if (_coordinatorsBySession.find(lsid) == _coordinatorsBySession.end()) {
-        _coordinatorsBySession[lsid] = {};
-    }
+    auto& coordinatorsBySession = _coordinatorsBySession[lsid];
 
     // We should never try to insert a coordinator if one already exists for this session and txn
     // number. Logic for avoiding this due to e.g. malformed commands should be handled external to
     // the catalog.
-    invariant(_coordinatorsBySession[lsid].find(txnNumber) == _coordinatorsBySession[lsid].end(),
+    invariant(coordinatorsBySession.find(txnNumber) == coordinatorsBySession.end(),
               "Cannot insert a TransactionCoordinator into the TransactionCoordinatorCatalog with "
               "the same session ID and transaction number as a previous coordinator");
 
@@ -83,7 +80,7 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
 
     LOG(3) << "Inserting coordinator for transaction " << txnNumber << " on session "
            << lsid.toBSON() << " into in-memory catalog";
-    _coordinatorsBySession[lsid][txnNumber] = std::move(coordinator);
+    coordinatorsBySession[txnNumber] = std::move(coordinator);
 }
 
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(OperationContext* opCtx,

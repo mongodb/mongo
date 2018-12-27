@@ -51,7 +51,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
@@ -75,7 +75,7 @@ public:
              BSONObjBuilder& result) override {
         auto txnRouter = TransactionRouter::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
-                "commitTransaction can only be run within a context of a session",
+                "commitTransaction can only be run within a session",
                 txnRouter != nullptr);
 
         auto commitCmd = CommitTransaction::parse(IDLParserErrorContext("commit cmd"), cmdObj);
@@ -83,6 +83,7 @@ public:
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
+
 } clusterCommitTransactionCmd;
 
 }  // namespace

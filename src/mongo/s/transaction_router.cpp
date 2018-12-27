@@ -159,18 +159,15 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
 
 }  // unnamed namespace
 
-TransactionRouter::Participant::Participant(bool isCoordinator,
-                                            StmtId stmtIdCreatedAt,
-                                            SharedTransactionOptions sharedOptions)
-    : _isCoordinator(isCoordinator),
-      _stmtIdCreatedAt(stmtIdCreatedAt),
-      _sharedOptions(sharedOptions) {}
+TransactionRouter::Participant::Participant(bool inIsCoordinator,
+                                            StmtId inStmtIdCreatedAt,
+                                            SharedTransactionOptions inSharedOptions)
+    : isCoordinator(inIsCoordinator),
+      stmtIdCreatedAt(inStmtIdCreatedAt),
+      sharedOptions(std::move(inSharedOptions)) {}
 
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     BSONObj cmd, bool isFirstStatementInThisParticipant) const {
-    // Perform checks first before calling std::move on cmd.
-    auto isTxnCmd = isTransactionCommand(cmd);
-
     bool hasStartTxn = false;
     bool hasAutoCommit = false;
     bool hasTxnNum = false;
@@ -195,7 +192,7 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     // The first command sent to a participant must start a transaction, unless it is a transaction
     // command, which don't support the options that start transactions, i.e. startTransaction and
     // readConcern. Otherwise the command must not have a read concern.
-    bool mustStartTransaction = isFirstStatementInThisParticipant && !isTxnCmd;
+    bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmd);
 
     if (!mustStartTransaction) {
         dassert(!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
@@ -203,12 +200,12 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
 
     BSONObjBuilder newCmd = mustStartTransaction
         ? appendFieldsForStartTransaction(std::move(cmd),
-                                          _sharedOptions.readConcernArgs,
-                                          _sharedOptions.atClusterTime,
+                                          sharedOptions.readConcernArgs,
+                                          sharedOptions.atClusterTime,
                                           !hasStartTxn)
         : BSONObjBuilder(std::move(cmd));
 
-    if (_isCoordinator) {
+    if (isCoordinator) {
         newCmd.append(kCoordinatorField, true);
     }
 
@@ -217,22 +214,14 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     }
 
     if (!hasTxnNum) {
-        newCmd.append(OperationSessionInfo::kTxnNumberFieldName, _sharedOptions.txnNumber);
+        newCmd.append(OperationSessionInfo::kTxnNumberFieldName, sharedOptions.txnNumber);
     } else {
         auto osi =
             OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, newCmd.asTempObj());
-        invariant(_sharedOptions.txnNumber == *osi.getTxnNumber());
+        invariant(sharedOptions.txnNumber == *osi.getTxnNumber());
     }
 
     return newCmd.obj();
-}
-
-bool TransactionRouter::Participant::isCoordinator() const {
-    return _isCoordinator;
-}
-
-StmtId TransactionRouter::Participant::getStmtIdCreatedAt() const {
-    return _stmtIdCreatedAt;
 }
 
 LogicalTime TransactionRouter::AtClusterTime::getTime() const {
@@ -300,24 +289,23 @@ void TransactionRouter::_verifyReadConcern() {
 }
 
 void TransactionRouter::_verifyParticipantAtClusterTime(const Participant& participant) {
-    auto participantAtClusterTime = participant.getSharedOptions().atClusterTime;
+    const auto& participantAtClusterTime = participant.sharedOptions.atClusterTime;
     invariant(participantAtClusterTime);
     invariant(*participantAtClusterTime == _atClusterTime->getTime());
 }
 
-boost::optional<TransactionRouter::Participant&> TransactionRouter::getParticipant(
-    const ShardId& shard) {
-    auto iter = _participants.find(shard.toString());
-    if (iter == _participants.end()) {
-        return boost::none;
-    }
+TransactionRouter::Participant* TransactionRouter::getParticipant(const ShardId& shard) {
+    const auto iter = _participants.find(shard.toString());
+    if (iter == _participants.end())
+        return nullptr;
 
     _verifyReadConcern();
+
     if (_atClusterTime) {
         _verifyParticipantAtClusterTime(iter->second);
     }
 
-    return iter->second;
+    return &iter->second;
 }
 
 TransactionRouter::Participant& TransactionRouter::_createParticipant(const ShardId& shard) {
@@ -345,7 +333,7 @@ TransactionRouter::Participant& TransactionRouter::_createParticipant(const Shar
 void TransactionRouter::_clearPendingParticipants() {
     for (auto&& it = _participants.begin(); it != _participants.end();) {
         auto participant = it++;
-        if (participant->second.getStmtIdCreatedAt() == _latestStmtId) {
+        if (participant->second.stmtIdCreatedAt == _latestStmtId) {
             _participants.erase(participant);
         }
     }
@@ -540,17 +528,19 @@ const LogicalSessionId& TransactionRouter::_sessionId() const {
 Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-    auto citer = _participants.cbegin();
-    ShardId shardId(citer->first);
-    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+    const auto citer = _participants.cbegin();
 
-    CommitTransaction commitCmd;
-    commitCmd.setDbName("admin");
+    const auto& shardId(citer->first);
+    const auto& participant = citer->second;
+
+    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
     LOG(0) << _txnIdToString()
            << " Committing single shard transaction, single participant: " << shardId;
 
-    const auto& participant = citer->second;
+    CommitTransaction commitCmd;
+    commitCmd.setDbName(NamespaceString::kAdminDb);
+
     return uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -633,7 +623,7 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
 }
 
 Shard::CommandResponse TransactionRouter::commitTransaction(
-    OperationContext* opCtx, boost::optional<TxnRecoveryToken> recoveryToken) {
+    OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
     if (_participants.empty()) {
         uassert(50940, "cannot commit with no participants", recoveryToken);
         return _commitWithRecoveryToken(opCtx, *recoveryToken);
@@ -694,25 +684,25 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
     }
 }
 
-std::string TransactionRouter::_txnIdToString() {
-    return str::stream() << "(txnNumber: " << _txnNumber << ", lsid: " << _sessionId().getId()
-                         << ")";
+std::string TransactionRouter::_txnIdToString() const {
+    return str::stream() << _sessionId().getId() << ":" << _txnNumber;
 }
 
-void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) {
-    if (_coordinatorId) {
-        BSONObjBuilder recoveryTokenBuilder(
-            builder->subobjStart(CommitTransaction::kRecoveryTokenFieldName));
-        TxnRecoveryToken recoveryToken(*_coordinatorId);
-        recoveryToken.serialize(&recoveryTokenBuilder);
-        recoveryTokenBuilder.doneFast();
-    }
+void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) const {
+    if (!_coordinatorId)
+        return;
+
+    BSONObjBuilder recoveryTokenBuilder(
+        builder->subobjStart(CommitTransaction::kRecoveryTokenFieldName));
+    TxnRecoveryToken recoveryToken(*_coordinatorId);
+    recoveryToken.serialize(&recoveryTokenBuilder);
+    recoveryTokenBuilder.doneFast();
 }
 
 Shard::CommandResponse TransactionRouter::_commitWithRecoveryToken(
     OperationContext* opCtx, const TxnRecoveryToken& recoveryToken) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto coordinatorId = recoveryToken.getShardId();
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto& coordinatorId = recoveryToken.getShardId();
 
     auto coordinateCommitCmd = [&] {
         CoordinateCommitTransaction coordinateCommitCmd;
@@ -724,11 +714,12 @@ Shard::CommandResponse TransactionRouter::_commitWithRecoveryToken(
 
         auto existingParticipant = getParticipant(coordinatorId);
         auto coordinatorParticipant =
-            existingParticipant ? existingParticipant : _createParticipant(coordinatorId);
+            existingParticipant ? existingParticipant : &_createParticipant(coordinatorId);
         return coordinatorParticipant->attachTxnFieldsIfNeeded(rawCoordinateCommit, false);
     }();
 
     _initiatedTwoPhaseCommit = true;
+
     auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, coordinatorId));
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
         opCtx,

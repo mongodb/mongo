@@ -35,16 +35,13 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-
-class TransactionCoordinator;
 
 /**
  * A container for TransactionCoordinator objects, indexed by logical session id and transaction
@@ -58,7 +55,7 @@ class TransactionCoordinatorCatalog
 
 public:
     TransactionCoordinatorCatalog();
-    virtual ~TransactionCoordinatorCatalog();
+    ~TransactionCoordinatorCatalog();
 
     /**
      * Inserts a coordinator into the catalog.

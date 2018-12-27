@@ -228,15 +228,16 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);
     executorPool->startup();
 
-    auto const grid = Grid::get(opCtx);
-    grid->init(
-        makeCatalogClient(opCtx->getServiceContext(), distLockProcessId),
-        std::move(catalogCache),
-        stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS),
-        stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
-        stdx::make_unique<BalancerConfiguration>(),
-        std::move(executorPool),
-        networkPtr);
+    const auto service = opCtx->getServiceContext();
+    auto const grid = Grid::get(service);
+
+    grid->init(makeCatalogClient(service, distLockProcessId),
+               std::move(catalogCache),
+               stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS),
+               stdx::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
+               stdx::make_unique<BalancerConfiguration>(),
+               std::move(executorPool),
+               networkPtr);
 
     // The shard registry must be started once the grid is initialized
     grid->shardRegistry()->startup(opCtx);
@@ -250,10 +251,9 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         std::make_shared<KeysCollectionManager>(KeysCollectionManager::kKeyManagerPurposeString,
                                                 std::move(keysCollectionClient),
                                                 Seconds(KeysRotationIntervalSec));
-    keyManager->startMonitoring(opCtx->getServiceContext());
+    keyManager->startMonitoring(service);
 
-    LogicalTimeValidator::set(opCtx->getServiceContext(),
-                              stdx::make_unique<LogicalTimeValidator>(keyManager));
+    LogicalTimeValidator::set(service, stdx::make_unique<LogicalTimeValidator>(keyManager));
 
     return Status::OK();
 }

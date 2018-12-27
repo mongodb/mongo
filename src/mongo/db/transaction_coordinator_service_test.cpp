@@ -224,17 +224,8 @@ public:
         ASSERT_FALSE(network()->hasReadyRequests());
     }
 
-    LogicalSessionId lsid() {
-        return _lsid;
-    }
-
-    TxnNumber txnNumber() {
-        return _txnNumber;
-    }
-
     // TODO (SERVER-38382): Put all these helpers in one separate file and share with
     // transaction_coordinator_test.
-
 
     /**
      * Goes through the steps to commit a transaction through the coordinator service  for a given
@@ -283,8 +274,6 @@ public:
         commitDecisionFuture.get();
     }
 
-
-private:
     // Override the CatalogClient to make CatalogClient::getAllShards automatically return the
     // expected shards. We cannot mock the network responses for the ShardRegistry reload, since the
     // ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
@@ -326,7 +315,7 @@ public:
     void setUp() final {
         TransactionCoordinatorServiceTest::setUp();
         TransactionCoordinatorService::get(operationContext())
-            ->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+            ->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
     }
 
     TransactionCoordinatorService* coordinatorService() {
@@ -338,43 +327,43 @@ public:
 
 TEST_F(TransactionCoordinatorServiceTest, CreateCoordinatorOnNewSessionSucceeds) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
-    commitTransaction(*coordinatorService, lsid(), txnNumber(), kTwoShardIdSet);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
+    commitTransaction(*coordinatorService, _lsid, _txnNumber, kTwoShardIdSet);
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
        CreateCoordinatorForExistingSessionWithPreviouslyCommittedTxnSucceeds) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
-    commitTransaction(*coordinatorService, lsid(), txnNumber(), kTwoShardIdSet);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
+    commitTransaction(*coordinatorService, _lsid, _txnNumber, kTwoShardIdSet);
 
     coordinatorService->createCoordinator(
-        operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
-    commitTransaction(*coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
+    commitTransaction(*coordinatorService, _lsid, _txnNumber + 1, kTwoShardIdSet);
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
        RetryingCreateCoordinatorForSameLsidAndTxnNumberSucceeds) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
     // Retry create. This should succeed but not replace the old coordinator.
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
-    commitTransaction(*coordinatorService, lsid(), txnNumber(), kTwoShardIdSet);
+    commitTransaction(*coordinatorService, _lsid, _txnNumber, kTwoShardIdSet);
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
        CreateCoordinatorWithHigherTxnNumberThanOngoingCommittingTxnCommitsPreviousTxnAndSucceeds) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     // Progress the transaction up until the point where it has sent commit and is waiting for
     // commit acks.
     auto oldTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // Simulate all participants acking prepare/voting to commit.
     assertPrepareSentAndRespondWithSuccess();
@@ -384,9 +373,9 @@ TEST_F(TransactionCoordinatorServiceTest,
     // "tryAbort" on the old coordinator which should NOT abort it since it's already waiting for
     // commit acks.
     coordinatorService->createCoordinator(
-        operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
+        operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
     auto newTxnCommitDecisionFuture = coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber() + 1, kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber + 1, kTwoShardIdSet);
 
     // Finish committing the old transaction by sending it commit acks from both participants.
     assertCommitSentAndRespondWithSuccess();
@@ -394,25 +383,25 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // The old transaction should now be committed.
     ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
-    commitTransaction(*coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
+              static_cast<int>(txn::CommitDecision::kCommit));
+    commitTransaction(*coordinatorService, _lsid, _txnNumber + 1, kTwoShardIdSet);
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinateCommitReturnsNoneIfNoCoordinatorEverExisted) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-    auto commitDecisionFuture = coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+    auto commitDecisionFuture =
+        coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
     ASSERT(boost::none == commitDecisionFuture);
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinateCommitReturnsNoneIfCoordinatorWasRemoved) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
-    commitTransaction(*coordinatorService, lsid(), txnNumber(), kTwoShardIdSet);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
+    commitTransaction(*coordinatorService, _lsid, _txnNumber, kTwoShardIdSet);
 
-    auto commitDecisionFuture = coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+    auto commitDecisionFuture =
+        coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
     ASSERT(boost::none == commitDecisionFuture);
 }
 
@@ -420,15 +409,15 @@ TEST_F(TransactionCoordinatorServiceTest,
        CoordinateCommitWithSameParticipantListJoinsOngoingCoordinationThatLeadsToAbort) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     auto commitDecisionFuture1 = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
     auto commitDecisionFuture2 = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
@@ -442,15 +431,15 @@ TEST_F(TransactionCoordinatorServiceTest,
        CoordinateCommitWithSameParticipantListJoinsOngoingCoordinationThatLeadsToCommit) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     auto commitDecisionFuture1 = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithSuccess();
 
     auto commitDecisionFuture2 = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
@@ -463,15 +452,15 @@ TEST_F(TransactionCoordinatorServiceTest,
 TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationThatLeadsToAbort) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     auto commitDecisionFuture1 = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
     auto commitDecisionFuture2 =
-        *coordinatorService->recoverCommit(operationContext(), lsid(), txnNumber());
+        *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumber);
 
     assertPrepareSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
@@ -484,15 +473,15 @@ TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationT
 TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationThatLeadsToCommit) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
 
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     auto commitDecisionFuture1 = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithSuccess();
 
     auto commitDecisionFuture2 =
-        *coordinatorService->recoverCommit(operationContext(), lsid(), txnNumber());
+        *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumber);
 
     assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
@@ -506,33 +495,33 @@ TEST_F(
     TransactionCoordinatorServiceTest,
     CreateCoordinatorWithHigherTxnNumberThanExistingButNotYetCommittingTxnCancelsPreviousTxnAndSucceeds) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     // Create a coordinator for a higher transaction number in the same session. This should
     // cancel commit on the old coordinator.
     coordinatorService->createCoordinator(
-        operationContext(), lsid(), txnNumber() + 1, kCommitDeadline);
+        operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
     auto newTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber() + 1, kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber + 1, kTwoShardIdSet);
 
     // Since this transaction has already been canceled, this should return boost::none.
-    auto oldTxnCommitDecisionFuture = coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+    auto oldTxnCommitDecisionFuture =
+        coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // The old transaction should now be committed.
     ASSERT(oldTxnCommitDecisionFuture == boost::none);
 
     // Make sure the newly created one works fine too.
-    commitTransaction(*coordinatorService, lsid(), txnNumber() + 1, kTwoShardIdSet);
+    commitTransaction(*coordinatorService, _lsid, _txnNumber + 1, kTwoShardIdSet);
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToPrepare) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     // Coordinator sends prepare.
     auto commitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // One participant responds with writeConcern error.
     assertPrepareSentAndRespondWithSuccess();
@@ -554,16 +543,16 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorT
 
     // The transaction should now be committed.
     ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
+              static_cast<int>(txn::CommitDecision::kCommit));
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToAbort) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     // Coordinator sends prepare.
     auto commitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // One participant votes to abort.
     assertPrepareSentAndRespondWithSuccess();
@@ -584,16 +573,16 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorT
 
     // The transaction should now be aborted.
     ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kAbort));
+              static_cast<int>(txn::CommitDecision::kAbort));
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToCommit) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), kCommitDeadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
 
     // Coordinator sends prepare.
     auto commitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // Both participants vote to commit.
     assertPrepareSentAndRespondWithSuccess();
@@ -613,14 +602,14 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorT
 
     // The transaction should now be committed.
     ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
+              static_cast<int>(txn::CommitDecision::kCommit));
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
        CoordinatorIsCanceledIfDeadlinePassesAndHasNotReceivedParticipantList) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
     const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), deadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, deadline);
 
     // Reach the deadline.
     network()->enterNetwork();
@@ -630,19 +619,19 @@ TEST_F(TransactionCoordinatorServiceTest,
     // The coordinator should no longer exist.
     ASSERT(boost::none ==
            coordinatorService->coordinateCommit(
-               operationContext(), lsid(), txnNumber(), kTwoShardIdSet));
+               operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
 }
 
 TEST_F(TransactionCoordinatorServiceTest,
        CoordinatorIsNotCanceledIfDeadlinePassesButHasReceivedParticipantList) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
     const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
-    coordinatorService->createCoordinator(operationContext(), lsid(), txnNumber(), deadline);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, deadline);
 
     // Deliver the participant list before the deadline.
     ASSERT(boost::none !=
            coordinatorService->coordinateCommit(
-               operationContext(), lsid(), txnNumber(), kTwoShardIdSet));
+               operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
 
     // Reach the deadline.
     network()->enterNetwork();
@@ -652,14 +641,14 @@ TEST_F(TransactionCoordinatorServiceTest,
     // The coordinator should still exist.
     ASSERT(boost::none !=
            coordinatorService->coordinateCommit(
-               operationContext(), lsid(), txnNumber(), kTwoShardIdSet));
+               operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        CoordinateCommitReturnsCorrectCommitDecisionOnAbort) {
 
     auto commitDecisionFuture = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // Simulate a participant voting to abort.
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -669,27 +658,25 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
     assertAbortSentAndRespondWithSuccess();
 
     auto commitDecision = commitDecisionFuture.get();
-    ASSERT_EQ(static_cast<int>(commitDecision),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kAbort));
+    ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kAbort));
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        CoordinateCommitWithNoVotesReturnsNotReadyFuture) {
 
     auto commitDecisionFuture = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     ASSERT_FALSE(commitDecisionFuture.isReady());
     // To prevent invariant failure in TransactionCoordinator that all futures have been completed.
-    abortTransaction(
-        *coordinatorService(), lsid(), txnNumber(), kTwoShardIdSet, kTwoShardIdList[0]);
+    abortTransaction(*coordinatorService(), _lsid, _txnNumber, kTwoShardIdSet, kTwoShardIdList[0]);
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        CoordinateCommitReturnsCorrectCommitDecisionOnCommit) {
 
     auto commitDecisionFuture = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithSuccess();
@@ -697,19 +684,18 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
     assertCommitSentAndRespondWithSuccess();
 
     auto commitDecision = commitDecisionFuture.get();
-    ASSERT_EQ(static_cast<int>(commitDecision),
-              static_cast<int>(TransactionCoordinator::CommitDecision::kCommit));
+    ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kCommit));
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        ConcurrentCallsToCoordinateCommitReturnSameDecisionOnCommit) {
 
     auto commitDecisionFuture1 = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
     auto commitDecisionFuture2 = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
-    commitTransaction(*coordinatorService(), lsid(), txnNumber(), kTwoShardIdSet);
+    commitTransaction(*coordinatorService(), _lsid, _txnNumber, kTwoShardIdSet);
 
     ASSERT_EQ(static_cast<int>(commitDecisionFuture1.get()),
               static_cast<int>(commitDecisionFuture2.get()));
@@ -719,12 +705,11 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        ConcurrentCallsToCoordinateCommitReturnSameDecisionOnAbort) {
 
     auto commitDecisionFuture1 = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
     auto commitDecisionFuture2 = *coordinatorService()->coordinateCommit(
-        operationContext(), lsid(), txnNumber(), kTwoShardIdSet);
+        operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
-    abortTransaction(
-        *coordinatorService(), lsid(), txnNumber(), kTwoShardIdSet, kTwoShardIdList[0]);
+    abortTransaction(*coordinatorService(), _lsid, _txnNumber, kTwoShardIdSet, kTwoShardIdList[0]);
 
     ASSERT_EQ(static_cast<int>(commitDecisionFuture1.get()),
               static_cast<int>(commitDecisionFuture2.get()));

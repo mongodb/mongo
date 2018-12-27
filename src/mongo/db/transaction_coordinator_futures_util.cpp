@@ -28,62 +28,22 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/transaction_router.h"
+#include "mongo/db/transaction_coordinator_futures_util.h"
 
 namespace mongo {
-namespace {
+namespace txn {
 
-/**
- * Implements the abortTransaction command on mongos.
- */
-class ClusterAbortTransactionCmd : public BasicCommand {
-public:
-    ClusterAbortTransactionCmd() : BasicCommand("abortTransaction") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+Future<void> whenAll(std::vector<Future<void>>& futures) {
+    std::vector<Future<int>> dummyFutures;
+    for (auto&& f : futures) {
+        dummyFutures.push_back(std::move(f).then([]() { return 0; }));
     }
+    return collect(
+               std::move(dummyFutures), 0, [](int, const int&) { return ShouldStopIteration::kNo; })
+        .ignoreValue();
+}
 
-    bool adminOnly() const override {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    std::string help() const override {
-        return "Aborts a transaction";
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto txnRouter = TransactionRouter::get(opCtx);
-        uassert(ErrorCodes::InvalidOptions,
-                "abortTransaction can only be run within a session",
-                txnRouter);
-
-        auto response = txnRouter->abortTransaction(opCtx);
-
-        std::string errMsg;
-        return appendRawResponses(opCtx, &errMsg, &result, response);
-    }
-
-} clusterAbortTransactionCmd;
-
-}  // namespace
+}  // namespace txn
 }  // namespace mongo

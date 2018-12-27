@@ -644,11 +644,12 @@ env.Library(
 env.Library(
     target='transaction_coordinator',
     source=[
-        'transaction_coordinator.cpp',
         'transaction_coordinator_catalog.cpp',
+        'transaction_coordinator_driver.cpp',
         'transaction_coordinator_factory_mongod.cpp',
+        'transaction_coordinator_futures_util.cpp',
         'transaction_coordinator_service.cpp',
-        'transaction_coordinator_util.cpp',
+        'transaction_coordinator.cpp',
         env.Idlc('transaction_coordinator_document.idl')[0],
     ],
     LIBDEPS=[
@@ -723,12 +724,12 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='transaction_two_phase_commit_test',
+    target='transaction_coordinator_test',
     source=[
         'transaction_coordinator_catalog_test.cpp',
+        'transaction_coordinator_futures_util_test.cpp',
         'transaction_coordinator_service_test.cpp',
         'transaction_coordinator_test.cpp',
-        'transaction_coordinator_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',

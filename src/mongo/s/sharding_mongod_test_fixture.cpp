@@ -100,8 +100,8 @@ ShardingMongodTestFixture::~ShardingMongodTestFixture() = default;
 void ShardingMongodTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
 
-    auto service = getServiceContext();
-    _opCtx = cc().makeOperationContext();
+    const auto service = getServiceContext();
+    _opCtx = makeOperationContext();
 
     // Set up this node as part of a replica set.
 
@@ -363,11 +363,6 @@ DistLockManager* ShardingMongodTestFixture::distLock() const {
 RemoteCommandTargeterFactoryMock* ShardingMongodTestFixture::targeterFactory() const {
     invariant(_targeterFactory);
     return _targeterFactory;
-}
-
-OperationContext* ShardingMongodTestFixture::operationContext() const {
-    invariant(_opCtx);
-    return _opCtx.get();
 }
 
 void ShardingMongodTestFixture::onCommand(NetworkTestEnv::OnCommandFunction func) {

@@ -32,26 +32,23 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_util.h"
-
-#include "mongo/db/logical_clock.h"
+#include "mongo/db/transaction_coordinator_driver.h"
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/executor/task_executor_pool.h"
+#include "mongo/db/transaction_coordinator_futures_util.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/functional.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
@@ -63,7 +60,10 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
-using CommitDecision = TransactionCoordinator::CommitDecision;
+
+using PrepareVote = txn::PrepareVote;
+using PrepareResponse = txn::PrepareResponse;
+using CommitDecision = txn::CommitDecision;
 
 const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
     WriteConcernOptions::kInternalMajorityNoSnapshot,
@@ -76,8 +76,7 @@ const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
 HostAndPort targetHost(const ShardId& shardId, const ReadPreferenceSetting& readPref) {
     const auto opCtxHolder = cc().makeOperationContext();
     const auto opCtx = opCtxHolder.get();
-    auto shard = uassertStatusOK(
-        Grid::get(opCtx->getServiceContext())->shardRegistry()->getShard(opCtx, shardId));
+    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
     // TODO SERVER-35678 return a SemiFuture<HostAndPort> rather than using a blocking call to
     // get().
     return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
@@ -193,72 +192,6 @@ BSONArray buildParticipantListMatchesConditions(const std::vector<ShardId>& part
     return BSON_ARRAY(participantListContains << participantListHasSize);
 }
 
-std::string buildParticipantListString(const std::vector<ShardId>& participantList) {
-    StringBuilder ss;
-    ss << "[";
-    for (const auto& participant : participantList) {
-        ss << participant << " ";
-    }
-    ss << "]";
-    return ss.str();
-}
-
-}  // namespace
-
-
-namespace txn {
-
-// TODO (SERVER-37880): Implement backoff for retries and only retry commands on retryable
-// errors.
-Future<void> sendDecisionToParticipantShard(executor::TaskExecutor* executor,
-                                            ThreadPool* pool,
-                                            const ShardId& shardId,
-                                            const BSONObj& commandObj) {
-    return sendAsyncCommandToShard(executor, pool, shardId, commandObj)
-        .then([ executor, pool, shardId, commandObj = commandObj.getOwned() ](
-            ResponseStatus response) {
-
-            auto status = getStatusFromCommandResult(response.data);
-            auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
-            // There must be no write concern errors in order for us to be able to
-            // interpret the command response.
-            if (!wcStatus.isOK()) {
-                status = wcStatus;
-            }
-
-            if (status.isOK()) {
-                LOG(3) << "Coordinator shard received OK in response to " << commandObj
-                       << "from shard " << shardId;
-                return Status::OK();
-            } else if (ErrorCodes::isVoteAbortError(status.code())) {
-                LOG(3) << "Coordinator shard received a vote abort error in response to "
-                       << commandObj << "from shard " << shardId << causedBy(status)
-                       << ", interpreting as a successful ack";
-
-                return Status::OK();
-            } else {
-                // Propagate the error.
-                return status;
-            }
-        })
-        .onError(
-            [ executor, pool, shardId, commandObj = commandObj.getOwned() ](Status status)
-                ->Future<void> {
-                    if (isRetryableError(status.code())) {
-                        LOG(3) << "Coordinator shard received a retryable error in response to "
-                               << commandObj << "from shard " << shardId << causedBy(status)
-                               << ", resending command.";
-
-                        return sendDecisionToParticipantShard(executor, pool, shardId, commandObj);
-                    } else {
-                        LOG(3) << "Coordinator shard received a non-retryable error in response to "
-                               << commandObj << "from shard " << shardId << causedBy(status);
-                        // Propagate the error.
-                        return status;
-                    }
-                });
-}
-
 /**
  * Processes a response from a participant to the prepareTransaction command. An OK response is
  * interpreted as a vote to commit, and the prepareTimestamp is extracted from the response and
@@ -314,154 +247,29 @@ PrepareResponse getCommitVoteFromPrepareResponse(const ShardId& shardId,
     MONGO_UNREACHABLE;
 }
 
-Future<PrepareResponse> sendPrepareToShard(executor::TaskExecutor* executor,
-                                           ThreadPool* pool,
-                                           const BSONObj& prepareCommandObj,
-                                           const ShardId& shardId,
-                                           std::shared_ptr<TransactionCoordinator> coordinator) {
-
-    return sendAsyncCommandToShard(executor, pool, shardId, prepareCommandObj)
-        .then([
-            coordinator,
-            executor,
-            pool,
-            prepareCommandObj = prepareCommandObj.getOwned(),
-            shardId
-        ](ResponseStatus response) { return getCommitVoteFromPrepareResponse(shardId, response); })
-        .onError<ErrorCodes::ShardNotFound>([shardId](Status s) {
-            // ShardNotFound indicates a participant shard was removed, so that is interpreted
-            // as an abort decision.
-            return Future<PrepareResponse>::makeReady(
-                {shardId, CommitDecision::kAbort, boost::none});
-        })
-        .onError([
-            coordinator,
-            executor,
-            pool,
-            prepareCommandObj = prepareCommandObj.getOwned(),
-            shardId
-        ](Status status) {
-            if (isRetryableError(status.code())) {
-                if (coordinator->getState() ==
-                    TransactionCoordinator::CoordinatorState::kPreparing) {
-                    // Retry on error if we're still in the preparing state.
-                    return sendPrepareToShard(
-                        executor, pool, prepareCommandObj, shardId, coordinator);
-                } else {
-                    LOG(3) << "Prepare stopped retrying due to concurrent received abort";
-                    return Future<PrepareResponse>::makeReady({shardId, boost::none, boost::none});
-                }
-            } else {
-                // Rethrow any non-retryable errors.
-                uassertStatusOK(status);
-            }
-            MONGO_UNREACHABLE;
-        });
-}
-
-Future<PrepareVoteConsensus> sendPrepare(std::shared_ptr<TransactionCoordinator> coordinator,
-                                         executor::TaskExecutor* executor,
-                                         ThreadPool* pool,
-                                         const std::vector<ShardId>& participantShards,
-                                         const LogicalSessionId& lsid,
-                                         const TxnNumber& txnNumber) {
-
-    PrepareTransaction prepareCmd;
-    prepareCmd.setDbName("admin");
-    auto prepareObj = prepareCmd.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
-                    << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::InternalMajorityNoSnapshot));
-
-    std::vector<Future<PrepareResponse>> responses;
-
-    // Send prepare to all participants asynchronously and collect their future responses in a
-    // vector of responses.
-    for (const auto& participant : participantShards) {
-        responses.push_back(
-            sendPrepareToShard(executor, pool, prepareObj, participant, coordinator));
+std::string buildParticipantListString(const std::vector<ShardId>& participantList) {
+    StringBuilder ss;
+    ss << "[";
+    for (const auto& participant : participantList) {
+        ss << participant << " ";
     }
-
-    // Asynchronously aggregate all prepare responses to find the decision and max prepare timestamp
-    // (used for commit), stopping the aggregation as soon as an abort decision is received. Return
-    // a future containing the result.
-    return collect(
-        std::move(responses),
-        // Initial value
-        PrepareVoteConsensus{boost::none, boost::none},
-        // Aggregates an incoming response (next) with the existing aggregate value (result)
-        [coordinator](PrepareVoteConsensus& result, const PrepareResponse& next) {
-            // There only won't be a vote when a prepareTransaction command fails, and then before
-            // retrying it sees that the coordinator is no longer in state 'preparing' due to a
-            // concurrently-received vote to abort. This means that a vote to abort must have
-            // already been processed by 'collect', and so an unknown vote should never be processed
-            // here unless there's a bug in collect.
-            invariant(next.vote);
-            switch (next.vote.get()) {
-                case PrepareVote::kAbort:
-                    LOG(3) << "Transaction coordinator received a vote to abort from shard "
-                           << next.participantShardId;
-                    result.decision = CommitDecision::kAbort;
-                    result.maxPrepareTimestamp = boost::none;
-                    return ShouldStopIteration::kYes;
-                case PrepareVote::kCommit:
-                    LOG(3) << "Transaction coordinator received a vote to commit from shard "
-                           << next.participantShardId;
-                    result.decision = CommitDecision::kCommit;
-                    result.maxPrepareTimestamp = (result.maxPrepareTimestamp)
-                        ? std::max(result.maxPrepareTimestamp, next.prepareTimestamp)
-                        : next.prepareTimestamp;
-                    return ShouldStopIteration::kNo;
-            }
-            MONGO_UNREACHABLE;
-        });
+    ss << "]";
+    return ss.str();
 }
 
-Future<void> sendCommit(executor::TaskExecutor* executor,
-                        ThreadPool* pool,
-                        const std::vector<ShardId>& participantShards,
-                        const LogicalSessionId& lsid,
-                        const TxnNumber& txnNumber,
-                        Timestamp commitTimestamp) {
-    CommitTransaction commitTransaction;
-    commitTransaction.setCommitTimestamp(commitTimestamp);
-    commitTransaction.setDbName("admin");
-    BSONObj commitObj = commitTransaction.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
-                    << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::Majority));
+}  // namespace
 
-    std::vector<Future<void>> responses;
-    for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(executor, pool, participant, commitObj));
-    }
-    return whenAll(responses);
-}
+TransactionCoordinatorDriver::TransactionCoordinatorDriver(executor::TaskExecutor* executor,
+                                                           ThreadPool* pool)
+    : _executor(executor), _pool(pool) {}
 
-Future<void> sendAbort(executor::TaskExecutor* executor,
-                       ThreadPool* pool,
-                       const std::vector<ShardId>& participantShards,
-                       const LogicalSessionId& lsid,
-                       const TxnNumber& txnNumber) {
-    // TODO (SERVER-36584) Use IDL to create command BSON.
-    BSONObj abortObj =
-        BSON("abortTransaction" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << txnNumber
-                                << "autocommit"
-                                << false
-                                << WriteConcernOptions::kWriteConcernField
-                                << WriteConcernOptions::Majority);
+TransactionCoordinatorDriver::~TransactionCoordinatorDriver() = default;
 
-    std::vector<Future<void>> responses;
-    for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(executor, pool, participant, abortObj));
-    }
-    return whenAll(responses);
-}
-
-void persistParticipantList(OperationContext* opCtx,
-                            LogicalSessionId lsid,
-                            TxnNumber txnNumber,
-                            const std::vector<ShardId>& participantList) {
+namespace {
+void persistParticipantListBlocking(OperationContext* opCtx,
+                                    const LogicalSessionId& lsid,
+                                    TxnNumber txnNumber,
+                                    const std::vector<ShardId>& participantList) {
     LOG(0) << "Going to write participant list for lsid: " << lsid.toBSON()
            << ", txnNumber: " << txnNumber;
 
@@ -546,12 +354,84 @@ void persistParticipantList(OperationContext* opCtx,
                             kInternalMajorityNoSnapshotWriteConcern,
                             &unusedWCResult));
 }
+}  // namespace
 
-void persistDecision(OperationContext* opCtx,
-                     LogicalSessionId lsid,
-                     TxnNumber txnNumber,
-                     const std::vector<ShardId>& participantList,
-                     const boost::optional<Timestamp>& commitTimestamp) {
+Future<void> TransactionCoordinatorDriver::persistParticipantList(
+    const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
+    return txn::async(_pool, [lsid, txnNumber, participantList] {
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        persistParticipantListBlocking(opCtx.get(), lsid, txnNumber, participantList);
+    });
+}
+
+Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
+    const std::vector<ShardId>& participantShards,
+    const LogicalSessionId& lsid,
+    TxnNumber txnNumber) {
+    PrepareTransaction prepareCmd;
+    prepareCmd.setDbName("admin");
+    auto prepareObj = prepareCmd.toBSON(
+        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
+                    << WriteConcernOptions::kWriteConcernField
+                    << WriteConcernOptions::InternalMajorityNoSnapshot));
+
+    std::vector<Future<PrepareResponse>> responses;
+
+    // Send prepare to all participants asynchronously and collect their future responses in a
+    // vector of responses.
+    for (const auto& participant : participantShards) {
+        responses.push_back(sendPrepareToShard(participant, prepareObj));
+    }
+
+    // Asynchronously aggregate all prepare responses to find the decision and max prepare timestamp
+    // (used for commit), stopping the aggregation and preventing any further retries as soon as an
+    // abort decision is received. Return a future containing the result.
+    return collect(
+        std::move(responses),
+        // Initial value
+        txn::PrepareVoteConsensus{boost::none, boost::none},
+        // Aggregates an incoming response (next) with the existing aggregate value (result)
+        [this](txn::PrepareVoteConsensus& result, const PrepareResponse& next) {
+            if (!next.vote) {
+                LOG(3) << "Transaction coordinator did not receive a response from shard "
+                       << next.participantShardId;
+                return txn::ShouldStopIteration::kNo;
+            }
+
+            switch (*next.vote) {
+                case PrepareVote::kAbort:
+                    LOG(3) << "Transaction coordinator received a vote to abort from shard "
+                           << next.participantShardId;
+                    result.decision = CommitDecision::kAbort;
+                    result.maxPrepareTimestamp = boost::none;
+                    cancel();
+                    break;
+                case PrepareVote::kCommit:
+                    LOG(3) << "Transaction coordinator received a vote to commit from shard "
+                           << next.participantShardId;
+                    if (result.decision == CommitDecision::kAbort) {
+                        LOG(3) << "Ignoring commmit decision from shard " << next.participantShardId
+                               << " because abort decision was received previously";
+                        break;
+                    }
+
+                    result.decision = CommitDecision::kCommit;
+                    result.maxPrepareTimestamp = (result.maxPrepareTimestamp)
+                        ? std::max(result.maxPrepareTimestamp, next.prepareTimestamp)
+                        : next.prepareTimestamp;
+                    break;
+            }
+
+            return txn::ShouldStopIteration::kNo;
+        });
+}
+
+namespace {
+void persistDecisionBlocking(OperationContext* opCtx,
+                             const LogicalSessionId& lsid,
+                             TxnNumber txnNumber,
+                             const std::vector<ShardId>& participantList,
+                             const boost::optional<Timestamp>& commitTimestamp) {
     LOG(0) << "Going to write decision " << (commitTimestamp ? "commit" : "abort")
            << " for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
 
@@ -657,8 +537,59 @@ void persistDecision(OperationContext* opCtx,
                             kInternalMajorityNoSnapshotWriteConcern,
                             &unusedWCResult));
 }
+}  // namespace
 
-void deleteCoordinatorDoc(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+Future<void> TransactionCoordinatorDriver::persistDecision(
+    const LogicalSessionId& lsid,
+    TxnNumber txnNumber,
+    std::vector<ShardId> participantList,
+    const boost::optional<Timestamp>& commitTimestamp) {
+    return txn::async(_pool, [lsid, txnNumber, participantList, commitTimestamp] {
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        persistDecisionBlocking(opCtx.get(), lsid, txnNumber, participantList, commitTimestamp);
+    });
+}
+
+Future<void> TransactionCoordinatorDriver::sendCommit(const std::vector<ShardId>& participantShards,
+                                                      const LogicalSessionId& lsid,
+                                                      TxnNumber txnNumber,
+                                                      Timestamp commitTimestamp) {
+    CommitTransaction commitTransaction;
+    commitTransaction.setCommitTimestamp(commitTimestamp);
+    commitTransaction.setDbName("admin");
+    BSONObj commitObj = commitTransaction.toBSON(
+        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
+                    << WriteConcernOptions::kWriteConcernField
+                    << WriteConcernOptions::Majority));
+
+    std::vector<Future<void>> responses;
+    for (const auto& participant : participantShards) {
+        responses.push_back(sendDecisionToParticipantShard(participant, commitObj));
+    }
+    return txn::whenAll(responses);
+}
+
+Future<void> TransactionCoordinatorDriver::sendAbort(const std::vector<ShardId>& participantShards,
+                                                     const LogicalSessionId& lsid,
+                                                     TxnNumber txnNumber) {
+    BSONObj abortObj =
+        BSON("abortTransaction" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << txnNumber
+                                << "autocommit"
+                                << false
+                                << WriteConcernOptions::kWriteConcernField
+                                << WriteConcernOptions::Majority);
+
+    std::vector<Future<void>> responses;
+    for (const auto& participant : participantShards) {
+        responses.push_back(sendDecisionToParticipantShard(participant, abortObj));
+    }
+    return txn::whenAll(responses);
+}
+
+namespace {
+void deleteCoordinatorDocBlocking(OperationContext* opCtx,
+                                  const LogicalSessionId& lsid,
+                                  TxnNumber txnNumber) {
     LOG(0) << "Going to delete coordinator doc for lsid: " << lsid.toBSON()
            << ", txnNumber: " << txnNumber;
 
@@ -719,8 +650,18 @@ void deleteCoordinatorDoc(OperationContext* opCtx, LogicalSessionId lsid, TxnNum
 
     LOG(0) << "Deleted coordinator doc for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
 }
+}  // namespace
 
-std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx) {
+Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSessionId& lsid,
+                                                                TxnNumber txnNumber) {
+    return txn::async(_pool, [lsid, txnNumber] {
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+        deleteCoordinatorDocBlocking(opCtx.get(), lsid, txnNumber);
+    });
+}
+
+std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAllCoordinatorDocs(
+    OperationContext* opCtx) {
     std::vector<TransactionCoordinatorDocument> allCoordinatorDocs;
 
     Query query;
@@ -739,15 +680,80 @@ std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationCont
     return allCoordinatorDocs;
 }
 
-Future<void> whenAll(std::vector<Future<void>>& futures) {
-    std::vector<Future<int>> dummyFutures;
-    for (auto&& f : futures) {
-        dummyFutures.push_back(std::move(f).then([]() { return 0; }));
-    }
-    return collect(
-               std::move(dummyFutures), 0, [](int, const int&) { return ShouldStopIteration::kNo; })
-        .ignoreValue();
+Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
+    const ShardId& shardId, const BSONObj& prepareCommandObj) {
+    return sendAsyncCommandToShard(_executor, _pool, shardId, prepareCommandObj)
+        .then([shardId](ResponseStatus response) {
+            return getCommitVoteFromPrepareResponse(shardId, response);
+        })
+        .onError<ErrorCodes::ShardNotFound>([shardId](const Status& s) {
+            // ShardNotFound indicates a participant shard was removed, so that is interpreted as an
+            // abort decision
+            return Future<PrepareResponse>::makeReady(
+                {shardId, CommitDecision::kAbort, boost::none});
+        })
+        .onError(
+            [ this, shardId, prepareCommandObj = prepareCommandObj.getOwned() ](Status status) {
+                if (!isRetryableError(status.code()))
+                    uassertStatusOK(status);
+
+                if (_cancelled.loadRelaxed()) {
+                    LOG(3) << "Prepare stopped retrying due to retrying being cancelled";
+                    return Future<PrepareResponse>::makeReady({shardId, boost::none, boost::none});
+                }
+
+                return sendPrepareToShard(shardId, prepareCommandObj);
+            });
 }
-}  // namespace txn
+
+// TODO (SERVER-37880): Implement backoff for retries and only retry commands on retryable
+// errors.
+Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
+    const ShardId& shardId, const BSONObj& commandObj) {
+    return sendAsyncCommandToShard(_executor, _pool, shardId, commandObj)
+        .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
+            auto status = getStatusFromCommandResult(response.data);
+            auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
+
+            // There must be no write concern errors in order for us to be able to interpret the
+            // command response
+            if (!wcStatus.isOK()) {
+                status = wcStatus;
+            }
+
+            if (status.isOK()) {
+                LOG(3) << "Coordinator shard received OK in response to " << commandObj
+                       << "from shard " << shardId;
+                return Status::OK();
+            } else if (ErrorCodes::isVoteAbortError(status.code())) {
+                LOG(3) << "Coordinator shard received a vote abort error in response to "
+                       << commandObj << "from shard " << shardId << causedBy(status)
+                       << ", interpreting as a successful ack";
+
+                return Status::OK();
+            } else {
+                return status;
+            }
+        })
+        .onError(
+            [ this, shardId, commandObj = commandObj.getOwned() ](Status status)->Future<void> {
+                if (isRetryableError(status.code())) {
+                    LOG(3) << "Coordinator shard received a retryable error in response to "
+                           << commandObj << "from shard " << shardId << causedBy(status)
+                           << ", resending command.";
+
+                    return sendDecisionToParticipantShard(shardId, commandObj);
+                } else {
+                    LOG(3) << "Coordinator shard received a non-retryable error in response to "
+                           << commandObj << "from shard " << shardId << causedBy(status);
+
+                    return status;
+                }
+            });
+}
+
+void TransactionCoordinatorDriver::cancel() {
+    _cancelled.store(true);
+}
 
 }  // namespace mongo

@@ -520,8 +520,9 @@ void MigrationManager::_schedule(WithLock lock,
     StatusWith<executor::TaskExecutor::CallbackHandle> callbackHandleWithStatus =
         executor->scheduleRemoteCommand(
             remoteRequest,
-            [this, itMigration](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-                ThreadClient tc(getThreadName(), getGlobalServiceContext());
+            [ this, service = opCtx->getServiceContext(), itMigration ](
+                const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                ThreadClient tc(getThreadName(), service);
                 auto opCtx = cc().makeOperationContext();
 
                 stdx::lock_guard<stdx::mutex> lock(_mutex);

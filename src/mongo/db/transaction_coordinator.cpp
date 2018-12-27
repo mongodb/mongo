@@ -35,21 +35,23 @@
 #include "mongo/db/transaction_coordinator.h"
 
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/transaction_coordinator_util.h"
+#include "mongo/db/transaction_coordinator_futures_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
-txn::CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
+using CoordinatorCommitDecision = TransactionCoordinator::CoordinatorCommitDecision;
+
+CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
+    ServiceContext* service,
     const txn::PrepareVoteConsensus& result,
     const LogicalSessionId& lsid,
-    const TxnNumber& txnNumber) {
+    TxnNumber txnNumber) {
     invariant(result.decision);
-    txn::CoordinatorCommitDecision decision{result.decision.get(), boost::none};
+    CoordinatorCommitDecision decision{*result.decision, boost::none};
 
-    if (result.decision == TransactionCoordinator::CommitDecision::kCommit) {
+    if (result.decision == txn::CommitDecision::kCommit) {
         invariant(result.maxPrepareTimestamp);
 
         decision.commitTimestamp = Timestamp(result.maxPrepareTimestamp->getSecs(),
@@ -58,8 +60,8 @@ txn::CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
         LOG(3) << "Advancing cluster time to commit Timestamp " << decision.commitTimestamp.get()
                << " of transaction " << txnNumber << " on session " << lsid.toBSON();
 
-        uassertStatusOK(LogicalClock::get(getGlobalServiceContext())
-                            ->advanceClusterTime(LogicalTime(result.maxPrepareTimestamp.get())));
+        uassertStatusOK(LogicalClock::get(service)->advanceClusterTime(
+            LogicalTime(result.maxPrepareTimestamp.get())));
     }
 
     return decision;
@@ -67,18 +69,30 @@ txn::CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
 
 }  // namespace
 
+TransactionCoordinator::TransactionCoordinator(ServiceContext* service,
+                                               executor::TaskExecutor* networkExecutor,
+                                               ThreadPool* callbackPool,
+                                               const LogicalSessionId& lsid,
+                                               const TxnNumber& txnNumber)
+    : _service(service),
+      _driver(networkExecutor, callbackPool),
+      _lsid(lsid),
+      _txnNumber(txnNumber),
+      _state(CoordinatorState::kInit) {}
+
 TransactionCoordinator::~TransactionCoordinator() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_state == TransactionCoordinator::CoordinatorState::kDone);
+
     // Make sure no callers of functions on the coordinator are waiting for a decision to be
     // signaled or the commit process to complete.
-    invariant(_completionPromises.size() == 0);
+    invariant(_completionPromises.empty());
 }
 
 /**
  * Implements the high-level logic for two-phase commit.
  */
-SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator::runCommit(
+SharedSemiFuture<txn::CommitDecision> TransactionCoordinator::runCommit(
     const std::vector<ShardId>& participantShards) {
     {
         // If another thread has already begun the commit process, return early.
@@ -89,104 +103,73 @@ SharedSemiFuture<TransactionCoordinator::CommitDecision> TransactionCoordinator:
         _state = CoordinatorState::kPreparing;
     }
 
-    auto coordinator = shared_from_this();
-    txn::async(_callbackPool,
-               [coordinator, participantShards] {
-                   auto opCtx = Client::getCurrent()->makeOperationContext();
-                   txn::persistParticipantList(
-                       opCtx.get(), coordinator->_lsid, coordinator->_txnNumber, participantShards);
-               })
-        .then([coordinator, participantShards]() {
-            return coordinator->_runPhaseOne(participantShards);
+    _driver.persistParticipantList(_lsid, _txnNumber, participantShards)
+        .then([this, participantShards]() { return _runPhaseOne(participantShards); })
+        .then([this, participantShards](CoordinatorCommitDecision decision) {
+            return _runPhaseTwo(participantShards, decision);
         })
-        .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
-            return coordinator->_runPhaseTwo(participantShards, decision);
-        })
-        .getAsync([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
+        .getAsync([this](Status s) { _handleCompletionStatus(s); });
 
     return _finalDecisionPromise.getFuture();
 }
 
-Future<txn::CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
+Future<CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
     const std::vector<ShardId>& participantShards) {
-    auto coordinator = shared_from_this();
-    return txn::sendPrepare(coordinator,
-                            coordinator->_networkExecutor,
-                            coordinator->_callbackPool,
-                            participantShards,
-                            coordinator->_lsid,
-                            coordinator->_txnNumber)
-        .then([coordinator, participantShards](txn::PrepareVoteConsensus result) {
-            invariant(coordinator->_state == CoordinatorState::kPreparing);
+    return _driver.sendPrepare(participantShards, _lsid, _txnNumber)
+        .then([this, participantShards](txn::PrepareVoteConsensus result) {
+            invariant(_state == CoordinatorState::kPreparing);
 
-            return txn::async(coordinator->_callbackPool, [coordinator, result, participantShards] {
-                auto opCtx = Client::getCurrent()->makeOperationContext();
+            auto decision =
+                makeDecisionFromPrepareVoteConsensus(_service, result, _lsid, _txnNumber);
 
-                const auto decision = makeDecisionFromPrepareVoteConsensus(
-                    result, coordinator->_lsid, coordinator->_txnNumber);
-
-                txn::persistDecision(opCtx.get(),
-                                     coordinator->_lsid,
-                                     coordinator->_txnNumber,
-                                     participantShards,
-                                     decision.commitTimestamp);
-                return decision;
-            });
+            return _driver
+                .persistDecision(_lsid, _txnNumber, participantShards, decision.commitTimestamp)
+                .then([decision] { return decision; });
         });
 }
 
 Future<void> TransactionCoordinator::_runPhaseTwo(const std::vector<ShardId>& participantShards,
-                                                  const txn::CoordinatorCommitDecision& decision) {
-    auto coordinator = shared_from_this();
+                                                  const CoordinatorCommitDecision& decision) {
     return _sendDecisionToParticipants(participantShards, decision)
-        .then([coordinator]() {
-            stdx::unique_lock<stdx::mutex> lk(coordinator->_mutex);
-            coordinator->_transitionToDone(std::move(lk));
-        })
-        .then([coordinator] {
-            return txn::async(coordinator->_callbackPool, [coordinator] {
-                auto opCtx = Client::getCurrent()->makeOperationContext();
-                return txn::deleteCoordinatorDoc(
-                    opCtx.get(), coordinator->_lsid, coordinator->_txnNumber);
-            });
-        })
-        .then([coordinator]() {
-            stdx::unique_lock<stdx::mutex> lk(coordinator->_mutex);
-            LOG(3) << "Two-phase commit completed for session " << coordinator->_lsid.toBSON()
-                   << ", transaction number " << coordinator->_txnNumber;
+        .then([this] { return _driver.deleteCoordinatorDoc(_lsid, _txnNumber); })
+        .then([this] {
+            LOG(3) << "Two-phase commit completed for session " << _lsid.toBSON()
+                   << ", transaction number " << _txnNumber;
+
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            _transitionToDone(std::move(ul));
         });
 }
 
 void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument& doc) {
     _state = CoordinatorState::kPreparing;
-    auto coordinator = shared_from_this();
     const auto participantShards = doc.getParticipants();
 
     if (!doc.getDecision()) {
         _runPhaseOne(participantShards)
-            .then([coordinator, participantShards](txn::CoordinatorCommitDecision decision) {
-                return coordinator->_runPhaseTwo(participantShards, decision);
+            .then([this, participantShards](CoordinatorCommitDecision decision) {
+                return _runPhaseTwo(participantShards, decision);
             })
-            .getAsync([coordinator](Status s) { coordinator->_handleCompletionStatus(s); });
+            .getAsync([this](Status s) { _handleCompletionStatus(s); });
         return;
     }
 
-    txn::CoordinatorCommitDecision decision;
+    CoordinatorCommitDecision decision;
+
     if (*doc.getDecision() == "commit") {
-        decision = txn::CoordinatorCommitDecision{TransactionCoordinator::CommitDecision::kCommit,
-                                                  *doc.getCommitTimestamp()};
+        decision =
+            CoordinatorCommitDecision{txn::CommitDecision::kCommit, *doc.getCommitTimestamp()};
     } else if (*doc.getDecision() == "abort") {
-        decision = txn::CoordinatorCommitDecision{TransactionCoordinator::CommitDecision::kAbort,
-                                                  boost::none};
+        decision = CoordinatorCommitDecision{txn::CommitDecision::kAbort, boost::none};
     }
-    _runPhaseTwo(participantShards, decision).getAsync([coordinator](Status s) {
-        coordinator->_handleCompletionStatus(s);
+
+    _runPhaseTwo(participantShards, decision).getAsync([this](Status s) {
+        _handleCompletionStatus(s);
     });
 }
 
 Future<void> TransactionCoordinator::onCompletion() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
     if (_state == CoordinatorState::kDone) {
         return Future<void>::makeReady();
     }
@@ -204,26 +187,20 @@ void TransactionCoordinator::cancelIfCommitNotYetStarted() {
 }
 
 Future<void> TransactionCoordinator::_sendDecisionToParticipants(
-    const std::vector<ShardId>& participantShards, txn::CoordinatorCommitDecision decision) {
+    const std::vector<ShardId>& participantShards, CoordinatorCommitDecision decision) {
     invariant(_state == CoordinatorState::kPreparing);
-
     _finalDecisionPromise.emplaceValue(decision.decision);
 
     // Send the decision to all participants.
     switch (decision.decision) {
-        case CommitDecision::kCommit:
+        case txn::CommitDecision::kCommit:
             _state = CoordinatorState::kCommitting;
             invariant(decision.commitTimestamp);
-            return txn::sendCommit(_networkExecutor,
-                                   _callbackPool,
-                                   participantShards,
-                                   _lsid,
-                                   _txnNumber,
-                                   decision.commitTimestamp.get());
-        case CommitDecision::kAbort:
+            return _driver.sendCommit(
+                participantShards, _lsid, _txnNumber, decision.commitTimestamp.get());
+        case txn::CommitDecision::kAbort:
             _state = CoordinatorState::kAborting;
-            return txn::sendAbort(
-                _networkExecutor, _callbackPool, participantShards, _lsid, _txnNumber);
+            return _driver.sendAbort(participantShards, _lsid, _txnNumber);
     };
     MONGO_UNREACHABLE;
 };
@@ -243,18 +220,22 @@ void TransactionCoordinator::_handleCompletionStatus(Status s) {
         invariant(_state == CoordinatorState::kPreparing);
         _finalDecisionPromise.setError(s);
     }
+
     _transitionToDone(std::move(lk));
 }
 
 void TransactionCoordinator::_transitionToDone(stdx::unique_lock<stdx::mutex> lk) noexcept {
     _state = CoordinatorState::kDone;
 
-    std::vector<Promise<void>> promisesToTrigger;
-    std::swap(promisesToTrigger, _completionPromises);
+    auto promisesToTrigger = std::move(_completionPromises);
     lk.unlock();
 
+    // No fields from 'this' are allowed to be accessed after the for loop below runs, because the
+    // future handlers indicate to the potential lifetime controller that the object can be
+    // destroyed
     for (auto&& promise : promisesToTrigger) {
         promise.emplaceValue();
     }
 }
+
 }  // namespace mongo

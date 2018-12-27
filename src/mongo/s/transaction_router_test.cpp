@@ -371,7 +371,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     {
         txnRouter.attachTxnFieldsIfNeeded(shard1, {});
         auto& participant = *txnRouter.getParticipant(shard1);
-        ASSERT(participant.isCoordinator());
+        ASSERT(participant.isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
     }
@@ -379,7 +379,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     {
         txnRouter.attachTxnFieldsIfNeeded(shard2, {});
         auto& participant = *txnRouter.getParticipant(shard2);
-        ASSERT_FALSE(participant.isCoordinator());
+        ASSERT(!participant.isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
     }
@@ -394,7 +394,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
     {
         txnRouter.attachTxnFieldsIfNeeded(shard2, {});
         auto& participant = *txnRouter.getParticipant(shard2);
-        ASSERT(participant.isCoordinator());
+        ASSERT(participant.isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
     }
@@ -1001,8 +1001,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
     txnRouter.attachTxnFieldsIfNeeded(shard1, {});
     txnRouter.attachTxnFieldsIfNeeded(shard2, {});
 
-    ASSERT_EQ(txnRouter.getParticipant(shard1)->getStmtIdCreatedAt(), initialStmtId);
-    ASSERT_EQ(txnRouter.getParticipant(shard2)->getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard2)->stmtIdCreatedAt, initialStmtId);
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(
@@ -1010,10 +1010,10 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
 
     ShardId shard3("shard3");
     txnRouter.attachTxnFieldsIfNeeded(shard3, {});
-    ASSERT_EQ(txnRouter.getParticipant(shard3)->getStmtIdCreatedAt(), initialStmtId + 1);
+    ASSERT_EQ(txnRouter.getParticipant(shard3)->stmtIdCreatedAt, initialStmtId + 1);
 
-    ASSERT_EQ(txnRouter.getParticipant(shard1)->getStmtIdCreatedAt(), initialStmtId);
-    ASSERT_EQ(txnRouter.getParticipant(shard2)->getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard2)->stmtIdCreatedAt, initialStmtId);
 
     // Transaction 2 contacts shard3 and shard2 during the first command, then shard1 in the second
     // command.
@@ -1028,15 +1028,15 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
     txnRouter.attachTxnFieldsIfNeeded(shard3, {});
     txnRouter.attachTxnFieldsIfNeeded(shard2, {});
 
-    ASSERT_EQ(txnRouter.getParticipant(shard3)->getStmtIdCreatedAt(), initialStmtId);
-    ASSERT_EQ(txnRouter.getParticipant(shard2)->getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard3)->stmtIdCreatedAt, initialStmtId);
+    ASSERT_EQ(txnRouter.getParticipant(shard2)->stmtIdCreatedAt, initialStmtId);
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum2, TransactionRouter::TransactionActions::kContinue);
 
     txnRouter.attachTxnFieldsIfNeeded(shard1, {});
-    ASSERT_EQ(txnRouter.getParticipant(shard1)->getStmtIdCreatedAt(), initialStmtId + 1);
+    ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId + 1);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,

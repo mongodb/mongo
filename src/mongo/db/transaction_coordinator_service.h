@@ -34,7 +34,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_catalog.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -86,7 +85,7 @@ public:
      *
      * If no coordinator for the (lsid, txnNumber) exists, returns boost::none.
      */
-    boost::optional<Future<TransactionCoordinator::CommitDecision>> coordinateCommit(
+    boost::optional<Future<txn::CommitDecision>> coordinateCommit(
         OperationContext* opCtx,
         LogicalSessionId lsid,
         TxnNumber txnNumber,
@@ -98,8 +97,9 @@ public:
      *
      * If no coordinator for the (lsid, txnNumber) exists, returns boost::none.
      */
-    boost::optional<Future<TransactionCoordinator::CommitDecision>> recoverCommit(
-        OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
+    boost::optional<Future<txn::CommitDecision>> recoverCommit(OperationContext* opCtx,
+                                                               LogicalSessionId lsid,
+                                                               TxnNumber txnNumber);
 
     /**
      * Marks the coordinator catalog as stepping up, which blocks all incoming requests for

@@ -30,184 +30,13 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/transaction_coordinator.h"
-#include "mongo/db/transaction_coordinator_document_gen.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/util/concurrency/thread_pool.h"
-
 #include <vector>
 
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
+
 namespace mongo {
-
 namespace txn {
-
-/**
- * An alias to indicate a vote from a participant. This just makes it clearer what's going on in
- * different stages of the commit process.
- */
-using PrepareVote = TransactionCoordinator::CommitDecision;
-
-/**
- * Represents a response to prepareTransaction from a single participant. The timestamp will only be
- * present if the participant votes to commit (indicated by the decision field).
- */
-struct PrepareResponse {
-    ShardId participantShardId;
-    boost::optional<PrepareVote> vote;
-    boost::optional<Timestamp> prepareTimestamp;
-};
-
-/**
- * Represents the aggregate of all prepare responses, including the decision that should be made and
- * the max of all prepare timestamps received in the case of a decision to commit.
- */
-struct PrepareVoteConsensus {
-    boost::optional<TransactionCoordinator::CommitDecision> decision;
-    boost::optional<Timestamp> maxPrepareTimestamp;
-};
-
-/**
- * Represents a decision made by the coordinator, including commit timestamp to be sent with
- * commitTransaction in the case of a decision to commit.
- */
-struct CoordinatorCommitDecision {
-    TransactionCoordinator::CommitDecision decision;
-    boost::optional<Timestamp> commitTimestamp;
-};
-
-/**
- * Sends a command corresponding to a commit decision (i.e. commitTransaction or abortTransaction)
- * to the given shard ID and retries on any retryable error until the command succeeds or receives a
- * response that may be interpreted as a vote to abort (e.g.  NoSuchTransaction). Used for
- * sendCommit and sendAbort.
- */
-Future<void> sendDecisionToParticipantShard(executor::TaskExecutor* executor,
-                                            ThreadPool* pool,
-                                            const ShardId& shardId,
-                                            const BSONObj& commandObj);
-
-/**
- * Sends prepare to a given shard, retrying until a response is received from the participant or
- * until the coordinator is no longer in a preparing state due to having already received a vote to
- * abort from another participant. Returns a future containing the participant's response
- */
-Future<PrepareResponse> sendPrepareToShard(executor::TaskExecutor* executor,
-                                           ThreadPool* pool,
-                                           const BSONObj& prepareCommandObj,
-                                           const ShardId& shardId,
-                                           std::shared_ptr<TransactionCoordinator> coordinator);
-
-/**
- * Sends prepare to all participants and returns a future that will be resolved when either:
- *    a) All participants have responded with a vote to commit, or
- *    b) At least one participant votes to abort.
- *
- * If all participants vote to commit, the result will contain the max prepare timestamp of all
- * prepare timestamps attached to the participants' responses. Otherwise the result will simply
- * contain the decision to abort.
- */
-Future<PrepareVoteConsensus> sendPrepare(std::shared_ptr<TransactionCoordinator> coordinator,
-                                         executor::TaskExecutor* executor,
-                                         ThreadPool* pool,
-                                         const std::vector<ShardId>& participantShards,
-                                         const LogicalSessionId& lsid,
-                                         const TxnNumber& txnNumber);
-
-/**
- * Sends commit to all shards and returns a future that will be resolved when all participants have
- * responded with success.
- */
-Future<void> sendCommit(executor::TaskExecutor* executor,
-                        ThreadPool* pool,
-                        const std::vector<ShardId>& participantShards,
-                        const LogicalSessionId& lsid,
-                        const TxnNumber& txnNumber,
-                        Timestamp commitTimestamp);
-
-/**
- * Sends abort to all shards and returns a future that will be resolved when all participants have
- * responded with success.
- */
-Future<void> sendAbort(executor::TaskExecutor* executor,
-                       ThreadPool* pool,
-                       const std::vector<ShardId>& participantShards,
-                       const LogicalSessionId& lsid,
-                       const TxnNumber& txnNumber);
-
-/**
- * Upserts a document of the form:
- *
- * {
- *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
- *    participants: ["shard0000", "shard0001"]
- * }
- *
- * into config.transaction_coordinators and waits for the upsert to be majority-committed.
- *
- * Throws if the upsert fails or waiting for writeConcern fails.
- * If the upsert returns a DuplicateKey error, converts it to an anonymous error, because it means
- * a document for the (lsid, txnNumber) exists with a different participant list.
- */
-void persistParticipantList(OperationContext* opCtx,
-                            LogicalSessionId lsid,
-                            TxnNumber txnNumber,
-                            const std::vector<ShardId>& participantList);
-
-/**
- * If 'commitTimestamp' is boost::none, updates the document in config.transaction_coordinators for
- * (lsid, txnNumber) to be:
- *
- * {
- *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
- *    participants: ["shard0000", "shard0001"]
- *    decision: "abort"
- * }
- *
- * else updates the document to be:
- *
- * {
- *    _id: {lsid: <lsid>, txnNumber: <txnNumber>}
- *    participants: ["shard0000", "shard0001"]
- *    decision: "commit"
- *    commitTimestamp: Timestamp(xxxxxxxx, x),
- * }
- *
- * and waits for the update to be majority-committed.
- *
- * Throws if the update fails or waiting for writeConcern fails.
- * If the update succeeds but did not update any document, throws an anonymous error, because it
- * means either no document for (lsid, txnNumber) exists, or a document exists but has a different
- * participant list, different decision, or different commit Timestamp.
- */
-void persistDecision(OperationContext* opCtx,
-                     LogicalSessionId lsid,
-                     TxnNumber txnNumber,
-                     const std::vector<ShardId>& participantList,
-                     const boost::optional<Timestamp>& commitTimestamp);
-
-/**
- * Deletes the document in config.transaction_coordinators for (lsid, txnNumber).
- *
- * Does *not* wait for the delete to be majority-committed.
- *
- * Throws if the update fails.
- * If the update succeeds but did not update any document, throws an anonymous error, because it
- * means either no document for (lsid, txnNumber) exists, or a document exists but without a
- * decision.
- */
-void deleteCoordinatorDoc(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
-
-/**
- * Reads and returns all documents in config.transaction_coordinators.
- */
-std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx);
-
-//
-// BELOW THIS ARE FUTURES-RELATED UTILITIES.
-//
 
 enum class ShouldStopIteration { kYes, kNo };
 
@@ -220,30 +49,29 @@ enum class ShouldStopIteration { kYes, kNo };
  *
  * Example from the unit tests:
  *
- *TEST_F(TransactionCoordinatorTest, CollectReturnsCombinedResultWithSeveralInputFutures) {
+ *  TEST_F(TransactionCoordinatorTest, CollectReturnsCombinedResultWithSeveralInputFutures) {
+ *      std::vector<Future<int>> futures;
+ *      std::vector<Promise<int>> promises;
+ *      std::vector<int> futureValues;
+ *      for (int i = 0; i < 5; ++i) {
+ *          auto pf = makePromiseFuture<int>();
+ *          futures.push_back(std::move(pf.future));
+ *          promises.push_back(std::move(pf.promise));
+ *          futureValues.push_back(i);
+ *      }
  *
- *     std::vector<Future<int>> futures;
- *     std::vector<Promise<int>> promises;
- *     std::vector<int> futureValues;
- *     for (int i = 0; i < 5; ++i) {
- *         auto pf = makePromiseFuture<int>();
- *         futures.push_back(std::move(pf.future));
- *         promises.push_back(std::move(pf.promise));
- *         futureValues.push_back(i);
- *     }
+ *      // Sum all of the inputs.
+ *      auto resultFuture = collect<int, int>(futures, 0, [](int& result, const int& next) {
+ *          result += next;
+ *          return true;
+ *      });
  *
- *     // Sum all of the inputs.
- *     auto resultFuture = collect<int, int>(futures, 0, [](int& result, const int& next) {
- *         result += next;
- *         return true;
- *     });
+ *      for (size_t i = 0; i < promises.size(); ++i) {
+ *          promises[i].emplaceValue(futureValues[i]);
+ *      }
  *
- *     for (size_t i = 0; i < promises.size(); ++i) {
- *         promises[i].emplaceValue(futureValues[i]);
- *     }
- *
- *     // Result should be the sum of all the values emplaced into the promises.
- *     ASSERT_EQ(resultFuture.get(), std::accumulate(futureValues.begin(), futureValues.end(), 0));
+ *      // Result should be the sum of all the values emplaced into the promises.
+ *      ASSERT_EQ(resultFuture.get(), std::accumulate(futureValues.begin(), futureValues.end(), 0));
  * }
  *
  */
@@ -272,6 +100,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
         ******************************************************/
         // Protects all state in the SharedBlock.
         stdx::mutex mutex;
+
         // Whether or not collect has finished collecting responses.
         bool done{false};
 
@@ -280,8 +109,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
         ******************************************************/
         // The number of input futures that have not yet been resolved and processed.
         size_t numOutstandingResponses;
-        // The variable where the intermediate results and final result
-        // is stored.
+        // The variable where the intermediate results and final result is stored.
         GlobalResult globalResult;
         // The promise to be fulfilled when the result is ready.
         Promise<GlobalResult> resultPromise;
@@ -370,7 +198,6 @@ Future<FutureContinuationResult<Callable>> async(ThreadPool* pool, Callable&& ta
  * when any of the futures is rejected.
  */
 Future<void> whenAll(std::vector<Future<void>>& futures);
-
 
 /**
  * Executes a function returning a Future until the function does not return an error status or

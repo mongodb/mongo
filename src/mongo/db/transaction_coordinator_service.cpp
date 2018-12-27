@@ -30,8 +30,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
 
-#include <memory>
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/transaction_coordinator_service.h"
@@ -39,8 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_coordinator.h"
-#include "mongo/db/transaction_coordinator_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -50,7 +46,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 const auto transactionCoordinatorServiceDecoration =
@@ -106,16 +101,16 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
                                                       TxnNumber txnNumber,
                                                       Date_t commitDeadline) {
     if (auto latestTxnNumAndCoordinator = _coordinatorCatalog->getLatestOnSession(opCtx, lsid)) {
-        auto latestCoordinator = latestTxnNumAndCoordinator.get().second;
-        if (txnNumber == latestTxnNumAndCoordinator.get().first) {
+        auto latestCoordinator = latestTxnNumAndCoordinator->second;
+        if (txnNumber == latestTxnNumAndCoordinator->first) {
             return;
         }
-        latestCoordinator.get()->cancelIfCommitNotYetStarted();
+        latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
     auto networkExecutor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto coordinator = std::make_shared<TransactionCoordinator>(
-        networkExecutor, _threadPool.get(), lsid, txnNumber);
+        opCtx->getServiceContext(), networkExecutor, _threadPool.get(), lsid, txnNumber);
 
     _coordinatorCatalog->insert(opCtx, lsid, txnNumber, coordinator);
 
@@ -136,22 +131,21 @@ void TransactionCoordinatorService::createCoordinator(OperationContext* opCtx,
     // can cancel the cancel task on receiving the participant list.
 }
 
-boost::optional<Future<TransactionCoordinator::CommitDecision>>
-TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
-                                                LogicalSessionId lsid,
-                                                TxnNumber txnNumber,
-                                                const std::set<ShardId>& participantList) {
-
+boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::coordinateCommit(
+    OperationContext* opCtx,
+    LogicalSessionId lsid,
+    TxnNumber txnNumber,
+    const std::set<ShardId>& participantList) {
     auto coordinator = _coordinatorCatalog->get(opCtx, lsid, txnNumber);
     if (!coordinator) {
         return boost::none;
     }
 
     std::vector<ShardId> participants(participantList.begin(), participantList.end());
-    auto decisionFuture = coordinator.get()->runCommit(participants);
+    auto decisionFuture = coordinator->runCommit(participants);
 
-    return coordinator.get()->onCompletion().then(
-        [coordinator] { return coordinator.get()->getDecision().get(); });
+    return coordinator->onCompletion().then(
+        [coordinator] { return coordinator->getDecision().get(); });
 
     // TODO (SERVER-37364): Re-enable the coordinator returning the decision as soon as the decision
     // is made durable. Currently the coordinator waits to hear acks because participants in prepare
@@ -159,10 +153,8 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
     // return coordinator.get()->runCommit(participants);
 }
 
-boost::optional<Future<TransactionCoordinator::CommitDecision>>
-TransactionCoordinatorService::recoverCommit(OperationContext* opCtx,
-                                             LogicalSessionId lsid,
-                                             TxnNumber txnNumber) {
+boost::optional<Future<txn::CommitDecision>> TransactionCoordinatorService::recoverCommit(
+    OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
     auto coordinator = _coordinatorCatalog->get(opCtx, lsid, txnNumber);
     if (!coordinator) {
         return boost::none;
@@ -203,7 +195,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx) {
                                     WriteConcernOptions::kNoTimeout},
                 &unusedWCResult));
 
-            auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
+            auto coordinatorDocs = TransactionCoordinatorDriver::readAllCoordinatorDocs(opCtx);
             LOG(0) << "Need to resume coordinating commit for " << coordinatorDocs.size()
                    << " transactions";
 
@@ -213,8 +205,12 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx) {
                 const auto txnNumber = *doc.getId().getTxnNumber();
 
                 auto networkExecutor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-                auto coordinator = std::make_shared<TransactionCoordinator>(
-                    networkExecutor, _threadPool.get(), lsid, txnNumber);
+                auto coordinator =
+                    std::make_shared<TransactionCoordinator>(opCtx->getServiceContext(),
+                                                             networkExecutor,
+                                                             _threadPool.get(),
+                                                             lsid,
+                                                             txnNumber);
                 _coordinatorCatalog->insert(
                     opCtx, lsid, txnNumber, coordinator, true /* forStepUp */);
                 coordinator->continueCommit(doc);

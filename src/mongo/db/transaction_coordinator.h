@@ -32,46 +32,32 @@
 
 #include <vector>
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/transaction_coordinator_document_gen.h"
-#include "mongo/executor/task_executor.h"
+#include "mongo/db/transaction_coordinator_driver.h"
 #include "mongo/logger/logstream_builder.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
 
 namespace mongo {
-
-namespace txn {
-struct PrepareResponse;
-struct PrepareVoteConsensus;
-struct CoordinatorCommitDecision;
-}
 
 /**
  * Class responsible for coordinating two-phase commit across shards.
  */
-class TransactionCoordinator : public std::enable_shared_from_this<TransactionCoordinator> {
+class TransactionCoordinator {
+    MONGO_DISALLOW_COPYING(TransactionCoordinator);
+
 public:
-    TransactionCoordinator(executor::TaskExecutor* networkExecutor,
+    TransactionCoordinator(ServiceContext* service,
+                           executor::TaskExecutor* networkExecutor,
                            ThreadPool* callbackPool,
                            const LogicalSessionId& lsid,
-                           const TxnNumber& txnNumber)
-        : _networkExecutor(networkExecutor),
-          _callbackPool(callbackPool),
-          _lsid(lsid),
-          _txnNumber(txnNumber),
-          _state(CoordinatorState::kInit) {}
-
+                           const TxnNumber& txnNumber);
     ~TransactionCoordinator();
 
     /**
-     * The decision made by the coordinator whether to commit or abort the transaction.
+     * Represents a decision made by the coordinator, including commit timestamp to be sent with
+     * commitTransaction in the case of a decision to commit.
      */
-    enum class CommitDecision {
-        kCommit,
-        kAbort,
+    struct CoordinatorCommitDecision {
+        txn::CommitDecision decision;
+        boost::optional<Timestamp> commitTimestamp;
     };
 
     /**
@@ -99,7 +85,7 @@ public:
      * resolved when the original commit process that was kicked off comes to a decision. If the
      * original commit process has completed, returns a ready future containing the final decision.
      */
-    SharedSemiFuture<CommitDecision> runCommit(const std::vector<ShardId>& participantShards);
+    SharedSemiFuture<txn::CommitDecision> runCommit(const std::vector<ShardId>& participantShards);
 
     /**
      * To be used to continue coordinating a transaction on step up.
@@ -116,11 +102,12 @@ public:
     Future<void> onCompletion();
 
     /**
-     * Gets a Future that will contain the decision that the coordinator reaches.
+     * Gets a Future that will contain the decision that the coordinator reaches. Note that this
+     * will never be signaled unless runCommit has been called.
      *
      * TODO (SERVER-37364): Remove this when it is no longer needed by the coordinator service.
      */
-    SharedSemiFuture<CommitDecision> getDecision() {
+    SharedSemiFuture<txn::CommitDecision> getDecision() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _finalDecisionPromise.getFuture();
     }
@@ -134,22 +121,6 @@ public:
      */
     void cancelIfCommitNotYetStarted();
 
-    /**
-     * Gets the current state of the coordinator.
-     *
-     * TODO (SERVER-38345): Consider making this state private.
-     */
-    CoordinatorState getState() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _state;
-    }
-
-    // NOTE: SHOULD BE USED IN TESTS ONLY.
-    void setState_forTest(CoordinatorState state) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _state = state;
-    }
-
 private:
     /**
      * Expects the participant list to already be majority-committed.
@@ -159,8 +130,7 @@ private:
      * 3. If the decision is to commit, calculates the commit Timestamp.
      * 4. Writes the decision and waits for the decision to become majority-committed.
      */
-    Future<txn::CoordinatorCommitDecision> _runPhaseOne(
-        const std::vector<ShardId>& participantShards);
+    Future<CoordinatorCommitDecision> _runPhaseOne(const std::vector<ShardId>& participantShards);
 
     /**
      * Expects the decision to already be majority-committed.
@@ -171,14 +141,14 @@ private:
      *    majority-committed.
      */
     Future<void> _runPhaseTwo(const std::vector<ShardId>& participantShards,
-                              const txn::CoordinatorCommitDecision& decision);
+                              const CoordinatorCommitDecision& decision);
 
     /**
     * Asynchronously sends the commit decision to all participants (commit or abort), resolving the
     * returned future when all participants have acknowledged the decision.
     */
     Future<void> _sendDecisionToParticipants(const std::vector<ShardId>& participantShards,
-                                             txn::CoordinatorCommitDecision coordinatorDecision);
+                                             CoordinatorCommitDecision coordinatorDecision);
 
     /**
      * Helper for handling errors that occur during either phase of commit coordination.
@@ -195,32 +165,22 @@ private:
      */
     void _transitionToDone(stdx::unique_lock<stdx::mutex> lk) noexcept;
 
-    /**
-     * A task executor used to execute all network requests used to send messages to participants.
-     * The only current networking that may occur outside of this is when targeting a shard to find
-     * its host and port.
-     *
-     * Note: Memory/object not owned by the coordinator.
-     */
-    executor::TaskExecutor* _networkExecutor;
+    // Shortcut to the service context under which this coordinator runs
+    ServiceContext* const _service;
 
-    /**
-     * A thread pool used to execute any code that should be non-blocking, e.g. persisting the
-     * participant list or the commit decision to disk.
-     *
-     * Note: Memory/object not owned by the coordinator.
-     */
-    ThreadPool* _callbackPool;
+    // Context object used to perform and track the state of asynchronous operations on behalf of
+    // this coordinator.
+    TransactionCoordinatorDriver _driver;
 
     /**
      * The logical session id of the transaction that this coordinator is coordinating.
      */
-    LogicalSessionId _lsid;
+    const LogicalSessionId _lsid;
 
     /**
      * The transaction number of the transaction that this coordinator is coordinating.
      */
-    TxnNumber _txnNumber;
+    const TxnNumber _txnNumber;
 
     /**
      * Protects _state, _finalDecisionPromise, and _completionPromises.
@@ -238,7 +198,7 @@ private:
      * participants, and the collective decision has been persisted to
      * config.transactionCommitDecisions.
      */
-    SharedPromise<CommitDecision> _finalDecisionPromise;
+    SharedPromise<txn::CommitDecision> _finalDecisionPromise;
 
     /**
      * A list of all promises corresponding to futures that were returned to callers of
@@ -264,15 +224,15 @@ inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
     return stream;
 }
 
-inline logger::LogstreamBuilder& operator<<(
-    logger::LogstreamBuilder& stream, const TransactionCoordinator::CommitDecision& decision) {
-    using Decision = TransactionCoordinator::CommitDecision;
+inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
+                                            const txn::CommitDecision& decision) {
     // clang-format off
     switch (decision) {
-        case Decision::kCommit:  stream.stream() << "kCommit"; break;
-        case Decision::kAbort:   stream.stream() << "kAbort"; break;
+        case txn::CommitDecision::kCommit:  stream.stream() << "kCommit"; break;
+        case txn::CommitDecision::kAbort:   stream.stream() << "kAbort"; break;
     };
     // clang-format on
     return stream;
 }
-}
+
+}  // namespace mongo

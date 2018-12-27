@@ -68,49 +68,31 @@ public:
         boost::optional<LogicalTime> atClusterTime;
     };
 
-    enum class TransactionActions { kStart, kContinue, kCommit };
-
     /**
      * Represents a shard participant in a distributed transaction. Lives only for the duration of
      * the transaction that created it.
      */
-    class Participant {
-    public:
-        explicit Participant(bool isCoordinator,
-                             StmtId stmtIdCreatedAt,
-                             SharedTransactionOptions sharedOptions);
+    struct Participant {
+        Participant(bool isCoordinator,
+                    StmtId stmtIdCreatedAt,
+                    SharedTransactionOptions sharedOptions);
 
         /**
          * Attaches necessary fields if this is participating in a multi statement transaction.
          */
         BSONObj attachTxnFieldsIfNeeded(BSONObj cmd, bool isFirstStatementInThisParticipant) const;
 
-        /**
-         * True if the participant has been chosen as the coordinator for its transaction.
-         */
-        bool isCoordinator() const;
-
-        /**
-         * Returns the highest statement id of the command during which this participant was
-         * created.
-         */
-        StmtId getStmtIdCreatedAt() const;
-
-        /**
-         * Returns the shared transaction options this participant was created with.
-         */
-        const auto& getSharedOptions() const {
-            return _sharedOptions;
-        }
-
-    private:
-        const bool _isCoordinator{false};
+        // True if the participant has been chosen as the coordinator for its transaction
+        const bool isCoordinator{false};
 
         // The highest statement id of the request during which this participant was created.
-        const StmtId _stmtIdCreatedAt{kUninitializedStmtId};
+        const StmtId stmtIdCreatedAt{kUninitializedStmtId};
 
-        const SharedTransactionOptions _sharedOptions;
+        // Returns the shared transaction options this participant was created with
+        const SharedTransactionOptions sharedOptions;
     };
+
+    enum class TransactionActions { kStart, kContinue, kCommit };
 
     /**
      * Encapsulates the logic around selecting a global read timestamp for a sharded transaction at
@@ -152,6 +134,12 @@ public:
 
     TransactionRouter();
     ~TransactionRouter();
+
+    /**
+     * Extract the runtime state attached to the operation context. Returns nullptr if none is
+     * attached.
+     */
+    static TransactionRouter* get(OperationContext* opCtx);
 
     /**
      * Starts a fresh transaction in this session or continue an existing one. Also cleans up the
@@ -214,8 +202,8 @@ public:
      * Commits the transaction. For transactions with multiple participants, this will initiate
      * the two phase commit procedure.
      */
-    Shard::CommandResponse commitTransaction(OperationContext* opCtx,
-                                             boost::optional<TxnRecoveryToken> recoveryToken);
+    Shard::CommandResponse commitTransaction(
+        OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken);
 
     /**
      * Sends abort to all participants and returns the responses from all shards.
@@ -230,17 +218,16 @@ public:
     void implicitlyAbortTransaction(OperationContext* opCtx);
 
     /**
-     * Extract the runtimne state attached to the operation context. Returns nullptr if none is
-     * attached.
+     * Returns the participant for this transaction or nullptr if the specified shard is not
+     * participant of this transaction.
      */
-    static TransactionRouter* get(OperationContext* opCtx);
+    Participant* getParticipant(const ShardId& shard);
 
     /**
-     * Returns the participant for this transaction.
+     * If a coordinator has been selected for this transaction already, constructs a recovery token,
+     * which can be used to resume commit or abort of the transaction from a different router.
      */
-    boost::optional<Participant&> getParticipant(const ShardId& shard);
-
-    void appendRecoveryToken(BSONObjBuilder* builder);
+    void appendRecoveryToken(BSONObjBuilder* builder) const;
 
 private:
     // Shortcut to obtain the id of the session under which this transaction router runs
@@ -314,7 +301,7 @@ private:
      * Returns a string with the active transaction's transaction number and logical session id
      * (i.e. the transaction id).
      */
-    std::string _txnIdToString();
+    std::string _txnIdToString() const;
 
     // The currently active transaction number on this transaction router (i.e. on the session)
     TxnNumber _txnNumber{kUninitializedTxnNumber};

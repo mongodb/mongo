@@ -73,8 +73,11 @@ public:
     void createCoordinatorInCatalog(OperationContext* opCtx,
                                     LogicalSessionId lsid,
                                     TxnNumber txnNumber) {
-        auto newCoordinator = std::make_shared<TransactionCoordinator>(
-            nullptr /* TaskExecutor */, nullptr /* ThreadPool */, lsid, txnNumber);
+        auto newCoordinator = std::make_shared<TransactionCoordinator>(getServiceContext(),
+                                                                       nullptr /* TaskExecutor */,
+                                                                       nullptr /* ThreadPool */,
+                                                                       lsid,
+                                                                       txnNumber);
 
         coordinatorCatalog().insert(opCtx, lsid, txnNumber, newCoordinator);
         _coordinatorsForTest.push_back(newCoordinator);
@@ -159,7 +162,7 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     auto coordinator = coordinatorCatalog().get(operationContext(), lsid, txnNumber);
 
     coordinator->cancelIfCommitNotYetStarted();
-    ASSERT(coordinator->getState() == TransactionCoordinator::CoordinatorState::kDone);
+    ASSERT(coordinator->onCompletion().isReady());
 
     auto latestTxnNumAndCoordinator =
         coordinatorCatalog().getLatestOnSession(operationContext(), lsid);
