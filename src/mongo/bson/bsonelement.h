@@ -491,7 +491,7 @@ public:
         // BinData: <int len> <byte subtype> <byte[len] data>
         verify(type() == BinData);
         unsigned char c = (value() + 4)[0];
-        return (BinDataType)c;
+        return static_cast<BinDataType>(c);
     }
 
     std::vector<uint8_t> _binDataVector() const {
@@ -704,8 +704,13 @@ public:
 
     std::string _asCode() const;
 
-    template <typename T>
-    bool coerce(T* out) const;
+    bool coerce(std::string* out) const;
+    bool coerce(int* out) const;
+    bool coerce(long long* out) const;
+    bool coerce(double* out) const;
+    bool coerce(bool* out) const;
+    bool coerce(Decimal128* out) const;
+    bool coerce(std::vector<std::string>* out) const;
 
     /**
      * Constant double representation of 2^63, the smallest value that will overflow a long long.

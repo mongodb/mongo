@@ -859,54 +859,47 @@ StringBuilder& operator<<(StringBuilder& s, const BSONElement& e) {
     return s;
 }
 
-template <>
-bool BSONElement::coerce<std::string>(std::string* out) const {
+bool BSONElement::coerce(std::string* out) const {
     if (type() != mongo::String)
         return false;
     *out = String();
     return true;
 }
 
-template <>
-bool BSONElement::coerce<int>(int* out) const {
+bool BSONElement::coerce(int* out) const {
     if (!isNumber())
         return false;
     *out = numberInt();
     return true;
 }
 
-template <>
-bool BSONElement::coerce<long long>(long long* out) const {
+bool BSONElement::coerce(long long* out) const {
     if (!isNumber())
         return false;
     *out = numberLong();
     return true;
 }
 
-template <>
-bool BSONElement::coerce<double>(double* out) const {
+bool BSONElement::coerce(double* out) const {
     if (!isNumber())
         return false;
     *out = numberDouble();
     return true;
 }
 
-template <>
-bool BSONElement::coerce<Decimal128>(Decimal128* out) const {
+bool BSONElement::coerce(Decimal128* out) const {
     if (!isNumber())
         return false;
     *out = numberDecimal();
     return true;
 }
 
-template <>
-bool BSONElement::coerce<bool>(bool* out) const {
+bool BSONElement::coerce(bool* out) const {
     *out = trueValue();
     return true;
 }
 
-template <>
-bool BSONElement::coerce<std::vector<std::string>>(std::vector<std::string>* out) const {
+bool BSONElement::coerce(std::vector<std::string>* out) const {
     if (type() != mongo::Array)
         return false;
     return Obj().coerceVector<std::string>(out);
@@ -918,7 +911,7 @@ bool BSONObj::coerceVector(std::vector<T>* out) const {
     while (i.more()) {
         BSONElement e = i.next();
         T t;
-        if (!e.coerce<T>(&t))
+        if (!e.coerce(&t))
             return false;
         out->push_back(t);
     }
