@@ -21,14 +21,24 @@ env.Library(
         'view.cpp',
         'view_catalog.cpp',
         'view_graph.cpp',
-        'resolved_view.cpp',
     ],
     LIBDEPS=[
+        'resolved_view',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+    ]
+)
+
+env.Library(
+    target='resolved_view',
+    source=[
+        'resolved_view.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ]
 )
 

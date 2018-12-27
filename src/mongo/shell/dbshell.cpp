@@ -765,6 +765,8 @@ int _main(int argc, char* argv[], char** envp) {
     // hide password from ps output
     redactPasswordOptions(argc, argv);
 
+    ErrorExtraInfo::invariantHaveAllParsers();
+
     if (!mongo::serverGlobalParams.quiet.load())
         cout << mongoShellVersion(VersionInfoInterface::instance()) << endl;
 

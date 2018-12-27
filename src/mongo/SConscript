@@ -523,6 +523,7 @@ if not has_option('noshell') and usemozjs:
             "db/server_options_core",
             "client/clientdriver_network",
             "$BUILD_DIR/mongo/util/password",
+            "$BUILD_DIR/mongo/db/views/resolved_view",
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/client/connection_string",

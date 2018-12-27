@@ -104,7 +104,8 @@ public:
      * Constructs an AggregationRequest over the given namespace with the given pipeline. All
      * options aside from the pipeline assume their default values.
      */
-    AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline);
+    AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
+        : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
 
     /**
      * Serializes the options to a Document. Note that this serialization includes the original
