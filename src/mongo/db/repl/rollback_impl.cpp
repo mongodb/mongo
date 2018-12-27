@@ -479,6 +479,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
     const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     log() << "finding record store counts";
     for (const auto& uiCount : _countDiffs) {
@@ -489,6 +490,16 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
         }
 
         const auto nss = uuidCatalog.lookupNSSByUUID(uuid);
+
+        // Drop-pending collections are not visible to rollback via the catalog when they are
+        // managed by the storage engine. See StorageEngine::supportsPendingDrops().
+        // TODO(SERVER-38548): The collection count is fixed as we rebuild the _id index coming out
+        // of rollback in catalog::openCatalog(). When idents for index drops are managed by the
+        // storage engine, we cannot depend on index rebuilds to fix the collection counts.
+        if (nss.isEmpty() && storageEngine->supportsPendingDrops()) {
+            continue;
+        }
+
         invariant(!nss.isEmpty(),
                   str::stream() << "The collection with UUID " << uuid
                                 << " is unexpectedly missing in the UUIDCatalog");
@@ -784,9 +795,21 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
 
 Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
     const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     for (auto&& entry : _observerInfo.rollbackDeletedIdsMap) {
         const auto& uuid = entry.first;
         const auto nss = uuidCatalog.lookupNSSByUUID(uuid);
+
+        // Drop-pending collections are not visible to rollback via the catalog when they are
+        // managed by the storage engine. See StorageEngine::supportsPendingDrops().
+        if (nss.isEmpty() && storageEngine->supportsPendingDrops()) {
+            log() << "The collection with UUID " << uuid
+                  << " is missing in the UUIDCatalog. This could be due to a dropped collection. "
+                     "Not writing rollback file for namespace "
+                  << nss.ns() << " with uuid " << uuid;
+            continue;
+        }
+
         invariant(!nss.isEmpty(),
                   str::stream() << "The collection with UUID " << uuid
                                 << " is unexpectedly missing in the UUIDCatalog");
