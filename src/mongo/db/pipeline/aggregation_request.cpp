@@ -65,9 +65,6 @@ constexpr StringData AggregationRequest::kExchangeName;
 
 constexpr long long AggregationRequest::kDefaultBatchSize;
 
-AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
-    : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
-
 StatusWith<std::vector<BSONObj>> AggregationRequest::parsePipelineFromBSON(
     BSONElement pipelineElem) {
     std::vector<BSONObj> pipeline;
