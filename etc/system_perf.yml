@@ -420,17 +420,6 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: initialsync-logkeeper
-  priority: 5
-  exec_timeout_secs: 216000 # 2.5 days
-  commands:
-    - func: "prepare environment"
-      vars:
-        test: "initialsync-logkeeper"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
 #######################################
 #               Modules               #
 #######################################
@@ -601,26 +590,6 @@ buildvariants:
         variant: compile-rhel70
   tasks:
     - name: initialsync
-
-- name: linux-replSet-initialsync-logkeeper
-  display_name: Linux ReplSet Initial Sync LogKeeper
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    setup: initialsync-logkeeper
-    cluster: initialsync-logkeeper
-    platform: linux
-    use_scons_cache: true
-    storageEngine: wiredTiger
-    project_dir: *project_dir
-  run_on:
-      - "rhel70-perf-initialsync-logkeeper"
-  depends_on:
-      - name: compile
-        variant: compile-rhel70
-  tasks:
-    - name: initialsync-logkeeper
 
 #######################################
 #         MMAP Buildvariants         #
