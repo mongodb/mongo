@@ -241,8 +241,19 @@
 
         // The isTransientError() function is responsible for setting hasTransientError to true.
         const isTransientError = (e) => {
-            if (e.hasOwnProperty('errorLabels') &&
-                e.errorLabels.includes('TransientTransactionError')) {
+            // It is possible for the ReplSetTest#getHashesUsingSessions() function to be
+            // interrupted due to active sessions being killed by a test running concurrently. We
+            // treat this as a transient error and simply retry running the dbHash check.
+            //
+            // Note that unlike auto_retry_transaction.js, we do not treat CursorKilled or
+            // CursorNotFound error responses as transient errors because the
+            // run_check_repl_dbhash_background.js hook would only establish a cursor via
+            // ReplSetTest#getCollectionDiffUsingSessions() upon detecting a dbHash mismatch. It is
+            // presumed to still useful to know that a bug exists even if we cannot get more
+            // diagnostics for it.
+            if ((e.hasOwnProperty('errorLabels') &&
+                 e.errorLabels.includes('TransientTransactionError')) ||
+                e.code === ErrorCodes.Interrupted) {
                 hasTransientError = true;
                 return true;
             }
