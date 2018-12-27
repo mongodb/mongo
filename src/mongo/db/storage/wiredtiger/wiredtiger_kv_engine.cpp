@@ -751,6 +751,10 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     if (_fileVersion.shouldDowngrade(_readOnly, _inRepairMode, !_recoveryTimestamp.isNull())) {
         log() << "Downgrading WiredTiger datafiles.";
+        invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
+
+        invariantWTOK(wiredtiger_open(
+            _path.c_str(), _eventHandler.getWtEventHandler(), _wtOpenConfig.c_str(), &_conn));
         LOG(1) << "Downgrade compatibility configuration: " << _fileVersion.getDowngradeString();
         invariantWTOK(_conn->reconfigure(_conn, _fileVersion.getDowngradeString().c_str()));
     }
