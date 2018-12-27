@@ -73,7 +73,6 @@ class ReadConcernArgs;
 class ReplSetConfig;
 class ReplSetHeartbeatArgsV1;
 class ReplSetHeartbeatResponse;
-class ReplSetHtmlSummary;
 class ReplSetRequestVotesArgs;
 class ReplSetRequestVotesResponse;
 class UpdatePositionArgs;
@@ -726,12 +725,6 @@ public:
      * explicitly set.
      */
     virtual bool getWriteConcernMajorityShouldJournal() = 0;
-
-    /**
-     * Writes into 'output' all the information needed to generate a summary of the current
-     * replication state for use by the web interface.
-     */
-    virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
     /**
      * Returns the current term.

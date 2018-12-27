@@ -238,8 +238,6 @@ public:
 
     virtual bool getWriteConcernMajorityShouldJournal();
 
-    virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
-
     virtual long long getTerm();
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);

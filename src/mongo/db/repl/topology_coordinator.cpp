@@ -50,7 +50,6 @@
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
@@ -2628,17 +2627,6 @@ rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid)
                                    rbid,
                                    _currentPrimaryIndex,
                                    _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
-}
-
-void TopologyCoordinator::summarizeAsHtml(ReplSetHtmlSummary* output) {
-    // TODO(dannenberg) consider putting both optimes into the htmlsummary.
-    output->setSelfOptime(getMyLastAppliedOpTime());
-    output->setConfig(_rsConfig);
-    output->setHBData(_memberData);
-    output->setSelfIndex(_selfIndex);
-    output->setPrimaryIndex(_currentPrimaryIndex);
-    output->setSelfState(getMemberState());
-    output->setSelfHeartbeatMessage(_hbmsg);
 }
 
 void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,

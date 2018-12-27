@@ -403,10 +403,6 @@ Status ReplicationCoordinatorEmbedded::processHeartbeatV1(const ReplSetHeartbeat
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::summarizeAsHtml(ReplSetHtmlSummary*) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 long long ReplicationCoordinatorEmbedded::getTerm() {
     UASSERT_NOT_IMPLEMENTED;
 }

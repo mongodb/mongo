@@ -101,18 +101,9 @@ public:
      */
     void clear();
 
-
-    /**
-     * Writes an HTML representation of the log to "s".
-     *
-     * Synchronized on the instance's own mutex, _mutex.
-     */
-    void toHTML(std::stringstream& s);
-
 private:
     static int repeats(const std::vector<const char*>& v, int i);
     static std::string clean(const std::vector<const char*>& v, int i, std::string line = "");
-    static std::string color(const std::string& line);
 
     /* turn http:... into an anchor */
     static std::string linkify(const char* s);

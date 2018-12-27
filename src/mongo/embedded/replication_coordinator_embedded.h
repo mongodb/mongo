@@ -206,8 +206,6 @@ public:
 
     bool getWriteConcernMajorityShouldJournal() override;
 
-    void summarizeAsHtml(repl::ReplSetHtmlSummary*) override;
-
     void dropAllSnapshots() override;
 
     long long getTerm() override;

@@ -595,12 +595,6 @@ public:
     rpc::OplogQueryMetadata prepareOplogQueryMetadata(int rbid) const;
 
     /**
-     * Writes into 'output' all the information needed to generate a summary of the current
-     * replication state for use by the web interface.
-     */
-    void summarizeAsHtml(ReplSetHtmlSummary* output);
-
-    /**
      * Prepares a ReplSetRequestVotesResponse.
      */
     void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,

@@ -38,7 +38,6 @@
 #include "mongo/base/status.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -136,21 +135,6 @@ string RamLog::clean(const std::vector<const char*>& v, int i, string line) {
     return v[i];
 }
 
-string RamLog::color(const std::string& line) {
-    std::string s = str::after(line, "replSet ");
-    if (str::startsWith(s, "warning") || str::startsWith(s, "error"))
-        return html::red(line);
-    if (str::startsWith(s, "info")) {
-        if (str::endsWith(s, " up\n"))
-            return html::green(line);
-        else if (str::contains(s, " down ") || str::endsWith(s, " down\n"))
-            return html::yellow(line);
-        return line;  // html::blue(line);
-    }
-
-    return line;
-}
-
 /* turn http:... into an anchor */
 string RamLog::linkify(const char* s) {
     const char* p = s;
@@ -166,41 +150,6 @@ string RamLog::linkify(const char* s) {
     std::stringstream ss;
     ss << string(s, h - s) << "<a href=\"" << url << "\">" << url << "</a>" << sp;
     return ss.str();
-}
-
-void RamLog::toHTML(std::stringstream& s) {
-    LineIterator iter(this);
-    std::vector<const char*> v;
-    while (iter.more())
-        v.push_back(iter.next());
-
-    s << "<pre>\n";
-    for (int i = 0; i < (int)v.size(); i++) {
-        verify(strlen(v[i]) > 24);
-        int r = repeats(v, i);
-        if (r < 0) {
-            s << color(linkify(html::escape(clean(v, i)).c_str())) << '\n';
-        } else {
-            std::stringstream x;
-            x << string(v[i], 0, 24);
-            int nr = (i - r);
-            int last = i + nr - 1;
-            for (; r < i; r++)
-                x << '.';
-            if (1) {
-                std::stringstream r;
-                if (nr == 1)
-                    r << "repeat last line";
-                else
-                    r << "repeats last " << nr << " lines; ends " << string(v[last] + 4, 0, 15);
-                s << html::a("", r.str(), html::escape(clean(v, i, x.str())));
-            } else
-                s << x.str();
-            s << '\n';
-            i = last;
-        }
-    }
-    s << "</pre>\n";
 }
 
 RamLog::LineIterator::LineIterator(RamLog* ramlog)

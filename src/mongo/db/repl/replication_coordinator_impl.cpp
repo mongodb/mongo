@@ -60,7 +60,6 @@
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_process.h"
@@ -3430,15 +3429,6 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
         }
     }
     return result;
-}
-
-void ReplicationCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    output->setSelfUptime(time(0) - serverGlobalParams.started);
-    output->setNow(_replExecutor->now());
-
-    _topCoord->summarizeAsHtml(output);
 }
 
 long long ReplicationCoordinatorImpl::getTerm() {

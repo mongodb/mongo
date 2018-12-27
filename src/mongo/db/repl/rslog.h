@@ -40,8 +40,6 @@ class Tee;
 
 namespace repl {
 
-void fillRsLog(std::stringstream* s);
-
 // ramlog used for replSet actions
 extern logger::Tee* rsLog;
 
