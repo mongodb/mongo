@@ -398,7 +398,7 @@ OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
 }
 
 OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
-    auto cmd = BSON("deleteIndexes" << nss.coll() << "index" << indexName);
+    auto cmd = BSON("dropIndexes" << nss.coll() << "index" << indexName);
     return makeCommandOplogEntry(nextOpTime(), nss, cmd);
 }
 

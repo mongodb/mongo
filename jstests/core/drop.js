@@ -19,8 +19,7 @@ assert.eq(0, coll.getIndexes().length, "D");
 
 coll.ensureIndex({a: 1});
 assert.eq(2, coll.getIndexes().length, "E");
-assert.commandWorked(db.runCommand({deleteIndexes: coll.getName(), index: "*"}),
-                     "delete indexes A");
+assert.commandWorked(db.runCommand({dropIndexes: coll.getName(), index: "*"}), "drop indexes A");
 assert.eq(1, coll.getIndexes().length, "G");
 
 // make sure we can still use it
