@@ -1,4 +1,4 @@
-// Checks storage-engine specific sections of db.severStatus() output.
+// Tests --networkMessageCompressors options.
 
 (function() {
     'use strict';
