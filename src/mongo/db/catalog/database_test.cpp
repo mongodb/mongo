@@ -34,12 +34,13 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -299,13 +300,6 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             wuow.commit();
         }
 
-        MultiIndexBlock indexer(opCtx, collection);
-        ON_BLOCK_EXIT([&indexer, opCtx] {
-            WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(indexer.commit());
-            wuow.commit();
-        });
-
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT_EQUALS(indexCatalog->numIndexesInProgress(opCtx), 0);
         auto indexInfoObj = BSON(
@@ -313,7 +307,19 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                 << "a_1"
                 << "ns"
                 << nss.ns());
-        ASSERT_OK(indexer.init(indexInfoObj).getStatus());
+
+        auto indexBuildBlock = indexCatalog->createIndexBuildBlock(opCtx, indexInfoObj);
+        {
+            WriteUnitOfWork wuow(opCtx);
+            ASSERT_OK(indexBuildBlock->init());
+            wuow.commit();
+        }
+        ON_BLOCK_EXIT([&indexBuildBlock, opCtx] {
+            WriteUnitOfWork wuow(opCtx);
+            indexBuildBlock->success();
+            wuow.commit();
+        });
+
         ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);
 
         WriteUnitOfWork wuow(opCtx);
