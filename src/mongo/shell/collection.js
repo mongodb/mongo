@@ -664,7 +664,7 @@ DBCollection.prototype.reIndex = function() {
 
 DBCollection.prototype.dropIndexes = function(indexNames) {
     indexNames = indexNames || '*';
-    var res = this._db.runCommand({deleteIndexes: this.getName(), index: indexNames});
+    var res = this._db.runCommand({dropIndexes: this.getName(), index: indexNames});
     assert(res, "no result from dropIndex result");
     if (res.ok)
         return res;
@@ -845,7 +845,7 @@ DBCollection.prototype.hashAllDocs = function() {
  */
 DBCollection.prototype.dropIndex = function(index) {
     assert(index, "need to specify index to dropIndex");
-    var res = this._dbCommand("deleteIndexes", {index: index});
+    var res = this._dbCommand("dropIndexes", {index: index});
     return res;
 };
 
