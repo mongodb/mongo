@@ -66,14 +66,5 @@
     // Check that index was created on the primary despite the attempted killOp().
     IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
-    // Check that a new index has been created on the secondary.
-    // This is due to the createIndexes command being replicated to the secondary before the primary
-    // has completed the index build in a background job.
-    rst.awaitReplication();
-    const secondary = rst.getSecondary();
-    const secondaryDB = secondary.getDB(testDB.getName());
-    const secondaryColl = secondaryDB.getCollection(coll.getName());
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
-
     rst.stopSet();
 })();
