@@ -283,11 +283,16 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         Lock::CollectionLock collLock(opCtx->lockState(), ns.ns(), MODE_IX);
         // WriteConflict exceptions and statuses are not expected to escape this method.
         status = indexer.insertAllDocumentsInCollection();
-        if (!status.isOK()) {
-            return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
-        }
+    }
+    // _failIndexBuild upgrades our database lock, so we must take care to release our Collection IX
+    // lock first.
+    if (!status.isOK()) {
+        return _failIndexBuild(opCtx, indexer, dbLock, status, allowBackgroundBuilding);
+    }
 
+    {
         // Perform the first drain while holding an intent lock.
+        Lock::CollectionLock collLock(opCtx->lockState(), ns.ns(), MODE_IX);
         status = indexer.drainBackgroundWritesIfNeeded();
     }
     if (!status.isOK()) {
