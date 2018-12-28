@@ -140,10 +140,6 @@ Status renameCollectionCommon(OperationContext* opCtx,
     else if (!lockState->isW())
         globalWriteLock.emplace(opCtx);
 
-    // Allow the MODE_X lock above to be interrupted, but rename is not resilient to interruption
-    // when the onRenameCollection OpObserver takes an oplog collection lock.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
     // We stay in source context the whole time. This is mostly to set the CurOp namespace.
     boost::optional<OldClientContext> ctx;
     ctx.emplace(opCtx, source.ns());
@@ -275,6 +271,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
                         return status;
                     }
                 }
+                // Rename is not resilient to interruption when the onRenameCollection OpObserver
+                // takes an oplog collection lock.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
                 // We have to override the provided 'dropTarget' setting for idempotency reasons to
                 // avoid unintentionally removing a collection on a secondary with the same name as
                 // the target.
