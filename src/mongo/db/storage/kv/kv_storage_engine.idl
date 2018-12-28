@@ -38,5 +38,5 @@ server_parameters:
     set_at: startup
     cpp_vartype: bool
     cpp_varname: "enableKVPendingDrops"
-    default: false
+    default: true
     test_only: true
