@@ -143,6 +143,8 @@ debian/mongodb
 .cproject
 .project
 .pydevproject
+.externalToolBuilders/
+.settings/
 
 # Idea CLion project artifacts
 .idea
