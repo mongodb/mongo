@@ -433,11 +433,7 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
     auto session = std::move(sws.getValue());
     session->ensureSync();
 
-#ifndef _WIN32
-    if (endpoints.front().family() == AF_UNIX) {
-        return static_cast<SessionHandle>(std::move(session));
-    }
-#endif
+
 
 #ifndef MONGO_CONFIG_SSL
     if (sslMode == kEnableSSL) {
@@ -452,6 +448,12 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
         if (!sslStatus.isOK()) {
             return sslStatus;
         }
+    }
+#endif
+
+#ifndef _WIN32
+    if (endpoints.front().family() == AF_UNIX) {
+        return static_cast<SessionHandle>(std::move(session));
     }
 #endif
 
