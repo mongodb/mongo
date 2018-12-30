@@ -6,11 +6,12 @@
 (function() {
     'use strict';
 
+    load("jstests/libs/check_log.js");
+
     const dbName = "test";
     const collName = "coll";
 
-    const firstIndex = "firstIndex";
-    const secondIndex = "secondIndex";
+    const indexName = "collIndex";
 
     function startStandalone() {
         let mongod = MongoRunner.runMongod({cleanData: true});
@@ -67,14 +68,11 @@
 
         if (isReplicaNode) {
             assert.commandWorked(hangDB.adminCommand(
-                {configureFailPoint: "slowBackgroundIndexBuild", mode: "alwaysOn"}));
+                {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
 
             db.runCommand({
                 createIndexes: collName,
-                indexes: [
-                    {key: {i: 1}, name: firstIndex, background: true},
-                    {key: {i: -1}, name: secondIndex, background: true},
-                ],
+                indexes: [{key: {i: 1}, name: indexName, background: true}],
                 writeConcern: {w: w}
             });
         } else {
@@ -84,10 +82,7 @@
             assert.throws(() => {
                 db.runCommand({
                     createIndexes: collName,
-                    indexes: [
-                        {key: {i: 1}, name: firstIndex, background: true},
-                        {key: {i: -1}, name: secondIndex, background: true},
-                    ]
+                    indexes: [{key: {i: 1}, name: indexName, background: true}]
                 });
             });
         }
@@ -157,8 +152,7 @@
 
         mongod = restartStandalone(mongod);
 
-        checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/false);
-        checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(mongod, indexName, /*shouldExist=*/false);
 
         shutdownStandalone(mongod);
     }
@@ -174,14 +168,16 @@
         addTestDocuments(primaryDB);
         startIndexBuildAndCrash(primaryDB, /*isReplicaNode=*/true, /*w=*/2, secondaryDB);
 
+        // Wait for index build to begin on secondary before restarting.
+        checkLog.contains(secondary, "build index on: " + dbName + "." + collName);
+
         let secondaryId = replSet.getNodeId(secondary);
         replSet.stop(secondaryId);
         replSet.remove(secondaryId);
 
         let mongod = restartStandalone(secondary);
 
-        checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/true);
-        checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(mongod, indexName, /*shouldExist=*/true);
 
         shutdownStandalone(mongod);
         stopReplSet(replSet);
