@@ -120,7 +120,11 @@ void WiredTigerOperationStats::fetchStats(WT_SESSION* session,
     uint64_t key;
     while (c->next(c) == 0 && c->get_key(c, &key) == 0) {
         fassert(51035, c->get_value(c, &desc, nullptr, &value) == 0);
+#if defined(__s390x__)
+        _stats[key >> 32] = WiredTigerUtil::castStatisticsValue<long long>(value);
+#else
         _stats[key] = WiredTigerUtil::castStatisticsValue<long long>(value);
+#endif  // __s390x__
     }
 
     // Reset the statistics so that the next fetch gives the recent values.
