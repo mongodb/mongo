@@ -10,7 +10,6 @@
     const collName = "coll";
 
     const firstIndex = "firstIndex";
-    const secondIndex = "secondIndex";
 
     function startStandalone() {
         let mongod = MongoRunner.runMongod({cleanData: true});
@@ -67,14 +66,11 @@
 
         if (isReplicaNode) {
             assert.commandWorked(hangDB.adminCommand(
-                {configureFailPoint: "slowBackgroundIndexBuild", mode: "alwaysOn"}));
+                {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
 
             db.runCommand({
                 createIndexes: collName,
-                indexes: [
-                    {key: {i: 1}, name: firstIndex, background: true},
-                    {key: {i: -1}, name: secondIndex, background: true},
-                ],
+                indexes: [{key: {i: 1}, name: firstIndex, background: true}],
                 writeConcern: {w: w}
             });
         } else {
@@ -84,10 +80,7 @@
             assert.throws(() => {
                 db.runCommand({
                     createIndexes: collName,
-                    indexes: [
-                        {key: {i: 1}, name: firstIndex, background: true},
-                        {key: {i: -1}, name: secondIndex, background: true},
-                    ]
+                    indexes: [{key: {i: 1}, name: firstIndex, background: true}]
                 });
             });
         }
@@ -158,7 +151,6 @@
         mongod = restartStandalone(mongod);
 
         checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/false);
-        checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/false);
 
         shutdownStandalone(mongod);
     }
@@ -181,7 +173,6 @@
         let mongod = restartStandalone(secondary);
 
         checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/true);
-        checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/true);
 
         shutdownStandalone(mongod);
         stopReplSet(replSet);
