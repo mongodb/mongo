@@ -446,11 +446,11 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
     if (checkIndexNamespace && !nss.isDropPendingNamespace()) {
-        auto indexNamespace = IndexDescriptor::makeIndexNamespace(nss.ns(), name);
-        if (indexNamespace.length() > NamespaceString::MaxNsLen)
+        auto indexNamespace = nss.makeIndexNamespace(name);
+        if (indexNamespace.size() > NamespaceString::MaxNsLen)
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "namespace name generated from index name \""
-                                        << indexNamespace
+                                        << indexNamespace.ns()
                                         << "\" is too long (127 byte max)");
     }
 

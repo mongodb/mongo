@@ -354,6 +354,11 @@ public:
     }
 
     /**
+     * Returns index namespace for an index in this collection namespace.
+     */
+    NamespaceString makeIndexNamespace(StringData indexName) const;
+
+    /**
      * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
      * which do not contain BSON objects in their records. ("oplog.$main" is the exception)
      */

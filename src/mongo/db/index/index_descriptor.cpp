@@ -99,6 +99,40 @@ constexpr StringData IndexDescriptor::kTextVersionFieldName;
 constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 
+IndexDescriptor::IndexDescriptor(Collection* collection,
+                                 const std::string& accessMethodName,
+                                 BSONObj infoObj)
+    : _collection(collection),
+      _accessMethodName(accessMethodName),
+      _indexType(IndexNames::nameToType(accessMethodName)),
+      _infoObj(infoObj.getOwned()),
+      _numFields(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).nFields()),
+      _keyPattern(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).getOwned()),
+      _projection(infoObj.getObjectField(IndexDescriptor::kPathProjectionFieldName).getOwned()),
+      _indexName(infoObj.getStringField(IndexDescriptor::kIndexNameFieldName)),
+      _parentNS(infoObj.getStringField(IndexDescriptor::kNamespaceFieldName)),
+      _isIdIndex(isIdIndexPattern(_keyPattern)),
+      _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
+      _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
+      _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
+      _cachedEntry(NULL) {
+    _indexNamespace = NamespaceString(_parentNS).makeIndexNamespace(_indexName).ns();
+
+    BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
+    fassert(50942, e.isNumber());
+    _version = static_cast<IndexVersion>(e.numberInt());
+
+    if (BSONElement filterElement = _infoObj[kPartialFilterExprFieldName]) {
+        invariant(filterElement.isABSONObj());
+        _partialFilterExpression = filterElement.Obj().getOwned();
+    }
+
+    if (BSONElement collationElement = _infoObj[kCollationFieldName]) {
+        invariant(collationElement.isABSONObj());
+        _collation = collationElement.Obj().getOwned();
+    }
+}
+
 bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     switch (indexVersion) {
         case IndexVersion::kV1:
@@ -175,7 +209,7 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
 
 void IndexDescriptor::setNs(NamespaceString ns) {
     _parentNS = ns.toString();
-    _indexNamespace = makeIndexNamespace(_parentNS, _indexName);
+    _indexNamespace = ns.makeIndexNamespace(_indexName).ns();
 
     // Construct a new infoObj with the namespace field replaced.
     _infoObj = renameNsInIndexSpec(_infoObj, ns);

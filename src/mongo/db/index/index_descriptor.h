@@ -40,8 +40,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -94,41 +92,9 @@ public:
     static BSONObj renameNsInIndexSpec(BSONObj spec, const NamespaceString& newNs);
 
     /**
-     * OnDiskIndexData is a pointer to the memory mapped per-index data.
-     * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
+     * infoObj is a copy of the index-describing BSONObj contained in the catalog.
      */
-    IndexDescriptor(Collection* collection, const std::string& accessMethodName, BSONObj infoObj)
-        : _collection(collection),
-          _accessMethodName(accessMethodName),
-          _indexType(IndexNames::nameToType(accessMethodName)),
-          _infoObj(infoObj.getOwned()),
-          _numFields(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).nFields()),
-          _keyPattern(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).getOwned()),
-          _projection(infoObj.getObjectField(IndexDescriptor::kPathProjectionFieldName).getOwned()),
-          _indexName(infoObj.getStringField(IndexDescriptor::kIndexNameFieldName)),
-          _parentNS(infoObj.getStringField(IndexDescriptor::kNamespaceFieldName)),
-          _isIdIndex(isIdIndexPattern(_keyPattern)),
-          _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
-          _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
-          _partial(!infoObj[kPartialFilterExprFieldName].eoo()),
-          _cachedEntry(NULL) {
-        _indexNamespace = makeIndexNamespace(_parentNS, _indexName);
-
-        BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
-        fassert(50942, e.isNumber());
-        _version = static_cast<IndexVersion>(e.numberInt());
-
-        if (BSONElement filterElement = _infoObj[kPartialFilterExprFieldName]) {
-            invariant(filterElement.isABSONObj());
-            _partialFilterExpression = filterElement.Obj().getOwned();
-        }
-
-        if (BSONElement collationElement = _infoObj[kCollationFieldName]) {
-            invariant(collationElement.isABSONObj());
-            _collation = collationElement.Obj().getOwned();
-        }
-    }
-
+    IndexDescriptor(Collection* collection, const std::string& accessMethodName, BSONObj infoObj);
 
     /**
      * Returns true if the specified index version is supported, and returns false otherwise.
@@ -286,10 +252,6 @@ public:
         if (!(strcmp(e.fieldName(), "_id") == 0 && (e.numberInt() == 1 || e.numberInt() == -1)))
             return false;
         return i.next().eoo();
-    }
-
-    static std::string makeIndexNamespace(StringData ns, StringData name) {
-        return ns.toString() + ".$" + name.toString();
     }
 
 private:
