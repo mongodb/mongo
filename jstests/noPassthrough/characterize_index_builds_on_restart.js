@@ -67,7 +67,7 @@
 
         if (isReplicaNode) {
             assert.commandWorked(hangDB.adminCommand(
-                {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+                {configureFailPoint: "slowBackgroundIndexBuild", mode: "alwaysOn"}));
 
             db.runCommand({
                 createIndexes: collName,

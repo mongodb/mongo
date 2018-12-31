@@ -47,8 +47,8 @@
     }
     assert.writeOK(bulk.execute({w: 2, wtimeout: replTest.kDefaultTimeoutMS}));
 
-    assert.commandWorked(secondDB.adminCommand(
-        {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+    assert.commandWorked(
+        secondDB.adminCommand({configureFailPoint: "slowBackgroundIndexBuild", mode: "alwaysOn"}));
 
     jsTest.log("Starting background indexing for test of: " + tojson(dc));
 
@@ -64,7 +64,7 @@
 
     jsTest.log("Waiting on replication");
     assert.commandWorked(
-        secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+        secondDB.adminCommand({configureFailPoint: "slowBackgroundIndexBuild", mode: "off"}));
     replTest.awaitReplication();
 
     print("Index list on master:");
