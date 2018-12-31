@@ -39,6 +39,7 @@
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 
 namespace mongo {
 
@@ -60,7 +61,8 @@ public:
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         // Intentionally ignoring failure.
-        _cce->_engine->dropIdent(_opCtx, _ident).transitional_ignore();
+        auto kvEngine = _cce->_engine->getEngine();
+        MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
     }
 
     OperationContext* const _opCtx;
@@ -70,23 +72,37 @@ public:
 
 class KVCollectionCatalogEntry::RemoveIndexChange : public RecoveryUnit::Change {
 public:
-    RemoveIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce, StringData ident)
-        : _opCtx(opCtx), _cce(cce), _ident(ident.toString()) {}
+    RemoveIndexChange(OperationContext* opCtx,
+                      KVCollectionCatalogEntry* cce,
+                      const NamespaceString& indexNss,
+                      StringData indexName,
+                      StringData ident)
+        : _opCtx(opCtx),
+          _cce(cce),
+          _indexNss(indexNss),
+          _indexName(indexName),
+          _ident(ident.toString()) {}
 
     virtual void rollback() {}
     virtual void commit(boost::optional<Timestamp>) {
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // index, we should never see it again anyway.
-        _cce->_engine->dropIdent(_opCtx, _ident).transitional_ignore();
+        auto engine = _cce->_engine;
+        {
+            auto kvEngine = engine->getEngine();
+            MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
+        }
     }
 
     OperationContext* const _opCtx;
     KVCollectionCatalogEntry* const _cce;
+    const NamespaceString _indexNss;
+    const std::string _indexName;
     const std::string _ident;
 };
 
 
-KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVEngine* engine,
+KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVStorageEngineInterface* engine,
                                                    KVCatalog* catalog,
                                                    StringData ns,
                                                    StringData ident,
@@ -184,7 +200,8 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
     _catalog->putMetaData(opCtx, ns().toString(), md);
 
     // Lazily remove to isolate underlying engine from rollback.
-    opCtx->recoveryUnit()->registerChange(new RemoveIndexChange(opCtx, this, ident));
+    opCtx->recoveryUnit()->registerChange(
+        new RemoveIndexChange(opCtx, this, ns().makeIndexNamespace(indexName), indexName, ident));
     return Status::OK();
 }
 
@@ -218,7 +235,8 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
 
     string ident = _catalog->getIndexIdent(opCtx, ns().ns(), spec->indexName());
 
-    const Status status = _engine->createGroupedSortedDataInterface(opCtx, ident, spec, prefix);
+    auto kvEngine = _engine->getEngine();
+    const Status status = kvEngine->createGroupedSortedDataInterface(opCtx, ident, spec, prefix);
     if (status.isOK()) {
         opCtx->recoveryUnit()->registerChange(new AddIndexChange(opCtx, this, ident));
     }
@@ -248,7 +266,8 @@ void KVCollectionCatalogEntry::updateIndexMetadata(OperationContext* opCtx,
                                                    const IndexDescriptor* desc) {
     // Update any metadata Ident has for this index
     const string ident = _catalog->getIndexIdent(opCtx, ns().ns(), desc->indexName());
-    _engine->alterIdentMetadata(opCtx, ident, desc);
+    auto kvEngine = _engine->getEngine();
+    kvEngine->alterIdentMetadata(opCtx, ident, desc);
 }
 
 bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,

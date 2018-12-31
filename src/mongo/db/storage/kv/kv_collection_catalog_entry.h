@@ -42,11 +42,11 @@
 namespace mongo {
 
 class KVCatalog;
-class KVEngine;
+class KVStorageEngineInterface;
 
 class KVCollectionCatalogEntry final : public BSONCollectionCatalogEntry {
 public:
-    KVCollectionCatalogEntry(KVEngine* engine,
+    KVCollectionCatalogEntry(KVStorageEngineInterface* engine,
                              KVCatalog* catalog,
                              StringData ns,
                              StringData ident,
@@ -109,8 +109,8 @@ private:
     class AddIndexChange;
     class RemoveIndexChange;
 
-    KVEngine* _engine;    // not owned
-    KVCatalog* _catalog;  // not owned
+    KVStorageEngineInterface* const _engine;  // not owned
+    KVCatalog* _catalog;                      // not owned
     std::string _ident;
     std::unique_ptr<RecordStore> _recordStore;  // owned
 };

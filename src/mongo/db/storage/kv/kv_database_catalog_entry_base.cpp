@@ -265,8 +265,8 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
     auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, options, prefix);
     invariant(rs);
 
-    _collections[ns.toString()] = new KVCollectionCatalogEntry(
-        _engine->getEngine(), _engine->getCatalog(), ns, ident, std::move(rs));
+    _collections[ns.toString()] =
+        new KVCollectionCatalogEntry(_engine, _engine->getCatalog(), ns, ident, std::move(rs));
 
     return Status::OK();
 }
@@ -290,8 +290,8 @@ void KVDatabaseCatalogEntryBase::initCollection(OperationContext* opCtx,
     }
 
     // No change registration since this is only for committed collections
-    _collections[ns] = new KVCollectionCatalogEntry(
-        _engine->getEngine(), _engine->getCatalog(), ns, ident, std::move(rs));
+    _collections[ns] =
+        new KVCollectionCatalogEntry(_engine, _engine->getCatalog(), ns, ident, std::move(rs));
 }
 
 void KVDatabaseCatalogEntryBase::reinitCollectionAfterRepair(OperationContext* opCtx,
