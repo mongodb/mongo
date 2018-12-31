@@ -149,7 +149,9 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     string ident = "abc";
     IndexDescriptor desc(nullptr,
                          "",
-                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "key"
+                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns"
+                                  << "mydb.mycoll"
+                                  << "key"
                                   << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;
     {
@@ -554,6 +556,8 @@ DEATH_TEST(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 50
                          "",
                          BSON("v"
                               << "1"
+                              << "ns"
+                              << "mydb.mycoll"
                               << "key"
                               << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;
