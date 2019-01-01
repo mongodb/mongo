@@ -30,9 +30,13 @@
  *    it in the license file.
  */
 
-#include <memory>
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
+
+#include <memory>
 
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -40,6 +44,7 @@
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -84,11 +89,20 @@ public:
           _ident(ident.toString()) {}
 
     virtual void rollback() {}
-    virtual void commit(boost::optional<Timestamp>) {
+    virtual void commit(boost::optional<Timestamp> commitTimestamp) {
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // index, we should never see it again anyway.
+        // TODO(SERVER-38800): Remove special case for _id index. The rollback process is unable to
+        // fix collection counts and currently relies on catalog::openCatalog() to update the
+        // collection count as it rebuilds missing indexes. Removing the ident for the _id index
+        // immediately ensures that we have at least one index to rebuild coming out of rollback.
         auto engine = _cce->_engine;
-        {
+        auto storageEngine = engine->getStorageEngine();
+        if (storageEngine->supportsPendingDrops() && commitTimestamp && _indexName != "_id_") {
+            log() << "Deferring ident drop for " << _ident << " (" << _indexNss
+                  << ") with commit timestamp: " << commitTimestamp->toBSON();
+            engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
+        } else {
             auto kvEngine = engine->getEngine();
             MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
         }
