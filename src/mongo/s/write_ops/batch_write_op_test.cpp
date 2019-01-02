@@ -32,6 +32,9 @@
 
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/s/session_catalog_router.h"
+#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/mock_ns_targeter.h"
@@ -1543,6 +1546,92 @@ TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
 
     batchOp.noteBatchResponse(*targeted.begin()->second, response, NULL);
     ASSERT(batchOp.isFinished());
+}
+
+class BatchWriteOpTransactionTest : public ShardingTestFixture {
+public:
+    const TxnNumber kTxnNumber = 5;
+
+    void setUp() override {
+        ShardingTestFixture::setUp();
+
+        operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        operationContext()->setTxnNumber(kTxnNumber);
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        _scopedSession.emplace(operationContext());
+
+        auto txnRouter = TransactionRouter::get(operationContext());
+        txnRouter->beginOrContinueTxn(
+            operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kStart);
+    }
+
+    void tearDown() override {
+        _scopedSession.reset();
+        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+
+        ShardingTestFixture::tearDown();
+    }
+
+private:
+    boost::optional<RouterOperationContextSession> _scopedSession;
+};
+
+TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Delete) {
+    NamespaceString nss("foo.bar");
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
+    MockNSTargeter targeter;
+    initTargeterHalfRange(nss, endpoint, &targeter);
+
+    // Untargetable delete op.
+    BatchedCommandRequest deleteRequest([&] {
+        write_ops::Delete deleteOp(nss);
+        deleteOp.setDeletes({buildDelete(BSON("x" << 1), false)});
+        return deleteOp;
+    }());
+    BatchWriteOp batchOp(operationContext(), deleteRequest);
+
+    OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
+    std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
+
+    bool recordTargetErrors = false;
+    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
+                       AssertionException,
+                       ErrorCodes::UnknownError);
+
+    recordTargetErrors = true;
+    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
+                       AssertionException,
+                       ErrorCodes::UnknownError);
+}
+
+TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
+    NamespaceString nss("foo.bar");
+    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
+    MockNSTargeter targeter;
+    initTargeterHalfRange(nss, endpoint, &targeter);
+
+    // Untargetable update op.
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setUpdates({buildUpdate(BSON("x" << 1), BSONObj(), false)});
+        return updateOp;
+    }());
+    BatchWriteOp batchOp(operationContext(), updateRequest);
+
+    OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
+    std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
+
+    bool recordTargetErrors = false;
+    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
+                       AssertionException,
+                       ErrorCodes::UnknownError);
+
+    recordTargetErrors = true;
+    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
+                       AssertionException,
+                       ErrorCodes::UnknownError);
 }
 
 }  // namespace
