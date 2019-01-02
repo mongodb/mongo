@@ -68,7 +68,7 @@
 
         if (isReplicaNode) {
             assert.commandWorked(hangDB.adminCommand(
-                {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+                {configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "alwaysOn"}));
 
             db.runCommand({
                 createIndexes: collName,
@@ -169,7 +169,13 @@
         startIndexBuildAndCrash(primaryDB, /*isReplicaNode=*/true, /*w=*/2, secondaryDB);
 
         // Wait for index build to begin on secondary before restarting.
-        checkLog.contains(secondary, "build index on: " + dbName + "." + collName);
+        replSet.awaitReplication();
+        checkLog.contains(secondary,
+                          "Hanging index build with no locks due " +
+                              "to \'hangAfterStartingIndexBuildUnlocked\' failpoint");
+
+        // Wait for the writes to be durable.
+        secondaryDB.adminCommand({fsync: 1});
 
         let secondaryId = replSet.getNodeId(secondary);
         replSet.stop(secondaryId);
