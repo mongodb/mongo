@@ -71,6 +71,9 @@
  *          enableBalancer setting
  *       manualAddShard {boolean}: shards will not be added if true.
  *
+ *       migrationLockAcquisitionMaxWaitMS {number}: number of milliseconds to acquire the migration
+ *          lock.
+ *
  *       useBridge {boolean}: If true, then a mongobridge process is started for each node in the
  *          sharded cluster. Defaults to false.
  *
@@ -87,6 +90,7 @@
  *       useHostname {boolean}: if true, use hostname of machine,
  *         otherwise use localhost
  *       numReplicas {number}
+ *
  *     }
  *   }
  *
@@ -1188,6 +1192,9 @@ var ShardingTest = function(params) {
         _allocatePortForShard = _allocatePortForMongos = allocatePort;
     }
 
+    otherParams.migrationLockAcquisitionMaxWaitMS =
+        otherParams.migrationLockAcquisitionMaxWaitMS || 30000;
+
     // Start the MongoD servers (shards)
     for (var i = 0; i < numShards; i++) {
         if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
@@ -1235,6 +1242,10 @@ var ShardingTest = function(params) {
                 rsDefaults = Object.merge(rsDefaults, otherParams["d" + i]);
                 rsDefaults = Object.merge(rsDefaults, otherParams.shardOptions);
             }
+
+            rsDefaults.setParameter = rsDefaults.setParameter || {};
+            rsDefaults.setParameter.migrationLockAcquisitionMaxWaitMS =
+                otherParams.migrationLockAcquisitionMaxWaitMS;
 
             var rsSettings = rsDefaults.settings;
             delete rsDefaults.settings;
@@ -1288,6 +1299,10 @@ var ShardingTest = function(params) {
                 shardsvr: '',
                 keyFile: keyFile
             };
+
+            options.setParameter = options.setParameter || {};
+            options.setParameter.migrationLockAcquisitionMaxWaitMS =
+                otherParams.migrationLockAcquisitionMaxWaitMS;
 
             if (jsTestOptions().shardMixedBinVersions) {
                 if (!otherParams.shardOptions) {

@@ -59,6 +59,7 @@
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -246,7 +247,13 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
+        AutoGetCollection autoColl(opCtx,
+                                   getNss(),
+                                   MODE_IX,
+                                   MODE_X,
+                                   AutoGetCollection::ViewMode::kViewsForbidden,
+                                   opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                       Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
         auto csr = CollectionShardingRuntime::get(opCtx, getNss());
         auto lockedCsr = CollectionShardingRuntimeLock::lockExclusive(opCtx, csr);
         invariant(nullptr == std::exchange(msmForCsr(csr), this));

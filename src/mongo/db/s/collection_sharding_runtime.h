@@ -35,12 +35,15 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
 class CollectionShardingRuntimeLock;
+
+extern AtomicWord<int> migrationLockAcquisitionMaxWaitMS;
 
 /**
  * See the comments for CollectionShardingState for more information on how this class fits in the

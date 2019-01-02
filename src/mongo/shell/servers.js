@@ -591,6 +591,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         _removeSetParameterIfBeforeVersion(opts, "writePeriodicNoops", "3.3.12");
         _removeSetParameterIfBeforeVersion(opts, "numInitialSyncAttempts", "3.3.12");
         _removeSetParameterIfBeforeVersion(opts, "numInitialSyncConnectAttempts", "3.3.12");
+        _removeSetParameterIfBeforeVersion(opts, "migrationLockAcquisitionMaxWaitMS", "4.1.7");
 
         if (!opts.logFile && opts.useLogFiles) {
             opts.logFile = opts.dbpath + "/mongod.log";
