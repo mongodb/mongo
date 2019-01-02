@@ -301,10 +301,6 @@ public:
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
     }
 
-    bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override {
-        return false;
-    }
-
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override {
         return false;
     }

@@ -139,10 +139,6 @@ public:
         }
     }
 
-    bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override {
-        return true;
-    }
-
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override {
         return true;
     }

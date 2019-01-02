@@ -614,9 +614,10 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     OpTime minValid = fassert(40492, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
 
-    // This method is only used with storage engines that do not support recover to stable
-    // timestamp. As a result, the timestamp on the 'appliedThrough' update does not matter.
-    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
+    // This method is only used when read concern majority is set to off, as the storage engine
+    // doesn't support recover to stable timestamp. As a result, the timestamp on the
+    // 'appliedThrough' update does not matter.
+    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
     replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 

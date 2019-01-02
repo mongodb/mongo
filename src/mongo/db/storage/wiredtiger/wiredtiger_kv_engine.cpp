@@ -1657,13 +1657,6 @@ void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp)
     _initialDataTimestamp.store(initialDataTimestamp.asULL());
 }
 
-bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
-    if (!_keepDataHistory) {
-        return false;
-    }
-    return true;
-}
-
 bool WiredTigerKVEngine::supportsRecoveryTimestamp() const {
     return true;
 }
@@ -1678,11 +1671,6 @@ bool WiredTigerKVEngine::_canRecoverToStableTimestamp() const {
 }
 
 StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationContext* opCtx) {
-    if (!supportsRecoverToStableTimestamp()) {
-        severe() << "WiredTiger is configured to not support recover to a stable timestamp";
-        fassertFailed(50665);
-    }
-
     if (!_canRecoverToStableTimestamp()) {
         Timestamp stableTS(_stableTimestamp.load());
         Timestamp initialDataTS(_initialDataTimestamp.load());
@@ -1752,24 +1740,12 @@ Timestamp WiredTigerKVEngine::getOldestOpenReadTimestamp() const {
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
-    if (!supportsRecoveryTimestamp()) {
-        severe() << "WiredTiger is configured to not support providing a recovery timestamp";
-        fassertFailed(50745);
-    }
-
-    if (_recoveryTimestamp.isNull()) {
+    if (_recoveryTimestamp.isNull())
         return boost::none;
-    }
-
     return _recoveryTimestamp;
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getLastStableRecoveryTimestamp() const {
-    if (!supportsRecoverToStableTimestamp()) {
-        severe() << "WiredTiger is configured to not support recover to a stable timestamp";
-        fassertFailed(50770);
-    }
-
     if (_ephemeral) {
         Timestamp stable(_stableTimestamp.load());
         Timestamp initialData(_initialDataTimestamp.load());

@@ -196,9 +196,9 @@ void ReplicationConsistencyMarkersImpl::setMinValid(OperationContext* opCtx,
                                      << MinValidDocument::kMinValidTermFieldName
                                      << minValid.getTerm()));
 
-    // This method is only used with storage engines that do not support recover to stable
-    // timestamp. As a result, their timestamps do not matter.
-    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
+    // This method is only used when read concern majority is set to off, as the storage engine
+    // doesn't support recover to stable timestamp. As a result, their timestamps do not matter.
+    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernMajority());
     update.timestamp = Timestamp();
 
     _updateMinValidDocument(opCtx, update);
