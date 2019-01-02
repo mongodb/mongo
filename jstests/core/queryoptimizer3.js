@@ -16,7 +16,16 @@
     var shellWaitHandle = startParallelShell(function() {
         for (var i = 0; i < 400; ++i) {
             sleep(50);
-            db.jstests_queryoptimizer3.drop();
+            try {
+                db.jstests_queryoptimizer3.drop();
+            } catch (e) {
+                if (e.code === ErrorCodes.BackgroundOperationInProgressForNamespace) {
+                    print("Background operation temporarily in progress while attempting to drop " +
+                          "collection.");
+                    continue;
+                }
+                throw e;
+            }
         }
     });
 

@@ -71,21 +71,7 @@ public:
     MultiIndexBlock(OperationContext* opCtx, Collection* collection);
     ~MultiIndexBlock();
 
-    /**
-     * By default we ignore the 'background' flag in specs when building an index. If this is
-     * called before init(), we will build the indexes in the background as long as *all* specs
-     * call for background indexing. If any spec calls for foreground indexing all indexes will
-     * be built in the foreground, as there is no concurrency benefit to building a subset of
-     * indexes in the background, but there is a performance benefit to building all in the
-     * foreground.
-     */
-    void allowBackgroundBuilding();
-
-    /**
-     * Call this before init() to allow the index build to be interrupted.
-     * This only affects builds using the insertAllDocumentsInCollection helper.
-     */
-    void allowInterruption();
+    static bool areHybridIndexBuildsEnabled();
 
     /**
      * By default we enforce the 'unique' flag in specs when building an index by failing.
@@ -157,7 +143,7 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status drainBackgroundWritesIfNeeded();
+    Status drainBackgroundWrites();
 
     /**
      * Check any constraits that may have been temporarily violated during the index build for
@@ -225,7 +211,11 @@ public:
      */
     void abortWithoutCleanup();
 
-    bool getBuildInBackground() const;
+    /**
+     * Returns true if this build block supports background writes while building an index. This is
+     * true for the kHybrid and kBackground methods.
+     */
+    bool isBackgroundBuilding() const;
 
     /**
      * State transitions:
@@ -289,8 +279,8 @@ private:
     Collection* _collection;
     OperationContext* _opCtx;
 
-    bool _buildInBackground = false;
-    bool _allowInterruption = false;
+    IndexBuildMethod _method = IndexBuildMethod::kHybrid;
+
     bool _ignoreUnique = false;
 
     bool _needToCleanup = true;
@@ -306,4 +296,5 @@ private:
 // The ASSERT_*() macros use this function to print the value of 'state' when the predicate fails.
 std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state);
 
+logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& out, const IndexBuildMethod& method);
 }  // namespace mongo

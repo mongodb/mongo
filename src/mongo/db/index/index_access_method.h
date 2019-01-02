@@ -286,7 +286,6 @@ public:
 
     virtual Status commitBulk(OperationContext* opCtx,
                               BulkBuilder* bulk,
-                              bool mayInterrupt,
                               bool dupsAllowed,
                               std::set<RecordId>* dupRecords,
                               std::vector<BSONObj>* dupKeys) = 0;
@@ -520,7 +519,6 @@ public:
 
     Status commitBulk(OperationContext* opCtx,
                       BulkBuilder* bulk,
-                      bool mayInterrupt,
                       bool dupsAllowed,
                       std::set<RecordId>* dupRecords,
                       std::vector<BSONObj>* dupKeys) final;

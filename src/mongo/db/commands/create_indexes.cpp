@@ -287,8 +287,6 @@ bool runCreateIndexes(OperationContext* opCtx,
 
 
     MultiIndexBlock indexer(opCtx, collection);
-    indexer.allowBackgroundBuilding();
-    indexer.allowInterruption();
 
     const size_t origSpecsSize = specs.size();
     specs = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, std::move(specs));
@@ -318,7 +316,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // If we're a background index, replace exclusive db lock with an intent lock, so that
     // other readers and writers can proceed during this phase.
-    if (indexer.getBuildInBackground()) {
+    if (indexer.isBackgroundBuilding()) {
         opCtx->recoveryUnit()->abandonSnapshot();
         dbLock.relockWithMode(MODE_IX);
     }
@@ -326,7 +324,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     auto relockOnErrorGuard = makeGuard([&] {
         // Must have exclusive DB lock before we clean up the index build via the
         // destructor of 'indexer'.
-        if (indexer.getBuildInBackground()) {
+        if (indexer.isBackgroundBuilding()) {
             try {
                 // This function cannot throw today, but we will preemptively prepare for
                 // that day, to avoid data corruption due to lack of index cleanup.
@@ -355,7 +353,7 @@ bool runCreateIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IS);
 
-        uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
+        uassertStatusOK(indexer.drainBackgroundWrites());
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
@@ -368,7 +366,7 @@ bool runCreateIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
 
-        uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
+        uassertStatusOK(indexer.drainBackgroundWrites());
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
@@ -379,7 +377,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     relockOnErrorGuard.dismiss();
 
     // Need to return db lock back to exclusive, to complete the index build.
-    if (indexer.getBuildInBackground()) {
+    if (indexer.isBackgroundBuilding()) {
         opCtx->recoveryUnit()->abandonSnapshot();
         dbLock.relockWithMode(MODE_X);
 
@@ -394,7 +392,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
-    uassertStatusOK(indexer.drainBackgroundWritesIfNeeded());
+    uassertStatusOK(indexer.drainBackgroundWrites());
 
     // This is required before completion.
     uassertStatusOK(indexer.checkConstraints());

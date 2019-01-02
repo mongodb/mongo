@@ -403,7 +403,6 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     // matches. It also wouldn't work on non-empty collections so we would need both
     // implementations anyway as long as that is supported.
     MultiIndexBlock indexer(opCtx, collection);
-    indexer.allowInterruption();
 
     auto indexCatalog = collection->getIndexCatalog();
     auto prunedIndexesToBuild = indexCatalog->removeExistingIndexes(opCtx, indexesToBuild);

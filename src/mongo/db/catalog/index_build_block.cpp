@@ -49,11 +49,13 @@ namespace mongo {
 IndexCatalogImpl::IndexBuildBlock::IndexBuildBlock(OperationContext* opCtx,
                                                    Collection* collection,
                                                    IndexCatalogImpl* catalog,
-                                                   const BSONObj& spec)
+                                                   const BSONObj& spec,
+                                                   IndexBuildMethod method)
     : _collection(collection),
       _catalog(catalog),
       _ns(_collection->ns().ns()),
       _spec(spec.getOwned()),
+      _method(method),
       _entry(nullptr),
       _opCtx(opCtx) {
     invariant(collection);
@@ -71,7 +73,8 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     _indexName = descriptor->indexName();
     _indexNamespace = descriptor->indexNamespace();
 
-    bool isBackgroundIndex = _spec["background"].trueValue();
+    bool isBackgroundIndex =
+        _method == IndexBuildMethod::kHybrid || _method == IndexBuildMethod::kBackground;
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(_opCtx)) {
         isBackgroundSecondaryBuild =
@@ -91,15 +94,7 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     _entry = _catalog->_setupInMemoryStructures(
         _opCtx, std::move(descriptor), initFromDisk, isReadyIndex);
 
-    // Hybrid indexes are only enabled for background indexes.
-    bool useHybrid = true;
-    // TODO: Remove when SERVER-37270 is complete.
-    useHybrid = useHybrid && isBackgroundIndex;
-    // TODO: Remove when SERVER-38550 is complete. The mobile storage engine does not suport
-    // dupsAllowed mode on bulk builders.
-    useHybrid = useHybrid && storageGlobalParams.engine != "mobile";
-
-    if (useHybrid) {
+    if (_method == IndexBuildMethod::kHybrid) {
         _indexBuildInterceptor = stdx::make_unique<IndexBuildInterceptor>(_opCtx, _entry);
         _entry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 

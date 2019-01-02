@@ -195,8 +195,6 @@ protected:
         auto coll = autoColl.getCollection();
 
         MultiIndexBlock indexer(opCtx(), coll);
-        indexer.allowBackgroundBuilding();
-        indexer.allowInterruption();
 
         // Initialize the index builder and add all documents currently in the collection.
         ASSERT_OK(indexer.init(indexSpec).getStatus());

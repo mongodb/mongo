@@ -206,8 +206,8 @@ public:
         return "";
     }
 
-    std::unique_ptr<IndexBuildBlockInterface> createIndexBuildBlock(OperationContext* opCtx,
-                                                                    const BSONObj& spec) override {
+    std::unique_ptr<IndexBuildBlockInterface> createIndexBuildBlock(
+        OperationContext* opCtx, const BSONObj& spec, IndexBuildMethod method) override {
         return {};
     }
 

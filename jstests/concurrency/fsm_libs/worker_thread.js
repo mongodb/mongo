@@ -51,6 +51,10 @@ var workerThread = (function() {
                 mongo = new Mongo(connectionString);
             }
 
+            // Retry operations that fail due to in-progress background operations. Load this early
+            // so that later overrides can be retried.
+            load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');
+
             if (typeof args.sessionOptions !== 'undefined') {
                 let initialClusterTime;
                 let initialOperationTime;
@@ -91,6 +95,12 @@ var workerThread = (function() {
                     // readPreference={mode: "secondary"} when there's only a single node in
                     // the CSRS.
                     load('jstests/libs/override_methods/set_read_preference_secondary.js');
+
+                    // Reads after an index build completes on a secondary should be causally
+                    // consistent.
+                    if (session.getOptions().isCausalConsistency()) {
+                        load('jstests/libs/override_methods/causally_consistent_index_builds.js');
+                    }
                 }
 
                 if (typeof initialClusterTime !== 'undefined') {

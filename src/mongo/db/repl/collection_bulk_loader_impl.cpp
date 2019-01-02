@@ -196,7 +196,6 @@ Status CollectionBulkLoaderImpl::commit() {
             if (!status.isOK()) {
                 return status;
             }
-
             for (auto&& it : dups) {
                 writeConflictRetry(
                     _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
@@ -209,6 +208,14 @@ Status CollectionBulkLoaderImpl::commit() {
                                                                    true /* noWarn */);
                         wunit.commit();
                     });
+            }
+            status = _idIndexBlock->drainBackgroundWrites();
+            if (!status.isOK()) {
+                return status;
+            }
+            status = _idIndexBlock->checkConstraints();
+            if (!status.isOK()) {
+                return status;
             }
 
             // Commit _id index, without dups.

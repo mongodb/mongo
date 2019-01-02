@@ -222,10 +222,6 @@ bool shouldBuildInForeground(OperationContext* opCtx,
         return true;
     }
 
-    if (!index["background"].trueValue()) {
-        return true;
-    }
-
     // Primaries should build indexes in the foreground because failures cannot be handled
     // by the background thread.
     const bool isPrimary =
@@ -235,6 +231,13 @@ bool shouldBuildInForeground(OperationContext* opCtx,
                << " in a background thread because this is a primary";
         return true;
     }
+
+    // Without hybrid builds enabled, indexes should build with the behavior of their specs.
+    bool hybrid = IndexBuilder::canBuildInBackground();
+    if (!hybrid) {
+        return !index["background"].trueValue();
+    }
+
     return false;
 }
 
@@ -273,12 +276,12 @@ void createIndexForApplyOps(OperationContext* opCtx,
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
     opCounters->gotInsert();
 
-    const IndexBuilder::IndexConstraints constraints =
+    const auto constraints =
         ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss)
         ? IndexBuilder::IndexConstraints::kRelax
         : IndexBuilder::IndexConstraints::kEnforce;
 
-    const IndexBuilder::ReplicatedWrites replicatedWrites = opCtx->writesAreReplicated()
+    const auto replicatedWrites = opCtx->writesAreReplicated()
         ? IndexBuilder::ReplicatedWrites::kReplicated
         : IndexBuilder::ReplicatedWrites::kUnreplicated;
 

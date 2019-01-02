@@ -271,6 +271,7 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         IndexAccessMethod* indexAccessMethod,
                                         const BSONObj* obj,
+                                        const InsertDeleteOptions& options,
                                         RecordId loc,
                                         Op op,
                                         int64_t* const numKeysOut) {
@@ -281,11 +282,14 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
 
-    indexAccessMethod->getKeys(*obj,
-                               IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                               &keys,
-                               &multikeyMetadataKeys,
-                               &multikeyPaths);
+    // Override key constraints when generating keys for removal. This is the same behavior as
+    // IndexAccessMethod::remove and only applies to keys that do not apply to a partial filter
+    // expression.
+    const auto getKeysMode = op == Op::kInsert
+        ? options.getKeysMode
+        : IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered;
+    indexAccessMethod->getKeys(*obj, getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
+
     // Maintain parity with IndexAccessMethods handling of key counting. Only include
     // `multikeyMetadataKeys` when inserting.
     *numKeysOut = keys.size() + (op == Op::kInsert ? multikeyMetadataKeys.size() : 0);

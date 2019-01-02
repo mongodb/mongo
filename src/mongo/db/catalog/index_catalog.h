@@ -54,6 +54,28 @@ struct BsonRecord {
     const BSONObj* docPtr;
 };
 
+enum class IndexBuildMethod {
+    /**
+     * Use a collection scan to dump all keys into an external sorter. During this process,
+     * concurrent client writes are accepted, and their generated keys are written into an
+     * interceptor. On completion, this interceptor is drained and used to verify uniqueness
+     * constraints on the index.
+     *
+     * This is the default for all index builds.
+     */
+    kHybrid,
+    /**
+     * Perform a collection scan by writing each document's generated key directly into the index.
+     * Accept writes in the background into the index as well.
+     */
+    kBackground,
+    /**
+     * Perform a collection scan to dump all keys into the exteral sorter, then into the index.
+     * During this process, callers guarantee that no writes will be accepted on this collection.
+     */
+    kForeground,
+};
+
 /**
  * The IndexCatalog is owned by the Collection and is responsible for the lookup and lifetimes of
  * the indexes in a collection. Every collection has exactly one instance of this class.
@@ -429,7 +451,7 @@ public:
      * spex and OperationContext.
      */
     virtual std::unique_ptr<IndexBuildBlockInterface> createIndexBuildBlock(
-        OperationContext* opCtx, const BSONObj& spec) = 0;
+        OperationContext* opCtx, const BSONObj& spec, IndexBuildMethod method) = 0;
 
     // public helpers
 

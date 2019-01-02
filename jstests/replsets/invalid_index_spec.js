@@ -41,9 +41,12 @@
         return false;
     }, "Node did not terminate due to invalid index spec", 60 * 1000);
 
-    replTest.stop(secondary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    // fassert() calls std::abort(), which returns a different exit code for Windows vs. other
+    // platforms.
+    const exitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
+    replTest.stop(secondary, undefined, {allowedExitCode: exitCode});
 
-    const msg1 = "Fatal assertion 34437";
+    const msg1 = "Fatal Assertion 50769";
     const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
 
     assert(rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2),

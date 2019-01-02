@@ -308,7 +308,8 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                 << "ns"
                 << nss.ns());
 
-        auto indexBuildBlock = indexCatalog->createIndexBuildBlock(opCtx, indexInfoObj);
+        auto indexBuildBlock =
+            indexCatalog->createIndexBuildBlock(opCtx, indexInfoObj, IndexBuildMethod::kHybrid);
         {
             WriteUnitOfWork wuow(opCtx);
             ASSERT_OK(indexBuildBlock->init());

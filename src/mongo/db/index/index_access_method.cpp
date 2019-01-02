@@ -183,7 +183,7 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                                          const RecordId& loc,
                                          const InsertDeleteOptions& options,
                                          InsertResult* result) {
-    invariant(options.fromIndexBuilder || !_btreeState->isBuilding());
+    invariant(options.fromIndexBuilder || !_btreeState->isHybridBuilding());
 
     BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -283,7 +283,7 @@ Status AbstractIndexAccessMethod::remove(OperationContext* opCtx,
                                          const RecordId& loc,
                                          const InsertDeleteOptions& options,
                                          int64_t* numDeleted) {
-    invariant(!_btreeState->isBuilding());
+    invariant(!_btreeState->isHybridBuilding());
     invariant(numDeleted);
 
     *numDeleted = 0;
@@ -468,7 +468,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
                                          const UpdateTicket& ticket,
                                          int64_t* numInserted,
                                          int64_t* numDeleted) {
-    invariant(!_btreeState->isBuilding());
+    invariant(!_btreeState->isHybridBuilding());
     invariant(ticket.newKeys.size() ==
               ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size());
     invariant(numInserted);
@@ -634,7 +634,6 @@ int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
 
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              BulkBuilder* bulk,
-                                             bool mayInterrupt,
                                              bool dupsAllowed,
                                              set<RecordId>* dupRecords,
                                              std::vector<BSONObj>* dupKeysInserted) {
@@ -663,9 +662,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     const Ordering ordering = Ordering::make(_descriptor->keyPattern());
 
     while (it->more()) {
-        if (mayInterrupt) {
-            opCtx->checkForInterrupt();
-        }
+        opCtx->checkForInterrupt();
 
         WriteUnitOfWork wunit(opCtx);
 
@@ -722,11 +719,11 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     pm.finished();
 
-    log() << "index build: inserted keys from external sorter into index in " << timer.seconds()
-          << " seconds";
+    log() << "index build: inserted " << bulk->getKeysInserted()
+          << " keys from external sorter into index in " << timer.seconds() << " seconds";
 
     WriteUnitOfWork wunit(opCtx);
-    SpecialFormatInserted specialFormatInserted = builder->commit(mayInterrupt);
+    SpecialFormatInserted specialFormatInserted = builder->commit(true /* mayInterrupt */);
     // It's ok to insert KeyStrings with long TypeBits but we need to mark the feature
     // tracker bit so that downgrade binary which cannot read the long TypeBits fails to
     // start up.

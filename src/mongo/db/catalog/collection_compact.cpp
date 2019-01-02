@@ -118,7 +118,6 @@ StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
     CompactStats stats;
 
     MultiIndexBlock indexer(opCtx, collection);
-    indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 
     Status status = indexer.init(indexSpecs).getStatus();

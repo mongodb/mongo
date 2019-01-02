@@ -63,6 +63,7 @@ public:
     Status sideWrite(OperationContext* opCtx,
                      IndexAccessMethod* indexAccessMethod,
                      const BSONObj* obj,
+                     const InsertDeleteOptions& options,
                      RecordId loc,
                      Op op,
                      int64_t* const numKeysOut);

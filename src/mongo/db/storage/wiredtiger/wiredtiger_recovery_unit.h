@@ -116,7 +116,7 @@ public:
 
     Status obtainMajorityCommittedSnapshot() override;
 
-    boost::optional<Timestamp> getPointInTimeReadTimestamp() const override;
+    boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
 
     SnapshotId getSnapshotId() const override;
 

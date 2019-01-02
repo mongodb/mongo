@@ -42,6 +42,15 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: true
 
+  enableHybridIndexBuilds:
+    description: "Build all indexes by performing external sorting while accepting concurrent client writes"
+    set_at:
+      - runtime
+      - startup
+    cpp_varname: enableHybridIndexBuilds
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
   maxIndexBuildMemoryUsageMegabytes:
     description: "Limits the amount of memory that simultaneous foreground index builds on one collection may consume for the duration of the builds"
     set_at:

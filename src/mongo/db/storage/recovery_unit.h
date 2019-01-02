@@ -194,13 +194,15 @@ public:
      * engine's last applied timestamp.
      *  - when using ReadSource::kAllCommittedSnapshot, the timestamp chosen using the storage
      * engine's all-committed timestamp.
-     *  - when using ReadSource::kLastApplied, the last applied timestamp at which the current
-     * storage transaction was opened, if one is open.
+     *  - when using ReadSource::kLastApplied, the timestamp chosen using the storage engine's last
+     * applied timestamp. Can return boost::none if no timestamp has been established.
      *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
      * storage engine after a transaction has been opened or after a call to
      * obtainMajorityCommittedSnapshot().
+     *
+     * This may passively start a storage engine transaction to establish a read timestamp.
      */
-    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp() const {
+    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp() {
         return boost::none;
     }
 

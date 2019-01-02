@@ -90,7 +90,7 @@ public:
         return _accessMethod.get();
     }
 
-    bool isBuilding() const final {
+    bool isHybridBuilding() const final {
         return _indexBuildInterceptor != nullptr;
     }
 

@@ -29,7 +29,7 @@ var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain("executio
 var stats = explain.executionStats;
 assert.eq(stats.nReturned, 50);
 assert.lte(stats.nReturned, stats.totalDocsExamined);
-assert.eq(stats.executionSuccess, true);
+assert.eq(stats.executionSuccess, true, "expected success: " + tojson(explain));
 
 // Check for the existence of a indexVersion field in explain output.
 var indexStages = getPlanStages(explain.queryPlanner.winningPlan, "GEO_NEAR_2D");

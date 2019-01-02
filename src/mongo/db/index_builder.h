@@ -92,6 +92,9 @@ public:
      */
     virtual std::string name() const;
 
+    /**
+     * Instead of building the index in a background thread, build on the current thread.
+     */
     Status buildInForeground(OperationContext* opCtx, Database* db) const;
 
     /**
@@ -101,12 +104,13 @@ public:
      */
     static void waitForBgIndexStarting();
 
+    static bool canBuildInBackground();
+
 private:
     Status _build(OperationContext* opCtx,
                   Database* db,
-                  bool allowBackgroundBuilding,
+                  bool buildInBackground,
                   Lock::DBLock* dbLock) const;
-
     const BSONObj _index;
     const IndexConstraints _indexConstraints;
     const ReplicatedWrites _replicatedWrites;

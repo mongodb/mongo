@@ -116,6 +116,10 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     if (!status.isOK()) {
         return status;
     }
+    status = indexer.checkConstraints();
+    if (!status.isOK()) {
+        return status;
+    }
     WriteUnitOfWork wunit(opCtx);
     ASSERT_OK(indexer.commit());
     wunit.commit();

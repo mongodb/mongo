@@ -48,6 +48,9 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
+    if (hasGlobalServiceContext()) {
+        getGlobalServiceContext()->waitForClientsToFinish();
+    }
     setGlobalServiceContext({});
 }
 

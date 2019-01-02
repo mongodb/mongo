@@ -1482,6 +1482,16 @@ var ReplSetTest = function(opts) {
         }, "awaiting replication", timeout);
     };
 
+    // TODO: SERVER-38961 Remove when simultaneous index builds complete.
+    this.waitForAllIndexBuildsToFinish = function(dbName, collName) {
+        // Run a no-op command and wait for it to be applied on secondaries. Due to the asynchronous
+        // completion nature of indexes on secondaries, we can guarantee an index build is complete
+        // on all secondaries once all secondaries have applied this collMod command.
+        assert.commandWorked(this.getPrimary().getDB(dbName).runCommand(
+            {collMod: collName, usePowerOf2Sizes: true}));
+        this.awaitReplication();
+    };
+
     this.getHashesUsingSessions = function(sessions, dbName, {
         filterCapped: filterCapped = true,
         filterMapReduce: filterMapReduce = true,
