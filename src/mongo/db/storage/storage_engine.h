@@ -327,17 +327,10 @@ public:
     virtual void setJournalListener(JournalListener* jl) = 0;
 
     /**
-     * Returns whether the storage engine supports "recover to stable timestamp". Returns true
-     * if the storage engine supports "recover to stable timestamp" but does not currently have
-     * a stable timestamp. In that case StorageEngine::recoverToStableTimestamp() will return
-     * a bad status.
-     */
-    virtual bool supportsRecoverToStableTimestamp() const {
-        return false;
-    }
-
-    /**
-     * Returns whether the storage engine can provide a recovery timestamp.
+     * Returns whether the storage engine can provide a timestamp that can be used for recovering
+     * to a stable timestamp. If the storage engine supports "recover to stable timestamp" but does
+     * not currently have a stable timestamp, then StorageEngine::recoverToStableTimestamp() will
+     * return a bad status.
      */
     virtual bool supportsRecoveryTimestamp() const {
         return false;
@@ -377,7 +370,7 @@ public:
      *
      * If successful, returns the timestamp that the storage engine recovered to.
      *
-     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return
+     * fasserts if StorageEngine::supportsRecoveryTimestamp() would return
      * false. Returns a bad status if there is no stable timestamp to recover to.
      *
      * It is illegal to call this concurrently with `setStableTimestamp` or
@@ -390,7 +383,7 @@ public:
     /**
      * Returns the stable timestamp that the storage engine recovered to on startup. If the
      * recovery point was not stable, returns "none".
-     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     * fasserts if StorageEngine::supportsRecoveryTimestamp() would return false.
      */
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
         MONGO_UNREACHABLE;
@@ -402,7 +395,7 @@ public:
      * durable engines, it is also the guaranteed minimum stable recovery point on server restart
      * after crash or shutdown.
      *
-     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false. Returns
+     * fasserts if StorageEngine::supportsRecoveryTimestamp() would return false. Returns
      * boost::none if the recovery time has not yet been established. Replication recoverable
      * rollback may not succeed before establishment, and restart will require resync.
      */

@@ -616,7 +616,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
 
     // This method is only used with storage engines that do not support recover to stable
     // timestamp. As a result, the timestamp on the 'appliedThrough' update does not matter.
-    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
+    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp());
     replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 

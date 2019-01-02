@@ -1084,10 +1084,6 @@ StatusWith<Timestamp> StorageInterfaceImpl::recoverToStableTimestamp(OperationCo
     return opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx);
 }
 
-bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const {
-    return serviceCtx->getStorageEngine()->supportsRecoverToStableTimestamp();
-}
-
 bool StorageInterfaceImpl::supportsRecoveryTimestamp(ServiceContext* serviceCtx) const {
     return serviceCtx->getStorageEngine()->supportsRecoveryTimestamp();
 }
@@ -1185,7 +1181,7 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
 
 boost::optional<Timestamp> StorageInterfaceImpl::getLastStableRecoveryTimestamp(
     ServiceContext* serviceCtx) const {
-    if (!supportsRecoverToStableTimestamp(serviceCtx)) {
+    if (!supportsRecoveryTimestamp(serviceCtx)) {
         return boost::none;
     }
 

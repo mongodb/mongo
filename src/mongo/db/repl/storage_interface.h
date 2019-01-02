@@ -371,11 +371,6 @@ public:
     virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) = 0;
 
     /**
-     * Returns whether the storage engine supports "recover to stable timestamp".
-     */
-    virtual bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const = 0;
-
-    /**
      * Returns whether the storage engine can provide a recovery timestamp.
      */
     virtual bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const = 0;
@@ -434,7 +429,7 @@ public:
      *
      * Returns `Timestamp::min()` if no stable recovery timestamp has yet been established.
      * Replication recoverable rollback may not succeed before establishment, and restart will
-     * require resync. Returns boost::none if `supportsRecoverToStableTimestamp` returns false.
+     * require resync. Returns boost::none if `supportsRecoveryTimestamp` returns false.
      */
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp(
         ServiceContext* serviceCtx) const = 0;
@@ -444,7 +439,7 @@ public:
      *
      * Returns a timestamp that is guaranteed to be persisted on disk in a checkpoint. Returns
      * `Timestamp::min()` if no stable checkpoint has been taken. Returns boost::none if
-     * `supportsRecoverToStableTimestamp` returns false or if this is not a persisted data engine.
+     * `supportsRecoveryTimestamp` returns false or if this is not a persisted data engine.
      *
      * TODO: delete this in v4.4 (SERVER-36194).
      */
