@@ -43,6 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -106,6 +107,8 @@ int runDbTests(int argc, char** argv) {
 
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
     DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
+    IndexBuildsCoordinator::set(globalServiceContext,
+                                std::make_unique<IndexBuildsCoordinatorMongod>());
     auto registry = stdx::make_unique<OpObserverRegistry>();
     registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     globalServiceContext->setOpObserver(std::move(registry));
