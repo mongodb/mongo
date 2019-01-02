@@ -1,5 +1,5 @@
 /**
- * Test that a node crashes if it tries to roll back a 'prepare' oplog entry using refetch-based
+ * Test that a node crashes if it tries to roll back a 'commit' oplog entry using refetch-based
  * rollback. The tests mimics the standard PSA rollback setup by using a PSS replica set where the
  * last node effectively acts as an arbiter without formally being one (this is necessary because
  * we disallow the 'prepareTransaction' command in sets with arbiters).
@@ -13,7 +13,7 @@
     load("jstests/core/txns/libs/prepare_helpers.js");
 
     const dbName = "test";
-    const collName = "rollback_via_refetch_prepare";
+    const collName = "rollback_via_refetch_commit_transaction";
 
     const rst = new ReplSetTest({
         name: collName,
@@ -60,11 +60,6 @@
     assert(result.prepareTimestamp,
            "prepareTransaction did not return a 'prepareTimestamp': " + tojson(result));
 
-    // TODO SERVER-38161: Remove this line once we have the functionality to step down without
-    // having to commit or abort our prepared transactions. This 'commitTransaction' is currently
-    // required to be able to proceed with the test. However, this makes the node crash on the
-    // commit entry before getting to the prepare entry, and the goal of this test is to verify
-    // it crashes on the prepare entry instead.
     PrepareHelpers.commitTransactionAfterPrepareTS(session, result.prepareTimestamp);
 
     // Shift the partition to only isolate the rollback node (current primary) instead.
