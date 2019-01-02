@@ -561,6 +561,12 @@ public:
     }
 };
 
+TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentReturnsEmptySet) {
+    BSONObj spec = fromjson("{a: 1, b: 1}}");
+    mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
+    ASSERT_EQ(getModifiedPaths(&doc, spec), "{}");
+}
+
 TEST_F(ModifiedPathsTestFixture, SetFieldInRoot) {
     BSONObj spec = fromjson("{$set: {a: 1}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
