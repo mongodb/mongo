@@ -312,11 +312,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement bsonExpr,
         const VariablesParseState& vps) {
-        boost::intrusive_ptr<ExpressionNaryBase> expr = new SubClass(expCtx);
+        auto expr = make_intrusive<SubClass>(expCtx);
         ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
         expr->validateArguments(args);
         expr->vpOperand = args;
-        return expr;
+        return std::move(expr);
     }
 
 protected:

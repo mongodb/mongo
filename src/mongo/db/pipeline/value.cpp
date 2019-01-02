@@ -125,9 +125,9 @@ void ValueStorage::putDocument(const Document& d) {
     putRefCountable(d._storage);
 }
 
-void ValueStorage::putVector(const RCVector* vec) {
-    fassert(16485, vec);
-    putRefCountable(vec);
+void ValueStorage::putVector(boost::intrusive_ptr<RCVector>&& vec) {
+    fassert(16485, bool(vec));
+    putRefCountable(std::move(vec));
 }
 
 void ValueStorage::putRegEx(const BSONRegEx& re) {
@@ -180,11 +180,11 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         }
 
         case Array: {
-            intrusive_ptr<RCVector> vec(new RCVector);
+            auto vec = make_intrusive<RCVector>();
             BSONForEach(sub, elem.embeddedObject()) {
                 vec->vec.push_back(Value(sub));
             }
-            _storage.putVector(vec.get());
+            _storage.putVector(std::move(vec));
             break;
         }
 
@@ -242,29 +242,29 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
 }
 
 Value::Value(const BSONArray& arr) : _storage(Array) {
-    intrusive_ptr<RCVector> vec(new RCVector);
+    auto vec = make_intrusive<RCVector>();
     BSONForEach(sub, arr) {
         vec->vec.push_back(Value(sub));
     }
-    _storage.putVector(vec.get());
+    _storage.putVector(std::move(vec));
 }
 
 Value::Value(const vector<BSONObj>& vec) : _storage(Array) {
-    intrusive_ptr<RCVector> storageVec(new RCVector);
+    auto storageVec = make_intrusive<RCVector>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
         storageVec->vec.push_back(Value(obj));
     }
-    _storage.putVector(storageVec.get());
+    _storage.putVector(std::move(storageVec));
 }
 
 Value::Value(const vector<Document>& vec) : _storage(Array) {
-    intrusive_ptr<RCVector> storageVec(new RCVector);
+    auto storageVec = make_intrusive<RCVector>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
         storageVec->vec.push_back(Value(obj));
     }
-    _storage.putVector(storageVec.get());
+    _storage.putVector(std::move(storageVec));
 }
 
 Value Value::createIntOrLong(long long longValue) {

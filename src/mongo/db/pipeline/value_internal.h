@@ -124,10 +124,10 @@ public:
         type = t;
         putDocument(d);
     }
-    ValueStorage(BSONType t, const RCVector* a) {
+    ValueStorage(BSONType t, boost::intrusive_ptr<RCVector>&& a) {
         zero();
         type = t;
-        putVector(a);
+        putVector(std::move(a));
     }
     ValueStorage(BSONType t, StringData s) {
         zero();
@@ -221,7 +221,7 @@ public:
 
     /// These are only to be called during Value construction on an empty Value
     void putString(StringData s);
-    void putVector(const RCVector* v);
+    void putVector(boost::intrusive_ptr<RCVector>&& v);
     void putDocument(const Document& d);
     void putRegEx(const BSONRegEx& re);
     void putBinData(const BSONBinData& bd) {
@@ -230,22 +230,21 @@ public:
     }
 
     void putDBRef(const BSONDBRef& dbref) {
-        putRefCountable(new RCDBRef(dbref.ns.toString(), dbref.oid));
+        putRefCountable(make_intrusive<RCDBRef>(dbref.ns.toString(), dbref.oid));
     }
 
     void putCodeWScope(const BSONCodeWScope& cws) {
-        putRefCountable(new RCCodeWScope(cws.code.toString(), cws.scope));
+        putRefCountable(make_intrusive<RCCodeWScope>(cws.code.toString(), cws.scope));
     }
 
     void putDecimal(const Decimal128& d) {
-        putRefCountable(new RCDecimal(d));
+        putRefCountable(make_intrusive<RCDecimal>(d));
     }
 
-    void putRefCountable(boost::intrusive_ptr<const RefCountable> ptr) {
-        genericRCPtr = ptr.get();
+    void putRefCountable(boost::intrusive_ptr<const RefCountable>&& ptr) {
+        genericRCPtr = ptr.detach();
 
         if (genericRCPtr) {
-            intrusive_ptr_add_ref(genericRCPtr);
             refCounter = true;
         }
         DEV verifyRefCountingIfShould();

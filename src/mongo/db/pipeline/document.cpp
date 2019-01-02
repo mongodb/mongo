@@ -191,7 +191,7 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 }
 
 intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
-    intrusive_ptr<DocumentStorage> out(new DocumentStorage());
+    auto out = make_intrusive<DocumentStorage>();
 
     // Make a copy of the buffer.
     // It is very important that the positions of each field are the same after cloning.

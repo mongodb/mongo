@@ -107,7 +107,8 @@ public:
     explicit Value(const BSONArray& arr);
     explicit Value(const std::vector<BSONObj>& vec);
     explicit Value(const std::vector<Document>& vec);
-    explicit Value(std::vector<Value> vec) : _storage(Array, new RCVector(std::move(vec))) {}
+    explicit Value(std::vector<Value> vec)
+        : _storage(Array, make_intrusive<RCVector>(std::move(vec))) {}
     explicit Value(const BSONBinData& bd) : _storage(BinData, bd) {}
     explicit Value(const BSONRegEx& re) : _storage(RegEx, re) {}
     explicit Value(const BSONCodeWScope& cws) : _storage(CodeWScope, cws) {}
