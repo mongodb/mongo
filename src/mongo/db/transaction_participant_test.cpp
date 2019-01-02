@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -455,8 +454,43 @@ TEST_F(TxnParticipantTest, EmptyTransactionCommit) {
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
     // The transaction machinery cannot store an empty locker.
-    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     txnParticipant->commitUnpreparedTransaction(opCtx());
+    txnParticipant->stashTransactionResources(opCtx());
+
+    ASSERT_TRUE(txnParticipant->transactionIsCommitted());
+}
+
+// This test makes sure the commit machinery works even when no operations are done on the
+// transaction.
+TEST_F(TxnParticipantTest, EmptyPreparedTransactionCommit) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+    txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
+    txnParticipant->stashTransactionResources(opCtx());
+
+    ASSERT_TRUE(txnParticipant->transactionIsCommitted());
+}
+
+TEST_F(TxnParticipantTest, PrepareSucceedsWithNestedLocks) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+
+    {
+        Lock::GlobalLock lk1(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        Lock::GlobalLock lk2(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    }
+
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+    txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
     txnParticipant->stashTransactionResources(opCtx());
 
     ASSERT_TRUE(txnParticipant->transactionIsCommitted());
@@ -603,6 +637,20 @@ TEST_F(TxnParticipantTest, EmptyTransactionAbort) {
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     txnParticipant->stashTransactionResources(opCtx());
     txnParticipant->abortArbitraryTransaction();
+    ASSERT_TRUE(txnParticipant->transactionIsAborted());
+}
+
+// This test makes sure the abort machinery works even when no operations are done on the
+// transaction.
+TEST_F(TxnParticipantTest, EmptyPreparedTransactionAbort) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    txnParticipant->prepareTransaction(opCtx(), {});
+    txnParticipant->abortActiveTransaction(opCtx());
     ASSERT_TRUE(txnParticipant->transactionIsAborted());
 }
 
@@ -837,6 +885,91 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedCommitDoesNotAbortTransacti
     ASSERT(_opObserver->transactionCommitted);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
     ASSERT(txnParticipant->transactionIsCommitted());
+}
+
+TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlock) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    txnParticipant->prepareTransaction(opCtx(), {});
+
+    // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
+    // complete successfully.
+    auto func = [&](OperationContext* opCtx) {
+        ASSERT_EQ(
+            LOCK_OK,
+            opCtx->lockState()->lock(opCtx, resourceIdReplicationStateTransitionLock, MODE_X));
+        opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+    };
+    runFunctionFromDifferentOpCtx(func);
+
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(_opObserver->transactionAborted);
+    ASSERT(txnParticipant->transactionIsAborted());
+}
+
+TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlockThenCommit) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+
+    // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
+    // complete successfully.
+    auto func = [&](OperationContext* opCtx) {
+        ASSERT_EQ(
+            LOCK_OK,
+            opCtx->lockState()->lock(opCtx, resourceIdReplicationStateTransitionLock, MODE_X));
+        opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+    };
+    runFunctionFromDifferentOpCtx(func);
+
+    txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
+    ASSERT(_opObserver->transactionCommitted);
+    ASSERT(txnParticipant->transactionIsCommitted());
+}
+
+TEST_F(TxnParticipantTest, StepDownDuringAbortSucceeds) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(_opObserver->transactionAborted);
+    ASSERT(txnParticipant->transactionIsAborted());
+}
+
+TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortFails) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    txnParticipant->prepareTransaction(opCtx(), {});
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(
+        txnParticipant->abortActiveTransaction(opCtx()), AssertionException, ErrorCodes::NotMaster);
+}
+
+TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitFails) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(txnParticipant->commitPreparedTransaction(opCtx(), commitTS),
+                       AssertionException,
+                       ErrorCodes::NotMaster);
 }
 
 TEST_F(TxnParticipantTest, ArbitraryAbortDuringPreparedCommitDoesNotAbortTransaction) {
@@ -1406,35 +1539,6 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedAbortFails) {
     ASSERT(txnParticipant->transactionIsAborted());
 }
 
-TEST_F(TxnParticipantTest, ActiveAbortSucceedsDuringPreparedAbort) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
-    txnParticipant->prepareTransaction(opCtx(), {});
-
-    auto sessionId = *opCtx()->getLogicalSessionId();
-    auto txnNumber = *opCtx()->getTxnNumber();
-    auto originalFn = _opObserver->onTransactionAbortFn;
-    _opObserver->onTransactionAbortFn = [&] {
-        originalFn();
-
-        auto func = [&](OperationContext* opCtx) {
-            opCtx->setLogicalSessionId(sessionId);
-            opCtx->setTxnNumber(txnNumber);
-
-            // Prevent recursion.
-            _opObserver->onTransactionAbortFn = originalFn;
-            txnParticipant->abortActiveTransaction(opCtx);
-            ASSERT(txnParticipant->transactionIsAborted());
-        };
-        runFunctionFromDifferentOpCtx(func);
-    };
-
-    txnParticipant->abortActiveTransaction(opCtx());
-    ASSERT(_opObserver->transactionAborted);
-    ASSERT(txnParticipant->transactionIsAborted());
-}
-
 TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -1881,7 +1985,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCom
               Microseconds(100));
 }
 
-TEST_F(TransactionsMetricsTest, SingleTranasactionStatsPreparedDurationShouldBeSetUponCommit) {
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSetUponCommit) {
     auto tickSource = initMockTickSource();
 
     auto sessionCheckout = checkOutSession();

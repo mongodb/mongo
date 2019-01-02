@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -893,6 +892,12 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterSettingPrepareStartTime);
     }
 
+    // We unlock the RSTL to allow prepared transactions to survive state transitions. This should
+    // be the last thing we do since a state transition may happen immediately after releasing the
+    // RSTL.
+    const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
+    invariant(unlocked);
+
     return prepareOplogSlot.opTime.getTimestamp();
 }
 
@@ -981,6 +986,17 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
 
 void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
                                                        Timestamp commitTimestamp) {
+    // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
+    // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
+    // if we're not the primary we will uassert anyways.
+    Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+    if (opCtx->writesAreReplicated()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassert(ErrorCodes::NotMaster,
+                "Not primary so we cannot commit a transaction",
+                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+    }
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
@@ -1045,6 +1061,7 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
 
 void TransactionParticipant::_commitStorageTransaction(OperationContext* opCtx) try {
     invariant(opCtx->getWriteUnitOfWork());
+    invariant(opCtx->lockState()->isRSTLLocked());
     opCtx->getWriteUnitOfWork()->commit();
     opCtx->setWriteUnitOfWork(nullptr);
 
@@ -1123,6 +1140,17 @@ bool TransactionParticipant::expired() const {
 
 void TransactionParticipant::abortActiveTransaction(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+
+    // Re-acquire the RSTL to prevent state transitions while aborting the transaction. If the
+    // transaction was prepared then we dropped it on preparing the transaction. We do not need to
+    // reacquire the PBWM because if we're not the primary we will uassert anyways.
+    Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+    if (_txnState.isPrepared(lock) && opCtx->writesAreReplicated()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassert(ErrorCodes::NotMaster,
+                "Not primary so we cannot abort a prepared transaction",
+                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+    }
 
     // This function shouldn't throw if the transaction is already aborted.
     _checkIsActiveTransaction(lock, *opCtx->getTxnNumber(), false);
@@ -1279,6 +1307,7 @@ void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(
 
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
+        invariant(opCtx->lockState()->isRSTLLocked());
         opCtx->setWriteUnitOfWork(nullptr);
     }
 

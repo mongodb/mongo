@@ -421,6 +421,9 @@ TEST(LockerImpl, SharedLocksShouldTwoPhaseLockIsTrue) {
     ASSERT_EQ(LOCK_OK, locker.lockGlobal(MODE_IS));
     ASSERT_EQ(locker.getLockMode(globalResId), MODE_IS);
 
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
+
     ASSERT_EQ(LOCK_OK, locker.lock(resId1, MODE_IS));
     ASSERT_EQ(LOCK_OK, locker.lock(resId2, MODE_IX));
     ASSERT_EQ(LOCK_OK, locker.lock(resId3, MODE_S));
@@ -441,6 +444,9 @@ TEST(LockerImpl, SharedLocksShouldTwoPhaseLockIsTrue) {
     ASSERT_EQ(locker.getLockMode(resId3), MODE_S);
     ASSERT_EQ(locker.getLockMode(resId4), MODE_X);
 
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
+
     ASSERT_FALSE(locker.unlockGlobal());
     ASSERT_EQ(locker.getLockMode(globalResId), MODE_IS);
 
@@ -450,6 +456,7 @@ TEST(LockerImpl, SharedLocksShouldTwoPhaseLockIsTrue) {
     ASSERT_EQ(locker.getLockMode(resId2), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resId3), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resId4), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(globalResId), MODE_NONE);
 }
 
@@ -467,6 +474,9 @@ TEST(LockerImpl, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
 
     ASSERT_EQ(LOCK_OK, locker.lockGlobal(MODE_IX));
     ASSERT_EQ(locker.getLockMode(globalResId), MODE_IX);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     ASSERT_EQ(LOCK_OK, locker.lock(resId1, MODE_IS));
     ASSERT_EQ(LOCK_OK, locker.lock(resId2, MODE_IX));
@@ -488,6 +498,9 @@ TEST(LockerImpl, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
     ASSERT_EQ(locker.getLockMode(resId3), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resId4), MODE_X);
 
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
     ASSERT_FALSE(locker.unlockGlobal());
     ASSERT_EQ(locker.getLockMode(globalResId), MODE_IX);
 
@@ -495,7 +508,99 @@ TEST(LockerImpl, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
 
     ASSERT_EQ(locker.getLockMode(resId2), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(resId4), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
     ASSERT_EQ(locker.getLockMode(globalResId), MODE_NONE);
+}
+
+TEST(LockerImpl, RSTLUnlocksWithNestedLock) {
+    LockerImpl locker;
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
+    locker.beginWriteUnitOfWork();
+
+    // Do a nested lock acquisition.
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
+    ASSERT(locker.unlockRSTLforPrepare());
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
+}
+
+TEST(LockerImpl, RSTLModeIXWithTwoPhaseLockingCanBeUnlockedWhenPrepared) {
+    LockerImpl locker;
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+
+    ASSERT(locker.unlockRSTLforPrepare());
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
+}
+
+TEST(LockerImpl, RSTLModeISWithTwoPhaseLockingCanBeUnlockedWhenPrepared) {
+    LockerImpl locker;
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT(locker.unlockRSTLforPrepare());
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
+}
+
+TEST(LockerImpl, RSTLTwoPhaseLockingBehaviorModeIS) {
+    LockerImpl locker;
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT_TRUE(locker.unlock(resourceIdReplicationStateTransitionLock));
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
+
+    ASSERT_FALSE(locker.unlockRSTLforPrepare());
+    ASSERT_FALSE(locker.unlock(resourceIdReplicationStateTransitionLock));
 }
 
 TEST(LockerImpl, OverrideLockRequestTimeout) {

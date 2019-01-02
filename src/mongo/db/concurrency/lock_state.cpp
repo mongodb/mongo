@@ -486,6 +486,11 @@ void LockerImpl::downgrade(ResourceId resId, LockMode newMode) {
 
 bool LockerImpl::unlock(ResourceId resId) {
     LockRequestsMap::Iterator it = _requests.find(resId);
+
+    // Don't attempt to unlock twice. This can happen when an interrupted global lock is destructed.
+    if (it.finished())
+        return false;
+
     if (inAWriteUnitOfWork() && _shouldDelayUnlock(it.key(), (it->mode))) {
         if (!it->unlockPending) {
             _numResourcesToUnlockAtEndUnitOfWork++;
@@ -498,10 +503,27 @@ bool LockerImpl::unlock(ResourceId resId) {
         return false;
     }
 
-    // Don't attempt to unlock twice. This can happen when an interrupted global lock is destructed.
-    if (it.finished())
-        return false;
     return _unlockImpl(&it);
+}
+
+bool LockerImpl::unlockRSTLforPrepare() {
+    auto rstlRequest = _requests.find(resourceIdReplicationStateTransitionLock);
+
+    // Don't attempt to unlock twice. This can happen when an interrupted global lock is destructed.
+    if (!rstlRequest)
+        return false;
+
+    // If the RSTL is 'unlockPending' and we are fully unlocking it, then we do not want to
+    // attempt to unlock the RSTL when the WUOW ends, since it will already be unlocked.
+    if (rstlRequest->unlockPending) {
+        _numResourcesToUnlockAtEndUnitOfWork--;
+    }
+
+    // Reset the recursiveCount to 1 so that we fully unlock the RSTL. Since it will be fully
+    // unlocked, any future unlocks will be noops anyways.
+    rstlRequest->recursiveCount = 1;
+
+    return _unlockImpl(&rstlRequest);
 }
 
 LockMode LockerImpl::getLockMode(ResourceId resId) const {

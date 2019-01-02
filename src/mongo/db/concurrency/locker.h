@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -203,6 +202,15 @@ public:
      * ReplicationStateTransitionLockGuard.
      */
     virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline) = 0;
+
+    /**
+     * Unlocks the RSTL when the transaction becomes prepared. This is used to bypass two-phase
+     * locking and unlock the RSTL immediately, rather than at the end of the WUOW.
+     *
+     * @return true if the RSTL is unlocked; false if we fail to unlock the RSTL or if it was
+     * already unlocked.
+     */
+    virtual bool unlockRSTLforPrepare() = 0;
 
     /**
      * beginWriteUnitOfWork/endWriteUnitOfWork are called at the start and end of WriteUnitOfWorks.

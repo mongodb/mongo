@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -148,6 +147,8 @@ public:
 
     virtual LockResult lockRSTLBegin(OperationContext* opCtx);
     virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline);
+
+    virtual bool unlockRSTLforPrepare();
 
     virtual void beginWriteUnitOfWork() override;
     virtual void endWriteUnitOfWork() override;

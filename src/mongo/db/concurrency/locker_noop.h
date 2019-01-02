@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -124,6 +123,10 @@ public:
     }
 
     virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual bool unlockRSTLforPrepare() {
         MONGO_UNREACHABLE;
     }
 
