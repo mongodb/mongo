@@ -33,6 +33,10 @@ VCXPROJ_FOOTER = r"""
     <ResourceCompile Include="src\mongo\db\db.rc" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Natvis Include="buildscripts\win\mongodb.natvis" />
+  </ItemGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets"></ImportGroup>
 </Project>

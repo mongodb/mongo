@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <!--
+  NatVis Documentation: 
+  https://docs.microsoft.com/en-us/visualstudio/debugger/create-custom-views-of-native-objects?view=vs-2017
+  
+  Boost Visualizers:
+  https://marketplace.visualstudio.com/items?itemName=ArkadyShapkin.CDebuggerVisualizersforVS2017
+  https://github.com/KindDragon/CPPDebuggerVisualizers
+
+  To load in Visual Studio, the natvis file must be in the Visual Studio project.
+  To load in WinDBG, run ".nvload mongdb.natvis"
+  -->
+  <Type Name="mongo::Status">
+    <DisplayString Condition="_error == 0x0">OK</DisplayString>
+    <DisplayString>{{Error={_error,d}}}</DisplayString>
+  </Type>
+
+  <Type Name="mongo::StatusWith&lt;*&gt;">
+    <DisplayString Condition="_status._error == 0x0">{{Value={_t}}}</DisplayString>
+    <DisplayString Condition="_status._error != 0x0">{{Error={_status._error,d}}}</DisplayString>
+    <DisplayString >{_status}</DisplayString>
+    <Expand>
+      <Item Name="Status">_status</Item>
+      <ExpandedItem>_t</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <Type Name="mongo::StringData">
+    <DisplayString Condition="_size == 0">empty</DisplayString>
+    <DisplayString>{_data,[_size]s8}</DisplayString>
+    <StringView>_data,[_size]s8</StringView>
+  </Type>
+
+  <Type Name="absl::container_internal::raw_hash_set&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[capacity]">capacity_</Item>
+      <CustomListItems>
+        <Variable Name="NumBuckets" InitialValue="capacity_" />
+        <Variable Name="BucketIndex" InitialValue="0" />
+        <Size>size_</Size>
+        <Loop>
+          <Break Condition="BucketIndex == NumBuckets"/>
+          <If Condition="ctrl_[BucketIndex] >= 0">
+            <Item>slots_[BucketIndex],na</Item>
+          </If>
+          <Exec>++BucketIndex</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+
+  <Type Name="absl::node_hash_map&lt;*&gt;">
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[capacity]">capacity_</Item>
+      <CustomListItems>
+        <Variable Name="NumBuckets" InitialValue="capacity_" />
+        <Variable Name="BucketIndex" InitialValue="0" />
+        <Size>size_</Size>
+        <Loop>
+          <Break Condition="BucketIndex == NumBuckets"/>
+          <If Condition="ctrl_[BucketIndex] >= 0">
+            <Item Name="[{slots_[BucketIndex]->first,na}]">slots_[BucketIndex]->second,na</Item>
+          </If>
+          <Exec>++BucketIndex</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>
