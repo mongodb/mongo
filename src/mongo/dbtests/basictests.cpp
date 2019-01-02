@@ -42,7 +42,6 @@
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
 #include "mongo/util/thread_safe_string.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 namespace BasicTests {
@@ -219,31 +218,6 @@ public:
 };
 }  // namespace stringbuildertests
 
-class SleepBackoffTest {
-public:
-    void run() {
-        int maxSleepTimeMillis = 1000;
-
-        Backoff backoff(maxSleepTimeMillis, maxSleepTimeMillis * 2);
-
-        // Double previous sleep duration
-        ASSERT_EQUALS(backoff.getNextSleepMillis(0, 0, 0), 1);
-        ASSERT_EQUALS(backoff.getNextSleepMillis(2, 0, 0), 4);
-        ASSERT_EQUALS(backoff.getNextSleepMillis(256, 0, 0), 512);
-
-        // Make sure our backoff increases to the maximum value
-        ASSERT_EQUALS(backoff.getNextSleepMillis(maxSleepTimeMillis - 200, 0, 0),
-                      maxSleepTimeMillis);
-        ASSERT_EQUALS(backoff.getNextSleepMillis(maxSleepTimeMillis * 2, 0, 0), maxSleepTimeMillis);
-
-        // Make sure that our backoff gets reset if we wait much longer than the maximum wait
-        unsigned long long resetAfterMillis = maxSleepTimeMillis + maxSleepTimeMillis * 2;
-        ASSERT_EQUALS(backoff.getNextSleepMillis(20, resetAfterMillis, 0), 40);  // no reset here
-        ASSERT_EQUALS(backoff.getNextSleepMillis(20, resetAfterMillis + 1, 0),
-                      1);  // reset expected
-    }
-};
-
 class AssertTests {
 public:
     int x;
@@ -399,7 +373,6 @@ public:
         add<stringbuildertests::reset1>();
         add<stringbuildertests::reset2>();
 
-        add<SleepBackoffTest>();
         add<AssertTests>();
 
         add<StringSplitterTest>();

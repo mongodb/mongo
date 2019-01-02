@@ -304,7 +304,7 @@ protected:
     AtomicWord<bool> _stayFailed{false};
     AtomicWord<bool> _failed{false};
     const bool autoReconnect;
-    Backoff autoReconnectBackoff;
+    Backoff _autoReconnectBackoff;
 
     HostAndPort _serverAddress;
     std::string _resolvedAddress;

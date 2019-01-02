@@ -888,5 +888,34 @@ TEST(DateTArithmetic, SubtractionOverflowThrows) {
                        ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(Date_t::max() - Milliseconds(-1), DBException, ErrorCodes::DurationOverflow);
 }
+
+TEST(Backoff, NextSleep) {
+    Backoff backoff(Milliseconds(8), Milliseconds::max());
+    ASSERT_EQ(Milliseconds(1), backoff.nextSleep());
+    ASSERT_EQ(Milliseconds(2), backoff.nextSleep());
+    ASSERT_EQ(Milliseconds(4), backoff.nextSleep());
+    ASSERT_EQ(Milliseconds(8), backoff.nextSleep());
+    ASSERT_EQ(Milliseconds(8), backoff.nextSleep());
+}
+
+TEST(Backoff, SleepBackoffTest) {
+    const int maxSleepTimeMillis = 1000;
+    Backoff backoff(Milliseconds(maxSleepTimeMillis), Milliseconds(maxSleepTimeMillis * 2));
+
+    // Double previous sleep duration
+    ASSERT_EQUALS(backoff.getNextSleepMillis(0, 0, 0), 1);
+    ASSERT_EQUALS(backoff.getNextSleepMillis(2, 0, 0), 4);
+    ASSERT_EQUALS(backoff.getNextSleepMillis(256, 0, 0), 512);
+
+    // Make sure our backoff increases to the maximum value
+    ASSERT_EQUALS(backoff.getNextSleepMillis(maxSleepTimeMillis - 200, 0, 0), maxSleepTimeMillis);
+    ASSERT_EQUALS(backoff.getNextSleepMillis(maxSleepTimeMillis * 2, 0, 0), maxSleepTimeMillis);
+
+    // Make sure that our backoff gets reset if we wait much longer than the maximum wait
+    const unsigned long long resetAfterMillis = maxSleepTimeMillis * 2;
+    ASSERT_EQUALS(backoff.getNextSleepMillis(20, resetAfterMillis, 0), 40);     // no reset here
+    ASSERT_EQUALS(backoff.getNextSleepMillis(20, resetAfterMillis + 1, 0), 1);  // reset expected
+}
+
 }  // namespace
 }  // namespace mongo

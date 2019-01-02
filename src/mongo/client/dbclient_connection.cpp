@@ -445,7 +445,7 @@ void DBClientConnection::_checkConnection() {
         throwSocketError(SocketErrorKind::FAILED_STATE, toString());
 
     // Don't hammer reconnects, backoff if needed
-    autoReconnectBackoff.nextSleepMillis();
+    sleepFor(_autoReconnectBackoff.nextSleep());
 
     LOG(_logLevel) << "trying reconnect to " << toString() << endl;
     string errmsg;
@@ -546,7 +546,7 @@ DBClientConnection::DBClientConnection(bool _autoReconnect,
                                        MongoURI uri,
                                        const HandshakeValidationHook& hook)
     : autoReconnect(_autoReconnect),
-      autoReconnectBackoff(1000, 2000),
+      _autoReconnectBackoff(Seconds(1), Seconds(2)),
       _hook(hook),
       _uri(std::move(uri)) {
     _numConnections.fetchAndAdd(1);

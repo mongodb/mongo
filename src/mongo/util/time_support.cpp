@@ -756,14 +756,15 @@ void sleepmicros(long long s) {
     stdx::this_thread::sleep_for(Microseconds(s).toSystemDuration());
 }
 
-void Backoff::nextSleepMillis() {
+Milliseconds Backoff::nextSleep() {
     // Get the current time
     unsigned long long currTimeMillis = curTimeMillis64();
 
     int lastSleepMillis = _lastSleepMillis;
 
-    if (_lastErrorTimeMillis == 0 || _lastErrorTimeMillis > currTimeMillis /* VM bugs exist */)
+    if (!_lastErrorTimeMillis || _lastErrorTimeMillis > currTimeMillis /* VM bugs exist */)
         _lastErrorTimeMillis = currTimeMillis;
+
     unsigned long long lastErrorTimeMillis = _lastErrorTimeMillis;
     _lastErrorTimeMillis = currTimeMillis;
 
@@ -771,27 +772,20 @@ void Backoff::nextSleepMillis() {
 
     // Store the last slept time
     _lastSleepMillis = lastSleepMillis;
-    sleepmillis(lastSleepMillis);
+    return Milliseconds(lastSleepMillis);
 }
 
-int Backoff::getNextSleepMillis(int lastSleepMillis,
+int Backoff::getNextSleepMillis(long long lastSleepMillis,
                                 unsigned long long currTimeMillis,
                                 unsigned long long lastErrorTimeMillis) const {
     // Backoff logic
 
     // Get the time since the last error
-    unsigned long long timeSinceLastErrorMillis = currTimeMillis - lastErrorTimeMillis;
+    const long long timeSinceLastErrorMillis = currTimeMillis - lastErrorTimeMillis;
 
-    // Makes the cast below safe
-    verify(_resetAfterMillis >= 0);
-
-    // If we haven't seen another error recently (3x the max wait time), reset our
-    // wait counter.
-    if (timeSinceLastErrorMillis > (unsigned)(_resetAfterMillis))
+    // If we haven't seen another error recently (3x the max wait time), reset our wait counter
+    if (timeSinceLastErrorMillis > _resetAfterMillis)
         lastSleepMillis = 0;
-
-    // Makes the test below sane
-    verify(_maxSleepMillis > 0);
 
     // Wait a power of two millis
     if (lastSleepMillis == 0)
