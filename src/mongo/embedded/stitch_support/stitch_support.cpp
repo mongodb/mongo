@@ -37,8 +37,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
 
 #include <iostream>
@@ -169,6 +171,51 @@ struct stitch_support_v1_matcher {
     mongo::Matcher matcher;
 };
 
+struct stitch_support_v1_update_details {
+    std::vector<std::string> modifiedPaths;
+};
+
+struct stitch_support_v1_update {
+    stitch_support_v1_update(mongo::ServiceContext::UniqueClient client,
+                             mongo::BSONObj updateExpr,
+                             mongo::BSONArray arrayFilters,
+                             stitch_support_v1_matcher* matcher,
+                             stitch_support_v1_collator* collator)
+        : client(std::move(client)),
+          opCtx(this->client->makeOperationContext()),
+          updateExpr(updateExpr.getOwned()),
+          arrayFilters(arrayFilters.getOwned()),
+          matcher(matcher),
+          updateDriver(new mongo::ExpressionContext(
+              opCtx.get(), collator ? collator->collator.get() : nullptr)) {
+        std::vector<mongo::BSONObj> arrayFilterVector;
+        for (auto&& filter : this->arrayFilters) {
+            arrayFilterVector.push_back(filter.embeddedObject());
+        }
+        this->parsedFilters = uassertStatusOK(mongo::ParsedUpdate::parseArrayFilters(
+            arrayFilterVector, this->opCtx.get(), collator ? collator->collator.get() : nullptr));
+
+        // Initializing the update as single-document allows document-replacement updates.
+        bool multi = false;
+
+        updateDriver.parse(this->updateExpr, parsedFilters, multi);
+
+        uassert(51037,
+                "Updates with a positional operator require a matcher object.",
+                matcher || !updateDriver.needMatchDetails());
+    }
+
+    mongo::ServiceContext::UniqueClient client;
+    mongo::ServiceContext::UniqueOperationContext opCtx;
+    mongo::BSONObj updateExpr;
+    mongo::BSONArray arrayFilters;
+
+    stitch_support_v1_matcher* matcher;
+
+    std::map<mongo::StringData, std::unique_ptr<mongo::ExpressionWithPlaceholder>> parsedFilters;
+    mongo::UpdateDriver updateDriver;
+};
+
 namespace mongo {
 namespace {
 
@@ -244,6 +291,30 @@ stitch_support_v1_matcher* matcher_create(stitch_support_v1_lib* const lib,
 
     return new stitch_support_v1_matcher(
         lib->serviceContext->makeClient("stitch_support"), filter.getOwned(), collator);
+}
+
+stitch_support_v1_update* update_create(stitch_support_v1_lib* const lib,
+                                        BSONObj updateExpr,
+                                        BSONArray arrayFilters,
+                                        stitch_support_v1_matcher* matcher,
+                                        stitch_support_v1_collator* collator) {
+    if (!library) {
+        throw StitchSupportException{
+            STITCH_SUPPORT_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+            "Cannot create a new update when the Stitch Support Library is not yet initialized."};
+    }
+
+    if (library.get() != lib) {
+        throw StitchSupportException{
+            STITCH_SUPPORT_V1_ERROR_INVALID_LIB_HANDLE,
+            "Cannot create a new udpate when the Stitch Support Library is not yet initialized."};
+    }
+
+    return new stitch_support_v1_update(lib->serviceContext->makeClient("stitch_support"),
+                                        updateExpr,
+                                        arrayFilters,
+                                        matcher,
+                                        collator);
 }
 
 int capi_status_get_error(const stitch_support_v1_status* const status) noexcept {
@@ -334,6 +405,103 @@ int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matc
         mongo::BSONObj document(documentBSON);
         *isMatch = matcher->matcher.matches(document, nullptr);
     });
+}
+
+stitch_support_v1_update* MONGO_API_CALL
+stitch_support_v1_update_create(stitch_support_v1_lib* lib,
+                                const char* updateExprBSON,
+                                const char* arrayFiltersBSON,
+                                stitch_support_v1_matcher* matcher,
+                                stitch_support_v1_collator* collator,
+                                stitch_support_v1_status* status) {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
+        mongo::BSONObj updateExpr(updateExprBSON);
+        mongo::BSONArray arrayFilters(
+            (arrayFiltersBSON ? mongo::BSONObj(arrayFiltersBSON) : mongo::BSONObj()));
+        return mongo::update_create(lib, updateExpr, arrayFilters, matcher, collator);
+    });
+}
+
+void MONGO_API_CALL stitch_support_v1_update_destroy(stitch_support_v1_update* const update) {
+    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete update; }));
+}
+
+char* MONGO_API_CALL
+stitch_support_v1_update_apply(stitch_support_v1_update* const update,
+                               const char* documentBSON,
+                               stitch_support_v1_update_details* update_details,
+                               stitch_support_v1_status* status) {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
+        mongo::BSONObj document(documentBSON);
+        mongo::StringData matchedField;
+
+        if (update->updateDriver.needMatchDetails()) {
+            invariant(update->matcher);
+
+            mongo::MatchDetails matchDetails;
+            matchDetails.requestElemMatchKey();
+            bool isMatch = update->matcher->matcher.matches(document, &matchDetails);
+            invariant(isMatch);
+            if (matchDetails.hasElemMatchKey()) {
+                matchedField = matchDetails.elemMatchKey();
+            } else {
+                // Empty 'matchedField' indicates that the matcher did not traverse an array.
+            }
+        }
+
+        mongo::mutablebson::Document mutableDoc(document,
+                                                mongo::mutablebson::Document::kInPlaceDisabled);
+
+        mongo::FieldRefSet immutablePaths;  // Empty set
+        bool docWasModified = false;
+
+        mongo::FieldRefSetWithStorage modifiedPaths;
+
+        uassertStatusOK(update->updateDriver.update(matchedField,
+                                                    &mutableDoc,
+                                                    false /* validateForStorage */,
+                                                    immutablePaths,
+                                                    NULL /* logOpRec*/,
+                                                    &docWasModified,
+                                                    &modifiedPaths));
+
+        auto outputObj = mutableDoc.getObject();
+        size_t output_size = static_cast<size_t>(outputObj.objsize());
+        char* output = static_cast<char*>(malloc(output_size));
+
+        uassert(
+            mongo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for update", output);
+
+        memcpy(
+            static_cast<void*>(output), static_cast<const void*>(outputObj.objdata()), output_size);
+
+        if (update_details) {
+            update_details->modifiedPaths = modifiedPaths.serialize();
+        }
+
+        return output;
+    });
+}
+
+stitch_support_v1_update_details* MONGO_API_CALL stitch_support_v1_update_details_create(void) {
+    return new stitch_support_v1_update_details;
+};
+
+void MONGO_API_CALL
+stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details) {
+    delete update_details;
+};
+
+size_t MONGO_API_CALL stitch_support_v1_update_details_num_modified_paths(
+    stitch_support_v1_update_details* update_details) {
+    return update_details->modifiedPaths.size();
+}
+
+const char* MONGO_API_CALL stitch_support_v1_update_details_path(
+    stitch_support_v1_update_details* update_details, size_t path_index) {
+    invariant(path_index < update_details->modifiedPaths.size());
+    return update_details->modifiedPaths[path_index].c_str();
 }
 
 }  // extern "C"

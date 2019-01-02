@@ -65,17 +65,19 @@ Status ParsedUpdate::parseRequest() {
         _collator = std::move(collator.getValue());
     }
 
-    Status status = parseArrayFilters();
-    if (!status.isOK()) {
-        return status;
+    auto statusWithArrayFilters =
+        parseArrayFilters(_request->getArrayFilters(), _opCtx, _collator.get());
+    if (!statusWithArrayFilters.isOK()) {
+        return statusWithArrayFilters.getStatus();
     }
+    _arrayFilters = std::move(statusWithArrayFilters.getValue());
 
     // We parse the update portion before the query portion because the dispostion of the update
     // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
     // the update involves the positional-dollar operator, we must have a CanonicalQuery even if
     // it isn't required for query execution.
     parseUpdate();
-    status = parseQuery();
+    Status status = parseQuery();
     if (!status.isOK())
         return status;
     return Status::OK();
@@ -147,15 +149,19 @@ void ParsedUpdate::parseUpdate() {
     _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
 }
 
-Status ParsedUpdate::parseArrayFilters() {
-    for (auto rawArrayFilter : _request->getArrayFilters()) {
-        boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(_opCtx, _collator.get()));
+StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>
+ParsedUpdate::parseArrayFilters(const std::vector<BSONObj>& rawArrayFiltersIn,
+                                OperationContext* opCtx,
+                                CollatorInterface* collator) {
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFiltersOut;
+    for (auto rawArrayFilter : rawArrayFiltersIn) {
+        boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
         auto parsedArrayFilter =
             MatchExpressionParser::parse(rawArrayFilter,
                                          std::move(expCtx),
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kBanAllSpecialFeatures);
+
         if (!parsedArrayFilter.isOK()) {
             return parsedArrayFilter.getStatus().withContext("Error parsing array filter");
         }
@@ -172,17 +178,17 @@ Status ParsedUpdate::parseArrayFilters() {
                 ErrorCodes::FailedToParse,
                 "Cannot use an expression without a top-level field name in arrayFilters");
         }
-        if (_arrayFilters.find(*fieldName) != _arrayFilters.end()) {
+        if (arrayFiltersOut.find(*fieldName) != arrayFiltersOut.end()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream()
                               << "Found multiple array filters with the same top-level field name "
                               << *fieldName);
         }
 
-        _arrayFilters[*fieldName] = std::move(finalArrayFilter);
+        arrayFiltersOut[*fieldName] = std::move(finalArrayFilter);
     }
 
-    return Status::OK();
+    return std::move(arrayFiltersOut);
 }
 
 PlanExecutor::YieldPolicy ParsedUpdate::yieldPolicy() const {

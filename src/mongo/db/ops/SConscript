@@ -47,6 +47,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='parsed_update',
+    source='parsed_update.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+    ],
+)
+
 env.CppUnitTest(
     target='write_ops_parsers_test',
     source='write_ops_parsers_test.cpp',
