@@ -63,7 +63,7 @@ class OplogTruncaterThread : public BackgroundJob {
 public:
     OplogTruncaterThread(const NamespaceString& ns)
         : BackgroundJob(true /* deleteSelf */), _ns(ns) {
-        _name = std::string("WT OplogTruncaterThread: ") + _ns.toString();
+        _name = std::string("WT-OplogTruncaterThread-") + _ns.toString();
     }
 
     virtual std::string name() const {

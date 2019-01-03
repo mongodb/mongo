@@ -128,7 +128,7 @@ IndexBuilder::IndexBuilder(const BSONObj& index,
       _indexConstraints(indexConstraints),
       _replicatedWrites(replicatedWrites),
       _initIndexTs(initIndexTs),
-      _name(str::stream() << "repl index builder " << _indexBuildCount.addAndFetch(1)) {}
+      _name(str::stream() << "repl-index-builder-" << _indexBuildCount.addAndFetch(1)) {}
 
 IndexBuilder::~IndexBuilder() {}
 

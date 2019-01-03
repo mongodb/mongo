@@ -102,7 +102,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
     invariant(!_thread.joinable());
 
     _thread = stdx::thread([] {
-        Client::initThread("Uptime reporter");
+        Client::initThread("Uptime-reporter");
 
         const std::string hostName(getHostNameCached());
         const std::string instanceId(constructInstanceIdString(hostName));

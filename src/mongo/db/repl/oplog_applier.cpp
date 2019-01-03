@@ -79,7 +79,7 @@ std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool() {
 // static
 std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
     ThreadPool::Options options;
-    options.threadNamePrefix = "repl writer worker ";
+    options.threadNamePrefix = "repl-writer-worker-";
     options.poolName = "repl writer worker Pool";
     options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {

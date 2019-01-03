@@ -251,7 +251,7 @@ void ShardRegistry::_internalReload(const CallbackArgs& cbArgs) {
         return;
     }
 
-    ThreadClient tc("shard registry reload", getGlobalServiceContext());
+    ThreadClient tc("shard-registry-reload", getGlobalServiceContext());
     auto opCtx = cc().makeOperationContext();
 
     try {

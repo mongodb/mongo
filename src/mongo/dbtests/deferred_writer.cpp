@@ -71,7 +71,7 @@ static const NamespaceString kTestNamespace("unittests", "deferred_writer_tests"
 class RaiiWrapper {
 public:
     explicit RaiiWrapper(std::unique_ptr<DeferredWriter> writer) : _writer(std::move(writer)) {
-        _writer->startup("DeferredWriter test");
+        _writer->startup("DeferredWriter-test");
     }
 
     RaiiWrapper(RaiiWrapper&& other) : _writer(std::move(other._writer)) {}

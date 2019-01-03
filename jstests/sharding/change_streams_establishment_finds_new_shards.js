@@ -50,11 +50,11 @@
         checkLog.contains(db,
             "clusterAggregateHangBeforeEstablishingShardCursors fail point enabled");
         assert.commandWorked(
-            db.adminCommand({addShard: "${newShard.getURL()}", name: "${newShard}"}));
+            db.adminCommand({addShard: "${newShard.getURL()}", name: "${newShard.name}"}));
         // Migrate the [10, MaxKey] chunk to "newShard".
         assert.commandWorked(db.adminCommand({moveChunk: "${mongosColl.getFullName()}",
                                               find: {_id: 20},
-                                              to: "${newShard}",
+                                              to: "${newShard.name}",
                                               _waitForDelete: true}));
         assert.commandWorked(
             db.adminCommand(

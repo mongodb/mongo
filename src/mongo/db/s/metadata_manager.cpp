@@ -145,7 +145,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
     LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
     auto swCallbackHandle = executor->scheduleWorkAt(
         when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto&) {
-            ThreadClient tc("Collection Range Deleter", getGlobalServiceContext());
+            ThreadClient tc("Collection-Range-Deleter", getGlobalServiceContext());
             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 

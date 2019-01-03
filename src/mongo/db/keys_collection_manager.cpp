@@ -157,7 +157,7 @@ void KeysCollectionManager::startMonitoring(ServiceContext* service) {
     _keysCache.resetCache();
     _refresher.setFunc([this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     _refresher.start(
-        service, str::stream() << "monitoring keys for " << _purpose, _keyValidForInterval);
+        service, str::stream() << "monitoring-keys-for-" << _purpose, _keyValidForInterval);
 }
 
 void KeysCollectionManager::stopMonitoring() {
