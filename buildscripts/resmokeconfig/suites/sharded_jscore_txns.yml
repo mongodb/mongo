@@ -21,9 +21,6 @@ selector:
   # cluster.
   - jstests/core/txns/transactions_block_ddl.js
 
-  # TODO SERVER-36124: maxTimeMS doesn't work for insert on mongos.
-  - jstests/core/txns/write_conflicts_with_non_txns.js
-
   # TODO SERVER-36120: No doTxn command on mongos.
   - jstests/core/txns/do_txn_atomicity.js
   - jstests/core/txns/do_txn_basic.js
