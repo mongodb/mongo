@@ -718,7 +718,9 @@ SSLX509Name getCertificateSubjectX509Name(X509* cert) {
         entries.push_back(std::move(rdn));
     }
 
-    return SSLX509Name(std::move(entries));
+    SSLX509Name subjectName = SSLX509Name(std::move(entries));
+    uassertStatusOK(subjectName.normalizeStrings());
+    return subjectName;
 }
 
 int verifyDHParameters(const UniqueDHParams& dhparams) {
@@ -1567,6 +1569,11 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
     // TODO: check optional cipher restriction, using cert.
     auto peerSubject = getCertificateSubjectX509Name(peerCert);
     LOG(2) << "Accepted TLS connection from peer: " << peerSubject;
+
+    // If this is a server and client and server certificate are the same, log a warning.
+    if (remoteHost.empty() && _sslConfiguration.serverSubjectName() == peerSubject) {
+        warning() << "Client connecting with server's own TLS certificate";
+    }
 
     StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {

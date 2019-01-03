@@ -386,7 +386,12 @@ StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
         }
     }
 
-    return SSLX509Name(std::move(ret));
+    SSLX509Name subjectName = SSLX509Name(std::move(ret));
+    Status normalize = subjectName.normalizeStrings();
+    if (!normalize.isOK()) {
+        return normalize;
+    }
+    return subjectName;
 }
 
 StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
@@ -1441,6 +1446,11 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     }
     const auto peerSubjectName = std::move(swPeerSubjectName.getValue());
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
+
+    // If this is a server and client and server certificate are the same, log a warning.
+    if (_sslConfiguration.serverSubjectName() == peerSubjectName) {
+        warning() << "Client connecting with server's own TLS certificate";
+    }
 
     if (remoteHost.empty()) {
         // If this is an SSL server context (on a mongod/mongos)

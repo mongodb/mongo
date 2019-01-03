@@ -1486,6 +1486,7 @@ Status SSLManagerWindows::_validateCertificate(PCCERT_CONTEXT cert,
             Date_t::fromMillisSinceEpoch(FiletimeToEpocMillis(cert->pCertInfo->NotAfter));
     }
 
+    uassertStatusOK(subjectName->normalizeStrings());
     return Status::OK();
 }
 
@@ -1696,6 +1697,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
+    uassertStatusOK(peerSubjectName->normalizeStrings());
     return Status::OK();
 }
 
@@ -1793,6 +1795,11 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
     }
 
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
+
+    // If this is a server and client and server certificate are the same, log a warning.
+    if (remoteHost.empty() && _sslConfiguration.serverSubjectName() == peerSubjectName) {
+        warning() << "Client connecting with server's own TLS certificate";
+    }
 
     // On the server side, parse the certificate for roles
     if (remoteHost.empty()) {
