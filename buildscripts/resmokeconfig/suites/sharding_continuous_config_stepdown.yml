@@ -47,6 +47,7 @@ selector:
   - jstests/sharding/movePrimary1.js
   - jstests/sharding/mrShardedOutput.js
   - jstests/sharding/names.js
+  - jstests/sharding/out_with_drop_shard.js
   - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/presplit.js
   - jstests/sharding/query_config.js
