@@ -118,6 +118,8 @@ public:
                                         long long dataSize);
 
 private:
+    friend class VisibilityManagerChange;
+
     const bool _isCapped;
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxDocs;
