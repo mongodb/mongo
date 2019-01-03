@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
@@ -52,6 +53,31 @@ class ServerParameterSet;
 class OperationContext;
 
 /**
+ * Server Parameters can be set startup up and/or runtime.
+ *
+ * At startup, --setParameter ... or config file is used.
+ * At runtime, { setParameter : 1, ...} is used.
+ */
+enum class ServerParameterType {
+
+    /**
+     * Parameter can only be set via runCommand.
+     */
+    kRuntimeOnly,
+
+    /**
+     * Parameter can only be set via --setParameter, and is only read at startup after command-line
+     * parameters, and the config file are processed.
+     */
+    kStartupOnly,
+
+    /**
+     * Parameter can be set at both startup and runtime.
+     */
+    kStartupAndRuntime,
+};
+
+/**
  * Lets you make server level settings easily configurable.
  * Hooks into (set|get)Parameter, as well as command line processing
  *
@@ -62,6 +88,7 @@ class ServerParameter {
 public:
     typedef std::map<std::string, ServerParameter*> Map;
 
+    ServerParameter(StringData name, ServerParameterType spt);
     ServerParameter(ServerParameterSet* sps,
                     StringData name,
                     bool allowedToChangeAtStartup,
@@ -123,33 +150,17 @@ public:
 
     void disableTestParameters();
 
+    template <typename T = ServerParameter>
+    T* get(StringData name) {
+        const auto& it = _map.find(name.toString());
+        uassert(ErrorCodes::NoSuchKey,
+                str::stream() << "Unknown server parameter: " << name,
+                it != _map.end());
+        return checked_cast<T*>(it->second);
+    }
+
 private:
     Map _map;
-};
-
-/**
- * Server Parameters can be set startup up and/or runtime.
- *
- * At startup, --setParameter ... or config file is used.
- * At runtime, { setParameter : 1, ...} is used.
- */
-enum class ServerParameterType {
-
-    /**
-     * Parameter can only be set via runCommand.
-     */
-    kRuntimeOnly,
-
-    /**
-     * Parameter can only be set via --setParameter, and is only read at startup after command-line
-     * parameters, and the config file are processed.
-     */
-    kStartupOnly,
-
-    /**
-     * Parameter can be set at both startup and runtime.
-     */
-    kStartupAndRuntime,
 };
 
 /**
@@ -168,7 +179,7 @@ public:
                          const setter set,
                          const getter get,
                          SPT paramType = SPT::kStartupOnly)
-        : BoundServerParameter(ServerParameterSet::getGlobal(), name, set, get, paramType) {}
+        : ServerParameter(name, paramType), _setter(set), _getter(get) {}
 
     BoundServerParameter(ServerParameterSet* sps,
                          const std::string& name,
