@@ -92,7 +92,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts = MakePipelineOptions{}) final;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override;
     std::string getShardName(OperationContext* opCtx) const final;
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext* opCtx, const NamespaceString&, UUID) const override;

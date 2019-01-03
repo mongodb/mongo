@@ -197,10 +197,10 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
     }
 
     // If executing on mongos and the foreign collection is sharded, then this stage can run on
-    // mongos.
+    // mongos or any shard.
     HostTypeRequirement hostRequirement =
         (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
-        ? HostTypeRequirement::kMongoS
+        ? HostTypeRequirement::kNone
         : HostTypeRequirement::kPrimaryShard;
 
     StageConstraints constraints(StreamType::kStreaming,
@@ -330,6 +330,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
         _cache.reset();
     }
 
+    invariant(pipeline);
     return pipeline;
 }
 

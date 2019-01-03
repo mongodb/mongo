@@ -32,6 +32,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         '$BUILD_DIR/mongo/db/pipeline/mongos_process_interface',
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/db/views/views',
         'cluster_query',
     ]

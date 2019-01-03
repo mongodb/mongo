@@ -44,10 +44,14 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/log.h"
 
@@ -151,6 +155,49 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
 
     // TODO SERVER-35403: Add more context for which shard produced the error.
     uassertStatusOKWithContext(response.toStatus(), "Update failed: ");
+}
+
+unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSourceToPipeline(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                        PipelineDeleter(expCtx->opCtx));
+
+    invariant(pipeline->getSources().empty() ||
+              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+
+    // $lookup on a sharded collection is not allowed in a transaction. We assume that if we're in
+    // a transaction, the foreign collection is unsharded. Otherwise, we may access the catalog
+    // cache, and attempt to do a network request while holding locks.
+    // TODO: SERVER-39162 allow $lookup in sharded transactions.
+    auto txnParticipant = TransactionParticipant::get(expCtx->opCtx);
+    const bool inTxn = txnParticipant && txnParticipant->inMultiDocumentTransaction();
+
+    const bool isSharded = [&]() {
+        if (inTxn || !ShardingState::get(expCtx->opCtx)->enabled()) {
+            // Sharding isn't enabled or we're in a transaction. In either case we assume it's
+            // unsharded.
+            return false;
+        } else if (expCtx->ns.db() == "local") {
+            // This may be a change stream examining the oplog. We know the oplog (or any local
+            // collections for that matter) will never be sharded.
+            return false;
+        }
+        return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(expCtx->opCtx, expCtx->ns)).cm() !=
+            nullptr;
+    }();
+
+    if (isSharded) {
+        // For a sharded collection we may have to establish cursors on a remote host.
+        return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, pipeline.release());
+    }
+
+    // Perform a "local read", the same as if we weren't a shard server.
+
+    // TODO SERVER-39015 we should do a shard version check here after we acquire a lock within
+    // this function, to be sure the collection didn't become sharded between the time we checked
+    // whether it's sharded and the time we took the lock.
+
+    return MongoInterfaceStandalone::attachCursorSourceToPipeline(expCtx, pipeline.release());
 }
 
 }  // namespace mongo

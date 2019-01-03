@@ -45,37 +45,6 @@ namespace mongo {
  */
 class MongoSInterface final : public MongoProcessCommon {
 public:
-    struct DispatchShardPipelineResults {
-        // True if this pipeline was split, and the second half of the pipeline needs to be run on
-        // the primary shard for the database.
-        bool needsPrimaryShardMerge;
-
-        // Populated if this *is not* an explain, this vector represents the cursors on the remote
-        // shards.
-        std::vector<OwnedRemoteCursor> remoteCursors;
-
-        // Populated if this *is* an explain, this vector represents the results from each shard.
-        std::vector<AsyncRequestsSender::Response> remoteExplainOutput;
-
-        // The split version of the pipeline if more than one shard was targeted, otherwise
-        // boost::none.
-        boost::optional<cluster_aggregation_planner::SplitPipeline> splitPipeline;
-
-        // If the pipeline targeted a single shard, this is the pipeline to run on that shard.
-        std::unique_ptr<Pipeline, PipelineDeleter> pipelineForSingleShard;
-
-        // The command object to send to the targeted shards.
-        BSONObj commandForTargetedShards;
-
-        // How many exchange producers are running the shard part of splitPipeline.
-        size_t numProducers;
-
-        // The exchange specification if the query can run with the exchange otherwise boost::none.
-        boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec;
-    };
-
-    static Shard::RetryPolicy getDesiredRetryPolicy(const AggregationRequest& req);
-
     static BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                                     const AggregationRequest& request,
                                                     const boost::optional<ShardId>& shardId,
@@ -101,25 +70,8 @@ public:
         const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
         bool needsMerge);
 
-    static std::set<ShardId> getTargetedShards(
-        OperationContext* opCtx,
-        bool mustRunOnAllShards,
-        const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
-        const BSONObj shardQuery,
-        const BSONObj collation);
-
-    static bool mustRunOnAllShards(const NamespaceString& nss, const LiteParsedPipeline& litePipe);
-
     static StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(
         OperationContext* opCtx, const NamespaceString& execNss);
-
-    static DispatchShardPipelineResults dispatchShardPipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const NamespaceString& executionNss,
-        const AggregationRequest& aggRequest,
-        const LiteParsedPipeline& litePipe,
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-        BSONObj collationObj);
 
     MongoSInterface() = default;
 

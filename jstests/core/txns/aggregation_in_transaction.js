@@ -3,6 +3,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/fixture_helpers.js");  // For isSharded.
+
     const session = db.getMongo().startSession({causalConsistency: false});
     const testDB = session.getDatabase("test");
     const coll = testDB.getCollection("aggregation_in_transaction");
@@ -20,6 +22,8 @@
     assert.commandWorked(coll.insert(testDoc, {writeConcern: {w: "majority"}}));
     const foreignDoc = {_id: "orange", val: 9};
     assert.commandWorked(foreignColl.insert(foreignDoc, {writeConcern: {w: "majority"}}));
+
+    const isForeignSharded = FixtureHelpers.isSharded(foreignColl);
 
     // Run a dummy find to start the transaction.
     jsTestLog("Starting transaction.");
@@ -43,29 +47,35 @@
     assert(!cursor.hasNext());
 
     // Perform aggregations that look at other collections.
-    const lookupDoc = Object.extend(testDoc, {lookup: [foreignDoc]});
-    cursor = coll.aggregate({
-        $lookup: {
-            from: foreignColl.getName(),
-            localField: "foreignKey",
-            foreignField: "_id",
-            as: "lookup",
-        }
-    });
-    assert.docEq(cursor.next(), lookupDoc);
-    assert(!cursor.hasNext());
+    // TODO: SERVER-39162 Sharded $lookup is not supported in transactions.
+    if (!isForeignSharded) {
+        const lookupDoc = Object.extend(testDoc, {lookup: [foreignDoc]});
+        cursor = coll.aggregate({
+            $lookup: {
+                from: foreignColl.getName(),
+                localField: "foreignKey",
+                foreignField: "_id",
+                as: "lookup",
+            }
+        });
+        assert.docEq(cursor.next(), lookupDoc);
+        assert(!cursor.hasNext());
 
-    cursor = coll.aggregate({
-        $graphLookup: {
-            from: foreignColl.getName(),
-            startWith: "$foreignKey",
-            connectFromField: "foreignKey",
-            connectToField: "_id",
-            as: "lookup"
-        }
-    });
-    assert.docEq(cursor.next(), lookupDoc);
-    assert(!cursor.hasNext());
+        cursor = coll.aggregate({
+            $graphLookup: {
+                from: foreignColl.getName(),
+                startWith: "$foreignKey",
+                connectFromField: "foreignKey",
+                connectToField: "_id",
+                as: "lookup"
+            }
+        });
+        assert.docEq(cursor.next(), lookupDoc);
+        assert(!cursor.hasNext());
+    } else {
+        // TODO SERVER-39048: Test that $lookup on sharded collection is banned
+        // within a transaction.
+    }
 
     jsTestLog("Testing $count within a transaction.");
 

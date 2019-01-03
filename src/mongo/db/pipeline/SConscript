@@ -194,6 +194,19 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='sharded_agg_helpers',
+    source=[
+        'sharded_agg_helpers.cpp',
+    ],
+    LIBDEPS=[
+        'aggregation',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
+        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
+    ],
+)
+
 env.CppUnitTest(
     target='document_source_test',
     source=[
@@ -314,6 +327,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/sharding_api',
         'process_interface_standalone',
+        'sharded_agg_helpers',
     ],
 )
 
@@ -328,6 +342,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_aggregation_planner',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'mongo_process_common',
+        'sharded_agg_helpers',
     ]
 )
 

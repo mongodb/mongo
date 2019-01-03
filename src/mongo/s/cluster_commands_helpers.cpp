@@ -553,6 +553,7 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
 StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
+    invariant(catalogCache);
 
     // Return the latest routing table if not running in a transaction with snapshot level read
     // concern.
