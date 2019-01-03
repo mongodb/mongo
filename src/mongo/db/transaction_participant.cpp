@@ -431,11 +431,8 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
         // The active transaction number can only be reused if the transaction is not in a state
         // that indicates it has been involved in a two phase commit. In normal operation this check
         // should never fail.
-        //
-        // TODO SERVER-36639: Ensure the active transaction number cannot be reused if the
-        // transaction is in the abort after prepare state (or any state indicating the participant
-        // has been involved in a two phase commit).
-        const auto restartableStates = TransactionState::kInProgress | TransactionState::kAborted;
+        const auto restartableStates =
+            TransactionState::kInProgress | TransactionState::kAbortedWithoutPrepare;
         uassert(50911,
                 str::stream() << "Cannot start a transaction at given transaction number "
                               << txnNumber
@@ -675,7 +672,7 @@ void TransactionParticipant::stashTransactionResources(OperationContext* opCtx) 
     stdx::unique_lock<stdx::mutex> lg(_mutex);
 
     // Always check session's txnNumber, since it can be modified by migration, which does not
-    // check out the session. We intentionally do not error if _txnState=kAborted, since we
+    // check out the session. We intentionally do not error if the transaction is aborted, since we
     // expect this function to be called at the end of the 'abortTransaction' command.
     _checkIsActiveTransaction(lg, *opCtx->getTxnNumber(), false);
 
@@ -1127,7 +1124,7 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
-    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TransactionState::kCommitted);
+    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TerminationCause::kCommitted);
 }
 
 void TransactionParticipant::_updateTxnMetricsOnCommit(WithLock lk,
@@ -1257,7 +1254,7 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
 
     // Clean up the transaction resources on the opCtx even if the transaction resources on the
     // session were not aborted. This actually aborts the storage-transaction.
-    _cleanUpTxnResourceOnOpCtx(lock, opCtx, TransactionState::kAborted);
+    _cleanUpTxnResourceOnOpCtx(lock, opCtx, TerminationCause::kAborted);
 
     // Write the abort oplog entry. This must be done after aborting the storage transaction, so
     // that the lock state is reset, and there is no max lock timeout on the locker. We need to
@@ -1300,7 +1297,10 @@ void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mut
                   str::stream() << "Cannot abort transaction in " << _txnState.toString());
     } else {
         // If _activeTxnNumber is higher than ours, it means the transaction is already aborted.
-        invariant(_txnState.isInSet(lock, TransactionState::kNone | TransactionState::kAborted));
+        invariant(_txnState.isInSet(lock,
+                                    TransactionState::kNone |
+                                        TransactionState::kAbortedWithoutPrepare |
+                                        TransactionState::kAbortedWithPrepare));
     }
 }
 
@@ -1319,7 +1319,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
         }
         _logSlowTransaction(wl,
                             &(_txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
-                            TransactionState::kAborted,
+                            TerminationCause::kAborted,
                             _txnResourceStash->getReadConcernArgs());
     } else {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
@@ -1332,11 +1332,14 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
             _txnState.isPrepared(lm));
     }
 
-    _resetTransactionState(wl, TransactionState::kAborted);
+    const auto nextState = _txnState.isPrepared(wl) ? TransactionState::kAbortedWithPrepare
+                                                    : TransactionState::kAbortedWithoutPrepare;
+    _resetTransactionState(wl, nextState);
 }
 
-void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(
-    WithLock wl, OperationContext* opCtx, TransactionState::StateFlag terminationCause) {
+void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(WithLock wl,
+                                                        OperationContext* opCtx,
+                                                        TerminationCause terminationCause) {
     // Log the transaction if its duration is longer than the slowMS command threshold.
     _logSlowTransaction(
         wl,
@@ -1471,8 +1474,10 @@ std::string TransactionParticipant::TransactionState::toString(StateFlag state) 
             return "TxnState::CommittingWithPrepare";
         case TransactionParticipant::TransactionState::kCommitted:
             return "TxnState::Committed";
-        case TransactionParticipant::TransactionState::kAborted:
-            return "TxnState::Aborted";
+        case TransactionParticipant::TransactionState::kAbortedWithoutPrepare:
+            return "TxnState::AbortedWithoutPrepare";
+        case TransactionParticipant::TransactionState::kAbortedWithPrepare:
+            return "TxnState::AbortedAfterPrepare";
     }
     MONGO_UNREACHABLE;
 }
@@ -1494,7 +1499,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 case kNone:
                 case kPrepared:
                 case kCommittingWithoutPrepare:
-                case kAborted:
+                case kAbortedWithoutPrepare:
                     return true;
                 default:
                     return false;
@@ -1503,18 +1508,25 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
         case kPrepared:
             switch (newState) {
                 case kCommittingWithPrepare:
-                case kAborted:
+                case kAbortedWithPrepare:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
         case kCommittingWithPrepare:
+            switch (newState) {
+                case kCommitted:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
         case kCommittingWithoutPrepare:
             switch (newState) {
                 case kNone:
                 case kCommitted:
-                case kAborted:
+                case kAbortedWithoutPrepare:
                     return true;
                 default:
                     return false;
@@ -1523,16 +1535,23 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
         case kCommitted:
             switch (newState) {
                 case kNone:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kAbortedWithoutPrepare:
+            switch (newState) {
+                case kNone:
                 case kInProgress:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case kAborted:
+        case kAbortedWithPrepare:
             switch (newState) {
                 case kNone:
-                case kInProgress:
                     return true;
                 default:
                     return false;
@@ -1565,11 +1584,9 @@ void TransactionParticipant::_reportTransactionStats(WithLock wl,
 
 std::string TransactionParticipant::_transactionInfoForLog(
     const SingleThreadedLockStats* lockStats,
-    TransactionState::StateFlag terminationCause,
+    TerminationCause terminationCause,
     repl::ReadConcernArgs readConcernArgs) const {
     invariant(lockStats);
-    invariant(terminationCause == TransactionState::kCommitted ||
-              terminationCause == TransactionState::kAborted);
 
     StringBuilder s;
 
@@ -1593,7 +1610,7 @@ std::string TransactionParticipant::_transactionInfoForLog(
     s << singleTransactionStats.getOpDebug()->additiveMetrics.report();
 
     std::string terminationCauseString =
-        terminationCause == TransactionState::kCommitted ? "committed" : "aborted";
+        terminationCause == TerminationCause::kCommitted ? "committed" : "aborted";
     s << " terminationCause:" << terminationCauseString;
 
     auto tickSource = getGlobalServiceContext()->getTickSource();
@@ -1637,7 +1654,7 @@ std::string TransactionParticipant::_transactionInfoForLog(
 
 void TransactionParticipant::_logSlowTransaction(WithLock wl,
                                                  const SingleThreadedLockStats* lockStats,
-                                                 TransactionState::StateFlag terminationCause,
+                                                 TerminationCause terminationCause,
                                                  repl::ReadConcernArgs readConcernArgs) {
     // Only log multi-document transactions.
     if (!_txnState.isNone(wl)) {

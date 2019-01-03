@@ -122,8 +122,29 @@
         assert.commandWorked(directDB.adminCommand(
             {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
 
-        // TODO SERVER-36639: Ensure a transaction that has been aborted after being prepared cannot
-        // be restarted.
+        //
+        // Cannot restart a transaction that has been aborted after being prepared.
+        //
+
+        txnNumber++;
+        assert.commandWorked(directDB.runCommand({
+            find: collName,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            startTransaction: true
+        }));
+        assert.commandWorked(directDB.adminCommand(
+            {prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
+        assert.commandWorked(directDB.adminCommand(
+            {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
+
+        assert.commandFailedWithCode(directDB.runCommand({
+            find: collName,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            startTransaction: true
+        }),
+                                     50911);
     }
 
     const st = new ShardingTest({shards: 1, mongos: 1, config: 1});

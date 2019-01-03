@@ -1383,9 +1383,27 @@ protected:
             50911);
     }
 
-    // TODO SERVER-36639: Add tests that the active transaction number cannot be reused if the
-    // transaction is in the abort after prepare state (or any state indicating the participant
-    // has been involved in a two phase commit).
+    void cannotSpecifyStartTransactionOnAbortedPreparedTransaction() {
+        auto autocommit = false;
+        auto startTransaction = true;
+        auto sessionCheckout = checkOutSession();
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+
+        txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+        txnParticipant->prepareTransaction(opCtx(), {});
+        ASSERT(txnParticipant->transactionIsPrepared());
+
+        txnParticipant->abortActiveTransaction(opCtx());
+        ASSERT(txnParticipant->transactionIsAborted());
+
+        startTransaction = true;
+        ASSERT_THROWS_CODE(
+            txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
+            AssertionException,
+            50911);
+    }
 };
 
 /**
@@ -1424,6 +1442,10 @@ TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableW
     cannotSpecifyStartTransactionOnStartedRetryableWrite();
 }
 
+TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnAbortedPreparedTransaction) {
+    cannotSpecifyStartTransactionOnAbortedPreparedTransaction();
+}
+
 /**
  * Test fixture for a transaction participant running on a config server.
  */
@@ -1458,6 +1480,10 @@ TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnPreparedTxn) {
 
 TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableWrite) {
     cannotSpecifyStartTransactionOnStartedRetryableWrite();
+}
+
+TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnAbortedPreparedTransaction) {
+    cannotSpecifyStartTransactionOnAbortedPreparedTransaction();
 }
 
 TEST_F(TxnParticipantTest, KillSessionsDuringUnpreparedAbortSucceeds) {
