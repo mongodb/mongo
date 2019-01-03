@@ -33,6 +33,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 from abc import ABCMeta, abstractmethod
 import io
 import os
+import re
 import string
 import sys
 import textwrap
@@ -223,6 +224,12 @@ def _gen_field_usage_constant(field):
     # type: (ast.Field) -> unicode
     """Get the name for a bitset constant in field usage checking."""
     return "k%sBit" % (common.title_case(field.cpp_name))
+
+
+def _get_constant(name):
+    # type: (unicode) -> unicode
+    """Transform an arbitrary label to a constant name."""
+    return 'k' + re.sub(r'([^a-zA-Z0-9_]+)', '_', common.title_case(name))
 
 
 class _FastFieldUsageChecker(_FieldUsageCheckerBase):
@@ -736,7 +743,19 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-    def gen_extern_declaration(self, vartype, varname, condition):
+    def _gen_exported_constexpr(self, name, suffix, expr, condition):
+        # type: (unicode, unicode, ast.Expression, ast.Condition) -> None
+        """Generate exports for default initializer."""
+        if not (name and expr and expr.export):
+            return
+
+        with self._condition(condition, preprocessor_only=True):
+            self._writer.write_line('constexpr auto %s%s = %s;' % (_get_constant(name), suffix,
+                                                                   expr.expr))
+
+        self.write_empty_line()
+
+    def _gen_extern_declaration(self, vartype, varname, condition):
         # type: (unicode, unicode, ast.Condition) -> None
         """Generate externs for storage declaration."""
         if (vartype is None) or (varname is None):
@@ -886,9 +905,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
             for scp in spec.server_parameters:
-                self.gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
+                self._gen_exported_constexpr(scp.name, 'Default', scp.default, scp.condition)
+                self._gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
+
             for opt in spec.configs:
-                self.gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
+                self._gen_exported_constexpr(opt.name, 'Default', opt.default, opt.condition)
+                self._gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):

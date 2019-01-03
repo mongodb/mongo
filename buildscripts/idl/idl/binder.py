@@ -526,9 +526,11 @@ def _bind_expression(expr, allow_literal_string=True):
     if expr.literal is None:
         node.expr = expr.expr
         node.validate_constexpr = expr.is_constexpr
+        node.export = expr.is_constexpr
         return node
 
     node.validate_constexpr = False
+    node.export = True
 
     # bool
     if (expr.literal == "true") or (expr.literal == "false"):

@@ -36,7 +36,6 @@
 namespace mongo {
 namespace test {
 
-constexpr std::int32_t kStartupIntWithExpressionsDefault = 100;
 constexpr std::int32_t kStartupIntWithExpressionsMinimum = 10;
 constexpr std::int32_t kStartupIntWithExpressionsMaximum = 1000;
 

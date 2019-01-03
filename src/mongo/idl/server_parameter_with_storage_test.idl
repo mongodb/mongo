@@ -76,8 +76,15 @@ server_parameters:
     description: "Use of c++ expressions in default and validators"
     cpp_vartype: "std::int32_t"
     cpp_varname: gStartupIntWithExpressions
-    default: { expr: kStartupIntWithExpressionsDefault }
+    default: 100
     validator:
         gte: { expr: kStartupIntWithExpressionsMinimum, is_constexpr: false }
         lte: { expr: kStartupIntWithExpressionsMaximum, is_constexpr: true }
+
+  'ugly complicated-name.sp':
+    set_at: startup
+    description: "Verify exported symbols are properly reformatted"
+    cpp_vartype: bool
+    cpp_varname: gUglyComplicatedNameSp
+    default: true
 

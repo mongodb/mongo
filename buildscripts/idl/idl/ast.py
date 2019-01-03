@@ -118,6 +118,7 @@ class Expression(common.SourceLocation):
         """Construct an Expression."""
         self.expr = None  # type: unicode
         self.validate_constexpr = True  # type: bool
+        self.export = False  # type: bool
 
         super(Expression, self).__init__(file_name, line, column)
 

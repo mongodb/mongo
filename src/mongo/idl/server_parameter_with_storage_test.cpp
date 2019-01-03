@@ -258,5 +258,12 @@ TEST(IDLServerParameterWithStorage, startupIntWithExpressions) {
     ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsMaximum);
 }
 
+TEST(IDLServerParameterWithStorage, exportedDefaults) {
+    ASSERT_EQ(test::kStdIntPreallocatedDefault, 11);
+    ASSERT_EQ(test::kStdIntDeclaredDefault, 42);
+    ASSERT_EQ(test::kStartupIntWithExpressionsDefault, 100);
+    ASSERT_EQ(test::kUgly_complicated_name_spDefault, true);
+}
+
 }  // namespace
 }  // namespace mongo
