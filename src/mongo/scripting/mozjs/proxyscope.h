@@ -35,9 +35,9 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 namespace mozjs {
@@ -51,7 +51,7 @@ class MozJSImplScope;
  * implementation scope from multiple threads.
  *
  * In terms of implementation, it does most of it's heavy lifting through a
- * stdx::function. The proxy scope owns an implementation scope transitively
+ * unique_function. The proxy scope owns an implementation scope transitively
  * through the thread it owns. They communicate by setting a variable, then
  * signaling each other. That communication has to work, there's no fallback
  * for timing out.
@@ -174,15 +174,16 @@ public:
 
     ScriptingFunction _createFunction(const char* code) override;
 
-    OperationContext* getOpContext() const;
-
     void interrupt();
 
 private:
     template <typename Closure>
     void run(Closure&& closure);
 
-    void runOnImplThread(stdx::function<void()> f);
+    template <typename Closure>
+    void runWithoutInterruption(Closure&& closure);
+
+    void runOnImplThread(unique_function<void()> f);
 
     void shutdownThread();
     static void implThread(void* proxy);
@@ -195,9 +196,10 @@ private:
      * function invocation and exception handling
      */
     stdx::mutex _mutex;
-    stdx::function<void()> _function;
+    unique_function<void()> _function;
     State _state;
     Status _status;
+    OperationContext* _opCtx = nullptr;
 
     stdx::condition_variable _condvar;
     PRThread* _thread;

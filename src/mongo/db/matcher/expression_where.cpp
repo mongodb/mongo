@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/scopeguard.h"
 
 
 namespace mongo {
@@ -67,6 +68,8 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
     _scope = getGlobalScriptEngine()->getPooledScope(_opCtx, _dbName, "where" + userToken);
+    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
+
     _func = _scope->createFunction(getCode().c_str());
 
     uassert(ErrorCodes::BadValue, "$where compile error", _func);
@@ -75,6 +78,9 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
 bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
     uassert(28692, "$where compile error", _func);
     BSONObj obj = doc->toBSON();
+
+    _scope->registerOperation(Client::getCurrent()->getOperationContext());
+    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
 
     if (!getScope().isEmpty()) {
         _scope->init(&getScope());

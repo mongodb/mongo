@@ -62,6 +62,9 @@ using std::vector;
 
 namespace JSTests {
 
+using ScopeFactory = Scope* (ScriptEngine::*)();
+
+template <ScopeFactory scopeFactory>
 class BuiltinTests {
 public:
     void run() {
@@ -70,11 +73,12 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class BasicScope {
 public:
     void run() {
         unique_ptr<Scope> s;
-        s.reset(getGlobalScriptEngine()->newScope());
+        s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         s->setNumber("x", 5);
         ASSERT(5 == s->getNumber("x"));
@@ -93,12 +97,13 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ResetScope {
 public:
     void run() {
         /* Currently reset does not clear data in v8 or spidermonkey scopes.  See SECURITY-10
         unique_ptr<Scope> s;
-        s.reset( getGlobalScriptEngine()->newScope() );
+        s.reset( (getGlobalScriptEngine()->*scopeFactory)() );
 
         s->setBoolean( "x" , true );
         ASSERT( s->getBoolean( "x" ) );
@@ -109,12 +114,13 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class FalseTests {
 public:
     void run() {
         // Test falsy javascript values
         unique_ptr<Scope> s;
-        s.reset(getGlobalScriptEngine()->newScope());
+        s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         ASSERT(!s->getBoolean("notSet"));
 
@@ -133,10 +139,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class SimpleFunctions {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invoke("x=5;", 0, 0);
         ASSERT(5 == s->getNumber("x"));
@@ -198,10 +205,11 @@ private:
 };
 
 /** Error logging in Scope::exec(). */
+template <ScopeFactory scopeFactory>
 class ExecLogError {
 public:
     void run() {
-        unique_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // No error is logged when reportError == false.
         ASSERT(!scope->exec("notAFunction()", "foo", false, false, false));
@@ -229,10 +237,11 @@ private:
 };
 
 /** Error logging in Scope::invoke(). */
+template <ScopeFactory scopeFactory>
 class InvokeLogError {
 public:
     void run() {
-        unique_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // No error is logged for a valid statement.
         ASSERT_EQUALS(0, scope->invoke("validStatement = true", 0, 0));
@@ -259,10 +268,11 @@ private:
     LogRecordingScope _logger;
 };
 
+template <ScopeFactory scopeFactory>
 class ObjectMapping {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj o = BSON("x" << 17.0 << "y"
                              << "eliot"
@@ -316,10 +326,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ObjectDecoding {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invoke("z = { num : 1 };", 0, 0);
         BSONObj out = s->getObject("z");
@@ -338,11 +349,12 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class JSOIDTests {
 public:
     void run() {
 #ifdef MOZJS
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->localConnect("blah");
 
@@ -370,10 +382,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class SetImplicit {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj o = BSON("foo"
                          << "bar");
@@ -392,10 +405,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ObjectModReadonlyTests {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj o = BSON("x" << 17 << "y"
                              << "eliot"
@@ -430,10 +444,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class OtherJSTypes {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         {
             // date
@@ -527,10 +542,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class SpecialDBTypes {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObjBuilder b;
         b.appendTimestamp("a", 123456789);
@@ -561,10 +577,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class TypeConservation {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         //  --  A  --
 
@@ -659,10 +676,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NumberLong {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         BSONObjBuilder b;
         long long val = (long long)(0xbabadeadbeefbaddULL);
         b.append("a", val);
@@ -718,10 +736,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NumberLong2 {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj in;
         {
@@ -745,10 +764,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NumberLongUnderLimit {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObjBuilder b;
         // limit is 2^53
@@ -791,10 +811,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NumberDecimal {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         BSONObjBuilder b;
         Decimal128 val = Decimal128("2.010");
         b.append("a", val);
@@ -820,19 +841,21 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NumberDecimalGetFromScope {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         ASSERT(s->exec("a = 5;", "a", false, true, false));
         ASSERT_TRUE(Decimal128(5).isEqual(s->getNumberDecimal("a")));
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NumberDecimalBigObject {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj in;
         {
@@ -856,10 +879,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class MaxTimestamp {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         // Timestamp 't' component can exceed max for int32_t.
         BSONObj in;
@@ -877,6 +901,7 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class WeirdObjects {
 public:
     BSONObj build(int depth) {
@@ -888,7 +913,7 @@ public:
     }
 
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         for (int i = 5; i < 100; i += 10) {
             s->setObject("a", build(i), false);
@@ -903,10 +928,11 @@ public:
 /**
  * Test exec() timeout value terminates execution (SERVER-8053)
  */
+template <ScopeFactory scopeFactory>
 class ExecTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // assert timeout occurred
         ASSERT(!scope->exec("var a = 1; while (true) { ; }", "ExecTimeout", false, true, false, 1));
@@ -916,10 +942,11 @@ public:
 /**
  * Test exec() timeout value terminates execution (SERVER-8053)
  */
+template <ScopeFactory scopeFactory>
 class ExecNoTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // assert no timeout occurred
         ASSERT(scope->exec("var a = function() { return 1; }",
@@ -934,10 +961,11 @@ public:
 /**
  * Test invoke() timeout value terminates execution (SERVER-8053)
  */
+template <ScopeFactory scopeFactory>
 class InvokeTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // scope timeout after 500ms
         bool caught = false;
@@ -956,22 +984,18 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class SleepInterruption {
 public:
     void run() {
-        std::shared_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
-
-        auto sleep = makePromiseFuture<void>();
-        auto awakened = makePromiseFuture<void>();
+        auto scopePF = makePromiseFuture<Scope*>();
+        auto awakenedPF = makePromiseFuture<void>();
 
         // Spawn a thread which attempts to sleep indefinitely.
-        stdx::thread([
-            preSleep = std::move(sleep.promise),
-            onAwake = std::move(awakened.promise),
-            scope
-        ]() mutable {
-            preSleep.emplaceValue();
-            onAwake.setWith([&] {
+        stdx::thread thread([&] {
+            std::unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+            scopePF.promise.emplaceValue(scope.get());
+            awakenedPF.promise.setWith([&] {
                 scope->exec(
                     ""
                     "  try {"
@@ -985,10 +1009,10 @@ public:
                     false,
                     true);
             });
-        }).detach();
+        });
 
         // Wait until just before the sleep begins.
-        sleep.future.get();
+        auto scope = scopePF.future.get();
 
         // Attempt to wait until Javascript enters the sleep.
         // It's OK if we kill the function prematurely, before it begins sleeping. Either cause of
@@ -999,18 +1023,21 @@ public:
         scope->kill();
 
         // Wait for the error.
-        auto result = awakened.future.getNoThrow();
+        auto result = awakenedPF.future.getNoThrow();
         ASSERT_EQ(ErrorCodes::Interrupted, result);
+
+        thread.join();
     }
 };
 
 /**
  * Test invoke() timeout value does not terminate execution (SERVER-8053)
  */
+template <ScopeFactory scopeFactory>
 class InvokeNoTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // invoke completes before timeout
         scope->invokeSafe(
@@ -1024,6 +1051,7 @@ public:
 };
 
 
+template <ScopeFactory scopeFactory>
 class Utf8Check {
 public:
     Utf8Check() {
@@ -1059,6 +1087,7 @@ private:
 };
 
 
+template <ScopeFactory scopeFactory>
 class BinDataType {
 public:
     void pp(const char* s, BSONElement e) {
@@ -1072,7 +1101,7 @@ public:
     }
 
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         const char* foo = "asdas\0asdasd";
         const char* base64 = "YXNkYXMAYXNkYXNk";
@@ -1119,10 +1148,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class VarTests {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         ASSERT(s->exec("a = 5;", "a", false, true, false));
         ASSERT_EQUALS(5, s->getNumber("a"));
@@ -1132,6 +1162,7 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class Speed1 {
 public:
     void run() {
@@ -1139,7 +1170,7 @@ public:
         BSONObj empty;
 
         unique_ptr<Scope> s;
-        s.reset(getGlobalScriptEngine()->newScope());
+        s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         ScriptingFunction f = s->createFunction("return this.x + 6;");
 
@@ -1153,11 +1184,12 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ScopeOut {
 public:
     void run() {
         unique_ptr<Scope> s;
-        s.reset(getGlobalScriptEngine()->newScope());
+        s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invokeSafe("x = 5;", 0, 0);
         {
@@ -1179,11 +1211,12 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class RenameTest {
 public:
     void run() {
         unique_ptr<Scope> s;
-        s.reset(getGlobalScriptEngine()->newScope());
+        s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         s->setNumber("x", 5);
         ASSERT_EQUALS(5, s->getNumber("x"));
@@ -1204,13 +1237,14 @@ public:
  * spidermonkey by looking like non-double type puns.  This verifies that we put that particular
  * interesting nan in and that we still get a nan out.
  */
+template <ScopeFactory scopeFactory>
 class NovelNaN {
 public:
     void run() {
         uint8_t bits[] = {
             16, 0, 0, 0, 0x01, 'a', '\0', 0x61, 0x79, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
         };
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->setObject("val", BSONObj(reinterpret_cast<char*>(bits)).getOwned());
 
@@ -1219,10 +1253,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class NoReturnSpecified {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invoke("x=5;", 0, 0);
         ASSERT_EQUALS(5, s->getNumber("__returnValue"));
@@ -1265,6 +1300,7 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class RecursiveInvoke {
 public:
     static BSONObj callback(const BSONObj& args, void* data) {
@@ -1276,7 +1312,7 @@ public:
     }
 
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->injectNative("foo", callback, s.get());
         s->invoke("var x = 1; foo();", 0, 0);
@@ -1284,10 +1320,11 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ErrorCodeFromInvoke {
 public:
     void run() {
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         {
             bool threwException = false;
@@ -1321,6 +1358,7 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ErrorWithSidecarFromInvoke {
 public:
     void run() {
@@ -1329,7 +1367,7 @@ public:
             return {};
         };
 
-        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->injectNative("foo", sidecarThrowingFunc);
 
@@ -1340,6 +1378,7 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class RequiresOwnedObjects {
 public:
     void run() {
@@ -1352,14 +1391,14 @@ public:
 
         // Ensure that by default we can bind owned and unowned
         {
-            unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+            unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
             s->setObject("unowned", unowned, true);
             s->setObject("owned", owned, true);
         }
 
         // After we set the flag, we should only be able to set owned
         {
-            unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+            unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
             s->requireOwnedObjects();
             s->setObject("owned", owned, true);
 
@@ -1383,6 +1422,7 @@ public:
     }
 };
 
+template <ScopeFactory scopeFactory>
 class ConvertShardKeyToHashed {
 public:
     void check(shared_ptr<Scope> s, const mongo::BSONObj& o) {
@@ -1430,7 +1470,7 @@ public:
     }
 
     void run() {
-        shared_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        shared_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         shell_utils::installShellUtils(*s);
 
         // Check a few elementary objects
@@ -1470,53 +1510,59 @@ class All : public Suite {
 public:
     All() : Suite("js") {}
 
+    template <ScopeFactory scopeFactory>
+    void setupTestsWithScopeFactory() {
+        add<BuiltinTests<scopeFactory>>();
+        add<BasicScope<scopeFactory>>();
+        add<ResetScope<scopeFactory>>();
+        add<FalseTests<scopeFactory>>();
+        add<SimpleFunctions<scopeFactory>>();
+        add<ExecLogError<scopeFactory>>();
+        add<InvokeLogError<scopeFactory>>();
+        add<ExecTimeout<scopeFactory>>();
+        add<ExecNoTimeout<scopeFactory>>();
+        add<InvokeTimeout<scopeFactory>>();
+        add<SleepInterruption<scopeFactory>>();
+        add<InvokeNoTimeout<scopeFactory>>();
+
+        add<ObjectMapping<scopeFactory>>();
+        add<ObjectDecoding<scopeFactory>>();
+        add<JSOIDTests<scopeFactory>>();
+        add<SetImplicit<scopeFactory>>();
+        add<ObjectModReadonlyTests<scopeFactory>>();
+        add<OtherJSTypes<scopeFactory>>();
+        add<SpecialDBTypes<scopeFactory>>();
+        add<TypeConservation<scopeFactory>>();
+        add<NumberLong<scopeFactory>>();
+        add<NumberLong2<scopeFactory>>();
+
+        add<NumberDecimal<scopeFactory>>();
+        add<NumberDecimalGetFromScope<scopeFactory>>();
+        add<NumberDecimalBigObject<scopeFactory>>();
+
+        add<MaxTimestamp<scopeFactory>>();
+        add<RenameTest<scopeFactory>>();
+
+        add<WeirdObjects<scopeFactory>>();
+        add<BinDataType<scopeFactory>>();
+
+        add<VarTests<scopeFactory>>();
+        add<Speed1<scopeFactory>>();
+        add<Utf8Check<scopeFactory>>();
+        add<ScopeOut<scopeFactory>>();
+        add<NovelNaN<scopeFactory>>();
+        add<NoReturnSpecified<scopeFactory>>();
+
+        add<RecursiveInvoke<scopeFactory>>();
+        add<ErrorCodeFromInvoke<scopeFactory>>();
+        add<ErrorWithSidecarFromInvoke<scopeFactory>>();
+        add<RequiresOwnedObjects<scopeFactory>>();
+        add<ConvertShardKeyToHashed<scopeFactory>>();
+    }
+
     void setupTests() {
-        add<BuiltinTests>();
-        add<BasicScope>();
-        add<ResetScope>();
-        add<FalseTests>();
-        add<SimpleFunctions>();
-        add<ExecLogError>();
-        add<InvokeLogError>();
-        add<ExecTimeout>();
-        add<ExecNoTimeout>();
-        add<InvokeTimeout>();
-        add<SleepInterruption>();
-        add<InvokeNoTimeout>();
-
-        add<ObjectMapping>();
-        add<ObjectDecoding>();
-        add<JSOIDTests>();
-        add<SetImplicit>();
-        add<ObjectModReadonlyTests>();
-        add<OtherJSTypes>();
-        add<SpecialDBTypes>();
-        add<TypeConservation>();
-        add<NumberLong>();
-        add<NumberLong2>();
-
-        add<NumberDecimal>();
-        add<NumberDecimalGetFromScope>();
-        add<NumberDecimalBigObject>();
-
-        add<MaxTimestamp>();
-        add<RenameTest>();
-
-        add<WeirdObjects>();
-        add<BinDataType>();
-
-        add<VarTests>();
-        add<Speed1>();
-        add<Utf8Check>();
-        add<ScopeOut>();
-        add<NovelNaN>();
-        add<NoReturnSpecified>();
-
-        add<RecursiveInvoke>();
-        add<ErrorCodeFromInvoke>();
-        add<ErrorWithSidecarFromInvoke>();
-        add<RequiresOwnedObjects>();
-        add<ConvertShardKeyToHashed>();
+        setupTestsWithScopeFactory<&ScriptEngine::newScope>();
+        setupTestsWithScopeFactory<&ScriptEngine::newScopeForCurrentThread>();
     }
 };
 

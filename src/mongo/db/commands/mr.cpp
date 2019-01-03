@@ -253,7 +253,6 @@ void JSMapper::map(const BSONObj& o) {
 BSONObj JSFinalizer::finalize(const BSONObj& o) {
     Scope* s = _func.scope();
 
-    Scope::NoDBAccess no = s->disableDBAccess("can't access db inside finalize");
     s->invokeSafe(_func.func(), &o, 0);
 
     // We don't want to use o.objsize() to size b since there are many cases where the point of

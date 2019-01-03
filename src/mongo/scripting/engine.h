@@ -191,20 +191,6 @@ public:
         return _lastRetIsNativeCode;
     }
 
-    class NoDBAccess {
-        Scope* _s;
-
-    public:
-        NoDBAccess(Scope* s) : _s(s) {}
-        ~NoDBAccess() {
-            _s->rename("____db____", "db");
-        }
-    };
-    NoDBAccess disableDBAccess(const char* why) {
-        rename("db", "____db____");
-        return NoDBAccess(this);
-    }
-
 protected:
     friend class PooledScope;
 

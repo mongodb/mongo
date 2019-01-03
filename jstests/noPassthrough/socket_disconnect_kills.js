@@ -134,6 +134,29 @@
         [[checkClosedEarly, runCommand({find: "test", filter: {}})],
          [
            checkClosedEarly,
+           runCommand({
+               find: "test",
+               filter: {
+                   $where: function() {
+                       sleep(100000);
+                   }
+               }
+           })
+         ],
+         [
+           checkClosedEarly,
+           runCommand({
+               find: "test",
+               filter: {
+                   $where: function() {
+                       while (true) {
+                       }
+                   }
+               }
+           })
+         ],
+         [
+           checkClosedEarly,
            function(client) {
                client.forceReadMode("legacy");
                assert(client.getDB(testName).test.findOne({}));

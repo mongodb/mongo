@@ -39,6 +39,7 @@
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 
@@ -66,7 +67,7 @@ MozJSProxyScope::MozJSProxyScope(MozJSScriptEngine* engine)
     // Test the child on startup to make sure it's awake and that the
     // implementation scope sucessfully constructed.
     try {
-        runOnImplThread([] {});
+        run([] {});
     } catch (...) {
         shutdownThread();
         throw;
@@ -82,7 +83,8 @@ void MozJSProxyScope::init(const BSONObj* data) {
 }
 
 void MozJSProxyScope::reset() {
-    run([&] { _implScope->reset(); });
+    unregisterOperation();
+    runWithoutInterruption([&] { _implScope->reset(); });
 }
 
 bool MozJSProxyScope::isKillPending() const {
@@ -90,11 +92,11 @@ bool MozJSProxyScope::isKillPending() const {
 }
 
 void MozJSProxyScope::registerOperation(OperationContext* opCtx) {
-    run([&] { _implScope->registerOperation(opCtx); });
+    _opCtx = opCtx;
 }
 
 void MozJSProxyScope::unregisterOperation() {
-    run([&] { _implScope->unregisterOperation(); });
+    _opCtx = nullptr;
 }
 
 void MozJSProxyScope::externalSetup() {
@@ -103,13 +105,13 @@ void MozJSProxyScope::externalSetup() {
 
 std::string MozJSProxyScope::getError() {
     std::string out;
-    run([&] { out = _implScope->getError(); });
+    runWithoutInterruption([&] { out = _implScope->getError(); });
     return out;
 }
 
 bool MozJSProxyScope::hasOutOfMemoryException() {
     bool out;
-    run([&] { out = _implScope->hasOutOfMemoryException(); });
+    runWithoutInterruption([&] { out = _implScope->hasOutOfMemoryException(); });
     return out;
 }
 
@@ -118,11 +120,11 @@ void MozJSProxyScope::gc() {
 }
 
 void MozJSProxyScope::advanceGeneration() {
-    run([&] { _implScope->advanceGeneration(); });
+    runWithoutInterruption([&] { _implScope->advanceGeneration(); });
 }
 
 void MozJSProxyScope::requireOwnedObjects() {
-    run([&] { _implScope->requireOwnedObjects(); });
+    runWithoutInterruption([&] { _implScope->requireOwnedObjects(); });
 }
 
 double MozJSProxyScope::getNumber(const char* field) {
@@ -240,10 +242,6 @@ ScriptingFunction MozJSProxyScope::_createFunction(const char* raw) {
     return out;
 }
 
-OperationContext* MozJSProxyScope::getOpContext() const {
-    return _implScope->getOpContext();
-}
-
 void MozJSProxyScope::kill() {
     _implScope->kill();
 }
@@ -255,7 +253,7 @@ void MozJSProxyScope::interrupt() {
 /**
  * Invokes a function on the implementation thread
  *
- * It does this by serializing the invocation through a stdx::function and
+ * It does this by serializing the invocation through a unique_function and
  * capturing any exceptions through _status.
  *
  * We transition:
@@ -276,7 +274,18 @@ void MozJSProxyScope::run(Closure&& closure) {
     runOnImplThread(std::move(closure));
 }
 
-void MozJSProxyScope::runOnImplThread(stdx::function<void()> f) {
+template <typename Closure>
+void MozJSProxyScope::runWithoutInterruption(Closure&& closure) {
+    auto toRun = [&] { run(std::forward<Closure>(closure)); };
+
+    if (_opCtx) {
+        return _opCtx->runWithoutInterruption(toRun);
+    } else {
+        return toRun();
+    }
+}
+
+void MozJSProxyScope::runOnImplThread(unique_function<void()> f) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _function = std::move(f);
 
@@ -285,7 +294,18 @@ void MozJSProxyScope::runOnImplThread(stdx::function<void()> f) {
 
     _condvar.notify_one();
 
-    _condvar.wait(lk, [this] { return _state == State::ImplResponse; });
+    Interruptible* interruptible = _opCtx ? _opCtx : Interruptible::notInterruptible();
+
+    auto pred = [&] { return _state == State::ImplResponse; };
+
+    try {
+        interruptible->waitForConditionOrInterrupt(_condvar, lk, pred);
+    } catch (const DBException& ex) {
+        _status = ex.toStatus();
+
+        _implScope->kill();
+        _condvar.wait(lk, pred);
+    }
 
     _state = State::Idle;
 
@@ -359,6 +379,8 @@ void MozJSProxyScope::implThread(void* arg) {
             break;
 
         try {
+            lk.unlock();
+            const auto unlockGuard = makeGuard([&] { lk.lock(); });
             proxy->_function();
         } catch (...) {
             proxy->_status = exceptionToStatus();
