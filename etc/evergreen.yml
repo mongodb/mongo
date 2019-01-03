@@ -3078,7 +3078,7 @@ functions:
       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
       # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
       - key: ssh_connection_options
-        value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ConnectionAttempts=20
+        value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ConnectionAttempts=20
       - key: ssh_retries
         value: "10"
       - key: set_sudo

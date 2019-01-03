@@ -1749,7 +1749,7 @@ Examples:
     default_ssh_connection_options = ("-o ServerAliveCountMax=10"
                                       " -o ServerAliveInterval=6"
                                       " -o StrictHostKeyChecking=no"
-                                      " -o ConnectTimeout=10"
+                                      " -o ConnectTimeout=30"
                                       " -o ConnectionAttempts=20")
     test_options.add_option("--sshConnection", dest="ssh_connection_options",
                             help="Server ssh additional connection options, i.e., '-i ident.pem'"
@@ -2234,9 +2234,12 @@ Examples:
     ssh_user, ssh_host = get_user_host(ssh_user_host)
     mongod_host = ssh_host
 
-    ssh_connection_options = "{} {}".format(default_ssh_connection_options,
-                                            options.ssh_connection_options
-                                            if options.ssh_connection_options else "")
+    # As described in http://man7.org/linux/man-pages/man5/ssh_config.5.html, ssh uses the value of
+    # the first occurrence for each parameter, so we have the default connection options follow the
+    # user-specified --sshConnection options.
+    ssh_connection_options = "{} {}".format(options.ssh_connection_options
+                                            if options.ssh_connection_options else "",
+                                            default_ssh_connection_options)
     # For remote operations requiring sudo, force pseudo-tty allocation,
     # see https://stackoverflow.com/questions/10310299/proper-way-to-sudo-over-ssh.
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
