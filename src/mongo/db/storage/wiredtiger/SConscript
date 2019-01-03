@@ -157,7 +157,6 @@ if wiredtiger:
     wtEnv.Library(
         target='additional_wiredtiger_record_store_tests',
         source=[
-            'record_store_test_oplog.cpp',
             'wiredtiger_record_store_test.cpp',
         ],
         LIBDEPS=[

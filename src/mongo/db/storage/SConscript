@@ -169,6 +169,7 @@ env.Library(
         'record_store_test_deleterecord.cpp',
         'record_store_test_harness.cpp',
         'record_store_test_insertrecord.cpp',
+        'record_store_test_oplog.cpp',
         'record_store_test_randomiter.cpp',
         'record_store_test_recorditer.cpp',
         'record_store_test_recordstore.cpp',

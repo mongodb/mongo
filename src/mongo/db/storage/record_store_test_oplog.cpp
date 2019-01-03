@@ -64,8 +64,11 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     return res.getValue();
 }
 
-TEST(RecordStore_Oplog, OplogHack) {
+TEST(RecordStoreTestHarness, OplogHack) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
+    if (!harnessHelper->supportsDocLocking())
+        return;
+
     // Use a large enough cappedMaxSize so that the limit is not reached by doing the inserts within
     // the test itself.
     const int64_t cappedMaxSize = 10 * 1024;  // 10KB
@@ -157,8 +160,11 @@ TEST(RecordStore_Oplog, OplogHack) {
     }
 }
 
-TEST(RecordStore_Oplog, OplogHackOnNonOplog) {
+TEST(RecordStoreTestHarness, OplogHackOnNonOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
+    if (!harnessHelper->supportsDocLocking())
+        return;
+
     std::unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore("local.NOT_oplog.foo"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -174,8 +180,11 @@ TEST(RecordStore_Oplog, OplogHackOnNonOplog) {
 }
 
 
-TEST(RecordStore_Oplog, OplogOrder) {
+TEST(RecordStoreTestHarness, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    if (!harnessHelper->supportsDocLocking())
+        return;
+
     std::unique_ptr<RecordStore> rs(
         harnessHelper->newCappedRecordStore("local.oplog.rs", 100000, -1));
 
