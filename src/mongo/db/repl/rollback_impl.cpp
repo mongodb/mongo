@@ -64,6 +64,9 @@ namespace mongo {
 namespace repl {
 namespace {
 
+// Used to set RollbackImpl::_newCounts to force a collection scan to fix count.
+constexpr long long kCollectionScanRequired = -1;
+
 RollbackImpl::Listener kNoopListener;
 
 // Control whether or not the server will write out data files containing deleted documents during
@@ -447,7 +450,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
         invariant(!ident.empty(),
                   str::stream() << "The collection with UUID " << uuid << " has no ident.");
 
-        const auto newCount = uiCount.second;
+        auto newCount = uiCount.second;
         // If the collection is marked for size adjustment, then we made sure the collection size
         // was accurate at the stable timestamp and we can trust replication recovery to keep it
         // correct. This is necessary for capped collections whose deletions will be untracked
@@ -458,6 +461,36 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                    << uuid.toString() << ") [" << ident
                    << "] because it is marked for size adjustment.";
             continue;
+        }
+
+        // If _findRecordStoreCounts() is unable to determine the correct count from the oplog
+        // (most likely due to a 4.0 drop oplog entry without the count information), we will
+        // determine the correct count here post-recovery using a collection scan.
+        if (kCollectionScanRequired == newCount) {
+            log() << "Scanning collection " << nss.ns() << " (" << uuid.toString()
+                  << ") to fix collection count.";
+            AutoGetCollectionForRead autoCollToScan(opCtx, nss);
+            auto collToScan = autoCollToScan.getCollection();
+            invariant(coll == collToScan,
+                      str::stream() << "Catalog returned invalid collection: " << nss.ns() << " ("
+                                    << uuid.toString()
+                                    << ")");
+            auto exec = collToScan->makePlanExecutor(
+                opCtx, PlanExecutor::INTERRUPT_ONLY, Collection::ScanDirection::kForward);
+            long long countFromScan = 0;
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(nullptr, nullptr))) {
+                ++countFromScan;
+            }
+            if (PlanExecutor::IS_EOF != state) {
+                // We ignore errors here because crashing or leaving rollback would only leave
+                // collection counts more inaccurate.
+                warning() << "Failed to set count of " << nss.ns() << " (" << uuid.toString()
+                          << ") [" << ident
+                          << "] due to failed collection scan: " << exec->statestr(state);
+                continue;
+            }
+            newCount = countFromScan;
         }
 
         auto status =
@@ -493,10 +526,8 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().
-        // TODO(SERVER-38548): The collection count is fixed as we rebuild the _id index coming out
-        // of rollback in catalog::openCatalog(). When idents for index drops are managed by the
-        // storage engine, we cannot depend on index rebuilds to fix the collection counts.
         if (nss.isEmpty() && storageEngine->supportsPendingDrops()) {
+            _newCounts[uuid] = kCollectionScanRequired;
             continue;
         }
 
