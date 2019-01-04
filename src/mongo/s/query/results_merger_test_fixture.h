@@ -32,6 +32,7 @@
 
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 
@@ -240,6 +241,13 @@ protected:
         remoteCursor.setHostAndPort(std::move(host));
         remoteCursor.setCursorResponse(std::move(response));
         return remoteCursor;
+    }
+
+    ClockSourceMock* getMockClockSource() {
+        ClockSourceMock* mockClock = dynamic_cast<ClockSourceMock*>(
+            operationContext()->getServiceContext()->getPreciseClockSource());
+        invariant(mockClock);
+        return mockClock;
     }
 };
 

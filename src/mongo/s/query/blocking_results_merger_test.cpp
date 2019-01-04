@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/query/find_common.h"
 #include "mongo/s/query/blocking_results_merger.h"
 #include "mongo/s/query/results_merger_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -53,6 +54,11 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilKilled) {
 }
 
 TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilDeadlineExpires) {
+    // Set the deadline to be two seconds in the future. We always test that the deadline
+    // expires, so there's no racing.
+    awaitDataState(operationContext()).waitForInsertsDeadline =
+        getMockClockSource()->now() + Milliseconds{2000};
+
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
@@ -63,14 +69,30 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilDeadlineExpires) {
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
     auto future = launchAsync([&]() {
-        auto next = unittest::assertGet(
-            blockingMerger.next(operationContext(), RouterExecStage::ExecContext::kInitialFind));
+        // Pass kGetMoreNoResultsYet so that the BRM will block and not just
+        // return an empty batch immediately.
+        auto next = unittest::assertGet(blockingMerger.next(
+            operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
 
-        // The timeout should hit, and return an empty object.
+        // The timeout should hit, and return EOF.
         ASSERT_TRUE(next.isEOF());
     });
 
+    // Wait for a bit. Hopefully the other thread will be waiting for the clock to advance.
+    // If not, we just advance the clock now, and when the other thread gets to that point
+    // it will see that "now" has passed the deadline.
+    sleepsecs(1);
+
+    getMockClockSource()->advance(Milliseconds{3000});
+
     future.timed_get(kFutureTimeout);
+
+    // Answer the getMore, so that there are no more outstanding requests.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return CursorResponse(kTestNss, 0LL, {BSONObj()})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
     blockingMerger.kill(operationContext());
 }
 
@@ -106,6 +128,12 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReady) {
 }
 
 TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDeadline) {
+    // Set the deadline to be two seconds in the future. We always test that the deadline
+    // expires, so there's no racing.
+    awaitDataState(operationContext()).waitForInsertsDeadline =
+        operationContext()->getServiceContext()->getPreciseClockSource()->now() +
+        Milliseconds{2000};
+
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
@@ -114,21 +142,31 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
     BlockingResultsMerger blockingMerger(
         operationContext(), std::move(params), executor(), nullptr);
 
+    // Will schedule a getMore. No one will send a response in time, so will return EOF.
+    auto future = launchAsync([&]() {
+        auto next = unittest::assertGet(blockingMerger.next(
+            operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // Wait for a bit. Hopefully the other thread will be waiting for the clock to advance.
+    // If not, we just advance the clock now, and when the other thread gets to that point
+    // it will see that "now" has passed the deadline.
+    sleepsecs(1);
+    getMockClockSource()->advance(Milliseconds{3000});
+
+    future.timed_get(kFutureTimeout);
+
     // Used for synchronizing the background thread with this thread.
     stdx::mutex mutex;
     stdx::unique_lock<stdx::mutex> lk(mutex);
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
-    auto future = launchAsync([&]() {
-        // Will schedule a getMore. No one will send a response, so will return EOF.
-        auto next = unittest::assertGet(blockingMerger.next(
-            operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
-        ASSERT_TRUE(next.isEOF());
-
+    future = launchAsync([&]() {
         // Block until the main thread has responded to the getMore.
         stdx::unique_lock<stdx::mutex> lk(mutex);
 
-        next = unittest::assertGet(blockingMerger.next(
+        auto next = unittest::assertGet(blockingMerger.next(
             operationContext(), RouterExecStage::ExecContext::kGetMoreNoResultsYet));
         ASSERT_FALSE(next.isEOF());
         ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
