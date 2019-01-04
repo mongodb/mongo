@@ -357,10 +357,12 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode pe
 void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     CollectionOptions options;
     options.temp = true;
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     fassert(40154, _storageInterface->createCollection(opCtx, _nss, options));
 }
 
 void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     fassert(40155, _storageInterface->dropCollection(opCtx, _nss));
 }
 

@@ -158,7 +158,13 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
             const auto& nss = opTimeAndNamespace.second;
             log() << "Completing collection drop for " << nss << " with drop optime " << dropOpTime
                   << " (notification optime: " << opTime << ")";
-            auto status = _storageInterface->dropCollection(opCtx, nss);
+            Status status = Status::OK();
+            try {
+                // dropCollection could throw an interrupt exception, since it acquires db locks.
+                status = _storageInterface->dropCollection(opCtx, nss);
+            } catch (...) {
+                status = exceptionToStatus();
+            }
             if (!status.isOK()) {
                 warning() << "Failed to remove drop-pending collection " << nss
                           << " with drop optime " << dropOpTime
