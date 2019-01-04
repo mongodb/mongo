@@ -145,27 +145,23 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
     _state = CoordinatorState::kPreparing;
     const auto participantShards = doc.getParticipants();
 
-    if (!doc.getDecision()) {
-        _runPhaseOne(participantShards)
-            .then([this, participantShards](CoordinatorCommitDecision decision) {
-                return _runPhaseTwo(participantShards, decision);
-            })
-            .getAsync([this](Status s) { _handleCompletionStatus(s); });
-        return;
-    }
+    // Helper lambda to get the decision either from the document passed in or from the participants
+    // (by performing 'phase one' of two-phase commit).
+    auto getDecision = [&]() -> Future<CoordinatorCommitDecision> {
+        if (!doc.getDecision()) {
+            return _runPhaseOne(participantShards);
+        } else {
+            return (*doc.getDecision() == "commit")
+                ? CoordinatorCommitDecision{txn::CommitDecision::kCommit, *doc.getCommitTimestamp()}
+                : CoordinatorCommitDecision{txn::CommitDecision::kAbort, boost::none};
+        }
+    };
 
-    CoordinatorCommitDecision decision;
-
-    if (*doc.getDecision() == "commit") {
-        decision =
-            CoordinatorCommitDecision{txn::CommitDecision::kCommit, *doc.getCommitTimestamp()};
-    } else if (*doc.getDecision() == "abort") {
-        decision = CoordinatorCommitDecision{txn::CommitDecision::kAbort, boost::none};
-    }
-
-    _runPhaseTwo(participantShards, decision).getAsync([this](Status s) {
-        _handleCompletionStatus(s);
-    });
+    getDecision()
+        .then([this, participantShards](CoordinatorCommitDecision decision) {
+            return _runPhaseTwo(participantShards, decision);
+        })
+        .getAsync([this](Status s) { _handleCompletionStatus(s); });
 }
 
 Future<void> TransactionCoordinator::onCompletion() {
