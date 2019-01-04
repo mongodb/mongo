@@ -355,9 +355,7 @@ class WtTxnPrinter(object):
 
 
 def absl_get_nodes(val):
-    """
-    Return a generator of every node in absl::container_internal::raw_hash_set and derived classes.
-    """
+    """Return a generator of every node in absl::container_internal::raw_hash_set and derived classes."""
     size = val["size_"]
 
     if size == 0:
