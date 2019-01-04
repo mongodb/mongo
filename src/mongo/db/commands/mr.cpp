@@ -505,6 +505,11 @@ void State::prepTempCollection() {
             // preserved.
             options.uuid.emplace(_config.finalOutputCollUUID ? *_config.finalOutputCollUUID
                                                              : UUID::gen());
+        } else {
+            // While downgrading, we can inherit a UUID from finalOptions and not override it
+            // above.  If we didn't clear it, this would result in creating a collection with a
+            // duplicate UUID.
+            options.uuid = boost::none;
         }
         tempColl = tempCtx.db()->createCollection(_opCtx, _config.tempNamespace.ns(), options);
 
