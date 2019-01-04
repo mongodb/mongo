@@ -1559,10 +1559,7 @@ int SSLManagerApple::SSL_shutdown(SSLConnectionInterface* conn) {
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
-namespace {
-SimpleMutex sslManagerMtx;
-SSLManagerInterface* theSSLManager = nullptr;
-}  // namespace
+extern SSLManagerInterface* theSSLManager;
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
@@ -1574,7 +1571,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
     kMongoDBRolesOID = ::CFStringCreateWithCString(
         nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 
-    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerApple(sslGlobalParams, isSSLServer);
     }
@@ -1582,11 +1578,3 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
 }
 
 }  // namespace mongo
-
-mongo::SSLManagerInterface* mongo::getSSLManager() {
-    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
-    if (theSSLManager) {
-        return theSSLManager;
-    }
-    return nullptr;
-}

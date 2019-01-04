@@ -53,6 +53,9 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
+
+SSLManagerInterface* theSSLManager = nullptr;
+
 namespace {
 
 // Some of these duplicate the std::isalpha/std::isxdigit because we don't want them to be
@@ -575,7 +578,7 @@ TLSVersionCounts& TLSVersionCounts::get(ServiceContext* serviceContext) {
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-        const auto& config = getSSLManager()->getSSLConfiguration();
+        const auto& config = theSSLManager->getSSLConfiguration();
         if (!config.clientSubjectName.empty()) {
             LOG(1) << "Client Certificate Name: " << config.clientSubjectName;
         }
@@ -1157,6 +1160,10 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
         log() << "Accepted connection with TLS Version " << versionString << " from connection "
               << hostForLogging;
     }
+}
+
+SSLManagerInterface* getSSLManager() {
+    return theSSLManager;
 }
 
 }  // namespace mongo

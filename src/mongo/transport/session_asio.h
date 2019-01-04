@@ -237,8 +237,7 @@ protected:
         return doHandshake().then([this, target] {
             _ranHandshake = true;
 
-            auto sslManager = getSSLManager();
-            auto swPeerInfo = uassertStatusOK(sslManager->parseAndValidatePeerCertificate(
+            auto swPeerInfo = uassertStatusOK(getSSLManager()->parseAndValidatePeerCertificate(
                 _sslSocket->native_handle(), target.host(), target));
 
             if (swPeerInfo) {
@@ -616,8 +615,7 @@ private:
                 auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
 
                 if (sslPeerInfo.subjectName.empty()) {
-                    auto sslManager = getSSLManager();
-                    auto swPeerInfo = sslManager->parseAndValidatePeerCertificate(
+                    auto swPeerInfo = getSSLManager()->parseAndValidatePeerCertificate(
                         _sslSocket->native_handle(), "", _remote);
 
                     // The value of swPeerInfo is a bit complicated:

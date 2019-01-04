@@ -82,25 +82,6 @@ using std::vector;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-namespace {
-
-#ifdef MONGO_CONFIG_SSL
-static SimpleMutex s_mtx;
-static SSLManagerInterface* s_sslMgr(NULL);
-
-SSLManagerInterface* sslManager() {
-    stdx::lock_guard<SimpleMutex> lk(s_mtx);
-    if (s_sslMgr) {
-        return s_sslMgr;
-    }
-
-    s_sslMgr = getSSLManager();
-    return s_sslMgr;
-}
-#endif
-
-}  // namespace
-
 AtomicWord<long long> DBClientBase::ConnectionIdSequence;
 
 void (*DBClientBase::withConnection_do_not_use)(std::string host,
@@ -470,8 +451,8 @@ void DBClientBase::_auth(const BSONObj& params) {
     // We will only have a client name if SSL is enabled
     std::string clientName = "";
 #ifdef MONGO_CONFIG_SSL
-    if (sslManager() != nullptr) {
-        clientName = sslManager()->getSSLConfiguration().clientSubjectName.toString();
+    if (getSSLManager() != nullptr) {
+        clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }
 #endif
 
@@ -497,8 +478,8 @@ Status DBClientBase::authenticateInternalUser() {
     // We will only have a client name if SSL is enabled
     std::string clientName = "";
 #ifdef MONGO_CONFIG_SSL
-    if (sslManager() != nullptr) {
-        clientName = sslManager()->getSSLConfiguration().clientSubjectName.toString();
+    if (getSSLManager() != nullptr) {
+        clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }
 #endif
 

@@ -66,10 +66,9 @@
 
 namespace mongo {
 
-namespace {
+extern SSLManagerInterface* theSSLManager;
 
-SimpleMutex sslManagerMtx;
-SSLManagerInterface* theSSLManager = NULL;
+namespace {
 
 /**
 * Free a Certificate Context.
@@ -346,7 +345,6 @@ private:
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
 (InitializerContext*) {
-    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerWindows(sslGlobalParams, isSSLServer);
     }
@@ -377,13 +375,6 @@ bool isSSLServer = false;
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
     return stdx::make_unique<SSLManagerWindows>(params, isServer);
-}
-
-SSLManagerInterface* getSSLManager() {
-    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
-    if (theSSLManager)
-        return theSSLManager;
-    return NULL;
 }
 
 namespace {

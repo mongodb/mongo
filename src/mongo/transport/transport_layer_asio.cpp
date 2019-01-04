@@ -739,26 +739,25 @@ Status TransportLayerASIO::setup() {
 
 #ifdef MONGO_CONFIG_SSL
     const auto& sslParams = getSSLGlobalParams();
-    auto sslManager = getSSLManager();
 
     if (_sslMode() != SSLParams::SSLMode_disabled && _listenerOptions.isIngress()) {
         _ingressSSLContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         Status status =
-            sslManager->initSSLContext(_ingressSSLContext->native_handle(),
-                                       sslParams,
-                                       SSLManagerInterface::ConnectionDirection::kIncoming);
+            getSSLManager()->initSSLContext(_ingressSSLContext->native_handle(),
+                                            sslParams,
+                                            SSLManagerInterface::ConnectionDirection::kIncoming);
         if (!status.isOK()) {
             return status;
         }
     }
 
-    if (_listenerOptions.isEgress() && sslManager) {
+    if (_listenerOptions.isEgress() && getSSLManager()) {
         _egressSSLContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
         Status status =
-            sslManager->initSSLContext(_egressSSLContext->native_handle(),
-                                       sslParams,
-                                       SSLManagerInterface::ConnectionDirection::kOutgoing);
+            getSSLManager()->initSSLContext(_egressSSLContext->native_handle(),
+                                            sslParams,
+                                            SSLManagerInterface::ConnectionDirection::kOutgoing);
         if (!status.isOK()) {
             return status;
         }

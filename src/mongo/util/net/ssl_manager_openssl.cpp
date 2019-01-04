@@ -416,8 +416,6 @@ public:
 
 ////////////////////////////////////////////////////////////////
 
-SimpleMutex sslManagerMtx;
-SSLManagerInterface* theSSLManager = NULL;
 using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&free_ssl_context)>;
 static const int BUFFER_SIZE = 8 * 1024;
 static const int DATE_LEN = 128;
@@ -642,6 +640,7 @@ void setupFIPS() {
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
+extern SSLManagerInterface* theSSLManager;
 
 MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     SSL_library_init();
@@ -664,7 +663,6 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
 (InitializerContext*) {
-    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerOpenSSL(sslGlobalParams, isSSLServer);
     }
@@ -674,13 +672,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
     return stdx::make_unique<SSLManagerOpenSSL>(params, isServer);
-}
-
-SSLManagerInterface* getSSLManager() {
-    stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
-    if (theSSLManager)
-        return theSSLManager;
-    return NULL;
 }
 
 SSLX509Name getCertificateSubjectX509Name(X509* cert) {
