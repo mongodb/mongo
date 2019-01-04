@@ -1222,4 +1222,15 @@ TEST(CollatorFactoryICUTest, TraditionalSpanishAliasNotSupported) {
                       .getStatus());
 }
 
+TEST(CollatorFactoryICUTest, InvalidIdPrefixedLocaleFailsGracefully) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "x_test"));
+    ASSERT_NOT_OK(collator.getStatus());
+
+    collator = factory.makeFromBSON(BSON("locale"
+                                         << "I-test"));
+    ASSERT_NOT_OK(collator.getStatus());
+}
+
 }  // namespace
