@@ -516,12 +516,10 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
 
         return;
     } catch (const DBException& e) {
-        // must be right above std::exception to avoid catching subclasses
         log() << "DBException handling request, closing client connection: " << redact(e);
-    } catch (const std::exception& e) {
-        error() << "Uncaught std::exception: " << e.what() << ", terminating";
-        quickExit(EXIT_UNCAUGHT);
     }
+    // No need to catch std::exception, as std::terminate will be called when the exception bubbles
+    // to the top of the stack
 
     if (!guard) {
         guard = ThreadGuard(this);
