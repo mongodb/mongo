@@ -124,9 +124,11 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         with self._lock:
             test_info = self.find_test_info(test)
             test_info.end_time = time.time()
+            test_status = "no failures detected" if test_info.status == "pass" else "failed"
 
         time_taken = test_info.end_time - test_info.start_time
-        self.job_logger.info("%s ran in %0.2f seconds.", test.basename(), time_taken)
+        self.job_logger.info("%s ran in %0.2f seconds: %s.", test.basename(), time_taken,
+                             test_status)
 
         # Asynchronously closes the buildlogger test handler to avoid having too many threads open
         # on 32-bit systems.
