@@ -42,6 +42,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
+#include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 
 namespace asio {
@@ -49,6 +50,8 @@ namespace ssl {
 namespace detail {
 
 namespace {
+// Limit size of output buffer to avoid growing indefinitely.
+constexpr auto max_outbuf_size = stream_core::max_tls_record_size;
 
 const class osstatus_category : public error_category {
 public:
@@ -303,8 +306,11 @@ asio::mutable_buffer engine::get_output(const asio::mutable_buffer& data) {
 ::OSStatus engine::write_func(::SSLConnectionRef ctx, const void* data, size_t* data_len) {
     auto* this_ = const_cast<engine*>(static_cast<const engine*>(ctx));
     const auto* p = static_cast<const char*>(data);
+
+    const auto requested = *data_len;
+    *data_len = std::min<size_t>(requested, max_outbuf_size - this_->_outbuf.size());
     this_->_outbuf.insert(this_->_outbuf.end(), p, p + *data_len);
-    return ::errSecSuccess;
+    return (requested == *data_len) ? ::errSecSuccess : ::errSSLWouldBlock;
 }
 
 engine::want engine::read(const asio::mutable_buffer& data,
