@@ -357,8 +357,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "config_base=false,";
     ss << "statistics=(fast),";
 
-    // We are still using MongoDB's cursor cache, don't double up.
-    ss << "cache_cursors=false,";
+    if (!WiredTigerSessionCache::isEngineCachingCursors()) {
+        ss << "cache_cursors=false,";
+    }
+
     // Ensure WiredTiger creates data in the expected format and attempting to start with a
     // data directory created using a newer version will fail.
     ss << "compatibility=(release=\"3.0\",require_max=\"3.0\"),";

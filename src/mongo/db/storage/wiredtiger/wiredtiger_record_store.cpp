@@ -976,11 +976,17 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
             WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
             WT_CURSOR* truncateStart = startWrap.get();
 
-            // If we know where the start point is, set it for the truncate
             if (savedFirstKey != 0) {
+                // If we know where the start point is, set it for the truncate
                 setKey(truncateStart, RecordId(savedFirstKey));
             } else {
-                truncateStart = NULL;
+                // Position at the first record.  This is equivalent to
+                // providing a NULL argument to WT_SESSION->truncate, but
+                // in that case, truncate will need to open its own cursor.
+                // Since we already have a cursor, we can use it here to
+                // make the whole operation faster.
+                ret = WT_READ_CHECK(truncateStart->next(truncateStart));
+                invariantWTOK(ret);
             }
             ret = session->truncate(session, NULL, truncateStart, truncateEnd, NULL);
 
