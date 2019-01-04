@@ -8637,9 +8637,11 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
-    test_flags: --repeatSuites=10 --shuffle
+    test_flags: >-
+      --excludeWithAnyTags=requires_http_client
+      --repeatSuites=10
+      --shuffle
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_http_client
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
