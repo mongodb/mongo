@@ -92,13 +92,9 @@ public:
     virtual void commit(boost::optional<Timestamp> commitTimestamp) {
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // index, we should never see it again anyway.
-        // TODO(SERVER-38800): Remove special case for _id index. The rollback process is unable to
-        // fix collection counts and currently relies on catalog::openCatalog() to update the
-        // collection count as it rebuilds missing indexes. Removing the ident for the _id index
-        // immediately ensures that we have at least one index to rebuild coming out of rollback.
         auto engine = _cce->_engine;
         auto storageEngine = engine->getStorageEngine();
-        if (storageEngine->supportsPendingDrops() && commitTimestamp && _indexName != "_id_") {
+        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
             log() << "Deferring ident drop for " << _ident << " (" << _indexNss
                   << ") with commit timestamp: " << commitTimestamp->toBSON();
             engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
