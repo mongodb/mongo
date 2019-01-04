@@ -1349,7 +1349,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortIsNoopWithNoParticipants) {
     txnRouter->setDefaultAtClusterTime(operationContext());
 
     // Should not throw.
-    txnRouter->implicitlyAbortTransaction(opCtx);
+    txnRouter->implicitlyAbortTransaction(opCtx, kDummyStatus);
 }
 
 TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
@@ -1367,8 +1367,8 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
     txnRouter->setDefaultAtClusterTime(operationContext());
     txnRouter->attachTxnFieldsIfNeeded(shard1, {});
 
-    auto future =
-        launchAsync([&] { return txnRouter->implicitlyAbortTransaction(operationContext()); });
+    auto future = launchAsync(
+        [&] { return txnRouter->implicitlyAbortTransaction(operationContext(), kDummyStatus); });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
@@ -1401,8 +1401,8 @@ TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
     txnRouter->attachTxnFieldsIfNeeded(shard1, {});
     txnRouter->attachTxnFieldsIfNeeded(shard2, {});
 
-    auto future =
-        launchAsync([&] { return txnRouter->implicitlyAbortTransaction(operationContext()); });
+    auto future = launchAsync(
+        [&] { return txnRouter->implicitlyAbortTransaction(operationContext(), kDummyStatus); });
 
     std::map<HostAndPort, boost::optional<bool>> targets = {{hostAndPort1, true},
                                                             {hostAndPort2, {}}};
@@ -1441,8 +1441,8 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
     txnRouter->setDefaultAtClusterTime(operationContext());
     txnRouter->attachTxnFieldsIfNeeded(shard1, {});
 
-    auto future =
-        launchAsync([&] { return txnRouter->implicitlyAbortTransaction(operationContext()); });
+    auto future = launchAsync(
+        [&] { return txnRouter->implicitlyAbortTransaction(operationContext(), kDummyStatus); });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);

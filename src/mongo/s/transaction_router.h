@@ -215,7 +215,7 @@ public:
      * Sends abort to all shards in the current participant list. Will retry on retryable errors,
      * but ignores the responses from each shard.
      */
-    void implicitlyAbortTransaction(OperationContext* opCtx);
+    void implicitlyAbortTransaction(OperationContext* opCtx, const Status& errorStatus);
 
     /**
      * Returns the participant for this transaction or nullptr if the specified shard is not

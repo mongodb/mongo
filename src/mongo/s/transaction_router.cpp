@@ -651,10 +651,8 @@ std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
         abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
     }
 
-    if (isImplicit) {
-        LOG(0) << _txnIdToString() << " Implicitly aborting transaction on " << _participants.size()
-               << " shard(s)";
-    } else {
+    // Implicit aborts log earlier.
+    if (!isImplicit) {
         LOG(0) << _txnIdToString() << " Aborting transaction on " << _participants.size()
                << " shard(s)";
     }
@@ -666,7 +664,8 @@ std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
                            abortRequests);
 }
 
-void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
+void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx,
+                                                   const Status& errorStatus) {
     if (_participants.empty()) {
         return;
     }
@@ -676,6 +675,9 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx) {
                                       "already initiated two phase commit for the transaction";
         return;
     }
+
+    LOG(0) << _txnIdToString() << " Implicitly aborting transaction on " << _participants.size()
+           << " shard(s) due to error: " << errorStatus;
 
     try {
         abortTransaction(opCtx, true /*isImplicit*/);
