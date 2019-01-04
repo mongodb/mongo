@@ -51,7 +51,9 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
                 core.output_ = core.engine_.get_output(core.output_buffer_);
                 // Get output data from the engine and write it to the underlying
                 // transport.
-                core.output_ += asio::write(next_layer, core.output_, ec);
+                while (!ec && core.output_.size()) {
+                    core.output_ += asio::write(next_layer, core.output_, ec);
+                }
 
                 // Try the operation again.
                 continue;
@@ -61,7 +63,9 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
                 core.output_ = core.engine_.get_output(core.output_buffer_);
                 // Get output data from the engine and write it to the underlying
                 // transport.
-                core.output_ += asio::write(next_layer, core.output_, ec);
+                while (!ec && core.output_.size()) {
+                    core.output_ += asio::write(next_layer, core.output_, ec);
+                }
 
                 // Operation is complete. Return result to caller.
                 core.engine_.map_error_code(ec);
