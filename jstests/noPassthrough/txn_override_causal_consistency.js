@@ -117,8 +117,8 @@
     }
 
     function testCommit(conn, isCausal, expectRetry) {
-        inspectFirstCommandForAfterClusterTime(conn, "count", isCausal, expectRetry, (coll) => {
-            assert.eq(0, coll.count({y: 1}));
+        inspectFirstCommandForAfterClusterTime(conn, "find", isCausal, expectRetry, (coll) => {
+            assert.eq(0, coll.find({y: 1}).itcount());
             assert.commandWorked(coll.getDB().runCommand({ping: 1}));  // commits the transaction.
         });
     }
