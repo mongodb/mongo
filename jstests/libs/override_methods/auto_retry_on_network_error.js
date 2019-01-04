@@ -147,11 +147,6 @@
             msg.indexOf("InterruptedDueToStepDown") >= 0;
     }
 
-    function isTransientTransactionError(res) {
-        return res.hasOwnProperty('errorLabels') &&
-            res.errorLabels.includes('TransientTransactionError');
-    }
-
     function runWithRetriesOnNetworkErrors(mongo, cmdObj, clientFunction, clientFunctionArguments) {
         let cmdName = Object.keys(cmdObj)[0];
 
@@ -242,15 +237,6 @@
                         continue;
                     }
 
-                    // A write in a transaction can fail with a TransientTransactionError and the
-                    // transaction should be retried and not treated as a retryable write.
-                    if (cmdObj.hasOwnProperty("autocommit") && isTransientTransactionError(res)) {
-                        print("=-=-=-= Retrying because of a TransientTransactionError: " +
-                              cmdName + ", retries remaining: " + numRetries + " error: " +
-                              tojsononeline(res));
-                        continue;
-                    }
-
                     // Don't interfere with retryable writes.
                     return res;
                 }
@@ -330,13 +316,6 @@
                               ", code: " + res.code + ", retries remaining: " + numRetries);
                         res.ok = 1;
                     }
-
-                    if (isTransientTransactionError(res)) {
-                        print("=-=-=-= Retrying on TransientTransactionError for command: " +
-                              cmdName + ", retries remaining: " + numRetries + " error: " +
-                              tojson(res));
-                        continue;
-                    }
                 }
 
                 if (res.writeConcernError && numRetries > 0) {
@@ -373,10 +352,6 @@
                 } else if ((e.message.indexOf("writeConcernError") >= 0) && isRetryableError(e)) {
                     print("=-=-=-= Retrying write concern error with retryable code for command: " +
                           cmdName + ", retries remaining: " + numRetries + " error: " + tojson(e));
-                    continue;
-                } else if (isTransientTransactionError(e)) {
-                    print("=-=-=-= Retrying on TransientTransactionError for command: " + cmdName +
-                          ", retries remaining: " + numRetries + " error: " + tojson(res));
                     continue;
                 } else if (!isNetworkError(e)) {
                     throw e;

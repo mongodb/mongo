@@ -53,6 +53,10 @@
     // it to our ops array multple times.
     let retryOp = false;
 
+    // True if the current command returned a transient transaction error and its entire transaction
+    // is being retried.
+    let retryingOnTransientTransactionError = false;
+
     // Set the max number of operations to run in a transaction. Once we've
     // hit this number of operations, we will commit the transaction. This is to
     // prevent having to retry an extremely long running transaction.
@@ -97,6 +101,15 @@
     // Use a "signature" value that won't typically match a value assigned in normal use. This way
     // the wtimeout set by this override is distinguishable in the server logs.
     const kDefaultWtimeout = 5 * 60 * 1000 + 456;
+
+    function isTransientTransactionError(res) {
+        return res.hasOwnProperty('errorLabels') &&
+            res.errorLabels.includes('TransientTransactionError');
+    }
+
+    function isRetryingOnNetworkOrTransientTransactionError() {
+        return TestData.retryingOnNetworkError || retryingOnTransientTransactionError;
+    }
 
     function logFailedCommandAndError(cmdObj, cmdName, res) {
         if (cmdObj !== lastLoggedOp) {
@@ -172,7 +185,7 @@
     }
 
     function appendReadAndWriteConcern(conn, dbName, commandName, commandObj) {
-        if (TestData.retryingOnNetworkError) {
+        if (isRetryingOnNetworkOrTransientTransactionError()) {
             return;
         }
 
@@ -379,11 +392,11 @@
         cmdObj.autocommit = false;
         delete cmdObj.writeConcern;
 
-        // We only want to add this op to the ops array if we have not already added it. If
-        // retryingOnNetworkError is true, this op will already have been added. If retryOp
-        // is false, this op is a write command that we are retrying thus this op has already
-        // been added to the ops array.
-        if (!TestData.retryingOnNetworkError && !retryOp) {
+        // We only want to add this op to the ops array if we have not already added it. If we're
+        // retrying on a transient txn or network error, this op will already have been added. If
+        // retryOp is false, this op is a write command that we are retrying thus this op has
+        // already been added to the ops array.
+        if (!isRetryingOnNetworkOrTransientTransactionError() && !retryOp) {
             // If the command object was created in a causally consistent session but did not
             // specify a readConcern level, it may have a readConcern object with only
             // afterClusterTime. The correct read concern options are added in
@@ -425,10 +438,13 @@
                 appendReadAndWriteConcern(conn, dbName, cmdNameUnwrapped, cmdObjUnwrapped);
                 cmdObjUnwrapped.txnNumber = txnOptions.txnNumber;
             } else {
-                // Commit the transaction if we've run `maxOpsInTransaction` commands as a part of
-                // this transaction to avoid having to retry really long running transactions.
-                if ((TestData.retryingOnNetworkError === false) &&
-                    (ops.length >= maxOpsInTransaction) &&
+                // If running in a suite that expects network errors, commit the transaction if
+                // we've run `maxOpsInTransaction` commands as a part of this transaction to avoid
+                // having to retry really long running transactions. Do not commit if the current
+                // command is getMore, because getMore cannot start a transaction.
+                if (TestData.retryingOnNetworkError !== undefined &&
+                    !isRetryingOnNetworkOrTransientTransactionError() &&
+                    (commandName !== "getMore") && (ops.length >= maxOpsInTransaction) &&
                     (conn.txnOverrideState === TransactionStates.kActive)) {
                     let commitRes =
                         commitTransaction(conn, cmdObjUnwrapped.lsid, txnOptions.txnNumber);
@@ -478,8 +494,8 @@
     function retryEntireTransaction(conn, lsid, func) {
         let txnOptions = getTxnOptionsForClient(conn);
         let txnNumber = txnOptions.txnNumber;
-        jsTestLog("Retrying entire transaction on TransientTransactionError for aborted txn " +
-                  "with txnNum: " + txnNumber + " and lsid " + tojson(lsid));
+        jsTestLog("Retrying entire transaction for aborted txn with txnNum: " + txnNumber +
+                  " and lsid " + tojson(lsid));
         // Set the transactionState to inactive so continueTransaction() will bump the
         // txnNum.
         conn.txnOverrideState = TransactionStates.kInactive;
@@ -492,8 +508,7 @@
             res = runCommandInTransactionIfNeeded(
                 conn, op.dbName, op.cmdName, op.cmdObj, func, op.makeFuncArgs);
 
-            if (res.hasOwnProperty('errorLabels') &&
-                res.errorLabels.includes('TransientTransactionError')) {
+            if (isTransientTransactionError(res)) {
                 return retryEntireTransaction(conn, op.lsid, func);
             }
         }
@@ -515,8 +530,7 @@
                 continue;
             }
 
-            if (res.hasOwnProperty('errorLabels') &&
-                res.errorLabels.includes('TransientTransactionError')) {
+            if (isTransientTransactionError(res)) {
                 transientErrorToLog = res;
                 retryCommit = true;
                 res = retryEntireTransaction(conn, commandObj.lsid, func);
@@ -528,7 +542,7 @@
         return res;
     }
 
-    function runCommandOnNetworkErrorRetry(
+    function runCommandOnNetworkOrTransientTransactionErrorRetry(
         conn, dbName, commandName, commandObj, func, makeFuncArgs) {
         transientErrorToLog = null;
         // If the ops array is empty, we failed on a command not being run in a
@@ -559,7 +573,7 @@
         }
 
         let res;
-        if (TestData.retryingOnNetworkError !== true) {
+        if (!isRetryingOnNetworkOrTransientTransactionError()) {
             res = runCommandInTransactionIfNeeded(
                 conn, dbName, commandName, commandObj, func, makeFuncArgs);
 
@@ -573,10 +587,41 @@
             return res;
         }
 
-        res = runCommandOnNetworkErrorRetry(
+        res = runCommandOnNetworkOrTransientTransactionErrorRetry(
             conn, dbName, commandName, commandObj, func, makeFuncArgs);
 
         return res;
+    }
+
+    function runCommandWithTransientTransactionErrorRetries(
+        conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        retryingOnTransientTransactionError = false;
+        while (true) {
+            try {
+                let res = runCommandWithTransactionRetries(
+                    conn, dbName, commandName, commandObj, func, makeFuncArgs);
+
+                if (isTransientTransactionError(res)) {
+                    retryingOnTransientTransactionError = true;
+                    print("=-=-=-= Retrying on TransientTransactionError for command: " +
+                          commandName + ", response: " + tojson(res));
+                    continue;
+                }
+
+                retryingOnTransientTransactionError = false;
+                return res;
+            } catch (e) {
+                if (isTransientTransactionError(e)) {
+                    retryingOnTransientTransactionError = true;
+                    print("=-=-=-= Retrying on TransientTransactionError for command: " +
+                          commandName + ", error: " + tojson(e));
+                    continue;
+                }
+
+                retryingOnTransientTransactionError = false;
+                throw e;
+            }
+        }
     }
 
     startParallelShell = function() {
@@ -585,5 +630,5 @@
             "startParalleShell()");
     };
 
-    OverrideHelpers.overrideRunCommand(runCommandWithTransactionRetries);
+    OverrideHelpers.overrideRunCommand(runCommandWithTransientTransactionErrorRetries);
 })();
