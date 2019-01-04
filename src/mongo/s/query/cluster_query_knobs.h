@@ -39,15 +39,15 @@ namespace mongo {
 // will be selected randomly amongst the shards participating in the query. Pipelines capable of
 // merging on mongoS are unaffected by this setting, unless internalQueryProhibitMergingOnMongoS is
 // true.
-extern AtomicBool internalQueryAlwaysMergeOnPrimaryShard;
+extern AtomicWord<bool> internalQueryAlwaysMergeOnPrimaryShard;
 
 // If set to true on mongos, all aggregations which could otherwise merge on the mongos will be
 // obliged to merge on a shard instead. Pipelines which are redirected to the shards will obey the
 // value of internalQueryAlwaysMergeOnPrimaryShard. False by default, meaning that pipelines capable
 // of merging on mongoS will always do so.
-extern AtomicBool internalQueryProhibitMergingOnMongoS;
+extern AtomicWord<bool> internalQueryProhibitMergingOnMongoS;
 
 // If set to true on mongos then the cluster query planner will not produce plans with the exchange.
 // False by default, so the queries run with exchanges.
-extern AtomicBool internalQueryDisableExchange;
+extern AtomicWord<bool> internalQueryDisableExchange;
 }  // namespace mongo

@@ -73,7 +73,7 @@ class FailPoint {
     MONGO_DISALLOW_COPYING(FailPoint);
 
 public:
-    typedef AtomicUInt32::WordType ValType;
+    typedef unsigned ValType;
     enum Mode { off, alwaysOn, random, nTimes, skip };
     enum RetCode { fastOff = 0, slowOff, slowOn, userIgnored };
 
@@ -171,11 +171,11 @@ private:
     // Bit layout:
     // 31: tells whether this fail point is active.
     // 0~30: unsigned ref counter for active dynamic instances.
-    AtomicUInt32 _fpInfo{0};
+    AtomicWord<unsigned> _fpInfo{0};
 
     // Invariant: These should be read only if ACTIVE_BIT of _fpInfo is set.
     Mode _mode{off};
-    AtomicInt32 _timesOrPeriod{0};
+    AtomicWord<int> _timesOrPeriod{0};
     BSONObj _data;
 
     // protects _mode, _timesOrPeriod, _data

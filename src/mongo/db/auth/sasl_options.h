@@ -51,9 +51,9 @@ struct SASLGlobalParams {
     std::string hostName;
     std::string serviceName;
     std::string authdPath;
-    AtomicInt32 scramSHA1IterationCount;
-    AtomicInt32 scramSHA256IterationCount;
-    AtomicInt32 authFailedDelay;
+    AtomicWord<int> scramSHA1IterationCount;
+    AtomicWord<int> scramSHA256IterationCount;
+    AtomicWord<int> authFailedDelay;
 
     SASLGlobalParams();
 };

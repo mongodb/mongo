@@ -57,7 +57,7 @@ public:
     bool isEmpty();
 
 private:
-    AtomicBool _isEmpty;
+    AtomicWord<bool> _isEmpty;
     stdx::mutex _queueMutex;
     std::queue<std::string> _opQueryQueue;
 };

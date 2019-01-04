@@ -64,6 +64,6 @@ public:
     }
 
 private:
-    AtomicInt64 _counter;
+    AtomicWord<long long> _counter;
 };
 }  // namespace mongo

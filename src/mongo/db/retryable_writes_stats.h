@@ -63,14 +63,14 @@ public:
 
 private:
     // The number of received commands that contained a statement that had already been executed.
-    AtomicUInt64 _retriedCommandsCount{0};
+    AtomicWord<unsigned long long> _retriedCommandsCount{0};
 
     // The number of received statements found to have been previously executed.
-    AtomicUInt64 _retriedStatementsCount{0};
+    AtomicWord<unsigned long long> _retriedStatementsCount{0};
 
     // The number of writes to the config.transactions collection. Includes writes initiated by a
     // migration.
-    AtomicUInt64 _transactionsCollectionWriteCount{0};
+    AtomicWord<unsigned long long> _transactionsCollectionWriteCount{0};
 };
 
 }  // namespace mongo

@@ -101,7 +101,7 @@ SSLManagerInterface* sslManager() {
 
 }  // namespace
 
-AtomicInt64 DBClientBase::ConnectionIdSequence;
+AtomicWord<long long> DBClientBase::ConnectionIdSequence;
 
 void (*DBClientBase::withConnection_do_not_use)(std::string host,
                                                 std::function<void(DBClientBase*)>) = nullptr;

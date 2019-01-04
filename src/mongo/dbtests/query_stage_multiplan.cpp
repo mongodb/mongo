@@ -62,7 +62,7 @@ namespace mongo {
 const std::unique_ptr<ClockSource> clockSource = stdx::make_unique<ClockSourceMock>();
 
 // How we access the external setParameter testing bool.
-extern AtomicBool internalQueryForceIntersectionPlans;
+extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
 namespace {
 

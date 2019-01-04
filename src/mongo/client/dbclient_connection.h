@@ -301,8 +301,8 @@ protected:
     uint64_t _sessionCreationMicros = INVALID_SOCK_CREATION_TIME;
     Date_t _lastConnectivityCheck;
 
-    AtomicBool _stayFailed{false};
-    AtomicBool _failed{false};
+    AtomicWord<bool> _stayFailed{false};
+    AtomicWord<bool> _failed{false};
     const bool autoReconnect;
     Backoff autoReconnectBackoff;
 
@@ -315,7 +315,7 @@ protected:
     bool _internalAuthOnReconnect = false;
     std::map<std::string, BSONObj> authCache;
 
-    static AtomicInt32 _numConnections;
+    static AtomicWord<int> _numConnections;
 
 private:
     /**

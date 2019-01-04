@@ -95,12 +95,12 @@ private:
     // the same severity as kDefault.
     // This is also used to update the severities of unconfigured components when the severity
     // for kDefault is modified.
-    AtomicBool _hasMinimumLoggedSeverity[LogComponent::kNumLogComponents];
+    AtomicWord<bool> _hasMinimumLoggedSeverity[LogComponent::kNumLogComponents];
 
     // Log severities for components.
     // Store numerical values of severities to be cache-line friendly.
     // Set to kDefault minimum logged severity if _hasMinimumLoggedSeverity[i] is false.
-    AtomicInt32 _minimumLoggedSeverity[LogComponent::kNumLogComponents];
+    AtomicWord<int> _minimumLoggedSeverity[LogComponent::kNumLogComponents];
 };
 
 }  // namespace logger

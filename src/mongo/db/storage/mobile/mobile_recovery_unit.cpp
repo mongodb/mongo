@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-AtomicInt64 MobileRecoveryUnit::_nextID(0);
+AtomicWord<long long> MobileRecoveryUnit::_nextID(0);
 
 MobileRecoveryUnit::MobileRecoveryUnit(MobileSessionPool* sessionPool)
     : _inUnitOfWork(false), _active(false), _isReadOnly(true), _sessionPool(sessionPool) {

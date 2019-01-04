@@ -209,7 +209,7 @@ public:
 
 private:
     WiredTigerSessionCache* _sessionCache;
-    AtomicBool _shuttingDown{false};
+    AtomicWord<bool> _shuttingDown{false};
 };
 
 class WiredTigerKVEngine::WiredTigerCheckpointThread : public BackgroundJob {
@@ -373,7 +373,7 @@ private:
     // taking checkpoints. It can be triggered early to expediate immediate checkpointing.
     stdx::condition_variable _condvar;
 
-    AtomicBool _shuttingDown{false};
+    AtomicWord<bool> _shuttingDown{false};
 
     bool _hasTriggeredFirstStableCheckpoint = false;
 

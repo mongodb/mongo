@@ -159,7 +159,7 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
         case alwaysOn:
             return slowOn;
         case random: {
-            const AtomicInt32::WordType maxActivationValue = _timesOrPeriod.load();
+            const int maxActivationValue = _timesOrPeriod.load();
             if (FailPointPRNG::current()->nextPositiveInt32() < maxActivationValue)
                 return slowOn;
 

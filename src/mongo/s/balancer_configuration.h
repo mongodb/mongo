@@ -284,8 +284,8 @@ private:
 
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value
     // is read on the critical path after each write operation, that's why it is cached.
-    AtomicUInt64 _maxChunkSizeBytes;
-    AtomicBool _shouldAutoSplit;
+    AtomicWord<unsigned long long> _maxChunkSizeBytes;
+    AtomicWord<bool> _shouldAutoSplit;
 };
 
 }  // namespace mongo

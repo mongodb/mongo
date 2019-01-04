@@ -183,7 +183,7 @@ public:
 }  // namespace atomic_word_detail
 
 /**
- * Instantiations of AtomicWord must be scalar types.
+ * Instantiations of AtomicWord must be trivially copyable.
  */
 template <typename T>
 class AtomicWord : public atomic_word_detail::Base<T> {
@@ -192,11 +192,5 @@ public:
                         sizeof(T) == sizeof(atomic_word_detail::Base<T>));
     using atomic_word_detail::Base<T>::Base;
 };
-
-using AtomicUInt32 = AtomicWord<unsigned>;
-using AtomicUInt64 = AtomicWord<unsigned long long>;
-using AtomicInt32 = AtomicWord<int>;
-using AtomicInt64 = AtomicWord<long long>;
-using AtomicBool = AtomicWord<bool>;
 
 }  // namespace mongo

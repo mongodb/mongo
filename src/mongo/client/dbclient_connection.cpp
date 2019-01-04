@@ -666,6 +666,6 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
     _markFailed(kSetFlag);
 }
 
-AtomicInt32 DBClientConnection::_numConnections;
+AtomicWord<int> DBClientConnection::_numConnections;
 
 }  // namespace mongo

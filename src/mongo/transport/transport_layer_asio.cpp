@@ -524,7 +524,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
               resolver(context),
               peer(std::move(peer)) {}
 
-        AtomicBool done{false};
+        AtomicWord<bool> done{false};
         Promise<SessionHandle> promise;
 
         stdx::mutex mutex;

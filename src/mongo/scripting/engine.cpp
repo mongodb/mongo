@@ -54,7 +54,7 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
-AtomicInt64 Scope::_lastVersion(1);
+AtomicWord<long long> Scope::_lastVersion(1);
 
 
 namespace {

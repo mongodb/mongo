@@ -55,7 +55,7 @@ namespace mongo {
 
 using std::endl;
 
-AtomicUInt32 IndexBuilder::_indexBuildCount;
+AtomicWord<unsigned> IndexBuilder::_indexBuildCount;
 
 namespace {
 

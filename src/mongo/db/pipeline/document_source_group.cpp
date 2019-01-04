@@ -59,7 +59,7 @@ namespace {
  * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
  */
 std::string nextFileName() {
-    static AtomicUInt32 documentSourceGroupFileCounter;
+    static AtomicWord<unsigned> documentSourceGroupFileCounter;
     return "extsort-doc-group." + std::to_string(documentSourceGroupFileCounter.fetchAndAdd(1));
 }
 

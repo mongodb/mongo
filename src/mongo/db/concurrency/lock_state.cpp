@@ -112,7 +112,7 @@ const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, ResourceId::SING
 const Milliseconds MaxWaitTime = Milliseconds(500);
 
 // Dispenses unique LockerId identifiers
-AtomicUInt64 idCounter(0);
+AtomicWord<unsigned long long> idCounter(0);
 
 // Partitioned global lock statistics, so we don't hit the same bucket
 PartitionedInstanceWideLockStats globalStats;

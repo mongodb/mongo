@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-AtomicInt64 SqliteStatement::_nextID(0);
+AtomicWord<long long> SqliteStatement::_nextID(0);
 
 SqliteStatement::SqliteStatement(const MobileSession& session, const std::string& sqlQuery) {
     // Increment the global instance count and assign this instance an id.

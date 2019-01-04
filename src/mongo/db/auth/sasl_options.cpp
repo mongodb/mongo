@@ -210,7 +210,7 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLAuth
 class ExportedScramIterationCountParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
-    ExportedScramIterationCountParameter(StringData name, AtomicInt32* value, int minimum)
+    ExportedScramIterationCountParameter(StringData name, AtomicWord<int>* value, int minimum)
         : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
               ServerParameterSet::getGlobal(), name.toString(), value),
           _minimum(minimum) {}

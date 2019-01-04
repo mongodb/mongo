@@ -174,7 +174,7 @@ StatusWith<OpTimeWithHash> parseOpTimeWithHash(const QueryResponseStatus& fetchR
  */
 class InitialSyncApplyObserver : public OplogApplier::Observer {
 public:
-    explicit InitialSyncApplyObserver(AtomicUInt32* fetchCount) : _fetchCount(fetchCount) {}
+    explicit InitialSyncApplyObserver(AtomicWord<unsigned>* fetchCount) : _fetchCount(fetchCount) {}
 
     // OplogApplier::Observer functions
     void onBatchBegin(const OplogApplier::Operations&) final {}
@@ -184,7 +184,7 @@ public:
     }
 
 private:
-    AtomicUInt32* const _fetchCount;
+    AtomicWord<unsigned>* const _fetchCount;
 };
 
 }  // namespace

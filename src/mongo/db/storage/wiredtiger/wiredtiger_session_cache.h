@@ -293,7 +293,7 @@ private:
     // Used as follows:
     //   The low 31 bits are a count of active calls to releaseSession.
     //   The high bit is a flag that is set if and only if we're shutting down.
-    AtomicUInt32 _shuttingDown;
+    AtomicWord<unsigned> _shuttingDown;
     static const uint32_t kShuttingDownMask = 1 << 31;
 
     stdx::mutex _cacheLock;
@@ -301,13 +301,13 @@ private:
     SessionCache _sessions;
 
     // Bumped when all open sessions need to be closed
-    AtomicUInt64 _epoch;  // atomic so we can check it outside of the lock
+    AtomicWord<unsigned long long> _epoch;  // atomic so we can check it outside of the lock
 
     // Bumped when all open cursors need to be closed
-    AtomicUInt64 _cursorEpoch;  // atomic so we can check it outside of the lock
+    AtomicWord<unsigned long long> _cursorEpoch;  // atomic so we can check it outside of the lock
 
     // Counter and critical section mutex for waitUntilDurable
-    AtomicUInt32 _lastSyncTime;
+    AtomicWord<unsigned> _lastSyncTime;
     stdx::mutex _lastSyncMutex;
 
     // Mutex and cond var for waiting on prepare commit or abort.

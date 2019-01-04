@@ -40,10 +40,10 @@ constexpr std::int32_t kStartupIntWithExpressionsMinimum = 10;
 constexpr std::int32_t kStartupIntWithExpressionsMaximum = 1000;
 
 // Storage for set parameter defined in server_parameter_with_storage.idl
-extern AtomicInt32 gStdIntPreallocated;
+extern AtomicWord<int> gStdIntPreallocated;
 
 // Counter for how many times gStdIntPreallocated has been modified.
-extern AtomicInt32 gStdIntPreallocatedUpdateCount;
+extern AtomicWord<int> gStdIntPreallocatedUpdateCount;
 
 /**
  * Validates that the proposed new value is odd.

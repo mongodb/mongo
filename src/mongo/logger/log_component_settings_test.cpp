@@ -48,7 +48,7 @@ using namespace mongo::logger;
 // cause an invariant failure, i.e. that these methods are thread-safe.
 TEST(SERVER25981Test, SetSeverityShouldLogAndClear) {
     unittest::Barrier startupBarrier(4);
-    AtomicBool running(true);
+    AtomicWord<bool> running(true);
 
     stdx::thread shouldLogThread([&]() {
         startupBarrier.countDownAndWait();

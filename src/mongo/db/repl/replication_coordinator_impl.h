@@ -594,7 +594,7 @@ private:
         // during rollback. In order to read it, must have the RSTL. To set it when transitioning
         // into RS_ROLLBACK, must have the RSTL in mode X. Otherwise, no lock or mutex is necessary
         // to set it.
-        AtomicUInt32 _canServeNonLocalReads;
+        AtomicWord<unsigned> _canServeNonLocalReads;
     };
 
     void _resetMyLastOpTimes(WithLock lk);
@@ -1256,7 +1256,7 @@ private:
         _initialSyncer;  // (I) pointer set under mutex, copied by callers.
 
     // Hands out the next snapshot name.
-    AtomicUInt64 _snapshotNameGenerator;  // (S)
+    AtomicWord<unsigned long long> _snapshotNameGenerator;  // (S)
 
     // The OpTimes and SnapshotNames for all snapshots newer than the current commit point, kept in
     // sorted order. Any time this is changed, you must also update _uncommitedSnapshotsSize.
@@ -1264,7 +1264,7 @@ private:
 
     // A cache of the size of _uncommittedSnaphots that can be read without any locking.
     // May only be written to while holding _mutex.
-    AtomicUInt64 _uncommittedSnapshotsSize;  // (I)
+    AtomicWord<unsigned long long> _uncommittedSnapshotsSize;  // (I)
 
     // The non-null OpTime and SnapshotName of the current snapshot used for committed reads, if
     // there is one.
@@ -1317,7 +1317,7 @@ private:
     int _earliestMemberId = -1;  // (M)
 
     // Cached copy of the current config protocol version.
-    AtomicInt64 _protVersion{1};  // (S)
+    AtomicWord<long long> _protVersion{1};  // (S)
 
     // Source of random numbers used in setting election timeouts, etc.
     PseudoRandom _random;  // (M)
@@ -1330,7 +1330,7 @@ private:
     // function.
     // This variable must be written immediately after _term, and thus its value can lag.
     // Reading this value does not require the replication coordinator mutex to be locked.
-    AtomicInt64 _termShadow;  // (S)
+    AtomicWord<long long> _termShadow;  // (S)
 
     // When we decide to step down due to hearing about a higher term, we remember the term we heard
     // here so we can update our term to match as part of finishing stepdown.

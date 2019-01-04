@@ -221,7 +221,7 @@ BSONObjBuilder OpMsgBuilder::resumeBody() {
     return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag(), _buf, _bodyStart);
 }
 
-AtomicBool OpMsgBuilder::disableDupeFieldCheck_forTest{false};
+AtomicWord<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
 
 Message OpMsgBuilder::finish() {
     if (kDebugBuild && !disableDupeFieldCheck_forTest.load()) {

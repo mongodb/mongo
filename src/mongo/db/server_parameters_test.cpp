@@ -202,7 +202,7 @@ TEST(ServerParameters, boundIntLock) {
 }
 
 TEST(ServerParameters, Simple1) {
-    AtomicInt32 f(5);
+    AtomicWord<int> f(5);
     ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> ff(NULL, "ff", &f);
     ASSERT_EQUALS("ff", ff.name());
 
@@ -247,7 +247,7 @@ TEST(ServerParameters, Vector1) {
 }
 
 TEST(ServerParameters, Validators) {
-    AtomicInt32 myVal(0);
+    AtomicWord<int> myVal(0);
     ExportedServerParameter<int, ServerParameterType::kRuntimeOnly> myParam(
         nullptr, "myVal", &myVal);
     myParam.withValidator([](const int& newVal) {

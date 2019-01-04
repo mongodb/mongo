@@ -46,7 +46,7 @@ struct CounterOps {
         return counter;
     }
 
-    static int64_t get(const AtomicInt64& counter) {
+    static int64_t get(const AtomicWord<long long>& counter) {
         return counter.load();
     }
 
@@ -54,7 +54,7 @@ struct CounterOps {
         counter = value;
     }
 
-    static void set(AtomicInt64& counter, int64_t value) {
+    static void set(AtomicWord<long long>& counter, int64_t value) {
         counter.store(value);
     }
 
@@ -62,11 +62,11 @@ struct CounterOps {
         counter += value;
     }
 
-    static void add(int64_t& counter, const AtomicInt64& value) {
+    static void add(int64_t& counter, const AtomicWord<long long>& value) {
         counter += value.load();
     }
 
-    static void add(AtomicInt64& counter, int64_t value) {
+    static void add(AtomicWord<long long>& counter, int64_t value) {
         counter.addAndFetch(value);
     }
 };
@@ -208,7 +208,7 @@ private:
 };
 
 typedef LockStats<int64_t> SingleThreadedLockStats;
-typedef LockStats<AtomicInt64> AtomicLockStats;
+typedef LockStats<AtomicWord<long long>> AtomicLockStats;
 
 
 /**

@@ -49,11 +49,11 @@ class OperationContext;
 // secondaryThrottle and rangeDeleterBatchDelayMS apply between each batch.
 // Must be positive or 0 (the default), which means to use the value of
 // internalQueryExecYieldIterations (or 1 if that's negative or zero).
-extern AtomicInt32 rangeDeleterBatchSize;
+extern AtomicWord<int> rangeDeleterBatchSize;
 
 // After completing a batch of document deletions, the time in millis to wait before commencing the
 // next batch of deletions.
-extern AtomicInt32 rangeDeleterBatchDelayMS;
+extern AtomicWord<int> rangeDeleterBatchDelayMS;
 
 class CollectionRangeDeleter {
     MONGO_DISALLOW_COPYING(CollectionRangeDeleter);

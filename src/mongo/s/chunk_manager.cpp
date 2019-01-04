@@ -49,7 +49,7 @@ namespace mongo {
 namespace {
 
 // Used to generate sequence numbers to assign to each newly created RoutingTableHistory
-AtomicUInt32 nextCMSequenceNumber(0);
+AtomicWord<unsigned> nextCMSequenceNumber(0);
 
 void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
     for (auto&& element : o) {

@@ -104,6 +104,6 @@ private:
     // journal flushing should not be delayed.
     std::int64_t _opsWaitingForVisibility = 0;  // Guarded by oplogVisibilityStateMutex.
 
-    AtomicUInt64 _oplogReadTimestamp;
+    AtomicWord<unsigned long long> _oplogReadTimestamp;
 };
 }  // namespace mongo

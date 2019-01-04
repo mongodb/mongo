@@ -188,7 +188,7 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
         void waitFor(int n) {
             waitFor([this, n]() { return this->step.load() == n; });
         }
-        AtomicInt32 step{0};
+        AtomicWord<int> step{0};
     } state;
 
     stdx::thread t1([&]() {
@@ -1127,7 +1127,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
-    AtomicInt32 ready{0};
+    AtomicWord<int> ready{0};
     std::vector<stdx::thread> threads;
 
 
@@ -1251,7 +1251,7 @@ TEST_F(DConcurrencyTestFixture, StressPartitioned) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients = makeKClientsWithLockers(kMaxStressThreads);
 
-    AtomicInt32 ready{0};
+    AtomicWord<int> ready{0};
     std::vector<stdx::thread> threads;
 
     for (int threadId = 0; threadId < kMaxStressThreads; threadId++) {
@@ -1753,8 +1753,8 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
 TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
     int numThreads = 8;
     int testMicros = 500'000;
-    AtomicUInt64 readOnlyInterval{0};
-    AtomicBool done{false};
+    AtomicWord<unsigned long long> readOnlyInterval{0};
+    AtomicWord<bool> done{false};
     std::vector<uint64_t> acquisitionCount(numThreads);
     std::vector<uint64_t> timeoutCount(numThreads);
     std::vector<uint64_t> busyWaitCount(numThreads);

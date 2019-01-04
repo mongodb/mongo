@@ -87,12 +87,12 @@ private:
     mutable sem_t _sem;
 
     // You can read _outof without a lock, but have to hold _resizeMutex to change.
-    AtomicInt32 _outof;
+    AtomicWord<int> _outof;
     stdx::mutex _resizeMutex;
 #else
     bool _tryAcquire();
 
-    AtomicInt32 _outof;
+    AtomicWord<int> _outof;
     int _num;
     stdx::mutex _mutex;
     stdx::condition_variable _newTicket;

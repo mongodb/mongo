@@ -252,7 +252,7 @@ private:
     RestrictionDocuments _restrictions;
 
     // Indicates whether the user has been marked as invalid by the AuthorizationManager.
-    AtomicBool _isValid{true};
+    AtomicWord<bool> _isValid{true};
 };
 
 using UserHandle = std::shared_ptr<User>;

@@ -54,7 +54,8 @@ std::string clusterAuthModeFormat() {
         case ServerGlobalParams::ClusterAuthMode_x509:
             return "x509";
         default:
-            // Default case because clusterAuthMode is an AtomicInt32 and not bound by enum rules.
+            // Default case because clusterAuthMode is an AtomicWord<int> and not bound by enum
+            // rules.
             return "undefined";
     }
 }

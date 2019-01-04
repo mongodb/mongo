@@ -146,7 +146,7 @@ private:
     stdx::mutex _mutex;
 
     // State of the initialization of the sharding state along with any potential errors
-    AtomicUInt32 _initializationState{static_cast<uint32_t>(InitializationState::kNew)};
+    AtomicWord<unsigned> _initializationState{static_cast<uint32_t>(InitializationState::kNew)};
 
     // Sets the shard name for this host (comes through setShardVersion)
     ShardId _shardId;

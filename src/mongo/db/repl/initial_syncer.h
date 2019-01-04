@@ -568,7 +568,7 @@ private:
     void _shutdownComponent_inlock(Component& component);
 
     // Counts how many documents have been refetched from the source in the current batch.
-    AtomicUInt32 _fetchCount;
+    AtomicWord<unsigned> _fetchCount;
 
     //
     // All member variables are labeled with one of the following codes indicating the

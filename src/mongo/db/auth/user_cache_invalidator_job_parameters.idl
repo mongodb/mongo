@@ -40,7 +40,7 @@ server_parameters:
       checks to determine whether the in-memory cache of user objects has stale data, and if so,
       clears the cache. If there are no changes to user objects, mongos will not clear the cache.
     cpp_varname: userCacheInvalidationIntervalSecs
-    cpp_vartype: AtomicInt32
+    cpp_vartype: AtomicWord<int>
     set_at:
       - startup
       - runtime

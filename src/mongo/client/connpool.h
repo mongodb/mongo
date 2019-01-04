@@ -441,7 +441,7 @@ public:
     }
 
 private:
-    static AtomicInt32 _numConnections;
+    static AtomicWord<int> _numConnections;
 };
 
 /** Use to get a connection from the pool.  On exceptions things

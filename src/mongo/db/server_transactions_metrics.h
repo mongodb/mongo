@@ -174,34 +174,34 @@ private:
     mutable stdx::mutex _mutex;
 
     // The number of multi-document transactions currently active.
-    AtomicUInt64 _currentActive{0};
+    AtomicWord<unsigned long long> _currentActive{0};
 
     // The number of multi-document transactions currently inactive.
-    AtomicUInt64 _currentInactive{0};
+    AtomicWord<unsigned long long> _currentInactive{0};
 
     // The total number of open transactions.
-    AtomicUInt64 _currentOpen{0};
+    AtomicWord<unsigned long long> _currentOpen{0};
 
     // The total number of multi-document transactions started since the last server startup.
-    AtomicUInt64 _totalStarted{0};
+    AtomicWord<unsigned long long> _totalStarted{0};
 
     // The total number of multi-document transaction aborts.
-    AtomicUInt64 _totalAborted{0};
+    AtomicWord<unsigned long long> _totalAborted{0};
 
     // The total number of multi-document transaction commits.
-    AtomicUInt64 _totalCommitted{0};
+    AtomicWord<unsigned long long> _totalCommitted{0};
 
     // The total number of prepared transactions since the last server startup.
-    AtomicUInt64 _totalPrepared{0};
+    AtomicWord<unsigned long long> _totalPrepared{0};
 
     // The total number of prepared transaction commits.
-    AtomicUInt64 _totalPreparedThenCommitted{0};
+    AtomicWord<unsigned long long> _totalPreparedThenCommitted{0};
 
     // The total number of prepared transaction aborts.
-    AtomicUInt64 _totalPreparedThenAborted{0};
+    AtomicWord<unsigned long long> _totalPreparedThenAborted{0};
 
     // The current number of transactions in the prepared state.
-    AtomicUInt64 _currentPrepared{0};
+    AtomicWord<unsigned long long> _currentPrepared{0};
 
     // The optime of the oldest oplog entry for any active transaction.
     boost::optional<repl::OpTime> _oldestActiveOplogEntryOpTime;  // (M)

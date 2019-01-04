@@ -250,7 +250,7 @@ public:
     // if the output collection is sharded, we must be told what UUID to use for it
     boost::optional<UUID> finalOutputCollUUID;
 
-    static AtomicUInt32 JOB_NUMBER;
+    static AtomicWord<unsigned> JOB_NUMBER;
 };  // end MRsetup
 
 /**

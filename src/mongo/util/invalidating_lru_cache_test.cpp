@@ -59,7 +59,7 @@ public:
     }
 
 private:
-    AtomicBool _isValid{true};
+    AtomicWord<bool> _isValid{true};
     boost::optional<stdx::function<bool()>> _isValidHook;
 };
 

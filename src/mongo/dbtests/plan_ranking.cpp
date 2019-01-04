@@ -57,9 +57,9 @@
 namespace mongo {
 
 // How we access the external setParameter testing bool.
-extern AtomicBool internalQueryForceIntersectionPlans;
+extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
-extern AtomicBool internalQueryPlannerEnableHashIntersection;
+extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
 
 }  // namespace mongo
 

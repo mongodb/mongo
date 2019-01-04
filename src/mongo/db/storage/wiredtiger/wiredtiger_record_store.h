@@ -349,8 +349,8 @@ private:
     const int64_t _cappedMaxSizeSlack;  // when to start applying backpressure
     const int64_t _cappedMaxDocs;
     RecordId _cappedFirstRecord;
-    AtomicInt64 _cappedSleep;
-    AtomicInt64 _cappedSleepMS;
+    AtomicWord<long long> _cappedSleep;
+    AtomicWord<long long> _cappedSleepMS;
     CappedCallback* _cappedCallback;
     bool _shuttingDown;
     mutable stdx::mutex _cappedCallbackMutex;  // guards _cappedCallback and _shuttingDown
@@ -359,7 +359,7 @@ private:
     int _cappedDeleteCheckCount;
     mutable stdx::timed_mutex _cappedDeleterMutex;
 
-    AtomicInt64 _nextIdNum;
+    AtomicWord<long long> _nextIdNum;
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;

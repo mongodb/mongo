@@ -47,7 +47,7 @@ namespace mongo {
 namespace {
 
 // Counter used to assign unique names to otherwise-unnamed thread pools.
-AtomicInt32 nextUnnamedThreadPoolId{1};
+AtomicWord<int> nextUnnamedThreadPoolId{1};
 
 /**
  * Sets defaults and checks bounds limits on "options", and returns it.

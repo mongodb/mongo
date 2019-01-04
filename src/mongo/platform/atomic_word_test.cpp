@@ -78,10 +78,10 @@ TEST(AtomicWordTests, BasicOperationsEnum) {
 }
 
 TEST(AtomicWordTests, BasicOperationsUnsigned32Bit) {
-    typedef AtomicUInt32::WordType WordType;
-    testAtomicWordBasicOperations<AtomicUInt32>();
+    typedef unsigned WordType;
+    testAtomicWordBasicOperations<AtomicWord<unsigned>>();
 
-    AtomicUInt32 w(0xdeadbeef);
+    AtomicWord<unsigned> w(0xdeadbeef);
     ASSERT_EQUALS(WordType(0xdeadbeef), w.compareAndSwap(0, 1));
     ASSERT_EQUALS(WordType(0xdeadbeef), w.compareAndSwap(0xdeadbeef, 0xcafe1234));
     ASSERT_EQUALS(WordType(0xcafe1234), w.fetchAndAdd(0xf000));
@@ -90,10 +90,10 @@ TEST(AtomicWordTests, BasicOperationsUnsigned32Bit) {
 }
 
 TEST(AtomicWordTests, BasicOperationsUnsigned64Bit) {
-    typedef AtomicUInt64::WordType WordType;
-    testAtomicWordBasicOperations<AtomicUInt64>();
+    typedef unsigned long long WordType;
+    testAtomicWordBasicOperations<AtomicWord<unsigned long long>>();
 
-    AtomicUInt64 w(0xdeadbeefcafe1234ULL);
+    AtomicWord<unsigned long long> w(0xdeadbeefcafe1234ULL);
     ASSERT_EQUALS(WordType(0xdeadbeefcafe1234ULL), w.compareAndSwap(0, 1));
     ASSERT_EQUALS(WordType(0xdeadbeefcafe1234ULL),
                   w.compareAndSwap(0xdeadbeefcafe1234ULL, 0xfedcba9876543210ULL));
@@ -103,10 +103,10 @@ TEST(AtomicWordTests, BasicOperationsUnsigned64Bit) {
 }
 
 TEST(AtomicWordTests, BasicOperationsSigned32Bit) {
-    typedef AtomicInt32::WordType WordType;
-    testAtomicWordBasicOperations<AtomicInt32>();
+    typedef int WordType;
+    testAtomicWordBasicOperations<AtomicWord<int>>();
 
-    AtomicInt32 w(0xdeadbeef);
+    AtomicWord<int> w(0xdeadbeef);
     ASSERT_EQUALS(WordType(0xdeadbeef), w.compareAndSwap(0, 1));
     ASSERT_EQUALS(WordType(0xdeadbeef), w.compareAndSwap(0xdeadbeef, 0xcafe1234));
     ASSERT_EQUALS(WordType(0xcafe1234), w.fetchAndAdd(0xf000));
@@ -115,10 +115,10 @@ TEST(AtomicWordTests, BasicOperationsSigned32Bit) {
 }
 
 TEST(AtomicWordTests, BasicOperationsSigned64Bit) {
-    typedef AtomicInt64::WordType WordType;
-    testAtomicWordBasicOperations<AtomicInt64>();
+    typedef long long WordType;
+    testAtomicWordBasicOperations<AtomicWord<long long>>();
 
-    AtomicInt64 w(0xdeadbeefcafe1234ULL);
+    AtomicWord<long long> w(0xdeadbeefcafe1234ULL);
     ASSERT_EQUALS(WordType(0xdeadbeefcafe1234LL), w.compareAndSwap(0, 1));
     ASSERT_EQUALS(WordType(0xdeadbeefcafe1234LL),
                   w.compareAndSwap(0xdeadbeefcafe1234LL, 0xfedcba9876543210LL));

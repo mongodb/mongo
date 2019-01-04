@@ -101,7 +101,7 @@ public:
 private:
     class Holder {
     public:
-        explicit Holder(AtomicUInt32::WordType initial, size_t capacity)
+        explicit Holder(unsigned initial, size_t capacity)
             : _refCount(initial), _capacity(capacity) {
             invariant(capacity == _capacity);
         }
@@ -132,7 +132,7 @@ private:
             return _refCount.load() > 1;
         }
 
-        AtomicUInt32 _refCount;
+        AtomicWord<unsigned> _refCount;
         uint32_t _capacity;
     };
 

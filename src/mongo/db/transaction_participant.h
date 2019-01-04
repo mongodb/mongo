@@ -56,7 +56,7 @@ namespace mongo {
 
 class OperationContext;
 
-extern AtomicInt32 transactionLifetimeLimitSeconds;
+extern AtomicWord<int> transactionLifetimeLimitSeconds;
 
 /**
  * Read timestamp to be used for a speculative transaction.  For transactions with read

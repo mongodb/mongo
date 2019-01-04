@@ -453,8 +453,8 @@ private:
     unsigned _numUnstartedWorkers;
     unsigned _numActiveWorkers;
 
-    AtomicUInt32 _isShuttingDown;
-    AtomicUInt32 _isCollectingStats;
+    AtomicWord<unsigned> _isShuttingDown;
+    AtomicWord<unsigned> _isCollectingStats;
 };
 
 /**

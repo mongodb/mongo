@@ -41,7 +41,8 @@ namespace {
 const auto getLogicalSessionCache =
     ServiceContext::declareDecoration<std::unique_ptr<LogicalSessionCache>>();
 
-const auto getLogicalSessionCacheIsRegistered = ServiceContext::declareDecoration<AtomicBool>();
+const auto getLogicalSessionCacheIsRegistered =
+    ServiceContext::declareDecoration<AtomicWord<bool>>();
 }  // namespace
 
 LogicalSessionCache::~LogicalSessionCache() = default;

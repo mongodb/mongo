@@ -295,7 +295,7 @@ private:
     executor::TaskExecutor::CallbackHandle _refresherHandle;
 
     const SetStatePtr _state;
-    AtomicBool _isRemovedFromManager{false};
+    AtomicWord<bool> _isRemovedFromManager{false};
 };
 
 

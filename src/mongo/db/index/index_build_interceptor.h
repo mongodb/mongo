@@ -127,7 +127,7 @@ private:
 
     int64_t _numApplied{0};
 
-    AtomicInt64 _sideWritesCounter{0};
+    AtomicWord<long long> _sideWritesCounter{0};
 
     mutable stdx::mutex _multikeyPathMutex;
     boost::optional<MultikeyPaths> _multikeyPaths;

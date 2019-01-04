@@ -94,7 +94,7 @@ const int64_t unknownLatency = numeric_limits<int64_t>::max();
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
 const Milliseconds kExpeditedRefreshPeriod(500);
-AtomicBool areRefreshRetriesDisabledForTest{false};  // Only true in tests.
+AtomicWord<bool> areRefreshRetriesDisabledForTest{false};  // Only true in tests.
 
 // TODO: Move to ReplicaSetMonitorManager
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;

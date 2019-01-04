@@ -227,7 +227,7 @@ public:
     // Below interface used for testing code only.
     //
 
-    inline AtomicUInt32::WordType refCount() const;
+    inline unsigned refCount() const;
 
 private:
     // Private since it could result in a type mismatch between code and extraInfo.
@@ -237,7 +237,7 @@ private:
     inline Status();
 
     struct ErrorInfo {
-        AtomicUInt32 refs;             // reference counter
+        AtomicWord<unsigned> refs;     // reference counter
         const ErrorCodes::Error code;  // error code
         const std::string reason;      // description of error cause
         const std::shared_ptr<const ErrorExtraInfo> extra;

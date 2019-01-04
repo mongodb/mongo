@@ -105,13 +105,13 @@ private:
  * Used to provide default values from FTDCConfig to the FTDC set parameters.
  */
 struct FTDCStartupParams {
-    AtomicBool enabled;
-    AtomicInt32 periodMillis;
+    AtomicWord<bool> enabled;
+    AtomicWord<int> periodMillis;
 
-    AtomicInt32 maxDirectorySizeMB;
-    AtomicInt32 maxFileSizeMB;
-    AtomicInt32 maxSamplesPerArchiveMetricChunk;
-    AtomicInt32 maxSamplesPerInterimMetricChunk;
+    AtomicWord<int> maxDirectorySizeMB;
+    AtomicWord<int> maxFileSizeMB;
+    AtomicWord<int> maxSamplesPerArchiveMetricChunk;
+    AtomicWord<int> maxSamplesPerInterimMetricChunk;
 
     FTDCStartupParams()
         : enabled(FTDCConfig::kEnabledDefault),

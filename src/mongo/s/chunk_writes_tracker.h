@@ -86,7 +86,7 @@ private:
      * The number of bytes that have been written to this chunk. May be
      * modified concurrently by several threads.
      */
-    AtomicUInt64 _bytesWritten{0};
+    AtomicWord<unsigned long long> _bytesWritten{0};
 
     /**
      * Protects _splitState when starting a split.

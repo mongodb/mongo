@@ -101,10 +101,10 @@ private:
     // (S) Self-synchronizing; access in any way from any context.
 
     // Whether the logAction call should attempt to create the actionlog collection
-    AtomicInt32 _actionLogCollectionCreated{0};  // (S)
+    AtomicWord<int> _actionLogCollectionCreated{0};  // (S)
 
     // Whether the logChange call should attempt to create the changelog collection
-    AtomicInt32 _changeLogCollectionCreated{0};  // (S)
+    AtomicWord<int> _changeLogCollectionCreated{0};  // (S)
 };
 
 }  // namespace mongo

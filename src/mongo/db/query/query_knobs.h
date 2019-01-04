@@ -41,34 +41,34 @@ namespace mongo {
 
 // Max number of times we call work() on plans before comparing them,
 // for small collections.
-extern AtomicInt32 internalQueryPlanEvaluationWorks;
+extern AtomicWord<int> internalQueryPlanEvaluationWorks;
 
 // For large collections, the number times we work() candidate plans is
 // taken as this fraction of the collection size.
 extern AtomicDouble internalQueryPlanEvaluationCollFraction;
 
 // Stop working plans once a plan returns this many results.
-extern AtomicInt32 internalQueryPlanEvaluationMaxResults;
+extern AtomicWord<int> internalQueryPlanEvaluationMaxResults;
 
 // Do we give a big ranking bonus to intersection plans?
-extern AtomicBool internalQueryForceIntersectionPlans;
+extern AtomicWord<bool> internalQueryForceIntersectionPlans;
 
 // Do we have ixisect on at all?
-extern AtomicBool internalQueryPlannerEnableIndexIntersection;
+extern AtomicWord<bool> internalQueryPlannerEnableIndexIntersection;
 
 // Do we use hash-based intersection for rooted $and queries?
-extern AtomicBool internalQueryPlannerEnableHashIntersection;
+extern AtomicWord<bool> internalQueryPlannerEnableHashIntersection;
 
 //
 // plan cache
 //
 
 // How many entries in the cache?
-extern AtomicInt32 internalQueryCacheSize;
+extern AtomicWord<int> internalQueryCacheSize;
 
 // How many feedback entries do we collect before possibly evicting from the cache based on bad
 // performance?
-extern AtomicInt32 internalQueryCacheFeedbacksStored;
+extern AtomicWord<int> internalQueryCacheFeedbacksStored;
 
 // How many times more works must we perform in order to justify plan cache eviction
 // and replanning?
@@ -79,66 +79,66 @@ extern AtomicDouble internalQueryCacheEvictionRatio;
 extern AtomicDouble internalQueryCacheWorksGrowthCoefficient;
 
 // Whether or not cache entries can be marked as "inactive."
-extern AtomicBool internalQueryCacheDisableInactiveEntries;
+extern AtomicWord<bool> internalQueryCacheDisableInactiveEntries;
 
 // Whether or not planCacheListPlans uses the new output format.
-extern AtomicBool internalQueryCacheListPlansNewOutput;
+extern AtomicWord<bool> internalQueryCacheListPlansNewOutput;
 
 //
 // Planning and enumeration.
 //
 
 // How many indexed solutions will QueryPlanner::plan output?
-extern AtomicInt32 internalQueryPlannerMaxIndexedSolutions;
+extern AtomicWord<int> internalQueryPlannerMaxIndexedSolutions;
 
 // How many solutions will the enumerator consider at each OR?
-extern AtomicInt32 internalQueryEnumerationMaxOrSolutions;
+extern AtomicWord<int> internalQueryEnumerationMaxOrSolutions;
 
 // How many intersections will the enumerator consider at each AND?
-extern AtomicInt32 internalQueryEnumerationMaxIntersectPerAnd;
+extern AtomicWord<int> internalQueryEnumerationMaxIntersectPerAnd;
 
 // Do we want to plan each child of the OR independently?
-extern AtomicBool internalQueryPlanOrChildrenIndependently;
+extern AtomicWord<bool> internalQueryPlanOrChildrenIndependently;
 
 // How many index scans are we willing to produce in order to obtain a sort order
 // during explodeForSort?
-extern AtomicInt32 internalQueryMaxScansToExplode;
+extern AtomicWord<int> internalQueryMaxScansToExplode;
 
 // Allow the planner to generate covered whole index scans, rather than falling back to a COLLSCAN.
-extern AtomicBool internalQueryPlannerGenerateCoveredWholeIndexScans;
+extern AtomicWord<bool> internalQueryPlannerGenerateCoveredWholeIndexScans;
 
 // Ignore unknown JSON Schema keywords.
-extern AtomicBool internalQueryIgnoreUnknownJSONSchemaKeywords;
+extern AtomicWord<bool> internalQueryIgnoreUnknownJSONSchemaKeywords;
 
 //
 // Query execution.
 //
 
-extern AtomicInt32 internalQueryExecMaxBlockingSortBytes;
+extern AtomicWord<int> internalQueryExecMaxBlockingSortBytes;
 
 // Yield after this many "should yield?" checks.
-extern AtomicInt32 internalQueryExecYieldIterations;
+extern AtomicWord<int> internalQueryExecYieldIterations;
 
 // Yield if it's been at least this many milliseconds since we last yielded.
-extern AtomicInt32 internalQueryExecYieldPeriodMS;
+extern AtomicWord<int> internalQueryExecYieldPeriodMS;
 
 // Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
 const int64_t insertVectorMaxBytes = 256 * 1024;
 
 // The number of bytes to buffer at once during a $facet stage.
-extern AtomicInt32 internalQueryFacetBufferSizeBytes;
+extern AtomicWord<int> internalQueryFacetBufferSizeBytes;
 
-extern AtomicInt64 internalDocumentSourceSortMaxBlockingSortBytes;
+extern AtomicWord<long long> internalDocumentSourceSortMaxBlockingSortBytes;
 
-extern AtomicInt64 internalLookupStageIntermediateDocumentMaxSizeBytes;
+extern AtomicWord<long long> internalLookupStageIntermediateDocumentMaxSizeBytes;
 
-extern AtomicInt64 internalDocumentSourceGroupMaxMemoryBytes;
+extern AtomicWord<long long> internalDocumentSourceGroupMaxMemoryBytes;
 
-extern AtomicInt32 internalInsertMaxBatchSize;
+extern AtomicWord<int> internalInsertMaxBatchSize;
 
-extern AtomicInt32 internalDocumentSourceCursorBatchSizeBytes;
+extern AtomicWord<int> internalDocumentSourceCursorBatchSizeBytes;
 
-extern AtomicInt32 internalDocumentSourceLookupCacheSizeBytes;
+extern AtomicWord<int> internalDocumentSourceLookupCacheSizeBytes;
 
-extern AtomicBool internalQueryProhibitBlockingMergeOnMongoS;
+extern AtomicWord<bool> internalQueryProhibitBlockingMergeOnMongoS;
 }  // namespace mongo

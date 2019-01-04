@@ -68,8 +68,8 @@ void OpCounters::gotOp(int op, bool isCommand) {
     }
 }
 
-void OpCounters::_checkWrap(CacheAligned<AtomicInt64> OpCounters::*counter, int n) {
-    static constexpr auto maxCount = AtomicInt64::WordType{1} << 60;
+void OpCounters::_checkWrap(CacheAligned<AtomicWord<long long>> OpCounters::*counter, int n) {
+    static constexpr auto maxCount = 1LL << 60;
     auto oldValue = (this->*counter).fetchAndAddRelaxed(n);
     if (oldValue > maxCount) {
         _insert.store(0);

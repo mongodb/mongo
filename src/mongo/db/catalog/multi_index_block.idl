@@ -39,7 +39,7 @@ server_parameters:
       - runtime
       - startup
     cpp_varname: useReadOnceCursorsForIndexBuilds
-    cpp_vartype: AtomicBool
+    cpp_vartype: AtomicWord<bool>
     default: true
 
   maxIndexBuildMemoryUsageMegabytes:
@@ -48,7 +48,7 @@ server_parameters:
       - runtime
       - startup
     cpp_varname: maxIndexBuildMemoryUsageMegabytes
-    cpp_vartype: AtomicInt32
+    cpp_vartype: AtomicWord<int>
     default: 500
     validator:
       gte: 100

@@ -163,7 +163,7 @@ private:
     const std::string _path;
     const std::string _ident;
 
-    AtomicInt64 _nextIdNum;
+    AtomicWord<long long> _nextIdNum;
 
     /**
      * Fetches the number of records from the database. _numRecsMutex should be locked before this

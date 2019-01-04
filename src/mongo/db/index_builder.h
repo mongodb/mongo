@@ -112,6 +112,6 @@ private:
     const ReplicatedWrites _replicatedWrites;
     const Timestamp _initIndexTs;
     std::string _name;  // name of this builder, not related to the index
-    static AtomicUInt32 _indexBuildCount;
+    static AtomicWord<unsigned> _indexBuildCount;
 };
 }

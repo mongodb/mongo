@@ -108,7 +108,7 @@ private:
         ConnHandle conn;
         std::unique_ptr<transport::ReactorTimer> timer;
 
-        AtomicBool done;
+        AtomicWord<bool> done;
         Promise<RemoteCommandResponse> promise;
     };
 
@@ -133,7 +133,7 @@ private:
     Counters _counters;
 
     std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
-    AtomicBool _inShutdown;
+    AtomicWord<bool> _inShutdown;
     stdx::thread _ioThread;
 
     stdx::mutex _inProgressMutex;

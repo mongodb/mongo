@@ -90,7 +90,7 @@ void setWindowsThreadName(DWORD dwThreadID, const char* threadName) {
 }
 #endif
 
-AtomicInt64 nextUnnamedThreadId{1};
+AtomicWord<long long> nextUnnamedThreadId{1};
 
 // It is unsafe to access threadName before its dynamic initialization has completed. Use
 // the execution of mongo initializers (which only happens once we have entered main, and

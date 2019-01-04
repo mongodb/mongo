@@ -76,35 +76,35 @@ public:
     BSONObj getObj() const;
 
     // thse are used by snmp, and other things, do not remove
-    const AtomicInt64* getInsert() const {
+    const AtomicWord<long long>* getInsert() const {
         return &_insert;
     }
-    const AtomicInt64* getQuery() const {
+    const AtomicWord<long long>* getQuery() const {
         return &_query;
     }
-    const AtomicInt64* getUpdate() const {
+    const AtomicWord<long long>* getUpdate() const {
         return &_update;
     }
-    const AtomicInt64* getDelete() const {
+    const AtomicWord<long long>* getDelete() const {
         return &_delete;
     }
-    const AtomicInt64* getGetMore() const {
+    const AtomicWord<long long>* getGetMore() const {
         return &_getmore;
     }
-    const AtomicInt64* getCommand() const {
+    const AtomicWord<long long>* getCommand() const {
         return &_command;
     }
 
 private:
     // Increment member `counter` by `n`, resetting all counters if it was > 2^60.
-    void _checkWrap(CacheAligned<AtomicInt64> OpCounters::*counter, int n);
+    void _checkWrap(CacheAligned<AtomicWord<long long>> OpCounters::*counter, int n);
 
-    CacheAligned<AtomicInt64> _insert;
-    CacheAligned<AtomicInt64> _query;
-    CacheAligned<AtomicInt64> _update;
-    CacheAligned<AtomicInt64> _delete;
-    CacheAligned<AtomicInt64> _getmore;
-    CacheAligned<AtomicInt64> _command;
+    CacheAligned<AtomicWord<long long>> _insert;
+    CacheAligned<AtomicWord<long long>> _query;
+    CacheAligned<AtomicWord<long long>> _update;
+    CacheAligned<AtomicWord<long long>> _delete;
+    CacheAligned<AtomicWord<long long>> _getmore;
+    CacheAligned<AtomicWord<long long>> _command;
 };
 
 extern OpCounters globalOpCounters;
@@ -124,20 +124,20 @@ public:
     void append(BSONObjBuilder& b);
 
 private:
-    CacheAligned<AtomicInt64> _physicalBytesIn{0};
-    CacheAligned<AtomicInt64> _physicalBytesOut{0};
+    CacheAligned<AtomicWord<long long>> _physicalBytesIn{0};
+    CacheAligned<AtomicWord<long long>> _physicalBytesOut{0};
 
     // These two counters are always incremented at the same time, so
     // we place them on the same cache line.
     struct Together {
-        AtomicInt64 logicalBytesIn{0};
-        AtomicInt64 requests{0};
+        AtomicWord<long long> logicalBytesIn{0};
+        AtomicWord<long long> requests{0};
     };
     CacheAligned<Together> _together{};
     static_assert(sizeof(decltype(_together)) <= stdx::hardware_constructive_interference_size,
                   "cache line spill");
 
-    CacheAligned<AtomicInt64> _logicalBytesOut{0};
+    CacheAligned<AtomicWord<long long>> _logicalBytesOut{0};
 };
 
 extern NetworkCounter networkCounter;

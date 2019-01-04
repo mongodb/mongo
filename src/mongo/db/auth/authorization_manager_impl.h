@@ -203,7 +203,7 @@ private:
     /**
      * A cache of whether there are any users set up for the cluster.
      */
-    AtomicBool _privilegeDocsExist;
+    AtomicWord<bool> _privilegeDocsExist;
 
     std::unique_ptr<AuthzManagerExternalState> _externalState;
 
@@ -256,7 +256,7 @@ private:
      */
     stdx::condition_variable _fetchPhaseIsReady;
 
-    AtomicBool _inUserManagementCommand{false};
+    AtomicWord<bool> _inUserManagementCommand{false};
 };
 
 extern int authorizationManagerCacheSize;

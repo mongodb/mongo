@@ -107,7 +107,7 @@ Value deserializeSortKey(size_t sortPatternSize, BSONObj bsonSortKey) {
  * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
  */
 std::string nextFileName() {
-    static AtomicUInt32 documentSourceSortFileCounter;
+    static AtomicWord<unsigned> documentSourceSortFileCounter;
     return "extsort-doc-source-sort." +
         std::to_string(documentSourceSortFileCounter.fetchAndAdd(1));
 }

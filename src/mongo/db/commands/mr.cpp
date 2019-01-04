@@ -165,7 +165,7 @@ void assertCollectionNotNull(const NamespaceString& nss, AutoT& autoT) {
 
 }  // namespace
 
-AtomicUInt32 Config::JOB_NUMBER;
+AtomicWord<unsigned> Config::JOB_NUMBER;
 
 JSFunction::JSFunction(const std::string& type, const BSONElement& e) {
     _type = type;

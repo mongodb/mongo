@@ -131,8 +131,8 @@ void LockStats<CounterType>::reset() {
 }
 
 
-// Ensures that there are instances compiled for LockStats for AtomicInt64 and int64_t
+// Ensures that there are instances compiled for LockStats for AtomicWord<long long> and int64_t
 template class LockStats<int64_t>;
-template class LockStats<AtomicInt64>;
+template class LockStats<AtomicWord<long long>>;
 
 }  // namespace mongo

@@ -65,7 +65,7 @@ private:
     static thread_local int _localRecursionDepth;
     static thread_local int64_t _localThreadIdleCounter;
 
-    AtomicBool _stillRunning{false};
+    AtomicWord<bool> _stillRunning{false};
 
     mutable stdx::mutex _shutdownMutex;
     stdx::condition_variable _shutdownCondition;

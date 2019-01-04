@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-AtomicBool WriteConflictException::trace(false);
+AtomicWord<bool> WriteConflictException::trace(false);
 
 WriteConflictException::WriteConflictException()
     : DBException(Status(ErrorCodes::WriteConflict, "WriteConflict")) {

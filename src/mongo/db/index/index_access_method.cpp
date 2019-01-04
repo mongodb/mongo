@@ -821,7 +821,7 @@ SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {
  * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
  */
 std::string nextFileName() {
-    static AtomicUInt32 indexAccessMethodFileCounter;
+    static AtomicWord<unsigned> indexAccessMethodFileCounter;
     return "extsort-index." + std::to_string(indexAccessMethodFileCounter.fetchAndAdd(1));
 }
 

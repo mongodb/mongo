@@ -191,7 +191,7 @@ private:
 
     CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 
-    AtomicBool _shardingInitialized{false};
+    AtomicWord<bool> _shardingInitialized{false};
 
     // Protects _configOpTime.
     mutable stdx::mutex _mutex;

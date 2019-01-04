@@ -36,6 +36,7 @@
 
 #include <boost/functional/hash.hpp>
 #include <limits>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,7 +47,7 @@
 namespace mongo {
 
 namespace {
-std::unique_ptr<AtomicUInt32> counter;
+std::unique_ptr<AtomicWord<int64_t>> counter;
 
 const std::size_t kTimestampOffset = 0;
 const std::size_t kInstanceUniqueOffset = kTimestampOffset + OID::kTimestampSize;
@@ -57,7 +58,7 @@ OID::InstanceUnique _instanceUnique;
 MONGO_INITIALIZER_GENERAL(OIDGeneration, MONGO_NO_PREREQUISITES, ("default"))
 (InitializerContext* context) {
     std::unique_ptr<SecureRandom> entropy(SecureRandom::create());
-    counter.reset(new AtomicUInt32(uint32_t(entropy->nextInt64())));
+    counter = std::make_unique<AtomicWord<int64_t>>(entropy->nextInt64());
     _instanceUnique = OID::InstanceUnique::generate(*entropy);
     return Status::OK();
 }

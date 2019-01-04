@@ -141,8 +141,8 @@ private:
 
     mutable stdx::mutex _cappedDeleterMutex;
 
-    AtomicInt64 _highest_record_id{1};
-    AtomicInt64 _numRecords{0};
+    AtomicWord<long long> _highest_record_id{1};
+    AtomicWord<long long> _numRecords{0};
     std::string generateKey(const uint8_t* key, size_t key_len) const;
 
     bool _isOplog;

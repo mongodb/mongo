@@ -289,7 +289,7 @@ public:
     virtual bool setContainsArbiter() const override;
 
 private:
-    AtomicUInt64 _snapshotNameGenerator;
+    AtomicWord<unsigned long long> _snapshotNameGenerator;
     ServiceContext* const _service;
     ReplSettings _settings;
     StorageInterface* _storage = nullptr;

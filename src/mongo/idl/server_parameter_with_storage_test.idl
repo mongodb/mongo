@@ -45,7 +45,7 @@ server_parameters:
   stdIntDeclared:
     set_at: [ startup, runtime ]
     description: "Create a simple int value, and declare storage"
-    cpp_vartype: AtomicInt32
+    cpp_vartype: AtomicWord<int>
     cpp_varname: gStdIntDeclared
     default: 42
     validator:

@@ -62,7 +62,7 @@
 namespace mongo {
 namespace {
 
-AtomicUInt32 JOB_NUMBER;
+AtomicWord<unsigned> JOB_NUMBER;
 
 const Milliseconds kNoDistLockTimeout(-1);
 

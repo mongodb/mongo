@@ -89,7 +89,7 @@ using namespace mongo;
 string historyFile;
 bool gotInterrupted = false;
 bool inMultiLine = false;
-static AtomicBool atPrompt(false);  // can eval before getting to prompt
+static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 
 namespace {
 const std::string kDefaultMongoHost = "127.0.0.1"s;

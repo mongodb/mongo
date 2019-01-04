@@ -116,7 +116,7 @@ struct LTE {
 };
 
 // Wrapped type unwrappers.
-// e.g. Given AtomicInt32, get std::int32_t and normalized store/load methods.
+// e.g. Given AtomicWord<int>, get std::int32_t and normalized store/load methods.
 template <typename U>
 struct storage_wrapper;
 

@@ -201,7 +201,7 @@ StatusWith<SSLParams::SSLModes> SSLParams::tlsModeParse(StringData strMode) {
 }
 
 
-std::string SSLParams::sslModeFormat(AtomicInt32::WordType mode) {
+std::string SSLParams::sslModeFormat(int mode) {
     switch (mode) {
         case SSLParams::SSLMode_disabled:
             return "disabled";
@@ -212,12 +212,12 @@ std::string SSLParams::sslModeFormat(AtomicInt32::WordType mode) {
         case SSLParams::SSLMode_requireSSL:
             return "requireSSL";
         default:
-            // Default case because sslMode is an AtomicInt32 and not bound by enum rules.
+            // Default case because sslMode is an AtomicWord<int> and not bound by enum rules.
             return "unknown";
     }
 }
 
-std::string SSLParams::tlsModeFormat(AtomicInt32::WordType mode) {
+std::string SSLParams::tlsModeFormat(int mode) {
     switch (mode) {
         case SSLParams::SSLMode_disabled:
             return "disabled";
@@ -228,7 +228,7 @@ std::string SSLParams::tlsModeFormat(AtomicInt32::WordType mode) {
         case SSLParams::SSLMode_requireSSL:
             return "requireTLS";
         default:
-            // Default case because sslMode is an AtomicInt32 and not bound by enum rules.
+            // Default case because sslMode is an AtomicWord<int> and not bound by enum rules.
             return "unknown";
     }
 }

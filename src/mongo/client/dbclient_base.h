@@ -710,7 +710,7 @@ protected:
     /** controls how chatty the client is about network errors & such.  See log.h */
     const logger::LogSeverity _logLevel;
 
-    static AtomicInt64 ConnectionIdSequence;
+    static AtomicWord<long long> ConnectionIdSequence;
     long long _connectionId;  // unique connection id for this connection
 
 private:

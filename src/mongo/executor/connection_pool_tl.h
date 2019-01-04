@@ -71,7 +71,7 @@ private:
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
 
     mutable stdx::mutex _mutex;
-    AtomicBool _inShutdown{false};
+    AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };
 

@@ -583,7 +583,7 @@ private:
     std::vector<KillOpListenerInterface*> _killOpListeners;
 
     // Counter for assigning operation ids.
-    AtomicUInt32 _nextOpId{1};
+    AtomicWord<unsigned> _nextOpId{1};
 
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;

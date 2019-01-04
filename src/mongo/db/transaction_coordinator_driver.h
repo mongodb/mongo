@@ -244,7 +244,7 @@ private:
     ThreadPool* const _pool;
 
     // TODO (SERVER-38522): Remove once AsyncWorkScheduler is used for cancellation
-    AtomicBool _cancelled{false};
+    AtomicWord<bool> _cancelled{false};
 };
 
 }  // namespace mongo

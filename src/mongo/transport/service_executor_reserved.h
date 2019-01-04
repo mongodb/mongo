@@ -73,7 +73,7 @@ private:
     static thread_local int _localRecursionDepth;
     static thread_local int64_t _localThreadIdleCounter;
 
-    AtomicBool _stillRunning{false};
+    AtomicWord<bool> _stillRunning{false};
 
     mutable stdx::mutex _mutex;
     stdx::condition_variable _threadWakeup;
@@ -81,7 +81,7 @@ private:
 
     std::deque<Task> _readyTasks;
 
-    AtomicUInt32 _numRunningWorkerThreads{0};
+    AtomicWord<unsigned> _numRunningWorkerThreads{0};
     size_t _numReadyThreads{0};
     size_t _numStartingThreads{0};
 

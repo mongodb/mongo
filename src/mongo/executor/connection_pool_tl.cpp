@@ -45,7 +45,7 @@ namespace {
 const auto kMaxTimerDuration = Milliseconds::max();
 
 struct TimeoutHandler {
-    AtomicBool done;
+    AtomicWord<bool> done;
     Promise<void> promise;
 
     explicit TimeoutHandler(Promise<void> p) : promise(std::move(p)) {}

@@ -141,8 +141,8 @@ private:
     // deque of oplog stones.
     int64_t _minBytesPerStone;
 
-    AtomicInt64 _currentRecords;  // Number of records in the stone being filled.
-    AtomicInt64 _currentBytes;    // Number of bytes in the stone being filled.
+    AtomicWord<long long> _currentRecords;  // Number of records in the stone being filled.
+    AtomicWord<long long> _currentBytes;    // Number of bytes in the stone being filled.
 
     mutable stdx::mutex _mutex;  // Protects against concurrent access to the deque of oplog stones.
     std::deque<OplogStones::Stone> _stones;  // front = oldest, back = newest.

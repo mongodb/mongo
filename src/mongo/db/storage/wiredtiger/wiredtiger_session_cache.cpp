@@ -76,7 +76,7 @@ namespace mongo {
 // will be cached in WiredTiger. Exclusive operations should only be blocked
 // for a short time, except if a cursor is held by a long running session. This
 // is a good compromise for most workloads.
-AtomicInt32 kWiredTigerCursorCacheSize(-100);
+AtomicWord<int> kWiredTigerCursorCacheSize(-100);
 
 const std::string kWTRepairMsg =
     "Please read the documentation for starting MongoDB with --repair here: "
@@ -216,7 +216,7 @@ void WiredTigerSession::closeCursorsForQueuedDrops(WiredTigerKVEngine* engine) {
 }
 
 namespace {
-AtomicUInt64 nextTableId(1);
+AtomicWord<unsigned long long> nextTableId(1);
 }
 // static
 uint64_t WiredTigerSession::genTableId() {

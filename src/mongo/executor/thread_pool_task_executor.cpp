@@ -93,7 +93,7 @@ public:
     // _mutex.
 
     CallbackFn callback;
-    AtomicUInt32 canceled{0U};
+    AtomicWord<unsigned> canceled{0U};
     WorkQueue::iterator iter;
     Date_t readyDate;
     bool isNetworkOperation = false;

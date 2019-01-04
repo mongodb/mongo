@@ -41,7 +41,7 @@ namespace transport {
 
 namespace {
 
-AtomicUInt64 sessionIdCounter(0);
+AtomicWord<unsigned long long> sessionIdCounter(0);
 
 }  // namespace
 

@@ -66,7 +66,7 @@ protected:
     virtual ~RefCountable() {}
 
 private:
-    mutable AtomicUInt32 _count;  // default initialized to 0
+    mutable AtomicWord<unsigned> _count;  // default initialized to 0
 };
 
 /// This is an immutable reference-counted string

@@ -68,12 +68,12 @@ public:
         ~SizeInfo() {
             invariant(!_dirty.load());
         }
-        AtomicInt64 numRecords;
-        AtomicInt64 dataSize;
+        AtomicWord<long long> numRecords;
+        AtomicWord<long long> dataSize;
 
     private:
         friend WiredTigerSizeStorer;
-        AtomicBool _dirty;
+        AtomicWord<bool> _dirty;
     };
 
     WiredTigerSizeStorer(WT_CONNECTION* conn,

@@ -58,8 +58,8 @@ public:
     }
 
 private:
-    AtomicInt64 _num;
-    AtomicInt64 _totalMillis;
+    AtomicWord<long long> _num;
+    AtomicWord<long long> _totalMillis;
 };
 
 /**

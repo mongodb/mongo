@@ -61,7 +61,7 @@ public:
      * If true, will call printStackTrace on every WriteConflictException created.
      * Can be set via setParameter named traceWriteConflictExceptions.
      */
-    static AtomicBool trace;
+    static AtomicWord<bool> trace;
 
 private:
     void defineOnlyInFinalSubclassToPreventSlicing() final {}

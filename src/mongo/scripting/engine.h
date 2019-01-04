@@ -219,7 +219,7 @@ protected:
     std::string _localDBName;
     int64_t _loadedVersion;
     std::set<std::string> _storedNames;
-    static AtomicInt64 _lastVersion;
+    static AtomicWord<long long> _lastVersion;
     FunctionCacheMap _cachedFunctions;
     int _numTimesUsed;
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
