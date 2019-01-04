@@ -173,49 +173,6 @@ class UUIDPrinter(object):
         return str(uuid.UUID("".join(uuid_hex_bytes)))
 
 
-class UnorderedFastKeyTablePrinter(object):
-    """Pretty-printer for mongo::UnorderedFastKeyTable<>."""
-
-    def __init__(self, val):
-        """Initialize UnorderedFastKeyTablePrinter."""
-        self.val = val
-
-        # Get the value_type by doing a type lookup
-        value_type_name = val.type.strip_typedefs().name + "::value_type"
-        value_type = gdb.lookup_type(value_type_name).target()
-        self.value_type_ptr = value_type.pointer()
-
-    @staticmethod
-    def display_hint():
-        """Display hint."""
-        return 'map'
-
-    def to_string(self):
-        """Return UnorderedFastKeyTablePrinter for printing."""
-        return "UnorderedFastKeyTablePrinter<%s> with %s elems " % (
-            self.val.type.template_argument(0), self.val["_size"])
-
-    def children(self):
-        """Children."""
-        cap = self.val["_area"]["_hashMask"] + 1
-        it = get_unique_ptr(self.val["_area"]["_entries"])
-        end = it + cap
-
-        if it == 0:
-            return
-
-        while it != end:
-            elt = it.dereference()
-            it += 1
-            if not elt['_used']:
-                continue
-
-            value = elt['_data']["__data"].cast(self.value_type_ptr).dereference()
-
-            yield ('key', value['first'])
-            yield ('value', value['second'])
-
-
 class DecorablePrinter(object):
     """Pretty-printer for mongo::Decorable<>."""
 
@@ -229,7 +186,7 @@ class DecorablePrinter(object):
         finish = decl_vector["_M_impl"]["_M_finish"]
         decorable_t = val.type.template_argument(0)
         decinfo_t = gdb.lookup_type(
-            'mongo::DecorationRegistry<{}>::DecorationInfo'.format(decorable_t))
+            'mongo::DecorationRegistry<{}>::DecorationInfo'.format(str(decorable_t).replace("class", "").strip()))
         self.count = long((long(finish) - long(self.start)) / decinfo_t.sizeof)
 
     @staticmethod
@@ -397,6 +354,77 @@ class WtTxnPrinter(object):
                 yield (field.name, field_val)
 
 
+def absl_get_nodes(val):
+    """
+    Return a generator of all the nodes in a absl::container_internal::raw_hash_set
+    and derived classes.
+    """
+    size = val["size_"]
+
+    if size == 0:
+        return
+
+    table = val
+    capacity = int(table["capacity_"])
+    ctrl = table["ctrl_"]
+
+    # Using the array of ctrl bytes, search for in-use slots and return them
+    # https://github.com/abseil/abseil-cpp/blob/7ffbe09f3d85504bd018783bbe1e2c12992fe47c/absl/container/internal/raw_hash_set.h#L787-L788
+    for x in range(capacity):
+        ctrl_t = int(ctrl[x])
+        if ctrl_t >= 0:
+            yield table["slots_"][x]
+
+
+class AbslNodeHashSetPrinter(object):
+    """Pretty-printer for absl::node_hash_set<>."""
+
+    def __init__(self, val):
+        """Initialize absl::node_hash_set."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'array'
+
+    def to_string(self):
+        """Return absl::node_hash_set for printing."""
+        return "absl::node_hash_set<%s> with %s elems " % (
+            self.val.type.template_argument(0), self.val["size_"])
+
+    def children(self):
+        """Children."""
+        count = 0
+        for val in absl_get_nodes(self.val):
+            yield (str(count), val.dereference())
+            count += 1
+
+
+class AbslNodeHashMapPrinter(object):
+    """Pretty-printer for absl::node_hash_map<>."""
+
+    def __init__(self, val):
+        """Initialize absl::node_hash_map."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'map'
+
+    def to_string(self):
+        """Return absl::node_hash_map for printing."""
+        return "absl::node_hash_map<%s, %s> with %s elems " % (
+            self.val.type.template_argument(0), self.val.type.template_argument(1), self.val["size_"])
+
+    def children(self):
+        """Children."""
+        for kvp in absl_get_nodes(self.val):
+            yield ('key', kvp['first'])
+            yield ('value', kvp['second'])
+
+
 def find_match_brackets(search, opening='<', closing='>'):
     """Return the index of the closing bracket that matches the first opening bracket.
 
@@ -486,8 +514,10 @@ def build_pretty_printer():
     pp.add('Status', 'mongo::Status', False, StatusPrinter)
     pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)
     pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
-    pp.add('UnorderedFastKeyTable', 'mongo::UnorderedFastKeyTable', True,
-           UnorderedFastKeyTablePrinter)
+    pp.add('node_hash_map', 'absl::node_hash_map', True,
+           AbslNodeHashMapPrinter)
+    pp.add('node_hash_set', 'absl::node_hash_set', True,
+           AbslNodeHashSetPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)

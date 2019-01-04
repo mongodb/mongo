@@ -15,7 +15,8 @@ try:
     printers = pp[0]
     path = os.path.dirname(os.path.dirname(os.path.dirname(printers)))
     sys.path.insert(0, path)
-    from libstdcxx.v6.printers import *
+    from libstdcxx.v6 import register_libstdcxx_printers
+    register_libstdcxx_printers(gdb.current_objfile())
     print("Loaded libstdc++ pretty printers from '%s'" % printers)
 except Exception as e:
     print("Failed to load the libstdc++ pretty printers: " + str(e))
@@ -94,14 +95,15 @@ def get_decorations(obj):
 
     TODO: De-duplicate the logic between here and DecorablePrinter. This code was copied from there.
     """
-    type_name = str(obj.type).replace(" ", "")
+    type_name = str(obj.type).replace("class", "").replace(" ", "")
     decorable = obj.cast(gdb.lookup_type("mongo::Decorable<{}>".format(type_name)))
     decl_vector = decorable["_decorations"]["_registry"]["_decorationInfo"]
     start = decl_vector["_M_impl"]["_M_start"]
     finish = decl_vector["_M_impl"]["_M_finish"]
 
     decorable_t = decorable.type.template_argument(0)
-    decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(decorable_t))
+    decinfo_t = gdb.lookup_type(
+        'mongo::DecorationRegistry<{}>::DecorationInfo'.format(str(decorable_t).replace("class", "").strip()))
     count = long((long(finish) - long(start)) / decinfo_t.sizeof)
 
     for i in range(count):
@@ -265,7 +267,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             )
             return
         lsid_map = session_catalog["_sessions"]
-        session_kv_pairs = list(StdHashtableIterator(lsid_map['_M_h']))  # pylint: disable=undefined-variable
+        session_kv_pairs = list(absl_get_nodes(lsid_map))  # pylint: disable=undefined-variable
         print("Dumping %d Session objects from the SessionCatalog" % len(session_kv_pairs))
 
         # Optionally search for a specified session, based on its id.
