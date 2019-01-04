@@ -102,8 +102,8 @@ def get_decorations(obj):
     finish = decl_vector["_M_impl"]["_M_finish"]
 
     decorable_t = decorable.type.template_argument(0)
-    decinfo_t = gdb.lookup_type(
-        'mongo::DecorationRegistry<{}>::DecorationInfo'.format(str(decorable_t).replace("class", "").strip()))
+    decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
+        str(decorable_t).replace("class", "").strip()))
     count = long((long(finish) - long(start)) / decinfo_t.sizeof)
 
     for i in range(count):

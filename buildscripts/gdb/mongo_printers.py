@@ -185,8 +185,8 @@ class DecorablePrinter(object):
         self.start = decl_vector["_M_impl"]["_M_start"]
         finish = decl_vector["_M_impl"]["_M_finish"]
         decorable_t = val.type.template_argument(0)
-        decinfo_t = gdb.lookup_type(
-            'mongo::DecorationRegistry<{}>::DecorationInfo'.format(str(decorable_t).replace("class", "").strip()))
+        decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
+            str(decorable_t).replace("class", "").strip()))
         self.count = long((long(finish) - long(self.start)) / decinfo_t.sizeof)
 
     @staticmethod
@@ -356,8 +356,7 @@ class WtTxnPrinter(object):
 
 def absl_get_nodes(val):
     """
-    Return a generator of all the nodes in a absl::container_internal::raw_hash_set
-    and derived classes.
+    Return a generator of every node in absl::container_internal::raw_hash_set and derived classes.
     """
     size = val["size_"]
 
@@ -370,10 +369,10 @@ def absl_get_nodes(val):
 
     # Using the array of ctrl bytes, search for in-use slots and return them
     # https://github.com/abseil/abseil-cpp/blob/7ffbe09f3d85504bd018783bbe1e2c12992fe47c/absl/container/internal/raw_hash_set.h#L787-L788
-    for x in range(capacity):
-        ctrl_t = int(ctrl[x])
+    for item in range(capacity):
+        ctrl_t = int(ctrl[item])
         if ctrl_t >= 0:
-            yield table["slots_"][x]
+            yield table["slots_"][item]
 
 
 class AbslNodeHashSetPrinter(object):
@@ -390,8 +389,8 @@ class AbslNodeHashSetPrinter(object):
 
     def to_string(self):
         """Return absl::node_hash_set for printing."""
-        return "absl::node_hash_set<%s> with %s elems " % (
-            self.val.type.template_argument(0), self.val["size_"])
+        return "absl::node_hash_set<%s> with %s elems " % (self.val.type.template_argument(0),
+                                                           self.val["size_"])
 
     def children(self):
         """Children."""
@@ -415,8 +414,9 @@ class AbslNodeHashMapPrinter(object):
 
     def to_string(self):
         """Return absl::node_hash_map for printing."""
-        return "absl::node_hash_map<%s, %s> with %s elems " % (
-            self.val.type.template_argument(0), self.val.type.template_argument(1), self.val["size_"])
+        return "absl::node_hash_map<%s, %s> with %s elems " % (self.val.type.template_argument(0),
+                                                               self.val.type.template_argument(1),
+                                                               self.val["size_"])
 
     def children(self):
         """Children."""
@@ -514,10 +514,8 @@ def build_pretty_printer():
     pp.add('Status', 'mongo::Status', False, StatusPrinter)
     pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)
     pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
-    pp.add('node_hash_map', 'absl::node_hash_map', True,
-           AbslNodeHashMapPrinter)
-    pp.add('node_hash_set', 'absl::node_hash_set', True,
-           AbslNodeHashSetPrinter)
+    pp.add('node_hash_map', 'absl::node_hash_map', True, AbslNodeHashMapPrinter)
+    pp.add('node_hash_set', 'absl::node_hash_set', True, AbslNodeHashSetPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
