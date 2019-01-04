@@ -576,7 +576,9 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         return childrenMatch(andSortedObj, asn, relaxBoundsCheck);
-    } else if (STAGE_PROJECTION == trueSoln->getType()) {
+    } else if (STAGE_PROJECTION_DEFAULT == trueSoln->getType() ||
+               STAGE_PROJECTION_COVERED == trueSoln->getType() ||
+               STAGE_PROJECTION_SIMPLE == trueSoln->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(trueSoln);
 
         BSONElement el = testSoln["proj"];
@@ -589,11 +591,21 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement projType = projObj["type"];
         if (!projType.eoo()) {
             string projTypeStr = projType.str();
-            if (!((pn->projType == ProjectionNode::DEFAULT && projTypeStr == "default") ||
-                  (pn->projType == ProjectionNode::SIMPLE_DOC && projTypeStr == "simple") ||
-                  (pn->projType == ProjectionNode::COVERED_ONE_INDEX &&
-                   projTypeStr == "coveredIndex"))) {
-                return false;
+            switch (pn->getType()) {
+                case StageType::STAGE_PROJECTION_DEFAULT:
+                    if (projTypeStr != "default")
+                        return false;
+                    break;
+                case StageType::STAGE_PROJECTION_COVERED:
+                    if (projTypeStr != "coveredIndex")
+                        return false;
+                    break;
+                case StageType::STAGE_PROJECTION_SIMPLE:
+                    if (projTypeStr != "simple")
+                        return false;
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
             }
         }
 

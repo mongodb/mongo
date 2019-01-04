@@ -36,7 +36,14 @@
             // Check that $project uses the query system.
             assert.eq(
                 expectProjectToCoalesce,
-                planHasStage(db, explain.stages[0].$cursor.queryPlanner.winningPlan, "PROJECTION"));
+                planHasStage(
+                    db, explain.stages[0].$cursor.queryPlanner.winningPlan, "PROJECTION_DEFAULT") ||
+                    planHasStage(db,
+                                 explain.stages[0].$cursor.queryPlanner.winningPlan,
+                                 "PROJECTION_COVERED") ||
+                    planHasStage(db,
+                                 explain.stages[0].$cursor.queryPlanner.winningPlan,
+                                 "PROJECTION_SIMPLE"));
 
             // Check that $project was removed from pipeline and pushed to the query system.
             explain.stages.forEach(function(stage) {

@@ -200,7 +200,7 @@
                     // nReturned Shouldn't change.
                     nReturned: testCase.expectedResult.executionStats.nReturned,
                     executionStages: {
-                        stage: "PROJECTION",
+                        stage: "PROJECTION_DEFAULT",
                         transformBy: {i: 0},
                         // put previous root stage under projection stage.
                         inputStage: testCase.expectedResult.executionStats.executionStages

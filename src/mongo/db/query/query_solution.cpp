@@ -858,14 +858,7 @@ void ProjectionNode::appendToString(mongoutils::str::stream* ss, int indent) con
     addIndent(ss, indent + 1);
     *ss << "proj = " << projection.toString() << '\n';
     addIndent(ss, indent + 1);
-    if (DEFAULT == projType) {
-        *ss << "type = DEFAULT\n";
-    } else if (COVERED_ONE_INDEX == projType) {
-        *ss << "type = COVERED_ONE_INDEX\n";
-    } else {
-        invariant(SIMPLE_DOC == projType);
-        *ss << "type = SIMPLE_DOC\n";
-    }
+    *ss << "type = " << projectionImplementationTypeToString() << '\n';
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
@@ -896,20 +889,45 @@ void ProjectionNode::computeProperties() {
     }
 }
 
-QuerySolutionNode* ProjectionNode::clone() const {
-    ProjectionNode* copy = new ProjectionNode(parsed);
-    cloneBaseData(copy);
+void ProjectionNode::cloneProjectionData(ProjectionNode* copy) const {
+    // ProjectionNode should not populate filter. This should be a no-op.
+    if (this->filter)
+        copy->filter = this->filter->shallowClone();
 
     copy->_sorts = this->_sorts;
-
-    // This MatchExpression* is owned by the canonical query, not by the
-    // ProjectionNode. Just copying the pointer is fine.
-    copy->fullExpression = this->fullExpression;
-
-    copy->projection = this->projection;
-
-    return copy;
 }
+
+ProjectionNode* ProjectionNodeDefault::clone() const {
+    auto copy = std::make_unique<ProjectionNodeDefault>(
+        std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
+        fullExpression,
+        projection,
+        parsed);
+    ProjectionNode::cloneProjectionData(copy.get());
+    return copy.release();
+}
+
+ProjectionNode* ProjectionNodeCovered::clone() const {
+    auto copy = std::make_unique<ProjectionNodeCovered>(
+        std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
+        fullExpression,
+        projection,
+        parsed,
+        coveredKeyObj);
+    ProjectionNode::cloneProjectionData(copy.get());
+    return copy.release();
+}
+
+ProjectionNode* ProjectionNodeSimple::clone() const {
+    auto copy = std::make_unique<ProjectionNodeSimple>(
+        std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
+        fullExpression,
+        projection,
+        parsed);
+    ProjectionNode::cloneProjectionData(copy.get());
+    return copy.release();
+}
+
 
 //
 // SortKeyGeneratorNode

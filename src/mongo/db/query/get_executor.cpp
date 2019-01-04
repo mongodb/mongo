@@ -398,7 +398,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                                                            canonicalQuery->getProj()->getProjObj(),
                                                            ws,
                                                            std::move(root),
-                                                           canonicalQuery->root(),
+                                                           *canonicalQuery->root(),
                                                            canonicalQuery->getCollator());
             } else {
                 root = make_unique<ProjectionStageSimple>(
@@ -792,7 +792,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                                                 proj,
                                                 ws,
                                                 std::unique_ptr<PlanStage>(root.release()),
-                                                cq->root(),
+                                                *cq->root(),
                                                 cq->getCollator())};
 }
 
@@ -1360,8 +1360,12 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
     QuerySolutionNode* root = soln->root.get();
 
     // Root stage must be a project.
-    if (STAGE_PROJECTION != root->getType()) {
-        return false;
+    switch (root->getType()) {
+        default:
+            return false;
+        case STAGE_PROJECTION_DEFAULT:
+        case STAGE_PROJECTION_COVERED:
+        case STAGE_PROJECTION_SIMPLE:;
     }
 
     // Child should be either an ixscan or fetch.
@@ -1474,7 +1478,13 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
         // If there is a fetch node, then there is no need for the projection. The fetch node should
         // become the new root, with the distinct as its child. The PROJECT=>FETCH=>IXSCAN tree
         // should become FETCH=>DISTINCT_SCAN.
-        invariant(STAGE_PROJECTION == root->getType());
+        switch (root->getType()) {
+            default:
+                MONGO_UNREACHABLE;
+            case STAGE_PROJECTION_DEFAULT:
+            case STAGE_PROJECTION_COVERED:
+            case STAGE_PROJECTION_SIMPLE:;
+        }
         invariant(STAGE_FETCH == root->children[0]->getType());
         invariant(STAGE_IXSCAN == root->children[0]->children[0]->getType());
 
@@ -1491,7 +1501,13 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
         fetchNode->children[0] = distinctNode.release();
     } else {
         // There is no fetch node. The PROJECT=>IXSCAN tree should become PROJECT=>DISTINCT_SCAN.
-        invariant(STAGE_PROJECTION == root->getType());
+        switch (root->getType()) {
+            default:
+                MONGO_UNREACHABLE;
+            case STAGE_PROJECTION_DEFAULT:
+            case STAGE_PROJECTION_COVERED:
+            case STAGE_PROJECTION_SIMPLE:;
+        }
         invariant(STAGE_IXSCAN == root->children[0]->getType());
 
         // Take ownership of the index scan node, detaching it from the solution tree.

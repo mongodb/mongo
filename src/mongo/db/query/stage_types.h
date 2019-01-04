@@ -76,7 +76,11 @@ enum StageType {
 
     STAGE_MULTI_PLAN,
     STAGE_OR,
-    STAGE_PROJECTION,
+
+    // Projection has three alternate implementations.
+    STAGE_PROJECTION_DEFAULT,
+    STAGE_PROJECTION_COVERED,
+    STAGE_PROJECTION_SIMPLE,
 
     // Stages for running aggregation pipelines.
     STAGE_CHANGE_STREAM_PROXY,

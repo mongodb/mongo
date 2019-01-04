@@ -512,7 +512,7 @@
     explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: "foo"}});
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
-    assert(!planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(!planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
 
     // Distinct scan cannot be used over an index with a collation when the predicate has inexact
     // bounds.
@@ -524,7 +524,7 @@
     // Distinct scan can be used without a fetch when predicate has exact non-string bounds.
     explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: 3}});
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
     assert(!planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
 
     // Distinct should not use index when no collation specified and collection default collation is

@@ -30,7 +30,6 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/projection_exec.h"
 #include "mongo/db/jsobj.h"
@@ -50,17 +49,12 @@ protected:
     ProjectionStage(OperationContext* opCtx,
                     const BSONObj& projObj,
                     WorkingSet* ws,
-                    std::unique_ptr<PlanStage> child);
+                    std::unique_ptr<PlanStage> child,
+                    const char* stageType);
 
 public:
-    static constexpr const char* kStageType = "PROJECTION";
-
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
-
-    StageType stageType() const final {
-        return STAGE_PROJECTION;
-    }
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
@@ -106,14 +100,18 @@ private:
 class ProjectionStageDefault final : public ProjectionStage {
 public:
     /**
-     * ProjectionNode::DEFAULT should use this for construction.
+     * ProjectionNodeDefault should use this for construction.
      */
     ProjectionStageDefault(OperationContext* opCtx,
                            const BSONObj& projObj,
                            WorkingSet* ws,
                            std::unique_ptr<PlanStage> child,
-                           const MatchExpression* fullExpression,
+                           const MatchExpression& fullExpression,
                            const CollatorInterface* collator);
+
+    StageType stageType() const final {
+        return STAGE_PROJECTION_DEFAULT;
+    }
 
 private:
     Status transform(WorkingSetMember* member) const final;
@@ -130,13 +128,17 @@ private:
 class ProjectionStageCovered final : public ProjectionStage {
 public:
     /**
-     * ProjectionNode::COVERED_ONE_INDEX should obtain a fast-path object through this constructor.
+     * ProjectionNodeCovered should obtain a fast-path object through this constructor.
      */
     ProjectionStageCovered(OperationContext* opCtx,
                            const BSONObj& projObj,
                            WorkingSet* ws,
                            std::unique_ptr<PlanStage> child,
                            const BSONObj& coveredKeyObj);
+
+    StageType stageType() const final {
+        return STAGE_PROJECTION_COVERED;
+    }
 
 private:
     Status transform(WorkingSetMember* member) const final;
@@ -164,12 +166,16 @@ private:
 class ProjectionStageSimple final : public ProjectionStage {
 public:
     /**
-     * ProjectionNode::SIMPLE_DOC should obtain a fast-path object through this constructor.
+     * ProjectionNodeSimple should obtain a fast-path object through this constructor.
      */
     ProjectionStageSimple(OperationContext* opCtx,
                           const BSONObj& projObj,
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child);
+
+    StageType stageType() const final {
+        return STAGE_PROJECTION_SIMPLE;
+    }
 
 private:
     Status transform(WorkingSetMember* member) const final;

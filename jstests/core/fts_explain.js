@@ -25,7 +25,7 @@
         stage = stage.shards[0].executionStages;
     }
 
-    assert.eq(stage.stage, "PROJECTION");
+    assert.eq(stage.stage, "PROJECTION_DEFAULT");
 
     let textStage = stage.inputStage;
     assert.eq(textStage.stage, "TEXT");

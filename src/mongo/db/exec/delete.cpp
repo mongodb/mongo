@@ -294,16 +294,21 @@ long long DeleteStage::getNumDeleted(const PlanExecutor& exec) {
 
     // If the collection exists, the delete plan may either have a delete stage at the root, or (for
     // findAndModify) a projection stage wrapping a delete stage.
-    if (StageType::STAGE_PROJECTION == exec.getRootStage()->stageType()) {
-        invariant(exec.getRootStage()->getChildren().size() == 1U);
-        invariant(StageType::STAGE_DELETE == exec.getRootStage()->child()->stageType());
-        const SpecificStats* stats = exec.getRootStage()->child()->getSpecificStats();
-        return static_cast<const DeleteStats*>(stats)->docsDeleted;
-    } else {
-        invariant(StageType::STAGE_DELETE == exec.getRootStage()->stageType());
-        const auto* deleteStats =
-            static_cast<const DeleteStats*>(exec.getRootStage()->getSpecificStats());
-        return deleteStats->docsDeleted;
+    switch (exec.getRootStage()->stageType()) {
+        case StageType::STAGE_PROJECTION_DEFAULT:
+        case StageType::STAGE_PROJECTION_COVERED:
+        case StageType::STAGE_PROJECTION_SIMPLE: {
+            invariant(exec.getRootStage()->getChildren().size() == 1U);
+            invariant(StageType::STAGE_DELETE == exec.getRootStage()->child()->stageType());
+            const SpecificStats* stats = exec.getRootStage()->child()->getSpecificStats();
+            return static_cast<const DeleteStats*>(stats)->docsDeleted;
+        }
+        default: {
+            invariant(StageType::STAGE_DELETE == exec.getRootStage()->stageType());
+            const auto* deleteStats =
+                static_cast<const DeleteStats*>(exec.getRootStage()->getSpecificStats());
+            return deleteStats->docsDeleted;
+        }
     }
 }
 

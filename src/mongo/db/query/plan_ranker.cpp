@@ -214,7 +214,9 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     // We only do this when we have a projection stage because we have so many jstests that
     // check bounds even when a collscan plan is just as good as the ixscan'd plan :(
     double noFetchBonus = epsilon;
-    if (hasStage(STAGE_PROJECTION, stats) && hasStage(STAGE_FETCH, stats)) {
+    if ((hasStage(STAGE_PROJECTION_DEFAULT, stats) || hasStage(STAGE_PROJECTION_COVERED, stats) ||
+         hasStage(STAGE_PROJECTION_SIMPLE, stats)) &&
+        hasStage(STAGE_FETCH, stats)) {
         noFetchBonus = 0;
     }
 

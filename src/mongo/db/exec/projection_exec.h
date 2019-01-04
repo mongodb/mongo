@@ -141,9 +141,9 @@ public:
                                 const int64_t recordId = 0) const;
 
     /**
-     * Performs a projection given a function to retrieve fields by name. This function handles
-     * projections which do not qualify for the COVERED_ONE_INDEX fast-path but are still coverd by
-     * indices.
+     * Performs a projection given index 'KeyData' to directly retrieve results. This function
+     * handles projections which do not qualify for the ProjectionNodeCovered fast-path but are
+     * still covered by indices.
      */
     StatusWith<BSONObj> projectCovered(
         const std::vector<IndexKeyDatum>& keyData,

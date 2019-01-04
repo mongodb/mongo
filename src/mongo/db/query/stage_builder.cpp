@@ -138,30 +138,38 @@ PlanStage* buildStages(OperationContext* opCtx,
             return new SortKeyGeneratorStage(
                 opCtx, childStage, ws, keyGenNode->sortSpec, cq.getCollator());
         }
-        case STAGE_PROJECTION: {
-            const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
+        case STAGE_PROJECTION_DEFAULT: {
+            auto pn = static_cast<const ProjectionNodeDefault*>(root);
             unique_ptr<PlanStage> childStage{
                 buildStages(opCtx, collection, cq, qsol, pn->children[0], ws)};
             if (nullptr == childStage) {
                 return nullptr;
             }
-
-            switch (pn->projType) {
-                case ProjectionNode::DEFAULT:
-                    return new ProjectionStageDefault(opCtx,
-                                                      pn->projection,
-                                                      ws,
-                                                      std::move(childStage),
-                                                      pn->fullExpression,
-                                                      cq.getCollator());
-                case ProjectionNode::COVERED_ONE_INDEX:
-                    invariant(!pn->coveredKeyObj.isEmpty());
-                    return new ProjectionStageCovered(
-                        opCtx, pn->projection, ws, std::move(childStage), pn->coveredKeyObj);
-                case ProjectionNode::SIMPLE_DOC:
-                    return new ProjectionStageSimple(
-                        opCtx, pn->projection, ws, std::move(childStage));
+            return new ProjectionStageDefault(opCtx,
+                                              pn->projection,
+                                              ws,
+                                              std::move(childStage),
+                                              pn->fullExpression,
+                                              cq.getCollator());
+        }
+        case STAGE_PROJECTION_COVERED: {
+            auto pn = static_cast<const ProjectionNodeCovered*>(root);
+            unique_ptr<PlanStage> childStage{
+                buildStages(opCtx, collection, cq, qsol, pn->children[0], ws)};
+            if (nullptr == childStage) {
+                return nullptr;
             }
+            return new ProjectionStageCovered(
+                opCtx, pn->projection, ws, std::move(childStage), pn->coveredKeyObj);
+        }
+        case STAGE_PROJECTION_SIMPLE: {
+            auto pn = static_cast<const ProjectionNodeSimple*>(root);
+            unique_ptr<PlanStage> childStage{
+                buildStages(opCtx, collection, cq, qsol, pn->children[0], ws)};
+            if (nullptr == childStage) {
+                return nullptr;
+            }
+            return new ProjectionStageSimple(opCtx, pn->projection, ws, std::move(childStage));
         }
         case STAGE_LIMIT: {
             const LimitNode* ln = static_cast<const LimitNode*>(root);

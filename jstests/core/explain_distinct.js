@@ -58,7 +58,7 @@
     var explain = runDistinctExplain(coll, 'a', {});
     assert.commandWorked(explain);
     assert.eq(2, explain.executionStats.nReturned);
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
     // Check that the DISTINCT_SCAN stage has the correct stats.
@@ -78,7 +78,7 @@
     var explain = runDistinctExplain(coll, 'a', {a: 1});
     assert.commandWorked(explain);
     assert.eq(1, explain.executionStats.nReturned);
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
     assert.eq([1], coll.distinct('b', {a: 1}));
@@ -86,6 +86,6 @@
     assert.commandWorked(explain);
     assert.eq(1, explain.executionStats.nReturned);
     assert(!planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 })();

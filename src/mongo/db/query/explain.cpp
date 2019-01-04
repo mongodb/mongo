@@ -512,7 +512,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
         bob->appendNumber("limitAmount", spec->limit);
-    } else if (STAGE_PROJECTION == stats.stageType) {
+    } else if (STAGE_PROJECTION_DEFAULT == stats.stageType ||
+               STAGE_PROJECTION_COVERED == stats.stageType ||
+               STAGE_PROJECTION_SIMPLE == stats.stageType) {
         ProjectionStats* spec = static_cast<ProjectionStats*>(stats.specific.get());
         bob->append("transformBy", spec->projObj);
     } else if (STAGE_RECORD_STORE_FAST_COUNT == stats.stageType) {

@@ -831,14 +831,18 @@ const UpdateStats* UpdateStage::getUpdateStats(const PlanExecutor* exec) {
 
     // If the collection exists, then we expect the root of the plan tree to either be an update
     // stage, or (for findAndModify) a projection stage wrapping an update stage.
-    if (StageType::STAGE_PROJECTION == exec->getRootStage()->stageType()) {
-        invariant(exec->getRootStage()->getChildren().size() == 1U);
-        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->child()->stageType());
-        const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
-        return static_cast<const UpdateStats*>(stats);
-    } else {
-        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->stageType());
-        return static_cast<const UpdateStats*>(exec->getRootStage()->getSpecificStats());
+    switch (exec->getRootStage()->stageType()) {
+        case StageType::STAGE_PROJECTION_DEFAULT:
+        case StageType::STAGE_PROJECTION_COVERED:
+        case StageType::STAGE_PROJECTION_SIMPLE: {
+            invariant(exec->getRootStage()->getChildren().size() == 1U);
+            invariant(StageType::STAGE_UPDATE == exec->getRootStage()->child()->stageType());
+            const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
+            return static_cast<const UpdateStats*>(stats);
+        }
+        default:
+            invariant(StageType::STAGE_UPDATE == exec->getRootStage()->stageType());
+            return static_cast<const UpdateStats*>(exec->getRootStage()->getSpecificStats());
     }
 }
 

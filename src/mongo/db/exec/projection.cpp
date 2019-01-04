@@ -121,8 +121,9 @@ StatusWith<BSONObj> provideMetaFieldsAndPerformExec(const ProjectionExec& exec,
 ProjectionStage::ProjectionStage(OperationContext* opCtx,
                                  const BSONObj& projObj,
                                  WorkingSet* ws,
-                                 std::unique_ptr<PlanStage> child)
-    : PlanStage(opCtx, std::move(child), kStageType), _projObj(projObj), _ws(*ws) {}
+                                 std::unique_ptr<PlanStage> child,
+                                 const char* stageType)
+    : PlanStage(opCtx, std::move(child), stageType), _projObj(projObj), _ws(*ws) {}
 
 // static
 void ProjectionStage::getSimpleInclusionFields(const BSONObj& projObj, FieldSet* includedFields) {
@@ -183,7 +184,7 @@ PlanStage::StageState ProjectionStage::doWork(WorkingSetID* out) {
 
 std::unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     _commonStats.isEOF = isEOF();
-    auto ret = std::make_unique<PlanStageStats>(_commonStats, STAGE_PROJECTION);
+    auto ret = std::make_unique<PlanStageStats>(_commonStats, stageType());
 
     auto projStats = std::make_unique<ProjectionStats>(_specificStats);
     projStats->projObj = _projObj;
@@ -197,10 +198,10 @@ ProjectionStageDefault::ProjectionStageDefault(OperationContext* opCtx,
                                                const BSONObj& projObj,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child,
-                                               const MatchExpression* fullExpression,
+                                               const MatchExpression& fullExpression,
                                                const CollatorInterface* collator)
-    : ProjectionStage(opCtx, projObj, ws, std::move(child)),
-      _exec(opCtx, projObj, fullExpression, collator) {}
+    : ProjectionStage(opCtx, projObj, ws, std::move(child), "PROJECTION_DEFAULT"),
+      _exec(opCtx, projObj, &fullExpression, collator) {}
 
 Status ProjectionStageDefault::transform(WorkingSetMember* member) const {
     // The default no-fast-path case.
@@ -234,7 +235,8 @@ ProjectionStageCovered::ProjectionStageCovered(OperationContext* opCtx,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child,
                                                const BSONObj& coveredKeyObj)
-    : ProjectionStage(opCtx, projObj, ws, std::move(child)), _coveredKeyObj(coveredKeyObj) {
+    : ProjectionStage(opCtx, projObj, ws, std::move(child), "PROJECTION_COVERED"),
+      _coveredKeyObj(coveredKeyObj) {
     invariant(projObjHasOwnedData());
     // Figure out what fields are in the projection.
     getSimpleInclusionFields(_projObj, &_includedFields);
@@ -289,7 +291,7 @@ ProjectionStageSimple::ProjectionStageSimple(OperationContext* opCtx,
                                              const BSONObj& projObj,
                                              WorkingSet* ws,
                                              std::unique_ptr<PlanStage> child)
-    : ProjectionStage(opCtx, projObj, ws, std::move(child)) {
+    : ProjectionStage(opCtx, projObj, ws, std::move(child), "PROJECTION_SIMPLE") {
     invariant(projObjHasOwnedData());
     // Figure out what fields are in the projection.
     getSimpleInclusionFields(_projObj, &_includedFields);
