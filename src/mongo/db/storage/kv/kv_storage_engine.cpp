@@ -705,6 +705,10 @@ void KVStorageEngine::setCachePressureForTest(int pressure) {
     return _engine->setCachePressureForTest(pressure);
 }
 
+bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
+    return _engine->supportsRecoverToStableTimestamp();
+}
+
 bool KVStorageEngine::supportsRecoveryTimestamp() const {
     return _engine->supportsRecoveryTimestamp();
 }
@@ -752,7 +756,7 @@ bool KVStorageEngine::supportsReadConcernMajority() const {
 }
 
 bool KVStorageEngine::supportsPendingDrops() const {
-    return enableKVPendingDrops && supportsRecoveryTimestamp();
+    return enableKVPendingDrops && supportsRecoverToStableTimestamp();
 }
 
 void KVStorageEngine::clearDropPendingState() {

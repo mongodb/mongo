@@ -342,6 +342,13 @@ public:
     virtual void setCachePressureForTest(int pressure) {}
 
     /**
+     * See `StorageEngine::supportsRecoverToStableTimestamp`
+     */
+    virtual bool supportsRecoverToStableTimestamp() const {
+        return false;
+    }
+
+    /**
      * See `StorageEngine::supportsRecoveryTimestamp`
      */
     virtual bool supportsRecoveryTimestamp() const {
