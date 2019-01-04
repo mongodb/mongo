@@ -661,9 +661,4 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
     }
 }
 
-void Balancer::notifyPersistedBalancerSettingsChanged() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _condVar.notify_all();
-}
-
 }  // namespace mongo

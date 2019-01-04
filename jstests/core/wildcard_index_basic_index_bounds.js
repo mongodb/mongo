@@ -4,7 +4,7 @@
  * Does not support stepdowns because the test issues getMores, which the stepdown/kill_primary
  * passthroughs will reject.
  *
- * @tags: [does_not_support_stepdowns, assumes_balancer_off]
+ * @tags: [does_not_support_stepdowns]
  */
 (function() {
     "use strict";

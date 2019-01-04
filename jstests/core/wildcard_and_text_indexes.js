@@ -1,6 +1,5 @@
 /**
  * Tests that a {$**: 1} index can coexist with a {$**: 'text'} index in the same collection.
- * @tags: [assumes_balancer_off]
  */
 (function() {
     "use strict";

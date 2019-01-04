@@ -1,4 +1,3 @@
-// @tags [assumes_balancer_off]
 (function() {
     "use strict";
 
