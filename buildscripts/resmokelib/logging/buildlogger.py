@@ -104,6 +104,7 @@ def new_build_id(config):
     response = handler.post(CREATE_BUILD_ENDPOINT, data={
         "builder": builder,
         "buildnum": build_num,
+        "task_id": _config.EVERGREEN_TASK_ID,
     })
 
     return response["id"]
@@ -128,6 +129,7 @@ def new_test_id(build_id, build_config, test_filename, test_command):
         "test_filename": test_filename,
         "command": test_command,
         "phase": build_config.get("build_phase", "unknown"),
+        "task_id": _config.EVERGREEN_TASK_ID,
     })
 
     return response["id"]
