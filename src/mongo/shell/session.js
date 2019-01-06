@@ -16,6 +16,18 @@ var {
         return typeof obj === "object" && obj !== null;
     }
 
+    function isAcknowledged(cmdObj) {
+        if (isNonNullObject(cmdObj.writeConcern)) {
+            const writeConcern = cmdObj.writeConcern;
+            // Intentional use of "==" comparing NumberInt, NumberLong, or plain Number.
+            if (writeConcern.hasOwnProperty("w") && writeConcern.w == 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     function SessionOptions(rawOptions = {}) {
         if (!(this instanceof SessionOptions)) {
             return new SessionOptions(rawOptions);
@@ -219,6 +231,10 @@ var {
         }
 
         function prepareCommandRequest(driverSession, cmdObj) {
+            if (driverSession._isExplicit && !isAcknowledged(cmdObj)) {
+                throw new Error("Unacknowledged writes are prohibited with sessions");
+            }
+
             if (serverSupports(kWireVersionSupportingLogicalSession) &&
                 // Always attach sessionId from explicit sessions.
                 (driverSession._isExplicit ||
@@ -549,7 +565,9 @@ var {
             }
 
             if (!cmdObjUnwrapped.hasOwnProperty("lsid")) {
-                cmdObjUnwrapped.lsid = this.handle.getId();
+                if (isAcknowledged(cmdObjUnwrapped)) {
+                    cmdObjUnwrapped.lsid = this.handle.getId();
+                }
 
                 // We consider the session to still be in use by the client any time the session id
                 // is injected into the command object as part of making a request.
@@ -594,16 +612,8 @@ var {
                 return false;
             }
 
-            if (isNonNullObject(cmdObj.writeConcern)) {
-                const writeConcern = cmdObj.writeConcern;
-
-                // We use bsonWoCompare() in order to handle cases where the "w" field is specified
-                // as a NumberInt() or NumberLong() instance.
-                if (writeConcern.hasOwnProperty("w") &&
-                    bsonWoCompare({_: writeConcern.w}, {_: 0}) === 0) {
-                    // Unacknowledged writes cannot be retried.
-                    return false;
-                }
+            if (!isAcknowledged(cmdObj)) {
+                return false;
             }
 
             if (cmdName === "insert") {

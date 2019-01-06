@@ -70,22 +70,6 @@ assert.eq(1, result.n);
 assert.eq(0, coll.count());
 
 //
-// Single document delete, w:0 write concern specified
-coll.remove({});
-coll.insert({a: 1});
-request = {
-    delete: coll.getName(),
-    deletes: [{q: {a: 1}, limit: 1}],
-    writeConcern: {w: 0}
-};
-result = coll.runCommand(request);
-assert(resultOK(result), tojson(result));
-countEventually(coll, 0);
-
-var fields = ['ok'];
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
-
-//
 // Single document remove, w:1 write concern specified, ordered:true
 coll.remove({});
 coll.insert([{a: 1}, {a: 1}]);
@@ -215,50 +199,3 @@ assert.eq(1, result.writeErrors[1].index);
 assert.eq('number', typeof result.writeErrors[1].code);
 assert.eq('string', typeof result.writeErrors[1].errmsg);
 assert.eq(0, coll.count());
-
-//
-// Cause remove error using ordered:false and w:0
-coll.remove({});
-coll.insert({a: 1});
-request = {
-    delete: coll.getName(),
-    deletes: [{q: {$set: {a: 1}}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}, {q: {a: 1}, limit: 0}],
-    writeConcern: {w: 0},
-    ordered: false
-};
-result = coll.runCommand(request);
-assert.commandWorked(result);
-countEventually(coll, 0);
-
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
-
-//
-// Cause remove error using ordered:true and w:0
-coll.remove({});
-coll.insert({a: 1});
-request = {
-    delete: coll.getName(),
-    deletes:
-        [{q: {$set: {a: 1}}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}, {q: {a: 1}, limit: (1)}],
-    writeConcern: {w: 0},
-    ordered: true
-};
-result = coll.runCommand(request);
-assert.commandWorked(result);
-countEventually(coll, 1);
-
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
-
-//
-// When limit is not 0 and 1
-coll.remove({});
-coll.insert({a: 1});
-request = {
-    delete: coll.getName(),
-    deletes: [{q: {a: 1}, limit: 2}],
-    writeConcern: {w: 0},
-    ordered: false
-};
-result = coll.runCommand(request);
-// Unacknowledged writes are always OK
-assert.commandWorked(result);

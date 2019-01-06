@@ -44,6 +44,9 @@ selector:
   # the retryable writes suite overrides the runCommand to repeat commands.
   - jstests/core/failcommand_failpoint.js
 
+  # Unacknowledged writes prohibited in an explicit session.
+  - jstests/core/batch_write_command_w0.js
+
 executor:
   archive:
     hooks:

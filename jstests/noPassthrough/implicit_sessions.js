@@ -73,6 +73,11 @@
             assert.writeOK(coll.insert({x: 1}));
         }, {shouldIncludeId: true});
 
+        // Unacknowledged writes have no session id.
+        inspectCommandForSessionId(function() {
+            coll.insert({x: 1}, {writeConcern: {w: 0}});
+        }, {shouldIncludeId: false});
+
         assert(bsonBinaryEqual(testDB.getSession().getSessionId(), implicitId),
                "Expected the id of the database's implicit session to match the one sent, sent: " +
                    tojson(implicitId) + " db session id: " +

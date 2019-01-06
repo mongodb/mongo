@@ -114,40 +114,6 @@ assert.eq(1, coll.count({_id: upsertedId}));
 assert.eq(0, result.nModified, "missing/wrong nModified");
 
 //
-// Single document upsert, write concern 0 specified, ordered = true
-coll.remove({});
-request = {
-    update: coll.getName(),
-    updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
-    writeConcern: {w: 0},
-    ordered: true
-};
-result = coll.runCommand(request);
-assert(resultOK(result), tojson(result));
-countEventually(coll, 1);
-
-var fields = ['ok'];
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
-
-//
-// Two document upsert, write concern 0 specified, ordered = true
-coll.remove({});
-request = {
-    update: coll.getName(),
-    updates: [
-        {q: {a: 2}, u: {$set: {a: 1}}, upsert: true},
-        {q: {a: 2}, u: {$set: {a: 2}}, upsert: true}
-    ],
-    writeConcern: {w: 0},
-    ordered: true
-};
-result = coll.runCommand(request);
-assert(resultOK(result), tojson(result));
-countEventually(coll, 2);
-
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
-
-//
 // Single document update
 coll.remove({});
 coll.insert({a: 1});
@@ -267,24 +233,6 @@ assert.eq(1, coll.count());
 // Unique index tests
 coll.remove({});
 coll.ensureIndex({a: 1}, {unique: true});
-
-//
-// Upsert fail due to duplicate key index, w:0, ordered:true
-coll.remove({});
-request = {
-    update: coll.getName(),
-    updates: [
-        {q: {b: 1}, u: {$set: {b: 1, a: 1}}, upsert: true},
-        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true}
-    ],
-    writeConcern: {w: 0},
-    ordered: true
-};
-result = coll.runCommand(request);
-assert(result.ok, tojson(result));
-countEventually(coll, 1);
-
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //
 // Upsert fail due to duplicate key index, w:1, ordered:true

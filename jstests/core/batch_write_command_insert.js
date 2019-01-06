@@ -70,21 +70,6 @@ assert.eq(1, result.n);
 assert.eq(coll.count(), 1);
 
 //
-// Single document insert, w:0 write concern specified, missing ordered
-coll.remove({});
-request = {
-    insert: coll.getName(),
-    documents: [{a: 1}],
-    writeConcern: {w: 0}
-};
-result = coll.runCommand(request);
-assert(resultOK(result), tojson(result));
-countEventually(coll, 1);
-
-var fields = ['ok'];
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
-
-//
 // Single document insert, w:1 write concern specified, ordered:true
 coll.remove({});
 request = {
