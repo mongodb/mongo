@@ -39,12 +39,6 @@
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoBridgeOptions)(InitializerContext* context) {
-    auto ret = addMessageCompressionOptions(&moe::startupOptions, false);
-    if (!ret.isOK())
-        return ret;
-    return Status::OK();
-}
 
 MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {
     if (!handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {

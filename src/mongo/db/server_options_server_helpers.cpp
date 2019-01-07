@@ -303,11 +303,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                             "fraction of slow ops to include in the profile and console log")
         .setDefault(moe::Value(1.0));
 
-    auto ret = addMessageCompressionOptions(options, false);
-    if (!ret.isOK()) {
-        return ret;
-    }
-
     return Status::OK();
 }
 

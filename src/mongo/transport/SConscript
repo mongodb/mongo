@@ -228,6 +228,28 @@ zlibEnv.Library(
     ]
 )
 
+env.Library(
+    target='message_compressor_options_client',
+    source=[
+        env.Idlc('message_compressor_options_client.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'message_compressor',
+    ],
+)
+
+env.Library(
+    target='message_compressor_options_server',
+    source=[
+        env.Idlc('message_compressor_options_server.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'message_compressor',
+    ],
+)
+
 env.CppUnitTest(
     target='message_compressor_test',
     source=[
@@ -236,6 +258,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'message_compressor',
+        'message_compressor_options_server',
     ]
 )
 

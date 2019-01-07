@@ -119,7 +119,6 @@ private:
     std::vector<std::string> _compressorNames;
 };
 
-Status addMessageCompressionOptions(moe::OptionSection* options, bool forShell);
 Status storeMessageCompressionOptions(const std::string& compressors);
 void appendMessageCompressionStats(BSONObjBuilder* b);
 }  // namespace mongo
