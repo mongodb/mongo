@@ -540,53 +540,56 @@ public:
         mutablebson::Element newFilterAnd = rewrittenCmdObj.makeElementArray("$and");
         uassertStatusOK(newFilter.pushBack(newFilterAnd));
 
-        // Append a rule to the $and, which rejects system collections.
-        mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
-            "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
-        uassertStatusOK(newFilterAnd.pushBack(systemCollectionsFilter));
+        mutablebson::Element newFilterOr = rewrittenCmdObj.makeElementArray("$or");
+        mutablebson::Element newFilterOrObj = rewrittenCmdObj.makeElementObject("");
+        uassertStatusOK(newFilterOrObj.pushBack(newFilterOr));
+        uassertStatusOK(newFilterAnd.pushBack(newFilterOrObj));
 
-        if (!authzSession->isAuthorizedForAnyActionOnResource(
+        // DB resource grants all non-system collections, so filter out system collections.
+        // This is done inside the $or, since some system collections might be granted specific
+        // privileges.
+        if (authzSession->isAuthorizedForAnyActionOnResource(
                 ResourcePattern::forDatabaseName(dbName))) {
-            // We passed an auth check which said we might be able to render some collections,
-            // but it doesn't seem like we should render all of them. We must filter.
+            mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
+                "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
+            uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
+        }
 
-            // Compute the set of collection names which would be permissible to return.
-            std::set<std::string> collectionNames;
-            for (UserNameIterator nameIter = authzSession->getAuthenticatedUserNames();
-                 nameIter.more();
-                 nameIter.next()) {
-                User* authUser = authzSession->lookupUser(*nameIter);
-                const User::ResourcePrivilegeMap& resourcePrivilegeMap = authUser->getPrivileges();
-                for (const std::pair<ResourcePattern, Privilege>& resourcePrivilege :
-                     resourcePrivilegeMap) {
-                    const auto& resource = resourcePrivilege.first;
-                    if (resource.isCollectionPattern() || (resource.isExactNamespacePattern() &&
-                                                           resource.databaseToMatch() == dbName)) {
-                        collectionNames.emplace(resource.collectionToMatch().toString());
-                    }
+        // Compute the set of collection names which would be permissible to return.
+        std::set<std::string> collectionNames;
+        for (UserNameIterator nameIter = authzSession->getAuthenticatedUserNames(); nameIter.more();
+             nameIter.next()) {
+            User* authUser = authzSession->lookupUser(*nameIter);
+            const User::ResourcePrivilegeMap& resourcePrivilegeMap = authUser->getPrivileges();
+            for (const std::pair<ResourcePattern, Privilege>& resourcePrivilege :
+                 resourcePrivilegeMap) {
+                const auto& resource = resourcePrivilege.first;
+                if (resource.isCollectionPattern() ||
+                    (resource.isExactNamespacePattern() && resource.databaseToMatch() == dbName)) {
+                    collectionNames.emplace(resource.collectionToMatch().toString());
                 }
             }
-
-            // Construct a new filter predicate which returns only collections we were found to
-            // have privileges for.
-            BSONObjBuilder predicateBuilder;
-            BSONObjBuilder nameBuilder(predicateBuilder.subobjStart("name"));
-            BSONArrayBuilder setBuilder(nameBuilder.subarrayStart("$in"));
-
-            // Load the de-duplicated set into a BSON array
-            for (StringData collectionName : collectionNames) {
-                setBuilder << collectionName;
-            }
-            setBuilder.done();
-            nameBuilder.done();
-
-            collectionFilter = predicateBuilder.obj();
-
-            // Filter the results by our collection names.
-            mutablebson::Element newFilterAndIn =
-                rewrittenCmdObj.makeElementObject("", collectionFilter);
-            uassertStatusOK(newFilterAnd.pushBack(newFilterAndIn));
         }
+
+        // Construct a new filter predicate which returns only collections we were found to
+        // have privileges for.
+        BSONObjBuilder predicateBuilder;
+        BSONObjBuilder nameBuilder(predicateBuilder.subobjStart("name"));
+        BSONArrayBuilder setBuilder(nameBuilder.subarrayStart("$in"));
+
+        // Load the de-duplicated set into a BSON array
+        for (StringData collectionName : collectionNames) {
+            setBuilder << collectionName;
+        }
+        setBuilder.done();
+        nameBuilder.done();
+
+        collectionFilter = predicateBuilder.obj();
+
+        // Filter the results by our collection names.
+        mutablebson::Element newFilterCollections =
+            rewrittenCmdObj.makeElementObject("", collectionFilter);
+        uassertStatusOK(newFilterOr.pushBack(newFilterCollections));
 
         // If there was a pre-existing filter, compose it with our new one.
         if (oldFilter.ok()) {
@@ -608,7 +611,9 @@ public:
 
         BSONObj newCmd = cmdObj;
 
-        if (newCmd["authorizedCollections"].trueValue()) {
+        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+        if (authzSession->getAuthorizationManager().isAuthEnabled() &&
+            newCmd["authorizedCollections"].trueValue()) {
             newCmd = rewriteCommandForListingOwnCollections(opCtx, dbName, cmdObj);
         }
 

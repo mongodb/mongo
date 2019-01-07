@@ -300,9 +300,8 @@ public:
                         // Only validate on a per-collection basis if the user requested
                         // a list of authorized collections
                         if (authorizedCollections &&
-                            (nss.coll().startsWith("system.") ||
-                             !as->isAuthorizedForAnyActionOnResource(
-                                 ResourcePattern::forExactNamespace(nss)))) {
+                            (!as->isAuthorizedForAnyActionOnResource(
+                                ResourcePattern::forExactNamespace(nss)))) {
                             continue;
                         }
 
@@ -317,9 +316,8 @@ public:
                 } else {
                     for (auto&& collection : *db) {
                         if (authorizedCollections &&
-                            (collection->ns().coll().startsWith("system.") ||
-                             !as->isAuthorizedForAnyActionOnResource(
-                                 ResourcePattern::forExactNamespace(collection->ns())))) {
+                            (!as->isAuthorizedForAnyActionOnResource(
+                                ResourcePattern::forExactNamespace(collection->ns())))) {
                             continue;
                         }
                         BSONObj collBson =
