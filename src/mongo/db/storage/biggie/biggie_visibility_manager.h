@@ -45,9 +45,6 @@ class RecordStore;
  */
 class VisibilityManager {
 public:
-    VisibilityManager(RecordStore* rs);
-    ~VisibilityManager() = default;
-
     /**
      * Removes the RecordId from the uncommitted records and notifies other threads that a chunk of
      * the oplog became visible.
@@ -58,13 +55,13 @@ public:
      * Adds a RecordId to be tracked while its Record is uncommitted. Upon commit or rollback of
      * the record, the appropriate actions are taken to change the visibility of the oplog.
      */
-    void addUncommittedRecord(OperationContext* opCtx, RecordId rid);
+    void addUncommittedRecord(OperationContext* opCtx, RecordStore* rs, RecordId rid);
 
     /**
-     * Returns the smallest RecordId whose Record is yet to be committed or rolled back. If there
-     * are uncommitted Records, it returns RecordId::max().
+     * Returns the highest seen RecordId such that it and all smaller RecordIds are committed or
+     * rolled back.
      */
-    RecordId getEarliestUncommittedRecord();
+    RecordId getAllCommittedRecord();
 
     /**
      * Returns true if the given RecordId is the earliest uncommitted Record being tracked by the
@@ -79,14 +76,12 @@ public:
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx);
 
 private:
-    RecordStore* const _rs;
-
     mutable stdx::mutex _stateLock;  // Protects the values below.
-    RecordId _oplog_highestSeen;     // Highest RecordId observed.
+    RecordId _highestSeen = RecordId();
 
     // Used to wait for all earlier oplog writes to be visible.
     mutable stdx::condition_variable _opsBecameVisibleCV;
-    std::set<RecordId> _uncommittedRecords;  // RecordIds that have yet to be committed.
+    std::set<RecordId> _uncommittedRecords;  // RecordIds that have yet to be committed/rolled back.
 };
 
 }  // namespace biggie

@@ -79,7 +79,8 @@ RecordStore::RecordStore(StringData ns,
                          bool isCapped,
                          int64_t cappedMaxSize,
                          int64_t cappedMaxDocs,
-                         CappedCallback* cappedCallback)
+                         CappedCallback* cappedCallback,
+                         VisibilityManager* visibilityManager)
     : mongo::RecordStore(ns),
       _isCapped(isCapped),
       _cappedMaxSize(cappedMaxSize),
@@ -90,7 +91,7 @@ RecordStore::RecordStore(StringData ns,
       _postfix(createKey(_ident, std::numeric_limits<int64_t>::max())),
       _cappedCallback(cappedCallback),
       _isOplog(NamespaceString::oplog(ns)),
-      _visibilityManager(std::make_unique<VisibilityManager>(this)) {
+      _visibilityManager(visibilityManager) {
     if (_isCapped) {
         invariant(_cappedMaxSize > 0);
         invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
@@ -172,7 +173,7 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
                 if (!status.isOK())
                     return status.getStatus();
                 thisRecordId = status.getValue().repr();
-                _visibilityManager->addUncommittedRecord(opCtx, RecordId(thisRecordId));
+                _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
             } else {
                 thisRecordId = _nextRecordId();
             }
@@ -216,7 +217,7 @@ Status RecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
                 if (!status.isOK())
                     return status.getStatus();
                 thisRecordId = status.getValue().repr();
-                _visibilityManager->addUncommittedRecord(opCtx, RecordId(thisRecordId));
+                _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
             } else {
                 thisRecordId = _nextRecordId();
             }
@@ -268,8 +269,8 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
 std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* opCtx,
                                                              bool forward) const {
     if (forward)
-        return std::make_unique<Cursor>(opCtx, *this, _visibilityManager.get());
-    return std::make_unique<ReverseCursor>(opCtx, *this, _visibilityManager.get());
+        return std::make_unique<Cursor>(opCtx, *this, _visibilityManager);
+    return std::make_unique<ReverseCursor>(opCtx, *this, _visibilityManager);
 }
 
 Status RecordStore::truncate(OperationContext* opCtx) {
@@ -517,7 +518,7 @@ boost::optional<Record> RecordStore::Cursor::next() {
         nextRecord.id = RecordId(extractRecordId(it->first));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
-        if (_isOplog && nextRecord.id >= _visibilityManager->getEarliestUncommittedRecord())
+        if (_isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
             return boost::none;
         return nextRecord;
     }
@@ -534,7 +535,7 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     if (it == workingCopy->end() || !inPrefix(it->first))
         return boost::none;
 
-    if (_isOplog && id >= _visibilityManager->getEarliestUncommittedRecord())
+    if (_isOplog && id > _visibilityManager->getAllCommittedRecord())
         return boost::none;
 
     _needFirstSeek = false;
@@ -598,7 +599,7 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
         nextRecord.id = RecordId(extractRecordId(it->first));
         nextRecord.data = RecordData(it->second.c_str(), it->second.length());
 
-        if (_isOplog && nextRecord.id >= _visibilityManager->getEarliestUncommittedRecord())
+        if (_isOplog && nextRecord.id > _visibilityManager->getAllCommittedRecord())
             return boost::none;
         return nextRecord;
     }
@@ -616,7 +617,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
         return boost::none;
     }
 
-    if (_isOplog && id >= _visibilityManager->getEarliestUncommittedRecord())
+    if (_isOplog && id > _visibilityManager->getAllCommittedRecord())
         return boost::none;
 
     it = StringStore::const_reverse_iterator(++canFind);  // reverse iterator returns item 1 before

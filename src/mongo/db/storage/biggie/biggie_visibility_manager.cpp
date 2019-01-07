@@ -67,29 +67,27 @@ private:
     const RecordId _rid;
 };
 
-VisibilityManager::VisibilityManager(RecordStore* rs)
-    : _rs(rs), _oplog_highestSeen(RecordId::min()) {}
-
 void VisibilityManager::dealtWithRecord(RecordId rid) {
     stdx::lock_guard<stdx::mutex> lock(_stateLock);
     _uncommittedRecords.erase(rid);
     _opsBecameVisibleCV.notify_all();
 }
 
-void VisibilityManager::addUncommittedRecord(OperationContext* opCtx, RecordId rid) {
+void VisibilityManager::addUncommittedRecord(OperationContext* opCtx,
+                                             RecordStore* rs,
+                                             RecordId rid) {
     stdx::lock_guard<stdx::mutex> lock(_stateLock);
     _uncommittedRecords.insert(rid);
-    opCtx->recoveryUnit()->registerChange(new VisibilityManagerChange(this, _rs, rid));
+    opCtx->recoveryUnit()->registerChange(new VisibilityManagerChange(this, rs, rid));
 
-    if (rid > _oplog_highestSeen)
-        _oplog_highestSeen = rid;
+    if (rid > _highestSeen)
+        _highestSeen = rid;
 }
 
-RecordId VisibilityManager::getEarliestUncommittedRecord() {
+RecordId VisibilityManager::getAllCommittedRecord() {
     stdx::lock_guard<stdx::mutex> lock(_stateLock);
-    if (_uncommittedRecords.empty())
-        return RecordId::max();
-    return *_uncommittedRecords.begin();
+    return _uncommittedRecords.empty() ? _highestSeen
+                                       : RecordId(_uncommittedRecords.begin()->repr() - 1);
 }
 
 bool VisibilityManager::isFirstHidden(RecordId rid) {
@@ -103,7 +101,7 @@ void VisibilityManager::waitForAllEarlierOplogWritesToBeVisible(OperationContext
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
     stdx::unique_lock<stdx::mutex> lock(_stateLock);
-    const RecordId waitFor = _oplog_highestSeen;
+    const RecordId waitFor = _highestSeen;
     opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lock, [&] {
         return _uncommittedRecords.empty() || *_uncommittedRecords.begin() > waitFor;
     });

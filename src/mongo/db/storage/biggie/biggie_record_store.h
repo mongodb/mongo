@@ -54,7 +54,8 @@ public:
                          bool isCapped = false,
                          int64_t cappedMaxSize = -1,
                          int64_t cappedMaxDocs = -1,
-                         CappedCallback* cappedCallback = nullptr);
+                         CappedCallback* cappedCallback = nullptr,
+                         VisibilityManager* visibilityManager = nullptr);
     ~RecordStore() = default;
 
     virtual const char* name() const;
@@ -162,7 +163,7 @@ private:
     std::string generateKey(const uint8_t* key, size_t key_len) const;
 
     bool _isOplog;
-    std::unique_ptr<VisibilityManager> _visibilityManager;
+    VisibilityManager* _visibilityManager;
 
     /**
      * Automatically adjust the record count and data size based on the size in change of the

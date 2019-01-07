@@ -45,6 +45,7 @@ namespace {
 
 class RecordStoreHarnessHelper final : public ::mongo::RecordStoreHarnessHelper {
     KVEngine _kvEngine{};
+    VisibilityManager _visibilityManager;
 
 public:
     RecordStoreHarnessHelper() {}
@@ -59,7 +60,8 @@ public:
                                              false /* isCapped */,
                                              -1 /* cappedMaxSize */,
                                              -1 /* cappedMaxDocs */,
-                                             nullptr /* cappedCallback */);
+                                             nullptr /* cappedCallback */,
+                                             nullptr /* visibilityManager */);
     }
 
     virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
@@ -70,8 +72,13 @@ public:
     virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(const std::string& ns,
                                                                      int64_t cappedSizeBytes,
                                                                      int64_t cappedMaxDocs) final {
-        return std::make_unique<RecordStore>(
-            ns, "ident"_sd, true, cappedSizeBytes, cappedMaxDocs, nullptr);
+        return std::make_unique<RecordStore>(ns,
+                                             "ident"_sd,
+                                             /*isCapped*/ true,
+                                             cappedSizeBytes,
+                                             cappedMaxDocs,
+                                             /*cappedCallback*/ nullptr,
+                                             &_visibilityManager);
     }
 
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {

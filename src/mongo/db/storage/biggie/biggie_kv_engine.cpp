@@ -76,14 +76,18 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* o
                                                              const CollectionOptions& options) {
     std::unique_ptr<mongo::RecordStore> recordStore;
     if (options.capped) {
+        if (NamespaceString::oplog(ns))
+            _visibilityManager = std::make_unique<VisibilityManager>();
         recordStore = std::make_unique<RecordStore>(
             ns,
             ident,
-            true,
+            options.capped,
             options.cappedSize ? options.cappedSize : kDefaultCappedSizeBytes,
-            options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+            options.cappedMaxDocs ? options.cappedMaxDocs : -1,
+            /*cappedCallback*/ nullptr,
+            _visibilityManager.get());
     } else {
-        recordStore = std::make_unique<RecordStore>(ns, ident, false);
+        recordStore = std::make_unique<RecordStore>(ns, ident, options.capped);
     }
     _idents[ident.toString()] = true;
     return recordStore;

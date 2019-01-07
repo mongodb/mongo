@@ -138,7 +138,8 @@ public:
     void setJournalListener(mongo::JournalListener* jl) final {}
 
     virtual Timestamp getAllCommittedTimestamp() const override {
-        return Timestamp();
+        RecordId id = _visibilityManager->getAllCommittedRecord();
+        return Timestamp(id.repr());
     }
 
     virtual Timestamp getOldestOpenReadTimestamp() const override {
@@ -165,6 +166,7 @@ private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest = 0;
     std::map<std::string, bool> _idents;  // TODO : replace with a query to _master.
+    std::unique_ptr<VisibilityManager> _visibilityManager;
 
     mutable stdx::mutex _masterLock;
     StringStore _master;

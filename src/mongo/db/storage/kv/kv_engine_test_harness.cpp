@@ -211,6 +211,77 @@ TEST(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     }
 }
 
+TEST(KVEngineTestHarness, AllCommittedTimestamp) {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    if (!engine->supportsDocLocking())
+        return;
+
+    unique_ptr<RecordStore> rs;
+    {
+        MyOperationContext opCtx(engine);
+        WriteUnitOfWork uow(&opCtx);
+        CollectionOptions options;
+        options.capped = true;
+        options.cappedSize = 10240;
+        options.cappedMaxDocs = -1;
+
+        NamespaceString oplogNss("local.oplog.rs");
+        ASSERT_OK(engine->createRecordStore(&opCtx, oplogNss.ns(), "ident", options));
+        rs = engine->getRecordStore(&opCtx, oplogNss.ns(), "ident", options);
+        ASSERT(rs);
+    }
+    {
+        Timestamp t11(1, 1);
+        Timestamp t12(1, 2);
+        Timestamp t21(2, 1);
+
+        auto t11Doc = BSON("ts" << t11);
+        auto t12Doc = BSON("ts" << t12);
+        auto t21Doc = BSON("ts" << t21);
+
+        Timestamp allCommitted = engine->getAllCommittedTimestamp();
+        MyOperationContext opCtx1(engine);
+        WriteUnitOfWork uow1(&opCtx1);
+        ASSERT_EQ(invariant(rs->insertRecord(
+                      &opCtx1, t11Doc.objdata(), t11Doc.objsize(), Timestamp::min())),
+                  RecordId(1, 1));
+
+        Timestamp lastAllCommitted = allCommitted;
+        allCommitted = engine->getAllCommittedTimestamp();
+        ASSERT_GTE(allCommitted, lastAllCommitted);
+        ASSERT_LT(allCommitted, t11);
+
+        MyOperationContext opCtx2(engine);
+        WriteUnitOfWork uow2(&opCtx2);
+        ASSERT_EQ(invariant(rs->insertRecord(
+                      &opCtx2, t21Doc.objdata(), t21Doc.objsize(), Timestamp::min())),
+                  RecordId(2, 1));
+        uow2.commit();
+
+        lastAllCommitted = allCommitted;
+        allCommitted = engine->getAllCommittedTimestamp();
+        ASSERT_GTE(allCommitted, lastAllCommitted);
+        ASSERT_LT(allCommitted, t11);
+
+        ASSERT_EQ(invariant(rs->insertRecord(
+                      &opCtx1, t12Doc.objdata(), t12Doc.objsize(), Timestamp::min())),
+                  RecordId(1, 2));
+
+        lastAllCommitted = allCommitted;
+        allCommitted = engine->getAllCommittedTimestamp();
+        ASSERT_GTE(allCommitted, lastAllCommitted);
+        ASSERT_LT(allCommitted, t11);
+
+        uow1.commit();
+
+        lastAllCommitted = allCommitted;
+        allCommitted = engine->getAllCommittedTimestamp();
+        ASSERT_GTE(allCommitted, lastAllCommitted);
+        ASSERT_LTE(allCommitted, t21);
+    }
+}
+
 TEST(KVCatalogTest, Coll1) {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
