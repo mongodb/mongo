@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, assumes_balancer_off]
 
 // Test that even when the execution of a query fails, explain reports query
 // planner information.

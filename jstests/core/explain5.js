@@ -1,4 +1,5 @@
 // Check explain results for a plan that uses an index to obtain the requested sort order.
+// @tags: [assumes_balancer_off]
 
 t = db.jstests_explain5;
 t.drop();

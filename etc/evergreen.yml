@@ -6085,6 +6085,16 @@ tasks:
       resmoke_args: --suites=multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: multi_stmt_txn_jscore_passthrough_with_migration
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=multi_stmt_txn_jscore_passthrough_with_migration --storageEngine=wiredTiger
+
+- <<: *task_template
   name: parallel
   depends_on:
   - name: jsCore
@@ -8791,6 +8801,7 @@ buildvariants:
   - name: mongosTest
   - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
+  - name: multi_stmt_txn_jscore_passthrough_with_migration
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -10472,6 +10483,8 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
   - name: mongosTest
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough
+  - name: multi_stmt_txn_jscore_passthrough_with_migration
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: rollback_fuzzer_gen
@@ -12122,6 +12135,9 @@ buildvariants:
   - name: mongosTest
   - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
   - name: multi_shard_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: multi_stmt_txn_jscore_passthrough_with_migration
     distros:
     - rhel62-large
   - name: multiversion_auth
