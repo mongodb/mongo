@@ -7893,7 +7893,6 @@ buildvariants:
       CXX=g++-7
       --cxx-std=17
       --disable-warnings-as-errors
-      --allocator=system
     repo_edition: enterprise
     scons_cache_scope: shared
     tooltags: "ssl sasl"
@@ -7934,7 +7933,6 @@ buildvariants:
       --libc++
       --cxx-std=17
       --disable-warnings-as-errors
-      --allocator=system
       CXXFLAGS="-Wno-register"
     repo_edition: enterprise
     scons_cache_scope: shared

@@ -50,7 +50,7 @@
 #endif
 
 #ifdef __cplusplus
-#define PERFTOOLS_THROW throw()
+#define PERFTOOLS_THROW noexcept
 #else
 # ifdef __GNUC__
 #  define PERFTOOLS_THROW __attribute__((__nothrow__))

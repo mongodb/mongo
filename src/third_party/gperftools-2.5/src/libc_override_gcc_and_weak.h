@@ -57,38 +57,38 @@
 
 #define ALIAS(tc_fn)   __attribute__ ((alias (#tc_fn), used))
 
-void* operator new(size_t size) throw (std::bad_alloc)
+void* operator new(size_t size)
     ALIAS(tc_new);
-void operator delete(void* p) throw()
+void operator delete(void* p) noexcept
     ALIAS(tc_delete);
-void* operator new[](size_t size) throw (std::bad_alloc)
+void* operator new[](size_t size)
     ALIAS(tc_newarray);
-void operator delete[](void* p) throw()
+void operator delete[](void* p) noexcept
     ALIAS(tc_deletearray);
-void* operator new(size_t size, const std::nothrow_t& nt) throw()
+void* operator new(size_t size, const std::nothrow_t& nt) noexcept
     ALIAS(tc_new_nothrow);
-void* operator new[](size_t size, const std::nothrow_t& nt) throw()
+void* operator new[](size_t size, const std::nothrow_t& nt) noexcept
     ALIAS(tc_newarray_nothrow);
-void operator delete(void* p, const std::nothrow_t& nt) throw()
+void operator delete(void* p, const std::nothrow_t& nt) noexcept
     ALIAS(tc_delete_nothrow);
-void operator delete[](void* p, const std::nothrow_t& nt) throw()
+void operator delete[](void* p, const std::nothrow_t& nt) noexcept
     ALIAS(tc_deletearray_nothrow);
 
 #if defined(ENABLE_SIZED_DELETE)
 
-void operator delete(void *p, size_t size) throw()
+void operator delete(void *p, size_t size) noexcept
     ALIAS(tc_delete_sized);
-void operator delete[](void *p, size_t size) throw()
+void operator delete[](void *p, size_t size) noexcept
     ALIAS(tc_deletearray_sized);
 
 #elif defined(ENABLE_DYNAMIC_SIZED_DELETE) && \
   (__GNUC__ * 100 + __GNUC_MINOR__) >= 405
 
-static void delegate_sized_delete(void *p, size_t s) throw() {
+static void delegate_sized_delete(void *p, size_t s) noexcept {
   (operator delete)(p);
 }
 
-static void delegate_sized_deletearray(void *p, size_t s) throw() {
+static void delegate_sized_deletearray(void *p, size_t s) noexcept {
   (operator delete[])(p);
 }
 
@@ -122,16 +122,16 @@ static void *resolve_deletearray_sized(void) {
 
 }
 
-void operator delete(void *p, size_t size) throw()
+void operator delete(void *p, size_t size) noexcept
   __attribute__((ifunc("resolve_delete_sized")));
-void operator delete[](void *p, size_t size) throw()
+void operator delete[](void *p, size_t size) noexcept
   __attribute__((ifunc("resolve_deletearray_sized")));
 
 #else /* !ENABLE_SIZED_DELETE && !ENABLE_DYN_SIZED_DELETE */
 
-void operator delete(void *p, size_t size) throw()
+void operator delete(void *p, size_t size) noexcept
   ALIAS(tc_delete);
-void operator delete[](void *p, size_t size) throw()
+void operator delete[](void *p, size_t size) noexcept
   ALIAS(tc_deletearray);
 
 #endif /* !ENABLE_SIZED_DELETE && !ENABLE_DYN_SIZED_DELETE */
