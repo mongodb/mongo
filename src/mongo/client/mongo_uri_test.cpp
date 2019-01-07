@@ -412,6 +412,8 @@ const URITestCase validCases[] = {
 
     {"mongodb://localhost/?ssl=true", "", "", kMaster, "", 1, 1, "", kEnableSSL},
     {"mongodb://localhost/?ssl=false", "", "", kMaster, "", 1, 1, "", kDisableSSL},
+    {"mongodb://localhost/?tls=true", "", "", kMaster, "", 1, 1, "", kEnableSSL},
+    {"mongodb://localhost/?tls=false", "", "", kMaster, "", 1, 1, "", kDisableSSL},
 };
 
 const InvalidURITestCase invalidCases[] = {
@@ -483,8 +485,9 @@ const InvalidURITestCase invalidCases[] = {
     // Missing an entire key-value pair
     {"mongodb://127.0.0.1:1234/dbName?foo=a&&c=b"},
 
-    // Illegal value for ssl.
+    // Illegal value for ssl/tls.
     {"mongodb://127.0.0.1:1234/dbName?ssl=blah", ErrorCodes::duplicateCodeForTest(51041)},
+    {"mongodb://127.0.0.1:1234/dbName?tls=blah", ErrorCodes::duplicateCodeForTest(51041)},
 };
 
 // Helper Method to take a filename for a json file and return the array of tests inside of it

@@ -487,7 +487,9 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
     }
 
     transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
-    auto sslModeIter = options.find("ssl");
+    auto sslModeIter = std::find_if(options.begin(), options.end(), [](auto pred) {
+        return pred.first == "ssl"_sd || pred.first == "tls"_sd;
+    });
     if (sslModeIter != options.end()) {
         const auto& val = sslModeIter->second;
         if (val == "true") {
@@ -495,7 +497,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
         } else if (val == "false") {
             sslMode = transport::kDisableSSL;
         } else {
-            uasserted(51041, str::stream() << "ssl must be either 'true' or 'false', not" << val);
+            uasserted(51041, str::stream() << "tls must be either 'true' or 'false', not" << val);
         }
     }
 
