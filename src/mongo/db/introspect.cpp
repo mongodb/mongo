@@ -117,6 +117,10 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
 
+    // True if we need to acquire an X lock on the database in order to create the system.profile
+    // collection.
+    bool acquireDbXLock = false;
+
     try {
         // Even if the operation we are profiling was interrupted, we still want to output the
         // profiler entry.  This lock guard will prevent lock acquisitions from throwing exceptions
@@ -127,10 +131,12 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             noInterrupt.emplace(opCtx->lockState());
         }
 
-        bool acquireDbXLock = false;
         while (true) {
             std::unique_ptr<AutoGetDb> autoGetDb;
             if (acquireDbXLock) {
+                // We should not attempt to acquire an X lock while in "noInterrupt" scope.
+                noInterrupt.reset();
+
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
                 if (autoGetDb->getDb()) {
                     createProfileCollection(opCtx, autoGetDb->getDb()).transitional_ignore();
@@ -170,8 +176,16 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             }
         }
     } catch (const AssertionException& assertionEx) {
-        warning() << "Caught Assertion while trying to profile " << networkOpToString(op)
-                  << " against " << CurOp::get(opCtx)->getNS() << ": " << redact(assertionEx);
+        if (acquireDbXLock && assertionEx.isA<ErrorCategory::Interruption>()) {
+            warning()
+                << "Interrupted while attempting to create profile collection in database "
+                << dbName << " to profile operation " << networkOpToString(op) << " against "
+                << CurOp::get(opCtx)->getNS()
+                << ". Manually create profile collection to ensure future operations are logged.";
+        } else {
+            warning() << "Caught Assertion while trying to profile " << networkOpToString(op)
+                      << " against " << CurOp::get(opCtx)->getNS() << ": " << redact(assertionEx);
+        }
     }
 }
 
