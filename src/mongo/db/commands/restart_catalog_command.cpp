@@ -86,7 +86,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const std::string& dbNameUnused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         Lock::GlobalLock global(opCtx, MODE_X);
