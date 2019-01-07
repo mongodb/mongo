@@ -49,9 +49,6 @@ protected:
 
         lib = stitch_support_v1_init(status);
         ASSERT(lib);
-
-        updateDetails = stitch_support_v1_update_details_create();
-        ASSERT(updateDetails);
     }
 
     void tearDown() override {
@@ -61,15 +58,10 @@ protected:
 
         stitch_support_v1_status_destroy(status);
         status = nullptr;
-
-        stitch_support_v1_update_details_destroy(updateDetails);
-        updateDetails = nullptr;
-
-        if (updateResult) {
-            free(updateResult);
-            updateResult = nullptr;
-        }
     }
+
+    stitch_support_v1_status* status = nullptr;
+    stitch_support_v1_lib* lib = nullptr;
 
     auto checkMatch(const char* filterJSON,
                     std::vector<const char*> documentsJSON,
@@ -103,71 +95,6 @@ protected:
 
         return explanation;
     }
-
-    mongo::BSONObj applyUpdate(const char* expr,
-                               const char* document,
-                               const char* match = nullptr,
-                               const char* arrayFilters = nullptr,
-                               const char* collatorObj = nullptr) {
-        stitch_support_v1_collator* collator = nullptr;
-        if (collatorObj) {
-            collator =
-                stitch_support_v1_collator_create(lib, fromjson(collatorObj).objdata(), nullptr);
-        }
-
-        stitch_support_v1_matcher* matcher = nullptr;
-        if (match) {
-            matcher =
-                stitch_support_v1_matcher_create(lib, fromjson(match).objdata(), collator, status);
-            ASSERT(matcher);
-        }
-
-        stitch_support_v1_update* update = stitch_support_v1_update_create(
-            lib,
-            fromjson(expr).objdata(),
-            arrayFilters ? fromjson(arrayFilters).objdata() : nullptr,
-            matcher,
-            collator,
-            status);
-        ASSERT(update);
-
-        // Free the previous update result, if there is one.
-        if (updateResult) {
-            free(updateResult);
-            updateResult = nullptr;
-        }
-
-        updateResult = stitch_support_v1_update_apply(
-            update, fromjson(document).objdata(), updateDetails, status);
-        ASSERT(updateResult);
-
-        stitch_support_v1_update_destroy(update);
-        stitch_support_v1_matcher_destroy(matcher);
-        stitch_support_v1_collator_destroy(collator);
-
-        return mongo::BSONObj(updateResult);
-    }
-
-    const std::string getModifiedPaths() {
-        ASSERT(updateDetails);
-
-        std::stringstream ss;
-        ss << "[";
-        size_t nPaths = stitch_support_v1_update_details_num_modified_paths(updateDetails);
-        for (size_t pathIdx = 0; pathIdx < nPaths; ++pathIdx) {
-            auto path = stitch_support_v1_update_details_path(updateDetails, pathIdx);
-            ss << path;
-            if (pathIdx != (nPaths - 1))
-                ss << ", ";
-        }
-        ss << "]";
-        return ss.str();
-    }
-
-    stitch_support_v1_status* status = nullptr;
-    stitch_support_v1_lib* lib = nullptr;
-    stitch_support_v1_update_details* updateDetails = nullptr;
-    char* updateResult = nullptr;
 };
 
 TEST_F(StitchSupportTest, InitializationIsSuccessful) {
@@ -220,81 +147,6 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithCollation) {
         lib, fromjson("{locale: 'en', strength: 2}").objdata(), nullptr);
     ASSERT_TRUE(checkMatch("{a: 'word'}", {"{a: 'WORD', b: 'other'}"}, collator));
     stitch_support_v1_collator_destroy(collator);
-}
-
-TEST_F(StitchSupportTest, TestUpdateSingleElement) {
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {a: 2}}", "{a: 1}"), fromjson("{a: 2}"));
-    ASSERT_EQ(getModifiedPaths(), "[a]");
-}
-
-TEST_F(StitchSupportTest, TestReplacementStyleUpdateReportsNoModifiedPaths) {
-    // Replacement-style updates reports no modified paths because this functionality is not
-    // currently needed by Stitch.
-    ASSERT_BSONOBJ_EQ(applyUpdate("{a: 2}", "{a: 1}"), fromjson("{a: 2}"));
-    ASSERT_EQ(getModifiedPaths(), "[]");
-}
-
-TEST_F(StitchSupportTest, TestUpdateArrayElement) {
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.0': 2}}", "{a: [1, 2]}"), fromjson("{a: [2, 2]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a.0]");
-
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.0.b': 2}}", "{a: [{b: 1}]}"),
-                      fromjson("{a: [{b: 2}]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a.0.b]");
-}
-
-TEST_F(StitchSupportTest, TestUpdateAddToArray) {
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.1.b': 2}}", "{a: [{b: 1}]}"),
-                      fromjson("{a: [{b: 1}, {b: 2}]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a]");
-
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.1.b': 2, c: 3}}", "{a: [{b: 1}]}"),
-                      fromjson("{a: [{b: 1}, {b: 2}], c: 3}"));
-    ASSERT_EQ(getModifiedPaths(), "[a, c]");
-}
-
-TEST_F(StitchSupportTest, TestUpdatePullFromArray) {
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$pull: {'a': 2}}", "{a: [3, 2, 1]}"), fromjson("{a: [3, 1]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a]");
-}
-
-TEST_F(StitchSupportTest, TestPositionalUpdates) {
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.$': 3}}", "{a: [1, 2]}", "{a: 2}"),
-                      fromjson("{a: [1, 3]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a.1]");
-
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.$.b': 3}}", "{a: [{b: 1}, {b: 2}]}", "{'a.b': 2}"),
-                      fromjson("{a: [{b: 1}, {b: 3}]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a.1.b]");
-}
-
-TEST_F(StitchSupportTest, TestUpdatesWithArrayFilters) {
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$set: {'a.$[i]': 3}}", "{a: [1, 2]}", nullptr, "[{'i': 2}]"),
-                      fromjson("{a: [1, 3]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a.1]");
-
-    ASSERT_BSONOBJ_EQ(
-        applyUpdate("{$set: {'a.$[i].b': 3}}", "{a: [{b: 1}, {b: 2}]}", nullptr, "[{'i.b': 2}]"),
-        fromjson("{a: [{b: 1}, {b: 3}]}"));
-    ASSERT_EQ(getModifiedPaths(), "[a.1.b]");
-}
-
-TEST_F(StitchSupportTest, TestUpdateRespectsTheCollation) {
-    auto caseInsensitive = "{locale: 'en', strength: 2}";
-    ASSERT_BSONOBJ_EQ(applyUpdate("{$addToSet: {a: 'santa'}}",
-                                  "{a: ['Santa', 'Elf']}",
-                                  nullptr,
-                                  nullptr,
-                                  caseInsensitive),
-                      fromjson("{a: ['Santa', 'Elf']}"));
-    // $addToSet with existing element is considered a no-op, but the array is marked as modified.
-    ASSERT_EQ(getModifiedPaths(), "[a]");
-
-    ASSERT_BSONOBJ_EQ(
-        applyUpdate(
-            "{$pull: {a: 'santa'}}", "{a: ['Santa', 'Elf']}", nullptr, nullptr, caseInsensitive),
-        fromjson("{a: ['Elf']}"));
-    ASSERT_EQ(getModifiedPaths(), "[a]");
 }
 
 }  // namespace
