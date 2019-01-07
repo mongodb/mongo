@@ -622,6 +622,15 @@ __wt_cell_unpack_safe(const WT_PAGE_HEADER *dsk,
 		return (WT_ERROR);	        			\
 } while (0)
 
+	/*
+	 * NB: when unpacking a WT_CELL_VALUE_COPY cell, unpack.cell is returned
+	 * as the original cell, not the copied cell (in other words, data from
+	 * the copied cell must be available from unpack after we return, as our
+	 * caller has no way to find the copied cell.
+	 */
+	WT_CELL_LEN_CHK(cell, 0);
+	unpack->cell = cell;
+
 restart:
 	/*
 	 * This path is performance critical for read-only trees, we're parsing
@@ -630,8 +639,6 @@ restart:
 	 * initialize all structure elements either here or in the immediately
 	 * following switch.
 	 */
-	WT_CELL_LEN_CHK(cell, 0);
-	unpack->cell = cell;
 	unpack->v = 0;
 	unpack->start_ts = WT_TS_NONE;
 	unpack->stop_ts = WT_TS_MAX;

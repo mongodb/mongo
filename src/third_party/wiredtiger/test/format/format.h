@@ -381,7 +381,7 @@ mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
 	 * Test runs with small row counts can easily pass a max of 0 (for
 	 * example, "g.rows / 20"). Avoid the problem.
 	 */
-	if (min <= max)
+	if (max <= min)
 		return (min);
 
 	v = rng(rnd);
