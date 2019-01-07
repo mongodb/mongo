@@ -10667,7 +10667,7 @@ buildvariants:
   expansions:
     resmoke_jobs_max: 1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11"
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
@@ -10686,6 +10686,8 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: replica_sets
+  - name: ssl
+  - name: sslSpecial
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
