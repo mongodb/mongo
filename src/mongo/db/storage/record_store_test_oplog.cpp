@@ -160,6 +160,33 @@ TEST(RecordStoreTestHarness, OplogHack) {
     }
 }
 
+TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
+    if (!harnessHelper->supportsDocLocking())
+        return;
+
+    const int64_t cappedMaxSize = 10 * 1024;  // Large enough to not exceed.
+    std::unique_ptr<RecordStore> rs(
+        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        // RecordId's are inserted out-of-order.
+        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1, 1)).getValue(), RecordId(1, 1));
+        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2, 2)).getValue(), RecordId(2, 2));
+        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1, 2)).getValue(), RecordId(1, 2));
+    }
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        rs->waitForAllEarlierOplogWritesToBeVisible(opCtx.get());
+        auto cursor = rs->getCursor(opCtx.get());
+        ASSERT_EQ(cursor->next()->id, RecordId(1, 1));
+        ASSERT_EQ(cursor->next()->id, RecordId(1, 2));
+        ASSERT_EQ(cursor->next()->id, RecordId(2, 2));
+        ASSERT(!cursor->next());
+    }
+}
+
 TEST(RecordStoreTestHarness, OplogHackOnNonOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     if (!harnessHelper->supportsDocLocking())

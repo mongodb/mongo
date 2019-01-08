@@ -168,7 +168,7 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
             int64_t thisRecordId = 0;
             if (_isOplog) {
                 StatusWith<RecordId> status =
-                    extractAndCheckLocForOplog(opCtx, record.data.data(), record.data.size());
+                    oploghack::extractKey(record.data.data(), record.data.size());
                 if (!status.isOK())
                     return status.getStatus();
                 thisRecordId = status.getValue().repr();
@@ -212,7 +212,7 @@ Status RecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
 
             int64_t thisRecordId = 0;
             if (_isOplog) {
-                StatusWith<RecordId> status = extractAndCheckLocForOplog(opCtx, buf.data(), len);
+                StatusWith<RecordId> status = oploghack::extractKey(buf.data(), len);
                 if (!status.isOK())
                     return status.getStatus();
                 thisRecordId = status.getValue().repr();
@@ -439,31 +439,6 @@ boost::optional<RecordId> RecordStore::oplogStartHack(OperationContext* opCtx,
         return RecordId();
 
     return rid;
-}
-
-StatusWith<RecordId> RecordStore::extractAndCheckLocForOplog(OperationContext* opCtx,
-                                                             const char* data,
-                                                             int len) const {
-    StatusWith<RecordId> status = oploghack::extractKey(data, len);
-    if (!status.isOK())
-        return status;
-
-    StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    StringStore::const_reverse_iterator it = workingCopy->upper_bound(_postfix);
-
-    if (numRecords(opCtx) == 0)
-        return status;
-
-    RecordId rid = RecordId(extractRecordId(it->first));
-    if (status.getValue() <= rid)
-        return StatusWith<RecordId>(ErrorCodes::BadValue,
-                                    str::stream() << "attempted out-of-order oplog insert of "
-                                                  << status.getValue()
-                                                  << " (oplog last insert was "
-                                                  << rid
-                                                  << " )");
-
-    return status;
 }
 
 bool RecordStore::_cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy) {

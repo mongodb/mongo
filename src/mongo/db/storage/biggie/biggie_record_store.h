@@ -133,10 +133,6 @@ private:
         return _highestRecordId.fetchAndAdd(1);
     }
 
-    StatusWith<RecordId> extractAndCheckLocForOplog(OperationContext* opCtx,
-                                                    const char* data,
-                                                    int len) const;
-
     /**
      *  Two helper functions for deleting excess records in capped record stores.
      *  The caller should not have an active SizeAdjuster.
