@@ -1842,7 +1842,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Optional storage declarations.
             if (param.cpp_vartype is not None) and (param.cpp_varname is not None):
                 with self._condition(param.condition, preprocessor_only=True):
-                    self._writer.write_line('%s %s;' % (param.cpp_vartype, param.cpp_varname))
+                    init = ('{%s}' % (param.default.expr)) if param.default else ''
+                    self._writer.write_line('%s %s%s;' % (param.cpp_vartype, param.cpp_varname,
+                                                          init))
 
         blockname = 'idl_' + uuid.uuid4().hex
         with self._block('MONGO_SERVER_PARAMETER_REGISTER(%s)(InitializerContext*) {' % (blockname),
@@ -1934,7 +1936,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 has_storage_targets = True
                 if opt.cpp_vartype is not None:
                     with self._condition(opt.condition, preprocessor_only=True):
-                        self._writer.write_line('%s %s;' % (opt.cpp_vartype, opt.cpp_varname))
+                        init = ('{%s}' % (opt.default.expr)) if opt.default else ''
+                        self._writer.write_line('%s %s%s;' % (opt.cpp_vartype, opt.cpp_varname,
+                                                              init))
 
         self.write_empty_line()
 
