@@ -32,61 +32,73 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replication_state_transition_lock_guard.h"
-
-#include "mongo/db/kill_sessions_local.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace repl {
 
 ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx)
-    : ReplicationStateTransitionLockGuard(opCtx, Args()) {}
+    : ReplicationStateTransitionLockGuard(opCtx, EnqueueOnly()) {
+    waitForLockUntil(Date_t::max());
+}
 
 ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx,
-                                                                         const Args& args)
-    : _opCtx(opCtx), _args(args) {
-    // Enqueue a lock request for the RSTL in mode X.
-    LockResult result = _opCtx->lockState()->lockRSTLBegin(_opCtx);
+                                                                         EnqueueOnly)
+    : _opCtx(opCtx) {
+    _enqueueLock();
+}
 
-    if (args.killUserOperations) {
-        ServiceContext* environment = opCtx->getServiceContext();
-        environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToStepDown);
+ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(
+    ReplicationStateTransitionLockGuard&& other)
+    : _opCtx(other._opCtx), _result(other._result) {
+    other._result = LOCK_INVALID;
+}
 
-        // Destroy all stashed transaction resources, in order to release locks.
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsLocalKillTransactions(
-            opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
-    }
+ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
+    _unlock();
+}
 
+void ReplicationStateTransitionLockGuard::waitForLockUntil(mongo::Date_t deadline) {
     // We can return early if the lock request was already satisfied.
-    if (result == LOCK_OK) {
+    if (_result == LOCK_OK) {
         return;
     }
 
     // Wait for the completion of the lock request for the RSTL in mode X.
-    _opCtx->lockState()->lockRSTLComplete(opCtx, args.lockDeadline);
+    _result = _opCtx->lockState()->lockRSTLComplete(_opCtx, deadline);
     uassert(ErrorCodes::ExceededTimeLimit,
             "Could not acquire the RSTL before the deadline",
-            opCtx->lockState()->isRSTLExclusive());
+            _opCtx->lockState()->isRSTLExclusive());
 }
 
-ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
-    invariant(_opCtx->lockState()->isRSTLExclusive());
-    _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+void ReplicationStateTransitionLockGuard::release() {
+    _unlock();
 }
 
-void ReplicationStateTransitionLockGuard::releaseRSTL() {
-    invariant(_opCtx->lockState()->isRSTLExclusive());
-    _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+void ReplicationStateTransitionLockGuard::reacquire() {
+    _enqueueLock();
+    waitForLockUntil(Date_t::max());
 }
 
-void ReplicationStateTransitionLockGuard::reacquireRSTL() {
-    invariant(!_opCtx->lockState()->isRSTLLocked());
-
-    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    _opCtx->lockState()->lock(_opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
+void ReplicationStateTransitionLockGuard::_enqueueLock() {
+    // Enqueue a lock request for the RSTL in mode X.
+    _result = _opCtx->lockState()->lockRSTLBegin(_opCtx);
 }
+
+void ReplicationStateTransitionLockGuard::_unlock() {
+    // waitForLockUntil() must be called after enqueue. It either times out or succeeds,
+    // so we should never see LOCK_WAITING here. This also means between the enqueue and
+    // waitForLockUntil(), no exception is accepted. We could call lockRSTLComplete() with
+    // timeout 0 here for pending locks to clean up the lock's state, but it's clearer to enforce
+    // the exception-free pattern.
+    invariant(_result != LOCK_WAITING);
+    if (isLocked()) {
+        _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+    }
+    _result = LOCK_INVALID;
+}
+
 
 }  // namespace repl
 }  // namespace mongo

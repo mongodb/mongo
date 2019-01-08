@@ -39,6 +39,7 @@
 #include <algorithm>
 
 #include "mongo/base/status.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -48,7 +49,6 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
@@ -381,11 +381,13 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     }
 
     auto opCtx = cc().makeOperationContext();
-    ReplicationStateTransitionLockGuard::Args transitionArgs;
+
+    ReplicationStateTransitionLockGuard rstlLock(
+        opCtx.get(), ReplicationStateTransitionLockGuard::EnqueueOnly());
     // Kill all user operations to help us get the global lock faster, as well as to ensure that
     // operations that are no longer safe to run (like writes) get killed.
-    transitionArgs.killUserOperations = true;
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), transitionArgs);
+    _killOperationsOnStepDown(opCtx.get());
+    rstlLock.waitForLockUntil(Date_t::max());
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 

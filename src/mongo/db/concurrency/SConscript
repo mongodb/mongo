@@ -39,6 +39,7 @@ env.Library(
         'lock_manager.cpp',
         'lock_state.cpp',
         'lock_stats.cpp',
+        'replication_state_transition_lock_guard.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

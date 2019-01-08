@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -1930,6 +1931,62 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
     opCtx->lockState()->endWriteUnitOfWork();
 }
 
+TEST_F(DConcurrencyTestFixture, RSTLLockGuardTimeout) {
+    auto clients = makeKClientsWithLockers(2);
+    auto firstOpCtx = clients[0].second.get();
+    auto secondOpCtx = clients[1].second.get();
+
+    // The first opCtx holds the RSTL.
+    repl::ReplicationStateTransitionLockGuard firstRSTL(firstOpCtx);
+    ASSERT_TRUE(firstRSTL.isLocked());
+    ASSERT_EQ(firstOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_X);
+
+    // The second opCtx enqueues the lock request but cannot acquire it.
+    repl::ReplicationStateTransitionLockGuard secondRSTL(
+        secondOpCtx, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+    ASSERT_FALSE(secondRSTL.isLocked());
+
+    // The second opCtx times out.
+    ASSERT_THROWS_CODE(secondRSTL.waitForLockUntil(Date_t::now() + Milliseconds(1)),
+                       AssertionException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    // Check the first opCtx is still holding the RSTL.
+    ASSERT_TRUE(firstRSTL.isLocked());
+    ASSERT_EQ(firstOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_X);
+    ASSERT_FALSE(secondRSTL.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
+    auto clients = makeKClientsWithLockers(2);
+    auto firstOpCtx = clients[0].second.get();
+    auto secondOpCtx = clients[1].second.get();
+
+    // The first opCtx holds the RSTL.
+    auto firstRSTL = stdx::make_unique<repl::ReplicationStateTransitionLockGuard>(firstOpCtx);
+    ASSERT_TRUE(firstRSTL->isLocked());
+    ASSERT_EQ(firstOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_X);
+
+
+    // The second opCtx enqueues the lock request but cannot acquire it.
+    repl::ReplicationStateTransitionLockGuard secondRSTL(
+        secondOpCtx, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+    ASSERT_FALSE(secondRSTL.isLocked());
+
+    // The first opCtx unlocks so the second opCtx acquires it.
+    firstRSTL.reset();
+    ASSERT_EQ(firstOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_NONE);
+
+
+    secondRSTL.waitForLockUntil(Date_t::now());
+    ASSERT_TRUE(secondRSTL.isLocked());
+    ASSERT_EQ(secondOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
+              MODE_X);
+}
 
 }  // namespace
 }  // namespace mongo

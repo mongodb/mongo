@@ -595,13 +595,13 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/kill_sessions_local',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/util/net/network',
         'optime',
         'repl_coordinator_interface',
-        'repl_state_transition_lock_guard',
         'roll_back_local_operations',
     ],
     LIBDEPS_PRIVATE=[
@@ -679,7 +679,6 @@ env.Library(
         'oplogreader',
         'repl_coordinator_interface',
         'repl_settings',
-        'repl_state_transition_lock_guard',
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
@@ -812,16 +811,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='repl_state_transition_lock_guard',
-    source=[
-        'replication_state_transition_lock_guard.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/kill_sessions_local',
-    ]
-)
-
-env.Library(
     target='repl_coordinator_impl',
     source=[
         'check_quorum_for_config_change.cpp',
@@ -848,7 +837,6 @@ env.Library(
         'data_replicator_external_state_initial_sync',
         'repl_coordinator_interface',
         'repl_settings',
-        'repl_state_transition_lock_guard',
         'replica_set_messages',
         'replication_process',
         'reporter',

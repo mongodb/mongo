@@ -46,7 +46,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
@@ -63,7 +65,6 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
@@ -1732,6 +1733,17 @@ void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     }
 }
 
+void ReplicationCoordinatorImpl::_killOperationsOnStepDown(OperationContext* opCtx) {
+    ServiceContext* environment = opCtx->getServiceContext();
+    environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToStepDown);
+
+    // Destroy all stashed transaction resources, in order to release locks.
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    killSessionsLocalKillTransactions(
+        opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
+}
+
 void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                                           const bool force,
                                           const Milliseconds& waitTime,
@@ -1746,17 +1758,17 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // from acquiring the global X lock unnecessarily.
     uassert(ErrorCodes::NotMaster, "not primary so can't step down", getMemberState().primary());
 
-    ReplicationStateTransitionLockGuard::Args transitionArgs;
+    ReplicationStateTransitionLockGuard rstlLock(
+        opCtx, ReplicationStateTransitionLockGuard::EnqueueOnly());
+
     // Kill all user operations to help us get the global lock faster, as well as to ensure that
     // operations that are no longer safe to run (like writes) get killed.
-    transitionArgs.killUserOperations = true;
+    _killOperationsOnStepDown(opCtx);
+
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
     // stepDownUntil deadline instead.
-    transitionArgs.lockDeadline = force ? stepDownUntil : waitUntil;
-
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx, transitionArgs);
-    invariant(opCtx->lockState()->isRSTLExclusive());
+    rstlLock.waitForLockUntil(force ? stepDownUntil : waitUntil);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -1824,7 +1836,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
             // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
             // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
-            transitionGuard.releaseRSTL();
+            rstlLock.release();
             invariant(!opCtx->lockState()->isLocked());
 
             // Make sure we re-acquire the RSTL before returning so that we're always holding the
@@ -1840,8 +1852,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 // clean up a failed stepdown attempt, we might as well spend whatever time we need
                 // to acquire it now.  For the same reason, we also disable lock acquisition
                 // interruption, to guarantee that we get the lock eventually.
-                transitionGuard.reacquireRSTL();
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                rstlLock.reacquire();
                 invariant(opCtx->lockState()->isRSTLExclusive());
+
                 lk.lock();
             });
 

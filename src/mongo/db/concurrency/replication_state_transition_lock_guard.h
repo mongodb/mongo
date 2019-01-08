@@ -33,10 +33,13 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class OperationContext;
+
 namespace repl {
 
 /**
@@ -47,14 +50,7 @@ class ReplicationStateTransitionLockGuard {
     MONGO_DISALLOW_COPYING(ReplicationStateTransitionLockGuard);
 
 public:
-    struct Args {
-        // How long to wait for the RSTL in mode X.
-        Date_t lockDeadline = Date_t::max();
-
-        // If true, will kill all user operations in between enqueuing the RSTL request and waiting
-        // for it to be granted.
-        bool killUserOperations = false;
-    };
+    class EnqueueOnly {};
 
     /**
      * Acquires the RSTL in mode X.
@@ -62,27 +58,37 @@ public:
     ReplicationStateTransitionLockGuard(OperationContext* opCtx);
 
     /**
-     * Acquires the RSTL in mode X and performs any other required actions according to the Args
-     * provided.
+     * Enqueues RSTL in mode X but does not block on lock acquisition.
+     * Must call waitForLockUntil() to complete locking process.
      */
-    ReplicationStateTransitionLockGuard(OperationContext* opCtx, const Args& args);
+    ReplicationStateTransitionLockGuard(OperationContext* opCtx, EnqueueOnly);
+
+    ReplicationStateTransitionLockGuard(ReplicationStateTransitionLockGuard&&);
+    ReplicationStateTransitionLockGuard& operator=(ReplicationStateTransitionLockGuard&&) = delete;
 
     ~ReplicationStateTransitionLockGuard();
 
     /**
-     * Temporarily releases the RSTL in mode X.  Must be followed by a call to reacquireRSTL().
+     * Waits for RSTL to be granted.
      */
-    void releaseRSTL();
+    void waitForLockUntil(Date_t deadline);
 
     /**
-     * Re-acquires the RSTL in mode X after it was released via a call to releaseRSTL.  Ignores
-     * the configured 'lockDeadline' and instead waits forever for the lock to be acquired.
+     * Release and reacquire the RSTL in mode X.
      */
-    void reacquireRSTL();
+    void release();
+    void reacquire();
+
+    bool isLocked() const {
+        return _result == LOCK_OK;
+    }
 
 private:
+    void _enqueueLock();
+    void _unlock();
+
     OperationContext* const _opCtx;
-    Args _args;
+    LockResult _result;
 };
 
 }  // namespace repl

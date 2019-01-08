@@ -924,6 +924,11 @@ private:
     executor::TaskExecutor::EventHandle _stepDownStart();
 
     /**
+     * Kills users operations and aborts unprepared transactions.
+     */
+    void _killOperationsOnStepDown(OperationContext* opCtx);
+
+    /**
      * Completes a step-down of the current node.  Must be run with a global
      * shared or global exclusive lock.
      * Signals 'finishedEvent' on successful completion.
