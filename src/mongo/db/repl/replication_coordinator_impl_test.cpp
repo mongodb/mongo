@@ -65,6 +65,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -3786,8 +3787,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
                                                << 0))),
                        HostAndPort("node1", 12345));
     runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
-    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(0, 0), 1));
-    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(0, 0), 1));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 1));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 1));
     OpTime committedOpTime(Timestamp(200, 0), 1);
     auto pseudoLogOp = stdx::async(stdx::launch::async, [this, &committedOpTime]() {
         // Not guaranteed to be scheduled after waitUntil blocks...
@@ -3815,8 +3816,8 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
                                                << 0))),
                        HostAndPort("node1", 12345));
     runSingleNodeElection(makeOperationContext(), getReplCoord(), getNet());
-    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(0, 0), 1));
-    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(0, 0), 1));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 1));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 1));
 
     OpTime opTimeToWait(Timestamp(100, 0), 1);
 
@@ -4742,9 +4743,10 @@ TEST_F(ReplCoordTest,
                        HostAndPort("node1", 12345));
 
 
-    OpTime time1(Timestamp(100, 1), 1);
-    OpTime time2(Timestamp(100, 2), 1);
-    OpTime time3(Timestamp(100, 3), 1);
+    auto term = getTopoCoord().getTerm();
+    OpTime time1(Timestamp(100, 1), term);
+    OpTime time2(Timestamp(100, 2), term);
+    OpTime time3(Timestamp(100, 3), term);
 
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
@@ -4753,6 +4755,106 @@ TEST_F(ReplCoordTest,
     getReplCoord()->setMyLastAppliedOpTimeForward(time2);
     getReplCoord()->setMyLastDurableOpTimeForward(time2);
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
+}
+
+DEATH_TEST_F(ReplCoordTest,
+             SetMyLastOpTimeToTimestampLesserThanCurrentLastOpTimeTimestampButWithHigherTerm,
+             "opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp()") {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(99, 1), 2);
+
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
+    // Since in pv1, oplog entries are ordered by non-decreasing
+    // term and strictly increasing timestamp, it leads to invariant failure.
+    getReplCoord()->setMyLastAppliedOpTimeForward(time2);
+}
+
+DEATH_TEST_F(ReplCoordTest,
+             SetMyLastOpTimeToTimestampEqualToCurrentLastOpTimeTimestampButWithHigherTerm,
+             "opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp()") {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 1), 2);
+
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
+    // Since in pv1, oplog entries are ordered by non-decreasing
+    // term and strictly increasing timestamp, it leads to invariant failure.
+    getReplCoord()->setMyLastAppliedOpTimeForward(time2);
+}
+
+DEATH_TEST_F(ReplCoordTest,
+             SetMyLastOpTimeToTimestampGreaterThanCurrentLastOpTimeTimestampButWithLesserTerm,
+             "opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp()") {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 2), 0);
+
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
+    // Since in pv1, oplog entries are ordered by non-decreasing
+    // term and strictly increasing timestamp, it leads to invariant failure.
+    getReplCoord()->setMyLastAppliedOpTimeForward(time2);
+}
+
+DEATH_TEST_F(ReplCoordTest,
+             SetMyLastOpTimeToTimestampEqualToCurrentLastOpTimeTimestampButWithLesserTerm,
+             "opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp()") {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 1), 0);
+
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
+    // Since in pv1, oplog entries are ordered by non-decreasing
+    // term and strictly increasing timestamp, it leads to invariant failure.
+    getReplCoord()->setMyLastAppliedOpTimeForward(time2);
 }
 
 TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelievedToBeUp) {

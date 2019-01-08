@@ -1165,10 +1165,18 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
 
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    if (opTime > _getMyLastAppliedOpTime_inlock()) {
+    auto myLastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
+    if (opTime > myLastAppliedOpTime) {
         const bool allowRollback = false;
         _setMyLastAppliedOpTime_inlock(opTime, allowRollback);
         _reportUpstream_inlock(std::move(lock));
+    } else if (opTime != myLastAppliedOpTime) {
+        // In pv1, oplog entries are ordered by non-decreasing term and strictly increasing
+        // timestamp. So, in pv1, its not possible for us to get opTime with lower term and
+        // timestamp higher than or equal to our current lastAppliedOptime.
+        invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
+                  myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
+                  opTime.getTimestamp() < myLastAppliedOpTime.getTimestamp());
     }
 }
 
@@ -1224,7 +1232,17 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::
 void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& opTime,
                                                                 bool isRollbackAllowed) {
     SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
-    invariant(isRollbackAllowed || mySlaveInfo->lastAppliedOpTime <= opTime);
+    auto myLastAppliedOpTime = mySlaveInfo->lastAppliedOpTime;
+
+    if (!(isRollbackAllowed || opTime == myLastAppliedOpTime)) {
+        invariant(opTime > myLastAppliedOpTime);
+        // In pv1, oplog entries are ordered by non-decreasing term and strictly increasing
+        // timestamp. So, in pv1, its not possible for us to get opTime with higher term and
+        // timestamp lesser than or equal to our current lastAppliedOptime.
+        invariant(opTime.getTerm() == OpTime::kUninitializedTerm ||
+                  myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
+                  opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp());
+    }
     _updateSlaveInfoAppliedOpTime_inlock(mySlaveInfo, opTime);
 
     _opTimeWaiterList.signalAndRemoveIf_inlock(
