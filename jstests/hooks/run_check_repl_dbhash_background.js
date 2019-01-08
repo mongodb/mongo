@@ -23,6 +23,8 @@
             "Expected mongo shell to be connected a server, but global 'db' object isn't defined");
     }
 
+    let debugInfo = [];
+
     // We turn off printing the JavaScript stacktrace in doassert() to avoid generating an
     // overwhelming amount of log messages when handling transient transaction errors.
     TestData = TestData || {};
@@ -77,10 +79,15 @@
     for (let session of sessions) {
         const db = session.getDatabase('admin');
 
-        assert.commandWorked(db.runCommand({
+        let preserveRes = assert.commandWorked(db.runCommand({
             configureFailPoint: 'WTPreserveSnapshotHistoryIndefinitely',
             mode: 'alwaysOn',
         }));
+        debugInfo.push({
+            "node": db.getMongo(),
+            "session": session,
+            "preserveFailPointOpTime": preserveRes['operationTime']
+        });
 
         resetFns.push(() => {
             assert.commandWorked(db.runCommand({
@@ -113,6 +120,11 @@
         for (let dbInfo of res.databases) {
             dbNames.add(dbInfo.name);
         }
+        debugInfo.push({
+            "node": db.getMongo(),
+            "session": session,
+            "listDatabaseOpTime": res['operationTime']
+        });
     }
 
     // Transactions cannot be run on the following databases. (The "local" database is also not
@@ -128,6 +140,7 @@
     // doesn't stall as a result of a pending global X lock (e.g. from a dropDatabase command) on
     // the primary preventing getMores on the oplog from receiving a response.
     const waitForSecondaries = (clusterTime) => {
+        debugInfo.push({"waitForSecondaries": clusterTime});
         for (let i = 1; i < sessions.length; ++i) {
             const session = sessions[i];
             const db = session.getDatabase('admin');
@@ -143,12 +156,17 @@
                 // If majority reads are supported, we can issue an afterClusterTime read on
                 // a nonexistent collection and wait on it. This has the advantage of being easier
                 // to debug in case of a timeout.
-                assert.commandWorked(db.runCommand({
+                let res = assert.commandWorked(db.runCommand({
                     find: 'run_check_repl_dbhash_background',
                     readConcern: {level: 'majority', afterClusterTime: clusterTime},
                     limit: 1,
                     singleBatch: true,
                 }));
+                debugInfo.push({
+                    "node": db.getMongo(),
+                    "session": session,
+                    "majorityReadOpTime": res['operationTime']
+                });
             } else {
                 // If majority reads are not supported, then our only option is to poll for the
                 // lastOpCommitted on the secondary to catch up.
@@ -157,6 +175,13 @@
                         const rsStatus =
                             assert.commandWorked(db.adminCommand({replSetGetStatus: 1}));
                         const committedOpTime = rsStatus.optimes.lastCommittedOpTime;
+                        if (bsonWoCompare(committedOpTime.ts, clusterTime) >= 0) {
+                            debugInfo.push({
+                                "node": db.getMongo(),
+                                "session": session,
+                                "committedOpTime": committedOpTime.ts
+                            });
+                        }
                         return bsonWoCompare(committedOpTime.ts, clusterTime) >= 0;
                     },
                     "The majority commit point on secondary " + i + " failed to reach " +
@@ -266,6 +291,11 @@
             waitForSecondaries(clusterTime);
 
             for (let session of sessions) {
+                debugInfo.push({
+                    "node": session.getClient(),
+                    "session": session,
+                    "startTransaction": clusterTime
+                });
                 session.startTransaction(
                     {readConcern: {level: 'snapshot', atClusterTime: clusterTime}});
             }
@@ -282,9 +312,11 @@
                 }
 
                 if (isTransientError(e)) {
+                    debugInfo.push({"transientError": e});
                     continue;
                 }
 
+                jsTestLog(debugInfo);
                 throw e;
             }
 
