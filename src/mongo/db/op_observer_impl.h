@@ -83,6 +83,7 @@ public:
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
                                   CollectionDropType dropType) final;
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
@@ -94,6 +95,7 @@ public:
                                      const NamespaceString& toCollection,
                                      OptionalCollectionUUID uuid,
                                      OptionalCollectionUUID dropTargetUUID,
+                                     std::uint64_t numRecords,
                                      bool stayTemp) final;
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
@@ -106,6 +108,7 @@ public:
                             const NamespaceString& toCollection,
                             OptionalCollectionUUID uuid,
                             OptionalCollectionUUID dropTargetUUID,
+                            std::uint64_t numRecords,
                             bool stayTemp) final;
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,

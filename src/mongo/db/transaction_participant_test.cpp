@@ -115,6 +115,7 @@ public:
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
                                   CollectionDropType dropType) override;
 
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
@@ -165,6 +166,7 @@ void OpObserverMock::onTransactionAbort(OperationContext* opCtx,
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               OptionalCollectionUUID uuid,
+                                              std::uint64_t numRecords,
                                               const CollectionDropType dropType) {
     // If the oplog is not disabled for this namespace, then we need to reserve an op time for the
     // drop.

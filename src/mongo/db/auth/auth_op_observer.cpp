@@ -134,6 +134,7 @@ void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const std::string& 
 repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               OptionalCollectionUUID uuid,
+                                              std::uint64_t numRecords,
                                               const CollectionDropType dropType) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
@@ -183,6 +184,7 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& toCollection,
                                         OptionalCollectionUUID uuid,
                                         OptionalCollectionUUID dropTargetUUID,
+                                        std::uint64_t numRecords,
                                         bool stayTemp) {
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }

@@ -145,10 +145,12 @@ public:
     repl::OpTime onDropCollection(OperationContext* const opCtx,
                                   const NamespaceString& collectionName,
                                   const OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
                                   const CollectionDropType dropType) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
-            auto time = observer->onDropCollection(opCtx, collectionName, uuid, dropType);
+            auto time =
+                observer->onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);
@@ -170,11 +172,12 @@ public:
                             const NamespaceString& toCollection,
                             OptionalCollectionUUID uuid,
                             OptionalCollectionUUID dropTargetUUID,
+                            std::uint64_t numRecords,
                             bool stayTemp) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onRenameCollection(
-                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
     }
 
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
@@ -182,11 +185,12 @@ public:
                                      const NamespaceString& toCollection,
                                      OptionalCollectionUUID uuid,
                                      OptionalCollectionUUID dropTargetUUID,
+                                     std::uint64_t numRecords,
                                      bool stayTemp) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
             const auto time = observer->preRenameCollection(
-                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);

@@ -510,6 +510,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         return Status::OK();  // Post condition already met.
     }
 
+    auto numRecords = uint64_t(0);
+
     auto uuid = collection->uuid();
     auto uuidString = uuid ? uuid.get().toString() : "no UUID";
 
@@ -543,7 +545,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             return status;
         }
         opObserver->onDropCollection(
-            opCtx, fullns, uuid, OpObserver::CollectionDropType::kOnePhase);
+            opCtx, fullns, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
         return Status::OK();
     }
 
@@ -594,7 +596,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
         // Log oplog entry for collection drop and proceed to complete rest of two phase drop
         // process.
-        dropOpTime = opObserver->onDropCollection(opCtx, fullns, uuid, collectionDropType);
+        dropOpTime =
+            opObserver->onDropCollection(opCtx, fullns, uuid, numRecords, collectionDropType);
 
         // The OpObserver should have written an entry to the oplog with a particular op time.
         // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
@@ -609,7 +612,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         // in the context of applying an oplog entry on a secondary.
         // OpObserver::onDropCollection() should be returning a null OpTime because we should not be
         // writing to the oplog.
-        auto opTime = opObserver->onDropCollection(opCtx, fullns, uuid, collectionDropType);
+        auto opTime =
+            opObserver->onDropCollection(opCtx, fullns, uuid, numRecords, collectionDropType);
         if (!opTime.isNull()) {
             severe() << "dropCollection: " << fullns << " (" << uuidString
                      << ") - unexpected oplog entry written to the oplog with optime " << opTime;

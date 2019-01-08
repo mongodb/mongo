@@ -71,6 +71,7 @@ public:
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
                                   CollectionDropType dropType) override;
 
     std::set<std::string> droppedDatabaseNames;
@@ -90,9 +91,11 @@ void OpObserverMock::onDropDatabase(OperationContext* opCtx, const std::string& 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               OptionalCollectionUUID uuid,
+                                              std::uint64_t numRecords,
                                               const CollectionDropType dropType) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    auto opTime = OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, dropType);
+    auto opTime =
+        OpObserverNoop::onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
     invariant(opTime.isNull());
     // Do not update 'droppedCollectionNames' if OpObserverNoop::onDropCollection() throws.
     droppedCollectionNames.insert(collectionName);

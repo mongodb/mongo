@@ -217,7 +217,7 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onDropCollection(
-            opCtx.get(), nss, uuid, OpObserver::CollectionDropType::kTwoPhase);
+            opCtx.get(), nss, uuid, 0U, OpObserver::CollectionDropType::kTwoPhase);
         dropOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -249,7 +249,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
         AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onRenameCollection(
-            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, stayTemp);
+            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -282,7 +282,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(opCtx.get(), sourceNss, targetNss, uuid, {}, stayTemp);
+        opObserver.onRenameCollection(opCtx.get(), sourceNss, targetNss, uuid, {}, 0U, stayTemp);
         wunit.commit();
     }
 

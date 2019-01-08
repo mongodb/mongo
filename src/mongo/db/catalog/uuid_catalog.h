@@ -87,6 +87,7 @@ public:
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
                                   CollectionDropType dropType) override;
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
@@ -99,6 +100,7 @@ public:
                             const NamespaceString& toCollection,
                             OptionalCollectionUUID uuid,
                             OptionalCollectionUUID dropTargetUUID,
+                            std::uint64_t numRecords,
                             bool stayTemp) override {
         // Do nothing: collection renames don't affect the UUID mapping.
     }
@@ -108,6 +110,7 @@ public:
                                      const NamespaceString& toCollection,
                                      OptionalCollectionUUID uuid,
                                      OptionalCollectionUUID dropTargetUUID,
+                                     std::uint64_t numRecords,
                                      bool stayTemp) override {
         // Do nothing: collection renames don't affect the UUID mapping.
         return {};

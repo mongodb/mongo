@@ -668,6 +668,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               OptionalCollectionUUID uuid,
+                                              std::uint64_t numRecords,
                                               const CollectionDropType dropType) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
@@ -734,6 +735,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  const NamespaceString& toCollection,
                                                  OptionalCollectionUUID uuid,
                                                  OptionalCollectionUUID dropTargetUUID,
+                                                 std::uint64_t numRecords,
                                                  bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
 
@@ -788,8 +790,10 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& toCollection,
                                         OptionalCollectionUUID uuid,
                                         OptionalCollectionUUID dropTargetUUID,
+                                        std::uint64_t numRecords,
                                         bool stayTemp) {
-    preRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+    preRenameCollection(
+        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 

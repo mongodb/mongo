@@ -278,7 +278,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 // We have to override the provided 'dropTarget' setting for idempotency reasons to
                 // avoid unintentionally removing a collection on a secondary with the same name as
                 // the target.
-                opObserver->onRenameCollection(opCtx, source, target, sourceUUID, {}, stayTemp);
+                opObserver->onRenameCollection(opCtx, source, target, sourceUUID, {}, 0U, stayTemp);
                 wunit.commit();
                 return Status::OK();
             }
@@ -331,8 +331,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 }
             }
 
+            auto numRecords = uint64_t(0);
             auto renameOpTime = opObserver->preRenameCollection(
-                opCtx, source, target, sourceUUID, dropTargetUUID, options.stayTemp);
+                opCtx, source, target, sourceUUID, dropTargetUUID, numRecords, options.stayTemp);
 
             if (!renameOpTimeFromApplyOps.isNull()) {
                 // 'renameOpTime' must be null because a valid 'renameOpTimeFromApplyOps' implies

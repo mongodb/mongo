@@ -96,6 +96,7 @@ public:
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
                                   CollectionDropType dropType) final;
 
     void onDropIndex(OperationContext* opCtx,
@@ -109,6 +110,7 @@ public:
                             const NamespaceString& toCollection,
                             OptionalCollectionUUID uuid,
                             OptionalCollectionUUID dropTargetUUID,
+                            std::uint64_t numRecords,
                             bool stayTemp) final;
 
     repl::OpTime preRenameCollection(OperationContext* opCtx,
@@ -116,6 +118,7 @@ public:
                                      const NamespaceString& toCollection,
                                      OptionalCollectionUUID uuid,
                                      OptionalCollectionUUID dropTargetUUID,
+                                     std::uint64_t numRecords,
                                      bool stayTemp) final {
         return repl::OpTime();
     }

@@ -193,6 +193,7 @@ public:
     virtual repl::OpTime onDropCollection(OperationContext* opCtx,
                                           const NamespaceString& collectionName,
                                           OptionalCollectionUUID uuid,
+                                          std::uint64_t numRecords,
                                           CollectionDropType dropType) = 0;
 
     /**
@@ -223,6 +224,7 @@ public:
                                              const NamespaceString& toCollection,
                                              OptionalCollectionUUID uuid,
                                              OptionalCollectionUUID dropTargetUUID,
+                                             std::uint64_t numRecords,
                                              bool stayTemp) = 0;
     /**
      * This function performs all op observer handling for a 'renameCollection' command except for
@@ -246,6 +248,7 @@ public:
                                     const NamespaceString& toCollection,
                                     OptionalCollectionUUID uuid,
                                     OptionalCollectionUUID dropTargetUUID,
+                                    std::uint64_t numRecords,
                                     bool stayTemp) = 0;
 
     virtual void onApplyOps(OperationContext* opCtx,

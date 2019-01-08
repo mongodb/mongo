@@ -77,6 +77,7 @@ void UUIDCatalogObserver::onCollMod(OperationContext* opCtx,
 repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
                                                    const NamespaceString& collectionName,
                                                    OptionalCollectionUUID uuid,
+                                                   std::uint64_t numRecords,
                                                    const CollectionDropType dropType) {
 
     if (!uuid)
