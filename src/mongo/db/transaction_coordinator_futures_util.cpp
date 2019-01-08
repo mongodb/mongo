@@ -28,12 +28,86 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/transaction_coordinator_futures_util.h"
 
+#include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/util/log.h"
+
 namespace mongo {
 namespace txn {
+namespace {
+
+using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
+using ResponseStatus = executor::TaskExecutor::ResponseStatus;
+
+}  // namespace
+
+AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext)
+    : _serviceContext(serviceContext),
+      _executor(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()) {}
+
+AsyncWorkScheduler::~AsyncWorkScheduler() = default;
+
+Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemoteCommand(
+    const ShardId& shardId, const ReadPreferenceSetting& readPref, const BSONObj& commandObj) {
+    auto promiseAndFuture = makePromiseFuture<ResponseStatus>();
+    auto sharedPromise =
+        std::make_shared<Promise<ResponseStatus>>(std::move(promiseAndFuture.promise));
+
+    _targetHostAsync(shardId, readPref)
+        .then([ this, shardId, sharedPromise, commandObj = commandObj.getOwned(), readPref ](
+            HostAndPort shardHostAndPort) mutable {
+            LOG(3) << "Coordinator sending command " << commandObj << " to shard " << shardId;
+
+            executor::RemoteCommandRequest request(shardHostAndPort,
+                                                   NamespaceString::kAdminDb.toString(),
+                                                   commandObj,
+                                                   readPref.toContainingBSON(),
+                                                   nullptr);
+
+            uassertStatusOK(_executor->scheduleRemoteCommand(
+                request, [ commandObj = commandObj.getOwned(),
+                           shardId,
+                           sharedPromise ](const RemoteCommandCallbackArgs& args) mutable {
+                    LOG(3) << "Coordinator shard got response " << args.response.data << " for "
+                           << commandObj << " to " << shardId;
+                    auto status = args.response.status;
+                    // Only consider actual failures to send the command as errors.
+                    if (status.isOK()) {
+                        sharedPromise->emplaceValue(args.response);
+                    } else {
+                        sharedPromise->setError(status);
+                    }
+                }));
+        })
+        .onError([ shardId, commandObj = commandObj.getOwned(), sharedPromise ](Status s) {
+            LOG(3) << "Coordinator shard failed to target command " << commandObj << " to shard "
+                   << shardId << causedBy(s);
+
+            sharedPromise->setError(s);
+        })
+        .getAsync([](Status) {});
+
+    // Do not wait for the callback to run. The callback will reschedule the remote request on
+    // the same executor if necessary.
+    return std::move(promiseAndFuture.future);
+}
+
+Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
+                                                         const ReadPreferenceSetting& readPref) {
+    return scheduleWork([shardId, readPref](OperationContext* opCtx) {
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+
+        // TODO (SERVER-35678): Return a SemiFuture<HostAndPort> rather than using a blocking call
+        return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
+    });
+}
 
 Future<void> whenAll(std::vector<Future<void>>& futures) {
     std::vector<Future<int>> dummyFutures;
