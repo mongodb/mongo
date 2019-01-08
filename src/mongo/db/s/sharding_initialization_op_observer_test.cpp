@@ -46,7 +46,7 @@
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
-#include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/s/sharding_mongod_test_fixture.h"
 
 namespace mongo {
 namespace {
@@ -55,13 +55,13 @@ const std::string kShardName("TestShard");
 
 /**
  * This test suite validates that when the default OpObserver chain is set up (which happens to
- * include the ShardServerOpObserver), writes to the 'admin.system.version' collection (and the
+ * include the ShardingMongodOpObserver), writes to the 'admin.system.version' collection (and the
  * shardIdentity document specifically) will invoke the sharding initialization code.
  */
-class ShardingInitializationOpObserverTest : public ShardServerTestFixture {
+class ShardingInitializationOpObserverTest : public ShardingMongodTestFixture {
 public:
     void setUp() override {
-        ShardServerTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         // NOTE: this assumes that globalInit will always be called on the same thread as the main
         // test thread
@@ -77,7 +77,7 @@ public:
     void tearDown() override {
         ShardingState::get(getServiceContext())->clearForTests();
 
-        ShardServerTestFixture::tearDown();
+        ShardingMongodTestFixture::tearDown();
     }
 
     int getInitCallCount() const {

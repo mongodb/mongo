@@ -79,6 +79,9 @@ protected:
      */
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override;
+
+    const ShardId _myShardName{"myShardName"};
+    OID _clusterId;
 };
 
 }  // namespace mongo

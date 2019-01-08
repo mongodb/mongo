@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -61,10 +62,14 @@ std::shared_ptr<RemoteCommandTargeterMock> ShardServerTestFixture::configTargete
 void ShardServerTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
 
+
     replicationCoordinator()->alwaysAllowWrites(true);
 
     // Initialize sharding components as a shard server.
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+    _clusterId = OID::gen();
+    ShardingState::get(getServiceContext())->setInitialized(_myShardName, _clusterId);
 
     CatalogCacheLoader::set(getServiceContext(),
                             stdx::make_unique<ShardServerCatalogCacheLoader>(
