@@ -86,13 +86,13 @@ Mongo.prototype._getDatabaseNamesFromPrivileges = function() {
 };
 
 Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
-                                  filter = {},
+                                  filter = undefined,
                                   nameOnly = undefined,
                                   authorizedDatabases = undefined) {
     'use strict';
 
     let cmdObj = {listDatabases: 1};
-    if (filter) {
+    if (filter !== undefined) {
         cmdObj.filter = filter;
     }
     if (nameOnly !== undefined) {
@@ -117,8 +117,8 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
         //   * authorizedDatabases should not be false as those are the only DBs we can infer.
         // Note that if the above are true and we get Unauthorized, that also means
         // that we MUST be talking to a pre-4.0 mongod.
-        if ((res.code === ErrorCodes.Unauthorized) && !filter && (nameOnly !== false) &&
-            (authorizedDatabases !== false)) {
+        if ((res.code === ErrorCodes.Unauthorized) && (filter === undefined) &&
+            (nameOnly !== false) && (authorizedDatabases !== false)) {
             return this._getDatabaseNamesFromPrivileges();
         }
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));

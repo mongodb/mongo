@@ -105,6 +105,38 @@
             if (test.user !== 'admin' && test.user !== "user7") {
                 // Admin and user7 don't have an explicit list of DBs to parse.
                 assert.eq(mongod._getDatabaseNamesFromPrivileges(), test.authDbs || test.dbs);
+
+                // Test (non-admin) call to Mongo.getDBs() on a < 4.0 MongoD
+                // by injecting a command failure into Mongo.adminCommand().
+                // This will allow us to resemble a < 4.0 server.
+                const adminCommandFunction = mongod.adminCommand;
+                const adminCommandMethod = adminCommandFunction.bind(mongod);
+
+                try {
+                    mongod.adminCommand = function(cmd) {
+                        if (cmd.hasOwnProperty('listDatabases')) {
+                            return {
+                                ok: 0,
+                                errmsg: 'Stubbed command failure: ' + tojson(cmd),
+                                code: ErrorCodes.Unauthorized,
+                                codeName: 'Unauthorized'
+                            };
+                        }
+                        return adminCommandMethod(cmd);
+                    };
+                    // Command fails, but we dispatch via _getDatabaseNamesFromPrivileges().
+                    assert.eq(mongod.getDBs(), test.authDbs || test.dbs);
+                    // Still dispatches with explciti nameOnly===true.
+                    assert.eq(mongod.getDBs(undefined, undefined, true), test.authDbs || test.dbs);
+
+                    // Command fails and unable to dispatch because nameOnly !== true.
+                    assert.throws(() => mongod.getDBs(undefined, undefined, false));
+
+                    // Command fails and unable to dispatch because filter is not empty.
+                    assert.throws(() => mongod.getDBs(undefined, {name: 'foo'}));
+                } finally {
+                    mongod.adminCommand = adminCommandFunction;
+                }
             }
 
             admin.logout();
