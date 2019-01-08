@@ -13,6 +13,7 @@ import datetime
 import logging
 import math
 import os
+import re
 import sys
 from collections import defaultdict
 from collections import namedtuple
@@ -63,7 +64,7 @@ ConfigOptions = namedtuple("ConfigOptions", [
     "use_multiversion",
     "is_patch",
     "depends_on",
-    "requires",
+    "build_id",
 ])
 
 
@@ -125,13 +126,12 @@ def get_config_options(cmd_line_options, config_file):
     is_patch = read_config.get_config_value("is_patch", cmd_line_options, config_file_data)
     depends_on = split_if_exists(
         read_config.get_config_value("depends_on", cmd_line_options, config_file_data))
-    requires = split_if_exists(
-        read_config.get_config_value("requires", cmd_line_options, config_file_data))
+    build_id = read_config.get_config_value("build_id", cmd_line_options, config_file_data)
 
     return ConfigOptions(fallback_num_sub_suites, max_sub_suites, project, resmoke_args,
                          resmoke_jobs_max, target_resmoke_time, run_multiple_jobs, suite, task,
                          variant, use_large_distro, large_distro_name, use_multiversion, is_patch,
-                         depends_on, requires)
+                         depends_on, build_id)
 
 
 def divide_remaining_tests_among_suites(remaining_tests_runtimes, suites):
@@ -178,6 +178,33 @@ def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None):
     return suites
 
 
+def update_suite_config(suite_config, roots=None, excludes=None):
+    """
+    Update suite config based on the roots and excludes passed in.
+
+    :param suite_config: suite_config to update.
+    :param roots: new roots to run, or None if roots should not be updated.
+    :param excludes: excludes to add, or None if excludes should not be include.
+    :return: updated suite_config
+    """
+    if roots:
+        suite_config['selector']['roots'] = roots
+
+    if excludes:
+        # This must be a misc file, if the exclude_files section exists, extend it, otherwise,
+        # create it.
+        if 'exclude_files' in suite_config['selector']:
+            suite_config['selector']['exclude_files'] += excludes
+        else:
+            suite_config['selector']['exclude_files'] = excludes
+    else:
+        # if excludes was not specified this must not a misc file, so don't exclude anything.
+        if 'exclude_files' in suite_config['selector']:
+            del suite_config['selector']['exclude_files']
+
+    return suite_config
+
+
 def generate_subsuite_file(source_suite_name, target_suite_name, roots=None, excludes=None):
     """
     Read and evaluate the yaml suite file.
@@ -191,13 +218,7 @@ def generate_subsuite_file(source_suite_name, target_suite_name, roots=None, exc
 
     with open(os.path.join(CONFIG_DIR, target_suite_name + ".yml"), 'w') as out:
         out.write(HEADER_TEMPLATE.format(file=__file__, suite_file=source_file))
-        if roots:
-            suite_config['selector']['roots'] = roots
-
-        if 'exclude_files' in suite_config['selector']:
-            del suite_config['selector']['exclude_files']
-        if excludes:
-            suite_config['selector']['exclude_files'] = excludes
+        suite_config = update_suite_config(suite_config, roots, excludes)
         out.write(yaml.dump(suite_config, default_flow_style=False, Dumper=yaml.SafeDumper))
 
 
@@ -223,13 +244,15 @@ def prepare_directory_for_suite(directory):
 class EvergreenConfigGenerator(object):
     """Generate evergreen configurations."""
 
-    def __init__(self, suites, options):
+    def __init__(self, suites, options, evg_api):
         """Create new EvergreenConfigGenerator object."""
         self.suites = suites
         self.options = options
+        self.evg_api = evg_api
         self.evg_config = Configuration()
         self.task_specs = []
         self.task_names = []
+        self.build_tasks = None
 
     def _set_task_distro(self, task_spec):
         if self.options.use_large_distro and self.options.large_distro_name:
@@ -260,16 +283,25 @@ class EvergreenConfigGenerator(object):
                 cmd_timeout.exec_timeout(int(math.ceil(expected_suite_runtime * 3)))
             commands.append(cmd_timeout.validate().resolve())
 
+    @staticmethod
+    def _is_task_dependency(task, possible_dependency):
+        return re.match('{0}_(\\d|misc)'.format(task), possible_dependency)
+
+    def _get_tasks_for_depends_on(self, dependent_task):
+        return [
+            str(task['display_name']) for task in self.build_tasks
+            if self._is_task_dependency(dependent_task, str(task['display_name']))
+        ]
+
     def _add_dependencies(self, task):
         task.dependency(TaskDependency("compile"))
         if not self.options.is_patch:
             # Don't worry about task dependencies in patch builds, only mainline.
             if self.options.depends_on:
                 for dep in self.options.depends_on:
-                    task.dependency(TaskDependency(dep))
-            if self.options.requires:
-                for dep in self.options.requires:
-                    task.requires(TaskDependency(dep))
+                    depends_on_tasks = self._get_tasks_for_depends_on(dep)
+                    for dependency in depends_on_tasks:
+                        task.dependency(TaskDependency(dependency))
 
         return task
 
@@ -321,6 +353,7 @@ class EvergreenConfigGenerator(object):
 
     def generate_config(self):
         """Generate evergreen configuration."""
+        self.build_tasks = self.evg_api.tasks_by_build_id(self.options.build_id)
         self._generate_variant()
         return self.evg_config
 
@@ -462,8 +495,6 @@ class Main(object):
         parser.add_argument("--is-patch", dest="is_patch", help="Is this part of a patch build.")
         parser.add_argument("--depends-on", dest="depends_on",
                             help="Generate depends on for these tasks.")
-        parser.add_argument("--requires", dest="requires",
-                            help="Generate requires for these tasks.")
         parser.add_argument("--verbose", dest="verbose", action="store_true", default=False,
                             help="Enable verbose logging.")
 
@@ -527,7 +558,8 @@ class Main(object):
 
     def write_evergreen_configuration(self, suites, task):
         """Generate the evergreen configuration for the new suite and write it to disk."""
-        evg_config = EvergreenConfigGenerator(suites, self.config_options).generate_config()
+        evg_config_gen = EvergreenConfigGenerator(suites, self.config_options, self.evergreen_api)
+        evg_config = evg_config_gen.generate_config()
 
         with open(os.path.join(CONFIG_DIR, task + ".json"), "w") as file_handle:
             file_handle.write(evg_config.to_json())

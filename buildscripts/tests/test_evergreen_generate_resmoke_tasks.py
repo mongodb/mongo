@@ -16,7 +16,7 @@ from buildscripts import evergreen_generate_resmoke_tasks as grt
 from buildscripts.evergreen_generate_resmoke_tasks import render_suite, render_misc_suite, \
     prepare_directory_for_suite
 
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use
+# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
 _DATE = datetime.datetime(2018, 7, 15)
 
@@ -176,6 +176,34 @@ def create_suite(count=3, start=0):
     return suite
 
 
+class UpdateSuiteConfigTest(unittest.TestCase):
+    def test_roots_are_updated(self):
+        config = {'selector': {}}
+
+        updated_config = grt.update_suite_config(config, 'root value')
+        self.assertEqual('root value', updated_config['selector']['roots'])
+
+    def test_excluded_files_not_included_if_not_specified(self):
+        config = {'selector': {'excluded_files': 'files to exclude'}}
+
+        updated_config = grt.update_suite_config(config, excludes=None)
+        self.assertNotIn('exclude_files', updated_config['selector'])
+
+    def test_excluded_files_added_to_misc(self):
+        config = {'selector': {}}
+
+        updated_config = grt.update_suite_config(config, excludes='files to exclude')
+        self.assertEqual('files to exclude', updated_config['selector']['exclude_files'])
+
+    def test_excluded_files_extended_in_misc(self):
+        config = {'selector': {'exclude_files': ['file 0', 'file 1']}}
+
+        updated_config = grt.update_suite_config(config, excludes=['file 2', 'file 3'])
+        self.assertEqual(4, len(updated_config['selector']['exclude_files']))
+        for exclude in ['file 0', 'file 1', 'file 2', 'file 3']:
+            self.assertIn(exclude, updated_config['selector']['exclude_files'])
+
+
 class RenderSuites(unittest.TestCase):
     EXPECTED_FORMAT = """selector:
   excludes:
@@ -293,7 +321,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options).generate_config().to_map()
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         command1 = config["tasks"][0]["commands"][2]
@@ -306,7 +334,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.task = "task"
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options).generate_config().to_map()
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         display_task = config["buildvariants"][0]["display_tasks"][0]
@@ -327,11 +355,63 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
         suites = self.generate_mock_suites(3)
 
-        config = grt.EvergreenConfigGenerator(suites, options).generate_config().to_map()
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         self.assertEqual(options.large_distro_name,
                          config["buildvariants"][0]["tasks"][0]["distros"][0])
+
+    def test_selecting_tasks(self):
+        is_task_dependency = grt.EvergreenConfigGenerator._is_task_dependency
+        self.assertFalse(is_task_dependency('sharding', 'sharding'))
+        self.assertFalse(is_task_dependency('sharding', 'other_task'))
+        self.assertFalse(is_task_dependency('sharding', 'sharding_gen'))
+
+        self.assertTrue(is_task_dependency('sharding', 'sharding_0'))
+        self.assertTrue(is_task_dependency('sharding', 'sharding_314'))
+        self.assertTrue(is_task_dependency('sharding', 'sharding_misc'))
+
+    def test_get_tasks_depends_on(self):
+        options = self.generate_mock_options()
+        suites = self.generate_mock_suites(3)
+
+        cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
+        cfg_generator.build_tasks = [
+            {'display_name': 'sharding_gen'},
+            {'display_name': 'sharding_0'},
+            {'display_name': 'other_task'},
+            {'display_name': 'other_task_2'},
+            {'display_name': 'sharding_1'},
+            {'display_name': 'compile'},
+            {'display_name': 'sharding_misc'},
+        ]
+
+        dependent_tasks = cfg_generator._get_tasks_for_depends_on('sharding')
+        self.assertEqual(3, len(dependent_tasks))
+        self.assertIn('sharding_0', dependent_tasks)
+        self.assertIn('sharding_1', dependent_tasks)
+        self.assertIn('sharding_misc', dependent_tasks)
+
+    def test_specified_dependencies_are_added(self):
+        options = self.generate_mock_options()
+        options.depends_on = ['sharding']
+        options.is_patch = False
+        suites = self.generate_mock_suites(3)
+
+        cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
+        cfg_generator.build_tasks = [
+            {'display_name': 'sharding_gen'},
+            {'display_name': 'sharding_0'},
+            {'display_name': 'other_task'},
+            {'display_name': 'other_task_2'},
+            {'display_name': 'sharding_1'},
+            {'display_name': 'compile'},
+            {'display_name': 'sharding_misc'},
+        ]
+
+        cfg_mock = Mock()
+        cfg_generator._add_dependencies(cfg_mock)
+        self.assertEqual(4, cfg_mock.dependency.call_count)
 
 
 class MainTest(unittest.TestCase):

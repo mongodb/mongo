@@ -144,6 +144,16 @@ class EvergreenApiV2(EvergreenApi):
         url = "{}/rest/v2/projects/{}/test_stats".format(self.api_server, project)
         return self._paginate(url, params)
 
+    def tasks_by_build_id(self, build_id):
+        """
+        Get a list of tasks for the given build.
+
+        :param build_id: Evergreen build to query.
+        :return: List of tasks.
+        """
+        url = "{}/rest/v2/builds/{}/tasks".format(self.api_server, build_id)
+        return self._call_api(url).json()
+
     def _call_api(self, url, params=None):
         start_time = time.time()
         response = self.session.get(url=url, params=params)
