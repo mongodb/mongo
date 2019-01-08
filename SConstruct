@@ -13,6 +13,7 @@ import subprocess
 import sys
 import textwrap
 import uuid
+import multiprocessing
 
 import SCons
 
@@ -3284,6 +3285,22 @@ env.Alias("distsrc-tgz", env.GZip(
 )
 env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
 env.Alias("distsrc", "distsrc-tgz")
+
+# Defaults for SCons provided flags. SetOption only sets the option to our value
+# if the user did not provide it. So for any flag here if it's explicitly passed
+# the values below set with SetOption will be overwritten.
+#
+# Default j to the number of CPUs on the system. Note: in containers this
+# reports the number of CPUs for the host system. We're relying on the standard
+# library here and perhaps in a future version of Python it will instead report
+# the correct number when in a container.
+try:
+    env.SetOption('num_jobs', multiprocessing.cpu_count())
+# On some platforms (like Windows) on Python 2.7 multiprocessing.cpu_count
+# is not implemented. After we upgrade to Python 3.4+ we can use alternative
+# methods that are cross-platform.
+except NotImplementedError:
+    pass
 
 env.SConscript(
     dirs=[
