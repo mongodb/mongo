@@ -13,6 +13,7 @@ import subprocess
 import sys
 import textwrap
 import uuid
+import multiprocessing
 
 import SCons
 
@@ -549,8 +550,10 @@ add_option('msvc-debugging-format',
 
 add_option('jlink',
         help="Limit link concurrency to given value",
-        nargs=1,
-        type=int)
+        const=0.5,
+        default=None,
+        nargs='?',
+        type=float)
 
 try:
     with open("version.json", "r") as version_fp:
@@ -3751,6 +3754,23 @@ env.Alias("distsrc-tgz", env.GZip(
 env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
 env.Alias("distsrc", "distsrc-tgz")
 
+# Defaults for SCons provided flags. SetOption only sets the option to our value
+# if the user did not provide it. So for any flag here if it's explicitly passed
+# the values below set with SetOption will be overwritten.
+#
+# Default j to the number of CPUs on the system. Note: in containers this
+# reports the number of CPUs for the host system. We're relying on the standard
+# library here and perhaps in a future version of Python it will instead report
+# the correct number when in a container.
+try:
+    env.SetOption('num_jobs', multiprocessing.cpu_count())
+# On some platforms (like Windows) on Python 2.7 multiprocessing.cpu_count
+# is not implemented. After we upgrade to Python 3.4+ we can use alternative
+# methods that are cross-platform.
+except NotImplementedError:
+    pass
+
+
 # Do this as close to last as possible before reading SConscripts, so
 # that any tools that may have injected other things via emitters are included
 # among the side effect adornments.
@@ -3758,9 +3778,16 @@ env.Alias("distsrc", "distsrc-tgz")
 # TODO: Move this to a tool.
 if has_option('jlink'):
     jlink = get_option('jlink')
-    if jlink < 1:
-        env.FatalError("The argument to jlink must be a positive integer")
+    if jlink <= 0:
+        env.FatalError("The argument to jlink must be a positive integer or float")
+    elif jlink < 1 and jlink > 0:
+        jlink = env.GetOption('num_jobs') * jlink
+        jlink = round(jlink)
+        if jlink < 1.0:
+            print("Computed jlink value was less than 1; Defaulting to 1")
+            jlink = 1.0
 
+    jlink = int(jlink)
     target_builders = ['Program', 'SharedLibrary', 'LoadableModule']
 
     # A bound map of stream (as in stream of work) name to side-effect
