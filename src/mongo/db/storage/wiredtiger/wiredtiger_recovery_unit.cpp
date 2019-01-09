@@ -113,7 +113,7 @@ void WiredTigerOperationStats::fetchStats(WT_SESSION* session,
     uassert(ErrorCodes::CursorNotFound, "Unable to open statistics cursor", ret == 0);
 
     invariant(c);
-    ON_BLOCK_EXIT(c->close, c);
+    ON_BLOCK_EXIT([&] { c->close(c); });
 
     const char* desc;
     uint64_t value;

@@ -116,7 +116,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
         return db;
 
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
-    auto removeDbGuard = MakeGuard([this, &lk, dbname] {
+    auto removeDbGuard = makeGuard([this, &lk, dbname] {
         if (!lk.owns_lock())
             lk.lock();
         _dbs.erase(dbname);
@@ -151,7 +151,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     newDb->init(opCtx);
 
     // Finally replace our nullptr entry with the new Database pointer.
-    removeDbGuard.Dismiss();
+    removeDbGuard.dismiss();
     lk.lock();
     auto it = _dbs.find(dbname);
     invariant(it != _dbs.end() && it->second == nullptr);

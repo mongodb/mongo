@@ -1981,7 +1981,7 @@ public:
         uassertStatusOK(status);
 
         // From here on, we always want to invalidate the user cache before returning.
-        auto invalidateGuard = MakeGuard([&] {
+        auto invalidateGuard = makeGuard([&] {
             try {
                 authzManager->invalidateUserCache(opCtx);
             } catch (const DBException& e) {
@@ -2102,7 +2102,7 @@ public:
 
         auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
         // From here on, we always want to invalidate the user cache before returning.
-        auto invalidateGuard = MakeGuard([&] {
+        auto invalidateGuard = makeGuard([&] {
             try {
                 authzManager->invalidateUserCache(opCtx);
             } catch (const DBException& e) {
@@ -2712,7 +2712,7 @@ public:
 
         auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
         // From here on, we always want to invalidate the user cache before returning.
-        auto invalidateGuard = MakeGuard([&] {
+        auto invalidateGuard = makeGuard([&] {
             try {
                 authzManager->invalidateUserCache(opCtx);
             } catch (const DBException& e) {

@@ -401,7 +401,7 @@ public:
             }
 
             // On early return, get rid of the cursor.
-            ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &ccPin);
+            auto cursorFreer = makeGuard([&] { ccPin.deleteUnderlying(); });
 
             // We must respect the read concern from the cursor.
             applyCursorReadConcern(opCtx, cursor->getReadConcernArgs());
@@ -528,7 +528,7 @@ public:
             curOp->debug().nreturned = numResults;
 
             if (respondWithId) {
-                cursorFreer.Dismiss();
+                cursorFreer.dismiss();
             }
 
             // We're about to unpin or delete the cursor as the ClientCursorPin goes out of scope.

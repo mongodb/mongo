@@ -2188,7 +2188,7 @@ public:
         auto taskFuture = task.get_future();
         stdx::thread taskThread{std::move(task)};
 
-        auto joinGuard = MakeGuard([&] {
+        auto joinGuard = makeGuard([&] {
             batchInProgress.promise.emplaceValue(false);
             taskThread.join();
         });
@@ -2241,7 +2241,7 @@ public:
         auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 
-        joinGuard.Dismiss();
+        joinGuard.dismiss();
         taskThread.join();
 
         // Read on the local snapshot to verify the document was inserted.

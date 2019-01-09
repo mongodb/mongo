@@ -622,13 +622,11 @@ Status runAggregate(OperationContext* opCtx,
     std::vector<ClientCursorPin> pins;
     std::vector<ClientCursor*> cursors;
 
-    ScopeGuard cursorFreer = MakeGuard(
-        [](std::vector<ClientCursorPin>* pins) {
-            for (auto& p : *pins) {
-                p.deleteUnderlying();
-            }
-        },
-        &pins);
+    auto cursorFreer = makeGuard([&] {
+        for (auto& p : pins) {
+            p.deleteUnderlying();
+        }
+    });
 
     for (size_t idx = 0; idx < execs.size(); ++idx) {
         ClientCursorParams cursorParams(
@@ -660,7 +658,7 @@ Status runAggregate(OperationContext* opCtx,
         const bool keepCursor =
             handleCursorCommand(opCtx, origNss, std::move(cursors), request, result);
         if (keepCursor) {
-            cursorFreer.Dismiss();
+            cursorFreer.dismiss();
         }
     }
 

@@ -830,7 +830,7 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
     // session kill and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    ScopeGuard abortGuard = MakeGuard([&] {
+    auto abortGuard = makeGuard([&] {
         // Prepare transaction on secondaries should always succeed.
         invariant(!prepareOptime);
 

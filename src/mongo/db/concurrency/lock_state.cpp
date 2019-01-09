@@ -335,7 +335,7 @@ LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Da
         }
 
         // If the ticket wait is interrupted, restore the state of the client.
-        auto restoreStateOnErrorGuard = MakeGuard([&] { _clientState.store(kInactive); });
+        auto restoreStateOnErrorGuard = makeGuard([&] { _clientState.store(kInactive); });
 
         OperationContext* interruptible = _uninterruptibleLocksRequested ? nullptr : opCtx;
         if (deadline == Date_t::max()) {
@@ -343,7 +343,7 @@ LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Da
         } else if (!holder->waitForTicketUntil(interruptible, deadline)) {
             return LOCK_TIMEOUT;
         }
-        restoreStateOnErrorGuard.Dismiss();
+        restoreStateOnErrorGuard.dismiss();
     }
     _clientState.store(reader ? kActiveReader : kActiveWriter);
     return LOCK_OK;
@@ -835,7 +835,7 @@ LockResult LockerImpl::lockComplete(OperationContext* opCtx,
     uint64_t startOfCurrentWaitTime = startOfTotalWaitTime;
 
     // Clean up the state on any failed lock attempts.
-    auto unlockOnErrorGuard = MakeGuard([&] {
+    auto unlockOnErrorGuard = makeGuard([&] {
         LockRequestsMap::Iterator it = _requests.find(resId);
         _unlockImpl(&it);
     });
@@ -892,7 +892,7 @@ LockResult LockerImpl::lockComplete(OperationContext* opCtx,
     // lock was still granted after all, but we don't try to take advantage of that and will return
     // a timeout.
     if (result == LOCK_OK) {
-        unlockOnErrorGuard.Dismiss();
+        unlockOnErrorGuard.dismiss();
     }
     return result;
 }

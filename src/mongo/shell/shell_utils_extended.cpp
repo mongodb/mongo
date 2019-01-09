@@ -200,7 +200,7 @@ BSONObj md5sumFile(const BSONObj& args, void* data) {
     stringstream ss;
     FILE* f = fopen(e.valuestrsafe(), "rb");
     uassert(CANT_OPEN_FILE, "couldn't open file", f);
-    ON_BLOCK_EXIT(fclose, f);
+    ON_BLOCK_EXIT([&] { fclose(f); });
 
     md5digest d;
     md5_state_t st;
@@ -275,10 +275,10 @@ BSONObj copyFile(const BSONObj& args, void* data) {
 BSONObj writeFile(const BSONObj& args, void* data) {
     // Parse the arguments.
 
-    uassert(
-        40340,
-        "writeFile requires at least 2 arguments: writeFile(filePath, content, [useBinaryMode])",
-        args.nFields() >= 2);
+    uassert(40340,
+            "writeFile requires at least 2 arguments: writeFile(filePath, content, "
+            "[useBinaryMode])",
+            args.nFields() >= 2);
 
     BSONObjIterator it(args);
 

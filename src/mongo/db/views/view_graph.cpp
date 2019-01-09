@@ -66,10 +66,7 @@ Status ViewGraph::insertAndValidate(const ViewDefinition& view,
 
     // If the graph fails validation for any reason, the insert is automatically rolled back on
     // exiting this method.
-    auto rollBackInsert = [&]() -> auto {
-        remove(viewNss);
-    };
-    auto guard = MakeGuard(rollBackInsert);
+    auto guard = makeGuard([&] { remove(viewNss); });
 
     // Check for cycles and get the height of the children.
     StatsMap statsMap;
@@ -118,7 +115,7 @@ Status ViewGraph::insertAndValidate(const ViewDefinition& view,
                               << " bytes"};
     }
 
-    guard.Dismiss();
+    guard.dismiss();
     return Status::OK();
 }
 

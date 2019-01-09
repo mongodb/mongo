@@ -224,7 +224,7 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
             _localThreadState->executing.markRunning();
             _threadsInUse.addAndFetch(1);
         }
-        const auto guard = MakeGuard([this, taskName] {
+        const auto guard = makeGuard([this, taskName] {
             if (--_localThreadState->recursionDepth == 0) {
                 _localThreadState->executingCurRun += _localThreadState->executing.markStopped();
                 _threadsInUse.subtractAndFetch(1);
@@ -563,7 +563,7 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
     log() << "Started new database worker thread " << threadId;
 
     bool guardThreadsRunning = true;
-    const auto guard = MakeGuard([this, &guardThreadsRunning, state] {
+    const auto guard = makeGuard([this, &guardThreadsRunning, state] {
         if (guardThreadsRunning)
             _threadsRunning.subtractAndFetch(1);
         _pastThreadsSpentRunning.addAndFetch(state->running.totalTime());

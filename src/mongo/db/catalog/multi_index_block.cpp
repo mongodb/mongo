@@ -302,9 +302,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection() {
     // accumulate them in the `MultikeyPathTracker` and do the write as part of the update that
     // commits the index.
     auto stopTracker =
-        MakeGuard([this] { MultikeyPathTracker::get(_opCtx).stopTrackingMultikeyPathInfo(); });
+        makeGuard([this] { MultikeyPathTracker::get(_opCtx).stopTrackingMultikeyPathInfo(); });
     if (MultikeyPathTracker::get(_opCtx).isTrackingMultikeyPathInfo()) {
-        stopTracker.Dismiss();
+        stopTracker.dismiss();
     }
     MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo();
 
@@ -613,9 +613,9 @@ Status MultiIndexBlock::commit(stdx::function<void(const BSONObj& spec)> onCreat
 
     // Do not interfere with writing multikey information when committing index builds.
     auto restartTracker =
-        MakeGuard([this] { MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo(); });
+        makeGuard([this] { MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo(); });
     if (!MultikeyPathTracker::get(_opCtx).isTrackingMultikeyPathInfo()) {
-        restartTracker.Dismiss();
+        restartTracker.dismiss();
     }
     MultikeyPathTracker::get(_opCtx).stopTrackingMultikeyPathInfo();
 

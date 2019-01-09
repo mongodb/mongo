@@ -389,7 +389,7 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
     stdx::thread inserterThread{[&] {
         ThreadClient tc("chunkInserter", opCtx->getServiceContext());
         auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
-        auto consumerGuard = MakeGuard([&] { batches.closeConsumerEnd(); });
+        auto consumerGuard = makeGuard([&] { batches.closeConsumerEnd(); });
         try {
             while (true) {
                 auto nextBatch = batches.pop(inserterOpCtx.get());
@@ -405,7 +405,7 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
             log() << "Batch insertion failed " << causedBy(redact(exceptionToStatus()));
         }
     }};
-    auto inserterThreadJoinGuard = MakeGuard([&] {
+    auto inserterThreadJoinGuard = makeGuard([&] {
         batches.closeProducerEnd();
         inserterThread.join();
     });
@@ -419,7 +419,7 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
         batches.push(res.getOwned(), opCtx);
         auto arr = res["objects"].Obj();
         if (arr.isEmpty()) {
-            inserterThreadJoinGuard.Dismiss();
+            inserterThreadJoinGuard.dismiss();
             inserterThread.join();
             opCtx->checkForInterrupt();
             break;

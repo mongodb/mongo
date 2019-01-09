@@ -1682,7 +1682,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     ThreadWaiter waiter(opTime, &writeConcern, &condVar);
     WaiterGuard guard(*lock, &_replicationWaiterList, &waiter);
 
-    ScopeGuard failGuard = MakeGuard([&]() {
+    auto failGuard = makeGuard([&] {
         if (getTestCommandsEnabled()) {
             log() << "Replication failed for write concern: " << writeConcern.toBSON()
                   << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
@@ -1716,7 +1716,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         return satisfiableStatus;
     }
 
-    failGuard.Dismiss();
+    failGuard.dismiss();
     return Status::OK();
 }
 
@@ -1801,7 +1801,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
         _performPostMemberStateUpdateAction(action);
     };
-    ScopeGuard onExitGuard = MakeGuard([&] {
+    auto onExitGuard = makeGuard([&] {
         abortFn();
         updateMemberState();
     });
@@ -1855,7 +1855,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     }
 
     // Stepdown success!
-    onExitGuard.Dismiss();
+    onExitGuard.dismiss();
     updateMemberState();
 
     // Schedule work to (potentially) step back up once the stepdown period has ended.
@@ -2319,8 +2319,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     _setConfigState_inlock(kConfigReconfiguring);
-    ScopeGuard configStateGuard =
-        MakeGuard(lockAndCall, &lk, [=] { _setConfigState_inlock(kConfigSteady); });
+    auto configStateGuard =
+        makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigSteady); }); });
 
     ReplSetConfig oldConfig = _rsConfig;
     lk.unlock();
@@ -2380,7 +2380,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         const executor::TaskExecutor::CallbackArgs& cbData) {
         _finishReplSetReconfig(cbData, newConfig, f, v, reconfigFinished);
     }));
-    configStateGuard.Dismiss();
+    configStateGuard.dismiss();
     _replExecutor->waitForEvent(reconfigFinished);
     return Status::OK();
 }
@@ -2455,8 +2455,8 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     invariant(!_rsConfig.isInitialized());
     _setConfigState_inlock(kConfigInitiating);
 
-    ScopeGuard configStateGuard =
-        MakeGuard(lockAndCall, &lk, [=] { _setConfigState_inlock(kConfigUninitialized); });
+    auto configStateGuard =
+        makeGuard([&] { lockAndCall(&lk, [=] { _setConfigState_inlock(kConfigUninitialized); }); });
     lk.unlock();
 
     ReplSetConfig newConfig;
@@ -2521,7 +2521,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     _externalState->startThreads(_settings);
     _startDataReplication(opCtx);
 
-    configStateGuard.Dismiss();
+    configStateGuard.dismiss();
     return Status::OK();
 }
 

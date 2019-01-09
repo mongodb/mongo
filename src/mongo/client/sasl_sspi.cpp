@@ -411,7 +411,7 @@ int sspiClientMechStep(void* conn_context,
         return SASL_FAIL;
     }
 
-    ON_BLOCK_EXIT(FreeContextBuffer, outbuf.pBuffers[0].pvBuffer);
+    ON_BLOCK_EXIT([&] { FreeContextBuffer(outbuf.pBuffers[0].pvBuffer); });
     pcctx->haveCtxt = true;
 
     if (status == SEC_E_OK) {

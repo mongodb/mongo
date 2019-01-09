@@ -734,7 +734,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
         if (!user->isValid()) {
             // The user is invalid, so make sure that we erase it from _authenticateUsers at the
             // end of this block.
-            auto removeGuard = MakeGuard([&] { _authenticatedUsers.removeAt(it++); });
+            auto removeGuard = makeGuard([&] { _authenticatedUsers.removeAt(it++); });
 
             // Make a good faith effort to acquire an up-to-date user object, since the one
             // we've cached is marked "out-of-date."
@@ -768,7 +768,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     }
 
                     // Success! Replace the old User object with the updated one.
-                    removeGuard.Dismiss();
+                    removeGuard.dismiss();
                     _authenticatedUsers.replaceAt(it, std::move(updatedUser));
                     LOG(1) << "Updated session cache of user information for " << name;
                     break;
@@ -792,7 +792,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     warning() << "Could not fetch updated user privilege information for " << name
                               << "; continuing to use old information.  Reason is "
                               << redact(status);
-                    removeGuard.Dismiss();
+                    removeGuard.dismiss();
                     break;
             }
         }

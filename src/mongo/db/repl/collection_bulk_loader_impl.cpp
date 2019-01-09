@@ -109,7 +109,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
 Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
     int count = 0;
-    return _runTaskReleaseResourcesOnFailure([&]() -> Status {
+    return _runTaskReleaseResourcesOnFailure([&] {
         UnreplicatedWritesBlock uwb(_opCtx.get());
 
         for (auto iter = begin; iter != end; ++iter) {
@@ -154,7 +154,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
 }
 
 Status CollectionBulkLoaderImpl::commit() {
-    return _runTaskReleaseResourcesOnFailure([this]() -> Status {
+    return _runTaskReleaseResourcesOnFailure([&] {
         _stats.startBuildingIndexes = Date_t::now();
         LOG(2) << "Creating indexes for ns: " << _nss.ns();
         UnreplicatedWritesBlock uwb(_opCtx.get());
@@ -247,17 +247,13 @@ void CollectionBulkLoaderImpl::_releaseResources() {
 }
 
 template <typename F>
-Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(F task) noexcept {
-
+Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(const F& task) noexcept {
     AlternativeClientRegion acr(_client);
-    ScopeGuard guard = MakeGuard(&CollectionBulkLoaderImpl::_releaseResources, this);
+    auto guard = makeGuard([this] { _releaseResources(); });
     try {
-        const auto status = [&task]() noexcept {
-            return task();
-        }
-        ();
+        const auto status = task();
         if (status.isOK()) {
-            guard.Dismiss();
+            guard.dismiss();
         }
         return status;
     } catch (...) {

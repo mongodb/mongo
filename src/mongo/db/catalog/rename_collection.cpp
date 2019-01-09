@@ -411,7 +411,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
 
     // Dismissed on success
-    auto tmpCollectionDropper = MakeGuard([&] {
+    auto tmpCollectionDropper = makeGuard([&] {
         BSONObjBuilder unusedResult;
         Status status = Status::OK();
         try {
@@ -563,7 +563,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
-    tmpCollectionDropper.Dismiss();
+    tmpCollectionDropper.dismiss();
 
     BSONObjBuilder unusedResult;
     return dropCollection(opCtx,

@@ -327,7 +327,7 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     if (_waitMutex) {
         invariant(++_numKillers > 0);
         getClient()->unlock();
-        ON_BLOCK_EXIT([this]() noexcept {
+        ON_BLOCK_EXIT([this] {
             getClient()->lock();
             invariant(--_numKillers >= 0);
         });

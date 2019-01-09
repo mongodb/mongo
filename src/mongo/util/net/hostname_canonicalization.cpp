@@ -95,7 +95,7 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
                << getAddrInfoStrError(err);
         return results;
     }
-    const auto guard = MakeGuard(shim_freeaddrinfo);
+    const auto guard = makeGuard(shim_freeaddrinfo);
 
     if (mode == HostnameCanonicalizationMode::kForward) {
         results.emplace_back(shim_fromNativeString(info->ai_canonname));

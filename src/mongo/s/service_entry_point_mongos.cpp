@@ -64,7 +64,7 @@ BSONObj buildErrReply(const DBException& ex) {
 
 DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const Message& message) {
     // Release any cached egress connections for client back to pool before destroying
-    auto guard = MakeGuard(ShardConnection::releaseMyConnections);
+    auto guard = makeGuard(ShardConnection::releaseMyConnections);
 
     const int32_t msgId = message.header().getId();
     const NetworkOp op = message.operation();

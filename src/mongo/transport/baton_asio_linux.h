@@ -248,7 +248,7 @@ public:
         std::vector<Promise<void>> toFulfill;
 
         // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
-        const auto guard = MakeGuard([&] {
+        const auto guard = makeGuard([&] {
             for (auto& promise : toFulfill) {
                 promise.emplaceValue();
             }
@@ -315,7 +315,7 @@ public:
                           pollSet.size(),
                           deadline ? Milliseconds(*deadline - now).count() : -1);
 
-            const auto pollGuard = MakeGuard([&] {
+            const auto pollGuard = makeGuard([&] {
                 lk.lock();
                 _inPoll = false;
             });

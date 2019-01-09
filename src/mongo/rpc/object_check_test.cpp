@@ -48,7 +48,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
 
     bool wasEnabled = serverGlobalParams.objcheck;
     const auto setValidation = [&](bool enabled) { serverGlobalParams.objcheck = enabled; };
-    ON_BLOCK_EXIT(setValidation, wasEnabled);
+    ON_BLOCK_EXIT([=] { setValidation(wasEnabled); });
 
     using std::begin;
     using std::end;

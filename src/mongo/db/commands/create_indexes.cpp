@@ -390,7 +390,7 @@ bool runCreateIndexes(OperationContext* opCtx,
         dbLock.relockWithMode(MODE_IX);
     }
 
-    auto relockOnErrorGuard = MakeGuard([&] {
+    auto relockOnErrorGuard = makeGuard([&] {
         // Must have exclusive DB lock before we clean up the index build via the
         // destructor of 'indexer'.
         if (indexer.getBuildInBackground()) {
@@ -443,7 +443,7 @@ bool runCreateIndexes(OperationContext* opCtx,
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
     }
 
-    relockOnErrorGuard.Dismiss();
+    relockOnErrorGuard.dismiss();
 
     // Need to return db lock back to exclusive, to complete the index build.
     if (indexer.getBuildInBackground()) {

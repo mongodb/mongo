@@ -925,7 +925,7 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
     _checkpointThread->assignOplogNeededForCrashRecoveryTo(&_oplogPinnedByBackup);
-    auto pinOplogGuard = MakeGuard([&] { _oplogPinnedByBackup = boost::none; });
+    auto pinOplogGuard = makeGuard([&] { _oplogPinnedByBackup = boost::none; });
 
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto sessionRaii = stdx::make_unique<WiredTigerSession>(_conn);
@@ -943,7 +943,7 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
         return swFilesToCopy;
     }
 
-    pinOplogGuard.Dismiss();
+    pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
     _backupCursor = cursor;
 
@@ -1380,7 +1380,7 @@ bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) co
     if (ret == ENOENT)
         return false;
     invariantWTOK(ret);
-    ON_BLOCK_EXIT(c->close, c);
+    ON_BLOCK_EXIT([&] { c->close(c); });
 
     c->set_key(c, uri.c_str());
     return c->search(c) == 0;

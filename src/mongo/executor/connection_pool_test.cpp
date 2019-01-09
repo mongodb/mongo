@@ -117,7 +117,7 @@ TEST_F(ConnectionPoolTest, ConnectionsAreAcquiredInMRUOrder) {
     // to the pool by destroying the 'connections' vector. Otherwise,
     // this test would cause an invariant failure instead of a normal
     // test failure if it fails, which would be confusing.
-    const auto guard = MakeGuard([&] {
+    const auto guard = makeGuard([&] {
         while (!connections.empty()) {
             try {
                 ConnectionPool::ConnectionHandle conn = std::move(connections.back());
@@ -190,7 +190,7 @@ TEST_F(ConnectionPoolTest, ConnectionsNotUsedRecentlyArePurged) {
     // to the pool by destroying the 'connections' vector. Otherwise,
     // this test would cause an invariant failure instead of a normal
     // test failure if it fails, which would be confusing.
-    const auto guard = MakeGuard([&] {
+    const auto guard = makeGuard([&] {
         while (!connections.empty()) {
             try {
                 ConnectionPool::ConnectionHandle conn = std::move(connections.back());

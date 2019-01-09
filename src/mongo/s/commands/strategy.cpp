@@ -492,11 +492,11 @@ void runCommand(OperationContext* opCtx,
                 // Update transaction tracking state for a possible retry. Throws and aborts the
                 // transaction if it cannot continue.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                    auto abortGuard = MakeGuard(
+                    auto abortGuard = makeGuard(
                         [&] { txnRouter->implicitlyAbortTransaction(opCtx, ex.toStatus()); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
                     txnRouter->onStaleShardOrDbError(commandName, ex.toStatus());
-                    abortGuard.Dismiss();
+                    abortGuard.dismiss();
                 }
 
                 if (canRetry) {
@@ -511,11 +511,11 @@ void runCommand(OperationContext* opCtx,
                 // Update transaction tracking state for a possible retry. Throws and aborts the
                 // transaction if it cannot continue.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                    auto abortGuard = MakeGuard(
+                    auto abortGuard = makeGuard(
                         [&] { txnRouter->implicitlyAbortTransaction(opCtx, ex.toStatus()); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
                     txnRouter->onStaleShardOrDbError(commandName, ex.toStatus());
-                    abortGuard.Dismiss();
+                    abortGuard.dismiss();
                 }
 
                 if (canRetry) {
@@ -528,11 +528,11 @@ void runCommand(OperationContext* opCtx,
                 // Update transaction tracking state for a possible retry. Throws and aborts the
                 // transaction if it cannot continue.
                 if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                    auto abortGuard = MakeGuard(
+                    auto abortGuard = makeGuard(
                         [&] { txnRouter->implicitlyAbortTransaction(opCtx, ex.toStatus()); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
                     txnRouter->onSnapshotError(ex.toStatus());
-                    abortGuard.Dismiss();
+                    abortGuard.dismiss();
                 }
 
                 if (canRetry) {

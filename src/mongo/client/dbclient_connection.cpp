@@ -554,17 +554,17 @@ DBClientConnection::DBClientConnection(bool _autoReconnect,
 
 void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer) {
     checkConnection();
-    auto killSessionOnError = MakeGuard([this] { _markFailed(kEndSession); });
+    auto killSessionOnError = makeGuard([this] { _markFailed(kEndSession); });
 
     toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(0);
     uassertStatusOK(
         _session->sinkMessage(uassertStatusOK(_compressorManager.compressMessage(toSend))));
-    killSessionOnError.Dismiss();
+    killSessionOnError.dismiss();
 }
 
 bool DBClientConnection::recv(Message& m, int lastRequestId) {
-    auto killSessionOnError = MakeGuard([this] { _markFailed(kEndSession); });
+    auto killSessionOnError = makeGuard([this] { _markFailed(kEndSession); });
     auto swm = _session->sourceMessage();
     if (!swm.isOK()) {
         return false;
@@ -579,7 +579,7 @@ bool DBClientConnection::recv(Message& m, int lastRequestId) {
         m = uassertStatusOK(_compressorManager.decompressMessage(m));
     }
 
-    killSessionOnError.Dismiss();
+    killSessionOnError.dismiss();
     return true;
 }
 
@@ -588,7 +588,7 @@ bool DBClientConnection::call(Message& toSend,
                               bool assertOk,
                               string* actualServer) {
     checkConnection();
-    auto killSessionOnError = MakeGuard([this] { _markFailed(kEndSession); });
+    auto killSessionOnError = makeGuard([this] { _markFailed(kEndSession); });
     auto maybeThrow = [&](const auto& errStatus) {
         if (assertOk)
             uasserted(10278,
@@ -620,7 +620,7 @@ bool DBClientConnection::call(Message& toSend,
         response = uassertStatusOK(_compressorManager.decompressMessage(response));
     }
 
-    killSessionOnError.Dismiss();
+    killSessionOnError.dismiss();
     return true;
 }
 

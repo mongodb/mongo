@@ -47,7 +47,7 @@ StackLocator::StackLocator() {
     pthread_t self = pthread_self();
 
     invariant(pthread_attr_init(&attr) == 0);
-    ON_BLOCK_EXIT(pthread_attr_destroy, &attr);
+    ON_BLOCK_EXIT([&] { pthread_attr_destroy(&attr); });
 
     invariant(pthread_attr_get_np(self, &attr) == 0);
 

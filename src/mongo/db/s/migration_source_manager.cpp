@@ -217,7 +217,7 @@ NamespaceString MigrationSourceManager::getNss() const {
 Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCreated);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
     const Status logStatus = ShardingLogging::get(opCtx)->logChangeChecked(
@@ -257,14 +257,14 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         return startCloneStatus;
     }
 
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
     return Status::OK();
 }
 
 Status MigrationSourceManager::awaitToCatchUp(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloning);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
@@ -276,14 +276,14 @@ Status MigrationSourceManager::awaitToCatchUp(OperationContext* opCtx) {
     }
 
     _state = kCloneCaughtUp;
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
     return Status::OK();
 }
 
 Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
@@ -324,14 +324,14 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
 
     log() << "Migration successfully entered critical section";
 
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
     return Status::OK();
 }
 
 Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCriticalSection);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     // Tell the recipient shard to fetch the latest changes.
     auto commitCloneStatus = _cloneDriver->commitClone(opCtx);
@@ -348,14 +348,14 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     _recipientCloneCounts = commitCloneStatus.getValue()["counts"].Obj().getOwned();
 
     _state = kCloneCompleted;
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
     return Status::OK();
 }
 
 Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloneCompleted);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     // If we have chunks left on the FROM shard, bump the version of one of them as well. This will
     // change the local collection major version, which indicates to other processes that the chunk
@@ -525,7 +525,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
 
     _stats.totalCriticalSectionCommitTimeMillis.addAndFetch(t.millis());
 

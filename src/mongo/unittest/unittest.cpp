@@ -162,7 +162,7 @@ private:
 };
 
 template <typename F>
-inline UnsafeScopeGuard<F> MakeUnsafeScopeGuard(F fun) {
+UnsafeScopeGuard<F> MakeUnsafeScopeGuard(F fun) {
     return UnsafeScopeGuard<F>(std::move(fun));
 }
 

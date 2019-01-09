@@ -50,7 +50,7 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv4) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
     bool wasEnabled = IPv6Enabled();
     enableIPv6(false);
-    ON_BLOCK_EXIT(enableIPv6, wasEnabled);
+    ON_BLOCK_EXIT([&] { enableIPv6(wasEnabled); });
     // first we get the addrs bound on this host
     const std::vector<std::string> addrs = getBoundAddrs(false);
     // Fastpath should agree with the result of getBoundAddrs
@@ -67,7 +67,7 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
     bool wasEnabled = IPv6Enabled();
     enableIPv6(true);
-    ON_BLOCK_EXIT(enableIPv6, wasEnabled);
+    ON_BLOCK_EXIT([&] { enableIPv6(wasEnabled); });
     // first we get the addrs bound on this host
     const std::vector<std::string> addrs = getBoundAddrs(true);
     // Fastpath should agree with the result of getBoundAddrs

@@ -743,7 +743,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         return;
 
     _inFulfillRequests = true;
-    auto guard = MakeGuard([&] { _inFulfillRequests = false; });
+    auto guard = makeGuard([&] { _inFulfillRequests = false; });
 
     while (_requests.size()) {
         // Caution: If this returns with a value, it's important that we not throw until we've
@@ -781,7 +781,7 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
         return;
 
     _inSpawnConnections = true;
-    auto guard = MakeGuard([&] { _inSpawnConnections = false; });
+    auto guard = makeGuard([&] { _inSpawnConnections = false; });
 
     // We want minConnections <= outstanding requests <= maxConnections
     auto target = [&] {

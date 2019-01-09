@@ -73,7 +73,7 @@ NamespaceString MovePrimarySourceManager::getNss() const {
 Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCreated);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     log() << "Moving " << _dbname << " primary from: " << _fromShard << " to: " << _toShard;
 
@@ -122,14 +122,14 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     }
 
     _state = kCloneCaughtUp;
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
     return Status::OK();
 }
 
 Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     // Mark the shard as running a critical operation that requires recovery on crash.
     uassertStatusOK(ShardingStateRecovery::startMetadataOp(opCtx));
@@ -173,14 +173,14 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
 
     log() << "movePrimary successfully entered critical section";
 
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
     return Status::OK();
 }
 
 Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCriticalSection);
-    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
     ConfigsvrCommitMovePrimary commitMovePrimaryRequest;
     commitMovePrimaryRequest.set_configsvrCommitMovePrimary(getNss().ns());
@@ -290,7 +290,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
         ShardingCatalogClient::kMajorityWriteConcern));
 
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
 
     _state = kNeedCleanStaleData;
 

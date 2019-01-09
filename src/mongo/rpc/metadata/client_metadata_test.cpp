@@ -257,7 +257,7 @@ TEST(ClientMetadatTest, TestNegativeWrongTypes) {
 // Negative: document larger than 512 bytes
 TEST(ClientMetadatTest, TestNegativeLargeDocument) {
     bool savedMongos = isMongos();
-    auto unsetMongoS = MakeGuard(&setMongos, savedMongos);
+    auto unsetMongoS = makeGuard([&] { setMongos(savedMongos); });
 
     setMongos(true);
     {

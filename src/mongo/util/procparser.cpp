@@ -97,7 +97,7 @@ StatusWith<std::string> readFileAsString(StringData filename) {
                       str::stream() << "Failed to open file " << filename << " with error: "
                                     << errnoWithDescription(err));
     }
-    auto scopedGuard = MakeGuard([fd] { close(fd); });
+    auto scopedGuard = makeGuard([fd] { close(fd); });
 
     BufBuilder builder(kFileBufferSize);
     std::array<char, kFileBufferSize> buf;

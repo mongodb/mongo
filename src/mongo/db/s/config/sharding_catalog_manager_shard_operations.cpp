@@ -581,7 +581,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     invariant(shard);
     auto targeter = shard->getTargeter();
 
-    auto stopMonitoringGuard = MakeGuard([&] {
+    auto stopMonitoringGuard = makeGuard([&] {
         if (shardConnectionString.type() == ConnectionString::SET) {
             // This is a workaround for the case were we could have some bad shard being
             // requested to be added and we put that bad connection string on the global replica set
@@ -770,7 +770,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                 "Could not find shard metadata for shard after adding it. This most likely "
                 "indicates that the shard was removed immediately after it was added."};
     }
-    stopMonitoringGuard.Dismiss();
+    stopMonitoringGuard.dismiss();
 
     return shardType.getName();
 }

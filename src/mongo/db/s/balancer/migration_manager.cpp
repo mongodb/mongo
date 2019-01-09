@@ -217,7 +217,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
         _state = State::kRecovering;
     }
 
-    auto scopedGuard = MakeGuard([&] {
+    auto scopedGuard = makeGuard([&] {
         _migrationRecoveryMap.clear();
         _abandonActiveMigrationsAndEnableManager(opCtx);
     });
@@ -279,7 +279,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
         it->second.push_back(std::move(migrateType));
     }
 
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
 }
 
 void MigrationManager::finishRecovery(OperationContext* opCtx,
@@ -301,7 +301,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
         invariant(_state == State::kRecovering);
     }
 
-    auto scopedGuard = MakeGuard([&] {
+    auto scopedGuard = makeGuard([&] {
         _migrationRecoveryMap.clear();
         _abandonActiveMigrationsAndEnableManager(opCtx);
     });
@@ -365,7 +365,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
     }
 
     _migrationRecoveryMap.clear();
-    scopedGuard.Dismiss();
+    scopedGuard.dismiss();
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);

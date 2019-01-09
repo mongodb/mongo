@@ -130,7 +130,7 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
     }
 
     scope->_inReportError = true;
-    const auto guard = MakeGuard([&] { scope->_inReportError = false; });
+    const auto guard = makeGuard([&] { scope->_inReportError = false; });
 
     if (!JSREPORT_IS_WARNING(report->flags)) {
 
@@ -243,7 +243,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto scope = getScope(cx);
 
     JS_SetInterruptCallback(scope->_runtime, nullptr);
-    auto guard = MakeGuard([&]() { JS_SetInterruptCallback(scope->_runtime, _interruptCallback); });
+    auto guard = makeGuard([&]() { JS_SetInterruptCallback(scope->_runtime, _interruptCallback); });
 
     if (scope->_pendingGC.load() || closeToMaxMemory()) {
         scope->_pendingGC.store(false);

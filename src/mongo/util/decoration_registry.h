@@ -100,7 +100,7 @@ public:
                           });
         };
 
-        auto cleanup = MakeGuard(std::move(cleanupFunction));
+        auto cleanup = makeGuard(std::move(cleanupFunction));
 
         using std::cend;
 
@@ -108,7 +108,7 @@ public:
             iter->constructor(container->getDecoration(iter->descriptor));
         }
 
-        cleanup.Dismiss();
+        cleanup.dismiss();
     }
 
     /**

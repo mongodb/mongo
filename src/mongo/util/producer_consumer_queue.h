@@ -814,7 +814,7 @@ private:
 
         _checkProducerClosed(lk);
 
-        const auto guard = MakeGuard([&] { _notifyIfNecessary(lk); });
+        const auto guard = makeGuard([&] { _notifyIfNecessary(lk); });
 
         return cb(lk);
     }
@@ -825,7 +825,7 @@ private:
 
         _checkConsumerClosed(lk);
 
-        const auto guard = MakeGuard([&] { _notifyIfNecessary(lk); });
+        const auto guard = makeGuard([&] { _notifyIfNecessary(lk); });
 
         return cb(lk);
     }

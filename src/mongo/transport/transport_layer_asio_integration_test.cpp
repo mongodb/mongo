@@ -106,7 +106,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
     auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
-    const auto threadGuard = MakeGuard([&] {
+    const auto threadGuard = makeGuard([&] {
         reactor->stop();
         thread.join();
     });
@@ -129,7 +129,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
 
     if (auto baton = sc->getTransportLayer()->makeBaton(opCtx.get())) {
         auto future = handle->runCommandRequest(ecr, baton);
-        const auto batonGuard = MakeGuard([&] { baton->detach(); });
+        const auto batonGuard = makeGuard([&] { baton->detach(); });
 
         future.get(opCtx.get());
     }
@@ -144,7 +144,7 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
 
     stdx::thread thread([&] { reactor->run(); });
 
-    const auto threadGuard = MakeGuard([&] {
+    const auto threadGuard = makeGuard([&] {
         reactor->stop();
         thread.join();
     });

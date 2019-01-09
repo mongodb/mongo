@@ -1205,7 +1205,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeWithHash>& 
     // if the task scheduling fails and we have to invoke _finishCallback() synchronously), we
     // declare the scope guard before the lock guard.
     auto result = lastApplied;
-    auto finishCallbackGuard = MakeGuard([this, &result] {
+    auto finishCallbackGuard = makeGuard([this, &result] {
         auto scheduleResult = _exec->scheduleWork(
             [=](const mongo::executor::TaskExecutor::CallbackArgs&) { _finishCallback(result); });
         if (!scheduleResult.isOK()) {
@@ -1273,7 +1273,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeWithHash>& 
 
     // Next initial sync attempt scheduled successfully and we do not need to call _finishCallback()
     // until the next initial sync attempt finishes.
-    finishCallbackGuard.Dismiss();
+    finishCallbackGuard.dismiss();
 }
 
 void InitialSyncer::_finishCallback(StatusWith<OpTimeWithHash> lastApplied) {

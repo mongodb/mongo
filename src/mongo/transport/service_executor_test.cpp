@@ -198,7 +198,7 @@ void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
 
 TEST_F(ServiceExecutorAdaptiveFixture, BasicTaskRuns) {
     ASSERT_OK(executor->start());
-    auto guard = MakeGuard([this] { ASSERT_OK(executor->shutdown(kShutdownTime)); });
+    auto guard = makeGuard([this] { ASSERT_OK(executor->shutdown(kShutdownTime)); });
 
     scheduleBasicTask(executor.get(), true);
 }
@@ -209,7 +209,7 @@ TEST_F(ServiceExecutorAdaptiveFixture, ScheduleFailsBeforeStartup) {
 
 TEST_F(ServiceExecutorSynchronousFixture, BasicTaskRuns) {
     ASSERT_OK(executor->start());
-    auto guard = MakeGuard([this] { ASSERT_OK(executor->shutdown(kShutdownTime)); });
+    auto guard = makeGuard([this] { ASSERT_OK(executor->shutdown(kShutdownTime)); });
 
     scheduleBasicTask(executor.get(), true);
 }

@@ -344,7 +344,7 @@ void MozJSProxyScope::implThread(void* arg) {
     // This is mostly to silence coverity, so that it sees that the
     // ProxyScope doesn't hold a reference to the ImplScope after it
     // is deleted by the unique_ptr.
-    const auto unbindImplScope = MakeGuard([&proxy] { proxy->_implScope = nullptr; });
+    const auto unbindImplScope = makeGuard([&proxy] { proxy->_implScope = nullptr; });
 
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);

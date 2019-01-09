@@ -125,7 +125,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // Prevent any scheduled journal flushes from being delayed and blocking this wait excessively.
     _opsWaitingForVisibility++;
     invariant(_opsWaitingForVisibility > 0);
-    auto exitGuard = MakeGuard([&] { _opsWaitingForVisibility--; });
+    auto exitGuard = makeGuard([&] { _opsWaitingForVisibility--; });
 
     opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lk, [&] {
         auto newLatestVisibleTimestamp = getOplogReadTimestamp();
@@ -155,8 +155,8 @@ void WiredTigerOplogManager::triggerJournalFlush() {
     }
 }
 
-void WiredTigerOplogManager::_oplogJournalThreadLoop(
-    WiredTigerSessionCache* sessionCache, WiredTigerRecordStore* oplogRecordStore) noexcept {
+void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
+                                                     WiredTigerRecordStore* oplogRecordStore) {
     Client::initThread("WTOplogJournalThread");
 
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with

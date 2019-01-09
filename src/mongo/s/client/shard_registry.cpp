@@ -311,7 +311,7 @@ bool ShardRegistry::reload(OperationContext* opCtx) {
 
     auto nextReloadState = ReloadState::Failed;
 
-    auto failGuard = MakeGuard([&] {
+    auto failGuard = makeGuard([&] {
         if (!reloadLock.owns_lock()) {
             reloadLock.lock();
         }

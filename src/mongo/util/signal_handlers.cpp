@@ -138,7 +138,7 @@ void eventProcessingThread() {
         return;
     }
 
-    ON_BLOCK_EXIT(CloseHandle, event);
+    ON_BLOCK_EXIT([&] { CloseHandle(event); });
 
     int returnCode = WaitForSingleObject(event, INFINITE);
     if (returnCode != WAIT_OBJECT_0) {

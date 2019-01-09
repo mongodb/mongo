@@ -152,7 +152,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     WorkingSetMember* member = _ws->get(id);
 
     // We want to free this member when we return, unless we need to retry deleting or returning it.
-    ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
+    auto memberFreer = makeGuard([&] { _ws->free(id); });
 
     invariant(member->hasRecordId());
     RecordId recordId = member->recordId;
@@ -167,7 +167,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             collection(), getOpCtx(), _ws, id, _params.canonicalQuery);
     } catch (const WriteConflictException&) {
         // There was a problem trying to detect if the document still exists, so retry.
-        memberFreer.Dismiss();
+        memberFreer.dismiss();
         return prepareToRetryWSM(id, out);
     }
 
@@ -213,7 +213,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                                                                : Collection::StoreDeletedDoc::Off);
             wunit.commit();
         } catch (const WriteConflictException&) {
-            memberFreer.Dismiss();  // Keep this member around so we can retry deleting it.
+            memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
             return prepareToRetryWSM(id, out);
         }
     }
@@ -240,7 +240,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 
             _idReturning = id;
             // Keep this member around so that we can return it on the next work() call.
-            memberFreer.Dismiss();
+            memberFreer.dismiss();
         }
         *out = WorkingSet::INVALID_ID;
         return NEED_YIELD;
@@ -250,7 +250,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         // member->obj should refer to the deleted document.
         invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
-        memberFreer.Dismiss();  // Keep this member around so we can return it.
+        memberFreer.dismiss();  // Keep this member around so we can return it.
         *out = id;
         return PlanStage::ADVANCED;
     }

@@ -138,7 +138,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, Str
         session->getCursor("metadata:create", WiredTigerSession::kMetadataTableId, false);
     invariant(cursor);
     auto releaser =
-        MakeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
+        makeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
 
     std::string strUri = uri.toString();
     cursor->set_key(cursor, strUri.c_str());
@@ -326,7 +326,7 @@ StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
                                                   << wiredtiger_strerror(ret));
     }
     invariant(cursor);
-    ON_BLOCK_EXIT(cursor->close, cursor);
+    ON_BLOCK_EXIT([&] { cursor->close(cursor); });
 
     cursor->set_key(cursor, statisticsKey);
     ret = cursor->search(cursor);
@@ -519,7 +519,7 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
     WT_SESSION* session;
     invariantWTOK(conn->open_session(conn, &eventHandler, NULL, &session));
-    ON_BLOCK_EXIT(session->close, session, "");
+    ON_BLOCK_EXIT([&] { session->close(session, ""); });
 
     // Do the verify. Weird parens prevent treating "verify" as a macro.
     return (session->verify)(session, uri.c_str(), NULL);
@@ -616,7 +616,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
     }
     bob->append("uri", uri);
     invariant(c);
-    ON_BLOCK_EXIT(c->close, c);
+    ON_BLOCK_EXIT([&] { c->close(c); });
 
     std::map<string, BSONObjBuilder*> subs;
     const char* desc;

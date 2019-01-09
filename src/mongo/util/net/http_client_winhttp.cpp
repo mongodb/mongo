@@ -181,7 +181,7 @@ private:
 
         // Cleanup handled in a guard rather than UniquePtrs to ensure order.
         HINTERNET session = nullptr, connect = nullptr, request = nullptr;
-        auto guard = MakeGuard([&] {
+        auto guard = makeGuard([&] {
             if (request) {
                 WinHttpCloseHandle(request);
             }
