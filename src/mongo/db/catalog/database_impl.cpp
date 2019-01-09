@@ -510,7 +510,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         return Status::OK();  // Post condition already met.
     }
 
-    auto numRecords = uint64_t(0);
+    auto numRecords = collection->numRecords(opCtx);
 
     auto uuid = collection->uuid();
     auto uuidString = uuid ? uuid.get().toString() : "no UUID";

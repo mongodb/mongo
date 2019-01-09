@@ -32,6 +32,8 @@
 
 #include "mongo/db/op_observer_impl.h"
 
+#include <limits>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -69,6 +71,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 
 const auto documentKeyDecoration = OperationContext::declareDecoration<BSONObj>();
+
+constexpr auto kNumRecordsFieldName = "numRecords"_sd;
+constexpr auto kMsgFieldName = "msg"_sd;
+constexpr long long kInvalidNumRecords = -1LL;
 
 repl::OpTime logOperation(OperationContext* opCtx,
                           const char* opstr,
@@ -128,6 +134,29 @@ void onWriteOpCompleted(OperationContext* opCtx,
                                                 lastStmtIdWriteOpTime,
                                                 lastStmtIdWriteDate,
                                                 txnState);
+}
+
+/**
+ * Given the collection count from Collection::numRecords(), create and return the object for the
+ * 'o2' field of a drop or rename oplog entry. If the collection count exceeds the upper limit of a
+ * BSON NumberLong (long long), we will add a count of -1 and append a message with the original
+ * collection count.
+ *
+ * Replication rollback uses this field to correct correction counts on drop-pending collections.
+ */
+BSONObj makeObject2ForDropOrRename(uint64_t numRecords) {
+    BSONObjBuilder obj2Builder;
+    if (numRecords > static_cast<uint64_t>(std::numeric_limits<long long>::max())) {
+        obj2Builder.appendNumber(kNumRecordsFieldName, kInvalidNumRecords);
+        std::string msg = str::stream() << "Collection count " << numRecords
+                                        << " is larger than the "
+                                           "maximum int64_t value. Setting numRecords to -1.";
+        obj2Builder.append(kMsgFieldName, msg);
+    } else {
+        obj2Builder.appendNumber(kNumRecordsFieldName, static_cast<long long>(numRecords));
+    }
+    auto obj = obj2Builder.obj();
+    return obj;
 }
 
 Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
@@ -672,6 +701,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const CollectionDropType dropType) {
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
+    const auto obj2 = makeObject2ForDropOrRename(numRecords);
 
     if (!collectionName.isSystemDotProfile()) {
         // Do not replicate system.profile modifications.
@@ -680,7 +710,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                      cmdNss,
                      uuid,
                      cmdObj,
-                     nullptr,
+                     &obj2,
                      false,
                      getWallClockTimeForOpLog(opCtx),
                      {},
@@ -748,13 +778,19 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     }
 
     const auto cmdObj = builder.done();
+    BSONObj obj2;
+    BSONObj* obj2Ptr = nullptr;
+    if (dropTargetUUID) {
+        obj2 = makeObject2ForDropOrRename(numRecords);
+        obj2Ptr = &obj2;
+    }
 
     logOperation(opCtx,
                  "c",
                  cmdNss,
                  uuid,
                  cmdObj,
-                 nullptr,
+                 obj2Ptr,
                  false,
                  getWallClockTimeForOpLog(opCtx),
                  {},

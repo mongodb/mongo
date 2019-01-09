@@ -331,7 +331,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 }
             }
 
-            auto numRecords = uint64_t(0);
+            auto numRecords = targetColl->numRecords(opCtx);
             auto renameOpTime = opObserver->preRenameCollection(
                 opCtx, source, target, sourceUUID, dropTargetUUID, numRecords, options.stayTemp);
 
