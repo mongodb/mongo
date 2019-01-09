@@ -64,6 +64,16 @@ var $config = extendWorkload($config, function($config, $super) {
             pipeline: [{$match: {flag: true}}, {$out: this.outputCollName}],
             cursor: {}
         });
+
+        const allowedErrorCodes = [
+            ErrorCodes.CommandFailed,  // indexes of target collection changed during processing.
+            17017,  // $out with mode replaceCollection is not supported to an existing *sharded*
+                    // output collection.
+            17152,  // namespace is capped so it can't be used for $out.
+            28769,  // $out collection cannot be sharded.
+        ];
+        assertWhenOwnDB.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
+
         if (res.ok) {
             const cursor = new DBCommandCursor(db, res);
             assertAlways.eq(0, cursor.itcount());  // No matter how many documents were in the
@@ -128,9 +138,10 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
         if (isMongos(db)) {
-            db.adminCommand({enableSharding: db.getName()});
-            db.adminCommand(
-                {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}});
+            assertWhenOwnDB.commandWorked(db.adminCommand({enableSharding: db.getName()}));
+            assertWhenOwnDB.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
+            assertWhenOwnDB.commandWorked(db.adminCommand(
+                {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}}));
         }
     };
 
