@@ -20,7 +20,7 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-VERSION=2.5
+VERSION=2.7
 NAME=gperftools
 TARBALL=$NAME-$VERSION.tar.gz
 TARBALL_DIR=$NAME-$VERSION
@@ -62,8 +62,7 @@ cd $TEMP_DIR
 
 # Adjust config.h, See note 2 at top of file
 mkdir $DEST_DIR/build_$TARGET_UNAME || true
-sed "s/.*MALLOC_HOOK_MAYBE_VOLATILE.*/\/* #undef MALLOC_HOOK_MAYBE_VOLATILE *\//" < src/config.h \
-    > $DEST_DIR/build_$TARGET_UNAME/config.h
+cp src/config.h $DEST_DIR/build_$TARGET_UNAME/config.h
 
 # Generate tcmalloc.h
 # See note 3 at top of file

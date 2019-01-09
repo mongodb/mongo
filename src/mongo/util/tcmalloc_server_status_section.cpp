@@ -55,7 +55,7 @@ namespace {
 // a long time.
 const int kManyClients = 40;
 
-stdx::mutex tcmallocCleanupLock;
+MONGO_COMPILER_VARIABLE_UNUSED stdx::mutex tcmallocCleanupLock;
 
 MONGO_EXPORT_SERVER_PARAMETER(tcmallocEnableMarkThreadTemporarilyIdle, bool, false);
 

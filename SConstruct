@@ -273,7 +273,7 @@ add_option('durableDefaultOn',
 )
 
 add_option('allocator',
-    choices=["auto", "system", "tcmalloc"],
+    choices=["auto", "system", "tcmalloc", "tcmalloc-experimental"],
     default="auto",
     help='allocator to use (use "auto" for best choice for current platform)',
     type='choice',
@@ -2591,7 +2591,7 @@ def doConfigure(myenv):
             # GCC's implementation of ASAN depends on libdl.
             env.Append(LIBS=['dl'])
 
-        if env['MONGO_ALLOCATOR'] == 'tcmalloc':
+        if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
             env.FatalError("Cannot use --sanitize with tcmalloc")
@@ -3303,7 +3303,7 @@ def doConfigure(myenv):
     if myenv['MONGO_ALLOCATOR'] == 'tcmalloc':
         if use_system_version_of_library('tcmalloc'):
             conf.FindSysLibDep("tcmalloc", ["tcmalloc"])
-    elif myenv['MONGO_ALLOCATOR'] == 'system':
+    elif myenv['MONGO_ALLOCATOR'] in ['system', 'tcmalloc-experimental']:
         pass
     else:
         myenv.FatalError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
