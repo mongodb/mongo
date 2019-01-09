@@ -149,6 +149,9 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
                 auto stackStr = ValueWriter(cx, stack).toString();
 
                 if (stackStr.empty()) {
+                    // The JavaScript Error objects resulting from C++ exceptions may not always
+                    // have a non-empty "stack" property. We instead use the line and column
+                    // numbers of where in the JavaScript code the C++ function was called from.
                     str::stream ss;
                     ss << "@" << report->filename << ":" << report->lineno << ":" << report->column
                        << "\n";
@@ -931,6 +934,15 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
             auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
             auto lineNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
             auto colNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
+
+            if (stackStr.empty()) {
+                // The JavaScript Error objects resulting from C++ exceptions may not always have a
+                // non-empty "stack" property. We instead use the line and column numbers of where
+                // in the JavaScript code the C++ function was called from.
+                str::stream ss;
+                ss << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
+                stackStr = ss;
+            }
 
             if (fnameStr != "") {
                 ss << "[" << fnameStr << ":" << lineNum << ":" << colNum << "] ";
