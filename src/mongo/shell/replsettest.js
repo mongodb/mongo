@@ -1625,18 +1625,25 @@ var ReplSetTest = function(opts) {
         return {master: hashes[0], slaves: hashes.slice(1)};
     };
 
+    this.findOplog = function(conn, query, limit) {
+        return conn.getDB('local')
+            .getCollection(oplogName)
+            .find(query)
+            .sort({$natural: -1})
+            .limit(limit);
+    };
+
     this.dumpOplog = function(conn, query = {}, limit = 10) {
         var log = 'Dumping the latest ' + limit + ' documents that match ' + tojson(query) +
             ' from the oplog ' + oplogName + ' of ' + conn.host;
-        var cursor = conn.getDB('local')
-                         .getCollection(oplogName)
-                         .find(query)
-                         .sort({$natural: -1})
-                         .limit(limit);
+        let entries = [];
+        let cursor = this.findOplog(conn, query, limit);
         cursor.forEach(function(entry) {
             log = log + '\n' + tojsononeline(entry);
+            entries.push(entry);
         });
         jsTestLog(log);
+        return entries;
     };
 
     // Call the provided checkerFunction, after the replica set has been write locked.
