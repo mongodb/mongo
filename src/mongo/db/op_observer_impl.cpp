@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -1028,12 +1027,16 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSl
     {
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-        // Writes to the oplog only require a Global intent lock.
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        writeConflictRetry(
+            opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
 
-        WriteUnitOfWork wuow(opCtx);
-        logApplyOpsForTransaction(opCtx, stmts, prepareOpTime);
-        wuow.commit();
+                // Writes to the oplog only require a Global intent lock.
+                Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+                WriteUnitOfWork wuow(opCtx);
+                logApplyOpsForTransaction(opCtx, stmts, prepareOpTime);
+                wuow.commit();
+            });
     }
 }
 
