@@ -247,7 +247,6 @@ env.CppUnitTest(
         'logical_session_id_helpers',
         'service_context',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/unittest/concurrency',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
@@ -1982,7 +1981,6 @@ env.CppUnitTest(
         'session_catalog_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/concurrency',
         'auth/authmocks',
         'service_context_test_fixture',
         'session_catalog',

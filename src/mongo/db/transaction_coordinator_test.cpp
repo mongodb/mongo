@@ -123,14 +123,6 @@ protected:
         ShardServerTestFixture::tearDown();
     }
 
-    ThreadPool* pool() {
-        return _pool.get();
-    }
-
-    executor::TaskExecutor* executor() {
-        return _executor;
-    }
-
     void assertCommandSentAndRespondWith(const StringData& commandName,
                                          const StatusWith<BSONObj>& response,
                                          boost::optional<BSONObj> expectedWriteConcern) {

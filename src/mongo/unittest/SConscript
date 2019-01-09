@@ -7,11 +7,12 @@ env = env.Clone()
 env.Library(
     target="unittest",
     source=[
+        'barrier.cpp',
         'bson_test_util.cpp',
         'death_test.cpp',
         'temp_dir.cpp',
-        'unittest.cpp',
         'unittest_helpers.cpp',
+        'unittest.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -76,16 +77,6 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/processinfo',
-    ],
-)
-
-env.Library(
-    target='concurrency',
-    source=[
-        'barrier.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
     ],
 )
 
