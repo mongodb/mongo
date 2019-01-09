@@ -1796,7 +1796,7 @@ TEST_F(RadixStoreTest, BasicInsertFindDeleteNullCharacter) {
     ASSERT_TRUE(iter != thisStore.end());
     ASSERT_EQ(iter->first, value1.first);
 
-    ASSERT_EQ(thisStore.erase(std::string("ab\0", 3)), StringStore::size_type(1));
+    ASSERT_TRUE(thisStore.erase(std::string("ab\0", 3)));
     ASSERT_EQ(thisStore.size(), StringStore::size_type(1));
 
     iter = thisStore.find(std::string("ab\0", 3));
