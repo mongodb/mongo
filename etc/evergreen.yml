@@ -11748,6 +11748,41 @@ buildvariants:
     distros:
     - rhel62-large
 
+- name: rhel-72-s390x
+  display_name: SSL RHEL 7.2 s390x
+  run_on:
+  - rhel72-zseries-test
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: s390x
+    packager_distro: rhel72
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: s390x-rhel72
+    repo_edition: org
+    build_mongoreplay: true
+    tooltags: "ssl"
+  display_tasks:
+  - *dbtest
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel72-zseries-build
+  - name: jsCore
+  - name: replica_sets_jscore_passthrough
+  - name: ssl
+  - name: publish_packages
+    distros:
+    - rhel70
+  - name: push
+    distros:
+    - rhel70
+
 - name: rhel-67-s390x
   display_name: SSL RHEL 6.7 s390x
   run_on:
