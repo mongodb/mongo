@@ -290,6 +290,20 @@ class PrepareDirectoryForSuite(unittest.TestCase):
         mock_os.makedirs.assert_called_once_with('tmp')
 
 
+class CalculateTimeoutTest(unittest.TestCase):
+    def test_min_timeout(self):
+        self.assertEqual(300, grt.calculate_timeout(15, 1))
+
+    def test_over_timeout_by_one_minute(self):
+        self.assertEqual(360, grt.calculate_timeout(301, 1))
+
+    def test_float_runtimes(self):
+        self.assertEqual(360, grt.calculate_timeout(300.14, 1))
+
+    def test_scaling_factor(self):
+        self.assertEqual(600, grt.calculate_timeout(30, 10))
+
+
 class EvergreenConfigGeneratorTest(unittest.TestCase):
     @staticmethod
     def generate_mock_suites(count):
