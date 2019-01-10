@@ -668,7 +668,6 @@ env.Library(
     target='session_catalog',
     source=[
         'session_catalog.cpp',
-        'session.cpp',
     ],
     LIBDEPS=[
         'kill_sessions',

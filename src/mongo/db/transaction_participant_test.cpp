@@ -1144,9 +1144,8 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
         ](OperationContext * newOpCtx) {
             newOpCtx->setLogicalSessionId(lsid);
             newOpCtx->setTxnNumber(txnNumberToStart);
-
-            auto session = SessionCatalog::get(newOpCtx)->checkOutSession(newOpCtx);
-            auto txnParticipant = TransactionParticipant::get(session.get());
+            MongoDOperationContextSession ocs(newOpCtx);
+            auto txnParticipant = TransactionParticipant::get(newOpCtx);
 
             ASSERT_THROWS_CODE(txnParticipant->beginOrContinue(txnNumberToStart, false, true),
                                AssertionException,

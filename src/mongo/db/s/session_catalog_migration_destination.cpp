@@ -42,7 +42,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/migration_session_id.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/client/shard_registry.h"
@@ -204,8 +204,7 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
  * Insert a new oplog entry by converting the oplogBSON into type 'n' oplog with the session
  * information. The new oplogEntry will also link to prePostImageTs if not null.
  */
-ProcessOplogResult processSessionOplog(OperationContext* opCtx,
-                                       const BSONObj& oplogBSON,
+ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                                        const ProcessOplogResult& lastResult) {
     auto oplogEntry = parseOplog(oplogBSON);
     const auto& sessionInfo = oplogEntry.getOperationSessionInfo();
@@ -247,9 +246,12 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
 
     const auto stmtId = *oplogEntry.getStatementId();
 
-    auto scopedSession = SessionCatalog::get(opCtx)->checkOutSession(opCtx, result.sessionId);
-    auto const txnParticipant = TransactionParticipant::get(scopedSession.get());
-    txnParticipant->refreshFromStorageIfNeeded();
+    auto uniqueOpCtx = cc().makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
+    opCtx->setLogicalSessionId(result.sessionId);
+    opCtx->setTxnNumber(result.txnNum);
+    MongoDOperationContextSession ocs(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant->beginOrContinue(result.txnNum, boost::none, boost::none);
 
     try {
@@ -396,10 +398,7 @@ void SessionCatalogMigrationDestination::join() {
  */
 void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(ServiceContext* service) {
     Client::initThread(
-        "sessionCatalogMigration-" + _migrationSessionId.toString(), service, nullptr);
-
-    auto uniqueCtx = cc().makeOperationContext();
-    auto opCtx = uniqueCtx.get();
+        "sessionCatalogMigrationProducer-" + _migrationSessionId.toString(), service, nullptr);
 
     bool oplogDrainedAfterCommiting = false;
     ProcessOplogResult lastResult;
@@ -413,67 +412,75 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
             }
         }
 
-        auto nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
-        BSONArray oplogArray(nextBatch[kOplogField].Obj());
-        BSONArrayIteratorSorted oplogIter(oplogArray);
+        BSONObj nextBatch;
+        BSONArray oplogArray;
+        {
+            auto uniqueCtx = cc().makeOperationContext();
+            auto opCtx = uniqueCtx.get();
 
-        if (!oplogIter.more()) {
-            {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
-                if (_state == State::Committing) {
-                    // The migration is considered done only when it gets an empty result from the
-                    // source shard while this is in state committing. This is to make sure that it
-                    // doesn't miss any new oplog created between the time window where this
-                    // depleted the buffer from the source shard and receiving the commit command.
-                    if (oplogDrainedAfterCommiting) {
-                        break;
+            nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
+            oplogArray = BSONArray{nextBatch[kOplogField].Obj()};
+
+            if (oplogArray.isEmpty()) {
+                {
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    if (_state == State::Committing) {
+                        // The migration is considered done only when it gets an empty result from
+                        // the source shard while this is in state committing. This is to make sure
+                        // that it doesn't miss any new oplog created between the time window where
+                        // this depleted the buffer from the source shard and receiving the commit
+                        // command.
+                        if (oplogDrainedAfterCommiting) {
+                            break;
+                        }
+
+                        oplogDrainedAfterCommiting = true;
                     }
-
-                    oplogDrainedAfterCommiting = true;
                 }
-            }
 
-            WriteConcernResult unusedWCResult;
-            uassertStatusOK(
-                waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &unusedWCResult));
+                WriteConcernResult unusedWCResult;
+                uassertStatusOK(
+                    waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &unusedWCResult));
 
-            // We depleted the buffer at least once, transition to ready for commit.
-            {
-                stdx::lock_guard<stdx::mutex> lk(_mutex);
-                // Note: only transition to "ready to commit" if state is not error/force stop.
-                if (_state == State::Migrating) {
-                    _state = State::ReadyToCommit;
-                    _isStateChanged.notify_all();
+                // We depleted the buffer at least once, transition to ready for commit.
+                {
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    // Note: only transition to "ready to commit" if state is not error/force stop.
+                    if (_state == State::Migrating) {
+                        _state = State::ReadyToCommit;
+                        _isStateChanged.notify_all();
+                    }
                 }
-            }
 
-            if (lastOpTimeWaited == lastResult.oplogTime) {
-                // We got an empty result at least twice in a row from the source shard so space it
-                // out a little bit so we don't hammer the shard
-                opCtx->sleepFor(Milliseconds(200));
-            }
+                if (lastOpTimeWaited == lastResult.oplogTime) {
+                    // We got an empty result at least twice in a row from the source shard so space
+                    // it
+                    // out a little bit so we don't hammer the shard
+                    opCtx->sleepFor(Milliseconds(200));
+                }
 
-            lastOpTimeWaited = lastResult.oplogTime;
+                lastOpTimeWaited = lastResult.oplogTime;
+            }
         }
-
-        while (oplogIter.more()) {
+        for (BSONArrayIteratorSorted oplogIter(oplogArray); oplogIter.more();) {
             try {
-                lastResult = processSessionOplog(opCtx, oplogIter.next().Obj(), lastResult);
-            } catch (const DBException& ex) {
-                if (ex.code() == ErrorCodes::ConflictingOperationInProgress ||
-                    ex.code() == ErrorCodes::TransactionTooOld) {
-                    // This means that the server has a newer txnNumber than the oplog being
-                    // migrated, so just skip it
-                    continue;
-                }
-
-                throw;
+                lastResult = processSessionOplog(oplogIter.next().Obj(), lastResult);
+            } catch (const ExceptionFor<ErrorCodes::ConfigurationInProgress>&) {
+                // This means that the server has a newer txnNumber than the oplog being
+                // migrated, so just skip it
+                continue;
+            } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>&) {
+                // This means that the server has a newer txnNumber than the oplog being
+                // migrated, so just skip it
+                continue;
             }
         }
     }
 
     WriteConcernResult unusedWCResult;
-    uassertStatusOK(waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &unusedWCResult));
+    auto uniqueOpCtx = cc().makeOperationContext();
+    uassertStatusOK(
+        waitForWriteConcern(uniqueOpCtx.get(), lastResult.oplogTime, kMajorityWC, &unusedWCResult));
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

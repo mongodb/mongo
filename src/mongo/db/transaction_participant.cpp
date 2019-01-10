@@ -307,7 +307,7 @@ const LogicalSessionId& TransactionParticipant::_sessionId() const {
 
 OperationContext* TransactionParticipant::_opCtx() const {
     const auto* owningSession = getTransactionParticipant.owner(this);
-    auto* opCtx = owningSession->currentOperation();
+    auto* opCtx = owningSession->currentOperation_forTest();
     invariant(opCtx);
     return opCtx;
 }

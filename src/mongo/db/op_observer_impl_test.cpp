@@ -334,7 +334,6 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
        OnRollbackDoesntInvalidateSessionCatalogIfNoSessionOpsRolledBack) {
     const NamespaceString nss("testDB", "testColl");
 
-    auto sessionCatalog = SessionCatalog::get(getServiceContext());
     auto sessionId = makeLogicalSessionIdForTest();
 
     const TxnNumber txnNum = 0;
@@ -343,10 +342,8 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
-
-        // Create a session and sync it from disk
-        auto session = sessionCatalog->checkOutSession(opCtx.get());
-        const auto txnParticipant = TransactionParticipant::get(session.get());
+        MongoDOperationContextSession ocs(opCtx.get());
+        const auto txnParticipant = TransactionParticipant::get(opCtx.get());
         txnParticipant->refreshFromStorageIfNeeded();
 
         // Simulate a write occurring on that session
@@ -369,9 +366,8 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
-
-        auto session = sessionCatalog->checkOutSession(opCtx.get());
-        const auto txnParticipant = TransactionParticipant::get(session.get());
+        MongoDOperationContextSession ocs(opCtx.get());
+        const auto txnParticipant = TransactionParticipant::get(opCtx.get());
         ASSERT(txnParticipant->checkStatementExecutedNoOplogEntryFetch(stmtId));
     }
 }

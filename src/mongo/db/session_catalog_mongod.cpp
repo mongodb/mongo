@@ -74,8 +74,9 @@ auto getThreadPool(OperationContext* opCtx) {
     return &sessionTasksExecutor(opCtx->getServiceContext()).threadPool;
 }
 
-void killSessionTokensFunction(OperationContext* opCtx,
-                               std::shared_ptr<std::vector<Session::KillToken>> sessionKillTokens) {
+void killSessionTokensFunction(
+    OperationContext* opCtx,
+    std::shared_ptr<std::vector<SessionCatalog::KillToken>> sessionKillTokens) {
     if (sessionKillTokens->empty())
         return;
 
@@ -105,7 +106,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     const auto catalog = SessionCatalog::get(opCtx);
     // The use of shared_ptr here is in order to work around the limitation of stdx::function that
     // the functor must be copyable.
-    auto sessionKillTokens = std::make_shared<std::vector<Session::KillToken>>();
+    auto sessionKillTokens = std::make_shared<std::vector<SessionCatalog::KillToken>>();
 
     // Scan all sessions and reacquire locks for prepared transactions.
     // There may be sessions that are checked out during this scan, but none of them
@@ -115,14 +116,14 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
 
     SessionKiller::Matcher matcher(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    catalog->scanSessions(matcher, [&](WithLock sessionCatalogLock, Session* session) {
-        const auto txnParticipant = TransactionParticipant::get(session);
+    catalog->scanSessions(matcher, [&](const ObservableSession& session) {
+        const auto txnParticipant = TransactionParticipant::get(session.get());
         if (!txnParticipant->inMultiDocumentTransaction()) {
-            sessionKillTokens->emplace_back(session->kill(sessionCatalogLock));
+            sessionKillTokens->emplace_back(session.kill());
         }
 
         if (txnParticipant->transactionIsPrepared()) {
-            sessionIdToReacquireLocks.emplace_back(session->getSessionId());
+            sessionIdToReacquireLocks.emplace_back(session.getSessionId());
         }
     });
     killSessionTokensFunction(opCtx, sessionKillTokens);
@@ -131,10 +132,12 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         // Create a new opCtx because we need an empty locker to refresh the locks.
         auto newClient = opCtx->getServiceContext()->makeClient("restore-prepared-txn");
         AlternativeClientRegion acr(newClient);
-        auto newOpCtx = cc().makeOperationContext();
         for (const auto& sessionId : sessionIdToReacquireLocks) {
-            auto scopedSessionCheckOut = catalog->checkOutSession(newOpCtx.get(), sessionId);
-            auto txnParticipant = TransactionParticipant::get(scopedSessionCheckOut.get());
+            auto newOpCtx = cc().makeOperationContext();
+            newOpCtx->setLogicalSessionId(sessionId);
+            MongoDOperationContextSession ocs(newOpCtx.get());
+            auto txnParticipant =
+                TransactionParticipant::get(OperationContextSession::get(newOpCtx.get()));
             txnParticipant->refreshLocksForPreparedTransaction(newOpCtx.get(), false);
         }
     }
@@ -195,7 +198,7 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
 
     // The use of shared_ptr here is in order to work around the limitation of stdx::function that
     // the functor must be copyable.
-    auto sessionKillTokens = std::make_shared<std::vector<Session::KillToken>>();
+    auto sessionKillTokens = std::make_shared<std::vector<SessionCatalog::KillToken>>();
 
     if (singleSessionDoc) {
         sessionKillTokens->emplace_back(catalog->killSession(LogicalSessionId::parse(
@@ -203,10 +206,9 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
     } else {
         SessionKiller::Matcher matcher(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        catalog->scanSessions(
-            matcher, [&sessionKillTokens](WithLock sessionCatalogLock, Session* session) {
-                sessionKillTokens->emplace_back(session->kill(sessionCatalogLock));
-            });
+        catalog->scanSessions(matcher, [&sessionKillTokens](const ObservableSession& session) {
+            sessionKillTokens->emplace_back(session.kill());
+        });
     }
 
     killSessionTokensFunction(opCtx, sessionKillTokens);
