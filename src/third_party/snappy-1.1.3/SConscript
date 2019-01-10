@@ -14,8 +14,6 @@ elif env.TargetOSIs('windows'):
     env.Append(CCFLAGS=['/wd4996'])
     # C4018: '<': signed/unsigned mismatch
     env.Append(CCFLAGS=['/wd4018'])
-    env.Append(CPPPATH=["build_windows"])
-    env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
 elif not env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_posix"])
     env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
