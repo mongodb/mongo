@@ -60,6 +60,8 @@ public:
                            << engine->supportsReadConcernMajority()
                            << "supportsPendingDrops"
                            << engine->supportsPendingDrops()
+                           << "dropPendingIdents"
+                           << static_cast<long long>(engine->getDropPendingIdents().size())
                            << "supportsSnapshotReadConcern"
                            << engine->supportsReadConcernSnapshot()
                            << "readOnly"

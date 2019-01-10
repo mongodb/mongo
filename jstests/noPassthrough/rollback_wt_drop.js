@@ -74,6 +74,9 @@
                           mydb.getName() + ' after dropping collection ' + coll.getFullName() +
                           '. Before: ' + tojson(collectionsBeforeDrop) + '. After: ' +
                           tojson(collectionsAfterDrop));
+            assert.gt(mydb.serverStatus().storageEngine.dropPendingIdents,
+                      0,
+                      'There is no drop pending ident in the storage engine.');
         }
 
         const renameTargetColl = node.getCollection(renameTargetCollName);

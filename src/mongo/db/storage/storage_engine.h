@@ -355,6 +355,11 @@ public:
     virtual bool supportsPendingDrops() const = 0;
 
     /**
+     * Returns a set of drop pending idents inside the storage engine.
+     */
+    virtual std::set<std::string> getDropPendingIdents() const = 0;
+
+    /**
      * Clears list of drop-pending idents in the storage engine.
      * Used primarily by rollback after recovering to a stable timestamp.
      */

@@ -355,6 +355,10 @@ public:
         return _timestampMonitor.get();
     }
 
+    std::set<std::string> getDropPendingIdents() const {
+        return _dropPendingIdentReaper.getAllIdents();
+    }
+
 private:
     using CollIter = std::list<std::string>::iterator;
 
