@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -784,18 +784,20 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	size_t insert_bytes;
 	uint64_t yield_count, sleep_usecs;
 	bool append_key, valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
+	insert_bytes = cursor->key.size + cursor->value.size;
 	session = (WT_SESSION_IMPL *)cursor->session;
 	yield_count = sleep_usecs = 0;
 
 	WT_STAT_CONN_INCR(session, cursor_insert);
 	WT_STAT_DATA_INCR(session, cursor_insert);
-	WT_STAT_DATA_INCRV(session,
-	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
+	WT_STAT_CONN_INCRV(session, cursor_insert_bytes, insert_bytes);
+	WT_STAT_DATA_INCRV(session, cursor_insert_bytes, insert_bytes);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -1033,6 +1035,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt, bool positioned)
 
 	WT_STAT_CONN_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCR(session, cursor_remove);
+	WT_STAT_CONN_INCRV(session, cursor_remove_bytes, cursor->key.size);
 	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
 	/* Save the cursor state. */
@@ -1425,10 +1428,11 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
 		upd_size += WT_UPDATE_MEMSIZE(upd);
 		if (upd_size >= WT_MODIFY_MEM_FACTOR * cursor->value.size)
 			return (true);
-		if (__wt_txn_upd_visible_all(session, upd) &&
-		    i >= WT_MAX_MODIFY_UPDATE)
-			return (true);
 	}
+	if (upd != NULL && upd->type == WT_UPDATE_STANDARD &&
+	    __wt_txn_upd_visible_all(session, upd) &&
+	    i >= WT_MAX_MODIFY_UPDATE)
+		return (true);
 	return (false);
 }
 
@@ -1449,9 +1453,6 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_STAT_CONN_INCR(session, cursor_modify);
-	WT_STAT_DATA_INCR(session, cursor_modify);
 
 	/* Save the cursor state. */
 	__cursor_state_save(cursor, &state);
@@ -1490,10 +1491,11 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	WT_ERR(__wt_modify_apply_api(session, cursor, entries, nentries));
 	new = cursor->value.size;
 	WT_ERR(__cursor_size_chk(session, &cursor->value));
-	if (new > orig)
-		WT_STAT_DATA_INCRV(session, cursor_update_bytes, new - orig);
-	else
-		WT_STAT_DATA_DECRV(session, cursor_update_bytes, orig - new);
+
+	WT_STAT_CONN_INCRV(session, cursor_update_bytes_changed,
+	    new > orig ? new - orig : orig - new);
+	WT_STAT_DATA_INCRV(session, cursor_update_bytes_changed,
+	    new > orig ? new - orig : orig - new);
 
 	/*
 	 * WT_CURSOR.modify is update-without-overwrite.
@@ -1571,7 +1573,10 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 
 	WT_STAT_CONN_INCR(session, cursor_update);
 	WT_STAT_DATA_INCR(session, cursor_update);
-	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
+	WT_STAT_CONN_INCRV(session,
+	    cursor_update_bytes, cursor->key.size + cursor->value.size);
+	WT_STAT_DATA_INCRV(session,
+	    cursor_update_bytes, cursor->key.size + cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1239,8 +1239,16 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			    !__txn_visible_id(session, txnid))
 				uncommitted = r->update_uncommitted = true;
 
-		       if (prepared || uncommitted)
+			if (prepared || uncommitted)
 			       continue;
+
+			/* Consider a non durable update as uncommitted. */
+			if (upd->timestamp != WT_TS_NONE &&
+			    !__wt_txn_upd_durable(session, upd)) {
+				uncommitted = r->update_uncommitted = true;
+				continue;
+			}
+
 		}
 
 		/* Track the first update with non-zero timestamp. */
@@ -1268,9 +1276,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if (*updp == NULL && r->las_skew_newest)
 			*updp = upd;
 
-		if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
+		/* Consider non durable updates as uncommitted. */
+		if ((F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    !__wt_txn_upd_visible_all(session, upd) :
-		    !__wt_txn_upd_visible(session, upd)) {
+		    !__wt_txn_upd_visible(session, upd)) ||
+		    !__wt_txn_upd_durable(session, upd)) {
 			if (F_ISSET(r, WT_REC_EVICT))
 				++r->updates_unstable;
 

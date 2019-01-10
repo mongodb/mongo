@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -503,34 +503,41 @@ __wt_panic(WT_SESSION_IMPL *session)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	WT_CONNECTION_IMPL *conn;
-
 	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 *
+	 * If the connection has already panicked, just return the error.
 	 */
-	if (session != NULL) {
-		/*
-		 * Panic the connection; if the connection has already been
-		 * marked, just return the error.
-		 */
-		conn = S2C(session);
-		if (F_ISSET(conn, WT_CONN_PANIC))
-			return (WT_PANIC);
-		F_SET(conn, WT_CONN_PANIC);
-	}
+	if (session != NULL && F_ISSET(S2C(session), WT_CONN_PANIC))
+		return (WT_PANIC);
 
+	/*
+	 * Call the error callback function before setting the connection's
+	 * panic flag, so applications can trace the failing thread before
+	 * being flooded with panic returns from API calls.
+	 */
 	__wt_err(session, WT_PANIC, "the process must exit and restart");
 
+	/*
+	 * Confusing #ifdef structure because gcc/clang knows the abort call
+	 * won't return, and Visual Studio doesn't.
+	 */
 #if defined(HAVE_DIAGNOSTIC)
 	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
 #endif
 #if !defined(HAVE_DIAGNOSTIC) || defined(_WIN32)
 	/*
-	 * Confusing #ifdef structure because gcc knows we can't get here and
-	 * Visual Studio doesn't.
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 *
+	 * Panic the connection;
+	 */
+	if (session != NULL)
+		F_SET(S2C(session), WT_CONN_PANIC);
+
+	/*
 	 * Chaos reigns within.
 	 * Reflect, repent, and reboot.
 	 * Order shall return.

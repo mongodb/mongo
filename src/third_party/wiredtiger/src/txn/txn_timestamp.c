@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -564,7 +564,7 @@ set:	__wt_writelock(session, &txn_global->rwlock);
  */
 int
 __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
-    wt_timestamp_t ts, WT_CONFIG_ITEM *cval)
+    wt_timestamp_t ts, WT_CONFIG_ITEM *cval, bool compare_stable)
 {
 	WT_TXN *txn = &session->txn;
 	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
@@ -593,7 +593,7 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 		    "%s timestamp %.*s older than oldest timestamp %s",
 		    name, (int)cval->len, cval->str, hex_timestamp);
 	}
-	if (has_stable_ts && ts < stable_ts) {
+	if (compare_stable && has_stable_ts && ts < stable_ts) {
 		__wt_timestamp_to_hex_string(hex_timestamp, stable_ts);
 		WT_RET_MSG(session, EINVAL,
 		    "%s timestamp %.*s older than stable timestamp %s",
@@ -643,8 +643,11 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_TXN *txn;
 	wt_timestamp_t ts;
+	bool prepare, prepare_allowed;
 
 	txn = &session->txn;
+	prepare = F_ISSET(txn, WT_TXN_PREPARE);
+	prepare_allowed = prepare == false;
 
 	/* Look for a commit timestamp. */
 	ret = __wt_config_gets_def(session, cfg, "commit_timestamp", 0, &cval);
@@ -652,14 +655,48 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	if (ret == 0 && cval.len != 0) {
 		WT_TRET(__wt_txn_context_check(session, true));
 		WT_RET(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
-		WT_RET(__wt_timestamp_validate(session, "commit", ts, &cval));
+		/*
+		 * For prepared transactions, commit timestamp can be earlier
+		 * than stable timestamp.
+		 */
+		if (prepare)
+			WT_RET(__wt_timestamp_validate(
+			    session, "commit", ts, &cval, false));
+		else
+			WT_RET(__wt_timestamp_validate(
+			    session, "commit", ts, &cval, true));
 		txn->commit_timestamp = ts;
 		__wt_txn_set_commit_timestamp(session);
-	} else
-		/*
-		 * We allow setting the commit timestamp after a prepare
-		 * but no other timestamp.
-		 */
+		txn->durable_timestamp = txn->commit_timestamp;
+		prepare_allowed = true;
+	}
+
+	/* Look for a durable timestamp incase of prepared transaction. */
+	if (prepare) {
+		ret = __wt_config_gets_def(
+		    session, cfg, "durable_timestamp", 0, &cval);
+		WT_RET_NOTFOUND_OK(ret);
+		if (ret == 0 && cval.len != 0) {
+			WT_TRET(__wt_txn_context_check(session, true));
+			WT_RET(__wt_txn_parse_timestamp(
+			    session, "durable", &ts, &cval));
+			txn->durable_timestamp = ts;
+			prepare_allowed = true;
+		}
+	}
+
+	/*
+	 * We copy the commit_timestamp as durable_timestamp, hence validation
+	 * is required.
+	 */
+	if (ret == 0 && cval.len != 0)
+		WT_RET(__wt_timestamp_validate(
+		    session, "durable", txn->durable_timestamp, &cval, true));
+	/*
+	 * We allow setting the commit timestamp and durable timestamp after a
+	 * prepare but no other timestamp.
+	 */
+	if (!prepare_allowed)
 		WT_RET(__wt_txn_context_prepare_check(session));
 
 	/* Look for a read timestamp. */
@@ -746,6 +783,7 @@ __wt_txn_parse_prepare_timestamp(
 
 	return (0);
 }
+
 /*
  * __wt_txn_parse_read_timestamp --
  *	Parse a request to set a transaction's read_timestamp.

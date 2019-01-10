@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -819,6 +819,7 @@ struct __wt_page {
 struct __wt_page_deleted {
 	volatile uint64_t txnid;		/* Transaction ID */
 	wt_timestamp_t timestamp;
+	wt_timestamp_t durable_timestamp;	/* aligned uint64_t timestamp */
 
 	/*
 	 * The state is used for transaction prepare to manage visibility
@@ -1049,6 +1050,7 @@ struct __wt_ikey {
 struct __wt_update {
 	volatile uint64_t txnid;	/* transaction ID */
 	wt_timestamp_t timestamp;	/* aligned uint64_t timestamp */
+	wt_timestamp_t durable_timestamp;	/* aligned uint64_t timestamp */
 
 	WT_UPDATE *next;		/* forward-linked list */
 
@@ -1085,7 +1087,7 @@ struct __wt_update {
  * WT_UPDATE_SIZE is the expected structure size excluding the payload data --
  * we verify the build to ensure the compiler hasn't inserted padding.
  */
-#define	WT_UPDATE_SIZE	30
+#define	WT_UPDATE_SIZE	38
 
 /*
  * The memory size of an update: include some padding because this is such a

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -108,7 +108,7 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		    upd->timestamp == WT_TS_NONE) {
 			if (upd == first_upd)
 				first_upd = upd->next;
-		} else if (rollback_timestamp < upd->timestamp) {
+		} else if (rollback_timestamp < upd->durable_timestamp) {
 			/*
 			 * If any updates are aborted, all newer updates
 			 * better be aborted as well.
@@ -127,6 +127,7 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 			upd->txnid = WT_TXN_ABORTED;
 			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
 			upd->timestamp = 0;
+			upd->durable_timestamp = 0;
 		}
 	}
 }
@@ -260,7 +261,7 @@ __txn_abort_newer_updates(
 
 	/* Review deleted page saved to the ref */
 	if (ref->page_del != NULL &&
-	    rollback_timestamp < ref->page_del->timestamp)
+	    rollback_timestamp < ref->page_del->durable_timestamp)
 		WT_ERR(__wt_delete_page_rollback(session, ref));
 
 	/*

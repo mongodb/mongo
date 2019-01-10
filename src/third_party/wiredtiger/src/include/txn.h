@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -257,6 +257,13 @@ struct __wt_txn {
 	 * running.
 	 */
 	wt_timestamp_t commit_timestamp;
+
+	/*
+	 * Durable timestamp copied into updates created by this transaction.
+	 * It is used to decide whether to consider this update to be persisted
+	 * or not by stable checkpoint.
+	 */
+	wt_timestamp_t durable_timestamp;
 
 	/*
 	 * Set to the first commit timestamp used in the transaction and fixed

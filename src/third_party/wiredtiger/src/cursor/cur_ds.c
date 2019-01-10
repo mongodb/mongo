@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -358,6 +358,7 @@ __curds_update(WT_CURSOR *cursor)
 
 	WT_STAT_CONN_INCR(session, cursor_update);
 	WT_STAT_DATA_INCR(session, cursor_update);
+	WT_STAT_CONN_INCRV(session, cursor_update_bytes, cursor->value.size);
 	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
 	WT_ERR(__curds_txn_enter(session, true));
@@ -389,6 +390,7 @@ __curds_remove(WT_CURSOR *cursor)
 
 	WT_STAT_CONN_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCR(session, cursor_remove);
+	WT_STAT_CONN_INCRV(session, cursor_remove_bytes, cursor->key.size);
 	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
 	WT_ERR(__curds_txn_enter(session, true));

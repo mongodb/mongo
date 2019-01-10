@@ -1285,6 +1285,12 @@ methods = {
         current transaction.  The value must also not be older than the
         current oldest and stable timestamps.  See
         @ref transaction_timestamps'''),
+    Config('durable_timestamp', '', r'''
+        set the durable timestamp for the current transaction.  The supplied
+        value must not be older than the commit timestamp set for the
+        current transaction.  The value must also not be older than the
+        current stable timestamp.  See
+        @ref transaction_timestamps'''),
     Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync.
@@ -1310,6 +1316,12 @@ methods = {
         value must not be older than the first commit timestamp set for the
         current transaction.  The value must also not be older than the
         current oldest and stable timestamps.  See
+        @ref transaction_timestamps'''),
+    Config('durable_timestamp', '', r'''
+        set the durable timestamp for the current transaction.  The supplied
+        value must not be older than the commit timestamp set for the
+        current transaction.  The value must also not be older than the
+        current stable timestamp.  See
         @ref transaction_timestamps'''),
     Config('read_timestamp', '', r'''
         read using the specified timestamp.  The supplied value must not be
