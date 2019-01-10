@@ -43,20 +43,6 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))
 
-IDLServerParameter::IDLServerParameter(StringData name, ServerParameterType paramType)
-    : ServerParameter(ServerParameterSet::getGlobal(),
-                      name,
-                      paramType == SPT::kStartupOnly || paramType == SPT::kStartupAndRuntime,
-                      paramType == SPT::kRuntimeOnly || paramType == SPT::kStartupAndRuntime) {}
-
-void IDLServerParameter::append(OperationContext* opCtx,
-                                BSONObjBuilder& b,
-                                const std::string& name) {
-    invariant(_appendBSON,
-              "append() called on IDLServerParamter with no appendBSON implementation");
-    _appendBSON(opCtx, &b, name);
-}
-
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
                                                                      ServerParameter* sp)
     : ServerParameter(ServerParameterSet::getGlobal(),
@@ -67,27 +53,6 @@ IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData 
     if (_sp->isTestOnly()) {
         setTestOnly();
     }
-}
-
-Status IDLServerParameter::set(const BSONElement& newValueElement) try {
-    if (_fromBSON) {
-        return _fromBSON(newValueElement);
-    } else {
-        // Default fallback behavior: Cast to string and use 'from_string' method.
-        return setFromString(newValueElement.String());
-    }
-} catch (const AssertionException& ex) {
-    return {ErrorCodes::BadValue,
-            str::stream() << "Invalid value '" << newValueElement << "' for setParameter '"
-                          << name()
-                          << "': "
-                          << ex.what()};
-}
-
-Status IDLServerParameter::setFromString(const std::string& str) {
-    invariant(_fromString,
-              "setFromString() called on IDLServerParamter with no setFromString implementation");
-    return _fromString(str);
 }
 
 void IDLServerParameterDeprecatedAlias::append(OperationContext* opCtx,

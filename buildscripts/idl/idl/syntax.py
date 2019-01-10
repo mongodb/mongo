@@ -520,18 +520,11 @@ class ServerParameter(common.SourceLocation):
         self.deprecated_name = []  # type: List[unicode]
         self.redact = False  # type: bool
         self.test_only = False  # type: bool
-
-        # Only valid if cpp_varname or cpp_class is specified.
         self.default = None  # type: Expression
 
         # Only valid if cpp_varname is specified.
         self.validator = None  # type: Validator
         self.on_update = None  # type: unicode
-
-        # Required if cpp_varname is not specified.
-        self.from_bson = None  # type: unicode
-        self.append_bson = None  # type: unicode
-        self.from_string = None  # type: unicode
 
         super(ServerParameter, self).__init__(file_name, line, column)
 

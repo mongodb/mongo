@@ -1935,32 +1935,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_line('return ret;')
 
-    def _gen_server_parameter_without_storage(self, param):
-        # type: (ast.ServerParameter) -> None
-        """Generate a single IDLServerParameter."""
-        self._writer.write_line(
-            common.template_args('auto* ret = new IDLServerParameter(${name}, ${spt});',
-                                 spt=param.set_at, name=_encaps(param.name)))
-        if param.from_bson:
-            self._writer.write_line('ret->setFromBSON(%s);' % (param.from_bson))
-
-        if param.append_bson:
-            self._writer.write_line('ret->setAppendBSON(%s);' % (param.append_bson))
-        elif param.redact:
-            self._writer.write_line('ret->setAppendBSON(IDLServerParameter::redactedAppendBSON);')
-
-        self._writer.write_line('ret->setFromString(%s);' % (param.from_string))
-        self._writer.write_line('return ret;')
-
     def _gen_server_parameter(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameter(WithStorage)."""
         if param.cpp_class is not None:
             self._gen_server_parameter_specialized(param)
-        elif param.cpp_varname is not None:
-            self._gen_server_parameter_with_storage(param)
         else:
-            self._gen_server_parameter_without_storage(param)
+            self._gen_server_parameter_with_storage(param)
 
     def _gen_server_parameter_deprecated_aliases(self, param_no, param):
         # type: (int, ast.ServerParameter) -> None

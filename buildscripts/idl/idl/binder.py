@@ -889,10 +889,7 @@ def _bind_server_parameter_class(ctxt, ast_param, param):
     """Bind and validate ServerParameter attributes specific to specialized ServerParameters."""
 
     # Fields specific to bound and unbound standard params.
-    for field in [
-            'cpp_vartype', 'cpp_varname', 'on_update', 'validator', 'append_bson', 'from_bson',
-            'from_string'
-    ]:
+    for field in ['cpp_vartype', 'cpp_varname', 'on_update', 'validator']:
         if getattr(param, field) is not None:
             ctxt.add_server_parameter_invalid_attr(param, field, 'specialized')
             return None
@@ -929,7 +926,7 @@ def _bind_server_parameter_with_storage(ctxt, ast_param, param):
     """Bind and validate ServerParameter attributes specific to bound ServerParameters."""
 
     # Fields specific to specialized and unbound standard params.
-    for field in ['cpp_class', 'append_bson', 'from_bson', 'from_string']:
+    for field in ['cpp_class']:
         if getattr(param, field) is not None:
             ctxt.add_server_parameter_invalid_attr(param, field, 'bound')
             return None
@@ -944,36 +941,6 @@ def _bind_server_parameter_with_storage(ctxt, ast_param, param):
             return None
 
     if param.validator:
-        ast_param.validator = _bind_validator(ctxt, param.validator)
-        if ast_param.validator is None:
-            return None
-
-    return ast_param
-
-
-def _bind_server_parameter_without_storage(ctxt, ast_param, param):
-    # type: (errors.ParserContext, ast.ServerParameter, syntax.ServerParameter) -> ast.ServerParameter
-    """Bind and validate ServerParameter attributes specific to unbound ServerParameters."""
-
-    # Fields specific to specialized and unbound standard params.
-    for field in ['cpp_class', 'cpp_vartype', 'cpp_varname', 'default', 'on_update', 'validator']:
-        if getattr(param, field) is not None:
-            ctxt.add_server_parameter_invalid_attr(param, field, 'unbound')
-            return None
-
-    if param.from_string is None:
-        ctxt.add_server_parameter_required_attr(param, 'from_string', 'unbound')
-        return None
-
-    if (not param.redact) and (param.append_bson is None):
-        ctxt.add_server_parameter_required_attr(param, 'append_bson', 'unbound')
-        return None
-
-    ast_param.append_bson = param.append_bson
-    ast_param.from_bson = param.from_bson
-    ast_param.from_string = param.from_string
-
-    if param.validator is not None:
         ast_param.validator = _bind_validator(ctxt, param.validator)
         if ast_param.validator is None:
             return None
@@ -1027,7 +994,8 @@ def _bind_server_parameter(ctxt, param):
     elif param.cpp_varname:
         return _bind_server_parameter_with_storage(ctxt, ast_param, param)
     else:
-        return _bind_server_parameter_without_storage(ctxt, ast_param, param)
+        ctxt.add_server_parameter_required_attr(param, 'cpp_varname', 'server_parameter')
+        return None
 
 
 def _is_invalid_config_short_name(name):
