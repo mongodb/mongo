@@ -441,6 +441,9 @@ MongoSInterface::DispatchShardPipelineResults MongoSInterface::dispatchShardPipe
         if (!shardRegistry->reload(opCtx)) {
             shardRegistry->reload(opCtx);
         }
+        // Rebuild the set of shards as the shard registry might have changed.
+        shardIds = getTargetedShards(
+            opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
     }
 
     // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
