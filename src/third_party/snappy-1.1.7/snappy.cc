@@ -26,9 +26,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// MongoDB customization: includes basetsd.h under Windows where SSIZE_T is declared.
-#include "mongo/platform/basic.h"
-
 #include "snappy.h"
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
@@ -50,16 +47,6 @@
 #include <algorithm>
 #include <string>
 #include <vector>
-
-// Fixes missing ssize_t under Windows.
-// Used in IncrementalCopy and IncrementalCopyFastPath.
-// See:
-//    https://code.google.com/p/snappy/issues/detail?id=79
-//    http://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx#SSIZE_T
-//    http://src.chromium.org/viewvc/chrome/trunk/src/third_party/snappy/win32/snappy-stubs-public.h
-#if defined(_WIN32)
-typedef SSIZE_T ssize_t;
-#endif  // _WIN32
 
 
 namespace snappy {
@@ -921,16 +908,16 @@ size_t Compress(Source* reader, Sink* writer) {
     // Compress input_fragment and append to dest
     const int max_output = MaxCompressedLength(num_to_read);
 
-    // If the byte sink doesn't have room for us directly, allocate a scratch
-    // buffer.
-    //
-    // Since we encode kBlockSize regions followed by a region
-    // which is <= kBlockSize in length, a previously allocated
-    // scratch_output[] region is big enough for this iteration.
-    char* dest = writer->GetAppendBuffer(max_output, scratch_output);
-    if (dest == NULL) {
-      dest = scratch_output = new char[max_output];
+    // Need a scratch buffer for the output, in case the byte sink doesn't
+    // have room for us directly.
+    if (scratch_output == NULL) {
+      scratch_output = new char[max_output];
+    } else {
+      // Since we encode kBlockSize regions followed by a region
+      // which is <= kBlockSize in length, a previously allocated
+      // scratch_output[] region is big enough for this iteration.
     }
+    char* dest = writer->GetAppendBuffer(max_output, scratch_output);
     char* end = internal::CompressFragment(fragment, fragment_size,
                                            dest, table, table_size);
     writer->Append(dest, end - dest);
