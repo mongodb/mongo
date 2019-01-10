@@ -5,6 +5,8 @@
  *
  * Executes the update_upsert_multi.js workload after dropping all non-_id
  * indexes on the collection.
+ *
+ * @tags: [requires_non_retryable_writes]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
 load('jstests/concurrency/fsm_workloads/update_upsert_multi.js');        // for $config

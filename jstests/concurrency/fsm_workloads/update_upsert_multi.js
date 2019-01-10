@@ -8,6 +8,8 @@
  * The 'update' state uses a query that will match one or more documents, causing a multi-update.
  * Both states use { multi: true, upsert: true }, but only one option will ever take effect,
  * depending on whether 0 or more than 0 documents match the query.
+ *
+ * @tags: [requires_non_retryable_writes]
  */
 var $config = (function() {
 
@@ -74,7 +76,8 @@ var $config = (function() {
         states: states,
         startState: 'insert',
         transitions: transitions,
-        data: {counter: 0},
+        // Shard by tid when run in a sharded cluster because upserts require the shard key.
+        data: {counter: 0, shardKey: {tid: 1}},
         setup: setup
     };
 
