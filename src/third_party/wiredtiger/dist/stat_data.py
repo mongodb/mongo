@@ -291,7 +291,9 @@ connection_stats = [
     ##########################################
     # Cursor operations
     ##########################################
-    CursorStat('cursor_cache', 'cursors cached on close'),
+    CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
+    CursorStat('cursor_cached_count', 'cached cursor count', 'no_clear,no_scale'),
+    CursorStat('cursor_cache', 'cursor close calls that result in cache'),
     CursorStat('cursor_create', 'cursor create calls'),
     CursorStat('cursor_insert', 'cursor insert calls'),
     CursorStat('cursor_modify', 'cursor modify calls'),
@@ -463,7 +465,6 @@ connection_stats = [
     ##########################################
     # Session operations
     ##########################################
-    SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
     SessionStat('session_open', 'open session count', 'no_clear,no_scale'),
     SessionStat('session_query_ts', 'session query timestamp calls'),
     SessionStat('session_table_alter_fail', 'table alter failed calls', 'no_clear,no_scale'),
@@ -691,7 +692,8 @@ dsrc_stats = [
     ##########################################
     # Cursor operations
     ##########################################
-    CursorStat('cursor_cache', 'cursors cached on close'),
+    CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
+    CursorStat('cursor_cache', 'close calls that result in cache'),
     CursorStat('cursor_create', 'create calls'),
     CursorStat('cursor_insert', 'insert calls'),
     CursorStat('cursor_insert_bulk', 'bulk-loaded cursor-insert calls'),
@@ -749,8 +751,6 @@ dsrc_stats = [
     # Session operations
     ##########################################
     SessionStat('session_compact', 'object compaction'),
-    SessionStat('session_cursor_cached', 'cached cursor count', 'no_clear,no_scale'),
-    SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
 
     ##########################################
     # Transaction statistics

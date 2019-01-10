@@ -1230,8 +1230,18 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	for (yield_cnt = 0; log->log_close_fh != NULL;) {
 		WT_STAT_CONN_INCR(session, log_close_yields);
+		/*
+		 * Processing slots will conditionally signal the file close
+		 * server thread. But if we've tried a while, signal the
+		 * thread directly here.
+		 */
 		__wt_log_wrlsn(session, NULL);
-		if (++yield_cnt > 10000)
+		if (++yield_cnt % WT_THOUSAND == 0) {
+			__wt_spin_unlock(session, &log->log_slot_lock);
+			__wt_cond_signal(session, conn->log_file_cond);
+			__wt_spin_lock(session, &log->log_slot_lock);
+		}
+		if (++yield_cnt > WT_THOUSAND * 10)
 			return (__wt_set_return(session, EBUSY));
 		__wt_yield();
 	}

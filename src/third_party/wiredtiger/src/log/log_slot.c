@@ -17,19 +17,22 @@ static void
 __log_slot_dump(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	int earliest, i;
 
 	conn = S2C(session);
 	log = conn->log;
+	ret = __wt_verbose_dump_log(session);
+	WT_ASSERT(session, ret == 0);
 	earliest = 0;
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		slot = &log->slot_pool[i];
 		if (__wt_log_cmp(&slot->slot_release_lsn,
 		    &log->slot_pool[earliest].slot_release_lsn) < 0)
 			earliest = i;
-		__wt_errx(session, "Slot %d:", i);
+		__wt_errx(session, "Slot %d (0x%p):", i, (void *)slot);
 		__wt_errx(session, "    State: %" PRIx64 " Flags: %" PRIx32,
 		    (uint64_t)slot->slot_state, slot->flags);
 		__wt_errx(session, "    Start LSN: %" PRIu32 "/%" PRIu32,
@@ -220,15 +223,6 @@ __log_slot_new(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
 	log = conn->log;
-	/*
-	 * Although this function is single threaded, multiple threads could
-	 * be trying to set a new active slot sequentially.  If we find an
-	 * active slot that is valid, return.
-	 */
-	if ((slot = log->active_slot) != NULL &&
-	    WT_LOG_SLOT_OPEN(slot->slot_state))
-		return (0);
-
 #ifdef	HAVE_DIAGNOSTIC
 	count = 0;
 	time_start = __wt_clock(session);
@@ -237,6 +231,16 @@ __log_slot_new(WT_SESSION_IMPL *session)
 	 * Keep trying until we can find a free slot.
 	 */
 	for (;;) {
+		/*
+		 * Although this function is single threaded, multiple threads
+		 * could be trying to set a new active slot sequentially.  If
+		 * we find an active slot that is valid, return. This check is
+		 * inside the loop because this function may release the lock
+		 * and needs to check again after acquiring it again.
+		 */
+		if ((slot = log->active_slot) != NULL &&
+		    WT_LOG_SLOT_OPEN(slot->slot_state))
+			return (0);
 		/*
 		 * Rotate among the slots to lessen collisions.
 		 */
@@ -264,10 +268,14 @@ __log_slot_new(WT_SESSION_IMPL *session)
 		}
 		/*
 		 * If we didn't find any free slots signal the worker thread.
+		 * Release the lock so that any threads waiting for it can
+		 * acquire and possibly move things forward.
 		 */
 		WT_STAT_CONN_INCR(session, log_slot_no_free_slots);
 		__wt_cond_signal(session, conn->log_wrlsn_cond);
+		__wt_spin_unlock(session, &log->log_slot_lock);
 		__wt_yield();
+		__wt_spin_lock(session, &log->log_slot_lock);
 #ifdef	HAVE_DIAGNOSTIC
 		++count;
 		if (count > WT_MILLION) {
