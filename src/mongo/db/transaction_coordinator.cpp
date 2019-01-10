@@ -69,13 +69,11 @@ CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
 
 }  // namespace
 
-TransactionCoordinator::TransactionCoordinator(ServiceContext* service,
-                                               executor::TaskExecutor* networkExecutor,
-                                               ThreadPool* callbackPool,
+TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                                                const LogicalSessionId& lsid,
                                                const TxnNumber& txnNumber)
-    : _service(service),
-      _driver(networkExecutor, callbackPool),
+    : _serviceContext(serviceContext),
+      _driver(serviceContext),
       _lsid(lsid),
       _txnNumber(txnNumber),
       _state(CoordinatorState::kInit) {}
@@ -120,7 +118,7 @@ Future<CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
             invariant(_state == CoordinatorState::kPreparing);
 
             auto decision =
-                makeDecisionFromPrepareVoteConsensus(_service, result, _lsid, _txnNumber);
+                makeDecisionFromPrepareVoteConsensus(_serviceContext, result, _lsid, _txnNumber);
 
             return _driver
                 .persistDecision(_lsid, _txnNumber, participantShards, decision.commitTimestamp)

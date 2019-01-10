@@ -35,7 +35,6 @@
 #include "mongo/db/transaction_coordinator_driver.h"
 
 #include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/dbdirectclient.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/transaction_coordinator_futures_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -70,103 +68,9 @@ const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
     WriteConcernOptions::SyncMode::UNSET,
     WriteConcernOptions::kNoTimeout);
 
-/**
- * Finds the host and port for a shard.
- */
-HostAndPort targetHost(const ShardId& shardId, const ReadPreferenceSetting& readPref) {
-    const auto opCtxHolder = cc().makeOperationContext();
-    const auto opCtx = opCtxHolder.get();
-    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-    // TODO SERVER-35678 return a SemiFuture<HostAndPort> rather than using a blocking call to
-    // get().
-    return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
-}
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
-/**
- * Finds the host and port for a shard.
- *
- * Possible errors: [ShardNotFound, ShutdownInProgress]
- *
- * TODO (SERVER-37880): Implement backoff for retries.
- */
-Future<HostAndPort> targetHostAsync(ThreadPool* pool,
-                                    const ShardId& shardId,
-                                    const ReadPreferenceSetting& readPref) {
-    return txn::doUntilSuccessOrOneOf({ErrorCodes::ShardNotFound, ErrorCodes::ShutdownInProgress},
-                                      [pool, shardId, readPref]() {
-                                          return txn::async(pool, [shardId, readPref]() {
-                                              return targetHost(shardId, readPref);
-                                          });
-                                      });
-}
-
-/**
- * Sends a command asynchronously to a shard using the given executor. The thread pool is used for
- * targeting the shard.
- *
- * If the command is sent successfully and a response is received, the resulting Future will contain
- * the ResponseStatus from the response.
- *
- * An error status is set on the resulting Future if any of the following occurs:
- *  - If the targeting the shard fails [Possible errors: ShardNotFound, ShutdownInProgress]
- *  - If the command cannot be scheduled to run on the executor [Possible errors:
- *    ShutdownInProgress, maybe others]
- *  - If a response is received that indicates that the destination shard was did not receive the
- *    command or could not process the command (e.g. because the command did not reach the shard due
- *    to a network issue) [Possible errors: Whatever the returned status is in the response]
- */
-Future<ResponseStatus> sendAsyncCommandToShard(executor::TaskExecutor* executor,
-                                               ThreadPool* pool,
-                                               const ShardId& shardId,
-                                               const BSONObj& commandObj) {
-
-    auto promiseAndFuture = makePromiseFuture<ResponseStatus>();
-    auto sharedPromise =
-        std::make_shared<Promise<ResponseStatus>>(std::move(promiseAndFuture.promise));
-
-    auto readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly);
-    targetHostAsync(pool, shardId, readPref)
-        .then([ executor, shardId, sharedPromise, commandObj = commandObj.getOwned(), readPref ](
-            HostAndPort shardHostAndPort) mutable {
-
-            LOG(3) << "Coordinator going to send command " << commandObj << " to shard " << shardId;
-
-            executor::RemoteCommandRequest request(
-                shardHostAndPort, "admin", commandObj, readPref.toContainingBSON(), nullptr);
-
-            auto swCallbackHandle = executor->scheduleRemoteCommand(
-                request, [ commandObj = commandObj.getOwned(),
-                           shardId,
-                           sharedPromise ](const RemoteCommandCallbackArgs& args) mutable {
-                    LOG(3) << "Coordinator shard got response " << args.response.data << " for "
-                           << commandObj << " to " << shardId;
-                    auto status = args.response.status;
-                    // Only consider actual failures to send the command as errors.
-                    if (status.isOK()) {
-                        sharedPromise->emplaceValue(args.response);
-                    } else {
-                        sharedPromise->setError(status);
-                    }
-                });
-
-            if (!swCallbackHandle.isOK()) {
-                LOG(3) << "Coordinator shard failed to schedule the task to send " << commandObj
-                       << " to shard " << shardId << causedBy(swCallbackHandle.getStatus());
-                sharedPromise->setError(swCallbackHandle.getStatus());
-            }
-        })
-        .onError([ shardId, commandObj = commandObj.getOwned(), sharedPromise ](Status s) {
-            LOG(3) << "Coordinator shard failed to target command " << commandObj << " to shard "
-                   << shardId << causedBy(s);
-
-            sharedPromise->setError(s);
-        })
-        .getAsync([](Status) {});
-
-    // Do not wait for the callback to run. The callback will reschedule the remote request on
-    // the same executor if necessary.
-    return std::move(promiseAndFuture.future);
-}
+const ReadPreferenceSetting kPrimaryReadPreference{ReadPreference::PrimaryOnly};
 
 bool isRetryableError(ErrorCodes::Error code) {
     // TODO (SERVER-37880): Consider using RemoteCommandRetryScheduler.
@@ -192,61 +96,6 @@ BSONArray buildParticipantListMatchesConditions(const std::vector<ShardId>& part
     return BSON_ARRAY(participantListContains << participantListHasSize);
 }
 
-/**
- * Processes a response from a participant to the prepareTransaction command. An OK response is
- * interpreted as a vote to commit, and the prepareTimestamp is extracted from the response and
- * returned. A response that indicates a vote to abort is interpreted as such, and a retryable error
- * will re-throw so that we can retry the prepare command.
- */
-PrepareResponse getCommitVoteFromPrepareResponse(const ShardId& shardId,
-                                                 const ResponseStatus& response) {
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
-    auto status = getStatusFromCommandResult(response.data);
-    auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
-
-    // There must be no write concern errors in order for us to be able to interpret the command
-    // response. As an example, it's possible for us to get NoSuchTransaction from a non-primary
-    // node of a shard, in which case we might also receive a write concern error but it can't be
-    // interpreted as a vote to abort.
-    if (!wcStatus.isOK()) {
-        status = wcStatus;
-    }
-
-    if (status.isOK()) {
-        auto prepareTimestampField = response.data["prepareTimestamp"];
-        if (prepareTimestampField.eoo() || prepareTimestampField.timestamp().isNull()) {
-            LOG(0) << "Coordinator shard received an OK response to prepareTransaction "
-                      "without a prepareTimestamp from shard "
-                   << shardId << ", which is not expected behavior. Interpreting the response from "
-                   << shardId << " as a vote to abort";
-            return PrepareResponse{shardId, PrepareVote::kAbort, boost::none};
-        }
-
-        LOG(3) << "Coordinator shard received a vote to commit from shard " << shardId
-               << " with prepareTimestamp: " << prepareTimestampField.timestamp();
-
-        return PrepareResponse{shardId, PrepareVote::kCommit, prepareTimestampField.timestamp()};
-    } else if (ErrorCodes::isVoteAbortError(status.code())) {
-        LOG(3) << "Coordinator shard received a vote to abort from shard " << shardId;
-        return PrepareResponse{shardId, PrepareVote::kAbort, boost::none};
-    } else if (isRetryableError(status.code())) {
-        LOG(3) << "Coordinator shard received a retryable error in response to prepareTransaction "
-                  "from shard "
-               << shardId << causedBy(status);
-
-        // Rethrow error so that we retry.
-        uassertStatusOK(status);
-    } else {
-        // Non-retryable errors lead to an abort decision.
-        LOG(3)
-            << "Coordinator shard received a non-retryable error in response to prepareTransaction "
-               "from shard "
-            << shardId << causedBy(status);
-        return PrepareResponse{shardId, PrepareVote::kAbort, boost::none};
-    }
-    MONGO_UNREACHABLE;
-}
-
 std::string buildParticipantListString(const std::vector<ShardId>& participantList) {
     StringBuilder ss;
     ss << "[";
@@ -259,9 +108,8 @@ std::string buildParticipantListString(const std::vector<ShardId>& participantLi
 
 }  // namespace
 
-TransactionCoordinatorDriver::TransactionCoordinatorDriver(executor::TaskExecutor* executor,
-                                                           ThreadPool* pool)
-    : _executor(executor), _pool(pool) {}
+TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* service)
+    : _scheduler(service) {}
 
 TransactionCoordinatorDriver::~TransactionCoordinatorDriver() = default;
 
@@ -358,9 +206,8 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::persistParticipantList(
     const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
-    return txn::async(_pool, [lsid, txnNumber, participantList] {
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        persistParticipantListBlocking(opCtx.get(), lsid, txnNumber, participantList);
+    return _scheduler.scheduleWork([lsid, txnNumber, participantList](OperationContext* opCtx) {
+        persistParticipantListBlocking(opCtx, lsid, txnNumber, participantList);
     });
 }
 
@@ -400,18 +247,19 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
 
             switch (*next.vote) {
                 case PrepareVote::kAbort:
-                    LOG(3) << "Transaction coordinator received a vote to abort from shard "
-                           << next.participantShardId;
+                    if (result.decision == CommitDecision::kAbort) {
+                        LOG(3) << "Ignoring vote to abort from shard " << next.participantShardId
+                               << " because a vote to abort has already been received";
+                        break;
+                    }
                     result.decision = CommitDecision::kAbort;
                     result.maxPrepareTimestamp = boost::none;
                     cancel();
                     break;
                 case PrepareVote::kCommit:
-                    LOG(3) << "Transaction coordinator received a vote to commit from shard "
-                           << next.participantShardId;
                     if (result.decision == CommitDecision::kAbort) {
-                        LOG(3) << "Ignoring commmit decision from shard " << next.participantShardId
-                               << " because abort decision was received previously";
+                        LOG(3) << "Ignoring vote to commit from shard " << next.participantShardId
+                               << " because a vote to abort has already been received";
                         break;
                     }
 
@@ -544,10 +392,10 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
     TxnNumber txnNumber,
     std::vector<ShardId> participantList,
     const boost::optional<Timestamp>& commitTimestamp) {
-    return txn::async(_pool, [lsid, txnNumber, participantList, commitTimestamp] {
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        persistDecisionBlocking(opCtx.get(), lsid, txnNumber, participantList, commitTimestamp);
-    });
+    return _scheduler.scheduleWork(
+        [lsid, txnNumber, participantList, commitTimestamp](OperationContext* opCtx) {
+            persistDecisionBlocking(opCtx, lsid, txnNumber, participantList, commitTimestamp);
+        });
 }
 
 Future<void> TransactionCoordinatorDriver::sendCommit(const std::vector<ShardId>& participantShards,
@@ -654,9 +502,8 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSessionId& lsid,
                                                                 TxnNumber txnNumber) {
-    return txn::async(_pool, [lsid, txnNumber] {
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        deleteCoordinatorDocBlocking(opCtx.get(), lsid, txnNumber);
+    return _scheduler.scheduleWork([lsid, txnNumber](OperationContext* opCtx) {
+        deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
     });
 }
 
@@ -681,75 +528,109 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
 }
 
 Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
-    const ShardId& shardId, const BSONObj& prepareCommandObj) {
-    return sendAsyncCommandToShard(_executor, _pool, shardId, prepareCommandObj)
-        .then([shardId](ResponseStatus response) {
-            return getCommitVoteFromPrepareResponse(shardId, response);
-        })
-        .onError<ErrorCodes::ShardNotFound>([shardId](const Status& s) {
-            // ShardNotFound indicates a participant shard was removed, so that is interpreted as an
-            // abort decision
-            return Future<PrepareResponse>::makeReady(
-                {shardId, CommitDecision::kAbort, boost::none});
-        })
-        .onError(
-            [ this, shardId, prepareCommandObj = prepareCommandObj.getOwned() ](Status status) {
-                if (!isRetryableError(status.code()))
+    const ShardId& shardId, const BSONObj& commandObj) {
+    return txn::doWhile(
+        _scheduler,
+        kExponentialBackoff,
+        [](StatusWith<PrepareResponse> s) { return isRetryableError(s.getStatus().code()); },
+        [ this, shardId, commandObj = commandObj.getOwned() ] {
+            return _scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
+                .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
+                    auto status = getStatusFromCommandResult(response.data);
+                    auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
+
+                    // There must be no writeConcern error in order for us to interpret the command
+                    // response.
+                    if (!wcStatus.isOK()) {
+                        status = wcStatus;
+                    }
+
+                    if (status.isOK()) {
+                        auto prepareTimestampField = response.data["prepareTimestamp"];
+                        if (prepareTimestampField.eoo() ||
+                            prepareTimestampField.timestamp().isNull()) {
+                            LOG(0) << "Coordinator shard received an OK response to "
+                                      "prepareTransaction "
+                                      "without a prepareTimestamp from shard "
+                                   << shardId << ", which is not expected behavior. "
+                                                 "Interpreting the response from "
+                                   << shardId << " as a vote to abort";
+                            return PrepareResponse{shardId, PrepareVote::kAbort, boost::none};
+                        }
+
+                        LOG(3) << "Coordinator shard received a vote to commit from shard "
+                               << shardId
+                               << " with prepareTimestamp: " << prepareTimestampField.timestamp();
+                        return PrepareResponse{
+                            shardId, PrepareVote::kCommit, prepareTimestampField.timestamp()};
+                    }
+
+                    LOG(3) << "Coordinator shard received " << status << " from shard " << shardId
+                           << " for " << commandObj;
+                    if (ErrorCodes::isVoteAbortError(status.code())) {
+                        return PrepareResponse{shardId, PrepareVote::kAbort, boost::none};
+                    }
+
                     uassertStatusOK(status);
-
-                if (_cancelled.loadRelaxed()) {
-                    LOG(3) << "Prepare stopped retrying due to retrying being cancelled";
-                    return Future<PrepareResponse>::makeReady({shardId, boost::none, boost::none});
-                }
-
-                return sendPrepareToShard(shardId, prepareCommandObj);
-            });
+                    MONGO_UNREACHABLE;
+                })
+                .onError<ErrorCodes::ShardNotFound>([shardId](const Status& s) {
+                    // ShardNotFound may indicate that the participant shard has been removed (it
+                    // could also mean the participant shard was recently added and this node
+                    // refreshed its ShardRegistry from a stale config secondary).
+                    //
+                    // Since this node can't know which is the case, it is safe to pessimistically
+                    // treat ShardNotFound as a vote to abort, which is always safe since the node
+                    // must then send abort.
+                    return Future<PrepareResponse>::makeReady(
+                        {shardId, CommitDecision::kAbort, boost::none});
+                })
+                .onError([this, shardId](const Status& status) {
+                    if (_cancelled.loadRelaxed()) {
+                        LOG(3) << "Prepare stopped retrying due to retrying being cancelled";
+                        return PrepareResponse{shardId, boost::none, boost::none};
+                    }
+                    uassertStatusOK(status);
+                    MONGO_UNREACHABLE;
+                });
+        });
 }
 
-// TODO (SERVER-37880): Implement backoff for retries and only retry commands on retryable
-// errors.
 Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
     const ShardId& shardId, const BSONObj& commandObj) {
-    return sendAsyncCommandToShard(_executor, _pool, shardId, commandObj)
-        .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
-            auto status = getStatusFromCommandResult(response.data);
-            auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
+    return txn::doWhile(
+        _scheduler,
+        kExponentialBackoff,
+        [](const Status& s) { return isRetryableError(s.code()); },
+        [ this, shardId, commandObj = commandObj.getOwned() ] {
+            return _scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
+                .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
+                    auto status = getStatusFromCommandResult(response.data);
+                    auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
 
-            // There must be no write concern errors in order for us to be able to interpret the
-            // command response
-            if (!wcStatus.isOK()) {
-                status = wcStatus;
-            }
+                    // There must be no writeConcern error in order for us to interpret the command
+                    // response.
+                    if (!wcStatus.isOK()) {
+                        status = wcStatus;
+                    }
 
-            if (status.isOK()) {
-                LOG(3) << "Coordinator shard received OK in response to " << commandObj
-                       << "from shard " << shardId;
-                return Status::OK();
-            } else if (ErrorCodes::isVoteAbortError(status.code())) {
-                LOG(3) << "Coordinator shard received a vote abort error in response to "
-                       << commandObj << "from shard " << shardId << causedBy(status)
-                       << ", interpreting as a successful ack";
+                    LOG(3) << "Coordinator shard received " << status << " in response to "
+                           << commandObj << " from shard " << shardId;
 
-                return Status::OK();
-            } else {
-                return status;
-            }
-        })
-        .onError(
-            [ this, shardId, commandObj = commandObj.getOwned() ](Status status)->Future<void> {
-                if (isRetryableError(status.code())) {
-                    LOG(3) << "Coordinator shard received a retryable error in response to "
-                           << commandObj << "from shard " << shardId << causedBy(status)
-                           << ", resending command.";
-
-                    return sendDecisionToParticipantShard(shardId, commandObj);
-                } else {
-                    LOG(3) << "Coordinator shard received a non-retryable error in response to "
-                           << commandObj << "from shard " << shardId << causedBy(status);
+                    if (ErrorCodes::isVoteAbortError(status.code())) {
+                        // Interpret voteAbort errors as an ack.
+                        status = Status::OK();
+                    }
 
                     return status;
-                }
-            });
+                })
+                .onError<ErrorCodes::ShardNotFound>([](const Status& s) {
+                    // TODO (SERVER-38918): Unlike for prepare, there is no pessimistic way to
+                    // handle ShardNotFound. It's not safe to treat ShardNotFound as an ack, because
+                    // this node may have refreshed its ShardRegistry from a stale config secondary.
+                    MONGO_UNREACHABLE;
+                });
+        });
 }
 
 void TransactionCoordinatorDriver::cancel() {

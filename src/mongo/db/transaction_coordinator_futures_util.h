@@ -36,7 +36,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 
@@ -241,27 +241,6 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
 }
 
 /**
- * A thin wrapper around ThreadPool::schedule that returns a future that will be resolved on the
- * completion of the task or rejected if the task errors.
- */
-template <class Callable>
-Future<FutureContinuationResult<Callable>> async(ThreadPool* pool, Callable&& task) {
-    using ReturnType = decltype(task());
-    auto pf = makePromiseFuture<ReturnType>();
-    auto taskCompletionPromise = std::make_shared<Promise<ReturnType>>(std::move(pf.promise));
-    auto scheduleStatus = pool->schedule(
-        [ task = std::forward<Callable>(task), taskCompletionPromise ]() mutable noexcept {
-            taskCompletionPromise->setWith(task);
-        });
-
-    if (!scheduleStatus.isOK()) {
-        taskCompletionPromise->setError(scheduleStatus);
-    }
-
-    return std::move(pf.future);
-}
-
-/**
  * Returns a future that will be resolved when all of the input futures have resolved, or rejected
  * when any of the futures is rejected.
  */
@@ -298,28 +277,6 @@ Future<FutureContinuationResult<LoopBodyFn>> doWhile(AsyncWorkScheduler& schedul
             return doWhile(scheduler, std::move(backoff), std::move(shouldRetryFn), std::move(f));
         });
     });
-}
-
-/**
- * Executes a function returning a Future until the function does not return an error status or
- * until one of the provided error codes is returned.
- *
- * TODO (SERVER-37880): Implement backoff for retries.
- */
-template <class Callable>
-Future<FutureContinuationResult<Callable>> doUntilSuccessOrOneOf(
-    std::set<ErrorCodes::Error>&& errorsToHaltOn, Callable&& f) {
-    auto future = f();
-    return std::move(future).onError(
-        [ errorsToHaltOn = std::move(errorsToHaltOn),
-          f = std::forward<Callable>(f) ](Status s) mutable {
-            // If this error is one of the errors we should halt on, rethrow the error and don't
-            // retry.
-            if (errorsToHaltOn.find(s.code()) != errorsToHaltOn.end()) {
-                uassertStatusOK(s);
-            }
-            return doUntilSuccessOrOneOf(std::move(errorsToHaltOn), std::forward<Callable>(f));
-        });
 }
 
 }  // namespace txn

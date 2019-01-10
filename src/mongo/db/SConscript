@@ -727,6 +727,7 @@ env.CppUnitTest(
         'transaction_coordinator_catalog_test.cpp',
         'transaction_coordinator_futures_util_test.cpp',
         'transaction_coordinator_service_test.cpp',
+        'transaction_coordinator_test_fixture.cpp',
         'transaction_coordinator_test.cpp',
     ],
     LIBDEPS=[

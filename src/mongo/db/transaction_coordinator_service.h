@@ -35,7 +35,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/transaction_coordinator_catalog.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -50,16 +49,6 @@ class TransactionCoordinatorService final {
 public:
     TransactionCoordinatorService();
     ~TransactionCoordinatorService() = default;
-
-    /**
-     * Starts up the thread pool used for executing commits.
-     */
-    void startup();
-
-    /**
-     * Shuts down and joins the thread pool used for executing commits.
-     */
-    void shutdown();
 
     /**
      * Retrieves the TransactionCoordinatorService associated with the service or operation context.
@@ -111,17 +100,10 @@ public:
      *    async task to continue coordinating its commit.
      */
     void onStepUp(OperationContext* opCtx);
-
-    /*
-     * Shuts down and joins the original thread pool, then sets the thread pool to 'pool' and starts
-     * 'pool'.
-     */
-    void setThreadPoolForTest(std::unique_ptr<ThreadPool> pool);
+    void onStepDown(OperationContext* opCtx);
 
 private:
     std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
-
-    std::unique_ptr<ThreadPool> _threadPool;
 };
 
 }  // namespace mongo

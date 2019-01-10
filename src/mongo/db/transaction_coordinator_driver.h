@@ -35,11 +35,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/transaction_coordinator_document_gen.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
+#include "mongo/db/transaction_coordinator_futures_util.h"
 
 namespace mongo {
 namespace txn {
@@ -91,7 +87,7 @@ class TransactionCoordinatorDriver {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorDriver);
 
 public:
-    TransactionCoordinatorDriver(executor::TaskExecutor* executor, ThreadPool* pool);
+    TransactionCoordinatorDriver(ServiceContext* service);
     ~TransactionCoordinatorDriver();
 
     /**
@@ -230,18 +226,7 @@ public:
     Future<void> sendDecisionToParticipantShard(const ShardId& shardId, const BSONObj& commandObj);
 
 private:
-    /**
-     * A task executor used to execute all network requests used to send messages to participants.
-     * The only current networking that may occur outside of this is when targeting a shard to find
-     * its host and port.
-     */
-    executor::TaskExecutor* const _executor;
-
-    /**
-     * A thread pool used to execute any code that should be non-blocking, e.g. persisting the
-     * participant list or the commit decision to disk.
-     */
-    ThreadPool* const _pool;
+    txn::AsyncWorkScheduler _scheduler;
 
     // TODO (SERVER-38522): Remove once AsyncWorkScheduler is used for cancellation
     AtomicWord<bool> _cancelled{false};

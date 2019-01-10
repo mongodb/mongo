@@ -253,6 +253,11 @@ public:
     Date_t runUntil(Date_t until);
 
     /**
+     * Runs the simulator forward until now() == until.
+     */
+    void advanceTime(Date_t newTime);
+
+    /**
      * Processes all ready, scheduled network operations.
      *
      * Will not return until the executor thread is blocked in waitForWorkUntil or waitForWork.

@@ -73,7 +73,6 @@ void recoverDecisionFromLocalParticipantOrAbortLocalParticipant(OperationContext
 
         // The local participant's txnNumber matched the request's txnNumber, and the txnNumber
         // corresponds to a transaction (not a retryable write).
-
         if (txnParticipant->transactionIsCommitted()) {
             return;
         }
@@ -82,8 +81,12 @@ void recoverDecisionFromLocalParticipantOrAbortLocalParticipant(OperationContext
     } catch (const DBException& e) {
         // Convert a PreparedTransactionInProgress error to an anonymous error code.
         uassert(51021,
-                "coordinateCommitTransaction command found local participant is prepared but no "
-                "active coordinator exists",
+                str::stream() << "coordinateCommitTransaction found local participant for "
+                              << opCtx->getLogicalSessionId()->getId()
+                              << ":"
+                              << *opCtx->getTxnNumber()
+                              << " is prepared but no "
+                                 "active coordinator exists",
                 e.code() != ErrorCodes::PreparedTransactionInProgress);
         throw;
     }

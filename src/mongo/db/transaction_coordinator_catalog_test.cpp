@@ -31,10 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/transaction_coordinator_catalog.h"
-
-#include <boost/optional/optional_io.hpp>
-
-#include "mongo/db/transaction_coordinator.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -73,11 +69,8 @@ public:
     void createCoordinatorInCatalog(OperationContext* opCtx,
                                     LogicalSessionId lsid,
                                     TxnNumber txnNumber) {
-        auto newCoordinator = std::make_shared<TransactionCoordinator>(getServiceContext(),
-                                                                       nullptr /* TaskExecutor */,
-                                                                       nullptr /* ThreadPool */,
-                                                                       lsid,
-                                                                       txnNumber);
+        auto newCoordinator =
+            std::make_shared<TransactionCoordinator>(getServiceContext(), lsid, txnNumber);
 
         coordinatorCatalog().insert(opCtx, lsid, txnNumber, newCoordinator);
         _coordinatorsForTest.push_back(newCoordinator);

@@ -31,36 +31,23 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_service.h"
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/transaction_coordinator_service.h"
+#include "mongo/db/transaction_coordinator_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
-const std::set<ShardId> kTwoShardIdSet{{"s1"}, {"s2"}};
-const std::vector<ShardId> kThreeShardIdList{{"s1"}, {"s2"}, {"s3"}};
-const std::set<ShardId> kThreeShardIdSet{{"s1"}, {"s2"}, {"s3"}};
 const Timestamp kDummyTimestamp = Timestamp::min();
 const Date_t kCommitDeadline = Date_t::max();
 
 const BSONObj kDummyWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
                                                     << "dummy");
 
-const StatusWith<BSONObj> kRetryableError = {ErrorCodes::HostUnreachable, ""};
 const StatusWith<BSONObj> kNoSuchTransactionAndWriteConcernError =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction << "writeConcernError"
               << kDummyWriteConcernError);
@@ -76,81 +63,8 @@ const StatusWith<BSONObj> kPrepareOkButWriteConcernError =
     BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1) << "writeConcernError"
               << kDummyWriteConcernError);
 
-HostAndPort makeHostAndPort(const ShardId& shardId) {
-    return HostAndPort(str::stream() << shardId << ":123");
-}
-
-/**
- * Constructs the default options for the thread pool used to run commit.
- */
-ThreadPool::Options makeSingleThreadedThreadPoolForTest() {
-    ThreadPool::Options options;
-    options.poolName = "TransactionCoordinatorService";
-    options.minThreads = 0;
-    options.maxThreads = 1;
-
-    // Ensure all threads have a client
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-    return options;
-}
-
-class TransactionCoordinatorServiceTest : public ShardServerTestFixture {
+class TransactionCoordinatorServiceTest : public TransactionCoordinatorTestFixture {
 public:
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-
-        // Use a thread pool with a maxThreads=1 so that the unit tests can expect tasks to be run
-        // in a deterministic order.
-        TransactionCoordinatorService::get(operationContext())
-            ->setThreadPoolForTest(
-                std::make_unique<ThreadPool>(makeSingleThreadedThreadPoolForTest()));
-
-        ASSERT_OK(ServerParameterSet::getGlobal()
-                      ->getMap()
-                      .find("logComponentVerbosity")
-                      ->second->setFromString("{verbosity: 3}"));
-
-        for (const auto& shardId : kThreeShardIdList) {
-            auto shardTargeter = RemoteCommandTargeterMock::get(
-                uassertStatusOK(shardRegistry()->getShard(operationContext(), shardId))
-                    ->getTargeter());
-            shardTargeter->setFindHostReturnValue(makeHostAndPort(shardId));
-        }
-    }
-
-    void tearDown() override {
-        // Join the original thread pool and replace it with a new one, because tasks in the pool
-        // may call getGlobalServiceContext, which is set to nullptr before the ServiceContext's
-        // destructor (which ordinarily joins the thread pool) is invoked.
-        TransactionCoordinatorService::get(operationContext())
-            ->setThreadPoolForTest(
-                std::make_unique<ThreadPool>(makeSingleThreadedThreadPoolForTest()));
-        ShardServerTestFixture::tearDown();
-    }
-
-    void assertCommandSentAndRespondWith(const StringData& commandName,
-                                         const StatusWith<BSONObj>& response,
-                                         const BSONObj& expectedWriteConcern) {
-        log() << "Mock storage layer waiting for command " << commandName;
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            if (response.isOK()) {
-                log() << "Got command " << request.cmdObj.firstElement().fieldNameStringData()
-                      << " and responding with " << response.getValue();
-            } else {
-                log() << "Got command " << request.cmdObj.firstElement().fieldNameStringData()
-                      << " and responding with " << response.getStatus();
-            }
-            ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), commandName);
-
-            ASSERT_BSONOBJ_EQ(
-                expectedWriteConcern,
-                request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
-            return response;
-        });
-    }
-
     // Prepare responses
 
     void assertPrepareSentAndRespondWithSuccess() {
@@ -163,6 +77,7 @@ public:
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOkButWriteConcernError,
                                         WriteConcernOptions::InternalMajorityNoSnapshot);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
@@ -175,6 +90,7 @@ public:
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kNoSuchTransactionAndWriteConcernError,
                                         WriteConcernOptions::InternalMajorityNoSnapshot);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     // Abort responses
@@ -186,6 +102,7 @@ public:
     void assertAbortSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(
             "abortTransaction", kOkButWriteConcernError, WriteConcernOptions::Majority);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     void assertAbortSentAndRespondWithNoSuchTransaction() {
@@ -197,6 +114,7 @@ public:
         assertCommandSentAndRespondWith("abortTransaction",
                                         kNoSuchTransactionAndWriteConcernError,
                                         WriteConcernOptions::Majority);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     // Commit responses
@@ -210,11 +128,13 @@ public:
         assertCommandSentAndRespondWith(CommitTransaction::kCommandName,
                                         kOkButWriteConcernError,
                                         WriteConcernOptions::Majority);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     void assertCommitSentAndRespondWithRetryableError() {
         assertCommandSentAndRespondWith(
             CommitTransaction::kCommandName, kRetryableError, WriteConcernOptions::Majority);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     // Other
@@ -272,35 +192,6 @@ public:
 
         // Wait for abort to complete.
         commitDecisionFuture.get();
-    }
-
-    // Override the CatalogClient to make CatalogClient::getAllShards automatically return the
-    // expected shards. We cannot mock the network responses for the ShardRegistry reload, since the
-    // ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
-    // DBClientMock analogous to the NetworkInterfaceMock.
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
-
-        class StaticCatalogClient final : public ShardingCatalogClientMock {
-        public:
-            StaticCatalogClient() : ShardingCatalogClientMock(nullptr) {}
-
-            StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-                OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
-                std::vector<ShardType> shardTypes;
-                for (const auto& shardId : kThreeShardIdList) {
-                    const ConnectionString cs = ConnectionString::forReplicaSet(
-                        shardId.toString(), {makeHostAndPort(shardId)});
-                    ShardType sType;
-                    sType.setName(cs.getSetName());
-                    sType.setHost(cs.toString());
-                    shardTypes.push_back(std::move(sType));
-                };
-                return repl::OpTimeWith<std::vector<ShardType>>(shardTypes);
-            }
-        };
-
-        return stdx::make_unique<StaticCatalogClient>();
     }
 
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
@@ -613,7 +504,7 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // Reach the deadline.
     network()->enterNetwork();
-    network()->runUntil(deadline);
+    network()->advanceTime(deadline);
     network()->exitNetwork();
 
     // The coordinator should no longer exist.
@@ -635,7 +526,7 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // Reach the deadline.
     network()->enterNetwork();
-    network()->runUntil(deadline);
+    network()->advanceTime(deadline);
     network()->exitNetwork();
 
     // The coordinator should still exist.

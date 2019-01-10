@@ -44,9 +44,7 @@ class TransactionCoordinator {
     MONGO_DISALLOW_COPYING(TransactionCoordinator);
 
 public:
-    TransactionCoordinator(ServiceContext* service,
-                           executor::TaskExecutor* networkExecutor,
-                           ThreadPool* callbackPool,
+    TransactionCoordinator(ServiceContext* serviceContext,
                            const LogicalSessionId& lsid,
                            const TxnNumber& txnNumber);
     ~TransactionCoordinator();
@@ -166,7 +164,7 @@ private:
     void _transitionToDone(stdx::unique_lock<stdx::mutex> lk) noexcept;
 
     // Shortcut to the service context under which this coordinator runs
-    ServiceContext* const _service;
+    ServiceContext* const _serviceContext;
 
     // Context object used to perform and track the state of asynchronous operations on behalf of
     // this coordinator.

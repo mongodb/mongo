@@ -35,31 +35,14 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/transaction_coordinator.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/s/shard_server_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/db/transaction_coordinator_test_fixture.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-using PrepareResponse = txn::PrepareResponse;
-
-const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
-const std::set<ShardId> kTwoShardIdSet{{"s1"}, {"s2"}};
-const std::vector<ShardId> kThreeShardIdList{{"s1"}, {"s2"}, {"s3"}};
-const std::set<ShardId> kThreeShardIdSet{{"s1"}, {"s2"}, {"s3"}};
 const Timestamp kDummyTimestamp = Timestamp::min();
 const Date_t kCommitDeadline = Date_t::max();
-const Status kRetryableError(ErrorCodes::HostUnreachable, "Retryable error for test");
 const StatusWith<BSONObj> kNoSuchTransaction =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
@@ -74,69 +57,8 @@ StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp) {
 
 const StatusWith<BSONObj> kPrepareOk = makePrepareOkResponse(kDummyPrepareTimestamp);
 
-HostAndPort makeHostAndPort(const ShardId& shardId) {
-    return HostAndPort(str::stream() << shardId << ":123");
-}
-
-/**
- * Constructs the default options for the thread pool used to run commit.
- */
-ThreadPool::Options makeDefaultThreadPoolOptions() {
-    ThreadPool::Options options;
-    options.poolName = "TransactionCoordinatorService";
-    options.minThreads = 0;
-    options.maxThreads = 1;
-
-    // Ensure all threads have a client
-    options.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-    return options;
-}
-
-class TransactionCoordinatorTestBase : public ShardServerTestFixture {
+class TransactionCoordinatorTestBase : public TransactionCoordinatorTestFixture {
 protected:
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-
-        ASSERT_OK(ServerParameterSet::getGlobal()
-                      ->getMap()
-                      .find("logComponentVerbosity")
-                      ->second->setFromString("{verbosity: 3}"));
-
-        for (const auto& shardId : kThreeShardIdList) {
-            auto shardTargeter = RemoteCommandTargeterMock::get(
-                uassertStatusOK(shardRegistry()->getShard(operationContext(), shardId))
-                    ->getTargeter());
-            shardTargeter->setFindHostReturnValue(makeHostAndPort(shardId));
-        }
-
-        _pool = std::make_unique<ThreadPool>(makeDefaultThreadPoolOptions());
-        _pool->startup();
-        _executor = Grid::get(getServiceContext())->getExecutorPool()->getFixedExecutor();
-    }
-
-    void tearDown() override {
-        _pool->shutdown();
-        _pool.reset();
-
-        ShardServerTestFixture::tearDown();
-    }
-
-    void assertCommandSentAndRespondWith(const StringData& commandName,
-                                         const StatusWith<BSONObj>& response,
-                                         boost::optional<BSONObj> expectedWriteConcern) {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), commandName);
-            if (expectedWriteConcern) {
-                ASSERT_BSONOBJ_EQ(
-                    *expectedWriteConcern,
-                    request.cmdObj.getObjectField(WriteConcernOptions::kWriteConcernField));
-            }
-            return response;
-        });
-    }
-
     void assertPrepareSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOk,
@@ -159,6 +81,7 @@ protected:
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kRetryableError,
                                         WriteConcernOptions::InternalMajorityNoSnapshot);
+        advanceClockAndExecuteScheduledTasks();
     }
 
     void assertAbortSentAndRespondWithSuccess() {
@@ -214,48 +137,15 @@ protected:
         //    commitDecisionFuture.get();
     }
 
-    // Override the CatalogClient to make CatalogClient::getAllShards automatically return the
-    // expected shards. We cannot mock the network responses for the ShardRegistry reload, since the
-    // ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
-    // DBClientMock analogous to the NetworkInterfaceMock.
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
-
-        class StaticCatalogClient final : public ShardingCatalogClientMock {
-        public:
-            StaticCatalogClient() : ShardingCatalogClientMock(nullptr) {}
-
-            StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-                OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
-                std::vector<ShardType> shardTypes;
-                for (const auto& shardId : kThreeShardIdList) {
-                    const ConnectionString cs = ConnectionString::forReplicaSet(
-                        shardId.toString(), {makeHostAndPort(shardId)});
-                    ShardType sType;
-                    sType.setName(cs.getSetName());
-                    sType.setHost(cs.toString());
-                    shardTypes.push_back(std::move(sType));
-                };
-                return repl::OpTimeWith<std::vector<ShardType>>(shardTypes);
-            }
-        };
-
-        return stdx::make_unique<StaticCatalogClient>();
-    }
-
-    std::unique_ptr<ThreadPool> _pool;
-    executor::TaskExecutor* _executor;
-
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
     TxnNumber _txnNumber{1};
 };
-
 
 class TransactionCoordinatorDriverTest : public TransactionCoordinatorTestBase {
 protected:
     void setUp() override {
         TransactionCoordinatorTestBase::setUp();
-        _driver.emplace(_executor, _pool.get());
+        _driver.emplace(getServiceContext());
     }
 
     void tearDown() override {
@@ -282,20 +172,21 @@ TEST_F(TransactionCoordinatorDriverTest, SendDecisionToParticipantShardReturnsOn
     Future<void> future = _driver->sendDecisionToParticipantShard(
         kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
-    std::move(future).getAsync([](Status s) { ASSERT(s.isOK()); });
-
     assertPrepareSentAndRespondWithSuccess();
+    future.get(operationContext());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
        SendDecisionToParticipantShardReturnsSuccessAfterOneFailureAndThenSuccess) {
     Future<void> future = _driver->sendDecisionToParticipantShard(
         kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
-
-    std::move(future).getAsync([](Status s) { ASSERT(s.isOK()); });
+    ASSERT(!future.isReady());
 
     assertPrepareSentAndRespondWithRetryableError();
+    ASSERT(!future.isReady());
+
     assertPrepareSentAndRespondWithSuccess();
+    future.get(operationContext());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -772,8 +663,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 using TransactionCoordinatorTest = TransactionCoordinatorTestBase;
 
 TEST_F(TransactionCoordinatorTest, RunCommitReturnsCorrectCommitDecisionOnAbort) {
-    TransactionCoordinator coordinator(
-        getServiceContext(), _executor, _pool.get(), _lsid, _txnNumber);
+    TransactionCoordinator coordinator(getServiceContext(), _lsid, _txnNumber);
     auto commitDecisionFuture = coordinator.runCommit(kTwoShardIdList);
 
     // Simulate a participant voting to abort.
@@ -790,8 +680,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitReturnsCorrectCommitDecisionOnAbort)
 }
 
 TEST_F(TransactionCoordinatorTest, RunCommitReturnsCorrectCommitDecisionOnCommit) {
-    TransactionCoordinator coordinator(
-        getServiceContext(), _executor, _pool.get(), _lsid, _txnNumber);
+    TransactionCoordinator coordinator(getServiceContext(), _lsid, _txnNumber);
     auto commitDecisionFuture = coordinator.runCommit(kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
@@ -808,8 +697,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitReturnsCorrectCommitDecisionOnCommit
 
 TEST_F(TransactionCoordinatorTest,
        RunCommitReturnsCorrectCommitDecisionOnAbortAfterNetworkRetriesOneParticipantAborts) {
-    TransactionCoordinator coordinator(
-        getServiceContext(), _executor, _pool.get(), _lsid, _txnNumber);
+    TransactionCoordinator coordinator(getServiceContext(), _lsid, _txnNumber);
     auto commitDecisionFuture = coordinator.runCommit(kTwoShardIdList);
 
     // One participant votes abort after retry.
@@ -830,8 +718,7 @@ TEST_F(TransactionCoordinatorTest,
 
 TEST_F(TransactionCoordinatorTest,
        RunCommitReturnsCorrectCommitDecisionOnAbortAfterNetworkRetriesBothParticipantsAbort) {
-    TransactionCoordinator coordinator(
-        getServiceContext(), _executor, _pool.get(), _lsid, _txnNumber);
+    TransactionCoordinator coordinator(getServiceContext(), _lsid, _txnNumber);
     auto commitDecisionFuture = coordinator.runCommit(kTwoShardIdList);
 
     // One participant votes abort after retry.
@@ -852,8 +739,7 @@ TEST_F(TransactionCoordinatorTest,
 
 TEST_F(TransactionCoordinatorTest,
        RunCommitReturnsCorrectCommitDecisionOnCommitAfterNetworkRetries) {
-    TransactionCoordinator coordinator(
-        getServiceContext(), _executor, _pool.get(), _lsid, _txnNumber);
+    TransactionCoordinator coordinator(getServiceContext(), _lsid, _txnNumber);
     auto commitDecisionFuture = coordinator.runCommit(kTwoShardIdList);
 
     // One participant votes commit after retry.
