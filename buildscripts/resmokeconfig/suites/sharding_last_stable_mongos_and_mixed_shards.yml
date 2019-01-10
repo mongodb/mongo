@@ -87,9 +87,6 @@ selector:
   - jstests/sharding/sharding_statistics_server_status.js
   # Enable if SERVER-36966 is backported or 4.2 becomes last-stable
   - jstests/sharding/mr_output_sharded_validation.js
-  # TODO: SERVER-38750 remove from blacklist
-  - jstests/sharding/shard_collection_basic.js
-  - jstests/sharding/enable_sharding_basic.js
 executor:
   config:
     shell_options:
