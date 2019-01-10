@@ -248,6 +248,7 @@ TEST_F(StitchSupportTest, TestUpdatePullFromArray) {
     ASSERT_EQ(getModifiedPaths(), "[a]");
 }
 
+#if 0
 TEST_F(StitchSupportTest, TestPositionalUpdates) {
     checkUpdate("{$set: {'a.$': 3}}", "{a: [1, 2]}", fromjson("{a: [1, 3]}"), "{a: 2}");
     ASSERT_EQ(getModifiedPaths(), "[a.1]");
@@ -258,6 +259,7 @@ TEST_F(StitchSupportTest, TestPositionalUpdates) {
                 "{'a.b': 2}");
     ASSERT_EQ(getModifiedPaths(), "[a.1.b]");
 }
+#endif  // 0
 
 TEST_F(StitchSupportTest, TestUpdatesWithArrayFilters) {
     checkUpdate(
