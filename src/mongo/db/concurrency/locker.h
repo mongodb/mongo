@@ -461,6 +461,14 @@ public:
         return _numResourcesToUnlockAtEndUnitOfWork;
     }
 
+    std::string getDebugInfo() const {
+        return _debugInfo;
+    }
+
+    void setDebugInfo(const std::string& info) {
+        _debugInfo = info;
+    }
+
 protected:
     Locker() {}
 
@@ -481,6 +489,7 @@ protected:
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
     bool _shouldAcquireTicket = true;
+    std::string _debugInfo;  // Extra info about this locker for debugging purpose
 };
 
 /**

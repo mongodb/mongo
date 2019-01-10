@@ -916,7 +916,8 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
                << "Thread = " << threadId.str() << "; "
                << "ConvertMode = " << modeName(iter->convertMode) << "; "
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
-               << "CompatibleFirst = " << iter->compatibleFirst << "; " << '\n';
+               << "CompatibleFirst = " << iter->compatibleFirst << "; "
+               << "DebugInfo = " << iter->locker->getDebugInfo() << '\n';
         }
 
         sb << "PENDING:\n";
@@ -930,7 +931,8 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
                << "Thread = " << threadId.str() << "; "
                << "ConvertMode = " << modeName(iter->convertMode) << "; "
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
-               << "CompatibleFirst = " << iter->compatibleFirst << "; " << '\n';
+               << "CompatibleFirst = " << iter->compatibleFirst << "; "
+               << "DebugInfo = " << iter->locker->getDebugInfo() << '\n';
         }
 
         sb << "-----------------------------------------------------------\n";

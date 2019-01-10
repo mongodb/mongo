@@ -540,6 +540,9 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
         _locker->shouldConflictWithSecondaryBatchApplication());
     _locker->unsetThreadId();
+    if (opCtx->getLogicalSessionId()) {
+        _locker->setDebugInfo("lsid: " + opCtx->getLogicalSessionId()->toBSON().toString());
+    }
 
     // OplogSlotReserver is only used by primary, so always set max transaction lock timeout.
     invariant(opCtx->writesAreReplicated());
@@ -583,6 +586,9 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, Stas
         _locker->releaseTicket();
     }
     _locker->unsetThreadId();
+    if (opCtx->getLogicalSessionId()) {
+        _locker->setDebugInfo("lsid: " + opCtx->getLogicalSessionId()->toBSON().toString());
+    }
 
     // On secondaries, we yield the locks for transactions.
     if (stashStyle == StashStyle::kSecondary) {
