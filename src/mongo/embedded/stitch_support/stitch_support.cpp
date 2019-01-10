@@ -434,7 +434,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
         mongo::BSONObj document(documentBSON);
-        mongo::StringData matchedField;
+        std::string matchedField;
 
         if (update->updateDriver.needMatchDetails()) {
             invariant(update->matcher);

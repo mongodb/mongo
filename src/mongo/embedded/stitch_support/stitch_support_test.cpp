@@ -129,6 +129,7 @@ protected:
 
         char* updateResult = stitch_support_v1_update_apply(
             update, fromjson(document).objdata(), updateDetails, status);
+        ASSERT_EQ(0, stitch_support_v1_status_get_code(status));
         ASSERT(updateResult);
 
         stitch_support_v1_update_destroy(update);
