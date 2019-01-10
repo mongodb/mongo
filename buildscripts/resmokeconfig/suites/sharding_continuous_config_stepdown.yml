@@ -25,6 +25,7 @@ selector:
   - jstests/sharding/basic_merge.js
   - jstests/sharding/count1.js
   - jstests/sharding/count2.js
+  - jstests/sharding/current_op_with_drop_shard.js
   - jstests/sharding/cursor1.js
   - jstests/sharding/diffservers1.js
   - jstests/sharding/disable_autosplit.js
