@@ -125,8 +125,9 @@ def get_config_options(cmd_line_options, config_file):
                                                      config_file_data)
     use_multiversion = read_config.get_config_value("use_multiversion", cmd_line_options,
                                                     config_file_data)
-    is_patch = strtobool(
-        read_config.get_config_value("is_patch", cmd_line_options, config_file_data))
+    is_patch = read_config.get_config_value("is_patch", cmd_line_options, config_file_data)
+    if is_patch:
+        is_patch = strtobool(is_patch)
     depends_on = split_if_exists(
         read_config.get_config_value("depends_on", cmd_line_options, config_file_data))
     build_id = read_config.get_config_value("build_id", cmd_line_options, config_file_data)
