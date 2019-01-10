@@ -227,6 +227,12 @@ void IDLParserErrorContext::throwBadEnumValue(StringData enumValue) const {
 
 NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
                                                                  const BSONElement& element) {
+    const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
+                         element.binDataType() == BinDataType::newUUID);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Collection name must be provided. UUID is not valid in this "
+                          << "context",
+            !isUUID);
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(element.type()),
             element.canonicalType() == canonicalizeBSONType(mongo::String));

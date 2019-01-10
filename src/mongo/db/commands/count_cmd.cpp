@@ -118,7 +118,7 @@ public:
                            BSONObjBuilder* out) const {
         const bool isExplain = true;
         Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
-        auto nss = parseNsOrUUID(opCtx, dbname, cmdObj);
+        auto nss = parseNsCollectionRequired(dbname, cmdObj);
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
             return request.getStatus();

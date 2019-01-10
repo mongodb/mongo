@@ -133,7 +133,7 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         if (!nss.isValid()) {
             return {ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid collection name: " << nss.ns()};

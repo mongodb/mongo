@@ -126,6 +126,12 @@ NamespaceString Command::parseNsCollectionRequired(const string& dbname, const B
     // Accepts both BSON String and Symbol for collection name per SERVER-16260
     // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
     BSONElement first = cmdObj.firstElement();
+    const bool isUUID = (first.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
+                         first.binDataType() == BinDataType::newUUID);
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Collection name must be provided. UUID is not valid in this "
+                          << "context",
+            !isUUID);
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
