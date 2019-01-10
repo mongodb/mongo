@@ -898,6 +898,7 @@ buildvariants:
     - name: change_streams_throughput
     - name: industry_benchmarks
     - name: industry_benchmarks_wmajority
+    - name: linkbench
     - name: mixed_workloads
     - name: mongos_workloads
     - name: mongos_large_catalog_workloads
