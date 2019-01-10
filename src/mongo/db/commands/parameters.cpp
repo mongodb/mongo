@@ -43,7 +43,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
@@ -385,11 +385,13 @@ public:
     }
 } cmdSet;
 
-void appendLogLevelToBSON(OperationContext* opCtx, BSONObjBuilder* builder, StringData name) {
-    builder->append(name, globalLogDomain()->getMinimumLogSeverity().toInt());
+void LogLevelServerParameter::append(OperationContext*,
+                                     BSONObjBuilder& builder,
+                                     const std::string& name) {
+    builder.append(name, globalLogDomain()->getMinimumLogSeverity().toInt());
 }
 
-Status setLogLevelFromBSON(const BSONElement& newValueElement) {
+Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
     int newValue;
     if (!newValueElement.coerce(&newValue) || newValue < 0)
         return Status(ErrorCodes::BadValue,
@@ -400,9 +402,9 @@ Status setLogLevelFromBSON(const BSONElement& newValueElement) {
     return Status::OK();
 }
 
-Status setLogLevelFromString(StringData strLevel) {
+Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
     int newValue;
-    Status status = parseNumberFromString(strLevel.toString(), &newValue);
+    Status status = parseNumberFromString(strLevel, &newValue);
     if (!status.isOK())
         return status;
     if (newValue < 0)
@@ -413,15 +415,15 @@ Status setLogLevelFromString(StringData strLevel) {
     return Status::OK();
 }
 
-void appendLogComponentVerbosityToBSON(OperationContext* opCtx,
-                                       BSONObjBuilder* builder,
-                                       StringData name) {
+void LogComponentVerbosityServerParameter::append(OperationContext*,
+                                                  BSONObjBuilder& builder,
+                                                  const std::string& name) {
     BSONObj currentSettings;
     getLogComponentVerbosity(&currentSettings);
-    builder->append(name, currentSettings);
+    builder.append(name, currentSettings);
 }
 
-Status setLogComponentVerbosityFromBSON(const BSONElement& newValueElement) {
+Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement) {
     if (!newValueElement.isABSONObj()) {
         return Status(ErrorCodes::TypeMismatch,
                       mongoutils::str::stream() << "log component verbosity is not a BSON object: "
@@ -430,23 +432,30 @@ Status setLogComponentVerbosityFromBSON(const BSONElement& newValueElement) {
     return setLogComponentVerbosity(newValueElement.Obj());
 }
 
-Status setLogComponentVerbosityFromString(StringData str) {
-    try {
-        return setLogComponentVerbosity(fromjson(str.toString()));
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+Status LogComponentVerbosityServerParameter::setFromString(const std::string& str) try {
+    return setLogComponentVerbosity(fromjson(str));
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
+void AutomationServiceDescriptorServerParameter::append(OperationContext*,
+                                                        BSONObjBuilder& builder,
+                                                        const std::string& name) {
+    const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
+    if (!autoServiceDescriptorValue.empty()) {
+        builder.append(name, autoServiceDescriptorValue);
     }
 }
 
-void appendAutomationServiceDescriptorToBSON(OperationContext* opCtx,
-                                             BSONObjBuilder* builder,
-                                             StringData name) {
-    const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
-    if (!autoServiceDescriptorValue.empty())
-        builder->append(name, autoServiceDescriptorValue);
+Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement) {
+    if (newValueElement.type() != String) {
+        return {ErrorCodes::TypeMismatch,
+                "Value for parameter automationServiceDescriptor must be of type 'string'"};
+    }
+    return setFromString(newValueElement.String());
 }
 
-Status setAutomationServiceDescriptorFromString(StringData str) {
+Status AutomationServiceDescriptorServerParameter::setFromString(const std::string& str) {
     auto kMaxSize = 64U;
     if (str.size() > kMaxSize)
         return {ErrorCodes::Overflow,
@@ -457,18 +466,10 @@ Status setAutomationServiceDescriptorFromString(StringData str) {
 
     {
         const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
-        autoServiceDescriptorValue = str.toString();
+        autoServiceDescriptorValue = str;
     }
 
     return Status::OK();
-}
-
-Status setAutomationServiceDescriptorFromBSON(const BSONElement& newValueElement) {
-    if (newValueElement.type() != mongo::String)
-        return {ErrorCodes::TypeMismatch,
-                mongoutils::str::stream() << "Value for parameter automationServiceDescriptor"
-                                          << " must be of type 'string'"};
-    return setAutomationServiceDescriptorFromString(newValueElement.String());
 }
 
 }  // namespace mongo

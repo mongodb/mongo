@@ -47,10 +47,4 @@ void startMongoSFTDC();
  */
 void stopMongoSFTDC();
 
-/**
- * Set Parameters utility methods
- */
-Status ftdcDirectoryFromString(StringData str);
-void ftdcDirectoryAppendBSON(OperationContext* opCtx, BSONObjBuilder* b, StringData name);
-
 }  // namespace mongo

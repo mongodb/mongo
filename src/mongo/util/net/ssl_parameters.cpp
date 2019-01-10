@@ -39,6 +39,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters.h"
+#include "mongo/util/net/ssl_parameters_gen.h"
 
 namespace mongo {
 namespace {
@@ -104,52 +105,23 @@ StatusWith<SSLParams::SSLModes> checkTLSModeTransition(T modeToString,
 }
 
 }  // namespace
-}  // namespace mongo
 
-mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
-    if (!sslGlobalParams.sslCipherConfig.empty()) {
-        return {ErrorCodes::BadValue,
-                "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig"};
-    }
-    // Note that there is very little validation that we can do here.
-    // OpenSSL exposes no API to validate a cipher config string. The only way to figure out
-    // what a string maps to is to make an SSL_CTX object, set the string on it, then parse the
-    // resulting STACK_OF object. If provided an invalid entry in the string, it will silently
-    // ignore it. Because an entry in the string may map to multiple ciphers, or remove ciphers
-    // from the final set produced by the full string, we can't tell if any entry failed
-    // to parse.
-    return Status::OK();
-}
-
-mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&) {
-    if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
-        return {ErrorCodes::BadValue,
-                "Error parsing command line: Multiple occurrences of option "
-                "disableNonTLSConnectionLogging"};
-    }
-    return Status::OK();
-}
-
-mongo::Status mongo::onUpdateDisableNonTLSConnectionLogging(const bool&) {
-    // disableNonSSLConnectionLogging is a write-once setting.
-    // Once we've updated it, we're not allowed to specify the set-param again.
-    // Record that update in a second bool value.
-    sslGlobalParams.disableNonSSLConnectionLoggingSet = true;
-    return Status::OK();
-}
-
-void mongo::appendSSLModeToBSON(OperationContext*, BSONObjBuilder* builder, StringData fieldName) {
+void SSLModeServerParameter::append(OperationContext*,
+                                    BSONObjBuilder& builder,
+                                    const std::string& fieldName) {
     warning() << "Use of deprecared server parameter 'sslMode', please use 'tlsMode' instead.";
-    builder->append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
+    builder.append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
 }
 
-void mongo::appendTLSModeToBSON(OperationContext*, BSONObjBuilder* builder, StringData fieldName) {
-    builder->append(
+void TLSModeServerParameter::append(OperationContext*,
+                                    BSONObjBuilder& builder,
+                                    const std::string& fieldName) {
+    builder.append(
         fieldName,
         SSLParams::tlsModeFormat(static_cast<SSLParams::SSLModes>(sslGlobalParams.sslMode.load())));
 }
 
-mongo::Status mongo::setSSLModeFromString(StringData strMode) {
+Status SSLModeServerParameter::setFromString(const std::string& strMode) {
 #ifndef MONGO_CONFIG_SSL
     return {ErrorCodes::IllegalOperation,
             "Unable to set sslMode, SSL support is not compiled into server"};
@@ -166,7 +138,7 @@ mongo::Status mongo::setSSLModeFromString(StringData strMode) {
     return Status::OK();
 }
 
-mongo::Status mongo::setTLSModeFromString(StringData strMode) {
+Status TLSModeServerParameter::setFromString(const std::string& strMode) {
 #ifndef MONGO_CONFIG_SSL
     return {ErrorCodes::IllegalOperation,
             "Unable to set tlsMode, TLS support is not compiled into server"};
@@ -181,13 +153,13 @@ mongo::Status mongo::setTLSModeFromString(StringData strMode) {
 }
 
 
-void mongo::appendClusterAuthModeToBSON(OperationContext*,
-                                        BSONObjBuilder* builder,
-                                        StringData fieldName) {
-    builder->append(fieldName, clusterAuthModeFormat());
+void ClusterAuthModeServerParameter::append(OperationContext*,
+                                            BSONObjBuilder& builder,
+                                            const std::string& fieldName) {
+    builder.append(fieldName, clusterAuthModeFormat());
 }
 
-mongo::Status mongo::setClusterAuthModeFromString(StringData strMode) {
+Status ClusterAuthModeServerParameter::setFromString(const std::string& strMode) {
 #ifndef MONGO_CONFIG_SSL
     return {ErrorCodes::IllegalOperation,
             "Unable to set clusterAuthMode, SSL support is not compiled into server"};
@@ -225,5 +197,39 @@ mongo::Status mongo::setClusterAuthModeFromString(StringData strMode) {
                               << strMode};
     }
 
+    return Status::OK();
+}
+
+}  // namespace mongo
+
+mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
+    if (!sslGlobalParams.sslCipherConfig.empty()) {
+        return {ErrorCodes::BadValue,
+                "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig"};
+    }
+    // Note that there is very little validation that we can do here.
+    // OpenSSL exposes no API to validate a cipher config string. The only way to figure out
+    // what a string maps to is to make an SSL_CTX object, set the string on it, then parse the
+    // resulting STACK_OF object. If provided an invalid entry in the string, it will silently
+    // ignore it. Because an entry in the string may map to multiple ciphers, or remove ciphers
+    // from the final set produced by the full string, we can't tell if any entry failed
+    // to parse.
+    return Status::OK();
+}
+
+mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&) {
+    if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
+        return {ErrorCodes::BadValue,
+                "Error parsing command line: Multiple occurrences of option "
+                "disableNonTLSConnectionLogging"};
+    }
+    return Status::OK();
+}
+
+mongo::Status mongo::onUpdateDisableNonTLSConnectionLogging(const bool&) {
+    // disableNonSSLConnectionLogging is a write-once setting.
+    // Once we've updated it, we're not allowed to specify the set-param again.
+    // Record that update in a second bool value.
+    sslGlobalParams.disableNonSSLConnectionLoggingSet = true;
     return Status::OK();
 }

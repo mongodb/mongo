@@ -31,14 +31,10 @@ global:
   cpp_includes:
     - "mongo/db/ftdc/ftdc_mongos.h"
 
-imports:
-  - "mongo/idl/basic_types.idl"
-
 server_parameters:
 
   diagnosticDataCollectionDirectoryPath:
     description: "Specify the directory for the diagnostic directory for mongos"
     set_at: [startup, runtime]
-    append_bson: "ftdcDirectoryAppendBSON"
-    from_string: "ftdcDirectoryFromString"
+    cpp_class: DiagnosticDataCollectionDirectoryPathServerParameter
 

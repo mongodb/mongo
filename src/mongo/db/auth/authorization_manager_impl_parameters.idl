@@ -48,6 +48,6 @@ server_parameters:
     set_at:
       - startup
       - runtime
-    append_bson: AuthorizationManagerPinnedUsersHooks::appendBson
-    from_bson: AuthorizationManagerPinnedUsersHooks::fromBson
-    from_string: AuthorizationManagerPinnedUsersHooks::fromString
+    cpp_class:
+      name: AuthorizationManagerPinnedUsersServerParameter
+      override_set: true

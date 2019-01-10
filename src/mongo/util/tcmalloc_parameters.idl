@@ -29,26 +29,23 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/util/tcmalloc_set_parameter.h"
-
-imports:
-  - "mongo/idl/basic_types.idl"
+    - "mongo/config.h"
 
 server_parameters:
 
   tcmallocMaxTotalThreadCacheBytes:
     description: "Configure tcmalloc's max_total_thread_cache_bytes"
     set_at: [startup, runtime]
-    append_bson: "tcmallocMaxTotalThreadCacheBytesServerParameterAppendBSON"
-    from_bson: "tcmallocMaxTotalThreadCacheBytesServerParameterSetFromBSON"
-    from_string: "tcmallocMaxTotalThreadCacheBytesServerParameterFromString"
+    cpp_class:
+      name: TCMallocMaxTotalThreadCacheBytesServerParameter
+      override_set: true
 
   tcmallocAggressiveMemoryDecommit:
     description: "Configure tcmalloc's aggressive_memory_decommit"
     set_at: [startup, runtime]
-    append_bson: "tcmallocAggressiveMemoryDecommitServerParameterAppendBSON"
-    from_bson: "tcmallocAggressiveMemoryDecommitServerParameterSetFromBSON"
-    from_string: "tcmallocAggressiveMemoryDecommitServerParameterFromString"
+    cpp_class:
+      name: TCMallocAggressiveMemoryDecommitServerParameter
+      override_set: true
 
   heapProfilingEnabled:
     description: "Enable Heap Profiling"

@@ -220,18 +220,18 @@ const auto inUserManagementCommandsFlag = OperationContext::declareDecoration<bo
 
 int authorizationManagerCacheSize;
 
-void AuthorizationManagerPinnedUsersHooks::appendBson(OperationContext* opCtx,
-                                                      BSONObjBuilder* out,
-                                                      StringData name) {
-    return authorizationManagerPinnedUsers.append(opCtx, *out, std::string(name));
+void AuthorizationManagerPinnedUsersServerParameter::append(OperationContext* opCtx,
+                                                            BSONObjBuilder& out,
+                                                            const std::string& name) {
+    return authorizationManagerPinnedUsers.append(opCtx, out, name);
 }
 
-Status AuthorizationManagerPinnedUsersHooks::fromBson(const BSONElement& newValue) {
+Status AuthorizationManagerPinnedUsersServerParameter::set(const BSONElement& newValue) {
     return authorizationManagerPinnedUsers.set(newValue);
 }
 
-Status AuthorizationManagerPinnedUsersHooks::fromString(StringData str) {
-    return authorizationManagerPinnedUsers.setFromString(std::string(str));
+Status AuthorizationManagerPinnedUsersServerParameter::setFromString(const std::string& str) {
+    return authorizationManagerPinnedUsers.setFromString(str);
 }
 
 MONGO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<AuthorizationManager> {

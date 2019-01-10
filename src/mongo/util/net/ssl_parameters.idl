@@ -32,9 +32,6 @@ global:
     - "mongo/util/net/ssl_options.h"
     - "mongo/util/net/ssl_parameters.h"
 
-imports:
-  - "mongo/idl/basic_types.idl"
-
 server_parameters:
   opensslDiffieHellmanParameters:
     description: "OpenSSL Diffie-Hellman parameters"
@@ -69,17 +66,14 @@ server_parameters:
   sslMode:
     description: "Transition from allowSSL to preferSSL, or from preferSSL to requireSSL"
     set_at: runtime
-    append_bson: "appendSSLModeToBSON"
-    from_string: "setSSLModeFromString"
+    cpp_class: SSLModeServerParameter
 
   tlsMode:
     description: "Transition from allowTLS to preferTLS, or from preferTLS to requireTLS"
     set_at: runtime
-    append_bson: "appendTLSModeToBSON"
-    from_string: "setTLSModeFromString"
+    cpp_class: TLSModeServerParameter
 
   clusterAuthMode:
     description: "Transition from sendKeyFile to sendX509, or sendX509 to x509 clusterAuthModes"
     set_at: runtime
-    append_bson: "appendClusterAuthModeToBSON"
-    from_string: "setClusterAuthModeFromString"
+    cpp_class: ClusterAuthModeServerParameter

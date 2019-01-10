@@ -29,7 +29,10 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/commands/parameters.h"
+    # For serverGlobalParams
+    - "mongo/db/server_options.h"
+    # For DBException
+    - "mongo/util/assert_util.h"
 
 server_parameters:
   quiet:
@@ -45,20 +48,20 @@ server_parameters:
   logLevel:
     description: "Specifies the verbosity of logging"
     set_at: ["startup", "runtime"]
-    append_bson: "appendLogLevelToBSON"
-    from_bson: "setLogLevelFromBSON"
-    from_string: "setLogLevelFromString"
+    cpp_class:
+      name: LogLevelServerParameter
+      override_set: true
 
   logComponentVerbosity:
     description: "Sets the verbosity levels of various components for log messages"
     set_at: ["startup", "runtime"]
-    append_bson: "appendLogComponentVerbosityToBSON"
-    from_bson: "setLogComponentVerbosityFromBSON"
-    from_string: "setLogComponentVerbosityFromString"
+    cpp_class:
+      name: LogComponentVerbosityServerParameter
+      override_set: true
 
   automationServiceDescriptor:
     description: "automationServiceDescriptor"
     set_at: ["startup", "runtime"]
-    append_bson: "appendAutomationServiceDescriptorToBSON"
-    from_bson: "setAutomationServiceDescriptorFromBSON"
-    from_string: "setAutomationServiceDescriptorFromString"
+    cpp_class:
+      name: AutomationServiceDescriptorServerParameter
+      override_set: true

@@ -32,11 +32,8 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
-class OperationContext;
 
 /**
  * Validation callback for setParameter 'opensslCipherConfig'.
@@ -52,19 +49,5 @@ Status validateDisableNonTLSConnectionLogging(const bool&);
  * Records that disableNonTLSConnectionLogging has been set.
  */
 Status onUpdateDisableNonTLSConnectionLogging(const bool&);
-
-/**
- * Callbacks for setParameter 'sslMode'
- */
-void appendSSLModeToBSON(OperationContext*, BSONObjBuilder*, StringData);
-void appendTLSModeToBSON(OperationContext*, BSONObjBuilder*, StringData);
-Status setSSLModeFromString(StringData);
-Status setTLSModeFromString(StringData);
-
-/**
- * Callbacks for setParameter 'clusterAuthMode'
- */
-void appendClusterAuthModeToBSON(OperationContext*, BSONObjBuilder*, StringData);
-Status setClusterAuthModeFromString(StringData);
 
 }  // namespace mongo

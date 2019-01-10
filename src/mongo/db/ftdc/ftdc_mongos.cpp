@@ -36,6 +36,7 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_mongos_gen.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/thread.h"
@@ -52,22 +53,24 @@ namespace {
 synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
 }  // namespace
 
-void ftdcDirectoryAppendBSON(OperationContext* opCtx, BSONObjBuilder* b, StringData name) {
-    b->append(name, ftdcDirectoryPathParameter->generic_string());
+void DiagnosticDataCollectionDirectoryPathServerParameter::append(OperationContext* opCtx,
+                                                                  BSONObjBuilder& b,
+                                                                  const std::string& name) {
+    b.append(name, ftdcDirectoryPathParameter->generic_string());
 }
 
-Status ftdcDirectoryFromString(StringData str) {
+Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(const std::string& str) {
     if (hasGlobalServiceContext()) {
         FTDCController* controller = FTDCController::get(getGlobalServiceContext());
         if (controller) {
-            Status s = controller->setDirectory(str.toString());
+            Status s = controller->setDirectory(str);
             if (!s.isOK()) {
                 return s;
             }
         }
     }
 
-    ftdcDirectoryPathParameter = str.toString();
+    ftdcDirectoryPathParameter = str;
 
     return Status::OK();
 }
