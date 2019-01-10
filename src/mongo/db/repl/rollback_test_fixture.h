@@ -90,8 +90,12 @@ public:
     /**
      * Creates an oplog entry with a recordId for a command operation.
      */
-    static std::pair<BSONObj, RecordId> makeCommandOp(
-        Timestamp ts, OptionalCollectionUUID uuid, StringData nss, BSONObj cmdObj, int recordId);
+    static std::pair<BSONObj, RecordId> makeCommandOp(Timestamp ts,
+                                                      OptionalCollectionUUID uuid,
+                                                      StringData nss,
+                                                      BSONObj cmdObj,
+                                                      int recordId,
+                                                      boost::optional<BSONObj> o2 = boost::none);
 
 protected:
     // OperationContext provided to test cases for storage layer operations.

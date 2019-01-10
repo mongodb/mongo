@@ -461,6 +461,13 @@ private:
     // and rolling back creates means that the UUID does not exist post rollback.
     stdx::unordered_map<UUID, long long, UUID::Hash> _countDiffs;  // (N)
 
+    // Maintains counts and namespaces of drop-pending collections.
+    using PendingDropInfo = struct {
+        long long count = 0;
+        NamespaceString nss;
+    };
+    stdx::unordered_map<UUID, PendingDropInfo, UUID::Hash> _pendingDrops;  // (N)
+
     // Maintains the count of the record store pointed to by the UUID after we recover from the
     // oplog.
     stdx::unordered_map<UUID, long long, UUID::Hash> _newCounts;  // (N)

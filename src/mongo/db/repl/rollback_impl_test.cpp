@@ -1291,12 +1291,13 @@ TEST_F(RollbackImplTest, CountChangesCancelOut) {
     _deleteDocAndGenerateOplogEntry(obj["_id"], uuid, nss, 3);
     _insertDocAndGenerateOplogEntry(BSON("_id" << 3), uuid, nss, 4);
 
-    // Test that we do nothing on drop oplog entries.
+    // Test that we read the collection count from drop entries.
     ASSERT_OK(_insertOplogEntry(makeCommandOp(Timestamp(5, 5),
-                                              UUID::gen(),
+                                              uuid,
                                               nss.getCommandNS().toString(),
                                               BSON("drop" << nss.coll()),
-                                              5)
+                                              5,
+                                              BSON("numRecords" << 1))
                                     .first));
 
     ASSERT_EQ(2ULL,
@@ -1656,11 +1657,13 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEnt
                                   2);
 
     auto dropNss = NamespaceString("test", "dropColl");
+    auto dropUuid = UUID::gen();
     auto dropOp = makeCommandOp(Timestamp(2, 2),
-                                UUID::gen(),
+                                dropUuid,
                                 dropNss.getCommandNS().toString(),
                                 BSON("drop" << dropNss.coll()),
                                 2);
+    _initializeCollection(_opCtx.get(), dropUuid, dropNss);
 
     auto collModNss = NamespaceString("test", "collModColl");
     auto collModOp = makeCommandOp(Timestamp(2, 2),
