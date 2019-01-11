@@ -24,14 +24,14 @@
 
     res = coll.runCommand('distinct', {key: 'loc'});
     assert.commandWorked(res);
-    assert.eq(res.values.sort(),
+    assert.eq(res.values.sort(bsonWoCompare),
               [{type: 'Point', coordinates: [10, 20]}, {type: 'Point', coordinates: [20, 30]}]);
 
     assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
 
     res = coll.runCommand('distinct', {key: 'loc'});
     assert.commandWorked(res);
-    assert.eq(res.values.sort(),
+    assert.eq(res.values.sort(bsonWoCompare),
               [{type: 'Point', coordinates: [10, 20]}, {type: 'Point', coordinates: [20, 30]}]);
 
     // Test distinct on legacy points with/without a 2d index.
