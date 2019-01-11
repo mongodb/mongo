@@ -82,7 +82,8 @@
         let preserveRes = assert.commandWorked(db.runCommand({
             configureFailPoint: 'WTPreserveSnapshotHistoryIndefinitely',
             mode: 'alwaysOn',
-        }));
+        }),
+                                               debugInfo);
         debugInfo.push({
             "node": db.getMongo(),
             "session": session,
@@ -110,10 +111,6 @@
         });
     }
 
-    // We run the "listDatabases" command on each of the nodes after having enabled the
-    // "WTPreserveSnapshotHistoryIndefinitely" failpoint on all of the nodes so that
-    // 'sessions[0].getOperationTime()' is guaranteed to be greater than the clusterTime at which
-    // the secondaries have stopped truncating their snapshot history.
     for (let session of sessions) {
         const db = session.getDatabase('admin');
         const res = assert.commandWorked(db.runCommand({listDatabases: 1, nameOnly: true}));
@@ -139,15 +136,15 @@
     // 'clusterTime' locally. This ensures that a later atClusterTime read inside a transaction
     // doesn't stall as a result of a pending global X lock (e.g. from a dropDatabase command) on
     // the primary preventing getMores on the oplog from receiving a response.
-    const waitForSecondaries = (clusterTime) => {
-        debugInfo.push({"waitForSecondaries": clusterTime});
+    const waitForSecondaries = (clusterTime, signedClusterTime) => {
+        debugInfo.push({"waitForSecondaries": clusterTime, "signedClusterTime": signedClusterTime});
         for (let i = 1; i < sessions.length; ++i) {
             const session = sessions[i];
             const db = session.getDatabase('admin');
 
             // We advance the clusterTime on the secondary's session to ensure that 'clusterTime'
             // doesn't exceed the node's notion of the latest clusterTime.
-            session.advanceClusterTime(sessions[0].getClusterTime());
+            session.advanceClusterTime(signedClusterTime);
 
             // We need to make sure the secondary has applied up to 'clusterTime' and advanced its
             // majority commit point.
@@ -161,7 +158,8 @@
                     readConcern: {level: 'majority', afterClusterTime: clusterTime},
                     limit: 1,
                     singleBatch: true,
-                }));
+                }),
+                                               debugInfo);
                 debugInfo.push({
                     "node": db.getMongo(),
                     "session": session,
@@ -287,8 +285,19 @@
         };
 
         do {
+            // SERVER-38928: Due to races around advancing last applied, there's technically no
+            // guarantee that a primary will report a later operation time than its
+            // secondaries. Perform the snapshot read at the latest reported operation time.
             clusterTime = sessions[0].getOperationTime();
-            waitForSecondaries(clusterTime);
+            let signedClusterTime = sessions[0].getClusterTime();
+            for (let sess of sessions.slice(1)) {
+                let ts = sess.getOperationTime();
+                if (timestampCmp(ts, clusterTime) > 0) {
+                    clusterTime = ts;
+                    signedClusterTime = sess.getClusterTime();
+                }
+            }
+            waitForSecondaries(clusterTime, signedClusterTime);
 
             for (let session of sessions) {
                 debugInfo.push({
@@ -329,6 +338,7 @@
                     session.commitTransaction();
                 } catch (e) {
                     if (!isTransientError(e)) {
+                        jsTestLog(debugInfo);
                         throw e;
                     }
                 }
