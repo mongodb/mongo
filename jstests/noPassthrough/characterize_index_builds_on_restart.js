@@ -6,11 +6,16 @@
 (function() {
     'use strict';
 
+    load("jstests/libs/check_log.js");
+    load("jstests/replsets/rslib.js");
+
     const dbName = "test";
     const collName = "coll";
 
-    const firstIndex = "firstIndex";
-    const secondIndex = "secondIndex";
+    const firstIndex = "first";
+    const secondIndex = "second";
+    const thirdIndex = "third";
+    const fourthIndex = "fourth";
 
     function startStandalone() {
         let mongod = MongoRunner.runMongod({cleanData: true});
@@ -29,18 +34,18 @@
     }
 
     function startReplSet() {
-        let replSet = new ReplSetTest({name: "indexBuilds", nodes: 3});
+        let replSet = new ReplSetTest({name: "indexBuilds", nodes: 3, nodeOptions: {syncdelay: 1}});
         let nodes = replSet.nodeList();
 
         // We need an arbiter to ensure that the primary doesn't step down when we restart the
         // secondary
         replSet.startSet({startClean: true});
         replSet.initiate({
-            "_id": "indexBuilds",
-            "members": [
-                {"_id": 0, "host": nodes[0]},
-                {"_id": 1, "host": nodes[1]},
-                {"_id": 2, "host": nodes[2], "arbiterOnly": true}
+            _id: "indexBuilds",
+            members: [
+                {_id: 0, host: nodes[0]},
+                {_id: 1, host: nodes[1]},
+                {_id: 2, host: nodes[2], arbiterOnly: true}
             ]
         });
 
@@ -57,7 +62,7 @@
         jsTest.log("Creating " + size + " test documents.");
         var bulk = db.getCollection(collName).initializeUnorderedBulkOp();
         for (var i = 0; i < size; ++i) {
-            bulk.insert({i: i});
+            bulk.insert({i: i, j: i * i, k: 1});
         }
         assert.writeOK(bulk.execute());
     }
@@ -65,30 +70,26 @@
     function startIndexBuildAndCrash(db, isReplicaNode, w, hangDB) {
         jsTest.log("Starting and hanging index builds.");
 
+        const indexesToBuild = [
+            {key: {i: 1}, name: firstIndex, background: true},
+            {key: {j: 1}, name: secondIndex, background: true},
+            {key: {i: 1, j: 1}, name: thirdIndex, background: true},
+            {key: {i: -1, j: 1, k: -1}, name: fourthIndex, background: true},
+        ];
+
         if (isReplicaNode) {
             assert.commandWorked(hangDB.adminCommand(
-                {configureFailPoint: "slowBackgroundIndexBuild", mode: "alwaysOn"}));
+                {configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "alwaysOn"}));
 
-            db.runCommand({
-                createIndexes: collName,
-                indexes: [
-                    {key: {i: 1}, name: firstIndex, background: true},
-                    {key: {i: -1}, name: secondIndex, background: true},
-                ],
-                writeConcern: {w: w}
-            });
+            let res = assert.commandWorked(db.runCommand(
+                {createIndexes: collName, indexes: indexesToBuild, writeConcern: {w: w}}));
+            return res.operationTime;
         } else {
             assert.commandWorked(db.adminCommand(
                 {configureFailPoint: "crashAfterStartingIndexBuild", mode: "alwaysOn"}));
 
             assert.throws(() => {
-                db.runCommand({
-                    createIndexes: collName,
-                    indexes: [
-                        {key: {i: 1}, name: firstIndex, background: true},
-                        {key: {i: -1}, name: secondIndex, background: true},
-                    ]
-                });
+                db.runCommand({createIndexes: collName, indexes: indexesToBuild});
             });
         }
     }
@@ -159,6 +160,8 @@
 
         checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/false);
         checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(mongod, thirdIndex, /*shouldExist=*/false);
+        checkForIndexRebuild(mongod, fourthIndex, /*shouldExist=*/false);
 
         shutdownStandalone(mongod);
     }
@@ -172,7 +175,28 @@
         let secondaryDB = secondary.getDB(dbName);
 
         addTestDocuments(primaryDB);
-        startIndexBuildAndCrash(primaryDB, /*isReplicaNode=*/true, /*w=*/2, secondaryDB);
+
+        // Make sure the documents get replicated on the secondary.
+        replSet.awaitReplication();
+
+        let indexBuildOpTime =
+            startIndexBuildAndCrash(primaryDB, /*isReplicaNode=*/true, /*w=*/2, secondaryDB);
+
+        // Wait till all four index builds hang.
+        checkLog.containsWithCount(secondary,
+                                   "Hanging index build with no locks due " +
+                                       "to \'hangAfterStartingIndexBuildUnlocked\' failpoint",
+                                   4);
+
+        // Wait until the secondary has a checkpoint timestamp beyond the index oplog entry. On
+        // restart, replication recovery will not replay the createIndex oplog entries.
+        jsTest.log("Waiting for unfinished index build to be in checkpoint.");
+        assert.soon(() => {
+            let replSetStatus =
+                assert.commandWorked(secondary.getDB("admin").runCommand({replSetGetStatus: 1}));
+            if (replSetStatus.lastStableCheckpointTimestamp >= indexBuildOpTime)
+                return true;
+        });
 
         let secondaryId = replSet.getNodeId(secondary);
         replSet.stop(secondaryId);
@@ -182,6 +206,8 @@
 
         checkForIndexRebuild(mongod, firstIndex, /*shouldExist=*/true);
         checkForIndexRebuild(mongod, secondIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(mongod, thirdIndex, /*shouldExist=*/true);
+        checkForIndexRebuild(mongod, fourthIndex, /*shouldExist=*/true);
 
         shutdownStandalone(mongod);
         stopReplSet(replSet);

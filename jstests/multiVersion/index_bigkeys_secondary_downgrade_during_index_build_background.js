@@ -38,7 +38,7 @@
         primaryDB.runCommand({insert: collName, documents: documents, writeConcern: {w: 2}}));
 
     assert.commandWorked(secondaryDB.adminCommand(
-        {configureFailPoint: "slowBackgroundIndexBuild", mode: "alwaysOn"}));
+        {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
 
     // Start the index build on the primary.
     assert.commandWorked(primaryDB.runCommand(
@@ -59,7 +59,7 @@
 
     // Continue index build on the secondary. There should be no KeyTooLong error.
     assert.commandWorked(
-        secondaryDB.adminCommand({configureFailPoint: "slowBackgroundIndexBuild", mode: "off"}));
+        secondaryDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
 
     // Make sure the index is successfully created.
     assert.soon(() => {
