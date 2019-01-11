@@ -20,6 +20,13 @@ from buildscripts.evergreen_generate_resmoke_tasks import render_suite, render_m
 
 _DATE = datetime.datetime(2018, 7, 15)
 
+NS = "buildscripts.evergreen_generate_resmoke_tasks"
+
+
+def ns(relative_name):  # pylint: disable-invalid-name
+    """Return a full name from a name relative to the test module"s name space."""
+    return NS + "." + relative_name
+
 
 class TestTestStats(unittest.TestCase):
     def test_no_hooks(self):
@@ -160,9 +167,9 @@ class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
 class SuiteTest(unittest.TestCase):
     def test_adding_tests_increases_count_and_runtime(self):
         suite = grt.Suite()
-        suite.add_test('test1', 10)
-        suite.add_test('test2', 12)
-        suite.add_test('test3', 7)
+        suite.add_test("test1", 10)
+        suite.add_test("test2", 12)
+        suite.add_test("test3", 7)
 
         self.assertEqual(suite.get_test_count(), 3)
         self.assertEqual(suite.get_runtime(), 29)
@@ -172,36 +179,36 @@ def create_suite(count=3, start=0):
     """ Create a suite with count tests."""
     suite = grt.Suite()
     for i in range(start, start + count):
-        suite.add_test('test{}'.format(i), 1)
+        suite.add_test("test{}".format(i), 1)
     return suite
 
 
 class UpdateSuiteConfigTest(unittest.TestCase):
     def test_roots_are_updated(self):
-        config = {'selector': {}}
+        config = {"selector": {}}
 
-        updated_config = grt.update_suite_config(config, 'root value')
-        self.assertEqual('root value', updated_config['selector']['roots'])
+        updated_config = grt.update_suite_config(config, "root value")
+        self.assertEqual("root value", updated_config["selector"]["roots"])
 
     def test_excluded_files_not_included_if_not_specified(self):
-        config = {'selector': {'excluded_files': 'files to exclude'}}
+        config = {"selector": {"excluded_files": "files to exclude"}}
 
         updated_config = grt.update_suite_config(config, excludes=None)
-        self.assertNotIn('exclude_files', updated_config['selector'])
+        self.assertNotIn("exclude_files", updated_config["selector"])
 
     def test_excluded_files_added_to_misc(self):
-        config = {'selector': {}}
+        config = {"selector": {}}
 
-        updated_config = grt.update_suite_config(config, excludes='files to exclude')
-        self.assertEqual('files to exclude', updated_config['selector']['exclude_files'])
+        updated_config = grt.update_suite_config(config, excludes="files to exclude")
+        self.assertEqual("files to exclude", updated_config["selector"]["exclude_files"])
 
     def test_excluded_files_extended_in_misc(self):
-        config = {'selector': {'exclude_files': ['file 0', 'file 1']}}
+        config = {"selector": {"exclude_files": ["file 0", "file 1"]}}
 
-        updated_config = grt.update_suite_config(config, excludes=['file 2', 'file 3'])
-        self.assertEqual(4, len(updated_config['selector']['exclude_files']))
-        for exclude in ['file 0', 'file 1', 'file 2', 'file 3']:
-            self.assertIn(exclude, updated_config['selector']['exclude_files'])
+        updated_config = grt.update_suite_config(config, excludes=["file 2", "file 3"])
+        self.assertEqual(4, len(updated_config["selector"]["exclude_files"]))
+        for exclude in ["file 0", "file 1", "file 2", "file 3"]:
+            self.assertIn(exclude, updated_config["selector"]["exclude_files"])
 
 
 class RenderSuites(unittest.TestCase):
@@ -221,22 +228,22 @@ class RenderSuites(unittest.TestCase):
             self.EXPECTED_FORMAT.format(*range(3 * i, 3 * (i + 1))) for i in range(len(suites))
         ]
 
-        m = mock_open(read_data=yaml.dump({'selector': {'roots': [], 'excludes': ['fixed']}}))
-        with patch('buildscripts.evergreen_generate_resmoke_tasks.open', m, create=True):
-            render_suite(suites, 'suite_name')
+        m = mock_open(read_data=yaml.dump({"selector": {"roots": [], "excludes": ["fixed"]}}))
+        with patch(ns("open"), m, create=True):
+            render_suite(suites, "suite_name")
         handle = m()
 
         # The other writes are for the headers.
         self.assertEquals(len(suites) * 2, handle.write.call_count)
         handle.write.assert_has_calls([call(e) for e in expected], any_order=True)
         calls = [
-            call(os.path.join(grt.TEST_SUITE_DIR, 'suite_name.yml'), 'r')
+            call(os.path.join(grt.TEST_SUITE_DIR, "suite_name.yml"), "r")
             for _ in range(len(suites))
         ]
         m.assert_has_calls(calls, any_order=True)
-        filename = os.path.join(grt.CONFIG_DIR, 'suite_name_{{:0{}}}.yml'.format(
+        filename = os.path.join(grt.CONFIG_DIR, "suite_name_{{:0{}}}.yml".format(
             int(math.ceil(math.log10(size)))))
-        calls = [call(filename.format(i), 'w') for i in range(size)]
+        calls = [call(filename.format(i), "w") for i in range(size)]
         m.assert_has_calls(calls, any_order=True)
 
     def test_1_suite(self):
@@ -252,10 +259,10 @@ class RenderSuites(unittest.TestCase):
 class RenderMiscSuites(unittest.TestCase):
     def test_single_suite(self):
 
-        test_list = ['test{}'.format(i) for i in range(10)]
-        m = mock_open(read_data=yaml.dump({'selector': {'roots': []}}))
-        with patch('buildscripts.evergreen_generate_resmoke_tasks.open', m, create=True):
-            render_misc_suite(test_list, 'suite_name')
+        test_list = ["test{}".format(i) for i in range(10)]
+        m = mock_open(read_data=yaml.dump({"selector": {"roots": []}}))
+        with patch(ns("open"), m, create=True):
+            render_misc_suite(test_list, "suite_name")
         handle = m()
 
         # The other writes are for the headers.
@@ -274,20 +281,20 @@ class RenderMiscSuites(unittest.TestCase):
   - test9
   roots: []
 """)
-        calls = [call(os.path.join(grt.TEST_SUITE_DIR, 'suite_name.yml'), 'r')]
+        calls = [call(os.path.join(grt.TEST_SUITE_DIR, "suite_name.yml"), "r")]
         m.assert_has_calls(calls, any_order=True)
-        filename = os.path.join(grt.CONFIG_DIR, 'suite_name_misc.yml')
-        calls = [call(filename, 'w')]
+        filename = os.path.join(grt.CONFIG_DIR, "suite_name_misc.yml")
+        calls = [call(filename, "w")]
         m.assert_has_calls(calls, any_order=True)
 
 
 class PrepareDirectoryForSuite(unittest.TestCase):
     def test_no_directory(self):
-        with patch('buildscripts.evergreen_generate_resmoke_tasks.os') as mock_os:
+        with patch(ns("os")) as mock_os:
             mock_os.path.exists.return_value = False
-            prepare_directory_for_suite('tmp')
+            prepare_directory_for_suite("tmp")
 
-        mock_os.makedirs.assert_called_once_with('tmp')
+        mock_os.makedirs.assert_called_once_with("tmp")
 
 
 class CalculateTimeoutTest(unittest.TestCase):
@@ -377,13 +384,13 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
     def test_selecting_tasks(self):
         is_task_dependency = grt.EvergreenConfigGenerator._is_task_dependency
-        self.assertFalse(is_task_dependency('sharding', 'sharding'))
-        self.assertFalse(is_task_dependency('sharding', 'other_task'))
-        self.assertFalse(is_task_dependency('sharding', 'sharding_gen'))
+        self.assertFalse(is_task_dependency("sharding", "sharding"))
+        self.assertFalse(is_task_dependency("sharding", "other_task"))
+        self.assertFalse(is_task_dependency("sharding", "sharding_gen"))
 
-        self.assertTrue(is_task_dependency('sharding', 'sharding_0'))
-        self.assertTrue(is_task_dependency('sharding', 'sharding_314'))
-        self.assertTrue(is_task_dependency('sharding', 'sharding_misc'))
+        self.assertTrue(is_task_dependency("sharding", "sharding_0"))
+        self.assertTrue(is_task_dependency("sharding", "sharding_314"))
+        self.assertTrue(is_task_dependency("sharding", "sharding_misc"))
 
     def test_get_tasks_depends_on(self):
         options = self.generate_mock_options()
@@ -391,41 +398,49 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
 
         cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
         cfg_generator.build_tasks = [
-            {'display_name': 'sharding_gen'},
-            {'display_name': 'sharding_0'},
-            {'display_name': 'other_task'},
-            {'display_name': 'other_task_2'},
-            {'display_name': 'sharding_1'},
-            {'display_name': 'compile'},
-            {'display_name': 'sharding_misc'},
+            {"display_name": "sharding_gen"},
+            {"display_name": "sharding_0"},
+            {"display_name": "other_task"},
+            {"display_name": "other_task_2"},
+            {"display_name": "sharding_1"},
+            {"display_name": "compile"},
+            {"display_name": "sharding_misc"},
         ]
 
-        dependent_tasks = cfg_generator._get_tasks_for_depends_on('sharding')
+        dependent_tasks = cfg_generator._get_tasks_for_depends_on("sharding")
         self.assertEqual(3, len(dependent_tasks))
-        self.assertIn('sharding_0', dependent_tasks)
-        self.assertIn('sharding_1', dependent_tasks)
-        self.assertIn('sharding_misc', dependent_tasks)
+        self.assertIn("sharding_0", dependent_tasks)
+        self.assertIn("sharding_1", dependent_tasks)
+        self.assertIn("sharding_misc", dependent_tasks)
 
     def test_specified_dependencies_are_added(self):
         options = self.generate_mock_options()
-        options.depends_on = ['sharding']
+        options.depends_on = ["sharding"]
         options.is_patch = False
         suites = self.generate_mock_suites(3)
 
         cfg_generator = grt.EvergreenConfigGenerator(suites, options, Mock())
         cfg_generator.build_tasks = [
-            {'display_name': 'sharding_gen'},
-            {'display_name': 'sharding_0'},
-            {'display_name': 'other_task'},
-            {'display_name': 'other_task_2'},
-            {'display_name': 'sharding_1'},
-            {'display_name': 'compile'},
-            {'display_name': 'sharding_misc'},
+            {"display_name": "sharding_gen"},
+            {"display_name": "sharding_0"},
+            {"display_name": "other_task"},
+            {"display_name": "other_task_2"},
+            {"display_name": "sharding_1"},
+            {"display_name": "compile"},
+            {"display_name": "sharding_misc"},
         ]
 
         cfg_mock = Mock()
         cfg_generator._add_dependencies(cfg_mock)
         self.assertEqual(4, cfg_mock.dependency.call_count)
+
+
+class NormalizeTestNameTest(unittest.TestCase):
+    def test_unix_names(self):
+        self.assertEqual("/home/user/test.js", grt.normalize_test_name("/home/user/test.js"))
+
+    def test_windows_names(self):
+        self.assertEqual("/home/user/test.js", grt.normalize_test_name("\\home\\user\\test.js"))
 
 
 class MainTest(unittest.TestCase):
@@ -446,8 +461,10 @@ class MainTest(unittest.TestCase):
         main.options = Mock()
         main.config_options = self.get_mock_options()
 
-        with patch('os.path.exists') as exists_mock:
+        with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
+            suitesconfig_mock.get_suite.return_value.tests = \
+                [stat["test_file"] for stat in evg.test_stats.return_value]
             suites = main.calculate_suites(_DATE, _DATE)
 
             # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
@@ -495,11 +512,67 @@ class MainTest(unittest.TestCase):
             ("dir1/file3.js", 36.32),
         ]
 
-        with patch("os.path.exists") as exists_mock:
+        with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.side_effect = [False, True, True]
-            filtered_list = grt.Main.filter_existing_tests(tests_runtimes)
+            evg = Mock()
+            suitesconfig_mock.get_suite.return_value.tests = \
+                [runtime[0] for runtime in tests_runtimes]
+            main = grt.Main(evg)
+            main.config_options = Mock()
+            main.config_options.suite = "suite"
+            filtered_list = main.filter_existing_tests(tests_runtimes)
 
             self.assertEqual(2, len(filtered_list))
             self.assertNotIn(tests_runtimes[0], filtered_list)
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[1], filtered_list)
+
+    def test_filter_blacklist_files(self):
+        tests_runtimes = [
+            ("dir1/file1.js", 20.32),
+            ("dir2/file2.js", 24.32),
+            ("dir1/file3.js", 36.32),
+        ]
+
+        blacklisted_test = tests_runtimes[1][0]
+
+        with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
+            exists_mock.return_value = True
+            evg = Mock()
+            suitesconfig_mock.get_suite.return_value.tests = \
+                [runtime[0] for runtime in tests_runtimes if runtime[0] != blacklisted_test]
+            main = grt.Main(evg)
+            main.config_options = Mock()
+            main.config_options.suite = "suite"
+            filtered_list = main.filter_existing_tests(tests_runtimes)
+
+            self.assertEqual(2, len(filtered_list))
+            self.assertNotIn(blacklisted_test, filtered_list)
+            self.assertIn(tests_runtimes[2], filtered_list)
+            self.assertIn(tests_runtimes[0], filtered_list)
+
+    def test_filter_blacklist_files_for_windows(self):
+        tests_runtimes = [
+            ("dir1/file1.js", 20.32),
+            ("dir2/file2.js", 24.32),
+            ("dir1/dir3/file3.js", 36.32),
+        ]
+
+        blacklisted_test = tests_runtimes[1][0]
+
+        with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
+            exists_mock.return_value = True
+            evg = Mock()
+            suitesconfig_mock.get_suite.return_value.tests = [
+                runtime[0].replace("/", "\\") for runtime in tests_runtimes
+                if runtime[0] != blacklisted_test
+            ]
+            main = grt.Main(evg)
+            main.config_options = Mock()
+            main.config_options.suite = "suite"
+            filtered_list = main.filter_existing_tests(tests_runtimes)
+
+            self.assertNotIn(blacklisted_test, filtered_list)
+            self.assertIn(tests_runtimes[2], filtered_list)
+            self.assertIn(tests_runtimes[0], filtered_list)
+            self.assertEqual(2, len(filtered_list))
