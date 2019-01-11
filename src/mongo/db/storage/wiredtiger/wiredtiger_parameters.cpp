@@ -31,8 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_parameters.h"
-
+#include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -41,31 +40,10 @@ namespace mongo {
 
 using std::string;
 
-WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
-    WiredTigerKVEngine* engine)
-    : ServerParameter(
-          ServerParameterSet::getGlobal(), "wiredTigerEngineRuntimeConfig", false, true),
-      _engine(engine) {}
-
-
 void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder& b,
                                                     const std::string& name) {
-    b << name << _currentValue;
-}
-
-Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueElement) {
-    try {
-        return setFromString(newValueElement.String());
-    } catch (const AssertionException& msg) {
-        return Status(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream()
-                << "Invalid value for wiredTigerEngineRuntimeConfig via setParameter command: "
-                << newValueElement
-                << ", exception: "
-                << msg.what());
-    }
+    b << name << _data.first;
 }
 
 Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& str) {
@@ -80,7 +58,8 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
 
     log() << "Reconfiguring WiredTiger storage engine with config string: \"" << str << "\"";
 
-    int ret = _engine->reconfigure(str.c_str());
+    invariant(_data.second);
+    int ret = _data.second->reconfigure(str.c_str());
     if (ret != 0) {
         string result =
             (mongoutils::str::stream() << "WiredTiger reconfiguration failed with error code ("
@@ -92,7 +71,7 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
         return Status(ErrorCodes::BadValue, result);
     }
 
-    _currentValue = str;
+    _data.first = str;
     return Status::OK();
 }
-}
+}  // namespace mongo

@@ -40,6 +40,7 @@ if wiredtiger:
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',
             'wiredtiger_oplog_manager.cpp',
+            'wiredtiger_parameters.cpp',
             'wiredtiger_prepare_conflict.cpp',
             'wiredtiger_record_store.cpp',
             'wiredtiger_recovery_unit.cpp',
@@ -47,6 +48,7 @@ if wiredtiger:
             'wiredtiger_snapshot_manager.cpp',
             'wiredtiger_size_storer.cpp',
             'wiredtiger_util.cpp',
+            env.Idlc('wiredtiger_parameters.idl')[0],
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/base',
@@ -91,7 +93,6 @@ if wiredtiger:
         source=[
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
-            'wiredtiger_parameters.cpp',
             'wiredtiger_record_store_mongod.cpp',
             'wiredtiger_server_status.cpp',
         ],
