@@ -76,7 +76,6 @@ const StringData kCommitReadyMembersFieldName = "commitReadyMembers"_sd;
 MONGO_FAIL_POINT_DEFINE(crashAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
-MONGO_FAIL_POINT_DEFINE(slowBackgroundIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
 
@@ -351,18 +350,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection() {
             if (_allowInterruption && !_opCtx->checkForInterruptNoAssert().isOK())
                 return _opCtx->checkForInterruptNoAssert();
 
-            if (!(retries || PlanExecutor::ADVANCED == state) ||
-                MONGO_FAIL_POINT(slowBackgroundIndexBuild)) {
-                log() << "Hanging index build due to failpoint";
-                invariant(_allowInterruption);
-                sleepmillis(1000);
+            if (!retries && PlanExecutor::ADVANCED != state) {
                 continue;
             }
 
             // Make sure we are working with the latest version of the document.
             if (objToIndex.snapshotId() != _opCtx->recoveryUnit()->getSnapshotId() &&
                 !_collection->findDoc(_opCtx, loc, &objToIndex)) {
-                // doc was deleted so don't index it.
+                // Document was deleted so don't index it.
                 retries = 0;
                 continue;
             }
@@ -421,11 +416,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection() {
         // Unlock before hanging so replication recognizes we've completed.
         Locker::LockSnapshot lockInfo;
         invariant(_opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
-        while (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
-            log() << "Hanging index build with no locks due to "
-                     "'hangAfterStartingIndexBuildUnlocked' failpoint";
-            sleepmillis(1000);
-        }
+
+        log() << "Hanging index build with no locks due to "
+                 "'hangAfterStartingIndexBuildUnlocked' failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterStartingIndexBuildUnlocked);
 
         if (_buildInBackground) {
             _opCtx->lockState()->restoreLockState(_opCtx, lockInfo);
