@@ -888,7 +888,7 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
     lk.unlock();
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(opCtx, prepareOplogSlot);
 
-    abortGuard.Dismiss();
+    abortGuard.dismiss();
 
     invariant(!_oldestOplogEntryOpTime,
               str::stream() << "This transaction's oldest oplog entry Timestamp has already "
