@@ -129,6 +129,7 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/ttl.h"
@@ -757,7 +758,8 @@ void startupConfigActions(const std::vector<std::string>& args) {
         bool failed = false;
 
         std::string name =
-            (boost::filesystem::path(storageGlobalParams.dbpath) / "mongod.lock").string();
+            (boost::filesystem::path(storageGlobalParams.dbpath) / kLockFileBasename.toString())
+                .string();
         if (!boost::filesystem::exists(name) || boost::filesystem::file_size(name) == 0)
             failed = true;
 

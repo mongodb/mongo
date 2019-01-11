@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+constexpr StringData kLockFileBasename = "mongod.lock"_sd;
+
 class StorageEngineLockFile {
     MONGO_DISALLOW_COPYING(StorageEngineLockFile);
 
@@ -52,7 +54,7 @@ public:
      * Uses open() to read existing lock file or create new file.
      * Uses boost::filesystem to check lock file so may throw boost::exception.
      */
-    StorageEngineLockFile(const std::string& dbpath);
+    StorageEngineLockFile(const std::string& dbpath, StringData fileName = kLockFileBasename);
 
     virtual ~StorageEngineLockFile();
 

@@ -51,7 +51,6 @@ namespace mongo {
 
 namespace {
 
-const std::string kLockFileBasename = "mongod.lock";
 void flushMyDirectory(const boost::filesystem::path& file) {
 #ifdef __linux__  // this isn't needed elsewhere
     static bool _warnedAboutFilesystem = false;
@@ -111,9 +110,9 @@ public:
     int _fd;
 };
 
-StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath)
+StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath, StringData fileName)
     : _dbpath(dbpath),
-      _filespec((boost::filesystem::path(_dbpath) / kLockFileBasename).string()),
+      _filespec((boost::filesystem::path(_dbpath) / fileName.toString()).string()),
       _uncleanShutdown(boost::filesystem::exists(_filespec) &&
                        boost::filesystem::file_size(_filespec) > 0),
       _lockFileHandle(new LockFileHandle()) {}
