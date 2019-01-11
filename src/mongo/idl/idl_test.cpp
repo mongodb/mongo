@@ -232,7 +232,44 @@ TEST(IDLOneTypeTests, TestObjectLoopbackTest) {
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+
+        ASSERT_TRUE(one_new == testStruct);
+        ASSERT_FALSE(one_new < testStruct);
     }
+}
+
+// Test we compare an object with optional BSONObjs correctly
+TEST(IDLOneTypeTests, TestOptionalObjectTest) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testValue = BSON("Hello"
+                          << "World");
+    auto testDoc = BSON("value" << testValue << "value2" << testValue << "opt_value" << testValue);
+
+    auto element = testDoc.firstElement();
+    ASSERT_EQUALS(element.type(), Object);
+
+    auto testStruct = One_plain_optional_object::parse(ctxt, testDoc);
+    assert_same_types<decltype(testStruct.getValue()), const BSONObj&>();
+
+    ASSERT_BSONOBJ_EQ(testStruct.getValue(), testValue);
+
+    One_plain_optional_object testEmptyStruct;
+    One_plain_optional_object testEmptyStruct2;
+
+    // Make sure we match the operator semantics for std::optional
+    ASSERT_TRUE(testEmptyStruct == testEmptyStruct2);
+    ASSERT_FALSE(testEmptyStruct != testEmptyStruct2);
+    ASSERT_FALSE(testEmptyStruct < testEmptyStruct2);
+
+    ASSERT_FALSE(testEmptyStruct == testStruct);
+    ASSERT_TRUE(testEmptyStruct != testStruct);
+    ASSERT_TRUE(testEmptyStruct < testStruct);
+    ASSERT_FALSE(testStruct < testEmptyStruct);
+
+    ASSERT_TRUE(testStruct == testStruct);
+    ASSERT_FALSE(testStruct != testStruct);
+    ASSERT_FALSE(testStruct < testStruct);
 }
 
 // Test if a given value for a given bson document parses successfully or fails if the bson types

@@ -120,9 +120,22 @@ structs:
 
     one_plain_object:
         description: UnitTest for a single BSONObj
+        generate_comparison_operators: true
         fields:
             value: object
 
+    one_plain_optional_object:
+        description: UnitTest for optional BSONObj
+        generate_comparison_operators: true
+        fields:
+            value: object
+            value2: object
+            opt_value:
+                type: object
+                optional: true
+            opt_value2:
+                type: object
+                optional: true
 
 ##################################################################################################
 #

@@ -132,6 +132,51 @@ def _get_bson_type_check(bson_element, ctxt_name, field):
         return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
 
 
+def _get_comparison(field, rel_op, left, right):
+    # type: (ast.Field, unicode, unicode, unicode) -> unicode
+    """Generate a comparison for a field."""
+    name = _get_field_member_name(field)
+    if not "BSONObj" in field.cpp_type:
+        return "%s.%s %s %s.%s" % (left, name, rel_op, right, name)
+
+    access = name
+    if field.optional:
+        access = name + ".get()"
+
+    comp = "(SimpleBSONObjComparator::kInstance.compare(%s.%s, %s.%s) %s 0)" % (left, access, right,
+                                                                                access, rel_op)
+
+    # boost::optional implements the various operator comparisons but we need to reimplement them
+    # for BSONObj
+    if field.optional:
+        if rel_op == "==":
+            # optional values are equal if they do not contain values otherwise compare the values
+            pred = "( (static_cast<bool>(${left}.${name}) == static_cast<bool>(${right}.${name}))" +\
+                " && (!static_cast<bool>(${left}.${name}) || ${comp}) )"
+        elif rel_op == "!=":
+            pred = "( (static_cast<bool>(${left}.${name}) != static_cast<bool>(${right}.${name}))" +\
+                " && (static_cast<bool>(${left}.${name}) && ${comp}) )"
+        elif rel_op == "<":
+            pred = "( static_cast<bool>(${right}.${name}) && (!static_cast<bool>(${left}.${name})" +\
+                " || ${comp}) )"
+
+        comp = common.template_args(pred, name=name, comp=comp, left=left, right=right)
+
+    return comp
+
+
+def _get_comparison_less(fields):
+    # type: (List[ast.Field]) -> unicode
+    """Generate a less than comparison for a list of fields recursively."""
+    field = fields[0]
+    if len(fields) == 1:
+        return _get_comparison(field, "<", "left", "right")
+
+    return "%s || (!(%s) && (%s))" % (_get_comparison(field, "<", "left", "right"),
+                                      _get_comparison(field, "<", "right", "left"),
+                                      _get_comparison_less(fields[1:]))
+
+
 def _get_all_fields(struct):
     # type: (ast.Struct) -> List[ast.Field]
     """Get a list of all the fields, including the command field."""
@@ -723,24 +768,44 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate comparison operators declarations for the type."""
         # pylint: disable=invalid-name
-
         sorted_fields = sorted([
             field for field in struct.fields if (not field.ignore) and field.comparison_order != -1
         ], key=lambda f: f.comparison_order)
-        fields = [_get_field_member_name(field) for field in sorted_fields]
 
-        with self._block("auto relationalTie() const {", "}"):
-            self._writer.write_line('return std::tie(%s);' % (', '.join(fields)))
-
-        for rel_op in ['==', '!=', '<', '>', '<=', '>=']:
+        for rel_op in [('==', " && "), ('!=', " || ")]:
             self.write_empty_line()
             decl = common.template_args(
                 "friend bool operator${rel_op}(const ${class_name}& left, const ${class_name}& right) {",
-                rel_op=rel_op, class_name=common.title_case(struct.name))
+                rel_op=rel_op[0], class_name=common.title_case(struct.name))
 
             with self._block(decl, "}"):
-                self._writer.write_line('return left.relationalTie() %s right.relationalTie();' %
-                                        (rel_op))
+                self._writer.write_line('return %s;' % (rel_op[1].join(
+                    [_get_comparison(field, rel_op[0], "left", "right")
+                     for field in sorted_fields])))
+
+        decl = common.template_args(
+            "friend bool operator<(const ${class_name}& left, const ${class_name}& right) {",
+            class_name=common.title_case(struct.name))
+        with self._block(decl, "}"):
+            self._writer.write_line("return %s;" % (_get_comparison_less(sorted_fields)))
+
+        decl = common.template_args(
+            "friend bool operator>(const ${class_name}& left, const ${class_name}& right) {",
+            class_name=common.title_case(struct.name))
+        with self._block(decl, "}"):
+            self._writer.write_line('return right < left;')
+
+        decl = common.template_args(
+            "friend bool operator<=(const ${class_name}& left, const ${class_name}& right) {",
+            class_name=common.title_case(struct.name))
+        with self._block(decl, "}"):
+            self._writer.write_line('return !(right < left);')
+
+        decl = common.template_args(
+            "friend bool operator>=(const ${class_name}& left, const ${class_name}& right) {",
+            class_name=common.title_case(struct.name))
+        with self._block(decl, "}"):
+            self._writer.write_line('return !(left < right);')
 
         self.write_empty_line()
 
@@ -844,6 +909,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'mongo/base/data_range.h',
             'mongo/bson/bsonobj.h',
             'mongo/bson/bsonobjbuilder.h',
+            'mongo/bson/simple_bsonobj_comparator.h',
             'mongo/idl/idl_parser.h',
             'mongo/rpc/op_msg.h',
         ] + spec.globals.cpp_includes
