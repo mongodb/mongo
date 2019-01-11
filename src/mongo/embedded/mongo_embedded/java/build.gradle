@@ -71,4 +71,6 @@ apply plugin: 'io.codearte.nexus-staging'
 
 nexusStaging {
     packageGroup = "org.mongodb"
+    username = ossrhUsername
+    password = ossrhPassword
 }
