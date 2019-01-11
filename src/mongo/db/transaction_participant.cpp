@@ -883,9 +883,13 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.opTime.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
 
-    // For prepared transactions, we must update ServerTransactionMetrics with the prepare optime
-    // before the prepare oplog entry is written so that we don't incorrectly advance the stable
-    // timestamp.
+    // We need to unlock the session to run the opObserver onTransactionPrepare, which calls back
+    // into the session.
+    lk.unlock();
+    opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(opCtx, prepareOplogSlot);
+
+    abortGuard.Dismiss();
+
     invariant(!_oldestOplogEntryOpTime,
               str::stream() << "This transaction's oldest oplog entry Timestamp has already "
                             << "been set to: "
@@ -903,13 +907,6 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
                                               *_oldestOplogEntryOpTime,
                                               tickSource->getTicks());
     }
-
-    // We need to unlock the session to run the opObserver onTransactionPrepare, which calls back
-    // into the session.
-    lk.unlock();
-    opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(opCtx, prepareOplogSlot);
-
-    abortGuard.Dismiss();
 
     if (MONGO_FAIL_POINT(hangAfterSettingPrepareStartTime)) {
         log() << "transaction - hangAfterSettingPrepareStartTime fail point enabled. Blocking "
@@ -1006,7 +1003,6 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
     invariant(_txnState.isCommittingWithoutPrepare(lk),
               str::stream() << "Current State: " << _txnState);
 
-    _updateTxnMetricsOnCommit(lk, opCtx, false);
     _finishCommitTransaction(lk, opCtx);
 }
 
@@ -1057,17 +1053,6 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
                                     << commitOplogSlot.opTime.toBSON());
         }
 
-        // Prepared transactions must have a valid oldestOplogEntryOpTime.
-        invariant(_oldestOplogEntryOpTime);
-        _finishOpTime = commitOplogSlot.opTime;
-
-        // For prepared transactions, we must update ServerTransactionMetrics with the finish optime
-        // before the commit oplog entry is written. This is because the commit point can advance to
-        // include the commit's opTime, triggering a recalculation of the stable timestamp. If the
-        // metrics are not updated, then the replication coordinator will not know that it can
-        // advance the stable timestamp.
-        _updateTxnMetricsOnCommit(lk, opCtx, true);
-
         // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
         // into the session. We also do not want to write to storage with the mutex locked.
         lk.unlock();
@@ -1079,6 +1064,11 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
 
         lk.lock();
         _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+
+        // If we are committing a prepared transaction, then we must have already recorded this
+        // transaction's oldest oplog entry optime.
+        invariant(_oldestOplogEntryOpTime);
+        _finishOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
         _finishCommitTransaction(lk, opCtx);
     } catch (...) {
@@ -1121,15 +1111,7 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
     if (_speculativeTransactionReadOpTime > clientInfo.getLastOp()) {
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
-
-    // We must clear the recovery unit and locker so any post-transaction writes can run without
-    // transactional settings such as a read timestamp.
-    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TerminationCause::kCommitted);
-}
-
-void TransactionParticipant::_updateTxnMetricsOnCommit(WithLock lk,
-                                                       OperationContext* opCtx,
-                                                       bool isCommittingWithPrepare) {
+    const bool isCommittingWithPrepare = _txnState.isCommittingWithPrepare(lk);
     _txnState.transitionTo(lk, TransactionState::kCommitted);
 
     {
@@ -1146,6 +1128,10 @@ void TransactionParticipant::_updateTxnMetricsOnCommit(WithLock lk,
             CurOp::get(opCtx)->debug().additiveMetrics,
             CurOp::get(opCtx)->debug().storageStats);
     }
+
+    // We must clear the recovery unit and locker so any post-transaction writes can run without
+    // transactional settings such as a read timestamp.
+    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TransactionState::kCommitted);
 }
 
 void TransactionParticipant::shutdown() {

@@ -768,11 +768,6 @@ private:
     // invalidating a transaction, or starting a new transaction.
     void _resetTransactionState(WithLock wl, TransactionState::StateFlag state);
 
-    // Helper that updates ServerTransactionsMetrics once a transaction commits.
-    void _updateTxnMetricsOnCommit(WithLock lk,
-                                   OperationContext* opCtx,
-                                   bool isCommittingWithPrepare);
-
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
 
