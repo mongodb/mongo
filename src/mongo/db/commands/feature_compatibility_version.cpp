@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/kill_sessions_local.h"
@@ -256,73 +257,58 @@ void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
 /**
  * Read-only server parameter for featureCompatibilityVersion.
  */
-class FeatureCompatibilityVersionParameter : public ServerParameter {
-public:
-    FeatureCompatibilityVersionParameter()
-        : ServerParameter(ServerParameterSet::getGlobal(),
-                          FeatureCompatibilityVersionParser::kParameterName.toString(),
-                          false,  // allowedToChangeAtStartup
-                          false   // allowedToChangeAtRuntime
-                          ) {}
+// No ability to specify 'none' as set_at type,
+// so use 'startup' in the IDL file, then override to none here.
+FeatureCompatibilityVersionParameter::FeatureCompatibilityVersionParameter(StringData name,
+                                                                           ServerParameterType)
+    : ServerParameter(ServerParameterSet::getGlobal(), name, false, false) {}
 
-    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
-        BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
-        uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
-                str::stream() << FeatureCompatibilityVersionParser::kParameterName
-                              << " is not yet known.",
-                serverGlobalParams.featureCompatibility.isVersionInitialized());
-        switch (serverGlobalParams.featureCompatibility.getVersion()) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersionParser::kVersionField,
-                    FeatureCompatibilityVersionParser::kVersion42);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersionParser::kVersionField,
-                    FeatureCompatibilityVersionParser::kVersion40);
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersionParser::kTargetVersionField,
-                    FeatureCompatibilityVersionParser::kVersion42);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersionParser::kVersionField,
-                    FeatureCompatibilityVersionParser::kVersion40);
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersionParser::kTargetVersionField,
-                    FeatureCompatibilityVersionParser::kVersion40);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersionParser::kVersionField,
-                    FeatureCompatibilityVersionParser::kVersion40);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
-                // getVersion() does not return this value.
-                MONGO_UNREACHABLE;
-        }
+void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
+                                                  BSONObjBuilder& b,
+                                                  const std::string& name) {
+    uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
+            str::stream() << name << " is not yet known.",
+            serverGlobalParams.featureCompatibility.isVersionInitialized());
+
+    BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
+    switch (serverGlobalParams.featureCompatibility.getVersion()) {
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kVersionField,
+                FeatureCompatibilityVersionParser::kVersion42);
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kVersionField,
+                FeatureCompatibilityVersionParser::kVersion40);
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kTargetVersionField,
+                FeatureCompatibilityVersionParser::kVersion42);
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40:
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kVersionField,
+                FeatureCompatibilityVersionParser::kVersion40);
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kTargetVersionField,
+                FeatureCompatibilityVersionParser::kVersion40);
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40:
+            featureCompatibilityVersionBuilder.append(
+                FeatureCompatibilityVersionParser::kVersionField,
+                FeatureCompatibilityVersionParser::kVersion40);
+            return;
+        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
+            // getVersion() does not return this value.
+            MONGO_UNREACHABLE;
     }
+}
 
-    virtual Status set(const BSONElement& newValueElement) {
-        return Status(ErrorCodes::IllegalOperation,
-                      str::stream()
-                          << FeatureCompatibilityVersionParser::kParameterName
-                          << " cannot be set via setParameter. See "
+Status FeatureCompatibilityVersionParameter::setFromString(const std::string&) {
+    return {ErrorCodes::IllegalOperation,
+            str::stream() << name() << " cannot be set via setParameter. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
-                          << ".");
-    }
-
-    virtual Status setFromString(const std::string& str) {
-        return Status(ErrorCodes::IllegalOperation,
-                      str::stream()
-                          << FeatureCompatibilityVersionParser::kParameterName
-                          << " cannot be set via setParameter. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << ".");
-    }
-} featureCompatibilityVersionParameter;
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(internalValidateFeaturesAsMaster, bool, true);
+                          << "."};
+}
 
 }  // namespace mongo

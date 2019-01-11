@@ -188,6 +188,7 @@ env.Library(
     target="mongod_fcv",
     source=[
         "feature_compatibility_version.cpp",
+        env.Idlc('feature_compatibility_version.idl')[0],
     ],
     LIBDEPS=[
         'feature_compatibility_parsers',
@@ -196,6 +197,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/kill_sessions_local',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
     ],
 )

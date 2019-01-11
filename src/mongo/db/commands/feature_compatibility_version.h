@@ -41,12 +41,6 @@ namespace mongo {
 class BSONObj;
 class OperationContext;
 
-/**
- * Startup parameter to ignore featureCompatibilityVersion checks. This parameter cannot be set if
- * the node is started with --replSet. This should never be set by end users.
- */
-extern bool internalValidateFeaturesAsMaster;
-
 class FeatureCompatibilityVersion {
 public:
     /**

@@ -30,42 +30,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
 
-const std::string kAuthSchemaVersionServerParameter = "authSchemaVersion";
-
-class AuthzVersionParameter : public ServerParameter {
-    MONGO_DISALLOW_COPYING(AuthzVersionParameter);
-
-public:
-    AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
-    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
-    virtual Status set(const BSONElement& newValueElement);
-    virtual Status setFromString(const std::string& str);
-};
-
-MONGO_INITIALIZER_GENERAL(AuthzSchemaParameter,
-                          MONGO_NO_PREREQUISITES,
-                          ("BeginStartupOptionParsing"))
-(InitializerContext*) {
-    new AuthzVersionParameter(ServerParameterSet::getGlobal(), kAuthSchemaVersionServerParameter);
-    return Status::OK();
-}
-
-AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name)
-    : ServerParameter(sps, name, false, false) {}
+// This setting is unique in that it is read-only.
+// The IDL subststem doesn't actually allow for that,
+// so we'll pretend it's startup-settable, then override it here.
+AuthzVersionParameter::AuthzVersionParameter(StringData name, ServerParameterType)
+    : ServerParameter(ServerParameterSet::getGlobal(), name, false, false) {}
 
 void AuthzVersionParameter::append(OperationContext* opCtx,
                                    BSONObjBuilder& b,
@@ -76,17 +55,9 @@ void AuthzVersionParameter::append(OperationContext* opCtx,
     b.append(name, authzVersion);
 }
 
-Status AuthzVersionParameter::set(const BSONElement& newValueElement) {
-    return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
-}
-
 Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
-    return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
+    return {ErrorCodes::InternalError, "set called on unsettable server parameter"};
 }
-
-}  // namespace
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(startupAuthSchemaValidation, bool, true);
 
 ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
@@ -97,7 +68,7 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
         auto authzManager = AuthorizationManager::create();
         authzManager->setAuthEnabled(serverGlobalParams.authState ==
                                      ServerGlobalParams::AuthState::kEnabled);
-        authzManager->setShouldValidateAuthSchemaOnStartup(startupAuthSchemaValidation);
+        authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
         AuthorizationManager::set(service, std::move(authzManager));
     });
 
