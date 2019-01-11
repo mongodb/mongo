@@ -22,7 +22,7 @@
     print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
     let log = cat(conn.fullOptions.logFile);
     assert(
-        /COMMAND .* command test.foo appName: "MongoDB Shell" command: count { count: "foo", query: { \$where: function ()/
+        /COMMAND .* command test.foo appName: "MongoDB Shell" command: count { count: "foo", query: { \$where: function\(\)/
             .test(log),
         "'slow query' log line missing in mongod log file!\n" + "Log file contents: " +
             conn.fullOptions.logFile +

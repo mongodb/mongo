@@ -1,0 +1,18 @@
+# Note: if you add more configure substitutions here with required values
+# you will also need to fix the sed commands in:
+# taskcluster/scripts/builder/build-sm-mozjs-crate.sh
+# taskcluster/scripts/builder/build-sm-rust-bindings.sh
+
+[source.crates-io]
+registry = 'https://github.com/rust-lang/crates.io-index'
+replace-with = 'vendored-sources'
+
+[source."https://github.com/gankro/serde"]
+git = "https://github.com/gankro/serde"
+branch = "deserialize_from_enums4"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = '/home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/third_party/rust'
+
+@WIN64_CARGO_LINKER_CONFIG@

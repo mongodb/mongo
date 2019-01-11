@@ -51,7 +51,7 @@ const JSFunctionSpec OIDInfo::methods[3] = {
 
 const char* const OIDInfo::className = "ObjectId";
 
-void OIDInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void OIDInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto oid = static_cast<OID*>(JS_GetPrivate(obj));
 
     if (oid) {
@@ -125,10 +125,9 @@ void OIDInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObje
     if (!JS_DefinePropertyById(cx,
                                proto,
                                getScope(cx)->getInternedStringId(InternedString::str),
-                               undef,
-                               JSPROP_ENUMERATE | JSPROP_SHARED,
                                smUtils::wrapConstrainedMethod<Functions::getter, true, OIDInfo>,
-                               nullptr)) {
+                               nullptr,
+                               JSPROP_ENUMERATE)) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
     }
 }

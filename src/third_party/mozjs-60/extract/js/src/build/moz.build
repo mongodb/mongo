@@ -1,0 +1,82 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+CONFIGURE_SUBST_FILES += [
+    'js-config',
+    'js.pc',
+]
+
+if not CONFIG['JS_STANDALONE']:
+    LIBRARY_DEFINES['MOZ_HAS_MOZGLUE'] = True
+
+# JavaScript must be built shared, even for static builds, as it is used by
+# other modules which are always built shared. Failure to do so results in
+# the js code getting copied into xpinstall and jsd as well as mozilla-bin,
+# and then the static data cells used for locking no longer work.
+#
+# In fact, we now build both a static and a shared library, as the
+# JS shell would like to link to the static library.
+
+if CONFIG['JS_SHARED_LIBRARY']:
+    GeckoSharedLibrary('js', linkage=None)
+    SHARED_LIBRARY_NAME = CONFIG['JS_LIBRARY_NAME']
+else:
+    Library('js')
+
+FORCE_STATIC_LIB = True
+STATIC_LIBRARY_NAME = 'js_static'
+
+if CONFIG['ENABLE_INTL_API']:
+    if not CONFIG['MOZ_ICU_DATA_ARCHIVE']:
+        USE_LIBS += [
+            'icu',
+        ]
+    else:
+        # Linking 'icu' will pull in the stubdata library,
+        # which the shell doesn't want, so link the other bits.
+        USE_LIBS += [
+            'icui18n',
+            'icuuc',
+        ]
+
+USE_LIBS += [
+    'nspr',
+    'zlib',
+]
+
+if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
+    OS_LIBS += [
+        'm',
+    ]
+
+if CONFIG['OS_ARCH'] == 'FreeBSD':
+    OS_LIBS += [
+        '-pthread',
+    ]
+
+if CONFIG['OS_ARCH'] == 'Linux':
+    OS_LIBS += [
+        'dl',
+    ]
+
+if CONFIG['OS_ARCH'] == 'SunOS':
+    OS_LIBS += [
+        'posix4',
+        'dl',
+        'nsl',
+        'socket',
+    ]
+
+OS_LIBS += CONFIG['REALTIME_LIBS']
+
+NO_EXPAND_LIBS = True
+
+DIST_INSTALL = True
+
+# Ensure symbol versions of shared library on Linux do not conflict
+# with those in libxul.
+if CONFIG['OS_TARGET'] == 'Linux':
+    LDFLAGS += ['-Wl,-version-script,symverscript']

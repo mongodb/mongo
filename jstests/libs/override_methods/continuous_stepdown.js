@@ -193,7 +193,19 @@ let ContinuousStepdown;
              * Overrides startSet call to increase logging verbosity.
              */
             this.startSet = function() {
-                let options = arguments[0] = arguments[0] || {};
+                let options = arguments[0] || {};
+
+                if (typeof(options.setParameter) === "string") {
+                    var eqIdx = options.setParameter.indexOf("=");
+                    if (eqIdx != -1) {
+                        var param = options.setParameter.substring(0, eqIdx);
+                        var value = options.setParameter.substring(eqIdx + 1);
+                        options.setParameter = {};
+                        options.setParameter[param] = value;
+                    }
+                }
+                arguments[0] = options;
+
                 options.setParameter = options.setParameter || {};
                 options.setParameter.logComponentVerbosity = verbositySetting;
                 return _originalStartSetFn.apply(this, arguments);

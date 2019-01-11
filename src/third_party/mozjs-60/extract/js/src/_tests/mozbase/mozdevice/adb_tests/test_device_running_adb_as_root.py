@@ -1,0 +1,1 @@
+/home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/testing/mozbase/mozdevice/adb_tests/test_device_running_adb_as_root.py

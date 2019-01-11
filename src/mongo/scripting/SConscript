@@ -66,12 +66,14 @@ if usemozjs:
     if env.TargetOSIs('windows'):
         scriptingEnv.Append(CCFLAGS=[
             '/FI', 'js-config.h',
+            '/FI', 'js-confdefs.h',
             '/FI', 'js/RequiredDefines.h',
         ])
     else:
         scriptingEnv.Append(
             CCFLAGS=[
                 '-include', 'js-config.h',
+                '-include', 'js-confdefs.h',
                 '-include', 'js/RequiredDefines.h',
                 '-Wno-invalid-offsetof',
             ],

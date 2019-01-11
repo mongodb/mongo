@@ -65,7 +65,7 @@ long long* getCursorId(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorHandleInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void CursorHandleInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto cursorTracker = static_cast<CursorHandleInfo::CursorTracker*>(JS_GetPrivate(obj));
     if (cursorTracker) {
         const long long cursorId = cursorTracker->cursorId;

@@ -1,0 +1,11 @@
+MFBT uses standard Mozilla style, with the following exceptions.
+
+- Some of the files use a lower-case letter at the start of function names.
+  This is because MFBT used to use a different style, and was later converted
+  to standard Mozilla style. These functions have not been changed to use an
+  upper-case letter because it would cause a lot of churn in other parts of the
+  codebase. However, new files should follow standard Mozilla style and use an
+  upper-case letter at the start of function names.
+
+- Imported third-party code (such as decimal/*, double-conversion/source/*, and
+  lz4*) remains in its original style.

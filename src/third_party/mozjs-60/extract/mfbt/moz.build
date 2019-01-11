@@ -1,0 +1,165 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+with Files("**"):
+    BUG_COMPONENT = ("Core", "MFBT")
+
+TEST_DIRS += ['tests']
+
+Library('mfbt')
+
+EXPORTS.mozilla = [
+    'Alignment.h',
+    'AllocPolicy.h',
+    'AlreadyAddRefed.h',
+    'Array.h',
+    'ArrayUtils.h',
+    'Assertions.h',
+    'Atomics.h',
+    'Attributes.h',
+    'BinarySearch.h',
+    'BloomFilter.h',
+    'BufferList.h',
+    'Casting.h',
+    'ChaosMode.h',
+    'Char16.h',
+    'CheckedInt.h',
+    'Compiler.h',
+    'Compression.h',
+    'DebugOnly.h',
+    'decimal/Decimal.h',
+    'DefineEnum.h',
+    'DoublyLinkedList.h',
+    'EndianUtils.h',
+    'EnumeratedArray.h',
+    'EnumeratedRange.h',
+    'EnumSet.h',
+    'EnumTypeTraits.h',
+    'FastBernoulliTrial.h',
+    'FloatingPoint.h',
+    'FStream.h',
+    'GuardObjects.h',
+    'HashFunctions.h',
+    'IndexSequence.h',
+    'IntegerPrintfMacros.h',
+    'IntegerRange.h',
+    'IntegerTypeTraits.h',
+    'JSONWriter.h',
+    'Likely.h',
+    'LinkedList.h',
+    'MacroArgs.h',
+    'MacroForEach.h',
+    'MathAlgorithms.h',
+    'Maybe.h',
+    'MaybeOneOf.h',
+    'MemoryChecking.h',
+    'MemoryReporting.h',
+    'Move.h',
+    'NotNull.h',
+    'NullPtr.h',
+    'Opaque.h',
+    'OperatorNewExtensions.h',
+    'Pair.h',
+    'Path.h',
+    'PodOperations.h',
+    'Poison.h',
+    'Range.h',
+    'RangedArray.h',
+    'RangedPtr.h',
+    'ReentrancyGuard.h',
+    'RefCounted.h',
+    'RefCountType.h',
+    'RefPtr.h',
+    'Result.h',
+    'ResultExtensions.h',
+    'ReverseIterator.h',
+    'RollingMean.h',
+    'Saturate.h',
+    'Scoped.h',
+    'ScopeExit.h',
+    'SegmentedVector.h',
+    'SHA1.h',
+    'SmallPointerArray.h',
+    'Span.h',
+    'SplayTree.h',
+    'Sprintf.h',
+    'StaticAnalysisFunctions.h',
+    'TaggedAnonymousMemory.h',
+    'TemplateLib.h',
+    'TextUtils.h',
+    'ThreadLocal.h',
+    'ThreadSafeWeakPtr.h',
+    'ToString.h',
+    'Tuple.h',
+    'TypedEnumBits.h',
+    'Types.h',
+    'TypeTraits.h',
+    'UniquePtr.h',
+    'UniquePtrExtensions.h',
+    'Unused.h',
+    'Variant.h',
+    'Vector.h',
+    'WeakPtr.h',
+    'WrappingOperations.h',
+    'XorShift128PlusRNG.h',
+]
+
+EXPORTS["double-conversion"] = [
+    'double-conversion/double-conversion/double-conversion.h',
+    'double-conversion/double-conversion/utils.h',
+]
+
+LOCAL_INCLUDES += [
+    '/mfbt/double-conversion',
+]
+
+if CONFIG['OS_ARCH'] == 'WINNT':
+    EXPORTS.mozilla += [
+        'WindowsVersion.h',
+    ]
+elif CONFIG['OS_ARCH'] == 'Linux':
+    EXPORTS.mozilla += [
+        'LinuxSignal.h',
+    ]
+
+UNIFIED_SOURCES += [
+    'Assertions.cpp',
+    'ChaosMode.cpp',
+    'double-conversion/double-conversion/bignum-dtoa.cc',
+    'double-conversion/double-conversion/bignum.cc',
+    'double-conversion/double-conversion/cached-powers.cc',
+    'double-conversion/double-conversion/diy-fp.cc',
+    'double-conversion/double-conversion/double-conversion.cc',
+    'double-conversion/double-conversion/fast-dtoa.cc',
+    'double-conversion/double-conversion/fixed-dtoa.cc',
+    'double-conversion/double-conversion/strtod.cc',
+    'FloatingPoint.cpp',
+    'HashFunctions.cpp',
+    'JSONWriter.cpp',
+    'Poison.cpp',
+    'SHA1.cpp',
+    'TaggedAnonymousMemory.cpp',
+    'Unused.cpp',
+]
+
+DEFINES['IMPL_MFBT'] = True
+
+SOURCES += [
+    'Compression.cpp',
+    'decimal/Decimal.cpp',
+    'lz4.c',
+]
+
+DisableStlWrapping()
+
+if CONFIG['CC_TYPE'] == 'clang':
+    # Suppress warnings from third-party V8 Decimal code.
+    SOURCES['decimal/Decimal.cpp'].flags += ['-Wno-implicit-fallthrough']
+
+if CONFIG['MOZ_NEEDS_LIBATOMIC']:
+    OS_LIBS += ['atomic']
+
+DEFINES['LZ4LIB_VISIBILITY'] = ''

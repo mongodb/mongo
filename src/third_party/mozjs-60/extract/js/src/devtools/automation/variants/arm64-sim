@@ -1,0 +1,10 @@
+{
+    "configure-args": "--enable-simulator=arm64",
+    "optimize": true,
+    "debug": true,
+    "env": {
+        "JSTESTS_EXTRA_ARGS": "--exclude-file={DIR}/arm64-jstests-slow.txt",
+        "JITTEST_EXTRA_ARGS": "--jitflags=none --args=--baseline-eager -x ion/ -x asm.js/"
+    },
+    "bits": 64
+}

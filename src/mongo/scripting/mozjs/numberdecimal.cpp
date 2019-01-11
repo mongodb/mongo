@@ -52,7 +52,7 @@ const JSFunctionSpec NumberDecimalInfo::methods[3] = {
 
 const char* const NumberDecimalInfo::className = "NumberDecimal";
 
-void NumberDecimalInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void NumberDecimalInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto x = static_cast<Decimal128*>(JS_GetPrivate(obj));
 
     if (x)

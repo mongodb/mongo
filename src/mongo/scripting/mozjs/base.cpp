@@ -54,10 +54,11 @@ void BaseInfo::enumerate(JSContext* cx,
                          JS::HandleObject obj,
                          JS::AutoIdVector& properties,
                          bool enumerableOnly) {}
-void BaseInfo::finalize(JSFreeOp* fop, JSObject* obj) {}
+void BaseInfo::finalize(js::FreeOp* fop, JSObject* obj) {}
 void BaseInfo::getProperty(JSContext* cx,
                            JS::HandleObject obj,
                            JS::HandleId id,
+                           JS::HandleValue receiver,
                            JS::MutableHandleValue vp) {}
 void BaseInfo::hasInstance(JSContext* cx,
                            JS::HandleObject obj,
@@ -71,7 +72,8 @@ void BaseInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
 void BaseInfo::setProperty(JSContext* cx,
                            JS::HandleObject obj,
                            JS::HandleId id,
-                           JS::MutableHandleValue vp,
+                           JS::HandleValue v,
+                           JS::HandleValue receiver,
                            JS::ObjectOpResult& result) {}
 
 }  // namespace mozjs

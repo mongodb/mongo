@@ -52,7 +52,7 @@ const JSFunctionSpec NumberIntInfo::methods[5] = {
 
 const char* const NumberIntInfo::className = "NumberInt";
 
-void NumberIntInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void NumberIntInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto x = static_cast<int*>(JS_GetPrivate(obj));
 
     if (x)

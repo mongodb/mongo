@@ -1,0 +1,10 @@
+{
+    "configure-args": "--enable-debug-symbols='-gline-tables-only' --disable-jemalloc --enable-address-sanitizer",
+    "optimize": true,
+    "debug": false,
+    "compiler": "clang",
+    "env": {
+        "LLVM_SYMBOLIZER": "{TOOLTOOL_CHECKOUT}/clang/bin/llvm-symbolizer"
+    },
+    "use_minidump": false
+}

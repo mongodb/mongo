@@ -126,7 +126,7 @@ void BSONInfo::make(
     JS_SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope, ro));
 }
 
-void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void BSONInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto holder = static_cast<BSONHolder*>(JS_GetPrivate(obj));
 
     if (!holder)
@@ -163,21 +163,24 @@ void BSONInfo::enumerate(JSContext* cx,
         if (!JS_ValueToId(cx, val, &id))
             uasserted(ErrorCodes::JSInterpreterFailure, "Failed to invoke JS_ValueToId");
 
-        properties.append(id);
+        if (!properties.append(id))
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to append property");
     }
 }
 
 void BSONInfo::setProperty(JSContext* cx,
+
                            JS::HandleObject obj,
                            JS::HandleId id,
-                           JS::MutableHandleValue vp,
+                           JS::HandleValue vp,
+                           JS::HandleValue receiver,
                            JS::ObjectOpResult& result) {
+
     auto holder = getValidHolder(cx, obj);
 
     if (holder) {
         if (holder->_readOnly) {
             uasserted(ErrorCodes::BadValue, "Read only object");
-            return;
         }
 
         auto iter = holder->_removed.find(IdWrapper(cx, id).toString());

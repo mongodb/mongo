@@ -1,0 +1,195 @@
+#!/usr/bin/perl
+
+# How to use:
+#
+# Step 1: run release-notes diff old-jsapi.h new-jsapi.h > diff.txt
+#
+# Step 2: edit diff.txt
+#  - when a function has been renamed, get the - and + lines adjacent and mark the - line with [renamed] at the end
+#  - when a function has been replaced, do the same (replacements behave differently)
+#  - for anything that isn't a simple addition, deletion, rename, or replace, tag with [other]
+#    (things tagged [other] will be put in a separate section for manual fixup)
+#
+# Step 3: run release-notes < diff.txt > changes.txt
+#  - this will group changes into sections and annotate them with bug numbers
+#  - the bugs chosen are just the bug that last touched each line, and are unlikely to be entirely accurate
+#
+# Step 4: run release-notes mdn < changes.txt > final.txt
+#  - this will add an MDN link to every list item, first checking whether such a link is valid
+#
+# Step 5: paste into the MDN page, eg https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Releases/45
+
+# Upcoming: basing everything off of jsapi.h is probably not going to work for
+# much longer, given that more stuff is moving into js/public. Scan
+# js/public/*.h too and record where everything comes from (to automate header
+# changes in the notes)?
+#
+# This is only looking at C style APIs. Dump out all methods too?
+#
+# The enbuggification should be split out into a separate phase because it is
+# wrong a fair amount of the time (whitespace changes, parameter changes,
+# etc.), and should have a way of running repeatedly so you can incrementally
+# fix stuff up.
+#
+# It would be very nice to have an example program that links against mozjs,
+# tested in CI, so we can diff that for release notes.
+
+use strict;
+use warnings;
+
+if (@ARGV && $ARGV[0] eq 'diff') {
+    my ($orig_file, $new_file) = @ARGV[1..2];
+    my $orig_api = grab_api($orig_file);
+    my $new_api = grab_api($new_file);
+    diff_apis($orig_api, $new_api);
+    exit 0;
+}
+
+my $path = "/en-US/docs/Mozilla/Projects/SpiderMonkey/JSAPI_Reference";
+my $url_prefix = "https://developer.mozilla.org$path";
+
+if (@ARGV && $ARGV[0] eq 'mdn') {
+    shift(@ARGV);
+    while(<>) {
+        if (/<li>([\w:]+)/) {
+            print STDERR "Checking $1...\n";
+            system("wget", "-q", "$url_prefix/$1");
+            if ($? == 0) {
+                s!<li>([\w:]+)!<li><a href="$path/$1">$1</a>!;
+            }
+        }
+        print;
+    }
+    exit 0;
+}
+
+sub grab_api {
+    my ($file) = @_;
+    open(my $fh, "<", $file) or die "open $file: $!";
+    my $grabbing;
+    my @api;
+    while(<$fh>) {
+        if ($grabbing && /^(\w+)/) {
+            push @api, $1;
+        }
+        $grabbing = /JS_PUBLIC_API/;
+    }
+    return \@api;
+}
+
+sub diff_apis {
+    my ($old, $new) = @_;
+    my %old;
+    @old{@$old} = ();
+    my %new;
+    @new{@$new} = ();
+
+    open(my $ofh, ">", "/tmp/r-c.diff.1");
+    print $ofh "$_\n" foreach (@$old);
+    close $ofh;
+    open(my $nfh, ">", "/tmp/r-c.diff.2");
+    print $nfh "$_\n" foreach (@$new);
+    close $nfh;
+    open(my $diff, "diff -u /tmp/r-c.diff.1 /tmp/r-c.diff.2 |");
+    while(<$diff>) {
+        if (/^-(\w+)/) {
+            next if exists $new{$1}; # Still exists, so skip it
+        } elsif (/^\+(\w+)/) {
+            next if exists $old{$1}; # It was already there, skip it
+        }
+        print;
+    }
+}
+
+my @added;
+my @renamed;
+my @replaced;
+my @deleted;
+my @other;
+
+my %N;
+
+my $renaming;
+my $replacing;
+while (<>) {
+    my $name;
+    if (/^[ +-](\w+)/) {
+        $name = $1;
+        $N{$name} = $name =~ /^JS_/ ? $name : "JS::$name";
+    }
+
+    if (/^-/) {
+        die if ! $name;
+        if (/\[rename\]/) {
+            $renaming = $name;
+        } elsif (/\[replace\]/) {
+            $replacing = $name;
+        } elsif (/\[other\]/) {
+            push @other, $name;
+        } else {
+            push @deleted, $name;
+        }
+    } elsif (/^\+/) {
+        die if ! $name;
+        if ($renaming) {
+            push @renamed, [ $renaming, $name ];
+            undef $renaming;
+        } elsif ($replacing) {
+            push @replaced, [ $replacing, $name ];
+            undef $replacing;
+        } elsif (/\[other\]/) {
+            push @other, $name;
+        } else {
+            push @added, $name;
+        }
+    }
+}
+
+open(my $fh, "<", "jsapi.blame") or die "open jsapi.blame: $!";
+my $grabbing;
+my %changerev;
+my %revs;
+while(<$fh>) {
+    if ($grabbing && /^\s*(\d+): (\w+)/ ) {
+        $changerev{$2} = $1;
+        $revs{$1} = 1;
+    }
+    $grabbing = /JS_PUBLIC_API/;
+}
+
+my %bug;
+for my $rev (keys %revs) {
+    open(my $fh, "hg log -r $rev -T '{desc}' |");
+    while(<$fh>) {
+        if (/[bB]ug (\d+)/) {
+            $bug{$rev} = $1;
+        }
+    }
+}
+
+sub get_bug_suffix {
+    my ($api) = @_;
+    $DB::single = 1 if ! $changerev{$api};
+    my $bug = $bug{$changerev{$api}};
+    return $bug ? " {{{bug($bug)}}}" : "";
+}
+
+print "(new apis)\n";
+print "<ul>\n";
+print "  <li>$N{$_}" . get_bug_suffix($_) . "</li>\n" foreach @added;
+print "  <li>$N{$_->[0]} renamed to $N{$_->[1]}" . get_bug_suffix($_->[1]) . "</li>\n" foreach @renamed;
+print "  <li>$N{$_->[0]} replaced with $N{$_->[1]}" . get_bug_suffix($_->[1]) . "</li>\n" foreach @replaced;
+print "</ul>\n";
+print "\n";
+
+print qq(<h2 id="Deleted_APIs">Deleted APIs</h2>\n);
+print "<ul>\n";
+print "  <li>$N{$_}</li>\n" foreach @deleted;
+print "</ul>\n";
+print "\n";
+
+print qq(<h2 id="Changed_APIs">Changed APIs</h2>\n);
+print "<ul>\n";
+print "  <li>$N{$_}" . get_bug_suffix($_) . "</li>\n" foreach @other;
+print "</ul>\n";
+print "\n";

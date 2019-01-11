@@ -1,0 +1,1 @@
+OBJS = /home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/js/src/memory/mozalloc/mozalloc_abort.o /home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/js/src/memory/mozalloc/Unified_cpp_memory_mozalloc0.o

@@ -1,0 +1,7 @@
+{
+    "configure-args": "--enable-simulator=arm --target=i686-pc-linux --host=i686-pc-linux",
+    "optimize": true,
+    "debug": true,
+    "bits": 32,
+    "use_minidump": false
+}

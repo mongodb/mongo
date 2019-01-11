@@ -201,7 +201,7 @@ void setHiddenMongo(JSContext* cx,
 }
 }  // namespace
 
-void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
+void MongoBase::finalize(js::FreeOp* fop, JSObject* obj) {
     auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(obj));
 
     if (conn) {
