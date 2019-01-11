@@ -3,7 +3,7 @@
 // context is an interrupted state (SERVER-38481).
 //
 // This test restarts the server and requires that data persists across restarts.
-// @tags: [requires_persistence]
+// @tags: [requires_persistence, requires_profiling]
 
 (function() {
     "use strict";
