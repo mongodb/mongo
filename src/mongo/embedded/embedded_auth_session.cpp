@@ -135,8 +135,10 @@ public:
         return Status::OK();
     }
 
-    Status checkAuthForAggregate(const NamespaceString&, const BSONObj&, bool) override {
-        return Status::OK();
+    StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString&,
+                                                          const BSONObj&,
+                                                          bool) override {
+        return PrivilegeVector();
     }
 
     Status checkAuthForCreate(const NamespaceString&, const BSONObj&, bool) override {
@@ -153,6 +155,11 @@ public:
 
     Status checkAuthorizedToRevokePrivilege(const Privilege&) override {
         return Status::OK();
+    }
+
+    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData,
+                                                                 const BSONObj&) override {
+        return PrivilegeVector();
     }
 
     bool isUsingLocalhostBypass() override {
@@ -180,10 +187,6 @@ public:
     }
 
     bool isAuthorizedToChangeOwnPasswordAsUser(const UserName&) override {
-        return true;
-    }
-
-    bool isAuthorizedToListCollections(StringData, const BSONObj&) override {
         return true;
     }
 

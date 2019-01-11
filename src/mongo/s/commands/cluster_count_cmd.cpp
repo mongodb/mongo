@@ -274,10 +274,13 @@ public:
             }
 
             auto bodyBuilder = result->getBodyBuilder();
+            // An empty PrivilegeVector is acceptable because these privileges are only checked on
+            // getMore and explain will not open a cursor.
             return ClusterAggregate::retryOnViewError(opCtx,
                                                       aggRequestOnView.getValue(),
                                                       *ex.extraInfo<ResolvedView>(),
                                                       nss,
+                                                      PrivilegeVector(),
                                                       &bodyBuilder);
         }
 

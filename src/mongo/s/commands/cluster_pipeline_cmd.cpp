@@ -47,16 +47,24 @@ public:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
+        auto privileges =
+            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                ->getPrivilegesForAggregate(
+                                    AggregationRequest::parseNs(
+                                        opMsgRequest.getDatabase().toString(), opMsgRequest.body),
+                                    opMsgRequest.body,
+                                    true));
         // TODO: Parsing to a Pipeline and/or AggregationRequest here.
-        return std::make_unique<Invocation>(this, opMsgRequest);
+        return std::make_unique<Invocation>(this, opMsgRequest, std::move(privileges));
     }
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(Command* cmd, const OpMsgRequest& request)
+        Invocation(Command* cmd, const OpMsgRequest& request, PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(request.getDatabase().toString()) {}
+              _dbName(request.getDatabase().toString()),
+              _privileges(std::move(privileges)) {}
 
     private:
         bool supportsWriteConcern() const override {
@@ -67,24 +75,31 @@ public:
             return true;
         }
 
-        static void _runAggCommand(OperationContext* opCtx,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj,
-                                   boost::optional<ExplainOptions::Verbosity> verbosity,
-                                   BSONObjBuilder* result) {
+        void _runAggCommand(OperationContext* opCtx,
+                            const std::string& dbname,
+                            const BSONObj& cmdObj,
+                            boost::optional<ExplainOptions::Verbosity> verbosity,
+                            BSONObjBuilder* result) {
             const auto aggregationRequest =
                 uassertStatusOK(AggregationRequest::parseFromBSON(dbname, cmdObj, verbosity));
-
             const auto& nss = aggregationRequest.getNamespaceString();
 
             try {
-                uassertStatusOK(ClusterAggregate::runAggregate(
-                    opCtx, ClusterAggregate::Namespaces{nss, nss}, aggregationRequest, result));
+                uassertStatusOK(
+                    ClusterAggregate::runAggregate(opCtx,
+                                                   ClusterAggregate::Namespaces{nss, nss},
+                                                   aggregationRequest,
+                                                   _privileges,
+                                                   result));
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 // If the aggregation failed because the namespace is a view, re-run the command
                 // with the resolved view pipeline and namespace.
-                uassertStatusOK(ClusterAggregate::retryOnViewError(
-                    opCtx, aggregationRequest, *ex.extraInfo<ResolvedView>(), nss, result));
+                uassertStatusOK(ClusterAggregate::retryOnViewError(opCtx,
+                                                                   aggregationRequest,
+                                                                   *ex.extraInfo<ResolvedView>(),
+                                                                   nss,
+                                                                   _privileges,
+                                                                   result));
             }
         }
 
@@ -101,9 +116,10 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            const auto nss = ns();
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthForAggregate(nss, _request.body, true));
+            uassert(ErrorCodes::Unauthorized,
+                    "unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivileges(_privileges));
         }
 
         NamespaceString ns() const override {
@@ -112,6 +128,7 @@ public:
 
         const OpMsgRequest& _request;
         const std::string _dbName;
+        const PrivilegeVector _privileges;
     };
 
     std::string help() const override {

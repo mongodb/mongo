@@ -676,7 +676,8 @@ std::string runQuery(OperationContext* opCtx,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              readConcernArgs,
              upconvertedQuery,
-             ClientCursorParams::LockPolicy::kLockExternally});
+             ClientCursorParams::LockPolicy::kLockExternally,
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults

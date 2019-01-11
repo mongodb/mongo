@@ -53,15 +53,24 @@ public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
         // TODO: Parsing to a Pipeline and/or AggregationRequest here.
-        return std::make_unique<Invocation>(this, opMsgRequest);
+
+        auto privileges =
+            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                ->getPrivilegesForAggregate(
+                                    AggregationRequest::parseNs(
+                                        opMsgRequest.getDatabase().toString(), opMsgRequest.body),
+                                    opMsgRequest.body,
+                                    false));
+        return std::make_unique<Invocation>(this, opMsgRequest, std::move(privileges));
     }
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(Command* cmd, const OpMsgRequest& request)
+        Invocation(Command* cmd, const OpMsgRequest& request, PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(request.getDatabase().toString()) {}
+              _dbName(request.getDatabase().toString()),
+              _privileges(std::move(privileges)) {}
 
     private:
         bool supportsWriteConcern() const override {
@@ -90,11 +99,11 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             const auto aggregationRequest = uassertStatusOK(
                 AggregationRequest::parseFromBSON(_dbName, _request.body, boost::none));
-
             uassertStatusOK(runAggregate(opCtx,
                                          aggregationRequest.getNamespaceString(),
                                          aggregationRequest,
                                          _request.body,
+                                         _privileges,
                                          reply));
         }
 
@@ -112,17 +121,20 @@ public:
                                          aggregationRequest.getNamespaceString(),
                                          aggregationRequest,
                                          _request.body,
+                                         _privileges,
                                          result));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            const auto nss = ns();
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthForAggregate(nss, _request.body, false));
+            uassert(ErrorCodes::Unauthorized,
+                    "unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivileges(_privileges));
         }
 
         const OpMsgRequest& _request;
         const std::string _dbName;
+        const PrivilegeVector _privileges;
     };
 
     std::string help() const override {

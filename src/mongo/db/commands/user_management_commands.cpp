@@ -1374,10 +1374,12 @@ public:
             rpc::OpMsgReplyBuilder replyBuilder;
             AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
                                           std::move(pipeline));
+            // Impose no cursor privilege requirements, as cursor is drained internally
             uassertStatusOK(runAggregate(opCtx,
                                          AuthorizationManager::usersCollectionNamespace,
                                          aggRequest,
                                          aggRequest.serializeToCommandObj().toBson(),
+                                         PrivilegeVector(),
                                          &replyBuilder));
             auto bodyBuilder = replyBuilder.getBodyBuilder();
             CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);

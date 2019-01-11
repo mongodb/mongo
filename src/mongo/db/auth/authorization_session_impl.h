@@ -122,9 +122,9 @@ public:
     Status checkAuthForKillCursors(const NamespaceString& cursorNss,
                                    UserNameIterator cursorOwner) override;
 
-    Status checkAuthForAggregate(const NamespaceString& ns,
-                                 const BSONObj& cmdObj,
-                                 bool isMongos) override;
+    StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
+                                                          const BSONObj& cmdObj,
+                                                          bool isMongos) override;
 
     Status checkAuthForCreate(const NamespaceString& ns,
                               const BSONObj& cmdObj,
@@ -133,6 +133,9 @@ public:
     Status checkAuthForCollMod(const NamespaceString& ns,
                                const BSONObj& cmdObj,
                                bool isMongos) override;
+
+    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
+                                                                 const BSONObj& cmdObj) override;
 
     Status checkAuthorizedToGrantPrivilege(const Privilege& privilege) override;
 
@@ -151,8 +154,6 @@ public:
     bool isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType) override;
 
     bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) override;
-
-    bool isAuthorizedToListCollections(StringData dbname, const BSONObj& cmdObj) override;
 
     bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) override;
 

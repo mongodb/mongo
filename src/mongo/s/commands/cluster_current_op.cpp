@@ -77,7 +77,11 @@ private:
         BSONObjBuilder responseBuilder;
 
         auto status = ClusterAggregate::runAggregate(
-            opCtx, ClusterAggregate::Namespaces{nss, nss}, request, &responseBuilder);
+            opCtx,
+            ClusterAggregate::Namespaces{nss, nss},
+            request,
+            {Privilege(ResourcePattern::forClusterResource(), ActionType::inprog)},
+            &responseBuilder);
 
         if (!status.isOK()) {
             return status;

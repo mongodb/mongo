@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
@@ -109,6 +110,9 @@ struct ClusterClientCursorParams {
 
     // The original command object which generated this cursor. Must either be empty or owned.
     BSONObj originatingCommandObj;
+
+    // The privileges required for the originatingCommand.
+    PrivilegeVector originatingPrivileges;
 
     // Per-remote node data.
     std::vector<RemoteCursor> remotes;

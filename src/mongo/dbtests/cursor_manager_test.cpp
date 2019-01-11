@@ -87,7 +87,8 @@ public:
                 {},
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
                 BSONObj(),
-                ClientCursorParams::LockPolicy::kLocksInternally};
+                ClientCursorParams::LockPolicy::kLocksInternally,
+                PrivilegeVector()};
     }
 
     ClientCursorPin makeCursor(OperationContext* opCtx) {
@@ -136,7 +137,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
     ASSERT_OK(cursorManager->killCursor(_opCtx.get(), cursorId, shouldAudit));
@@ -161,7 +163,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
 
@@ -196,7 +199,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
                                    {},
                                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
                                    BSONObj(),
-                                   ClientCursorParams::LockPolicy::kLocksInternally});
+                                   ClientCursorParams::LockPolicy::kLocksInternally,
+                                   PrivilegeVector()});
 
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
 
@@ -210,7 +214,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
                                    {},
                                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
                                    BSONObj(),
-                                   ClientCursorParams::LockPolicy::kLocksInternally});
+                                   ClientCursorParams::LockPolicy::kLocksInternally,
+                                   PrivilegeVector()});
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t::max()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
 }
@@ -229,7 +234,8 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
 
     // The pin is still in scope, so it should not time out.
     clock->advance(getDefaultCursorTimeoutMillis());
@@ -252,7 +258,8 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
     auto cursorId = cursorPin->cursorid();
 
     // A cursor will stay alive, but be marked as killed, if it is interrupted with a code other
@@ -284,7 +291,8 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
 
     // A cursor will stay alive, but be marked as killed, if it is interrupted with a code other
     // than ErrorCodes::Interrupted or ErrorCodes::CursorKilled and then unpinned.
@@ -315,7 +323,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
     auto usedCursorId = cursorPin.getCursor()->cursorid();
     cursorPin.release();
 
@@ -327,7 +336,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
                                    {},
                                    repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
                                    BSONObj(),
-                                   ClientCursorParams::LockPolicy::kLocksInternally});
+                                   ClientCursorParams::LockPolicy::kLocksInternally,
+                                   PrivilegeVector()});
 
     // Advance the clock to simulate time passing.
     clock->advance(Milliseconds(1));
@@ -363,7 +373,8 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
          {},
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
+         ClientCursorParams::LockPolicy::kLocksInternally,
+         PrivilegeVector()});
 
     // Advance the clock to simulate time passing.
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));

@@ -144,8 +144,14 @@ public:
                 return viewAggRequest.getStatus();
             }
 
-            return runAggregate(
-                opCtx, nss, viewAggRequest.getValue(), viewAggregation.getValue(), result);
+            // An empty PrivilegeVector is acceptable because these privileges are only checked on
+            // getMore and explain will not open a cursor.
+            return runAggregate(opCtx,
+                                nss,
+                                viewAggRequest.getValue(),
+                                viewAggregation.getValue(),
+                                PrivilegeVector(),
+                                result);
         }
 
         Collection* const collection = ctx->getCollection();

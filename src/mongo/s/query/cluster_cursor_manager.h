@@ -194,6 +194,13 @@ public:
         BSONObj getOriginatingCommand() const;
 
         /**
+         * Returns the privleges for the original command object which created this cursor.
+         */
+
+        const PrivilegeVector& getOriginatingPrivileges() const&;
+        void getOriginatingPrivileges() && = delete;
+
+        /**
          * Returns a reference to the vector of remote hosts involved in this operation.
          */
         std::size_t getNumRemotes() const;

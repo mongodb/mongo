@@ -293,12 +293,12 @@ Shard::CommandResponse establishMergingShardCursor(OperationContext* opCtx,
         opCtx, ReadPreferenceSetting::get(opCtx), nss.db().toString(), mergeCmdObj, retryPolicy));
 }
 
-BSONObj establishMergingMongosCursor(
-    OperationContext* opCtx,
-    const AggregationRequest& request,
-    const NamespaceString& requestedNss,
-    const LiteParsedPipeline& liteParsedPipeline,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging) {
+BSONObj establishMergingMongosCursor(OperationContext* opCtx,
+                                     const AggregationRequest& request,
+                                     const NamespaceString& requestedNss,
+                                     const LiteParsedPipeline& liteParsedPipeline,
+                                     std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
+                                     const PrivilegeVector& privileges) {
 
     ClusterClientCursorParams params(requestedNss, ReadPreferenceSetting::get(opCtx));
 
@@ -312,6 +312,7 @@ BSONObj establishMergingMongosCursor(
         : boost::optional<long long>(request.getBatchSize());
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
+    params.originatingPrivileges = privileges;
 
     if (TransactionRouter::get(opCtx)) {
         params.isAutoCommit = false;
@@ -577,7 +578,8 @@ Status runPipelineOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx
                            const AggregationRequest& request,
                            const LiteParsedPipeline& litePipe,
                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                           BSONObjBuilder* result) {
+                           BSONObjBuilder* result,
+                           const PrivilegeVector& privileges) {
     // We should never receive a pipeline which cannot run on mongoS.
     invariant(!expCtx->explain);
     invariant(pipeline->canRunOnMongos());
@@ -593,8 +595,8 @@ Status runPipelineOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx
             !pipeline->getSources().front()->constraints().requiresInputDocSource);
 
     // Register the new mongoS cursor, and retrieve the initial batch of results.
-    auto cursorResponse =
-        establishMergingMongosCursor(opCtx, request, requestedNss, litePipe, std::move(pipeline));
+    auto cursorResponse = establishMergingMongosCursor(
+        opCtx, request, requestedNss, litePipe, std::move(pipeline), privileges);
 
     // We don't need to storePossibleCursor or propagate writeConcern errors; an $out pipeline
     // can never run on mongoS. Filter the command response and return immediately.
@@ -609,7 +611,8 @@ Status dispatchMergingPipeline(
     const LiteParsedPipeline& litePipe,
     const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
     sharded_agg_helpers::DispatchShardPipelineResults&& shardDispatchResults,
-    BSONObjBuilder* result) {
+    BSONObjBuilder* result,
+    const PrivilegeVector& privileges) {
     // We should never be in a situation where we call this function on a non-merge pipeline.
     invariant(shardDispatchResults.splitPipeline);
     auto* mergePipeline = shardDispatchResults.splitPipeline->mergePipeline.get();
@@ -640,7 +643,8 @@ Status dispatchMergingPipeline(
                                    request,
                                    litePipe,
                                    std::move(shardDispatchResults.splitPipeline->mergePipeline),
-                                   result);
+                                   result,
+                                   privileges);
     }
 
     // If we are not merging on mongoS, then this is not a $changeStream aggregation, and we
@@ -662,8 +666,12 @@ Status dispatchMergingPipeline(
     auto mergeResponse = establishMergingShardCursor(
         opCtx, namespaces.executionNss, request, mergeCmdObj, mergingShardId);
 
-    auto mergeCursorResponse = uassertStatusOK(storePossibleCursor(
-        opCtx, namespaces.requestedNss, mergingShardId, mergeResponse, expCtx->tailableMode));
+    auto mergeCursorResponse = uassertStatusOK(storePossibleCursor(opCtx,
+                                                                   namespaces.requestedNss,
+                                                                   mergingShardId,
+                                                                   mergeResponse,
+                                                                   privileges,
+                                                                   expCtx->tailableMode));
 
     // Ownership for the shard cursors has been transferred to the merging shard. Dismiss the
     // ownership in the current merging pipeline such that when it goes out of scope it does not
@@ -690,6 +698,7 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
                                       const AggregationRequest& request,
+                                      const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
     auto executionNsRoutingInfoStatus =
@@ -739,7 +748,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         litePipe.allowedToForwardFromMongos() && litePipe.allowedToPassthroughFromMongos() &&
         !involvesShardedCollections) {
         const auto primaryShardId = routingInfo->db().primary()->getId();
-        return aggPassthrough(opCtx, namespaces, primaryShardId, request, litePipe, result);
+        return aggPassthrough(
+            opCtx, namespaces, primaryShardId, request, litePipe, privileges, result);
     }
 
     // Populate the collection UUID and the appropriate collation to use.
@@ -768,7 +778,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
 
         return runPipelineOnMongoS(
-            expCtx, namespaces, request, litePipe, std::move(pipeline), result);
+            expCtx, namespaces, request, litePipe, std::move(pipeline), result, privileges);
     }
 
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
@@ -790,8 +800,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         invariant(shardDispatchResults.remoteCursors.size() == 1);
         auto&& remoteCursor = std::move(shardDispatchResults.remoteCursors.front());
         const auto shardId = remoteCursor->getShardId().toString();
-        const auto reply = uassertStatusOK(storePossibleCursor(
-            opCtx, namespaces.requestedNss, std::move(remoteCursor), expCtx->tailableMode));
+        const auto reply = uassertStatusOK(storePossibleCursor(opCtx,
+                                                               namespaces.requestedNss,
+                                                               std::move(remoteCursor),
+                                                               privileges,
+                                                               expCtx->tailableMode));
         return appendCursorResponseToCommandResult(shardId, reply, result);
     }
 
@@ -812,7 +825,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                    litePipe,
                                    routingInfo,
                                    std::move(shardDispatchResults),
-                                   result);
+                                   result,
+                                   privileges);
 }
 
 void ClusterAggregate::uassertAllShardsSupportExplain(
@@ -839,6 +853,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const AggregationRequest& aggRequest,
                                         const LiteParsedPipeline& liteParsedPipeline,
+                                        const PrivilegeVector& privileges,
                                         BSONObjBuilder* out) {
     // Temporary hack. See comment on declaration for details.
     auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
@@ -878,7 +893,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
             ? TailableModeEnum::kTailableAndAwaitData
             : TailableModeEnum::kNormal;
         result = uassertStatusOK(storePossibleCursor(
-            opCtx, namespaces.requestedNss, shard->getId(), cmdResponse, tailMode));
+            opCtx, namespaces.requestedNss, shard->getId(), cmdResponse, privileges, tailMode));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped
@@ -896,6 +911,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                           const AggregationRequest& request,
                                           const ResolvedView& resolvedView,
                                           const NamespaceString& requestedNss,
+                                          const PrivilegeVector& privileges,
                                           BSONObjBuilder* result,
                                           unsigned numberRetries) {
     if (numberRetries >= kMaxViewRetries) {
@@ -918,7 +934,8 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     nsStruct.requestedNss = requestedNss;
     nsStruct.executionNss = resolvedView.getNamespace();
 
-    auto status = ClusterAggregate::runAggregate(opCtx, nsStruct, resolvedAggRequest, result);
+    auto status =
+        ClusterAggregate::runAggregate(opCtx, nsStruct, resolvedAggRequest, privileges, result);
 
     // If the underlying namespace was changed to a view during retry, then re-run the aggregation
     // on the new resolved namespace.
@@ -927,6 +944,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                                   resolvedAggRequest,
                                                   *status.extraInfo<ResolvedView>(),
                                                   requestedNss,
+                                                  privileges,
                                                   result,
                                                   numberRetries + 1);
     }

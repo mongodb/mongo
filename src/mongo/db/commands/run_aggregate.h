@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
@@ -45,12 +46,16 @@ namespace mongo {
  * The raw aggregate command parameters should be passed in 'cmdObj', and will be reported as the
  * originatingCommand in subsequent getMores on the resulting agg cursor.
  *
+ * 'privileges' contains the privileges that were required to run this aggregation, to be used later
+ * for re-checking privileges for getMore commands.
+ *
  * On success, fills out 'result' with the command response.
  */
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const AggregationRequest& request,
                     const BSONObj& cmdObj,
+                    const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result);
 
 }  // namespace mongo

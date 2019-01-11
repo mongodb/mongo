@@ -32,6 +32,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
@@ -80,7 +81,8 @@ struct ClientCursorParams {
                        UserNameIterator authenticatedUsersIter,
                        repl::ReadConcernArgs readConcernArgs,
                        BSONObj originatingCommandObj,
-                       LockPolicy lockPolicy)
+                       LockPolicy lockPolicy,
+                       PrivilegeVector originatingPrivileges)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
           readConcernArgs(readConcernArgs),
@@ -88,7 +90,8 @@ struct ClientCursorParams {
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
           originatingCommandObj(originatingCommandObj.getOwned()),
-          lockPolicy(lockPolicy) {
+          lockPolicy(lockPolicy),
+          originatingPrivileges(std::move(originatingPrivileges)) {
         while (authenticatedUsersIter.more()) {
             authenticatedUsers.emplace_back(authenticatedUsersIter.next());
         }
@@ -115,6 +118,7 @@ struct ClientCursorParams {
     int queryOptions = 0;
     BSONObj originatingCommandObj;
     const LockPolicy lockPolicy;
+    PrivilegeVector originatingPrivileges;
 };
 
 /**
@@ -186,9 +190,21 @@ public:
         return _queryOptions & QueryOption_AwaitData;
     }
 
+    /**
+     * Returns the original command object which created this cursor.
+     */
     const BSONObj& getOriginatingCommandObj() const {
         return _originatingCommand;
     }
+
+    /**
+     * Returns the privileges required to run a getMore against this cursor. This is the same as the
+     * set of privileges which would have been required to create the cursor in the first place.
+     */
+    const PrivilegeVector& getOriginatingPrivileges() const& {
+        return _originatingPrivileges;
+    }
+    void getOriginatingPrivileges() && = delete;
 
     /**
      * Returns the total number of query results returned by the cursor so far.
@@ -368,6 +384,9 @@ private:
 
     // Holds an owned copy of the command specification received from the client.
     const BSONObj _originatingCommand;
+
+    // The privileges required for the _originatingCommand.
+    const PrivilegeVector _originatingPrivileges;
 
     // See the QueryOptions enum in dbclientinterface.h.
     const int _queryOptions = 0;

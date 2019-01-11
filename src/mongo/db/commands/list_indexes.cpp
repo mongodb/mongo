@@ -226,7 +226,8 @@ public:
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              repl::ReadConcernArgs::get(opCtx),
              cmdObj,
-             ClientCursorParams::LockPolicy::kLocksInternally});
+             ClientCursorParams::LockPolicy::kLocksInternally,
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);

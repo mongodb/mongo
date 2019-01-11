@@ -77,16 +77,23 @@ public:
      * over which the aggregation will actually execute. Typically these two namespaces are the
      * same, but they may differ in the case of a query on a view.
      *
+     * 'privileges' contains the privileges that were required to run this aggregation, to be used
+     * later for re-checking privileges for GetMore commands.
+     *
      * On success, fills out 'result' with the command response.
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
                                const AggregationRequest& request,
+                               const PrivilegeVector& privileges,
                                BSONObjBuilder* result);
 
     /**
      * Retries a command that was previously run on a view by resolving the view as an aggregation
      * against the underlying collection.
+     *
+     * 'privileges' contains the privileges that were required to run this aggregation, to be used
+     * later for re-checking privileges for GetMore commands.
      *
      * On success, populates 'result' with the command response.
      */
@@ -94,6 +101,7 @@ public:
                                    const AggregationRequest& request,
                                    const ResolvedView& resolvedView,
                                    const NamespaceString& requestedNss,
+                                   const PrivilegeVector& privileges,
                                    BSONObjBuilder* result,
                                    unsigned numberRetries = 0);
 
@@ -106,6 +114,7 @@ private:
                                  const ShardId&,
                                  const AggregationRequest&,
                                  const LiteParsedPipeline&,
+                                 const PrivilegeVector& privileges,
                                  BSONObjBuilder* result);
 };
 

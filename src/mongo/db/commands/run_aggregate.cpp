@@ -392,6 +392,7 @@ Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& origNss,
                     const AggregationRequest& request,
                     const BSONObj& cmdObj,
+                    const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespaceString();
@@ -516,7 +517,7 @@ Status runAggregate(OperationContext* opCtx,
             auto newRequest = resolvedView.asExpandedViewAggregation(request);
             auto newCmd = newRequest.serializeToCommandObj().toBson();
 
-            auto status = runAggregate(opCtx, origNss, newRequest, newCmd, result);
+            auto status = runAggregate(opCtx, origNss, newRequest, newCmd, privileges, result);
 
             {
                 // Set the namespace of the curop back to the view namespace so ctx records
@@ -628,7 +629,6 @@ Status runAggregate(OperationContext* opCtx,
             p.deleteUnderlying();
         }
     });
-
     for (size_t idx = 0; idx < execs.size(); ++idx) {
         ClientCursorParams cursorParams(
             std::move(execs[idx]),
@@ -636,7 +636,8 @@ Status runAggregate(OperationContext* opCtx,
             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
             repl::ReadConcernArgs::get(opCtx),
             cmdObj,
-            ClientCursorParams::LockPolicy::kLocksInternally);
+            ClientCursorParams::LockPolicy::kLocksInternally,
+            privileges);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);
         } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {

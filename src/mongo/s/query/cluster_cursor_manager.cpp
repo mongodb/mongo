@@ -149,6 +149,11 @@ BSONObj ClusterCursorManager::PinnedCursor::getOriginatingCommand() const {
     return _cursor->getOriginatingCommand();
 }
 
+const PrivilegeVector& ClusterCursorManager::PinnedCursor::getOriginatingPrivileges() const& {
+    invariant(_cursor);
+    return _cursor->getOriginatingPrivileges();
+}
+
 std::size_t ClusterCursorManager::PinnedCursor::getNumRemotes() const {
     invariant(_cursor);
     return _cursor->getNumRemotes();

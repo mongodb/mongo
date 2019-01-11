@@ -50,6 +50,7 @@ namespace mongo {
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         OwnedRemoteCursor&& remoteCursor,
+                                        PrivilegeVector privileges,
                                         TailableModeEnum tailableMode) {
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
     auto result = storePossibleCursor(
@@ -60,6 +61,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         requestedNss,
         executorPool->getArbitraryExecutor(),
         Grid::get(opCtx)->getCursorManager(),
+        std::move(privileges),
         tailableMode);
 
     // On success, release ownership of the cursor because it has been registered with the cursor
@@ -72,6 +74,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         const ShardId& shardId,
                                         const Shard::CommandResponse& commandResponse,
+                                        PrivilegeVector privileges,
                                         TailableModeEnum tailableMode) {
     invariant(commandResponse.hostAndPort);
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
@@ -82,6 +85,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                requestedNss,
                                executorPool->getArbitraryExecutor(),
                                Grid::get(opCtx)->getCursorManager(),
+                               std::move(privileges),
                                tailableMode);
 }
 
@@ -92,6 +96,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager,
+                                        PrivilegeVector privileges,
                                         TailableModeEnum tailableMode) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
@@ -126,6 +131,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     params.tailableMode = tailableMode;
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
+    params.originatingPrivileges = std::move(privileges);
 
     if (TransactionRouter::get(opCtx)) {
         params.isAutoCommit = false;

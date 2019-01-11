@@ -233,6 +233,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
+    params.originatingPrivileges = {
+        Privilege(ResourcePattern::forExactNamespace(query.nss()), ActionType::find)};
 
     if (TransactionRouter::get(opCtx)) {
         params.isAutoCommit = false;
@@ -564,6 +566,14 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
 
     validateOperationSessionInfo(opCtx, request, &pinnedCursor.getValue());
+
+    // Ensure that the client still has the privileges to run the originating command.
+    if (!authzSession->isAuthorizedForPrivileges(
+            pinnedCursor.getValue().getOriginatingPrivileges())) {
+        uasserted(ErrorCodes::Unauthorized,
+                  str::stream() << "not authorized for getMore with cursor id "
+                                << request.cursorid);
+    }
 
     // Set the originatingCommand object and the cursorID in CurOp.
     {

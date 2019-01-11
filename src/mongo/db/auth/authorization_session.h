@@ -219,11 +219,12 @@ public:
     virtual Status checkAuthForKillCursors(const NamespaceString& cursorNss,
                                            UserNameIterator cursorOwner) = 0;
 
-    // Checks if this connection has the privileges necessary to run the aggregation pipeline
-    // specified in 'cmdObj' on the namespace 'ns' either directly on mongoD or via mongoS.
-    virtual Status checkAuthForAggregate(const NamespaceString& ns,
-                                         const BSONObj& cmdObj,
-                                         bool isMongos) = 0;
+    // Attempts to get the privileges necessary to run the aggregation pipeline specified in
+    // 'cmdObj' on the namespace 'ns' either directly on mongoD or via mongoS. Returns a non-ok
+    // status if it is unable to parse the pipeline.
+    virtual StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
+                                                                  const BSONObj& cmdObj,
+                                                                  bool isMongos) = 0;
 
     // Checks if this connection has the privileges necessary to create 'ns' with the options
     // supplied in 'cmdObj' either directly on mongoD or via mongoS.
@@ -244,6 +245,12 @@ public:
     // Checks if this connection has the privileges necessary to revoke the given privilege
     // from a role.
     virtual Status checkAuthorizedToRevokePrivilege(const Privilege& privilege) = 0;
+
+    // Checks if the current session is authorized to list the collections in the given
+    // database. If it is, return a privilegeVector containing the privileges used to authorize
+    // this command.
+    virtual StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
+                                                                         const BSONObj& cmdObj) = 0;
 
     // Checks if this connection is using the localhost bypass
     virtual bool isUsingLocalhostBypass() = 0;
@@ -270,10 +277,6 @@ public:
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own password
     virtual bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) = 0;
-
-    // Returns true if the current session is authorized to list the collections in the given
-    // database.
-    virtual bool isAuthorizedToListCollections(StringData dbname, const BSONObj& cmdObj) = 0;
 
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own customData.

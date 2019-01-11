@@ -87,10 +87,15 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
     // This check performs some validation but it is not exhaustive and may allow for an invalid
     // pipeline specification. In this case the authorization check will succeed but the pipeline
     // will fail to parse later in Command::run().
-    return authzSession->checkAuthForAggregate(
+    auto statusWithPrivs = authzSession->getPrivilegesForAggregate(
         viewOnNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()),
         isMongos);
+    PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
+    if (!authzSession->isAuthorizedForPrivileges(privileges)) {
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    }
+    return Status::OK();
 }
 
 }  // namespace
@@ -236,23 +241,19 @@ PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
     return defaultPrivileges;
 }
 
-Status AuthorizationSessionImpl::checkAuthForAggregate(const NamespaceString& nss,
-                                                       const BSONObj& cmdObj,
-                                                       bool isMongos) {
+StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
+    const NamespaceString& nss, const BSONObj& cmdObj, bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
                       mongoutils::str::stream() << "Invalid input namespace, " << nss.ns());
     }
 
-    // If this connection does not need to be authenticated (for instance, if auth is disabled),
-    // return Status::OK() immediately.
-    if (_externalState->shouldIgnoreAuthChecks()) {
-        return Status::OK();
-    }
+    PrivilegeVector privileges;
 
-    // We require at least one authenticated user when running aggregate with auth enabled.
-    if (!isAuthenticated()) {
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    // If this connection does not need to be authenticated (for instance, if auth is disabled),
+    // returns an empty requirements set.
+    if (_externalState->shouldIgnoreAuthChecks()) {
+        return privileges;
     }
 
     auto statusWithAggRequest = AggregationRequest::parseFromBSON(nss, cmdObj);
@@ -265,44 +266,28 @@ Status AuthorizationSessionImpl::checkAuthForAggregate(const NamespaceString& ns
 
     // If the aggregation pipeline is empty, confirm the user is authorized for find on 'nss'.
     if (pipeline.empty()) {
-        if (!isAuthorizedForPrivilege(
-                Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find))) {
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
-        }
-
-        return Status::OK();
+        Privilege currentPriv =
+            Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find);
+        Privilege::addPrivilegeToPrivilegeVector(&privileges, currentPriv);
+        return privileges;
     }
 
-    // Confirm the user is authorized for the pipeline's initial document source. We confirm a user
-    // is authorized incrementally rather than once for the entire pipeline. This will prevent a
-    // malicious user, who doesn't have access to the initial document source, from consuming the
-    // resources needed to parse a potentially large pipeline.
-    auto liteParsedFirstDocumentSource = LiteParsedDocumentSource::parse(aggRequest, pipeline[0]);
-    if (!liteParsedFirstDocumentSource->isInitialSource() &&
-        !isAuthorizedForPrivilege(
-            Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find))) {
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    // If the first stage of the pipeline is not an initial source, the pipeline is implicitly
+    // reading documents from the underlying collection. The client must be authorized to do so.
+    auto liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, pipeline[0]);
+    if (!liteParsedDocSource->isInitialSource()) {
+        Privilege currentPriv =
+            Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find);
+        Privilege::addPrivilegeToPrivilegeVector(&privileges, currentPriv);
     }
 
-    // We have done the work to lite parse the first stage. Given that, we check required privileges
-    // for it using 'liteParsedFirstDocumentSource' regardless of whether is an initial source or
-    // not.
-    if (!isAuthorizedForPrivileges(liteParsedFirstDocumentSource->requiredPrivileges(isMongos))) {
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+    // Confirm privileges for the pipeline.
+    for (auto&& pipelineStage : pipeline) {
+        liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, pipelineStage);
+        PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(isMongos);
+        Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
     }
-
-    // Confirm privileges for the remainder of the pipepline. Start with the second stage as we have
-    // already authorized the first.
-    auto pipelineIter = pipeline.begin() + 1;
-
-    for (; pipelineIter != pipeline.end(); ++pipelineIter) {
-        auto liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, *pipelineIter);
-        if (!isAuthorizedForPrivileges(liteParsedDocSource->requiredPrivileges(isMongos))) {
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
-        }
-    }
-
-    return Status::OK();
+    return privileges;
 }
 
 Status AuthorizationSessionImpl::checkAuthForFind(const NamespaceString& ns, bool hasTerm) {
@@ -699,16 +684,20 @@ bool AuthorizationSessionImpl::isAuthorizedToChangeOwnCustomDataAsUser(const Use
                                                                 ActionType::changeOwnCustomData);
 }
 
-bool AuthorizationSessionImpl::isAuthorizedToListCollections(StringData dbname,
-                                                             const BSONObj& cmdObj) {
+StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListCollections(
+    StringData dbname, const BSONObj& cmdObj) {
     if (cmdObj["authorizedCollections"].trueValue() && cmdObj["nameOnly"].trueValue() &&
         AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
-        return true;
+        return PrivilegeVector();
     }
 
     // Check for the listCollections ActionType on the database.
-    return AuthorizationSessionImpl::isAuthorizedForActionsOnResource(
-        ResourcePattern::forDatabaseName(dbname), ActionType::listCollections);
+    PrivilegeVector privileges = {
+        Privilege(ResourcePattern::forDatabaseName(dbname), ActionType::listCollections)};
+    if (AuthorizationSessionImpl::isAuthorizedForPrivileges(privileges)) {
+        return privileges;
+    }
+    return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

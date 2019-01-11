@@ -363,11 +363,18 @@ public:
             // A user can only call getMore on their own cursor. If there were multiple users
             // authenticated when the cursor was created, then at least one of them must be
             // authenticated in order to run getMore on the cursor.
-            if (!AuthorizationSession::get(opCtx->getClient())
-                     ->isCoauthorizedWith(cursorPin->getAuthenticatedUsers())) {
+            auto authzSession = AuthorizationSession::get(opCtx->getClient());
+            if (!authzSession->isCoauthorizedWith(cursorPin->getAuthenticatedUsers())) {
                 uasserted(ErrorCodes::Unauthorized,
                           str::stream() << "cursor id " << _request.cursorid
                                         << " was not created by the authenticated user");
+            }
+
+            // Ensure that the client still has the privileges to run the originating command.
+            if (!authzSession->isAuthorizedForPrivileges(cursorPin->getOriginatingPrivileges())) {
+                uasserted(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized for getMore with cursor id "
+                                        << _request.cursorid);
             }
 
             if (_request.nss != cursorPin->nss()) {

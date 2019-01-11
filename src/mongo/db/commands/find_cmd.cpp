@@ -192,8 +192,10 @@ public:
                     AggregationRequest::parseFromBSON(nss, viewAggregationCommand, verbosity));
 
                 try {
-                    uassertStatusOK(
-                        runAggregate(opCtx, nss, aggRequest, viewAggregationCommand, result));
+                    // An empty PrivilegeVector is acceptable because these privileges are only
+                    // checked on getMore and explain will not open a cursor.
+                    uassertStatusOK(runAggregate(
+                        opCtx, nss, aggRequest, viewAggregationCommand, PrivilegeVector(), result));
                 } catch (DBException& error) {
                     if (error.code() == ErrorCodes::InvalidPipelineOperator) {
                         uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -404,7 +406,8 @@ public:
                          AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                          repl::ReadConcernArgs::get(opCtx),
                          _request.body,
-                         ClientCursorParams::LockPolicy::kLockExternally});
+                         ClientCursorParams::LockPolicy::kLockExternally,
+                         {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);

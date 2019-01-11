@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/tailable_mode.h"
@@ -70,6 +71,8 @@ class TaskExecutor;
  * differ from the execution namespace if the command was issued on a view)
  * @ executor the TaskExecutor to store in the resulting ClusterClientCursor
  * @ cursorManager the ClusterCursorManager on which to register the resulting ClusterClientCursor
+ * @ privileges the PrivilegeVector of privileges needed for the original command, to be used for
+ * auth checking by GetMore
 */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
@@ -78,25 +81,30 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager,
+                                        PrivilegeVector privileges,
                                         TailableModeEnum tailableMode = TailableModeEnum::kNormal);
 
 /**
  * Convenience function which extracts all necessary information from the passed RemoteCursor, and
  * stores a ClusterClientCursor based on it. The ownership of the remote cursor is transferred to
- * this function, and will handle killing it upon failure.
+ * this function, and will handle killing it upon failure. 'privileges' contains the required
+ * privileges for the command, to be used by GetMore for auth checks.
  */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         OwnedRemoteCursor&& remoteCursor,
+                                        PrivilegeVector privileges,
                                         TailableModeEnum tailableMode);
 
 /**
  * Convenience function which extracts all necessary information from the passed CommandResponse,
- * and stores a ClusterClientCursor based on it.
+ * and stores a ClusterClientCursor based on it. 'privileges' contains the required privileges for
+ * the command, to be used by GetMore for auth checks.
  */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         const ShardId& shardId,
                                         const Shard::CommandResponse& commandResponse,
+                                        PrivilegeVector privileges,
                                         TailableModeEnum tailableMode);
 }  // namespace mongo

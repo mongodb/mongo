@@ -158,6 +158,10 @@ BSONObj ClusterClientCursorImpl::getOriginatingCommand() const {
     return _params.originatingCommandObj;
 }
 
+const PrivilegeVector& ClusterClientCursorImpl::getOriginatingPrivileges() const& {
+    return _params.originatingPrivileges;
+}
+
 std::size_t ClusterClientCursorImpl::getNumRemotes() const {
     return _root->getNumRemotes();
 }

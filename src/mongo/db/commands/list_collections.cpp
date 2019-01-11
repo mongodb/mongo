@@ -233,7 +233,7 @@ public:
 
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        if (authzSession->isAuthorizedToListCollections(dbname, cmdObj)) {
+        if (authzSession->checkAuthorizedToListCollections(dbname, cmdObj).isOK()) {
             return Status::OK();
         }
 
@@ -386,7 +386,9 @@ public:
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              repl::ReadConcernArgs::get(opCtx),
              jsobj,
-             ClientCursorParams::LockPolicy::kLocksInternally});
+             ClientCursorParams::LockPolicy::kLocksInternally,
+             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                 ->checkAuthorizedToListCollections(dbname, jsobj))});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), cursorNss.ns(), firstBatch.arr(), &result);

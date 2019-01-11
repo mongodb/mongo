@@ -108,7 +108,8 @@ public:
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              repl::ReadConcernArgs::get(opCtx),
              cmdObj,
-             ClientCursorParams::LockPolicy::kLockExternally});
+             ClientCursorParams::LockPolicy::kLockExternally,
+             {Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find)}});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &result);
