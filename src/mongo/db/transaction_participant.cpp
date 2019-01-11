@@ -1131,7 +1131,7 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
-    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TransactionState::kCommitted);
+    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TerminationCause::kCommitted);
 }
 
 void TransactionParticipant::shutdown() {
