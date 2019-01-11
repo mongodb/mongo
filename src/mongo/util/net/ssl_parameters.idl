@@ -77,3 +77,9 @@ server_parameters:
     description: "Transition from sendKeyFile to sendX509, or sendX509 to x509 clusterAuthModes"
     set_at: runtime
     cpp_class: ClusterAuthModeServerParameter
+
+  tlsX509ClusterAuthDNOverride:
+    description: "Distinguished name to use for cluster membership"
+    set_at: [startup, runtime]
+    cpp_class: ClusterMemberDNOverride
+

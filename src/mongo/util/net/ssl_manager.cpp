@@ -50,6 +50,8 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_parameters_gen.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -327,79 +329,58 @@ std::vector<SSLX509Name::Entry> canonicalizeClusterDN(
     return ret;
 }
 
-class ClusterMemberDNOverride : public ServerParameter {
-public:
-    ClusterMemberDNOverride()
-        : ServerParameter(
-              ServerParameterSet::getGlobal(), "tlsX509ClusterAuthDNOverride", true, true) {}
+struct DNValue {
+    explicit DNValue(SSLX509Name dn)
+        : fullDN(std::move(dn)), canonicalized(canonicalizeClusterDN(fullDN.entries())) {}
 
-    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) override {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (!_value) {
-            return;
-        }
-
-        b.append(name, _value->fullDN.toString());
+    SSLX509Name fullDN;
+    std::vector<SSLX509Name::Entry> canonicalized;
+};
+synchronized_value<boost::optional<DNValue>> clusterMemberOverride;
+boost::optional<std::vector<SSLX509Name::Entry>> getClusterMemberDNOverrideParameter() {
+    auto guarded_value = clusterMemberOverride.synchronize();
+    auto& value = *guarded_value;
+    if (!value) {
+        return boost::none;
     }
+    return value->canonicalized;
+}
+}  // namespace
 
-    Status set(const BSONElement& newValueElement) override {
-        if (newValueElement.type() != String) {
-            return {ErrorCodes::BadValue, "DN must be a string"};
-        }
-        return setFromString(newValueElement.String());
+void ClusterMemberDNOverride::append(OperationContext* opCtx,
+                                     BSONObjBuilder& b,
+                                     const std::string& name) {
+    auto value = clusterMemberOverride.get();
+    if (value) {
+        b.append(name, value->fullDN.toString());
     }
+}
 
-    Status setFromString(const std::string& str) override {
-        if (str.empty()) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            _value = boost::none;
-            return Status::OK();
-        }
-
-        auto swDN = parseDN(str);
-        if (!swDN.isOK()) {
-            return swDN.getStatus();
-        }
-        auto dn = std::move(swDN.getValue());
-        auto status = dn.normalizeStrings();
-        if (!status.isOK()) {
-            return status;
-        }
-
-        DNValue val(std::move(dn));
-        if (val.canonicalized.empty()) {
-            return {ErrorCodes::BadValue,
-                    "Cluster member DN's must contain at least one O, OU, or DC component"};
-        }
-
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _value = {std::move(val)};
-
+Status ClusterMemberDNOverride::setFromString(const std::string& str) {
+    if (str.empty()) {
+        *clusterMemberOverride = boost::none;
         return Status::OK();
     }
 
-    boost::optional<std::vector<SSLX509Name::Entry>> getCanonical() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (!_value) {
-            return boost::none;
-        }
-        return _value->canonicalized;
+    auto swDN = parseDN(str);
+    if (!swDN.isOK()) {
+        return swDN.getStatus();
+    }
+    auto dn = std::move(swDN.getValue());
+    auto status = dn.normalizeStrings();
+    if (!status.isOK()) {
+        return status;
     }
 
-private:
-    struct DNValue {
-        explicit DNValue(SSLX509Name dn)
-            : fullDN(std::move(dn)), canonicalized(canonicalizeClusterDN(fullDN.entries())) {}
+    DNValue val(std::move(dn));
+    if (val.canonicalized.empty()) {
+        return {ErrorCodes::BadValue,
+                "Cluster member DN's must contain at least one O, OU, or DC component"};
+    }
 
-        SSLX509Name fullDN;
-        std::vector<SSLX509Name::Entry> canonicalized;
-    };
-
-    stdx::mutex _mutex;
-    boost::optional<DNValue> _value;
-} clusterMemberDNOverrideParameter;
-
-}  // namespace
+    *clusterMemberOverride = {std::move(val)};
+    return Status::OK();
+}
 
 StatusWith<SSLX509Name> parseDN(StringData sd) try {
     uassert(ErrorCodes::BadValue, "DN strings must be valid UTF-8 strings", isValidUTF8(sd));
@@ -683,7 +664,7 @@ bool SSLConfiguration::isClusterMember(SSLX509Name subject) const {
         return true;
     }
 
-    auto altClusterDN = clusterMemberDNOverrideParameter.getCanonical();
+    auto altClusterDN = getClusterMemberDNOverrideParameter();
     return (altClusterDN && (client == *altClusterDN));
 }
 
