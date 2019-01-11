@@ -278,8 +278,7 @@ private:
         return {};
     }
 
-    ObservableSession(WithLock wl, Session& session)
-        : _session(&session), _clientLock(_lockClientForSession(std::move(wl), _session)) {}
+    ObservableSession(WithLock wl, Session& session) : _session(&session) {}
 
     /**
      * Returns whether 'kill' has been called on this session.
@@ -293,7 +292,6 @@ private:
     void _markNotKilled(WithLock sessionCatalogLock, SessionCatalog::KillToken killToken);
 
     Session* _session;
-    stdx::unique_lock<Client> _clientLock;
 };
 
 

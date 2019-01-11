@@ -186,7 +186,8 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     // For currently checked-out sessions, interrupt the operation context so that the current owner
     // can release the session
     if (firstKiller && _session->_checkoutOpCtx) {
-        invariant(_clientLock);
+        stdx::lock_guard<Client> lg(*_session->_checkoutOpCtx->getClient());
+
         const auto serviceContext = _session->_checkoutOpCtx->getServiceContext();
         serviceContext->killOperation(_session->_checkoutOpCtx, reason);
     }
