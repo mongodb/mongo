@@ -74,16 +74,16 @@ def enable_logging():
     """Enable verbose logging for execution."""
 
     logging.basicConfig(
-        format='[%(asctime)s - %(name)s - %(levelname)s] %(message)s',
+        format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
         level=logging.DEBUG,
         stream=sys.stdout,
     )
 
 
 def split_if_exists(str_to_split):
-    """Split the given string on ',' if it is not None."""
+    """Split the given string on "," if it is not None."""
     if str_to_split:
-        return str_to_split.split(',')
+        return str_to_split.split(",")
     return None
 
 
@@ -192,19 +192,19 @@ def update_suite_config(suite_config, roots=None, excludes=None):
     :return: updated suite_config
     """
     if roots:
-        suite_config['selector']['roots'] = roots
+        suite_config["selector"]["roots"] = roots
 
     if excludes:
         # This must be a misc file, if the exclude_files section exists, extend it, otherwise,
         # create it.
-        if 'exclude_files' in suite_config['selector']:
-            suite_config['selector']['exclude_files'] += excludes
+        if "exclude_files" in suite_config["selector"]:
+            suite_config["selector"]["exclude_files"] += excludes
         else:
-            suite_config['selector']['exclude_files'] = excludes
+            suite_config["selector"]["exclude_files"] = excludes
     else:
-        # if excludes was not specified this must not a misc file, so don't exclude anything.
-        if 'exclude_files' in suite_config['selector']:
-            del suite_config['selector']['exclude_files']
+        # if excludes was not specified this must not a misc file, so don"t exclude anything.
+        if "exclude_files" in suite_config["selector"]:
+            del suite_config["selector"]["exclude_files"]
 
     return suite_config
 
@@ -220,7 +220,7 @@ def generate_subsuite_file(source_suite_name, target_suite_name, roots=None, exc
     with open(source_file, "r") as fstream:
         suite_config = yaml.load(fstream)
 
-    with open(os.path.join(CONFIG_DIR, target_suite_name + ".yml"), 'w') as out:
+    with open(os.path.join(CONFIG_DIR, target_suite_name + ".yml"), "w") as out:
         out.write(HEADER_TEMPLATE.format(file=__file__, suite_file=source_file))
         suite_config = update_suite_config(suite_config, roots, excludes)
         out.write(yaml.dump(suite_config, default_flow_style=False, Dumper=yaml.SafeDumper))
@@ -306,18 +306,18 @@ class EvergreenConfigGenerator(object):
 
     @staticmethod
     def _is_task_dependency(task, possible_dependency):
-        return re.match('{0}_(\\d|misc)'.format(task), possible_dependency)
+        return re.match("{0}_(\\d|misc)".format(task), possible_dependency)
 
     def _get_tasks_for_depends_on(self, dependent_task):
         return [
-            str(task['display_name']) for task in self.build_tasks
-            if self._is_task_dependency(dependent_task, str(task['display_name']))
+            str(task["display_name"]) for task in self.build_tasks
+            if self._is_task_dependency(dependent_task, str(task["display_name"]))
         ]
 
     def _add_dependencies(self, task):
         task.dependency(TaskDependency("compile"))
         if not self.options.is_patch:
-            # Don't worry about task dependencies in patch builds, only mainline.
+            # Don"t worry about task dependencies in patch builds, only mainline.
             if self.options.depends_on:
                 for dep in self.options.depends_on:
                     depends_on_tasks = self._get_tasks_for_depends_on(dep)
@@ -379,6 +379,11 @@ class EvergreenConfigGenerator(object):
         return self.evg_config
 
 
+def normalize_test_name(test_name):
+    """Normalize test names that may have been run on windows or unix."""
+    return test_name.replace("\\", "/")
+
+
 class TestStats(object):
     """Represent the test statistics for the task that is being analyzed."""
 
@@ -437,7 +442,7 @@ class TestStats(object):
             hook_runtime_info = self._hook_runtime_by_test[test_name]
             if hook_runtime_info:
                 duration += hook_runtime_info["duration"]
-            tests.append((test_file, duration))
+            tests.append((normalize_test_name(test_file), duration))
         return sorted(tests, key=lambda x: x[1], reverse=True)
 
 
@@ -559,10 +564,10 @@ class Main(object):
         return divide_tests_into_suites(tests_runtimes, execution_time_secs,
                                         self.options.max_sub_suites)
 
-    @staticmethod
-    def filter_existing_tests(tests_runtimes):
+    def filter_existing_tests(self, tests_runtimes):
         """Filter out tests that do not exist in the filesystem."""
-        return [info for info in tests_runtimes if os.path.exists(info[0])]
+        all_tests = [normalize_test_name(test) for test in self.list_tests()]
+        return [info for info in tests_runtimes if os.path.exists(info[0]) and info[0] in all_tests]
 
     def calculate_fallback_suites(self):
         """Divide tests into a fixed number of suites."""
