@@ -1,5 +1,7 @@
 /**
  * Test basic, steady-state replication change stream functionality with speculative majority reads.
+ *
+ * @tags: [uses_speculative_majority]
  */
 (function() {
     "use strict";

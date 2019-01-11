@@ -6,6 +6,8 @@
  * committed data, we just read the newest data available on a node, and then, before returning to a
  * client, block until we know the data has become majority committed. Currently this is an internal
  * feature used only by change streams.
+ *
+ * @tags: [uses_speculative_majority]
  */
 (function() {
     "use strict";

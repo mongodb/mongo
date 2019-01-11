@@ -8,6 +8,8 @@
  * that no new change events will occur at a lesser timestamp. This guarantee is only valid if the
  * timestamp is actually majority committed, so we need to make sure that guarantee holds, even when
  * using speculative majority.
+ *
+ * @tags: [uses_speculative_majority]
  */
 (function() {
     "use strict";

@@ -1,5 +1,7 @@
 /**
  * Test change stream behavior with speculative majority reads in the face of replication rollback.
+ *
+ * @tags: [uses_speculative_majority]
  */
 (function() {
     'use strict';

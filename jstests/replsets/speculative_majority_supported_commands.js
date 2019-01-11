@@ -3,6 +3,8 @@
  *
  * Currently, only change stream aggregation commands and the 'find' command with the
  * 'allowSpeculativeMajorityRead' flag are permitted.
+ *
+ * @tags: [uses_speculative_majority]
  */
 (function() {
     "use strict";
