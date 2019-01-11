@@ -29,6 +29,8 @@
  */
 
 #include "mongo/db/query/query_knobs.h"
+
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 
@@ -69,6 +71,18 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldIterations, int, 128);
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldPeriodMS, int, 10);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryFacetBufferSizeBytes, int, 100 * 1024 * 1024);
+
+MONGO_EXPORT_SERVER_PARAMETER(internalLookupStageIntermediateDocumentMaxSizeBytes,
+                              long long,
+                              100 * 1024 * 1024)
+    ->withValidator([](const long long& newVal) {
+        if (newVal < BSONObjMaxInternalSize) {
+            return Status(ErrorCodes::BadValue,
+                          "internalLookupStageIntermediateDocumentMaxSizeBytes must be >= " +
+                              std::to_string(BSONObjMaxInternalSize));
+        }
+        return Status::OK();
+    });
 
 MONGO_EXPORT_SERVER_PARAMETER(internalInsertMaxBatchSize,
                               int,
