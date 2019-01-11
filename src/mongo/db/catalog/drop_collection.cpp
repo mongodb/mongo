@@ -58,6 +58,10 @@ Status dropCollection(OperationContext* opCtx,
         log() << "CMD: drop " << collectionName;
     }
 
+    invariant(opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::ReadSource::kUnset ||
+              opCtx->recoveryUnit()->getTimestampReadSource() ==
+                  RecoveryUnit::ReadSource::kNoTimestamp);
+
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
         AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
         Database* const db = autoDb.getDb();
