@@ -1,3 +1,4 @@
+// @tags: [assumes_balancer_off]
 // Simple covered index query test
 
 // Include helpers for analyzing explain output.

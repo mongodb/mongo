@@ -1,4 +1,4 @@
-
+// @tags: [assumes_balancer_off]
 t = db.distinct_index1;
 t.drop();
 

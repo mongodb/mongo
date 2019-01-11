@@ -1,3 +1,5 @@
+// @tags: [assumes_balancer_off]
+
 var t = db.geo_2d_explain;
 
 load("jstests/libs/analyze_plan.js");

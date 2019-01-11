@@ -1,3 +1,4 @@
+// @tags: [assumes_balancer_off]
 
 t = db.regex4;
 t.drop();

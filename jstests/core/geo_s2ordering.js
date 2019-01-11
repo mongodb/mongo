@@ -2,6 +2,7 @@
 // actually matters for lookup speed.  That is, if we're looking for a non-geo key of which
 // there are not many, the index order (nongeo, geo) should be faster than (geo, nongeo)
 // for 2dsphere.
+// @tags: [assumes_balancer_off]
 (function() {
     "use strict";
 

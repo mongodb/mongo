@@ -4,6 +4,7 @@
 // nscannedObjects > 0
 
 // Include helpers for analyzing explain output.
+// @tags: [assumes_balancer_off]
 load("jstests/libs/analyze_plan.js");
 
 var coll = db.getCollection("covered_negative_1");
