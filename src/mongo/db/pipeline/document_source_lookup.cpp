@@ -235,16 +235,14 @@ DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
     std::vector<Value> results;
     int objsize = 0;
 
-    const auto maxBytes = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
     while (auto result = pipeline->getNext()) {
         objsize += result->getApproximateSize();
         uassert(4568,
                 str::stream() << "Total size of documents in " << _fromNs.coll()
-                              << " matching pipeline's $lookup stage exceeds "
-                              << maxBytes
-                              << " bytes",
-
-                objsize <= maxBytes);
+                              << " matching pipeline "
+                              << getUserPipelineDefinition()
+                              << " exceeds maximum document size",
+                objsize <= BSONObjMaxInternalSize);
         results.emplace_back(std::move(*result));
     }
 
