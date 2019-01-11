@@ -28,6 +28,7 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -43,6 +44,7 @@ namespace {
 using mongo::fromjson;
 using mongo::makeGuard;
 using mongo::ScopeGuard;
+using mongo::tojson;
 
 class StitchSupportTest : public mongo::unittest::Test {
 protected:
@@ -75,31 +77,102 @@ protected:
         auto matcher = stitch_support_v1_matcher_create(
             lib, fromjson(filterJSON).objdata(), collator, nullptr);
         ASSERT(matcher);
-        bool isMatch = true;
-        for (const auto documentJSON : documentsJSON) {
-            stitch_support_v1_check_match(
-                matcher, fromjson(documentJSON).objdata(), &isMatch, nullptr);
-        }
-        stitch_support_v1_matcher_destroy(matcher);
-        return isMatch;
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
+        return std::all_of(
+            documentsJSON.begin(), documentsJSON.end(), [=](const char* documentJSON) {
+                bool isMatch;
+                stitch_support_v1_check_match(
+                    matcher, fromjson(documentJSON).objdata(), &isMatch, nullptr);
+                return isMatch;
+            });
     }
 
     auto checkMatchStatus(const char* filterJSON,
                           const char* documentJSON,
                           stitch_support_v1_collator* collator = nullptr) {
-        auto match_status = stitch_support_v1_status_create();
+        auto matchStatus = stitch_support_v1_status_create();
+        ON_BLOCK_EXIT([matchStatus] { stitch_support_v1_status_destroy(matchStatus); });
         auto matcher = stitch_support_v1_matcher_create(
-            lib, fromjson(filterJSON).objdata(), collator, match_status);
-        ASSERT(!matcher);
+            lib, fromjson(filterJSON).objdata(), collator, matchStatus);
+        if (matcher) {
+            stitch_support_v1_matcher_destroy(matcher);
+            FAIL("Expected stich_support_v1_matcher_create to fail");
+        }
 
         ASSERT_EQ(STITCH_SUPPORT_V1_ERROR_EXCEPTION,
-                  stitch_support_v1_status_get_error(match_status));
+                  stitch_support_v1_status_get_error(matchStatus));
         // Make sure that we get a proper code back but don't worry about its exact value.
-        ASSERT_NE(0, stitch_support_v1_status_get_code(match_status));
-        std::string explanation(stitch_support_v1_status_get_explanation(match_status));
-        stitch_support_v1_status_destroy(match_status);
+        ASSERT_NE(0, stitch_support_v1_status_get_code(matchStatus));
+        std::string explanation(stitch_support_v1_status_get_explanation(matchStatus));
 
         return explanation;
+    }
+
+    auto checkProjection(const char* specJSON,
+                         std::vector<const char*> documentsJSON,
+                         const char* filterJSON = nullptr,
+                         stitch_support_v1_collator* collator = nullptr,
+                         bool denyProjectionCollator = false) {
+        stitch_support_v1_matcher* matcher = nullptr;
+        if (filterJSON) {
+            matcher = stitch_support_v1_matcher_create(
+                lib, fromjson(filterJSON).objdata(), collator, nullptr);
+            ASSERT(matcher);
+        }
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
+
+        auto projection =
+            stitch_support_v1_projection_create(lib,
+                                                fromjson(specJSON).objdata(),
+                                                matcher,
+                                                denyProjectionCollator ? nullptr : collator,
+                                                nullptr);
+        ASSERT(projection);
+        ON_BLOCK_EXIT([projection] { stitch_support_v1_projection_destroy(projection); });
+
+        std::vector<std::string> results;
+        std::transform(documentsJSON.begin(),
+                       documentsJSON.end(),
+                       std::back_inserter(results),
+                       [=](const char* documentJSON) {
+                           auto bson = stitch_support_v1_projection_apply(
+                               projection, fromjson(documentJSON).objdata(), nullptr);
+                           auto result = tojson(mongo::BSONObj(bson));
+                           stitch_support_v1_bson_free(bson);
+                           return result;
+                       });
+
+        return results;
+    }
+
+    auto checkProjectionStatus(const char* specJSON,
+                               const char* documentJSON,
+                               const char* filterJSON = nullptr,
+                               stitch_support_v1_collator* collator = nullptr) {
+        auto projectionStatus = stitch_support_v1_status_create();
+        ON_BLOCK_EXIT([projectionStatus] { stitch_support_v1_status_destroy(projectionStatus); });
+
+        stitch_support_v1_matcher* matcher = nullptr;
+        if (filterJSON) {
+            matcher = stitch_support_v1_matcher_create(
+                lib, fromjson(filterJSON).objdata(), collator, nullptr);
+            ASSERT(matcher);
+        }
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
+
+        auto projection = stitch_support_v1_projection_create(
+            lib, fromjson(specJSON).objdata(), matcher, collator, projectionStatus);
+        if (projection) {
+            stitch_support_v1_projection_destroy(projection);
+            FAIL("Expected stich_support_v1_projection_create to fail");
+        }
+
+        ASSERT_EQ(STITCH_SUPPORT_V1_ERROR_EXCEPTION,
+                  stitch_support_v1_status_get_error(projectionStatus));
+        // Make sure that we get a proper code back but don't worry about its exact value.
+        ASSERT_NE(0, stitch_support_v1_status_get_code(projectionStatus));
+
+        return std::string(stitch_support_v1_status_get_explanation(projectionStatus));
     }
 
     void checkUpdate(const char* expr,
@@ -139,9 +212,54 @@ protected:
             << stitch_support_v1_status_get_error(status) << ":"
             << stitch_support_v1_status_get_explanation(status);
         ASSERT(updateResult);
-        ON_BLOCK_EXIT([updateResult] { free(updateResult); });
+        ON_BLOCK_EXIT([updateResult] { stitch_support_v1_bson_free(updateResult); });
 
         ASSERT_BSONOBJ_EQ(mongo::BSONObj(updateResult), expectedResult);
+    }
+
+    auto checkUpdateStatus(const char* expr,
+                           const char* document,
+                           const char* match = nullptr,
+                           const char* arrayFilters = nullptr,
+                           const char* collatorObj = nullptr) {
+        auto updateStatus = stitch_support_v1_status_create();
+        ON_BLOCK_EXIT([updateStatus] { stitch_support_v1_status_destroy(updateStatus); });
+
+        stitch_support_v1_collator* collator = nullptr;
+        if (collatorObj) {
+            collator =
+                stitch_support_v1_collator_create(lib, fromjson(collatorObj).objdata(), nullptr);
+        }
+        ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
+
+        stitch_support_v1_matcher* matcher = nullptr;
+        if (match) {
+            matcher =
+                stitch_support_v1_matcher_create(lib, fromjson(match).objdata(), collator, nullptr);
+            ASSERT(matcher);
+        }
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
+
+        stitch_support_v1_update* update = stitch_support_v1_update_create(
+            lib,
+            fromjson(expr).objdata(),
+            arrayFilters ? fromjson(arrayFilters).objdata() : nullptr,
+            matcher,
+            collator,
+            updateStatus);
+        if (!update) {
+            ASSERT_EQ(STITCH_SUPPORT_V1_ERROR_EXCEPTION,
+                      stitch_support_v1_status_get_error(updateStatus));
+            // Make sure that we get a proper code back but don't worry about its exact value.
+            ASSERT_NE(0, stitch_support_v1_status_get_code(updateStatus));
+        } else {
+            ON_BLOCK_EXIT([update] { stitch_support_v1_update_destroy(update); });
+            char* updateResult = stitch_support_v1_update_apply(
+                update, fromjson(document).objdata(), updateDetails, updateStatus);
+            ASSERT_NE(0, stitch_support_v1_status_get_code(updateStatus));
+            ASSERT(!updateResult);
+        }
+        return std::string(stitch_support_v1_status_get_explanation(updateStatus));
     }
 
     const std::string getModifiedPaths() {
@@ -213,8 +331,53 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithStatus) {
 TEST_F(StitchSupportTest, CheckMatchWorksWithCollation) {
     auto collator = stitch_support_v1_collator_create(
         lib, fromjson("{locale: 'en', strength: 2}").objdata(), nullptr);
+    ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
     ASSERT_TRUE(checkMatch("{a: 'word'}", {"{a: 'WORD', b: 'other'}"}, collator));
-    stitch_support_v1_collator_destroy(collator);
+}
+
+TEST_F(StitchSupportTest, CheckProjectionWorkDefaults) {
+    auto results =
+        checkProjection("{a: 1}", {"{_id: 1, a: 100, b: 200}", "{_id: 1, a: 200, b: 300}"});
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : 100 }", results[0]);
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : 200 }", results[1]);
+    results = checkProjection("{'a.$.c': 1}",
+                              {"{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}",
+                               "{_id: 1, a: [{b: 1, c: 100, d: 45}, {b: 2, c: 200}]}"},
+                              "{'a.b': 1}");
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ { \"b\" : 1, \"c\" : 200 } ] }", results[0]);
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ { \"b\" : 1, \"c\" : 100, \"d\" : 45 } ] }", results[1]);
+    ASSERT_EQ(
+        "{ \"a\" : [ { \"b\" : 2, \"c\" : 2 } ] }",
+        checkProjection("{a: {$elemMatch: {b: 2}}}", {"{a: [{b: 1, c: 1}, {b: 2, c: 2}]}"})[0]);
+    ASSERT_EQ("{ \"a\" : [ 2, 3 ] }",
+              checkProjection("{a: {$slice: [1, 2]}}", {"{a: [1, 2, 3, 4]}"})[0]);
+}
+
+TEST_F(StitchSupportTest, CheckProjectionProducesExpectedStatus) {
+    ASSERT_EQ(
+        "Projections with a positional operator require a matcher",
+        checkProjectionStatus("{'a.$.c': 1}", "{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}"));
+    ASSERT_EQ(
+        "$textScore, $sortKey, $recordId, $geoNear and $returnKey are not allowed in this context",
+        checkProjectionStatus("{a: {$meta: 'textScore'}}", "{_id: 1, a: 100, b: 200}"));
+}
+
+TEST_F(StitchSupportTest, CheckProjectionCollatesRespectfully) {
+    auto collator = stitch_support_v1_collator_create(
+        lib, fromjson("{locale: 'en', strength: 2}").objdata(), nullptr);
+    ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ \"mixEdCaSe\" ] }",
+              checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
+                              {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
+                              nullptr,
+                              collator)[0]);
+    // Ignore a matcher's collator.
+    ASSERT_EQ("{ \"_id\" : 1 }",
+              checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
+                              {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
+                              "{_id: 1}",
+                              collator,
+                              true)[0]);
 }
 
 TEST_F(StitchSupportTest, TestUpdateSingleElement) {
@@ -293,6 +456,19 @@ TEST_F(StitchSupportTest, TestUpdateRespectsTheCollation) {
                 nullptr,
                 caseInsensitive);
     ASSERT_EQ(getModifiedPaths(), "[a]");
+}
+
+TEST_F(StitchSupportTest, TestUpdateProducesProperStatus) {
+    ASSERT_EQ("Unknown modifier: $bogus", checkUpdateStatus("{$bogus: {a: 2}}", "{a: 1}"));
+    ASSERT_EQ("Updating the path 'a' would create a conflict at 'a'",
+              checkUpdateStatus("{$set: {a: 2, a: 3}}", "{a: 1}"));
+    ASSERT_EQ("No array filter found for identifier 'i' in path 'a.$[i]'",
+              checkUpdateStatus("{$set: {'a.$[i]': 3}}", "{a: [1, 2]}"));
+    ASSERT_EQ("No array filter found for identifier 'i' in path 'a.$[i]'",
+              checkUpdateStatus("{$set: {'a.$[i]': 3}}", "{a: [1, 2]}", nullptr, "[{'j': 2}]"));
+    ASSERT_EQ("Update created a conflict at 'a.0'",
+              checkUpdateStatus(
+                  "{$set: {'a.$[i]': 2, 'a.$[j]': 3}}", "{a: [0]}", nullptr, " [{i: 0}, {j:0}]"));
 }
 
 }  // namespace

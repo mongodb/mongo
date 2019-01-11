@@ -226,7 +226,7 @@ StatusWith<BSONObj> ProjectionExec::project(const BSONObj& in,
     MatchDetails matchDetails;
 
     // If it's a positional projection we need a MatchDetails.
-    if (transformRequiresDetails()) {
+    if (projectRequiresQueryExpression()) {
         matchDetails.requestElemMatchKey();
         invariant(nullptr != _queryExpression);
         invariant(_queryExpression->matchesBSON(in, &matchDetails));

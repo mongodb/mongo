@@ -190,36 +190,6 @@ stitch_support_v1_status_get_explanation(const stitch_support_v1_status* status)
 STITCH_SUPPORT_API int MONGO_API_CALL
 stitch_support_v1_status_get_code(const stitch_support_v1_status* status);
 
-typedef struct stitch_support_v1_update_details stitch_support_v1_update_details;
-
-/**
- * Create an "update details" object to pass to stitch_support_v1_update_apply(), which will
- * populate the update details with a list of paths modified by the update.
- *
- * Clients can reuse the same update details object for multiple calls to
- * stitch_support_v1_update_apply().
- */
-STITCH_SUPPORT_API stitch_support_v1_update_details* MONGO_API_CALL
-stitch_support_v1_update_details_create(void);
-
-STITCH_SUPPORT_API void MONGO_API_CALL
-stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details);
-
-/**
- * The number of modified paths in an update details object. Always call this function to ensure an
- * index is in bounds before calling stitch_support_v1_update_details_path().
- */
-STITCH_SUPPORT_API size_t MONGO_API_CALL stitch_support_v1_update_details_num_modified_paths(
-    stitch_support_v1_update_details* update_details);
-
-/**
- * Return a dotted-path string from the given index of the modified paths in the update details
- * object. The above note about distinguishing field names from array indexes in the documentation
- * of stitch_support_v1_match_details_elem_match_path_component() also applies here.
- */
-STITCH_SUPPORT_API const char* MONGO_API_CALL stitch_support_v1_update_details_path(
-    stitch_support_v1_update_details* update_details, size_t path_index);
-
 /**
  * An object which describes the runtime state of the Stitch Support Library.
  *
@@ -234,71 +204,6 @@ STITCH_SUPPORT_API const char* MONGO_API_CALL stitch_support_v1_update_details_p
  * thread may access the `stitch_support_v1_lib` object.
  */
 typedef struct stitch_support_v1_lib stitch_support_v1_lib;
-
-/**
- * An update object used to apply an update to a BSON document, which may modify particular
- * fields (e.g.: {$set: {a: 1}}) or replace the entire document with a new one.
- */
-typedef struct stitch_support_v1_update stitch_support_v1_update;
-
-typedef struct stitch_support_v1_matcher stitch_support_v1_matcher;
-typedef struct stitch_support_v1_collator stitch_support_v1_collator;
-/**
- * Creates a stitch_support_v1_update object by parsing the given update expression.
- *
- * If the update expression includes a positional ($) operator, then the caller must pass a
- * stitch_support_v1_matcher, which is used to determine which array element matches the positional.
- * The 'matcher' argument is not used when the update expression has no positional operator, and it
- * can be NULL.
- *
- * The caller can optionally provide a collator, which is used when evaluating arrayFilters match
- * expressions. The 'collator' parameter must match the collator in 'matcher'. A mismatch will raise
- * an invariant violation. Multiple matcher, projection, and update objects can share the same
- * collation object.
- *
- * The newly created update object does _not_ take ownership of its 'matcher' or 'collators'
- * objects. The client is responsible for ensuring that the matcher and collator continue to exist
- * for the lifetime of the update and for ultimately destroying all three of the update, matcher,
- * and collator.
- */
-STITCH_SUPPORT_API stitch_support_v1_update* MONGO_API_CALL
-stitch_support_v1_update_create(stitch_support_v1_lib* lib,
-                                const char* updateBSON,
-                                const char* arrayFiltersBSON,
-                                stitch_support_v1_matcher* matcher,
-                                stitch_support_v1_collator* collator,
-                                stitch_support_v1_status* status);
-
-/**
- * Destroys a valid stitch_support_v1_update object.
- *
- * This function does not destroy the collator associated with the destroyed update. When
- * destroying a update and its associated collator together, it is safe to destroy them in either
- * order. Although a update is no longer valid once its associated collator has been destroyed, it
- * is still safe to call this destroy function on the update.
- *
- * This function is not thread safe, and it must not execute concurrently with any other function
- * that accesses the matcher object being destroyed.
- *
- * This function does not report failures.
- */
-STITCH_SUPPORT_API void MONGO_API_CALL
-stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
-
-/**
- * Apply an update to an input document, writing the resulting BSON to the 'output' buffer. Returns
- * a pointer to the output buffer on success or NULL on error. The caller is responsible for
- * destroying the result buffer with free().
- *
- * If the update includes a positional ($) operator, the caller should verify before applying it
- * that the associated matcher matches the input document. A non-matching input document will
- * trigger an assertion failure.
- */
-STITCH_SUPPORT_API char* MONGO_API_CALL
-stitch_support_v1_update_apply(stitch_support_v1_update* const update,
-                               const char* documentBSON,
-                               stitch_support_v1_update_details* update_details,
-                               stitch_support_v1_status* status);
 
 /**
  * Creates a stitch_support_v1_lib object, which stores context for the Stitch Support library. A
@@ -414,6 +319,201 @@ stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
                               const char* documentBSON,
                               bool* isMatch,
                               stitch_support_v1_status* status);
+
+/**
+ * A projection object is used to apply a projection to a BSON document which may include or exclude
+ * particular fields (e.g.: {_id: 0, a: 1}) or produce new columns through an expression made of
+ * projection operators.
+ *
+ * A projection requires a matcher if it uses the positional ($) operator. This matcher is used to
+ * determine which array element matches the specified position. The matcher is optional and unused
+ * when there is no positional operator.
+ *
+ * A projection can optionally use a collator for evaluating $elemMatch operators. Projection
+ * objects without collators will use the default collation for $elemMatch, even if their matcher
+ * has a collator object. Multiple matcher, projection, and update objects can share the same
+ * collation object.
+ */
+typedef struct stitch_support_v1_projection stitch_support_v1_projection;
+
+/**
+ * Creates a stitch_support_v1_projection object, which is used to apply a projection to a BSON
+ * document. The projection specification is also represented as a BSON document, which is passed in
+ * the 'specBSON' argument. The syntax used for projection is the same as a MongoDB "find" command
+ * (i.e., not an aggregation $project stage).
+ *
+ * This function will fail if the projection specification is invalid, returning NULL and populating
+ * 'status' with information about the error.
+ *
+ * If the projection specification includes a positional ($) operator, then the caller must pass a
+ * mongo_embedded_v1_matcher. The 'matcher' argument is unnecessary if the specification has no
+ * positional operator and it can be NULL.
+ *
+ * The 'collator' argument, a pointer to a stitch_support_v1_collator, will cause the projection to
+ * use the given collator if provided, The pointer can be NULL to cause the projection to use no
+ * collator.
+ *
+ * The newly created projection object does _not_ take ownership of its 'matcher' or 'collator'
+ * objects. The client is responsible for ensuring that the matcher and collator continue to exist
+ * for the lifetime of the projection and for ultimately destroying all three of the projection,
+ * matcher and collator.
+ */
+STITCH_SUPPORT_API stitch_support_v1_projection* MONGO_API_CALL
+stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
+                                    const char* specBSON,
+                                    stitch_support_v1_matcher* matcher,
+                                    stitch_support_v1_collator* collator,
+                                    stitch_support_v1_status* status);
+
+/**
+ * Destroys a valid stitch_support_v1_projection object.
+ *
+ * This function does not destroy the collator or matcher associated with the destroyed projection.
+ * When destroying a projection and its associated collator and/or matcher together, it is safe to
+ * destroy them in any order. Although a projection is no longer valid once its associated collator
+ * or matcher has been destroyed, it is still safe to call this destroy function on the projection.
+ *
+ * This function is not thread safe, and it must not execute concurrently with any other function
+ * that accesses the matcher object being destroyed.
+ *
+ * This function does not report failures.
+ */
+STITCH_SUPPORT_API void MONGO_API_CALL
+stitch_support_v1_projection_destroy(stitch_support_v1_projection* const projection);
+
+/**
+ * Apply a projection to an input document, writing the resulting BSON to a newly allocated 'output'
+ * buffer. Returns a pointer to the output buffer on success or NULL on error. 'status' is populated
+ * in the error case. The caller is responsible for destroying the result buffer with
+ * stitch_support_v1_bson_free().
+ *
+ * If the projection includes a positional ($) operator, the caller should verify before applying it
+ * that the associated matcher matches the input document. A non-matching input document will
+ * trigger an assertion failure.
+ */
+STITCH_SUPPORT_API char* MONGO_API_CALL
+stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
+                                   const char* documentBSON,
+                                   stitch_support_v1_status* status);
+
+/**
+ * An update details object stores the list of paths modified by a call to
+ * stitch_support_v1_update_apply().
+ */
+typedef struct stitch_support_v1_update_details stitch_support_v1_update_details;
+
+/**
+ * Create an "update details" object to pass to stitch_support_v1_update_apply(), which will
+ * populate the update details with a list of paths modified by the update.
+ *
+ * Clients can reuse the same update details object for multiple calls to
+ * stitch_support_v1_update_apply().
+ */
+STITCH_SUPPORT_API stitch_support_v1_update_details* MONGO_API_CALL
+stitch_support_v1_update_details_create(void);
+
+/**
+ * Destroys an update details object.
+ *
+ * This function is not thread safe, and it must not execute concurrently with any other function
+ * that accesses the update details object being destroyed.
+ *
+ * This function does not report failures.
+ */
+STITCH_SUPPORT_API void MONGO_API_CALL
+stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details);
+
+/**
+ * The number of modified paths in an update details object. Always call this function to ensure an
+ * index is in bounds before calling stitch_support_v1_update_details_path().
+ */
+STITCH_SUPPORT_API size_t MONGO_API_CALL stitch_support_v1_update_details_num_modified_paths(
+    stitch_support_v1_update_details* update_details);
+
+/**
+ * Return a dotted-path string from the given index of the modified paths in the update details
+ * object.
+ */
+STITCH_SUPPORT_API const char* MONGO_API_CALL stitch_support_v1_update_details_path(
+    stitch_support_v1_update_details* update_details, size_t path_index);
+
+/**
+ * An update object used to apply an update to a BSON document, which may modify particular
+ * fields (e.g.: {$set: {a: 1}}) or replace the entire document with a new one.
+ */
+typedef struct stitch_support_v1_update stitch_support_v1_update;
+
+/**
+ * Creates a stitch_support_v1_update object by parsing the update expression provided in the
+ * 'updateBSON' argument.
+ *
+ * The optional 'arrayFiltersBSON' argument must be a BSON array where each element of the array
+ * represents an array filter with the field name storing the placeholder name and the value storing
+ * the assoicated match expression. This argument is permitted to be NULL in the case where there
+ * are no array filters. If 'updateBSON' contains a placeholder ($[*]) that does not have a
+ * corresponding 'arrayFiltersBSON' entry this function will fail to parse.
+ *
+ * This function will fail if either 'updateBSON' or 'arrayFiltersBSON fails to parse, returning
+ * NULL and populating 'status' with information about the error.
+ *
+ * The caller can optionally provide a collator, which is used when evaluating arrayFilters match
+ * expressions. The 'collator' parameter must match the collator in 'matcher'. A mismatch will raise
+ * an invariant violation if 'matcher' is non-NULL. Multiple matcher, projection, and update objects
+ * can share the same collation object.
+ *
+ * The newly created update object does _not_ take ownership of its 'matcher' or 'collator'
+ * objects. The client is responsible for ensuring that the matcher and collator continue to exist
+ * for the lifetime of the update and for ultimately destroying all three of the update, matcher,
+ * and collator.
+ */
+STITCH_SUPPORT_API stitch_support_v1_update* MONGO_API_CALL
+stitch_support_v1_update_create(stitch_support_v1_lib* lib,
+                                const char* updateBSON,
+                                const char* arrayFiltersBSON,
+                                stitch_support_v1_matcher* matcher,
+                                stitch_support_v1_collator* collator,
+                                stitch_support_v1_status* status);
+
+/**
+ * Destroys a valid stitch_support_v1_update object.
+ *
+ * This function does not destroy the collator associated with the destroyed update. When
+ * destroying an update and its associated collator together, it is safe to destroy them in either
+ * order. Although an update is no longer valid once its associated collator has been destroyed, it
+ * is still safe to call this destroy function on the update.
+ *
+ * This function is not thread safe, and it must not execute concurrently with any other function
+ * that accesses the update object being destroyed.
+ *
+ * This function does not report failures.
+ */
+STITCH_SUPPORT_API void MONGO_API_CALL
+stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
+
+/**
+ * Apply an update to an input document writing the resulting BSON to a newly allocated output
+ * buffer. Returns a pointer to the output buffer on success or NULL on error. 'status' is populated
+ * in the error case. The caller is responsible for destroying the result buffer with
+ * stitch_support_v1_bson_free().
+ *
+ * If the update includes a positional ($) operator, the caller should verify before applying it
+ * that the associated matcher matches the input document. A non-matching input document will
+ * trigger an assertion failure.
+ */
+STITCH_SUPPORT_API char* MONGO_API_CALL
+stitch_support_v1_update_apply(stitch_support_v1_update* const update,
+                               const char* documentBSON,
+                               stitch_support_v1_update_details* update_details,
+                               stitch_support_v1_status* status);
+
+/**
+ * Free the memory of a BSON buffer returned by stitch_support_v1_projection_apply() or
+ * stitch_support_v1_update_apply(). This function can be safely called on a NULL pointer.
+ *
+ * This function can be called at any time to deallocate a BSON buffer and will not invalidate any
+ * library object.
+ */
+STITCH_SUPPORT_API void MONGO_API_CALL stitch_support_v1_bson_free(char* bson);
 
 #ifdef __cplusplus
 }  // extern "C"

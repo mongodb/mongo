@@ -36,6 +36,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
+#include "mongo/db/exec/projection_exec.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -43,7 +44,7 @@
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
 
-#include <iostream>
+#include <algorithm>
 #include <string>
 
 #if defined(_WIN32)
@@ -162,13 +163,41 @@ struct stitch_support_v1_matcher {
                               stitch_support_v1_collator* collator)
         : client(std::move(client)),
           opCtx(this->client->makeOperationContext()),
-          matcher(filterBSON,
+          matcher(filterBSON.getOwned(),
                   new mongo::ExpressionContext(opCtx.get(),
                                                collator ? collator->collator.get() : nullptr)){};
 
     mongo::ServiceContext::UniqueClient client;
     mongo::ServiceContext::UniqueOperationContext opCtx;
     mongo::Matcher matcher;
+};
+
+struct stitch_support_v1_projection {
+    stitch_support_v1_projection(mongo::ServiceContext::UniqueClient client,
+                                 const mongo::BSONObj& pattern,
+                                 stitch_support_v1_matcher* matcher,
+                                 stitch_support_v1_collator* collator)
+        : client(std::move(client)),
+          opCtx(this->client->makeOperationContext()),
+          projectionExec(opCtx.get(),
+                         pattern.getOwned(),
+                         matcher ? matcher->matcher.getMatchExpression() : nullptr,
+                         collator ? collator->collator.get() : nullptr),
+          matcher(matcher) {
+        uassert(51050,
+                "Projections with a positional operator require a matcher",
+                matcher || !projectionExec.projectRequiresQueryExpression());
+        uassert(51051,
+                "$textScore, $sortKey, $recordId, $geoNear and $returnKey are not allowed in this "
+                "context",
+                !projectionExec.hasMetaFields() && !projectionExec.returnKey());
+    }
+
+    mongo::ServiceContext::UniqueClient client;
+    mongo::ServiceContext::UniqueOperationContext opCtx;
+    mongo::ProjectionExec projectionExec;
+
+    stitch_support_v1_matcher* matcher;
 };
 
 struct stitch_support_v1_update_details {
@@ -290,7 +319,28 @@ stitch_support_v1_matcher* matcher_create(stitch_support_v1_lib* const lib,
     }
 
     return new stitch_support_v1_matcher(
-        lib->serviceContext->makeClient("stitch_support"), filter.getOwned(), collator);
+        lib->serviceContext->makeClient("stitch_support"), filter, collator);
+}
+
+stitch_support_v1_projection* projection_create(stitch_support_v1_lib* const lib,
+                                                BSONObj spec,
+                                                stitch_support_v1_matcher* matcher,
+                                                stitch_support_v1_collator* collator) {
+    if (!library) {
+        throw StitchSupportException{STITCH_SUPPORT_V1_ERROR_LIBRARY_NOT_INITIALIZED,
+                                     "Cannot create a new projection when the Stitch Support "
+                                     "Library is not yet initialized."};
+    }
+
+    if (library.get() != lib) {
+        throw StitchSupportException{STITCH_SUPPORT_V1_ERROR_INVALID_LIB_HANDLE,
+                                     "Cannot create a new projection when the Stitch Support "
+                                     "Library is not yet initialized."};
+    }
+
+
+    return new stitch_support_v1_projection(
+        lib->serviceContext->makeClient("stitch_support"), spec, matcher, collator);
 }
 
 stitch_support_v1_update* update_create(stitch_support_v1_lib* const lib,
@@ -385,8 +435,8 @@ stitch_support_v1_matcher* MONGO_API_CALL
 stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
                                  const char* filterBSON,
                                  stitch_support_v1_collator* collator,
-                                 stitch_support_v1_status* const statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() {
+                                 stitch_support_v1_status* const status) {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
         mongo::BSONObj filter(filterBSON);
         return mongo::matcher_create(lib, filter, collator);
     });
@@ -397,13 +447,52 @@ void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher*
     static_cast<void>(enterCXX(nullStatus, [=]() { delete matcher; }));
 }
 
+stitch_support_v1_projection* MONGO_API_CALL
+stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
+                                    const char* specBSON,
+                                    stitch_support_v1_matcher* matcher,
+                                    stitch_support_v1_collator* collator,
+                                    stitch_support_v1_status* const status) {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
+        mongo::BSONObj spec(specBSON);
+        return mongo::projection_create(lib, spec, matcher, collator);
+    });
+}
+
+void MONGO_API_CALL
+stitch_support_v1_projection_destroy(stitch_support_v1_projection* const projection) {
+    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete projection; }));
+}
+
 int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
                                                  const char* documentBSON,
                                                  bool* isMatch,
-                                                 stitch_support_v1_status* statusPtr) {
-    return enterCXX(mongo::getStatusImpl(statusPtr), [&]() {
+                                                 stitch_support_v1_status* status) {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
         mongo::BSONObj document(documentBSON);
         *isMatch = matcher->matcher.matches(document, nullptr);
+    });
+}
+
+char* MONGO_API_CALL
+stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
+                                   const char* documentBSON,
+                                   stitch_support_v1_status* status) {
+    return enterCXX(mongo::getStatusImpl(status), [&]() {
+        mongo::BSONObj document(documentBSON);
+
+        auto outputResult = projection->projectionExec.project(document);
+        auto outputObj = uassertStatusOK(outputResult);
+        auto outputSize = static_cast<size_t>(outputObj.objsize());
+        auto output = new (std::nothrow) char[outputSize];
+
+        uassert(mongo::ErrorCodes::ExceededMemoryLimit,
+                "Failed to allocate memory for projection",
+                output);
+
+        static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
+        return output;
     });
 }
 
@@ -462,19 +551,18 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                                     &mutableDoc,
                                                     false /* validateForStorage */,
                                                     immutablePaths,
-                                                    NULL /* logOpRec*/,
+                                                    nullptr /* logOpRec*/,
                                                     &docWasModified,
                                                     &modifiedPaths));
 
         auto outputObj = mutableDoc.getObject();
-        size_t output_size = static_cast<size_t>(outputObj.objsize());
-        char* output = static_cast<char*>(malloc(output_size));
+        size_t outputSize = static_cast<size_t>(outputObj.objsize());
+        auto output = new (std::nothrow) char[outputSize];
 
         uassert(
             mongo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for update", output);
 
-        memcpy(
-            static_cast<void*>(output), static_cast<const void*>(outputObj.objdata()), output_size);
+        static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
 
         if (update_details) {
             update_details->modifiedPaths = modifiedPaths.serialize();
@@ -490,7 +578,8 @@ stitch_support_v1_update_details* MONGO_API_CALL stitch_support_v1_update_detail
 
 void MONGO_API_CALL
 stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details) {
-    delete update_details;
+    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete update_details; }));
 };
 
 size_t MONGO_API_CALL stitch_support_v1_update_details_num_modified_paths(
@@ -502,6 +591,11 @@ const char* MONGO_API_CALL stitch_support_v1_update_details_path(
     stitch_support_v1_update_details* update_details, size_t path_index) {
     invariant(path_index < update_details->modifiedPaths.size());
     return update_details->modifiedPaths[path_index].c_str();
+}
+
+void MONGO_API_CALL stitch_support_v1_bson_free(char* bson) {
+    mongo::StitchSupportStatusImpl* nullStatus = nullptr;
+    static_cast<void>(enterCXX(nullStatus, [=]() { delete[](bson); }));
 }
 
 }  // extern "C"

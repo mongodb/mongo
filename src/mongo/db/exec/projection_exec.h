@@ -153,6 +153,15 @@ public:
         const boost::optional<const double> textScore = boost::none,
         const int64_t recordId = 0) const;
 
+    /**
+     * Determines if calls to the project method require that this object was created with the full
+     * query expression. We may need it for MatchDetails.
+     */
+    bool projectRequiresQueryExpression() const {
+        return ARRAY_OP_POSITIONAL == _arrayOpType;
+    }
+
+
 private:
     /**
      * Adds meta fields to the end of a projection.
@@ -196,13 +205,6 @@ private:
     Status projectHelper(const BSONObj& in,
                          BSONObjBuilder* bob,
                          const MatchDetails* details = nullptr) const;
-
-    /**
-     * See transform(...) above.
-     */
-    bool transformRequiresDetails() const {
-        return ARRAY_OP_POSITIONAL == _arrayOpType;
-    }
 
     /**
      * Appends the element 'e' to the builder 'bob', possibly descending into sub-fields of 'e'
