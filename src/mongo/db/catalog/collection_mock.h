@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -264,6 +263,11 @@ public:
     }
 
     const CollatorInterface* getDefaultCollator() const {
+        std::abort();
+    }
+
+    StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
+        OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const {
         std::abort();
     }
 

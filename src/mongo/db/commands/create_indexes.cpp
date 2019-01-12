@@ -52,7 +52,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -164,57 +163,6 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
 }
 
 /**
- * Returns index specifications with attributes (such as "collation") that are inherited from the
- * collection filled in.
- *
- * The returned index specifications will not be equivalent to the ones specified as 'indexSpecs' if
- * any missing attributes were filled in; however, the returned index specifications will match the
- * form stored in the IndexCatalog should any of these indexes already exist.
- */
-StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
-    OperationContext* opCtx, const Collection* collection, std::vector<BSONObj> indexSpecs) {
-    std::vector<BSONObj> indexSpecsWithDefaults = std::move(indexSpecs);
-
-    for (size_t i = 0, numIndexSpecs = indexSpecsWithDefaults.size(); i < numIndexSpecs; ++i) {
-        auto indexSpecStatus = index_key_validate::validateIndexSpecCollation(
-            opCtx, indexSpecsWithDefaults[i], collection->getDefaultCollator());
-        if (!indexSpecStatus.isOK()) {
-            return indexSpecStatus.getStatus();
-        }
-        auto indexSpec = indexSpecStatus.getValue();
-
-        if (IndexDescriptor::isIdIndexPattern(
-                indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj())) {
-            std::unique_ptr<CollatorInterface> indexCollator;
-            if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
-                auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                          ->makeFromBSON(collationElem.Obj());
-                // validateIndexSpecCollation() should have checked that the index collation spec is
-                // valid.
-                invariant(collatorStatus.getStatus());
-                indexCollator = std::move(collatorStatus.getValue());
-            }
-            if (!CollatorInterface::collatorsMatch(collection->getDefaultCollator(),
-                                                   indexCollator.get())) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "The _id index must have the same collation as the "
-                                         "collection. Index collation: "
-                                      << (indexCollator.get() ? indexCollator->getSpec().toBSON()
-                                                              : CollationSpec::kSimpleSpec)
-                                      << ", collection collation: "
-                                      << (collection->getDefaultCollator()
-                                              ? collection->getDefaultCollator()->getSpec().toBSON()
-                                              : CollationSpec::kSimpleSpec)};
-            }
-        }
-
-        indexSpecsWithDefaults[i] = indexSpec;
-    }
-
-    return indexSpecsWithDefaults;
-}
-
-/**
  * Returns a vector of index specs with the filled in collection default options and removes any
  * indexes that already exist on the collection. If the returned vector is empty after returning, no
  * new indexes need to be built. Throws on error.
@@ -222,8 +170,7 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
 std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
                                                              const Collection* collection,
                                                              std::vector<BSONObj> validatedSpecs) {
-    auto swDefaults =
-        resolveCollectionDefaultProperties(opCtx, collection, std::move(validatedSpecs));
+    auto swDefaults = collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, validatedSpecs);
     uassertStatusOK(swDefaults.getStatus());
 
     auto indexCatalog = collection->getIndexCatalog();
