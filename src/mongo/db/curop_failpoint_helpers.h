@@ -55,7 +55,6 @@ public:
                                           OperationContext* opCtx,
                                           const std::string& curOpMsg,
                                           const std::function<void(void)>& whileWaiting = nullptr,
-                                          bool checkForInterrupt = false,
-                                          boost::optional<NamespaceString> nss = boost::none);
+                                          bool checkForInterrupt = false);
 };
 }

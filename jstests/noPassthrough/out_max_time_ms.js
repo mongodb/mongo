@@ -45,20 +45,11 @@
         // use the 'maxTimeNeverTimeOut' failpoint to ensure that the operation does not
         // prematurely time out.
         const maxTimeMS = 1000 * 2;
-
+        const kFailPointName =
+            mode == "replaceDocuments" ? "hangDuringBatchUpdate" : "hangDuringBatchInsert";
         // Enable a failPoint so that the write will hang.
-        let failpointCommand = {
-            configureFailPoint: failPointName,
-            mode: "alwaysOn",
-            data: {nss: kDBName + "." + kDestCollName}
-        };
-
-        // For mode "replaceCollection", the namespace of the writes will be to a temp namespace so
-        // remove the restriction on nss.
-        if (mode == "replaceCollection")
-            delete failpointCommand.data;
-
-        assert.commandWorked(connToHang.getDB("admin").runCommand(failpointCommand));
+        assert.commandWorked(connToHang.getDB("admin").runCommand(
+            {configureFailPoint: failPointName, mode: "alwaysOn"}));
 
         // Make sure we don't run out of time before the failpoint is hit.
         assert.commandWorked(connToHang.getDB("admin").runCommand(
