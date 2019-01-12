@@ -67,10 +67,6 @@
 
 namespace mongo {
 
-using std::string;
-
-using IndexVersion = IndexDescriptor::IndexVersion;
-
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
@@ -230,18 +226,8 @@ std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* o
         resolveCollectionDefaultProperties(opCtx, collection, std::move(validatedSpecs));
     uassertStatusOK(swDefaults.getStatus());
 
-    auto specs = std::move(swDefaults.getValue());
-    for (size_t i = 0; i < specs.size(); i++) {
-        Status status =
-            collection->getIndexCatalog()->prepareSpecForCreate(opCtx, specs.at(i)).getStatus();
-        if (status.code() == ErrorCodes::IndexAlreadyExists) {
-            specs.erase(specs.begin() + i);
-            i--;
-            continue;
-        }
-        uassertStatusOK(status);
-    }
-    return specs;
+    auto indexCatalog = collection->getIndexCatalog();
+    return indexCatalog->removeExistingIndexes(opCtx, swDefaults.getValue(), /*throwOnError=*/true);
 }
 
 void checkUniqueIndexConstraints(OperationContext* opCtx,
@@ -262,9 +248,9 @@ void checkUniqueIndexConstraints(OperationContext* opCtx,
 }
 
 bool runCreateIndexes(OperationContext* opCtx,
-                      const string& dbname,
+                      const std::string& dbname,
                       const BSONObj& cmdObj,
-                      string& errmsg,
+                      std::string& errmsg,
                       BSONObjBuilder& result,
                       bool runTwoPhaseBuild) {
     const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
@@ -509,9 +495,9 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
+                   const std::string& dbname,
                    const BSONObj& cmdObj,
-                   string& errmsg,
+                   std::string& errmsg,
                    BSONObjBuilder& result) override {
         return runCreateIndexes(opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
     }
@@ -550,9 +536,9 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
+                   const std::string& dbname,
                    const BSONObj& cmdObj,
-                   string& errmsg,
+                   std::string& errmsg,
                    BSONObjBuilder& result) override {
         return runCreateIndexes(opCtx, dbname, cmdObj, errmsg, result, true /*two phase build*/);
     }

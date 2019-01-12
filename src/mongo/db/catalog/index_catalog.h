@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -325,11 +324,17 @@ public:
                                                      const BSONObj& original) const = 0;
 
     /**
-     * Removes pre-existing indexes from 'indexSpecsToBuild'. If this isn't done, an index build
-     * using 'indexSpecsToBuild' may fail with error code IndexAlreadyExists.
+     * Returns a copy of 'indexSpecsToBuild' that does not contain index specifications already
+     * existing in this index catalog. If this isn't done, an index build using 'indexSpecsToBuild'
+     * may fail with error code IndexAlreadyExists.
+     *
+     * If 'throwOnErrors' is set to true, any validation errors on a non-duplicate index
+     * will result in this function throwing an exception.
      */
     virtual std::vector<BSONObj> removeExistingIndexes(
-        OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
+        OperationContext* const opCtx,
+        const std::vector<BSONObj>& indexSpecsToBuild,
+        bool throwOnErrors = false) const = 0;
 
     /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the

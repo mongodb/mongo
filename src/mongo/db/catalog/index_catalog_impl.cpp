@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -271,14 +270,19 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
 }
 
 std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
-    OperationContext* const opCtx, const std::vector<BSONObj>& indexSpecsToBuild) const {
+    OperationContext* const opCtx,
+    const std::vector<BSONObj>& indexSpecsToBuild,
+    bool throwOnErrors) const {
     std::vector<BSONObj> result;
     for (const auto& spec : indexSpecsToBuild) {
-        auto status = prepareSpecForCreate(opCtx, spec).getStatus();
-        if (status.code() == ErrorCodes::IndexAlreadyExists) {
+        auto prepareResult = prepareSpecForCreate(opCtx, spec);
+        if (prepareResult == ErrorCodes::IndexAlreadyExists) {
             continue;
         }
-        // Intentionally ignoring other error codes.
+        // Intentionally ignoring other error codes unless 'throwOnErrors' is true.
+        if (throwOnErrors) {
+            uassertStatusOK(prepareResult);
+        }
         result.push_back(spec);
     }
     return result;
