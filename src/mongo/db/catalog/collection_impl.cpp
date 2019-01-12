@@ -1,3 +1,4 @@
+
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -49,7 +50,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
@@ -57,14 +57,12 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -959,53 +957,6 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
 
 const CollatorInterface* CollectionImpl::getDefaultCollator() const {
     return _collator.get();
-}
-
-StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpecsForCreate(
-    OperationContext* opCtx, const std::vector<BSONObj>& originalIndexSpecs) const {
-    std::vector<BSONObj> newIndexSpecs;
-
-    auto collator = getDefaultCollator();  // could be null.
-    auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
-
-    for (const auto& originalIndexSpec : originalIndexSpecs) {
-        auto validateResult =
-            index_key_validate::validateIndexSpecCollation(opCtx, originalIndexSpec, collator);
-        if (!validateResult.isOK()) {
-            return validateResult.getStatus().withContext(
-                str::stream()
-                << "failed to add collation information to index spec for index creation: "
-                << originalIndexSpec);
-        }
-        const auto& newIndexSpec = validateResult.getValue();
-
-        auto keyPattern = newIndexSpec[IndexDescriptor::kKeyPatternFieldName].Obj();
-        if (IndexDescriptor::isIdIndexPattern(keyPattern)) {
-            std::unique_ptr<CollatorInterface> indexCollator;
-            if (auto collationElem = newIndexSpec[IndexDescriptor::kCollationFieldName]) {
-                auto indexCollatorResult = collatorFactory->makeFromBSON(collationElem.Obj());
-                // validateIndexSpecCollation() should have checked that the index collation spec is
-                // valid.
-                invariant(indexCollatorResult.getStatus(),
-                          str::stream() << "invalid collation in index spec: " << newIndexSpec);
-                indexCollator = std::move(indexCollatorResult.getValue());
-            }
-            if (!CollatorInterface::collatorsMatch(collator, indexCollator.get())) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "The _id index must have the same collation as the "
-                                         "collection. Index collation: "
-                                      << (indexCollator.get() ? indexCollator->getSpec().toBSON()
-                                                              : CollationSpec::kSimpleSpec)
-                                      << ", collection collation: "
-                                      << (collator ? collator->getSpec().toBSON()
-                                                   : CollationSpec::kSimpleSpec)};
-            }
-        }
-
-        newIndexSpecs.push_back(newIndexSpec);
-    }
-
-    return newIndexSpecs;
 }
 
 namespace {
