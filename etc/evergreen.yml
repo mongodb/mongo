@@ -7290,30 +7290,6 @@ buildvariants:
 #         Linux buildvariants             #
 ###########################################
 
-- name: linux-64
-  display_name: Linux
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --ssl=off --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off --release
-    scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_http_client
-    tooltags: ""
-    build_mongoreplay: true
-  tasks:
-  - name: compile_TG
-    distros:
-    - rhel62-large
-  - name: dbtest_TG
-  - name: replica_sets_jscore_passthrough
-  - name: jsCore
-  - name: push
-
 - name: linux-64-repeated-execution
   stepback: false
   display_name: ~ Linux Repeated Execution
