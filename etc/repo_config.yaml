@@ -200,6 +200,7 @@ repos:
       - amd64
       - i386
       - s390x
+      - arm64
     repos:
       - apt/ubuntu/dists/bionic/mongodb-org
 
@@ -369,5 +370,6 @@ repos:
       - amd64
       - i386
       - s390x
+      - arm64
     repos:
       - apt/ubuntu/dists/bionic/mongodb-enterprise
