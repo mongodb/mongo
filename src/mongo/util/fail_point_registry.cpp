@@ -30,33 +30,33 @@
 
 #include "mongo/util/fail_point_registry.h"
 
-#include "mongo/util/fail_point_server_parameter.h"
+#include "mongo/bson/json.h"
+#include "mongo/util/fail_point_server_parameter_gen.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
-using mongoutils::str::stream;
-
 namespace mongo {
 
-using std::string;
+constexpr auto kFailPointServerParameterPrefix = "failpoint."_sd;
 
 FailPointRegistry::FailPointRegistry() : _frozen(false) {}
 
-Status FailPointRegistry::addFailPoint(const string& name, FailPoint* failPoint) {
+Status FailPointRegistry::addFailPoint(const std::string& name, FailPoint* failPoint) {
     if (_frozen) {
-        return Status(ErrorCodes::CannotMutateObject, "Registry is already frozen");
+        return {ErrorCodes::CannotMutateObject, "Registry is already frozen"};
     }
 
     if (_fpMap.count(name) > 0) {
-        return Status(ErrorCodes::Error(51006),
-                      stream() << "Fail point already registered: " << name);
+        return {ErrorCodes::Error(51006),
+                str::stream() << "Fail point already registered: " << name};
     }
 
     _fpMap.insert(make_pair(name, failPoint));
     return Status::OK();
 }
 
-FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
+FailPoint* FailPointRegistry::getFailPoint(const std::string& name) const {
     return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(nullptr));
 }
 
@@ -65,9 +65,45 @@ void FailPointRegistry::freeze() {
 }
 
 void FailPointRegistry::registerAllFailPointsAsServerParameters() {
-    for (auto it = _fpMap.begin(); it != _fpMap.end(); ++it) {
+    for (const auto& it : _fpMap) {
         // Intentionally leaked.
-        new FailPointServerParameter(it->first, it->second);
+        new FailPointServerParameter(it.first, ServerParameterType::kStartupOnly);
     }
 }
+
+FailPointServerParameter::FailPointServerParameter(StringData name, ServerParameterType spt)
+    : ServerParameter(kFailPointServerParameterPrefix.toString() + name.toString(), spt),
+      _data(getGlobalFailPointRegistry()->getFailPoint(name.toString())) {
+    invariant(name != "failpoint.*", "Failpoint prototype was auto-registered from IDL");
+    invariant(_data != nullptr, str::stream() << "Unknown failpoint: " << name);
 }
+
+void FailPointServerParameter::append(OperationContext* opCtx,
+                                      BSONObjBuilder& b,
+                                      const std::string& name) {
+    b << name << _data->toBSON();
+}
+
+Status FailPointServerParameter::setFromString(const std::string& str) {
+    BSONObj failPointOptions;
+    try {
+        failPointOptions = fromjson(str);
+    } catch (DBException& ex) {
+        return ex.toStatus();
+    }
+
+    auto swParsedOptions = FailPoint::parseBSON(failPointOptions);
+    if (!swParsedOptions.isOK()) {
+        return swParsedOptions.getStatus();
+    }
+
+    FailPoint::Mode mode;
+    FailPoint::ValType val;
+    BSONObj data;
+    std::tie(mode, val, data) = std::move(swParsedOptions.getValue());
+
+    _data->setMode(mode, val, data);
+
+    return Status::OK();
+}
+}  // namespace mongo
