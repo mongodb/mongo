@@ -159,11 +159,13 @@
     // the inserts or updates.
     testEpochChangeDuringAgg({
         outSpec: {to: target.getName(), mode: "insertDocuments"},
-        failpoint: "hangDuringBatchInsert"
+        failpoint: "hangDuringBatchInsert",
+        failpointData: {nss: target.getFullName()}
     });
     testEpochChangeDuringAgg({
         outSpec: {to: target.getName(), mode: "replaceDocuments"},
-        failpoint: "hangDuringBatchUpdate"
+        failpoint: "hangDuringBatchUpdate",
+        failpointData: {nss: target.getFullName()}
     });
 
     st.stop();
