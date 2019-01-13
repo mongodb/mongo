@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -33,6 +32,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -429,6 +429,18 @@ public:
      * Collection is destroyed.
      */
     virtual const CollatorInterface* getDefaultCollator() const = 0;
+
+    /**
+     * Fills in each index specification with collation information from this collection and returns
+     * the new index specifications.
+     *
+     * The returned index specifications will not be equivalent to the ones specified in
+     * 'indexSpecs' if any missing collation information were filled in; however, the returned index
+     * specifications will match the form stored in the IndexCatalog should any of these indexes
+     * already exist.
+     */
+    virtual StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
+        OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const = 0;
 
     /**
      * Returns a plan executor for a collection scan over this collection.
