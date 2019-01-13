@@ -130,7 +130,7 @@ class EnterpriseDistro(packager.Distro):
             if self.dname == 'suse':
                 return ["suse11", "suse12"]
             if self.dname == 'ubuntu':
-                return ["ubuntu1604"]
+                return ["ubuntu1604", "ubuntu1804"]
             return []
         if arch == "arm64":
             if self.dname == 'ubuntu':
