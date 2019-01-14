@@ -326,14 +326,17 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
         return;
     }
 
-    try {
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->logChange(
+    Grid::get(opCtx)
+        ->catalogClient()
+        ->logChange(
             opCtx,
             "movePrimary.error",
             _dbname.toString(),
             _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
-            ShardingCatalogClient::kMajorityWriteConcern));
+            ShardingCatalogClient::kMajorityWriteConcern)
+        .ignore();
 
+    try {
         _cleanup(opCtx);
     } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
         BSONObjBuilder requestArgsBSON;
