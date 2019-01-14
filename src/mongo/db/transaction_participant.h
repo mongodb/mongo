@@ -172,6 +172,17 @@ public:
     static TransactionParticipant* get(Session* session);
 
     /**
+     * When the server returns a NoSuchTransaction error for a command, it performs a noop write if
+     * there is a writeConcern on the command. The TransientTransactionError label is only appended
+     * to a NoSuchTransaction response for 'commitTransaction' if there is no writeConcern error.
+     * This ensures that if 'commitTransaction' is run with w:majority, then the
+     * TransientTransactionError label is only returned if the transaction is not committed on any
+     * valid branch of history, so the driver or application can safely retry the entire
+     * transaction.
+     */
+    static void performNoopWriteForNoSuchTransaction(OperationContext* opCtx);
+
+    /**
      * Blocking method, which loads the transaction state from storage if it has been marked as
      * needing refresh.
      *

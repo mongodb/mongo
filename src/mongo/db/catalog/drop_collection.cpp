@@ -45,9 +45,12 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
@@ -64,6 +67,12 @@ Status dropCollection(OperationContext* opCtx,
         Collection* coll = db ? db->getCollection(opCtx, collectionName) : nullptr;
         auto view =
             db && !coll ? db->getViewCatalog()->lookup(opCtx, collectionName.ns()) : nullptr;
+
+        if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
+            log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
+                     "disabled.";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
+        }
 
         if (!db || (!coll && !view)) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");

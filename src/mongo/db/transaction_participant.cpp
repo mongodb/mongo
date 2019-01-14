@@ -300,6 +300,37 @@ TransactionParticipant* TransactionParticipant::get(Session* session) {
     return &getTransactionParticipant(session);
 }
 
+void TransactionParticipant::performNoopWriteForNoSuchTransaction(OperationContext* opCtx) {
+    repl::ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+
+    // The locker must not have a max lock timeout when this noop write is performed, since if it
+    // threw LockTimeout, this would be treated as a TransientTransactionError, which would indicate
+    // it's resafe to retry the entire transaction. We cannot know it is safe to attach
+    // TransientTransactionError until the noop write has been performed and the writeConcern has
+    // been satisfied.
+    invariant(!opCtx->lockState()->hasMaxLockTimeout());
+
+    {
+        Lock::DBLock dbLock(opCtx, "local", MODE_IX);
+        Lock::CollectionLock collectionLock(opCtx->lockState(), "local.oplog.rs", MODE_IX);
+
+        uassert(ErrorCodes::NotMaster,
+                "Not primary when performing noop write for NoSuchTransaction error",
+                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+
+        writeConflictRetry(
+            opCtx, "performNoopWriteForNoSuchTransaction", "local.rs.oplog", [&opCtx] {
+                WriteUnitOfWork wuow(opCtx);
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                    opCtx,
+                    BSON("msg"
+                         << "NoSuchTransaction"));
+                wuow.commit();
+            });
+    }
+}
+
 const LogicalSessionId& TransactionParticipant::_sessionId() const {
     const auto* owningSession = getTransactionParticipant.owner(this);
     return owningSession->getSessionId();

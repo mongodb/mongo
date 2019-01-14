@@ -3,22 +3,17 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/check_log.js");
     load("jstests/libs/write_concern_util.js");
     load("jstests/replsets/rslib.js");
 
     const dbName = "test";
     const collName = "transient_txn_error_labels_with_write_concern";
-    const rst = new ReplSetTest({name: collName, nodes: 3});
+    const rst = new ReplSetTest({name: collName, nodes: 2});
     const config = rst.getReplSetConfig();
-    config.members[2].priority = 0;
-    config.settings = {};
-    // Disable catchup so the new primary will not sync from the old one.
-    config.settings.catchUpTimeoutMillis = 0;
-    // Disable catchup takeover to prevent the old primary to take over the new one.
-    config.settings.catchUpTakeoverDelayMillis = -1;
+    config.members[1].priority = 0;
     rst.startSet();
     rst.initiate(config);
-
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();
     assert.eq(primary, rst.nodes[0]);
@@ -45,54 +40,14 @@
 
     jsTest.log(
         "commitTransaction should wait for write concern even if it returns NoSuchTransaction");
-    // Make sure the new primary only miss the commitTransaction sent in this test case.
     rst.awaitReplication();
-
-    session.startTransaction(writeConcernMajority);
-    // Pick up a high enough txnNumber so that it doesn't conflict with previous test cases.
-    let txnNumber = 20;
-    assert.commandWorked(sessionDb.runCommand({
-        insert: collName,
-        documents: [{_id: "commitTransaction-with-write-concern"}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
-    const oldPrimary = rst.getPrimary();
-    // Stop replication on all nodes, including the old primary so that it won't replicate from the
-    // new primary.
-    stopServerReplication(rst.nodes);
-    // commitTransaction fails on the old primary.
+    stopServerReplication(rst.getSecondaries());
+    // Use a txnNumber that is one higher than the server has tracked.
     res = sessionDb.adminCommand({
         commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
+        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
         autocommit: false,
-        writeConcern: writeConcernMajority,
-    });
-    checkWriteConcernTimedOut(res);
-
-    // Failover happens, but the new secondary cannot replicate anything to others.
-    assert.commandWorked(secondary.adminCommand({replSetStepUp: 1}));
-    rst.awaitNodesAgreeOnPrimary();
-    reconnect(secondary);
-    // Restart replication on the new primary, so it can become "master".
-    restartServerReplication(secondary);
-    const newPrimary = rst.getPrimary();
-    assert.neq(oldPrimary, newPrimary);
-    const newPrimarySession = newPrimary.startSession(sessionOptions);
-    // Force the new session to use the old session id to simulate driver's behavior.
-    const overridenSessionId = newPrimarySession._serverSession.handle.getId();
-    const lsid = session._serverSession.handle.getId();
-    jsTest.log("Overriding sessionID " + tojson(overridenSessionId) + " with " + tojson(lsid));
-    newPrimarySession._serverSession.handle.getId = () => lsid;
-    const newPrimarySessionDb = newPrimarySession.getDatabase(dbName);
-
-    res = newPrimarySessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: writeConcernMajority,
+        writeConcern: writeConcernMajority
     });
     checkWriteConcernTimedOut(res);
     assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
@@ -101,18 +56,45 @@
     assert(!res.hasOwnProperty("errorLabels"));
 
     jsTest.log("NoSuchTransaction without write concern error is transient");
-    restartServerReplication(rst.nodes);
-    res = newPrimarySessionDb.adminCommand({
+    restartServerReplication(rst.getSecondaries());
+    // Use a txnNumber that is one higher than the server has tracked.
+    res = sessionDb.adminCommand({
         commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
+        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
         autocommit: false,
-        writeConcern: {w: "majority"},  // Wait with a long timeout.
+        writeConcern: {w: "majority"}  // Wait with a long timeout.
     });
     assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
     assert(!res.hasOwnProperty("writeConcernError"), res);
     assert.eq(res["errorLabels"], ["TransientTransactionError"], res);
 
-    rst.awaitNodesAgreeOnPrimary();
+    jsTest.log("If the noop write for NoSuchTransaction cannot occur, the error is not transient");
+    assert.commandWorked(testDB.getSiblingDB("local").createCollection("todrop"));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "alwaysOn"}));
+    // Create a pending drop on a collection in the local database. This will hold an X lock on
+    // the local database.
+    let awaitDrop =
+        startParallelShell(() => assert(db.getSiblingDB("local")["todrop"].drop()), rst.ports[0]);
+    checkLog.contains(testDB.getMongo(), "hangDuringDropCollection fail point enabled");
+    // The server will attempt to perform a noop write, since the command returns
+    // NoSuchTransaction. The noop write will time out acquiring a lock on the local database.
+    // This should not be a TransientTransactionError, since the server has not successfully
+    // replicated a write to confirm that it is primary.
+    // Use a txnNumber that is one higher than the server has tracked.
+    res = sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+        autocommit: false,
+        writeConcern: writeConcernMajority,
+        maxTimeMS: 1000
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
+    assert(!res.hasOwnProperty("errorLabels"));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "off"}));
+    awaitDrop();
+
     session.endSession();
 
     rst.stopSet();

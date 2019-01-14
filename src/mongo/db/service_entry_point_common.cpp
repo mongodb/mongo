@@ -421,13 +421,9 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     txnParticipant->stashTransactionResources(opCtx);
     guard.dismiss();
 } catch (const ExceptionFor<ErrorCodes::NoSuchTransaction>&) {
-    // We make our decision about the transaction state based on the oplog we have, so
-    // we set the client last op to the last optime observed by the system to ensure that
-    // we wait for the specified write concern on an optime greater than or equal to the
-    // the optime of our decision basis. Thus we know our decision basis won't be rolled
-    // back.
-    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-    replClient.setLastOpToSystemLastOpTime(opCtx);
+    if (!opCtx->getWriteConcern().usedDefault) {
+        TransactionParticipant::performNoopWriteForNoSuchTransaction(opCtx);
+    }
     throw;
 }
 
