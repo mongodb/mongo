@@ -11,27 +11,9 @@
     load("jstests/libs/override_methods/read_and_write_concern_helpers.js");
     load('jstests/libs/override_methods/override_helpers.js');
     load("jstests/libs/retryable_writes_util.js");
+    load("jstests/libs/transactions_util.js");
 
     const runCommandOriginal = Mongo.prototype.runCommand;
-
-    const kCmdsSupportingTransactions = new Set([
-        'aggregate',
-        'delete',
-        'find',
-        'findAndModify',
-        'findandmodify',
-        'getMore',
-        'insert',
-        'update',
-    ]);
-
-    const kCmdsThatWrite = new Set([
-        'insert',
-        'update',
-        'findAndModify',
-        'findandmodify',
-        'delete',
-    ]);
 
     const kCmdsThatInsert = new Set([
         'insert',
@@ -125,32 +107,6 @@
                 jsTestLog("Error that caused retry of transaction " + tojson(transientErrorToLog));
             }
         }
-    }
-
-    function commandSupportsTxn(dbName, cmdName, cmdObj) {
-        if (cmdName === 'commitTransaction' || cmdName === 'abortTransaction') {
-            return true;
-        }
-
-        if (!kCmdsSupportingTransactions.has(cmdName)) {
-            return false;
-        }
-
-        if (dbName === 'local' || dbName === 'config' || dbName === 'admin') {
-            return false;
-        }
-
-        if (kCmdsThatWrite.has(cmdName)) {
-            if (cmdObj[cmdName].startsWith('system.')) {
-                return false;
-            }
-        }
-
-        if (cmdObj.lsid === undefined) {
-            return false;
-        }
-
-        return true;
     }
 
     function getTxnOptionsForClient(conn) {
@@ -379,6 +335,7 @@
         if (conn.txnOverrideState === TransactionStates.kInactive) {
             // First command in a transaction.
             txnOptions.txnNumber = new NumberLong(txnOptions.txnNumber + 1);
+            conn.getDB(dbName).getSession().setTxnNumber_forTesting(txnOptions.txnNumber);
             txnOptions.stmtId = new NumberInt(0);
 
             cmdObj.startTransaction = true;
@@ -431,7 +388,7 @@
         }
 
         const commandSupportsTransaction =
-            commandSupportsTxn(dbName, cmdNameUnwrapped, cmdObjUnwrapped);
+            TransactionsUtil.commandSupportsTxn(dbName, cmdNameUnwrapped, cmdObjUnwrapped);
 
         const txnOptions = getTxnOptionsForClient(conn);
         if (commandSupportsTransaction) {
@@ -511,7 +468,7 @@
                 conn, op.dbName, op.cmdName, op.cmdObj, func, op.makeFuncArgs);
 
             if (isTransientTransactionError(res)) {
-                return retryEntireTransaction(conn, op.lsid, func);
+                return retryEntireTransaction(conn, lsid, func);
             }
         }
 
@@ -546,6 +503,8 @@
 
     function runCommandOnNetworkOrTransientTransactionErrorRetry(
         conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        jsTestLog("Retrying command on network error or TransientTransactionError: " +
+                  tojsononeline(commandObj));
         transientErrorToLog = null;
         // If the ops array is empty, we failed on a command not being run in a
         // transaction and need to retry just this command.
@@ -581,6 +540,8 @@
 
             if (commandName === "commitTransaction") {
                 while (res.writeConcernError) {
+                    jsTestLog("Retrying commitTransaction on WCE for txnNum: " +
+                              commandObj.txnNumber + " and lsid: " + tojson(commandObj.lsid));
                     res = runCommandInTransactionIfNeeded(
                         conn, dbName, commandName, commandObj, func, makeFuncArgs);
                 }
