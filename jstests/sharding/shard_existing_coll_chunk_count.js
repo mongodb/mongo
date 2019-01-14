@@ -158,7 +158,7 @@
         docSize: 510 * 1024,
         stages: [
             {numDocsToInsert: 10, expectedNumChunks: 6},
-            {numDocsToInsert: 10, expectedNumChunks: 12},
+            {numDocsToInsert: 10, expectedNumChunks: 10},
         ],
     });
 
