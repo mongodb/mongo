@@ -134,7 +134,3 @@ Install the following ports:
   * lang/gcc
   * lang/python
 
-Special Build Notes
---------------
-  * [open solaris on ec2](building.opensolaris.ec2.md)
-
