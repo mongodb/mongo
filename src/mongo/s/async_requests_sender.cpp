@@ -173,6 +173,10 @@ void AsyncRequestsSender::_scheduleRequests() {
                 status = getStatusFromCommandResult(remote.swResponse->getValue().data);
             }
 
+            if (status.isOK()) {
+                status = getWriteConcernStatusFromCommandResult(remote.swResponse->getValue().data);
+            }
+
             if (!status.isOK()) {
                 // There was an error with either the response or the command.
                 auto shard = remote.getShard();
