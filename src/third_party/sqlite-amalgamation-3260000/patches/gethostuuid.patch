@@ -1,0 +1,13 @@
+--- a/src/third_party/sqlite-amalgamation-3260000/sqlite/sqlite3.c
++++ b/src/third_party/sqlite-amalgamation-3260000/sqlite/sqlite3.c
+@@ -32247,7 +32247,9 @@ SQLITE_PRIVATE const char *sqlite3OpcodeName(int i){
+        && (!defined(TARGET_IPHONE_SIMULATOR) || (TARGET_IPHONE_SIMULATOR==0))
+ #    define HAVE_GETHOSTUUID 1
+ #  else
+-#    warning "gethostuuid() is disabled."
++// MongoDB modification
++// Disable this warning so that this can be built with -Werror
++// #    warning "gethostuuid() is disabled."
+ #  endif
+ #endif
+ 

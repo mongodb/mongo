@@ -10,28 +10,45 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-VERSION=3190300
+IS_WSL=$(grep -q Microsoft /proc/version)
+
+VERSION=3260000
+RELEASEYEAR=2018
 NAME=sqlite
 PNAME=$NAME-amalgamation-$VERSION
 
-SRC_ROOT=$(mktemp -d /tmp/$NAME.XXXXXX)
+GIT_EXE=git
+if $IS_WSL; then
+    GIT_EXE=git.exe
+fi
+
+if $IS_WSL; then
+    TEMPDIR=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
+else
+    TEMPDIR="/tmp"
+fi
+
+SRC_ROOT=$(mktemp -d $TEMPDIR/$NAME.XXXXXX)
+
 trap "rm -rf $SRC_ROOT" EXIT
 SRC=${SRC_ROOT}/${PNAME}
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$PNAME
-PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/$PNAME/patches
+DEST_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$PNAME
+PATCH_DIR=$($GIT_EXE rev-parse --show-toplevel)/src/third_party/$PNAME/patches
+if $IS_WSL; then
+    DEST_DIR=$(wslpath -u "$DEST_DIR")
+    PATCH_DIR=$(wslpath -u "$PATCH_DIR")
+fi
 
 if [ ! -d $SRC ]; then
 
     pushd $SRC_ROOT
 
-    wget https://sqlite.org/2017/$PNAME.zip
+    wget https://sqlite.org/$RELEASEYEAR/$PNAME.zip
     unzip $PNAME.zip
 
     pushd $SRC
 
-    for patch in $PATCH_DIR/*.patch ; do
-        patch < $patch
-    done
+    patch < $PATCH_DIR/gethostuuid.patch
 
     popd
     popd

@@ -18,7 +18,7 @@ gperftoolsSuffix = '-2.5'
 timelibSuffix = '-2018.01'
 tomcryptSuffix = '-1.18.2'
 benchmarkSuffix = '-1.4.1'
-sqliteSuffix = '-amalgamation-3190300'
+sqliteSuffix = '-amalgamation-3260000'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
