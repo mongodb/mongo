@@ -350,11 +350,14 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
                     _counters.timedOut++;
                 }
 
-                LOG(2) << "Request " << state->request.id << " timed out"
-                       << ", deadline was " << state->deadline << ", op was "
-                       << redact(state->request.toString());
+                const std::string message = str::stream()
+                    << "Request " << state->request.id << " timed out"
+                    << ", deadline was " << state->deadline.toString() << ", op was "
+                    << redact(state->request.toString());
+
+                LOG(2) << message;
                 state->promise.setError(
-                    Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, "timed out"));
+                    Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, message));
 
                 client->cancel(baton);
             });
