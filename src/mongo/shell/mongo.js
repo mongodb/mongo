@@ -61,7 +61,7 @@ Mongo.prototype._getDatabaseNamesFromPrivileges = function() {
 
     const ret = this.adminCommand({connectionStatus: 1, showPrivileges: 1});
     if (!ret.ok) {
-        throw _getErrorWithCode(res, "Failed to acquire database information from privileges");
+        throw _getErrorWithCode(ret, "Failed to acquire database information from privileges");
     }
 
     const privileges = (ret.authInfo || {}).authenticatedUserPrivileges;
@@ -112,14 +112,29 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
         // asked for anything difficult to provide from userspace, then we can
         // fallback on inspecting the user's permissions.
         // This means that:
-        //   * filter should be empty, as reimplementing that logic is out of scope.
-        //   * nameOnly should not be false as we can't infer size information.
-        //   * authorizedDatabases should not be false as those are the only DBs we can infer.
-        // Note that if the above are true and we get Unauthorized, that also means
+        //   * filter must be undefined, as reimplementing that logic is out of scope.
+        //   * nameOnly must not be false as we can't infer size information.
+        //   * authorizedDatabases must not be false as those are the only DBs we can infer.
+        // Note that if the above are valid and we get Unauthorized, that also means
         // that we MUST be talking to a pre-4.0 mongod.
+        //
+        // Like the server response mode, this path will return a simple list of
+        // names if nameOnly is specified as true.
+        // If nameOnly is undefined, we come as close as we can to what the
+        // server would return by supplying the databases key of the returned
+        // object.  Other information is unavailable.
         if ((res.code === ErrorCodes.Unauthorized) && (filter === undefined) &&
             (nameOnly !== false) && (authorizedDatabases !== false)) {
-            return this._getDatabaseNamesFromPrivileges();
+            const names = this._getDatabaseNamesFromPrivileges();
+            if (nameOnly === true) {
+                return names;
+            } else {
+                return {
+                    databases: names.map(function(x) {
+                        return {name: x};
+                    }),
+                };
+            }
         }
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
     }

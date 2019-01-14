@@ -74,6 +74,8 @@
                 // Ignore these for simplicity.
                 return (db !== 'local') && (db !== 'config');
             }
+
+            // Invoking {listDatabases: 1} directly.
             function tryList(cmd, expect_dbs) {
                 const dbs = assert.commandWorked(admin.runCommand(cmd));
                 assert.eq(dbs.databases
@@ -125,8 +127,12 @@
                         return adminCommandMethod(cmd);
                     };
                     // Command fails, but we dispatch via _getDatabaseNamesFromPrivileges().
-                    assert.eq(mongod.getDBs(), test.authDbs || test.dbs);
-                    // Still dispatches with explciti nameOnly===true.
+                    assert.eq(mongod.getDBs().databases.map(function(x) {
+                        return x.name;
+                    }),
+                              test.authDbs || test.dbs);
+
+                    // Still dispatches with explicit nameOnly===true, returns only names.
                     assert.eq(mongod.getDBs(undefined, undefined, true), test.authDbs || test.dbs);
 
                     // Command fails and unable to dispatch because nameOnly !== true.

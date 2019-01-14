@@ -899,7 +899,18 @@ shellHelper.show = function(what) {
     }
 
     if (what == "dbs" || what == "databases") {
-        var dbs = db.getMongo().getDBs(db.getSession());
+        var mongo = db.getMongo();
+        var dbs;
+        try {
+            dbs = mongo.getDBs(db.getSession(), undefined, false);
+        } catch (ex) {
+            // Unable to get detailed information, retry name-only.
+            mongo.getDBs(db.getSession(), undefined, true).forEach(function(x) {
+                print(x);
+            });
+            return "";
+        }
+
         var dbinfo = [];
         var maxNameLength = 0;
         var maxGbDigits = 0;
