@@ -322,14 +322,14 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
         return;
     }
 
-    try {
-        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
-            opCtx,
-            "movePrimary.error",
-            _dbname.toString(),
-            _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
-            ShardingCatalogClient::kMajorityWriteConcern));
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx,
+        "movePrimary.error",
+        _dbname.toString(),
+        _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
+        ShardingCatalogClient::kMajorityWriteConcern);
 
+    try {
         _cleanup(opCtx);
     } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
         BSONObjBuilder requestArgsBSON;
