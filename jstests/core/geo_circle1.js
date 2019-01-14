@@ -1,4 +1,4 @@
-// @tags: [requires_fastcount]
+// @tags: [requires_fastcount, assumes_balancer_off]
 
 t = db.geo_circle1;
 t.drop();

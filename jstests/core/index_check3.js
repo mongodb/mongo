@@ -1,4 +1,4 @@
-
+// @tags: [assumes_balancer_off]
 
 t = db.index_check3;
 t.drop();

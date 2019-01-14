@@ -1,6 +1,7 @@
 // @tags: [
 //     # Uses $where operator
 //     requires_scripting,
+//     assumes_balancer_off
 // ]
 
 t = db.mod1;

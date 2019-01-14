@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, assumes_balancer_off]
 
 t = db.index_check2;
 t.drop();
