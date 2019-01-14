@@ -218,5 +218,72 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
     ASSERT_FALSE(expr.matchesBSON(fromjson("{a: ['str']}")));
 }
 
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataGeneral) {
+    BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::BinDataGeneral));
+    BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::bdtCustom));
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::BinDataGeneral);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataFunction) {
+    BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::Function));
+    BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::MD5Type));
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::Function);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataNewUUID) {
+    BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::newUUID));
+    BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::BinDataGeneral));
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::newUUID);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataMD5Type) {
+    BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::MD5Type));
+    BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::newUUID));
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::MD5Type);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
+    BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::bdtCustom));
+    BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::Function));
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::bdtCustom);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(ExpressionBinDataSubTypeTest, DoesNotMatchArrays) {
+    InternalSchemaBinDataSubTypeExpression type("a", BinDataType::BinDataGeneral);
+    ASSERT_FALSE(type.matchesBSON(
+        BSON("a" << BSON_ARRAY(BSONBinData(NULL, 0, BinDataType::BinDataGeneral)
+                               << BSONBinData(NULL, 0, BinDataType::BinDataGeneral)))));
+    ASSERT_FALSE(
+        type.matchesBSON(BSON("a" << BSON_ARRAY(BSONBinData(NULL, 0, BinDataType::BinDataGeneral)
+                                                << BSONBinData(NULL, 0, BinDataType::Function)))));
+}
+
+TEST(ExpressionBinDataSubTypeTest, DoesNotMatchString) {
+    BSONObj notMatch = BSON("a"
+                            << "str");
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::bdtCustom);
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
+TEST(ExpressionBinDataSubTypeTest, Equivalent) {
+    InternalSchemaBinDataSubTypeExpression e1("a", BinDataType::newUUID);
+    InternalSchemaBinDataSubTypeExpression e2("a", BinDataType::MD5Type);
+    InternalSchemaBinDataSubTypeExpression e3("b", BinDataType::newUUID);
+
+    ASSERT(e1.equivalent(&e1));
+    ASSERT(!e1.equivalent(&e2));
+    ASSERT(!e1.equivalent(&e3));
+}
+
 }  // namespace
 }  // namepace mongo

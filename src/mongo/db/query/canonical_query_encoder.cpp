@@ -174,6 +174,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
             return "internalSchemaAllowedProperties";
 
+        case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
+            return "internalSchemaBinDataSubType";
+
         case MatchExpression::INTERNAL_SCHEMA_COND:
             return "internalSchemaCond";
 

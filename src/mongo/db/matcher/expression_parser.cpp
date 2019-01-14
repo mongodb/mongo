@@ -1381,6 +1381,33 @@ StatusWithMatchExpression parseNot(StringData name,
     return {stdx::make_unique<NotMatchExpression>(theAnd.release())};
 }
 
+StatusWithMatchExpression parseInternalSchemaBinDataSubType(StringData name, BSONElement e) {
+    if (!e.isNumber()) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << InternalSchemaBinDataSubTypeExpression::kName
+                                    << " must be represented as a number");
+    }
+
+    auto valueAsInt = MatchExpressionParser::parseIntegerElementToInt(e);
+    if (!valueAsInt.isOK()) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Invalid numerical BinData subtype value for "
+                                    << InternalSchemaBinDataSubTypeExpression::kName
+                                    << ": "
+                                    << e.number());
+    }
+
+    if (!isValidBinDataType(valueAsInt.getValue())) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << InternalSchemaBinDataSubTypeExpression::kName
+                                    << " value must represent BinData subtype: "
+                                    << valueAsInt.getValue());
+    }
+
+    return {stdx::make_unique<InternalSchemaBinDataSubTypeExpression>(
+        name, static_cast<BinDataType>(valueAsInt.getValue()))};
+}
+
 /**
  * Parses a single field in a sub expression.
  * If the query is { x : { $gt : 5, $lt : 8 } },
@@ -1708,6 +1735,10 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ: {
             return {stdx::make_unique<InternalSchemaEqMatchExpression>(name, e)};
         }
+
+        case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE: {
+            return parseInternalSchemaBinDataSubType(name, e);
+        }
     }
 
     return {
@@ -1845,6 +1876,8 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"_internalExprEq", PathAcceptingKeyword::INTERNAL_EXPR_EQ},
             {"_internalSchemaAllElemMatchFromIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
+            {"_internalSchemaBinDataSubType",
+             PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE},
             {"_internalSchemaEq", PathAcceptingKeyword::INTERNAL_SCHEMA_EQ},
             {"_internalSchemaFmod", PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD},
             {"_internalSchemaMatchArrayIndex",

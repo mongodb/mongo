@@ -180,4 +180,19 @@ const char* typeName(BinDataType type) {
     }
 }
 
+bool isValidBinDataType(int type) {
+    switch (type) {
+        case BinDataGeneral:
+        case Function:
+        case ByteArrayDeprecated:
+        case bdtUUID:
+        case newUUID:
+        case MD5Type:
+        case bdtCustom:
+            return true;
+        default:
+            return false;
+    }
+}
+
 }  // namespace mongo
