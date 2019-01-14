@@ -156,18 +156,19 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
     handle->start();
     // Fast forward ten times, we should run all ten times.
     for (int i = 0; i < 10; i++) {
-        clockSource().advance(interval);
         {
             stdx::unique_lock<stdx::mutex> lk(mutex);
-            cv.wait(lk, [&count, &i] { return count > i; });
+            cv.wait(lk, [&] { return count == i + 1; });
         }
+        clockSource().advance(interval);
     }
 
     tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
-    int count = 0;
+    bool hasExecuted = false;
+    bool isPaused = false;
     Milliseconds interval{5};
 
     stdx::mutex mutex;
@@ -175,10 +176,12 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
 
     // Add a job, ensure that it runs once
     PeriodicRunner::PeriodicJob job("job",
-                                    [&count, &mutex, &cv](Client*) {
+                                    [&](Client*) {
                                         {
                                             stdx::unique_lock<stdx::mutex> lk(mutex);
-                                            count++;
+                                            // This will fail if pause does not work correctly.
+                                            ASSERT_FALSE(isPaused);
+                                            hasExecuted = true;
                                         }
                                         cv.notify_all();
                                     },
@@ -186,36 +189,36 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
 
     auto handle = runner().makeJob(std::move(job));
     handle->start();
-    // Fast forward ten times, we should run all ten times.
+    // Wait for the first execution.
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return hasExecuted; });
+    }
+
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        isPaused = true;
+        handle->pause();
+    }
+
+    // Fast forward ten times, we shouldn't run anymore. If we do, the assert inside the job will
+    // fail. (Note that even if the pausing behavior were incorrect, this is racy since tearDown()
+    // could happen before the job executes, leading the test to incorrectly succeed from time to
+    // time.)
     for (int i = 0; i < 10; i++) {
         clockSource().advance(interval);
-        {
-            stdx::unique_lock<stdx::mutex> lk(mutex);
-            cv.wait(lk, [&count, &i] { return count > i; });
-        }
     }
-    auto numExecutionsBeforePause = count;
-    handle->pause();
-    // Fast forward ten times, we shouldn't run anymore
-    for (int i = 0; i < 10; i++) {
-        clockSource().advance(interval);
-    }
-    ASSERT_TRUE(count == numExecutionsBeforePause || count == numExecutionsBeforePause + 1)
-        << "Actual values: count: " << count
-        << ", numExecutionsBeforePause: " << numExecutionsBeforePause;
 
     tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     int count = 0;
-    int numFastForwardsForIterationWhileActive = 10;
     Milliseconds interval{5};
 
     stdx::mutex mutex;
     stdx::condition_variable cv;
 
-    // Add a job, ensure that it runs once
     PeriodicRunner::PeriodicJob job("job",
                                     [&count, &mutex, &cv](Client*) {
                                         {
@@ -228,40 +231,47 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
 
     auto handle = runner().makeJob(std::move(job));
     handle->start();
-    // Fast forward ten times, we should run all ten times.
-    for (int i = 0; i < numFastForwardsForIterationWhileActive; i++) {
+    // Wait for the first execution.
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return count == 1; });
+    }
+
+    // Reset the count before iterating to make other conditions in the test slightly simpler to
+    // follow.
+    count = 0;
+
+    int numIterationsBeforePause = 10;
+    // Fast forward ten times, we should run exactly 10 times.
+    for (int i = 0; i < numIterationsBeforePause; i++) {
         clockSource().advance(interval);
+
         {
             stdx::unique_lock<stdx::mutex> lk(mutex);
-            cv.wait(lk, [&count, &i] { return count > i; });
+            // Wait for count to increment due to job execution.
+            cv.wait(lk, [&] { return count == i + 1; });
         }
     }
-    auto countBeforePause = count;
-    ASSERT_TRUE(countBeforePause == numFastForwardsForIterationWhileActive ||
-                countBeforePause == numFastForwardsForIterationWhileActive + 1)
-        << "Actual values: countBeforePause: " << countBeforePause
-        << ", numFastForwardsForIterationWhileActive: " << numFastForwardsForIterationWhileActive;
 
     handle->pause();
-    // Fast forward ten times, we shouldn't run anymore
+
+    // Fast forward ten times, we shouldn't run anymore.
     for (int i = 0; i < 10; i++) {
         clockSource().advance(interval);
     }
-    handle->resume();
-    // Fast forward ten times, we should run all ten times.
-    for (int i = 0; i < numFastForwardsForIterationWhileActive; i++) {
-        clockSource().advance(interval);
-        {
-            stdx::unique_lock<stdx::mutex> lk(mutex);
-            cv.wait(lk, [&count, &countBeforePause, &i] { return count > countBeforePause + i; });
-        }
-    }
 
-    // This is slightly racy so once in a while count will be one extra
-    ASSERT_TRUE(count == numFastForwardsForIterationWhileActive * 2 ||
-                count == numFastForwardsForIterationWhileActive * 2 + 1)
-        << "Actual values: count: " << count
-        << ", numFastForwardsForIterationWhileActive: " << numFastForwardsForIterationWhileActive;
+    // Make sure we didn't run anymore while paused.
+    ASSERT_EQ(count, numIterationsBeforePause);
+
+    handle->resume();
+    // Fast forward, we should run at least once.
+    clockSource().advance(interval);
+
+    // Wait for count to increase. Test will hang if resume() does not work correctly.
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return count > numIterationsBeforePause; });
+    }
 
     tearDown();
 }
