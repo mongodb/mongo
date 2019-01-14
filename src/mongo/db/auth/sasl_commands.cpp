@@ -220,7 +220,8 @@ Status doSaslStep(OperationContext* opCtx,
 StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext* opCtx,
                                                                const std::string& db,
                                                                const BSONObj& cmdObj,
-                                                               BSONObjBuilder* result) {
+                                                               BSONObjBuilder* result,
+                                                               std::string* principalName) {
     bool autoAuthorize = false;
     Status status = bsonExtractBooleanFieldWithDefault(
         cmdObj, saslCommandAutoAuthorizeFieldName, autoAuthorizeDefault, &autoAuthorize);
@@ -242,6 +243,7 @@ StatusWith<std::unique_ptr<AuthenticationSession>> doSaslStart(OperationContext*
 
     auto session = std::make_unique<AuthenticationSession>(std::move(swMech.getValue()));
     Status statusStep = doSaslStep(opCtx, session.get(), cmdObj, result);
+    *principalName = session->getMechanism().getPrincipalName().toString();
     if (!statusStep.isOK()) {
         return statusStep;
     }
@@ -282,21 +284,19 @@ bool CmdSaslStart::run(OperationContext* opCtx,
         return false;
     }
 
-    StatusWith<std::unique_ptr<AuthenticationSession>> swSession =
-        doSaslStart(opCtx, db, cmdObj, &result);
-    uassertStatusOK(swSession.getStatus());
-    auto session = std::move(swSession.getValue());
+    std::string principalName;
+    auto swSession = doSaslStart(opCtx, db, cmdObj, &result, &principalName);
 
-    auto& mechanism = session->getMechanism();
-    if (mechanism.isSuccess() || !swSession.isOK()) {
-        audit::logAuthentication(client,
-                                 mechanismName,
-                                 UserName(mechanism.getPrincipalName(), db),
-                                 swSession.getStatus().code());
+    if (!swSession.isOK() || swSession.getValue()->getMechanism().isSuccess()) {
+        audit::logAuthentication(
+            client, mechanismName, UserName(principalName, db), swSession.getStatus().code());
+        uassertStatusOK(swSession.getStatus());
     } else {
+        auto session = std::move(swSession.getValue());
         AuthenticationSession::swap(client, session);
     }
-    return swSession.isOK();
+
+    return true;
 }
 
 CmdSaslContinue::CmdSaslContinue() : BasicCommand(saslContinueCommandName) {}
