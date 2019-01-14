@@ -33,29 +33,42 @@
 
 namespace mongo {
 
+RequiresIndexStage::RequiresIndexStage(const char* stageType,
+                                       OperationContext* opCtx,
+                                       const IndexDescriptor* indexDescriptor)
+    : RequiresCollectionStage(stageType, opCtx, indexDescriptor->getCollection()),
+      _weakIndexCatalogEntry(collection()->getIndexCatalog()->getEntryShared(indexDescriptor)) {
+    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
+    _indexDescriptor = indexCatalogEntry->descriptor();
+    _indexAccessMethod = indexCatalogEntry->accessMethod();
+    invariant(_indexDescriptor);
+    invariant(_indexAccessMethod);
+    _indexName = _indexDescriptor->indexName();
+}
+
 void RequiresIndexStage::doSaveStateRequiresCollection() {
     doSaveStateRequiresIndex();
 
-    // During yield, we relinquish our shared ownership of the index catalog entry. This allows the
-    // index to be dropped during yield, but permits us to check via the weak_ptr interface
-    // whether the index is still valid on yield recovery.
-    //
-    // We also set catalog pointers to null, since accessing these pointers is illegal during yield.
-    _indexCatalogEntry.reset();
+    // Set catalog pointers to null, since accessing these pointers is illegal during yield.
     _indexDescriptor = nullptr;
     _indexAccessMethod = nullptr;
 }
 
 void RequiresIndexStage::doRestoreStateRequiresCollection() {
-    // Reacquire shared ownership of the index catalog entry. If we're unable to do so, then the
-    // our index is no longer valid, and the query should die.
-    _indexCatalogEntry = _weakIndexCatalogEntry.lock();
+    // Attempt to lock the weak_ptr. If the resulting shared_ptr is null, then our index is no
+    // longer valid and the query should die.
+    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            _indexCatalogEntry);
+            indexCatalogEntry);
 
-    _indexDescriptor = _indexCatalogEntry->descriptor();
-    _indexAccessMethod = _indexCatalogEntry->accessMethod();
+    // Re-obtain catalog pointers that were set to null during yield preparation. It is safe to
+    // access the catalog entry by raw pointer when the query is active, as its validity is
+    // protected by at least MODE_IS collection locks.
+    _indexDescriptor = indexCatalogEntry->descriptor();
+    _indexAccessMethod = indexCatalogEntry->accessMethod();
+    invariant(_indexDescriptor);
+    invariant(_indexAccessMethod);
 
     doRestoreStateRequiresIndex();
 }

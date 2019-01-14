@@ -48,17 +48,7 @@ class RequiresIndexStage : public RequiresCollectionStage {
 public:
     RequiresIndexStage(const char* stageType,
                        OperationContext* opCtx,
-                       const IndexDescriptor* indexDescriptor)
-        : RequiresCollectionStage(stageType, opCtx, indexDescriptor->getCollection()),
-          _weakIndexCatalogEntry(collection()->getIndexCatalog()->getEntryShared(indexDescriptor)),
-          _indexCatalogEntry(_weakIndexCatalogEntry.lock()),
-          _indexDescriptor(indexDescriptor),
-          _indexAccessMethod(_indexCatalogEntry->accessMethod()),
-          _indexName(_indexDescriptor->indexName()) {
-        invariant(_indexCatalogEntry);
-        invariant(_indexDescriptor);
-        invariant(_indexAccessMethod);
-    }
+                       const IndexDescriptor* indexDescriptor);
 
     virtual ~RequiresIndexStage() = default;
 
@@ -86,25 +76,23 @@ protected:
     }
 
 private:
-    // This stage shares ownership of the index catalog entry when the query is running, and
-    // relinquishes its shared ownership when in a saved state for a yield or between getMores. We
-    // keep a weak_ptr to the entry in order to reacquire shared ownership on yield recovery,
-    // throwing a query-fatal exception if the weak_ptr indicates that the underlying catalog object
-    // has been destroyed.
+    // We keep a weak_ptr to the index catalog entry in order to detect when the underlying catalog
+    // object has been destroyed, e.g. due to an index drop. In this scenario, the
+    // RequiresIndexStage will throw a query-fatal exception after an attempt to lock the weak_ptr
+    // indicates that the pointed-to object was deleted.
     //
     // This is necessary to protect against that case that our index is dropped and then recreated
     // during yield. Such an event should cause the query to be killed, since index cursors may have
     // pointers into catalog objects that no longer exist. Since indices do not have UUIDs,
-    // different epochs of the index cannot be distinguished. The weak_ptr allows us to relinquish
-    // ownership of the index during yield, but also determine whether the pointed-to object has
-    // been destroyed during yield recovery.
+    // different epochs of the index cannot be distinguished. The weak_ptr allows us to safely.
+    // determine whether the pointed-to object has been destroyed during yield recovery via the
+    // shared_ptr control block.
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
-    std::shared_ptr<const IndexCatalogEntry> _indexCatalogEntry;
 
     const IndexDescriptor* _indexDescriptor;
     const IndexAccessMethod* _indexAccessMethod;
 
-    const std::string _indexName;
+    std::string _indexName;
 };
 
 }  // namespace mongo
