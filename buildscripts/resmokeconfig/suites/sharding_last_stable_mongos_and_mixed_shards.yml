@@ -54,6 +54,7 @@ selector:
   - jstests/sharding/out_write_concern.js
   - jstests/sharding/restart_transactions.js
   - jstests/sharding/shard7.js
+  - jstests/sharding/shard_config_db_collections.js
   # TODO: SERVER-38541 remove from blacklist
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/single_shard_transaction_with_arbiter.js
@@ -85,7 +86,7 @@ selector:
   - jstests/sharding/shard_existing_coll_chunk_count.js
   - jstests/sharding/wildcard_index_banned_for_shard_key.js
   - jstests/sharding/unsharded_lookup_in_txn.js
-# Enable if SERVER-20865 is backported or 4.2 becomes last-stable
+  # Enable if SERVER-20865 is backported or 4.2 becomes last-stable
   - jstests/sharding/sharding_statistics_server_status.js
   # Enable if SERVER-36966 is backported or 4.2 becomes last-stable
   - jstests/sharding/mr_output_sharded_validation.js

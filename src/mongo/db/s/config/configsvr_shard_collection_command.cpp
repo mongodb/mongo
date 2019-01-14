@@ -658,7 +658,7 @@ public:
             // Only whitelisted collections in config may be sharded (unless we are in test mode)
             uassert(ErrorCodes::IllegalOperation,
                     "only special collections in the config db may be sharded",
-                    nss == NamespaceString::kLogicalSessionsNamespace || getTestCommandsEnabled());
+                    nss == NamespaceString::kLogicalSessionsNamespace);
 
             auto configShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
             ScopedDbConnection configConn(configShard->getConnString());

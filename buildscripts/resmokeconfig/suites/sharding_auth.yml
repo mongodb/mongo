@@ -16,8 +16,6 @@ selector:
   - jstests/sharding/kill_sessions.js
   # Skip these additional tests when running with auth enabled.
   - jstests/sharding/parallel.js
-  # Skip these tests that run with enableTestCommands off.
-  - jstests/sharding/shard_config_db_collections.js
   # Skip the testcases that do not have auth bypass when running ops in parallel.
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js         # SERVER-21713
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js  # SERVER-21713
