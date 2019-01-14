@@ -525,6 +525,7 @@ void addQueryableBackupPrivileges(PrivilegeVector* privileges) {
 void addBackupPrivileges(PrivilegeVector* privileges) {
     ActionSet clusterActions;
     clusterActions << ActionType::appendOplogNote;  // For BRS
+    clusterActions << ActionType::serverStatus;     // For push based initial sync
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forClusterResource(), clusterActions));
 

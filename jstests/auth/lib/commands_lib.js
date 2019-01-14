@@ -3130,7 +3130,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_monitoring,
+                roles: Object.extend({backup: 1}, roles_monitoring),
                 privileges: [{resource: {cluster: true}, actions: ["serverStatus"]}]
               },
               {runOnDb: firstDbName, roles: {}, expectFail: true},
@@ -5478,17 +5478,17 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_monitoring,
+                roles: Object.extend({backup: 1}, roles_monitoring),
                 privileges: [{resource: {cluster: true}, actions: ["serverStatus"]}]
               },
               {
                 runOnDb: firstDbName,
-                roles: roles_monitoring,
+                roles: Object.extend({backup: 1}, roles_monitoring),
                 privileges: [{resource: {cluster: true}, actions: ["serverStatus"]}]
               },
               {
                 runOnDb: secondDbName,
-                roles: roles_monitoring,
+                roles: Object.extend({backup: 1}, roles_monitoring),
                 privileges: [{resource: {cluster: true}, actions: ["serverStatus"]}]
               }
           ]
