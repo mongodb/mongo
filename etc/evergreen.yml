@@ -7943,6 +7943,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-ubuntu1804
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     multiversion_architecture: s390x
@@ -7982,6 +7983,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1804
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -10771,6 +10773,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -11197,6 +11200,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
