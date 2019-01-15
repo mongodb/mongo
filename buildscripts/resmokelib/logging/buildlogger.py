@@ -6,6 +6,7 @@ from __future__ import absolute_import
 
 import functools
 import json
+import os
 import threading
 
 import requests
@@ -19,7 +20,7 @@ APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"
 CREATE_TEST_ENDPOINT = "/build/%(build_id)s/test"
 APPEND_TEST_LOGS_ENDPOINT = "/build/%(build_id)s/test/%(test_id)s"
 
-_BUILDLOGGER_CONFIG = "mci.buildlogger"
+_BUILDLOGGER_CONFIG = os.getenv("BUILDLOGGER_CREDENTIALS", "mci.buildlogger")
 
 _SEND_AFTER_LINES = 2000
 _SEND_AFTER_SECS = 10
