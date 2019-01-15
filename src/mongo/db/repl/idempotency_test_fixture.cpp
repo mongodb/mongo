@@ -76,7 +76,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<StmtId> stmtId = boost::none,
                                 boost::optional<UUID> uuid = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
-                            1LL,                              // hash
+                            boost::none,                      // hash
                             opType,                           // opType
                             nss,                              // namespace
                             uuid,                             // uuid

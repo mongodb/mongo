@@ -43,11 +43,6 @@ namespace mongo {
 namespace repl {
 
 /**
- * Used to keep track of the OpTime and hash of the last fetched operation.
- */
-using OpTimeWithHash = OpTimeWith<long long>;
-
-/**
  * This class represents an abstract base class for replication components that try to read from
  * remote oplogs. An abstract oplog fetcher is an abstract async component. It owns a Fetcher
  * that fetches operations from a remote oplog and restarts from the last fetched oplog entry on
@@ -73,15 +68,10 @@ public:
     using OnShutdownCallbackFn = stdx::function<void(const Status& shutdownStatus)>;
 
     /**
-     * This function takes a BSONObj oplog entry and parses out the OpTime and hash.
-     */
-    static StatusWith<OpTimeWithHash> parseOpTimeWithHash(const BSONObj& oplogEntryObj);
-
-    /**
      * Invariants if validation fails on any of the provided arguments.
      */
     AbstractOplogFetcher(executor::TaskExecutor* executor,
-                         OpTimeWithHash lastFetched,
+                         OpTime lastFetched,
                          HostAndPort source,
                          NamespaceString nss,
                          std::size_t maxFetcherRestarts,
@@ -107,9 +97,9 @@ public:
     BSONObj getFindQuery_forTest() const;
 
     /**
-     * Returns the OpTime and hash of the last oplog entry fetched and processed.
+     * Returns the OpTime of the last oplog entry fetched and processed.
      */
-    OpTimeWithHash getLastOpTimeWithHashFetched_forTest() const;
+    OpTime getLastOpTimeFetched_forTest() const;
 
 protected:
     /**
@@ -141,9 +131,9 @@ protected:
     NamespaceString _getNamespace() const;
 
     /**
-     * Returns the OpTime and hash of the last oplog entry fetched and processed.
+     * Returns the OpTime of the last oplog entry fetched and processed.
      */
-    OpTimeWithHash _getLastOpTimeWithHashFetched() const;
+    OpTime _getLastOpTimeFetched() const;
 
     // =============== AbstractAsyncComponent overrides ================
 
@@ -230,7 +220,7 @@ private:
     OnShutdownCallbackFn _onShutdownCallbackFn;
 
     // Used to keep track of the last oplog entry read and processed from the sync source.
-    OpTimeWithHash _lastFetched;
+    OpTime _lastFetched;
 
     // Fetcher restarts since the last successful oplog query response.
     std::size_t _fetcherRestarts = 0;

@@ -705,7 +705,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         return;
     }
 
-    auto onCompletion = [this, startCompleted](const StatusWith<OpTimeWithHash>& status) {
+    auto onCompletion = [this, startCompleted](const StatusWith<OpTime>& status) {
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (status == ErrorCodes::CallbackCanceled) {
@@ -723,7 +723,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
             }
 
             const auto lastApplied = status.getValue();
-            _setMyLastAppliedOpTime(lock, lastApplied.opTime, false, DataConsistency::Consistent);
+            _setMyLastAppliedOpTime(lock, lastApplied, false, DataConsistency::Consistent);
         }
 
         // Clear maint. mode.

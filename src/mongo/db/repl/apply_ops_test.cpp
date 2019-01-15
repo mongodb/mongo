@@ -353,7 +353,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
  */
 OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
     return OplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
-                      1LL,                         // hash
+                      boost::none,                 // hash
                       opType,                      // op type
                       NamespaceString("a.a"),      // namespace
                       boost::none,                 // uuid

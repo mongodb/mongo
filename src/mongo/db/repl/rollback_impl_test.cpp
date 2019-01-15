@@ -63,7 +63,7 @@ NamespaceString nss("test.coll");
 std::string kGenericUUIDStr = "b4c66a44-c1ca-4d86-8d25-12e82fa2de5b";
 
 BSONObj makeInsertOplogEntry(long long time, BSONObj obj, StringData ns, UUID uuid) {
-    return BSON("ts" << Timestamp(time, time) << "h" << time << "t" << time << "op"
+    return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "i"
                      << "o"
                      << obj
@@ -75,7 +75,7 @@ BSONObj makeInsertOplogEntry(long long time, BSONObj obj, StringData ns, UUID uu
 
 BSONObj makeUpdateOplogEntry(
     long long time, BSONObj query, BSONObj update, StringData ns, UUID uuid) {
-    return BSON("ts" << Timestamp(time, time) << "h" << time << "t" << time << "op"
+    return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "u"
                      << "ns"
                      << ns
@@ -88,7 +88,7 @@ BSONObj makeUpdateOplogEntry(
 }
 
 BSONObj makeDeleteOplogEntry(long long time, BSONObj id, StringData ns, UUID uuid) {
-    return BSON("ts" << Timestamp(time, time) << "h" << time << "t" << time << "op"
+    return BSON("ts" << Timestamp(time, time) << "t" << time << "op"
                      << "d"
                      << "ns"
                      << ns
@@ -349,11 +349,11 @@ private:
 };
 
 /**
- * Helper functions to make simple oplog entries with timestamps, terms, and hashes.
+ * Helper functions to make simple oplog entries with timestamps and terms.
  */
-BSONObj makeOp(OpTime time, long long hash) {
+BSONObj makeOp(OpTime time) {
     auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
-    return BSON("ts" << time.getTimestamp() << "h" << hash << "t" << time.getTerm() << "op"
+    return BSON("ts" << time.getTimestamp() << "t" << time.getTerm() << "op"
                      << "n"
                      << "o"
                      << BSONObj()
@@ -364,16 +364,16 @@ BSONObj makeOp(OpTime time, long long hash) {
 }
 
 BSONObj makeOp(int count) {
-    return makeOp(OpTime(Timestamp(count, count), count), count);
+    return makeOp(OpTime(Timestamp(count, count), count));
 }
 
 /**
- * Helper functions to make simple oplog entries with timestamps, terms, hashes, and wall clock
+ * Helper functions to make simple oplog entries with timestamps, terms, and wall clock
  * times.
  */
-auto makeOpWithWallClockTime(long count, long long hash, long wallClockMillis) {
+auto makeOpWithWallClockTime(long count, long wallClockMillis) {
     auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
-    return BSON("ts" << Timestamp(count, count) << "h" << hash << "t" << (long long)count << "op"
+    return BSON("ts" << Timestamp(count, count) << "t" << (long long)count << "op"
                      << "n"
                      << "o"
                      << BSONObj()
@@ -394,8 +394,8 @@ OplogInterfaceMock::Operation makeOpAndRecordId(const BSONObj& op) {
     return std::make_pair(op, RecordId(++recordId));
 }
 
-OplogInterfaceMock::Operation makeOpAndRecordId(OpTime time, long long hash) {
-    return makeOpAndRecordId(makeOp(time, hash));
+OplogInterfaceMock::Operation makeOpAndRecordId(OpTime time) {
+    return makeOpAndRecordId(makeOp(time));
 }
 
 OplogInterfaceMock::Operation makeOpAndRecordId(int count) {
@@ -465,8 +465,8 @@ TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
 TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
 
     // The default limit is 1 day, so we make the difference be just under a day.
-    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 1, 5 * 1000));
-    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 60 * 60 * 24 * 1000));
+    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 5 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 60 * 60 * 24 * 1000));
 
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
@@ -481,8 +481,8 @@ TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
 TEST_F(RollbackImplTest, RollbackFailsIfRollbackPeriodIsTooLong) {
 
     // The default limit is 1 day, so we make the difference be 2 days.
-    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 1, 5 * 1000));
-    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 2 * 60 * 60 * 24 * 1000));
+    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 5 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2 * 60 * 60 * 24 * 1000));
 
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
@@ -857,7 +857,7 @@ TEST_F(RollbackImplTest, RollbackDoesNotWriteRollbackFilesIfNoInsertsOrUpdatesAf
     const auto uuid = UUID::gen();
     const auto nss = NamespaceString("db.coll");
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "h" << 3LL << "t" << 3LL << "op"
+    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
                                       << "c"
                                       << "o"
                                       << BSON("create" << nss.coll())
@@ -1082,15 +1082,15 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenInsertsAndDropOfCollectio
     _insertDocAndGenerateOplogEntry(obj2, uuid, nss);
 
     // Create an oplog entry for the collection drop.
-    const auto oplogEntry = BSON(
-        "ts" << dropOpTime.getTimestamp() << "h" << 200LL << "t" << dropOpTime.getTerm() << "op"
-             << "c"
-             << "o"
-             << BSON("drop" << nss.coll())
-             << "ns"
-             << nss.ns()
-             << "ui"
-             << uuid);
+    const auto oplogEntry =
+        BSON("ts" << dropOpTime.getTimestamp() << "t" << dropOpTime.getTerm() << "op"
+                  << "c"
+                  << "o"
+                  << BSON("drop" << nss.coll())
+                  << "ns"
+                  << nss.ns()
+                  << "ui"
+                  << uuid);
     ASSERT_OK(_insertOplogEntry(oplogEntry));
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -1115,7 +1115,7 @@ TEST_F(RollbackImplTest, RollbackProperlySavesFilesWhenCreateCollAndInsertsAreRo
     const auto nss = NamespaceString("db.people");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "h" << 3LL << "t" << 3LL << "op"
+    const auto oplogEntry = BSON("ts" << Timestamp(3, 3) << "t" << 3LL << "op"
                                       << "c"
                                       << "o"
                                       << BSON("create" << nss.coll())
@@ -1434,7 +1434,6 @@ public:
 
         BSONObjBuilder bob;
         bob.append("ts", time);
-        bob.append("h", 1LL);
         bob.append("op", "i");
         collId.appendToBuilder(&bob, "ui");
         bob.append("ns", nss.ns());

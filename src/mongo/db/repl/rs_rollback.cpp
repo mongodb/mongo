@@ -233,10 +233,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         if (!ourObj.hasField("ts")) {
             bob.appendTimestamp("ts");
         }
-        if (!ourObj.hasField("h")) {
-            long long dummyHash = 0;
-            bob.append("h", dummyHash);
-        }
     }
     bob.appendElements(ourObj);
     BSONObj fixedObj = bob.obj();
@@ -1475,7 +1471,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
-    // lastAppliedHash value in bgsync to reflect our new last op. The rollback common point does
+    // lastApplied value in bgsync to reflect our new last op. The rollback common point does
     // not necessarily represent a consistent database state. For example, on a secondary, we may
     // have rolled back to an optime that fell in the middle of an oplog application batch. We make
     // the database consistent again after rollback by applying ops forward until we reach

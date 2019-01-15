@@ -73,23 +73,8 @@ const Milliseconds kDefaultOplogGetMoreMaxMS{5000};
 
 }  // namespace
 
-StatusWith<OpTimeWithHash> AbstractOplogFetcher::parseOpTimeWithHash(const BSONObj& oplogEntryObj) {
-    const auto opTime = OpTime::parseFromOplogEntry(oplogEntryObj);
-    if (!opTime.isOK()) {
-        return opTime.getStatus();
-    }
-
-    long long hash = 0;
-    Status hashStatus = bsonExtractIntegerField(oplogEntryObj, "h"_sd, &hash);
-    if (!hashStatus.isOK()) {
-        return hashStatus;
-    }
-
-    return OpTimeWithHash{hash, opTime.getValue()};
-}
-
 AbstractOplogFetcher::AbstractOplogFetcher(executor::TaskExecutor* executor,
-                                           OpTimeWithHash lastFetched,
+                                           OpTime lastFetched,
                                            HostAndPort source,
                                            NamespaceString nss,
                                            std::size_t maxFetcherRestarts,
@@ -102,7 +87,7 @@ AbstractOplogFetcher::AbstractOplogFetcher(executor::TaskExecutor* executor,
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(lastFetched) {
 
-    invariant(!_lastFetched.opTime.isNull());
+    invariant(!_lastFetched.isNull());
     invariant(onShutdownCallbackFn);
 }
 
@@ -122,8 +107,7 @@ std::string AbstractOplogFetcher::toString() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     str::stream msg;
     msg << _getComponentName() << " -"
-        << " last optime fetched: " << _lastFetched.opTime.toString()
-        << " last hash fetched: " << _lastFetched.value;
+        << " last optime fetched: " << _lastFetched.toString();
     // The fetcher is created a startup, not at construction, so we must check if it exists.
     if (_fetcher) {
         msg << " fetcher: " << _fetcher->getDiagnosticString();
@@ -139,8 +123,8 @@ void AbstractOplogFetcher::_makeAndScheduleFetcherCallback(
         return;
     }
 
-    BSONObj findCommandObj = _makeFindCommandObject(
-        _nss, _getLastOpTimeWithHashFetched().opTime, _getInitialFindMaxTime());
+    BSONObj findCommandObj =
+        _makeFindCommandObject(_nss, _getLastOpTimeFetched(), _getInitialFindMaxTime());
     BSONObj metadataObj = _makeMetadataObject();
 
     Status scheduleStatus = Status::OK();
@@ -180,11 +164,11 @@ Status AbstractOplogFetcher::_scheduleFetcher_inlock() {
     return _fetcher->schedule();
 }
 
-OpTimeWithHash AbstractOplogFetcher::getLastOpTimeWithHashFetched_forTest() const {
-    return _getLastOpTimeWithHashFetched();
+OpTime AbstractOplogFetcher::getLastOpTimeFetched_forTest() const {
+    return _getLastOpTimeFetched();
 }
 
-OpTimeWithHash AbstractOplogFetcher::_getLastOpTimeWithHashFetched() const {
+OpTime AbstractOplogFetcher::_getLastOpTimeFetched() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _lastFetched;
 }
@@ -195,8 +179,7 @@ BSONObj AbstractOplogFetcher::getCommandObject_forTest() const {
 }
 
 BSONObj AbstractOplogFetcher::getFindQuery_forTest() const {
-    return _makeFindCommandObject(
-        _nss, _getLastOpTimeWithHashFetched().opTime, _getInitialFindMaxTime());
+    return _makeFindCommandObject(_nss, _getLastOpTimeFetched(), _getInitialFindMaxTime());
 }
 
 HostAndPort AbstractOplogFetcher::_getSource() const {
@@ -222,8 +205,8 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     // example, because it stepped down) we might not have a cursor.
     if (!responseStatus.isOK()) {
 
-        BSONObj findCommandObj = _makeFindCommandObject(
-            _nss, _getLastOpTimeWithHashFetched().opTime, _getRetriedFindMaxTime());
+        BSONObj findCommandObj =
+            _makeFindCommandObject(_nss, _getLastOpTimeFetched(), _getRetriedFindMaxTime());
         BSONObj metadataObj = _makeMetadataObject();
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -232,7 +215,7 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
                       << redact(responseStatus);
             } else {
                 log() << "Restarting oplog query due to error: " << redact(responseStatus)
-                      << ". Last fetched optime (with hash): " << _lastFetched
+                      << ". Last fetched optime: " << _lastFetched
                       << ". Restarts remaining: " << (_maxFetcherRestarts - _fetcherRestarts);
                 _fetcherRestarts++;
                 // Destroying current instance in _shuttingDownFetcher will possibly block.
@@ -294,15 +277,14 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     // completed.
     const auto& documents = queryResponse.documents;
     if (documents.size() > 0) {
-        auto lastDocRes = AbstractOplogFetcher::parseOpTimeWithHash(documents.back());
+        auto lastDocRes = OpTime::parseFromOplogEntry(documents.back());
         if (!lastDocRes.isOK()) {
             _finishCallback(lastDocRes.getStatus());
             return;
         }
         auto lastDoc = lastDocRes.getValue();
         LOG(3) << _getComponentName()
-               << " setting last fetched optime ahead after batch: " << lastDoc.opTime
-               << "; hash: " << lastDoc.value;
+               << " setting last fetched optime ahead after batch: " << lastDoc;
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _lastFetched = lastDoc;

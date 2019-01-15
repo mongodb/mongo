@@ -85,7 +85,7 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
  * Returns a document representing an oplog entry with the given fields.
  */
 BSONObj makeOplogEntryDoc(OpTime opTime,
-                          long long hash,
+                          const boost::optional<long long> hash,
                           OpTypeEnum opType,
                           const NamespaceString& nss,
                           const boost::optional<UUID>& uuid,
@@ -104,10 +104,12 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     sessionInfo.serialize(&builder);
     builder.append(OplogEntryBase::kTimestampFieldName, opTime.getTimestamp());
     builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
-    builder.append(OplogEntryBase::kHashFieldName, hash);
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
     builder.append(OplogEntryBase::kNssFieldName, nss.toString());
+    if (hash) {
+        builder.append(OplogEntryBase::kHashFieldName, hash.get());
+    }
     if (uuid) {
         uuid->appendToBuilder(&builder, OplogEntryBase::kUuidFieldName);
     }
@@ -209,7 +211,7 @@ OplogEntry::OplogEntry(BSONObj rawInput) : raw(std::move(rawInput)) {
 }
 
 OplogEntry::OplogEntry(OpTime opTime,
-                       long long hash,
+                       const boost::optional<long long> hash,
                        OpTypeEnum opType,
                        const NamespaceString& nss,
                        const boost::optional<UUID>& uuid,

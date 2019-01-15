@@ -215,7 +215,7 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                                  OperationSessionInfo sessionInfo = {},
                                  boost::optional<Date_t> wallTime = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
-                            1LL,                              // hash
+                            boost::none,                      // hash
                             opType,                           // opType
                             testNs,                           // namespace
                             boost::none,                      // uuid
@@ -247,7 +247,6 @@ repl::OplogEntry _makeTransactionOplogEntry(repl::OpTime opTime,
     sessionInfo.serialize(&builder);
     builder.append("ts", opTime.getTimestamp());
     builder.append("t", opTime.getTerm());
-    builder.append("h", 1LL);
     builder.append("v", repl::OplogEntry::kOplogVersion);
     builder.append("op", "c");
     builder.append("ns", testNs.toString());

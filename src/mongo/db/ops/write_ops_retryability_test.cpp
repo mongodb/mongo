@@ -61,7 +61,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
                                 boost::optional<repl::OpTime> postImageOpTime = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
-                            0,                                // hash
+                            boost::none,                      // hash
                             opType,                           // opType
                             nss,                              // namespace
                             boost::none,                      // uuid
@@ -79,15 +79,15 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
-    const auto entry = assertGet(
-        repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
-                                          << "u"
-                                          << "ns"
-                                          << "a.b"
-                                          << "o"
-                                          << BSON("_id" << 1 << "x" << 5)
-                                          << "o2"
-                                          << BSON("_id" << 1))));
+    const auto entry =
+        assertGet(repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "op"
+                                                    << "u"
+                                                    << "ns"
+                                                    << "a.b"
+                                                    << "o"
+                                                    << BSON("_id" << 1 << "x" << 5)
+                                                    << "o2"
+                                                    << BSON("_id" << 1))));
 
     auto res = parseOplogEntryForUpdate(entry);
 
@@ -116,13 +116,13 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpdate) {
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpsert) {
-    const auto entry = assertGet(
-        repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "h" << 0LL << "op"
-                                          << "i"
-                                          << "ns"
-                                          << "a.b"
-                                          << "o"
-                                          << BSON("_id" << 1 << "x" << 5))));
+    const auto entry =
+        assertGet(repl::OplogEntry::parse(BSON("ts" << Timestamp(50, 10) << "t" << 1LL << "op"
+                                                    << "i"
+                                                    << "ns"
+                                                    << "a.b"
+                                                    << "o"
+                                                    << BSON("_id" << 1 << "x" << 5))));
 
     auto res = parseOplogEntryForUpdate(entry);
 

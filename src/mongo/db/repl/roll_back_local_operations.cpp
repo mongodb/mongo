@@ -60,6 +60,10 @@ OpTime getOpTime(const OplogInterface::Iterator::Value& oplogValue) {
     return fassert(40298, OpTime::parseFromOplogEntry(oplogValue.first));
 }
 
+long long getTerm(const BSONObj& operation) {
+    return operation["t"].numberLong();
+}
+
 Timestamp getTimestamp(const BSONObj& operation) {
     return operation["ts"].timestamp();
 }
@@ -68,14 +72,9 @@ Timestamp getTimestamp(const OplogInterface::Iterator::Value& oplogValue) {
     return getTimestamp(oplogValue.first);
 }
 
-long long getHash(const BSONObj& operation) {
-    return operation["h"].Long();
+long long getTerm(const OplogInterface::Iterator::Value& oplogValue) {
+    return getTerm(oplogValue.first);
 }
-
-long long getHash(const OplogInterface::Iterator::Value& oplogValue) {
-    return getHash(oplogValue.first);
-}
-
 }  // namespace
 
 RollBackLocalOperations::RollBackLocalOperations(const OplogInterface& localOplog,
@@ -131,31 +130,17 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
 
     if (getTimestamp(_localOplogValue) == getTimestamp(operation)) {
         _scanned++;
-        if (getHash(_localOplogValue) == getHash(operation)) {
+        if (getTerm(_localOplogValue) == getTerm(operation)) {
             return RollbackCommonPoint(_localOplogValue.first, _localOplogValue.second);
         }
 
-        LOG(2) << "Local oplog entry to roll back: " << redact(_localOplogValue.first);
-        auto status = _rollbackOperation(_localOplogValue.first);
-        if (!status.isOK()) {
-            invariant(ErrorCodes::NoSuchKey != status.code());
-            return status;
-        }
-        auto result = _localOplogIterator->next();
-        if (!result.isOK()) {
-            return Status(ErrorCodes::NoMatchingDocument,
-                          str::stream() << "reached beginning of local oplog: {"
-                                        << "scanned: "
-                                        << _scanned
-                                        << ", theirTime: "
-                                        << getTimestamp(operation).toString()
-                                        << ", ourTime: "
-                                        << getTimestamp(_localOplogValue).toString()
-                                        << "}");
-        }
-        _localOplogValue = result.getValue();
+        // We don't need to advance the localOplogIterator here because it is guaranteed to advance
+        // during the next call to onRemoteOperation. This is because before the next call to
+        // onRemoteOperation, the remote oplog iterator will advance and the new remote operation is
+        // guaranteed to have a timestamp less than the current local operation, which will trigger
+        // a call to get the next local operation.
         return Status(ErrorCodes::NoSuchKey,
-                      "Unable to determine common point - same timestamp but different hash. "
+                      "Unable to determine common point - same timestamp but different terms. "
                       "Need to process additional remote operations.");
     }
 

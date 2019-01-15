@@ -82,7 +82,7 @@ std::string OplogInterfaceRemote::toString() const {
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() const {
     const Query query = Query().sort(BSON("$natural" << -1));
-    const BSONObj fields = BSON("ts" << 1 << "h" << 1);
+    const BSONObj fields = BSON("ts" << 1 << "t" << 1);
     return std::unique_ptr<OplogInterface::Iterator>(
         new OplogIteratorRemote(_getConnection()->query(
             NamespaceString(_collectionName), query, 0, 0, &fields, 0, _batchSize)));

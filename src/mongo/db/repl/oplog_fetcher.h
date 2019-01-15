@@ -51,8 +51,8 @@ MONGO_FAIL_POINT_DECLARE(stopReplProducer);
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable cursor.
  *
- * The initial find command is generated from last fetched optime and hash and may contain the
- * current term depending on the replica set config provided.
+ * The initial find command is generated from last fetched optime and may contain the current term
+ * depending on the replica set config provided.
  *
  * Forwards metadata in each find/getMore response to the data replicator external state.
  *
@@ -86,7 +86,7 @@ public:
         size_t networkDocumentBytes = 0;
         size_t toApplyDocumentCount = 0;
         size_t toApplyDocumentBytes = 0;
-        OpTimeWithHash lastDocument = {0, OpTime()};
+        OpTime lastDocument = OpTime();
     };
 
     /**
@@ -115,7 +115,7 @@ public:
      * Invariants if validation fails on any of the provided arguments.
      */
     OplogFetcher(executor::TaskExecutor* executor,
-                 OpTimeWithHash lastFetched,
+                 OpTime lastFetched,
                  HostAndPort source,
                  NamespaceString nss,
                  ReplSetConfig config,

@@ -154,7 +154,6 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
 
     BSONObjBuilder bob;
     bob.append("ts", ts);
-    bob.append("h", 1LL);
     bob.append("op", OpType_serializer(opType));
     uuid.appendToBuilder(&bob, "ui");
     bob.append("ns", nss);
@@ -176,7 +175,6 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
 
     BSONObjBuilder bob;
     bob.append("ts", ts);
-    bob.append("h", 1LL);
     bob.append("op", "c");
     if (uuid) {  // Not all ops have UUID fields.
         uuid.get().appendToBuilder(&bob, "ui");
@@ -296,7 +294,7 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
     auto coll = _createCollection(_opCtx.get(), nss.toString(), localCollOptions);
 
     auto commonOpUuid = unittest::assertGet(UUID::parse("f005ba11-cafe-bead-f00d-123456789abc"));
-    auto commonOpBson = BSON("ts" << Timestamp(1, 1) << "h" << 1LL << "t" << 1LL << "op"
+    auto commonOpBson = BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
                                   << "n"
                                   << "o"
                                   << BSONObj()

@@ -82,7 +82,7 @@ namespace {
  */
 OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid) {
     return OplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
-                      1LL,                         // hash
+                      boost::none,                 // hash
                       opType,                      // opType
                       nss,                         // namespace
                       uuid,                        // uuid
@@ -356,9 +356,7 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
                    << "o"
                    << BSON("create" << nss.coll())
                    << "ts"
-                   << Timestamp(1, 1)
-                   << "h"
-                   << 0LL);
+                   << Timestamp(1, 1));
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
                                             Collection*,
@@ -388,9 +386,7 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
                             << BSON("create"
                                     << "t")
                             << "ts"
-                            << Timestamp(1, 1)
-                            << "h"
-                            << 0LL);
+                            << Timestamp(1, 1));
     // This test relies on the namespace type check of IDL.
     ASSERT_THROWS(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync),
                   ExceptionFor<ErrorCodes::TypeMismatch>);
@@ -1508,7 +1504,7 @@ TEST_F(SyncTailTest, LogSlowOpApplicationWhenSuccessful) {
     // Use a builder for easier escaping. We expect the operation to be logged.
     StringBuilder expected;
     expected << "applied op: CRUD { op: \"i\", ns: \"test.t\", o: { _id: 0 }, ts: Timestamp(1, 1), "
-                "t: 1, h: 1, v: 2 }, took "
+                "t: 1, v: 2 }, took "
              << applyDuration << "ms";
     ASSERT_EQUALS(1, countLogLinesContaining(expected.str()));
 }
@@ -1584,7 +1580,7 @@ public:
                                     const OperationSessionInfo& sessionInfo,
                                     Date_t wallClockTime) {
         return repl::OplogEntry(opTime,         // optime
-                                0,              // hash
+                                boost::none,    // hash
                                 opType,         // opType
                                 ns,             // namespace
                                 boost::none,    // uuid

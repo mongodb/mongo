@@ -45,12 +45,11 @@ namespace {
  * Creates an OplogEntry using given field values.
  */
 repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
-                                long long hash,
                                 repl::OpTypeEnum opType,
                                 NamespaceString nss,
                                 BSONObj object) {
     return repl::OplogEntry(opTime,                           // optime
-                            hash,                             // hash
+                            boost::none,                      // hash
                             opType,                           // opType
                             nss,                              // namespace
                             boost::none,                      // uuid
@@ -79,21 +78,12 @@ void ShutdownState::operator()(const Status& status) {
     _status = status;
 }
 
-BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(OpTimeWithHash opTimeWithHash) {
-    return makeOplogEntry(opTimeWithHash.opTime,
-                          opTimeWithHash.value,
-                          OpTypeEnum::kNoop,
-                          NamespaceString("test.t"),
-                          BSONObj())
-        .toBSON();
+BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(OpTime opTime) {
+    return makeOplogEntry(opTime, OpTypeEnum::kNoop, NamespaceString("test.t"), BSONObj()).toBSON();
 }
 
-BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(OpTime opTime, long long hash) {
-    return makeNoopOplogEntry({hash, opTime});
-}
-
-BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(Seconds seconds, long long hash) {
-    return makeNoopOplogEntry({{seconds, 0}, 1LL}, hash);
+BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(Seconds seconds) {
+    return makeNoopOplogEntry({{seconds, 0}, 1LL});
 }
 
 BSONObj AbstractOplogFetcherTest::makeCursorResponse(CursorId cursorId,
@@ -121,7 +111,7 @@ void AbstractOplogFetcherTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     launchExecutorThread();
 
-    lastFetched = {456LL, {{123, 0}, 1}};
+    lastFetched = {{123, 0}, 1};
 }
 
 executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(

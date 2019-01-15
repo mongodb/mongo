@@ -631,8 +631,6 @@ public:
                 nss.db().toString(),
                 BSON("applyOps" << BSON_ARRAY(
                          BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
-                                   << "h"
-                                   << 0xBEEFBEEFLL
                                    << "v"
                                    << 2
                                    << "op"
@@ -644,8 +642,6 @@ public:
                                    << "o"
                                    << BSON("_id" << idx))
                          << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t" << 1LL
-                                      << "h"
-                                      << 1LL
                                       << "op"
                                       << "c"
                                       << "ns"
@@ -705,7 +701,7 @@ public:
         }
         oArrayBuilder.done();
 
-        oplogEntryBuilder << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+        oplogEntryBuilder << "v" << 2 << "op"
                           << "i"
                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid().get();
 
@@ -756,9 +752,7 @@ public:
             ASSERT_OK(
                 doNonAtomicApplyOps(
                     nss.db().toString(),
-                    {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "h"
-                               << 0xBEEFBEEFLL
-                               << "v"
+                    {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL << "v"
                                << 2
                                << "op"
                                << "d"
@@ -823,9 +817,7 @@ public:
             ASSERT_OK(
                 doNonAtomicApplyOps(
                     nss.db().toString(),
-                    {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "h"
-                               << 0xBEEFBEEFLL
-                               << "v"
+                    {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL << "v"
                                << 2
                                << "op"
                                << "u"
@@ -1280,36 +1272,33 @@ public:
         BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
         BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
         BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
-        auto op0 = repl::OplogEntry(
-            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                      << "op"
-                      << "i"
-                      << "ns"
-                      << nss.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc0));
-        auto op1 = repl::OplogEntry(
-            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                      << "op"
-                      << "i"
-                      << "ns"
-                      << nss.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc1));
-        auto op2 = repl::OplogEntry(
-            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                      << "op"
-                      << "i"
-                      << "ns"
-                      << nss.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc2));
+        auto op0 = repl::OplogEntry(BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2
+                                              << "op"
+                                              << "i"
+                                              << "ns"
+                                              << nss.ns()
+                                              << "ui"
+                                              << uuid
+                                              << "o"
+                                              << doc0));
+        auto op1 = repl::OplogEntry(BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2
+                                              << "op"
+                                              << "i"
+                                              << "ns"
+                                              << nss.ns()
+                                              << "ui"
+                                              << uuid
+                                              << "o"
+                                              << doc1));
+        auto op2 = repl::OplogEntry(BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2
+                                              << "op"
+                                              << "i"
+                                              << "ns"
+                                              << nss.ns()
+                                              << "ui"
+                                              << uuid
+                                              << "o"
+                                              << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
         DoNothingOplogApplierObserver observer;
@@ -1369,52 +1358,48 @@ public:
         BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
         BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
         BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
-        auto op0 = repl::OplogEntry(
-            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                      << "op"
-                      << "i"
-                      << "ns"
-                      << nss.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc0));
-        auto op1 = repl::OplogEntry(
-            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                      << "op"
-                      << "i"
-                      << "ns"
-                      << nss.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc1));
-        auto op2 = repl::OplogEntry(
-            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                      << "op"
-                      << "i"
-                      << "ns"
-                      << nss.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc2));
+        auto op0 = repl::OplogEntry(BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2
+                                              << "op"
+                                              << "i"
+                                              << "ns"
+                                              << nss.ns()
+                                              << "ui"
+                                              << uuid
+                                              << "o"
+                                              << doc0));
+        auto op1 = repl::OplogEntry(BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2
+                                              << "op"
+                                              << "i"
+                                              << "ns"
+                                              << nss.ns()
+                                              << "ui"
+                                              << uuid
+                                              << "o"
+                                              << doc1));
+        auto op2 = repl::OplogEntry(BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2
+                                              << "op"
+                                              << "i"
+                                              << "ns"
+                                              << nss.ns()
+                                              << "ui"
+                                              << uuid
+                                              << "o"
+                                              << doc2));
         auto indexSpec2 = BSON("createIndexes" << nss.coll() << "ns" << nss.ns() << "v"
                                                << static_cast<int>(kIndexVersion)
                                                << "key"
                                                << BSON("b" << 1)
                                                << "name"
                                                << "b_1");
-        auto createIndexOp = repl::OplogEntry(BSON(
-            "ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                 << "op"
-                 << "c"
-                 << "ns"
-                 << nss.getCommandNS().ns()
-                 << "ui"
-                 << uuid
-                 << "o"
-                 << indexSpec2));
+        auto createIndexOp = repl::OplogEntry(
+            BSON("ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "c"
+                      << "ns"
+                      << nss.getCommandNS().ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << indexSpec2));
 
         // We add in an index creation op to test that we restart tracking multikey path info
         // after bulk index builds.
@@ -2223,15 +2208,14 @@ public:
 
         // Make a simple insert operation.
         BSONObj doc0 = BSON("_id" << 0 << "a" << 0);
-        auto insertOp = repl::OplogEntry(
-            BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                      << "i"
-                      << "ns"
-                      << ns.ns()
-                      << "ui"
-                      << uuid
-                      << "o"
-                      << doc0));
+        auto insertOp = repl::OplogEntry(BSON("ts" << futureTs << "t" << 1LL << "v" << 2 << "op"
+                                                   << "i"
+                                                   << "ns"
+                                                   << ns.ns()
+                                                   << "ui"
+                                                   << uuid
+                                                   << "o"
+                                                   << doc0));
 
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
@@ -2316,15 +2300,14 @@ public:
                                                   << "name"
                                                   << "field_1");
 
-            auto createIndexOp =
-                BSON("ts" << startBuildTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                          << "c"
-                          << "ns"
-                          << nss.getCommandNS().ns()
-                          << "ui"
-                          << collUUID
-                          << "o"
-                          << indexSpec);
+            auto createIndexOp = BSON("ts" << startBuildTs << "t" << 1LL << "v" << 2 << "op"
+                                           << "c"
+                                           << "ns"
+                                           << nss.getCommandNS().ns()
+                                           << "ui"
+                                           << collUUID
+                                           << "o"
+                                           << indexSpec);
 
             ASSERT_OK(doAtomicApplyOps(nss.db().toString(), {createIndexOp}));
 

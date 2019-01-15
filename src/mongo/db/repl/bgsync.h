@@ -201,7 +201,7 @@ private:
     // restart syncing
     void start(OperationContext* opCtx);
 
-    OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* opCtx);
+    OpTime _readLastAppliedOpTime(OperationContext* opCtx);
 
     // This OplogApplier applies oplog entries fetched from the sync source.
     OplogApplier* const _oplogApplier;
@@ -234,9 +234,6 @@ private:
     mutable stdx::mutex _mutex;  // (S)
 
     OpTime _lastOpTimeFetched;  // (M)
-
-    // lastFetchedHash is used to match ops to determine if we need to rollback, when a secondary.
-    long long _lastFetchedHash = 0LL;  // (M)
 
     // Thread running producerThread().
     std::unique_ptr<stdx::thread> _producerThread;  // (M)

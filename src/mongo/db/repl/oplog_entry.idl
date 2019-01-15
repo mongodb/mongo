@@ -100,6 +100,7 @@ structs:
             h:
                 cpp_name: hash
                 type: long
+                optional: true # Only used for backwards compatibility with 4.0 and before.
                 description: "The hash of the oplog entry"
             v:
                 cpp_name: version
