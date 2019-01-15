@@ -53,8 +53,9 @@
                                  ErrorCodes.PreparedTransactionInProgress);
 
     jsTestLog("Test that you can't run delete on a prepared transaction.");
-    assert.commandFailedWithCode(sessionColl.remove({_id: 4}),
-                                 ErrorCodes.PreparedTransactionInProgress);
+    var res = assert.commandFailedWithCode(sessionColl.remove({_id: 4}),
+                                           ErrorCodes.PreparedTransactionInProgress);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     jsTestLog("Test that you can't run distinct on a prepared transaction.");
     assert.commandFailedWithCode(assert.throws(function() {
@@ -101,17 +102,19 @@
         ErrorCodes.PreparedTransactionInProgress);
 
     jsTestLog("Test that you can't insert on a prepared transaction.");
-    assert.commandFailedWithCode(sessionColl.insert({_id: 5}),
-                                 ErrorCodes.PreparedTransactionInProgress);
+    res = assert.commandFailedWithCode(sessionColl.insert({_id: 5}),
+                                       ErrorCodes.PreparedTransactionInProgress);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     jsTestLog("Test that you can't run update on a prepared transaction.");
-    assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}),
-                                 ErrorCodes.PreparedTransactionInProgress);
+    res = assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}),
+                                       ErrorCodes.PreparedTransactionInProgress);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
     session.abortTransaction_forTesting();
 
     jsTestLog("Test that you can't run getMore on a prepared transaction.");
     session.startTransaction();
-    const res = assert.commandWorked(sessionDB.runCommand({find: collName, batchSize: 1}));
+    res = assert.commandWorked(sessionDB.runCommand({find: collName, batchSize: 1}));
     assert(res.hasOwnProperty("cursor"), tojson(res));
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
     PrepareHelpers.prepareTransaction(session);

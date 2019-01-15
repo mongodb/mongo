@@ -1,6 +1,5 @@
-
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,32 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/db/handle_request_response.h"
 #include "mongo/base/transaction_error.h"
 
 namespace mongo {
 
-BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
-                       const std::string& commandName,
-                       ErrorCodes::Error code,
-                       bool hasWriteConcernError) {
-
-    // By specifying "autocommit", the user indicates they want to run a transaction.
-    // It is always false when set.
-    if (!sessionOptions.getAutocommit()) {
-        return {};
+bool isTransientTransactionError(ErrorCodes::Error code,
+                                 bool hasWriteConcernError,
+                                 bool isCommitTransaction) {
+    bool isTransient;
+    switch (code) {
+        case ErrorCodes::WriteConflict:
+        case ErrorCodes::SnapshotUnavailable:
+        case ErrorCodes::LockTimeout:
+        case ErrorCodes::PreparedTransactionInProgress:
+        case ErrorCodes::StaleConfig:
+            isTransient = true;
+            break;
+        default:
+            isTransient = false;
+            break;
     }
 
-    // The errors that indicate the transaction fails without any persistent side-effect.
-    bool isTransient = isTransientTransactionError(
-        code,
-        hasWriteConcernError,
-        commandName == "commitTransaction" || commandName == "coordinateCommitTransaction");
-
-    if (isTransient) {
-        return BSON("errorLabels" << BSON_ARRAY("TransientTransactionError"));
+    if (isCommitTransaction) {
+        // On NoSuchTransaction it's safe to retry the whole transaction only if the data cannot be
+        // rolled back.
+        isTransient |= code == ErrorCodes::NoSuchTransaction && !hasWriteConcernError;
+    } else {
+        // For commands other than "commitTransaction", we know there's no side-effect for these
+        // errors, but it's not true for "commitTransaction" if a failover happens.
+        isTransient |= ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code) ||
+            code == ErrorCodes::NoSuchTransaction;
     }
-    return {};
+
+    return isTransient;
 }
 
 }  // namespace mongo

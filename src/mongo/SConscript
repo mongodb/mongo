@@ -72,6 +72,7 @@ env.Library(
         'base/simple_string_data_comparator.cpp',
         'base/status.cpp',
         'base/string_data.cpp',
+        'base/transaction_error.cpp',
         'base/validate_locale.cpp',
         'bson/bson_comparator_interface_base.cpp',
         'bson/bson_depth.cpp',

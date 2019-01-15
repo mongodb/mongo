@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/transaction_error.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -222,7 +223,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 /**
- * Returns true if the operation can continue.
+ * Returns true if the batch can continue, false to stop the batch, or throws to fail the command.
  */
 bool handleError(OperationContext* opCtx,
                  const DBException& ex,
@@ -239,8 +240,16 @@ bool handleError(OperationContext* opCtx,
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && txnParticipant->inActiveOrKilledMultiDocumentTransaction()) {
+        if (isTransientTransactionError(
+                ex.code(), false /* hasWriteConcernError */, false /* isCommitTransaction */)) {
+            // Tell the client to try the whole txn again, by returning ok: 0 with errorLabels.
+            throw;
+        }
+
         // If we are in a transaction, we must fail the whole batch.
-        throw;
+        out->results.emplace_back(ex.toStatus());
+        txnParticipant->abortActiveTransaction(opCtx);
+        return false;
     }
 
     if (ex.extraInfo<StaleConfigInfo>()) {
@@ -397,7 +406,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
     try {
         acquireCollection();
-        if (!collection->getCollection()->isCapped() && batch.size() > 1) {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        auto inTxn = txnParticipant && txnParticipant->inActiveOrKilledMultiDocumentTransaction();
+        if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
             // First try doing it all together. If all goes well, this is all we need to do.
             // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
             lastOpFixer->startingOp();
@@ -415,20 +426,13 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             return true;
         }
     } catch (const DBException&) {
-
-        // If we cannot abandon the current snapshot, we give up and rethrow the exception.
-        // No WCE retrying is attempted.  This code path is intended for snapshot read concern.
-        if (opCtx->lockState()->inAWriteUnitOfWork()) {
-            throw;
-        }
-
-        // Otherwise, ignore this failure and behave as-if we never tried to do the combined batch
-        // insert.  The loop below will handle reporting any non-transient errors.
+        // Ignore this failure and behave as if we never tried to do the combined batch
+        // insert. The loop below will handle reporting any non-transient errors.
         collection.reset();
     }
 
-    // Try to insert the batch one-at-a-time. This path is executed both for singular batches, and
-    // for batches that failed all-at-once inserting.
+    // Try to insert the batch one-at-a-time. This path is executed for singular batches,
+    // multi-statement transactions, capped collections, and if we failed all-at-once inserting.
     for (auto it = batch.begin(); it != batch.end(); ++it) {
         globalOpCounters.gotInsert();
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
@@ -449,7 +453,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     // Release the lock following any error if we are not in multi-statement
                     // transaction. Among other things, this ensures that we don't sleep in the WCE
                     // retry loop with the lock held.
-                    // If we are in multi-statement transaction and under a under a WUOW, we will
+                    // If we are in multi-statement transaction and under a WUOW, we will
                     // not actually release the lock.
                     collection.reset();
                     throw;
@@ -458,8 +462,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         } catch (const DBException& ex) {
             bool canContinue =
                 handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), out);
-            if (!canContinue)
+
+            if (!canContinue) {
+                // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
                 return false;
+            }
         }
     }
 

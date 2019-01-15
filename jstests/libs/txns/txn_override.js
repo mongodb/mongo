@@ -288,7 +288,17 @@
             // retry the command. If the collection did exist, we'll return the original
             // response because it failed for a different reason. Tests that expect collections
             // to not exist will have to be skipped.
+            var unsupported = false;
             if (res.code === ErrorCodes.OperationNotSupportedInTransaction) {
+                unsupported = true;
+            } else if (res.writeErrors) {
+                const code = res.writeErrors.slice(-1)[0].code;
+                if (code === ErrorCodes.OperationNotSupportedInTransaction) {
+                    unsupported = true;
+                }
+            }
+
+            if (unsupported) {
                 const createCmdRes = runCommandOriginal.call(conn,
                                                              dbName,
                                                              {
@@ -476,7 +486,8 @@
 
         let res = func.apply(conn, makeFuncArgs(commandObj));
 
-        if ((res.ok !== 1) && (conn.txnOverrideState === TransactionStates.kActive)) {
+        if ((res.ok !== 1 || res.writeErrors) &&
+            (conn.txnOverrideState === TransactionStates.kActive)) {
             abortTransaction(conn, cmdObjUnwrapped.lsid, txnOptions.txnNumber);
             res = retryOnImplicitCollectionCreationIfNeeded(conn,
                                                             dbName,

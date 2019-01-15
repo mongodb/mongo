@@ -36,6 +36,9 @@ selector:
 
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
+
+  # TODO SERVER-39175: Mongos doesn't correctly report write errors in transactions
+  - jstests/core/txns/multi_statement_transaction_write_error.js
   exclude_with_any_tags:
   # Prepare is not a command on mongos.
   - uses_prepare_transaction
