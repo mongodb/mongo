@@ -88,7 +88,12 @@ ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>
                                      &kWiredTigerCursorCacheSize);
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
-    : _epoch(epoch), _cursorEpoch(cursorEpoch), _session(NULL), _cursorGen(0), _cursorsOut(0) {
+    : _epoch(epoch),
+      _cursorEpoch(cursorEpoch),
+      _session(NULL),
+      _cursorGen(0),
+      _cursorsOut(0),
+      _idleExpireTime(Date_t::min()) {
     invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
 }
 
@@ -101,7 +106,8 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
       _cache(cache),
       _session(NULL),
       _cursorGen(0),
-      _cursorsOut(0) {
+      _cursorsOut(0),
+      _idleExpireTime(Date_t::min()) {
     invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
 }
 
@@ -226,10 +232,13 @@ uint64_t WiredTigerSession::genTableId() {
 // -----------------------
 
 WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-    : _engine(engine), _conn(engine->getConnection()), _shuttingDown(0) {}
+    : _engine(engine),
+      _conn(engine->getConnection()),
+      _clockSource(_engine->getClockSource()),
+      _shuttingDown(0) {}
 
-WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn)
-    : _engine(NULL), _conn(conn), _shuttingDown(0) {}
+WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn, ClockSource* cs)
+    : _engine(NULL), _conn(conn), _clockSource(cs), _shuttingDown(0) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
@@ -365,6 +374,34 @@ void WiredTigerSessionCache::closeCursorsForQueuedDrops() {
     }
 }
 
+size_t WiredTigerSessionCache::getIdleSessionsCount() {
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    return _sessions.size();
+}
+
+void WiredTigerSessionCache::closeExpiredIdleSessions(int64_t idleTimeMillis) {
+    // Do nothing if session close idle time is set to 0 or less
+    if (idleTimeMillis <= 0) {
+        return;
+    }
+
+    auto cutoffTime = _clockSource->now() - Milliseconds(idleTimeMillis);
+    {
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+        // Discard all sessions that became idle before the cutoff time
+        for (auto it = _sessions.begin(); it != _sessions.end();) {
+            auto session = *it;
+            invariant(session->getIdleExpireTime() != Date_t::min());
+            if (session->getIdleExpireTime() < cutoffTime) {
+                it = _sessions.erase(it);
+                delete (session);
+            } else {
+                ++it;
+            }
+        }
+    }
+}
+
 void WiredTigerSessionCache::closeAll() {
     // Increment the epoch as we are now closing all sessions with this epoch.
     SessionCache swap;
@@ -396,6 +433,8 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
             // discarding older ones
             WiredTigerSession* cachedSession = _sessions.back();
             _sessions.pop_back();
+            // Reset the idle time
+            cachedSession->setIdleExpireTime(Date_t::min());
             return UniqueWiredTigerSession(cachedSession);
         }
     }
@@ -450,8 +489,9 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     bool dropQueuedIdentsAtSessionEnd = session->isDropQueuedIdentsAtSessionEndAllowed();
 
     // Reset this session's flag for dropping queued idents to default, before returning it to
-    // session cache.
+    // session cache. Also set the time this session got idle at.
     session->dropQueuedIdentsAtSessionEndAllowed(true);
+    session->setIdleExpireTime(_clockSource->now());
 
     if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
         stdx::lock_guard<stdx::mutex> lock(_cacheLock);

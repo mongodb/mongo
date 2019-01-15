@@ -99,6 +99,19 @@
 
 namespace mongo {
 
+// Close idle wiredtiger sessions in the session cache after this many seconds.
+// The default is 5 mins. Have a shorter default in the debug build to aid testing.
+MONGO_EXPORT_SERVER_PARAMETER(wiredTigerSessionCloseIdleTimeSecs,
+                              std::int32_t,
+                              kDebugBuild ? 5 : 300)
+    ->withValidator([](const auto& potentialNewValue) {
+        if (potentialNewValue < 0) {
+            return Status(ErrorCodes::BadValue,
+                          "wiredTigerSessionCloseIdleTimeSecs must be greater than or equal to 0s");
+        }
+        return Status::OK();
+    });
+
 bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
                                             bool repairMode,
                                             bool hasRecoveryTimestamp) {
@@ -168,6 +181,54 @@ using std::string;
 namespace dps = ::mongo::dotted_path_support;
 
 const int WiredTigerKVEngine::kDefaultJournalDelayMillis = 100;
+
+class WiredTigerKVEngine::WiredTigerSessionSweeper : public BackgroundJob {
+public:
+    explicit WiredTigerSessionSweeper(WiredTigerSessionCache* sessionCache)
+        : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
+
+    virtual string name() const {
+        return "WTIdleSessionSweeper";
+    }
+
+    virtual void run() {
+        ThreadClient tc(name(), getGlobalServiceContext());
+        LOG(1) << "starting " << name() << " thread";
+
+        while (!_shuttingDown.load()) {
+            {
+                stdx::unique_lock<stdx::mutex> lock(_mutex);
+                MONGO_IDLE_THREAD_BLOCK;
+                // Check every 10 seconds or sooner in the debug builds
+                _condvar.wait_for(lock, stdx::chrono::seconds(kDebugBuild ? 1 : 10));
+            }
+
+            _sessionCache->closeExpiredIdleSessions(wiredTigerSessionCloseIdleTimeSecs.load() *
+                                                    1000);
+        }
+        LOG(1) << "stopping " << name() << " thread";
+    }
+
+    void shutdown() {
+        _shuttingDown.store(true);
+        {
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            // Wake up the session sweeper thread early, we do not want the shutdown
+            // to wait for us too long.
+            _condvar.notify_one();
+        }
+        wait();
+    }
+
+private:
+    WiredTigerSessionCache* _sessionCache;
+    AtomicWord<bool> _shuttingDown{false};
+
+    stdx::mutex _mutex;  // protects _condvar
+    // The session sweeper thread idles on this condition variable for a particular time duration
+    // between cleaning up expired sessions. It can be triggered early to expediate shutdown.
+    stdx::condition_variable _condvar;
+};
 
 class WiredTigerKVEngine::WiredTigerJournalFlusher : public BackgroundJob {
 public:
@@ -369,7 +430,7 @@ private:
     WiredTigerSessionCache* _sessionCache;
 
     stdx::mutex _mutex;  // protects _condvar
-    // The checkpoint thead idles on this condition variable for a particular time duration between
+    // The checkpoint thread idles on this condition variable for a particular time duration between
     // taking checkpoints. It can be triggered early to expediate immediate checkpointing.
     stdx::condition_variable _condvar;
 
@@ -585,6 +646,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sessionCache.reset(new WiredTigerSessionCache(this));
 
+    _sessionSweeper = stdx::make_unique<WiredTigerSessionSweeper>(_sessionCache.get());
+    _sessionSweeper->go();
+
     if (_durable && !_ephemeral) {
         _journalFlusher = stdx::make_unique<WiredTigerJournalFlusher>(_sessionCache.get());
         _journalFlusher->go();
@@ -716,6 +780,11 @@ void WiredTigerKVEngine::cleanShutdown() {
     }
 
     // these must be the last things we do before _conn->close();
+    if (_sessionSweeper) {
+        log() << "Shutting down session sweeper thread";
+        _sessionSweeper->shutdown();
+        log() << "Finished shutting down session sweeper thread";
+    }
     if (_journalFlusher) {
         log() << "Shutting down journal flusher thread";
         _journalFlusher->shutdown();

@@ -266,3 +266,12 @@ if wiredtiger:
                 'storage_wiredtiger_mock',
                 ],
             )
+
+        wtEnv.CppUnitTest(
+            target='storage_wiredtiger_session_cache_test',
+            source=['wiredtiger_session_cache_test.cpp',
+                    ],
+            LIBDEPS=[
+                'storage_wiredtiger_mock',
+                ],
+            )
