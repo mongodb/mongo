@@ -55,6 +55,7 @@ StatusWith<ClusterQueryResult> RouterStagePipeline::next(RouterExecStage::ExecCo
 
     // Pipeline::getNext will return a boost::optional<Document> or boost::none if EOF.
     if (auto result = _mergePipeline->getNext()) {
+        _validateAndRecordSortKey(*result);
         return {result->toBson()};
     }
 
@@ -88,7 +89,30 @@ std::size_t RouterStagePipeline::getNumRemotes() const {
 }
 
 BSONObj RouterStagePipeline::getPostBatchResumeToken() const {
-    return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
+    auto pbrt = _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
+    return pbrt.isEmpty() ? pbrt : _setPostBatchResumeTokenUUID(pbrt);
+}
+
+BSONObj RouterStagePipeline::_setPostBatchResumeTokenUUID(BSONObj pbrt) const {
+    // If the PBRT does not match the sort key of the latest document, it is a high water mark.
+    const bool isHighWaterMark = !pbrt.binaryEqual(_latestSortKey);
+
+    // If this stream is on a single collection and the token is a high water mark, then it may have
+    // come from a shard that does not have the collection. If so, we must fill in the correct UUID.
+    if (isHighWaterMark && _mergePipeline->getContext()->uuid) {
+        auto tokenData = ResumeToken::parse(pbrt).getData();
+        // Check whether the UUID is missing before regenerating the token.
+        if (!tokenData.uuid) {
+            invariant(tokenData.tokenType == ResumeTokenData::kHighWaterMarkToken);
+            tokenData.uuid = _mergePipeline->getContext()->uuid;
+            pbrt = ResumeToken(tokenData).toDocument().toBson();
+        }
+    }
+    return pbrt;
+}
+
+void RouterStagePipeline::_validateAndRecordSortKey(const Document& doc) {
+    _latestSortKey = doc.getSortKeyMetaField();
 }
 
 bool RouterStagePipeline::remotesExhausted() {

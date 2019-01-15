@@ -431,7 +431,7 @@ Status runAggregate(OperationContext* opCtx,
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);
 
-            if (!origNss.isCollectionlessAggregateNS()) {
+            if (liteParsedPipeline.shouldResolveUUIDAndCollation()) {
                 // AutoGetCollectionForReadCommand will raise an error if 'origNss' is a view.
                 AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
 

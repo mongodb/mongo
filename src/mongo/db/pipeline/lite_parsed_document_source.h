@@ -109,6 +109,14 @@ public:
     }
 
     /**
+     * Returns true if this pipeline's UUID and collation should be resolved. For the latter, this
+     * means adopting the collection's default collation, unless a custom collation was specified.
+     */
+    virtual bool shouldResolveUUIDAndCollation() const {
+        return true;
+    }
+
+    /**
      * Returns true if this stage does not require an input source.
      */
     virtual bool isInitialSource() const {
