@@ -50,6 +50,24 @@
     }),
                                  ErrorCodes.InvalidIndexSpecificationOption);
 
+    // A createIndexes command for a background index with unknown field in the index spec should
+    // fail.
+    assert.commandFailedWithCode(db.adminCommand({
+        applyOps: [{
+            op: 'c',
+            ns: cmdNs,
+            o: {
+                createIndexes: t.getName(),
+                v: 2,
+                key: {a: 1},
+                background: true,
+                name: 'a_1_background',
+                unknown: 1,
+            },
+        }],
+    }),
+                                 ErrorCodes.InvalidIndexSpecificationOption);
+
     // A createIndexes command for a v:1 index with an unknown field in the index spec should work.
     const res1 = assert.commandWorked(db.adminCommand({
         applyOps: [{
