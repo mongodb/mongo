@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -169,21 +168,8 @@ public:
                 "Transaction isn't in progress",
                 txnParticipant->inMultiDocumentTransaction());
 
-        auto wasPrepared = txnParticipant->transactionIsPrepared();
-        try {
-            txnParticipant->abortActiveTransaction(opCtx);
-        } catch (...) {
-            // Make sure that abort succeeds if we are prepared. We check if we're prepared before
-            // aborting because the state may have changed while attempting to abort.
-            invariant(!wasPrepared,
-                      str::stream() << "Caught exception during transaction "
-                                    << opCtx->getTxnNumber()
-                                    << " abort on "
-                                    << opCtx->getLogicalSessionId()
-                                    << ": "
-                                    << exceptionToStatus());
-            throw;
-        }
+        txnParticipant->abortActiveTransaction(opCtx);
+
         if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
             uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");

@@ -1015,7 +1015,7 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
     if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotMaster,
-                "Not primary so we cannot commit a transaction",
+                "Not primary so we cannot commit a prepared transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
 

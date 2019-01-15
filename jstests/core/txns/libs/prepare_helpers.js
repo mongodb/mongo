@@ -66,9 +66,25 @@ const PrepareHelpers = (function() {
         return this.commitTransaction(session, commitTimestamp);
     }
 
+    /**
+     * Creates a session object on the given connection with the provided 'lsid'.
+     *
+     * @return {session} the session created.
+     */
+    function createSessionWithGivenId(conn, lsid, sessionOptions = {}) {
+        const session = conn.startSession(sessionOptions);
+
+        const oldId = session._serverSession.handle.getId();
+        print("Overriding sessionID " + tojson(oldId) + " with " + tojson(lsid) + " for test.");
+        session._serverSession.handle.getId = () => lsid;
+
+        return session;
+    }
+
     return {
         prepareTransaction: prepareTransaction,
         commitTransaction: commitTransaction,
         commitTransactionAfterPrepareTS: commitTransactionAfterPrepareTS,
+        createSessionWithGivenId: createSessionWithGivenId,
     };
 })();
