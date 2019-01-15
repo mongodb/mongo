@@ -570,7 +570,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceTo
         mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
         shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
     } else {
-        mergePipeline = std::move(shardDispatchResults.pipelineForSingleShard);
+        // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
+        // empty local pipeline which we will attach the merge cursors stage to.
+        mergePipeline = uassertStatusOK(Pipeline::parse(std::vector<BSONObj>(), expCtx));
     }
 
     cluster_aggregation_planner::addMergeCursorsSource(

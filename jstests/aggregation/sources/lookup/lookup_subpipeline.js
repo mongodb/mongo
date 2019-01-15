@@ -122,9 +122,7 @@
                   {
                     $lookup: {
                         let : {var2: "$_id"},
-                        pipeline: [
-                            {$match: {$expr: {$gt: ["$_id", "$$var2"]}}},
-                        ],
+                        pipeline: [{$match: {$expr: {$gt: ["$_id", "$$var2"]}}}, {$sort: {_id: 1}}],
                         from: "from",
                         as: "d"
                     }
@@ -151,7 +149,8 @@
               pipeline: [
                   {$addFields: {newField: 2}},
                   {$match: {$expr: {$eq: ["$newField", "$$var1"]}}},
-                  {$project: {newField: 0}}
+                  {$project: {newField: 0}},
+                  {$sort: {_id: 1}}
               ],
               from: "from",
               as: "c",

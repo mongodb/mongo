@@ -71,6 +71,15 @@ public:
         return new DocumentSourceSequentialDocumentCache(pExpCtx, cache);
     }
 
+    /**
+     * Transitions the SequentialDocumentCache object's state to CacheStatus::kAbandoned. Once
+     * abandoned it is expected that the cache will not be used for subsequent operations.
+     */
+    void abandonCache() {
+        invariant(_cache);
+        _cache->abandon();
+    }
+
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
