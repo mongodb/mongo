@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -50,6 +51,8 @@
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
 
 /**
 *  Synchronize writeRequests
@@ -344,6 +347,12 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
 
 MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)(OperationContext* opCtx)->Status {
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangBeforeLinearizableReadConcern, opCtx, "hangBeforeLinearizableReadConcern", [opCtx]() {
+            log() << "batch update - hangBeforeLinearizableReadConcern fail point enabled. "
+                     "Blocking until fail point is disabled.";
+        });
+
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
@@ -370,6 +379,7 @@ MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)(OperationContext* opCtx)->St
 
     repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     auto awaitReplResult = replCoord->awaitReplication(opCtx, lastOpApplied, wc);
+
     if (awaitReplResult.status == ErrorCodes::WriteConcernFailed) {
         return Status(ErrorCodes::LinearizableReadConcernError,
                       "Failed to confirm that read was linearizable.");

@@ -6,7 +6,8 @@
 
     load("jstests/libs/check_log.js");
 
-    const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+    const rst = new ReplSetTest(
+        {nodes: [{setParameter: {closeConnectionsOnStepdown: false}}, {rsConfig: {priority: 0}}]});
     rst.startSet();
     rst.initiate();
 
@@ -60,13 +61,7 @@
         operation();
         checkLog.contains(primary, failpoint + " fail point enabled");
         jsTestLog("Within " + description + ": stepping down and disabling failpoint");
-        try {
-            assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
-        } catch (ex) {
-            // TODO(SERVER-38755): Remove this as stepdown should not hang up the command
-            // connection.
-            assert(isNetworkError(ex));
-        }
+        assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
         assert.commandWorked(
             primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "off"}));
@@ -75,7 +70,7 @@
         // We should automatically reconnect after the failed command.
         assert.commandWorked(primaryDb.adminCommand({ping: 1}));
         // Allow the primary to be re-elected, and wait for it.
-        primaryAdmin.adminCommand({replSetFreeze: 0});
+        assert.commandWorked(primaryAdmin.adminCommand({replSetFreeze: 0}));
         rst.getPrimary();
     }
     runStepDownTest({

@@ -439,7 +439,7 @@ private:
      */
     enum PostMemberStateUpdateAction {
         kActionNone,
-        kActionCloseAllConnections,  // Also indicates that we should clear sharding state.
+        kActionSteppedDownOrRemoved,
         kActionFollowerModeStateChange,
         kActionStartSingleNodeElection
     };

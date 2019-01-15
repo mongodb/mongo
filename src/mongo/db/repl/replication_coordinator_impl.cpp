@@ -97,6 +97,8 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions
 MONGO_FAIL_POINT_DEFINE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 
+MONGO_EXPORT_SERVER_PARAMETER(closeConnectionsOnStepdown, bool, true);
+
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
@@ -2591,7 +2593,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
 
         serverGlobalParams.validateFeaturesAsMaster.store(false);
-        result = kActionCloseAllConnections;
+        result = kActionSteppedDownOrRemoved;
     } else {
         result = kActionFollowerModeStateChange;
     }
@@ -2696,8 +2698,10 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionFollowerModeStateChange:
             _onFollowerModeStateChange();
             break;
-        case kActionCloseAllConnections:
-            _externalState->closeConnections();
+        case kActionSteppedDownOrRemoved:
+            if (closeConnectionsOnStepdown.load()) {
+                _externalState->closeConnections();
+            }
             _externalState->shardingOnStepDownHook();
             _externalState->stopNoopWriter();
             break;
