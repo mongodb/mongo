@@ -102,7 +102,7 @@ public:
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop.
         if ((lastOpAfterRun == lastOpBeforeRun) &&
-            GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken()) {
+            GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked()) {
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         }

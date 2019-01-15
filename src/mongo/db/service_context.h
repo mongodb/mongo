@@ -362,12 +362,6 @@ public:
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
-     * Kills all operations that have a Client that is associated with an incoming user
-     * connection, except for the one associated with opCtx.
-     */
-    void killAllUserOperations(const OperationContext* opCtx, ErrorCodes::Error killCode);
-
-    /**
      * Registers a listener to be notified each time an op is killed.
      *
      * listener does not become owned by the environment. As there is currently no way to

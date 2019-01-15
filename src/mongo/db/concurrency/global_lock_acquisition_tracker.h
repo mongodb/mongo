@@ -35,9 +35,11 @@
 namespace mongo {
 
 /**
- * The GlobalLockAcquisitionTracker keeps track of if the global lock has ever been taken in X or
- * IX mode. This class is used to track if we ever did a transaction with the intent to do a
- * write, so that we can enforce write concern on noop writes.
+ * GlobalLockAcquisitionTracker keeps track of the global lock modes acquired during the
+ * operation's lifetime. This class is used to track if we ever did a transaction with the
+ * intent to do a write, so that we can enforce write concern on noop writes. Also, used
+ * during step down to kill all user operations except those that acquired global lock in
+ * IS mode.
  */
 class GlobalLockAcquisitionTracker {
 public:
@@ -49,16 +51,21 @@ public:
     /**
      * Returns whether we have ever taken a global lock in X or IX mode in this operation.
      */
-    bool getGlobalExclusiveLockTaken() const;
+    bool getGlobalWriteLocked() const;
 
     /**
-     * Sets that we have ever taken a global lock in X or IX mode in this operation.
+     * Returns whether we have ever taken a global lock in S mode in this operation.
      */
-    void setGlobalExclusiveLockTaken();
+    bool getGlobalSharedLockTaken() const;
+
+    /**
+     * Sets the mode bit in _globalLockMode. Once a mode bit is set, we won't clear it.
+     */
+    void setGlobalLockModeBit(LockMode mode);
 
 private:
-    // Set to true when the global lock is first taken in X or IX mode. Never set back to false.
-    bool _globalExclusiveLockTaken = false;
+    // keeps track of the global lock modes acquired for this operation.
+    unsigned char _globalLockMode = (1 << MODE_NONE);
 };
 
 }  // namespace mongo

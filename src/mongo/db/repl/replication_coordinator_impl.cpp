@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_sessions_local.h"
@@ -1751,15 +1752,84 @@ void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     }
 }
 
-void ReplicationCoordinatorImpl::_killOperationsOnStepDown(OperationContext* opCtx) {
-    ServiceContext* environment = opCtx->getServiceContext();
-    environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToStepDown);
+void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
+    const OperationContext* stepDownOpCtx) {
+    ServiceContext* serviceCtx = stepDownOpCtx->getServiceContext();
+    invariant(serviceCtx);
 
-    // Destroy all stashed transaction resources, in order to release locks.
-    SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAbortUnpreparedTransactions(
-        opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
+    for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
+        if (!client->isFromUserConnection()) {
+            // Don't kill system operations.
+            continue;
+        }
+
+        stdx::lock_guard<Client> lk(*client);
+        OperationContext* toKill = client->getOperationContext();
+
+        // Don't kill the stepdown thread.
+        if (toKill && toKill->getOpID() != stepDownOpCtx->getOpID()) {
+            const GlobalLockAcquisitionTracker& globalLockTracker =
+                GlobalLockAcquisitionTracker::get(toKill);
+            if (closeConnectionsOnStepdown.load() || globalLockTracker.getGlobalWriteLocked() ||
+                globalLockTracker.getGlobalSharedLockTaken()) {
+                serviceCtx->killOperation(toKill, ErrorCodes::InterruptedDueToStepDown);
+            }
+        }
+    }
+}
+
+void ReplicationCoordinatorImpl::KillOpContainer::startKillOpThread() {
+    invariant(!_killOpThread);
+    _killOpThread = stdx::make_unique<stdx::thread>([this] { killOpThreadFn(); });
+}
+
+void ReplicationCoordinatorImpl::KillOpContainer::killOpThreadFn() {
+    Client::initThread("RstlKillOpthread");
+
+    invariant(!cc().isFromUserConnection());
+
+    log() << "Starting to kill user operations";
+    auto uniqueOpCtx = cc().makeOperationContext();
+    OperationContext* opCtx = uniqueOpCtx.get();
+
+    while (true) {
+        _replCord->_killUserOperationsOnStepDown(_stepDownOpCtx);
+
+        // Destroy all stashed transaction resources, in order to release locks.
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        killSessionsAbortUnpreparedTransactions(
+            opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
+
+        // Operations (like batch insert) that have currently yielded the global lock during step
+        // down can reacquire global lock in IX mode when this node steps back up after a brief
+        // network partition. And, this can lead to data inconsistency (see SERVER-27534). So,
+        // its important we mark operations killed at least once after enqueuing the RSTL lock in
+        // X mode for the first time. This ensures that no writing operations will continue
+        // after the node's term change.
+        {
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            if (_stopKillingOps.wait_for(
+                    lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
+                log() << "Stopped killing user operations";
+                _killSignaled = false;
+                return;
+            }
+        }
+    }
+}
+
+void ReplicationCoordinatorImpl::KillOpContainer::stopAndWaitForKillOpThread() {
+    if (!(_killOpThread && _killOpThread->joinable()))
+        return;
+
+    {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        _killSignaled = true;
+        _stopKillingOps.notify_all();
+    }
+    _killOpThread->join();
+    _killOpThread.reset();
 }
 
 void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
@@ -1779,14 +1849,19 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     ReplicationStateTransitionLockGuard rstlLock(
         opCtx, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
-    // Since we are in stepdown, after enqueueing the RSTL we need to kill all user operations to
-    // ensure that operations that are no longer safe to run (like writes) get killed.
-    _killOperationsOnStepDown(opCtx);
+    // Kill all write operations which are no longer safe to run on step down. Also, operations that
+    // have taken global lock in S mode will be killed to avoid 3-way deadlock between read,
+    // prepared transaction and step down thread.
+    KillOpContainer koc(this, opCtx);
+    koc.startKillOpThread();
 
-    // Using 'force' sets the default for the wait time to zero, which means the stepdown will
-    // fail if it does not acquire the lock immediately. In such a scenario, we use the
-    // stepDownUntil deadline instead.
-    rstlLock.waitForLockUntil(force ? stepDownUntil : waitUntil);
+    {
+        auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
+        // Using 'force' sets the default for the wait time to zero, which means the stepdown will
+        // fail if it does not acquire the lock immediately. In such a scenario, we use the
+        // stepDownUntil deadline instead.
+        rstlLock.waitForLockUntil(force ? stepDownUntil : waitUntil);
+    }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -1864,15 +1939,27 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 // order rules.
                 lk.unlock();
 
+                // Since we have released the RSTL lock at this point, there can be some read
+                // operations holding global S lock sneaked in here. We need to kill those
+                // operations to avoid 3-way deadlock between read, prepared transaction and
+                // step down thread. Also, its ok to start "RstlKillOpthread" thread before RSTL
+                // lock enqueue. As a result, even if we miss marking write operations killed,
+                // it doesn't lead to problems like in SERVER-27534. Since any write operations
+                // that gets sneaked in here will fail as we have updated _canAcceptNonLocalWrites
+                // to false after our first successful RSTL lock acquisition.
+                koc.startKillOpThread();
+
                 // Need to re-acquire the RSTL before re-attempting stepdown.
                 // We use no timeout here even though that means the lock acquisition could take
                 // longer than the stepdown window. Since we'll need the RSTL no matter what to
                 // clean up a failed stepdown attempt, we might as well spend whatever time we need
                 // to acquire it now.  For the same reason, we also disable lock acquisition
                 // interruption, to guarantee that we get the lock eventually.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                rstlLock.reacquire();
-                invariant(opCtx->lockState()->isRSTLExclusive());
+                {
+                    auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    rstlLock.reacquire();
+                }
 
                 lk.lock();
             });

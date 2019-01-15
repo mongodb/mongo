@@ -466,71 +466,71 @@ TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
         MODE_NONE);
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 
     {
         Lock::GlobalLock globalWrite(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockIXSetsGlobalLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockIXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
     {
         Lock::GlobalLock globalWrite(
             opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockSDoesNotSetGlobalLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockSDoesNotSetGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
     {
         Lock::GlobalLock globalRead(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockXSetsGlobalLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, DBLockXSetsGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 
     { Lock::DBLock dbWrite(opCtx, "db", MODE_X); }
-    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalLockTakenOnOperationContext) {
+TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalWriteLockedOnOperationContext) {
     auto clients = makeKClientsWithLockers(1);
     auto opCtx = clients[0].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 
     { Lock::DBLock dbRead(opCtx, "db", MODE_S); }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalLockTakenWhenLockAcquisitionTimesOut) {
+TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalWriteLockedWhenLockAcquisitionTimesOut) {
     auto clients = makeKClientsWithLockers(2);
 
     // Take a global lock so that the next one times out.
@@ -539,13 +539,113 @@ TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalLockTakenWhenLockAcqu
     ASSERT(globalWrite0.isLocked());
 
     auto opCtx = clients[1].second.get();
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
     {
         Lock::GlobalLock globalWrite1(
             opCtx, MODE_X, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kThrow);
         ASSERT_FALSE(globalWrite1.isLocked());
     }
-    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockSSetsGlobalSharedLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+
+    {
+        Lock::GlobalLock globalWrite(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        ASSERT(globalWrite.isLocked());
+    }
+    ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalSharedLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockIXDoesNotSetGlobalSharedLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalSharedLockTakenOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    {
+        Lock::GlobalLock globalRead(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        ASSERT(globalRead.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+
+    { Lock::DBLock dbWrite(opCtx, "db", MODE_S); }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockISDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+
+    { Lock::DBLock dbWrite(opCtx, "db", MODE_IS); }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockIXDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+
+    { Lock::DBLock dbWrite(opCtx, "db", MODE_IX); }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockXDoesNotSetGlobalSharedLockTakeOnOperationContext) {
+    auto clients = makeKClientsWithLockers(1);
+    auto opCtx = clients[0].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+
+    { Lock::DBLock dbRead(opCtx, "db", MODE_X); }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+}
+
+TEST_F(DConcurrencyTestFixture,
+       GlobalLockSDoesNotSetGlobalSharedLockTakenWhenLockAcquisitionTimesOut) {
+    auto clients = makeKClientsWithLockers(2);
+
+    // Take a global lock so that the next one times out.
+    Lock::GlobalLock globalWrite0(
+        clients[0].second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    ASSERT(globalWrite0.isLocked());
+
+    auto opCtx = clients[1].second.get();
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
+    {
+        Lock::GlobalLock globalWrite1(
+            opCtx, MODE_S, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kThrow);
+        ASSERT_FALSE(globalWrite1.isLocked());
+    }
+    ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalSharedLockTaken());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockS_NoTimeoutDueToGlobalLockS) {

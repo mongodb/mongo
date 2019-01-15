@@ -43,7 +43,7 @@
         assert.commandWorked(
             primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
 
-        errorCode = errorCode || ErrorCodes.InterruptedDueToStepDown;
+        errorCode = errorCode || ErrorCodes.PrimarySteppedDown;
         const writeCommand = `db.getMongo().forceWriteMode("commands");
                               assert.commandFailedWithCode(${operation}, ${errorCode});
                               assert.commandWorked(db.adminCommand({ping:1}));`;
@@ -85,6 +85,7 @@
         failpoint: "hangBeforeLinearizableReadConcern",
         operation: "db.runCommand({find: '" + collname +
             "', filter: {'_id': 'findme'}, readConcern: {level: 'linearizable'}})",
+        errorCode: ErrorCodes.NotMaster
     });
     rst.stopSet();
 })();

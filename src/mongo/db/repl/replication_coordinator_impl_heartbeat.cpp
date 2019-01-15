@@ -384,10 +384,17 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     ReplicationStateTransitionLockGuard rstlLock(
         opCtx.get(), ReplicationStateTransitionLockGuard::EnqueueOnly());
-    // Since we are in stepdown, after enqueueing the RSTL we need to kill all user operations to
-    // ensure that operations that are no longer safe to run (like writes) get killed.
-    _killOperationsOnStepDown(opCtx.get());
-    rstlLock.waitForLockUntil(Date_t::max());
+
+    // kill all write operations which are no longer safe to run on step down. Also, operations that
+    // have taken global lock in S mode will be killed to avoid 3-way deadlock between read,
+    // prepared transaction and step down thread.
+    KillOpContainer koc(this, opCtx.get());
+    koc.startKillOpThread();
+
+    {
+        auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
+        rstlLock.waitForLockUntil(Date_t::max());
+    }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 

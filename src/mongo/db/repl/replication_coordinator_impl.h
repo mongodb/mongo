@@ -461,6 +461,43 @@ private:
         kActionStartSingleNodeElection
     };
 
+    // This object handles killing user operations and aborting stashed running
+    // transactions during step down.
+    class KillOpContainer {
+    public:
+        KillOpContainer(ReplicationCoordinatorImpl* repl, OperationContext* opCtx)
+            : _replCord(repl), _stepDownOpCtx(opCtx){};
+
+        /**
+         * It will spawn a new thread killOpThread to kill user operations.
+         */
+        void startKillOpThread();
+
+        /**
+         * Loops continuously to kill all user operations that have global lock except in IS mode.
+         * And, aborts all stashed (inactive) transactions.
+         * Terminates once killSignaled is set true.
+        */
+        void killOpThreadFn();
+
+        /*
+         * Signals killOpThread to stop killing user operations.
+         */
+        void stopAndWaitForKillOpThread();
+
+    private:
+        ReplicationCoordinatorImpl* const _replCord;  // not owned.
+        OperationContext* const _stepDownOpCtx;       // not owned.
+        // Thread that will run killOpThreadFn().
+        std::unique_ptr<stdx::thread> _killOpThread;
+        // Protects killSignaled and stopKillingOps cond. variable.
+        stdx::mutex _mutex;
+        // Signals thread about the change of killSignaled value.
+        stdx::condition_variable _stopKillingOps;
+        // Once this is set to true, the killOpThreadFn method will terminate.
+        bool _killSignaled = false;
+    };
+
     // Abstract struct that holds information about clients waiting for replication.
     // Subclasses need to define how to notify them.
     struct Waiter {
@@ -941,9 +978,9 @@ private:
     executor::TaskExecutor::EventHandle _stepDownStart();
 
     /**
-     * Kills users operations and aborts unprepared transactions.
+     * kill all user operations that have taken a global lock except in IS mode.
      */
-    void _killOperationsOnStepDown(OperationContext* opCtx);
+    void _killUserOperationsOnStepDown(const OperationContext* stepDownOpCtx);
 
     /**
      * Completes a step-down of the current node.  Must be run with a global

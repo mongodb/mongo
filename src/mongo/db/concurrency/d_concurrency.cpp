@@ -220,9 +220,9 @@ void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
             throw;
     }
 
-    if (_opCtx->lockState()->isWriteLocked()) {
-        GlobalLockAcquisitionTracker::get(_opCtx).setGlobalExclusiveLockTaken();
-    }
+    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    auto lockMode = _opCtx->lockState()->getLockMode(globalResId);
+    GlobalLockAcquisitionTracker::get(_opCtx).setGlobalLockModeBit(lockMode);
 }
 
 void Lock::GlobalLock::_unlock() {
