@@ -23,7 +23,7 @@ func init() {
 }
 
 func TestEscape(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("with a few strings", t, func() {
 		So(Escape("(blah)"), ShouldEqual, "(blah)")
@@ -34,7 +34,7 @@ func TestEscape(t *testing.T) {
 }
 
 func TestUnescape(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("with a few escaped strings", t, func() {
 		So(Unescape("(blah)"), ShouldEqual, "(blah)")
@@ -45,7 +45,7 @@ func TestUnescape(t *testing.T) {
 }
 
 func TestReplacer(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("with replacements", t, func() {
 		Convey(`'$db$.user$$' -> 'test.user$$_$db$', 'pr\*d\.*' -> 'st\*g\\ing.*'`, func() {
@@ -87,7 +87,7 @@ func TestReplacer(t *testing.T) {
 }
 
 func TestMatcher(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("with matcher", t, func() {
 		Convey(`'*.user*', 'pr\*d\.*'`, func() {

@@ -17,7 +17,7 @@ import (
 )
 
 func TestWriteJSON(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a JSON export output", t, func() {
 		out := &bytes.Buffer{}
@@ -45,7 +45,7 @@ func TestWriteJSON(t *testing.T) {
 }
 
 func TestJSONArray(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a JSON export output in array mode", t, func() {
 		out := &bytes.Buffer{}

@@ -352,7 +352,7 @@ func testQuery(md *MongoDump, session *mgo.Session) string {
 }
 
 func TestMongoDumpValidateOptions(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a MongoDump instance", t, func() {
 		md := simpleMongoDumpInstance()
@@ -380,7 +380,7 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 }
 
 func TestMongoDumpKerberos(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.KerberosTestType)
+	testtype.SkipUnlessTestType(t, testtype.KerberosTestType)
 
 	Convey("Should be able to run mongodump with Kerberos auth", t, func() {
 		opts, err := testutil.GetKerberosOptions()
@@ -419,7 +419,7 @@ func TestMongoDumpKerberos(t *testing.T) {
 }
 
 func TestMongoDumpBSON(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	log.SetWriter(ioutil.Discard)
 
 	Convey("With a MongoDump instance", t, func() {
@@ -629,7 +629,7 @@ func TestMongoDumpBSON(t *testing.T) {
 }
 
 func TestMongoDumpMetaData(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	log.SetWriter(ioutil.Discard)
 
 	Convey("With a MongoDump instance", t, func() {
@@ -714,7 +714,7 @@ func TestMongoDumpMetaData(t *testing.T) {
 }
 
 func TestMongoDumpOplog(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")

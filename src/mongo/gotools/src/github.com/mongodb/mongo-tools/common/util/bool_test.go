@@ -7,6 +7,7 @@
 package util
 
 import (
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"math"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestJSTruthyValues(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With some sample values", t, func() {
 		Convey("known server code edge cases are correct", func() {
 			Convey("true -> true", func() {

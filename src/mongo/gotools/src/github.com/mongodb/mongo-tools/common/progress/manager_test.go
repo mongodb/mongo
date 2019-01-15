@@ -8,6 +8,7 @@ package progress
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"strconv"
 	"strings"
@@ -40,6 +41,7 @@ func (b *safeBuffer) Reset() {
 }
 
 func TestManagerAttachAndDetach(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	writeBuffer := new(safeBuffer)
 	var manager *BarWriter
 
@@ -111,6 +113,7 @@ func TestManagerAttachAndDetach(t *testing.T) {
 }
 
 func TestManagerStartAndStop(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	writeBuffer := new(safeBuffer)
 	var manager *BarWriter
 
@@ -143,6 +146,7 @@ func TestManagerStartAndStop(t *testing.T) {
 }
 
 func TestNumberOfWrites(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var cw *CountWriter
 	var manager *BarWriter
 	Convey("With a test manager and counting writer", t, func() {

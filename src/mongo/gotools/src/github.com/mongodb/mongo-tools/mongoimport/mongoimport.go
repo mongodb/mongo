@@ -537,6 +537,7 @@ func (up *upserter) Insert(doc interface{}) error {
 	selector := constructUpsertDocument(up.imp.upsertFields, document)
 	var err error
 	if selector == nil { // modeInsert || doc-not-exist
+		log.Logvf(log.Info, "Could not construct selector from %v, falling back to insert mode", up.imp.upsertFields)
 		err = up.collection.Insert(document)
 	} else if up.imp.IngestOptions.Mode == modeUpsert {
 		_, err = up.collection.Upsert(selector, document)

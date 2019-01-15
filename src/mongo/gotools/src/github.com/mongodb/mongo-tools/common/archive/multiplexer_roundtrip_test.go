@@ -16,6 +16,7 @@ import (
 
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -61,6 +62,7 @@ type testNotifier struct{}
 func (n *testNotifier) Notify() {}
 
 func TestBasicMux(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var err error
 
 	Convey("with 10000 docs in each of five collections", t, func() {
@@ -123,6 +125,7 @@ func TestBasicMux(t *testing.T) {
 }
 
 func TestParallelMux(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("parallel mux/demux over a pipe", t, func() {
 		readPipe, writePipe, err := os.Pipe()
 		So(err, ShouldBeNil)

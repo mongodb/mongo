@@ -21,7 +21,7 @@ const ExistsDB = "restore_collection_exists"
 
 func TestCollectionExists(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
@@ -82,7 +82,7 @@ func TestCollectionExists(t *testing.T) {
 
 func TestGetDumpAuthVersion(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	restore := &MongoRestore{}
 
 	Convey("With a test mongorestore", t, func() {

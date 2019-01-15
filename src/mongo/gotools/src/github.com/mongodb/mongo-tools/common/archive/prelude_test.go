@@ -11,10 +11,12 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	//	"gopkg.in/mgo.v2/bson"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	"testing"
 )
 
 func TestPrelude(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var err error
 
 	Convey("WritePrelude/ReadPrelude roundtrip", t, func() {

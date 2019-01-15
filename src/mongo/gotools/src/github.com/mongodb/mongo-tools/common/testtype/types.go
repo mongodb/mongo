@@ -7,8 +7,7 @@
 package testtype
 
 import (
-	"flag"
-	"strings"
+	"os"
 	"testing"
 )
 
@@ -16,48 +15,43 @@ const (
 	// Integration tests require a mongod running on localhost:33333. If your
 	// mongod uses SSL you need to specify the "ssl" type below, and ditto for
 	// if your mongod requires auth.
-	IntegrationTestType = "integration"
+	// First checks for a URI for a Mongod in the env variable TOOLS_TESTING_MONGOD. If it does not find it, looks on localhost:33333
+	IntegrationTestType = "TOOLS_TESTING_INTEGRATION"
 
 	// Unit tests don't require a real mongod. They may still do file I/O.
-	UnitTestType = "unit"
+	UnitTestType = "TOOLS_TESTING_UNIT"
 
 	// Kerberos tests are a special type of integration test that test tools
 	// with Kerberos authentication against the drivers Kerberos testing cluster
 	// because setting up a KDC every time is too brittle and expensive.
 	// (See https://wiki.mongodb.com/display/DH/Testing+Kerberos)
-	KerberosTestType = "kerberos"
+	KerberosTestType = "TOOLS_TESTING_KERBEROS"
 
-	// "ssl" and "auth" are used to configure integration tests to run against
-	// different mongod configurations. "ssl" will configure the integration tests
-	// to expect an SSL-enabled mongod on localhost:33333. "auth" will do the same
+	// "TOOLS_TESTING_SSL" and "TOOLS_TESTING_AUTH" are used to configure integration tests to run against
+	// different mongod configurations. "TOOLS_TESTING_SSL" will configure the integration tests
+	// to expect an SSL-enabled mongod on localhost:33333. "TOOLS_TESTING_AUTH" will do the same
 	// for an auth-enabled mongod on localhost:33333.
-	SSLTestType  = "ssl"
-	AuthTestType = "auth"
-)
+	SSLTestType  = "TOOLS_TESTING_SSL"
+	AuthTestType = "TOOLS_TESTING_AUTH"
 
-var (
-	// the types of tests that should be run
-	testTypes = flag.String("test.types", UnitTestType, "Comma-separated list of the"+
-		" types of tests to be run")
+	// For now mongoreplay tests are unique, and will have to be explicitly run.
+	MongoReplayTestType = "TOOLS_TESTING_REPLAY"
 )
 
 func HasTestType(testType string) bool {
-	if !flag.Parsed() {
-		flag.Parse()
-	}
-
-	// skip the test if the passed-in type is not being run
-	for _, typ := range strings.Split(*testTypes, ",") {
-		if typ == testType {
-			return true
-		}
-	}
-	return false
+	envVal := os.Getenv(testType)
+	return envVal == "true"
 }
 
 // Skip the test if the specified type is not being run.
-func VerifyTestType(t *testing.T, testType string) {
+func SkipUnlessTestType(t *testing.T, testType string) {
 	if !HasTestType(testType) {
 		t.SkipNow()
+	}
+}
+
+func SkipUnlessBenchmarkType(b *testing.B, testType string) {
+	if !HasTestType(testType) {
+		b.SkipNow()
 	}
 }

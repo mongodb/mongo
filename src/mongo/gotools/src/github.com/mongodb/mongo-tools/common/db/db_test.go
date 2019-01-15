@@ -18,7 +18,9 @@ import (
 
 func TestNewSessionProvider(t *testing.T) {
 
-	testtype.VerifyTestType(t, "db")
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	auth := DBGetAuthOptions()
+	ssl := DBGetSSLOptions()
 
 	Convey("When initializing a session provider", t, func() {
 
@@ -28,13 +30,15 @@ func TestNewSessionProvider(t *testing.T) {
 				Connection: &options.Connection{
 					Port: DefaultTestPort,
 				},
-				SSL:  &options.SSL{},
-				Auth: &options.Auth{},
+				SSL:  &ssl,
+				Auth: &auth,
 			}
 			provider, err := NewSessionProvider(opts)
 			So(err, ShouldBeNil)
-			So(reflect.TypeOf(provider.connector), ShouldEqual,
-				reflect.TypeOf(&VanillaDBConnector{}))
+			if !testtype.HasTestType(testtype.SSLTestType) {
+				So(reflect.TypeOf(provider.connector), ShouldEqual,
+					reflect.TypeOf(&VanillaDBConnector{}))
+			}
 
 			Convey("and should be closeable", func() {
 				provider.Close()
@@ -48,8 +52,8 @@ func TestNewSessionProvider(t *testing.T) {
 				Connection: &options.Connection{
 					Port: DefaultTestPort,
 				},
-				SSL:  &options.SSL{},
-				Auth: &options.Auth{},
+				SSL:  &ssl,
+				Auth: &auth,
 			}
 			provider, err := NewSessionProvider(opts)
 			So(err, ShouldBeNil)
@@ -74,15 +78,17 @@ func TestNewSessionProvider(t *testing.T) {
 
 func TestGetIndexes(t *testing.T) {
 
-	testtype.VerifyTestType(t, "db")
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 
 	Convey("With a valid session", t, func() {
+		auth := DBGetAuthOptions()
+		ssl := DBGetSSLOptions()
 		opts := options.ToolOptions{
 			Connection: &options.Connection{
 				Port: DefaultTestPort,
 			},
-			SSL:  &options.SSL{},
-			Auth: &options.Auth{},
+			SSL:  &ssl,
+			Auth: &auth,
 		}
 		provider, err := NewSessionProvider(opts)
 		So(err, ShouldBeNil)

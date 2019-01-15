@@ -8,12 +8,14 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
 )
 
 func TestDecodeBsonD(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("When unmarshalling JSON into a bson.D", t, func() {
 		Convey("a document should be stored with keys in the same order", func() {
 			data := `{"a":1, "b":2, "c":3, "d":4, "e":5, "f":6}`

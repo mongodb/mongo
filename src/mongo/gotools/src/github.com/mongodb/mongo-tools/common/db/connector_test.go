@@ -15,12 +15,15 @@ import (
 	"github.com/mongodb/mongo-tools/common/testtype"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2"
 )
 
 func TestVanillaDBConnector(t *testing.T) {
 
-	testtype.VerifyTestType(t, "db")
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
+	// VanillaDBConnector can't connect if SSL or Auth are enabled
+	if testtype.HasTestType(testtype.SSLTestType) || testtype.HasTestType(testtype.AuthTestType) {
+		t.SkipNow()
+	}
 
 	Convey("With a vanilla db connector", t, func() {
 
@@ -72,21 +75,16 @@ func TestVanillaDBConnector(t *testing.T) {
 }
 
 func TestVanillaDBConnectorWithAuth(t *testing.T) {
-	testtype.VerifyTestType(t, "auth")
-	session, err := mgo.Dial("localhost:33333")
-	if err != nil {
-		t.Fatalf("error dialing server: %v", err)
+	testtype.SkipUnlessTestType(t, testtype.AuthTestType)
+	// VanillaDBConnector can't connect if SSL is enabled
+	if testtype.HasTestType(testtype.SSLTestType) {
+		t.SkipNow()
 	}
-
-	err = testutil.CreateUserAdmin(session)
-	So(err, ShouldBeNil)
-	err = testutil.CreateUserWithRole(session, "cAdmin", "password",
-		mgo.RoleClusterAdmin, true)
-	So(err, ShouldBeNil)
-	session.Close()
 
 	Convey("With a vanilla db connector and a mongod running with"+
 		" auth", t, func() {
+
+		auth := testutil.GetAuthOptions()
 
 		var connector *db.VanillaDBConnector
 
@@ -123,10 +121,7 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 					Host: "localhost",
 					Port: db.DefaultTestPort,
 				},
-				Auth: &options.Auth{
-					Username: "cAdmin",
-					Password: "password",
-				},
+				Auth: &auth,
 			}
 			So(connector.Configure(opts), ShouldBeNil)
 

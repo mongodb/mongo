@@ -8,12 +8,14 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
 )
 
 func TestDBPointerValue(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Unmarshalling JSON with DBPointer values", t, func() {
 		key := "key"

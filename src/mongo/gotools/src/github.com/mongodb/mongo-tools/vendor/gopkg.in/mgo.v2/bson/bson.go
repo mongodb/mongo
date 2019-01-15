@@ -112,6 +112,16 @@ var SetZero = errors.New("set to zero")
 // undefined ordered. See also the bson.D type for an ordered alternative.
 type M map[string]interface{}
 
+// MarshalBSON marshals the document to BSON.
+func (m M) MarshalBSON() ([]byte, error) {
+	return Marshal(m)
+}
+
+// UnmarshalBSON unmarshals BSON into the document.
+func (m *M) UnmarshalBSON(data []byte) error {
+	return Unmarshal(data, m)
+}
+
 // D represents a BSON document containing ordered elements. For example:
 //
 //     bson.D{{"a", 1}, {"b", true}}
@@ -120,6 +130,16 @@ type M map[string]interface{}
 // which the elements are defined is important.  If the order is not important,
 // using a map is generally more comfortable. See bson.M and bson.RawD.
 type D []DocElem
+
+// MarshalBSON marshals the document to BSON.
+func (d D) MarshalBSON() ([]byte, error) {
+	return Marshal(d)
+}
+
+// UnmarshalBSON unmarshals BSON into the document.
+func (d *D) UnmarshalBSON(data []byte) error {
+	return Unmarshal(data, d)
+}
 
 // DocElem is an element of the bson.D document representation.
 type DocElem struct {
@@ -155,6 +175,16 @@ type Raw struct {
 // documents of uncertain content, or when manipulating the raw content
 // documents in general.
 type RawD []RawDocElem
+
+// MarshalBSON marshals the document to BSON.
+func (d RawD) MarshalBSON() ([]byte, error) {
+	return Marshal(d)
+}
+
+// UnmarshalBSON unmarshals BSON into the document.
+func (d *RawD) UnmarshalBSON(data []byte) error {
+	return Unmarshal(data, d)
+}
 
 // See the RawD type.
 type RawDocElem struct {

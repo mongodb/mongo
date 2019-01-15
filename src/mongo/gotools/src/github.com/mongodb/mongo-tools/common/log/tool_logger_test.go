@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -25,6 +26,7 @@ func (v verbosity) IsQuiet() bool { return v.Q }
 func (v verbosity) Level() int    { return v.L }
 
 func TestBasicToolLoggerFunctionality(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var tl *ToolLogger
 
 	oldTime := time.Now()
@@ -73,6 +75,7 @@ func TestBasicToolLoggerFunctionality(t *testing.T) {
 }
 
 func TestGlobalToolLoggerFunctionality(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	globalToolLogger = nil // just to be sure
 
 	Convey("With an initialized global ToolLogger", t, func() {
@@ -89,6 +92,7 @@ func TestGlobalToolLoggerFunctionality(t *testing.T) {
 }
 
 func TestToolLoggerWriter(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a tool logger that writes to a buffer", t, func() {
 		buff := bytes.NewBuffer(make([]byte, 1024))
 		tl := NewToolLogger(&verbosity{L: 3})

@@ -15,7 +15,7 @@ import (
 
 func TestParseConnectionString(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When extracting the replica set and hosts from a connection"+
 		" url", t, func() {
@@ -47,7 +47,7 @@ func TestParseConnectionString(t *testing.T) {
 
 func TestCreateConnectionAddrs(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When creating the slice of connection addresses", t, func() {
 
@@ -72,6 +72,8 @@ func TestCreateConnectionAddrs(t *testing.T) {
 }
 
 func TestInvalidNames(t *testing.T) {
+
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Checking some invalid collection names, ", t, func() {
 		Convey("test.col$ is invalid", func() {

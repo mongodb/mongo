@@ -7,12 +7,14 @@
 package text
 
 import (
+	"github.com/mongodb/mongo-tools/common/testtype"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestFormatByteCount(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With some sample byte amounts", t, func() {
 		Convey("0 Bytes -> 0B", func() {
 			So(FormatByteAmount(0), ShouldEqual, "0B")
@@ -36,6 +38,7 @@ func TestFormatByteCount(t *testing.T) {
 }
 
 func TestOtherByteFormats(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With some sample byte amounts", t, func() {
 		Convey("with '10'", func() {
 			Convey("FormatMegabyteAmount -> 10.0M", func() {
@@ -64,6 +67,7 @@ func TestOtherByteFormats(t *testing.T) {
 }
 
 func TestBitFormatPrecision(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With values less than 1k", t, func() {
 		Convey("with '999'", func() {
 			Convey("FormatBits -> 999b", func() {

@@ -1,0 +1,118 @@
+# Gopkg.toml example
+#
+# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#   name = "github.com/x/y"
+#   version = "2.4.0"
+#
+# [prune]
+#   non-go = false
+#   go-tests = true
+#   unused-packages = true
+
+# mongo-lint is a custom linter that is not called in any of the go code.
+required = ["github.com/3rf/mongo-lint"]
+
+[[constraint]]
+  name = "github.com/10gen/escaper"
+  revision = "17fe61c658dcbdcbf246c783f4f7dc97efde3a8b"
+
+[[constraint]]
+  name = "github.com/10gen/llmgo"
+  revision = "afcced55e92d9b6b93ccf32508238c08cfbaddb8"
+
+[[constraint]]
+  name = "github.com/10gen/openssl"
+  revision = "812b95859f13cba543f6ad860fcff4bb0f7fcdaa"
+
+[[constraint]]
+  name = "github.com/google/gopacket"
+  revision = "1b0b78901cdd351ecfc68bf1a2adafcd2ff30220"
+
+[[constraint]]
+  name = "github.com/howeyc/gopass"
+  revision = "44476384cd4721b68705e72f19e95d1a3a504370"
+
+[[constraint]]
+  name = "github.com/jessevdk/go-flags"
+  revision = "97448c91aac742cbca3d020b3e769013a420a06f"
+
+[[constraint]]
+  name = "github.com/nsf/termbox-go"
+  revision = "0723e7c3d0a317dea811f0fbe4d6edd81908c971"
+
+[[constraint]]
+  name = "github.com/patrickmn/go-cache"
+  revision = "1881a9bccb818787f68c52bfba648c6cf34c34fa"
+
+[[constraint]]
+  name = "github.com/smartystreets/goconvey"
+  revision = "bf58a9a1291224109919756b4dcc469c670cc7e4"
+
+[[constraint]]
+  name = "golang.org/x/crypto"
+  revision = "1f22c0103821b9390939b6776727195525381532"
+
+[[override]]
+  name = "gopkg.in/mgo.v2"
+  source = "github.com/10gen/mgo"
+  revision = "8c133fd1d0fc316302df84fc12769e17fb473bb1"
+
+[[constraint]]
+  name = "gopkg.in/tomb.v2"
+  revision = "14b3d72120e8d10ea6e6b7f87f7175734b1faab8"
+
+[[override]]
+  name = "github.com/jtolds/gls"
+  revision = "8ddce2a84170772b95dd5d576c48d517b22cac63"
+
+[[override]]
+  name = "github.com/jacobsa/oglematchers"
+  revision = "3ecefc49db07722beca986d9bb71ddd026b133f0"
+
+[[override]]
+  name = "github.com/smartystreets/assertions"
+  revision = "287b4346dc4e71a038c346375a9d572453bc469b"
+
+[[override]]
+  name = "github.com/3rf/mongo-lint"
+  revision = "3550fdcf1f43b89aaeabaa4559eaae6dc4407e42"
+
+[[override]]
+  name = "github.com/spacemonkeygo/spacelog"
+  revision = "f936fb050dc6b5fe4a96b485a6f069e8bdc59aeb"
+
+[[override]]
+  name = "github.com/mattn/go-runewidth"
+  revision = "d6bea18f789704b5f83375793155289da36a3c7f"
+
+[[override]]
+  name = "github.com/golang/snappy"
+  revision = "d9eb7a3d35ec988b8585d4a0068e462c27d28380"
+
+[[override]]
+  name = "github.com/xdp/stringprep"
+  version = "v1.0.0"
+
+[[override]]
+  name = "github.com/golang/text"
+  version = "v0.3.0"
+
+[prune]
+  go-tests = true
+  # unused-packages = true
+

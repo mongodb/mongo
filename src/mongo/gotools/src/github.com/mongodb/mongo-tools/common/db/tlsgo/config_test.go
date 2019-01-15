@@ -8,7 +8,7 @@ import (
 )
 
 func TestAddClientCert(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	cases := []struct {
 		Path  string

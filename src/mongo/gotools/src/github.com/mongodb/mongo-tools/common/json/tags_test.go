@@ -10,10 +10,12 @@
 package json
 
 import (
+	"github.com/mongodb/mongo-tools/common/testtype"
 	"testing"
 )
 
 func TestTagParsing(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	name, opts := parseTag("field,foobar,foo")
 	if name != "field" {
 		t.Fatalf("name = %q, want field", name)

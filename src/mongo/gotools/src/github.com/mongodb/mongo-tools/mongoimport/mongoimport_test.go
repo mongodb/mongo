@@ -57,6 +57,23 @@ func checkOnlyHasDocuments(sessionProvider db.SessionProvider, expectedDocuments
 	return nil
 }
 
+func countDocuments(sessionProvider *db.SessionProvider) (int, error) {
+	session, err := (*sessionProvider).GetSession()
+	if err != nil {
+		return 0, err
+	}
+	defer session.Close()
+
+	collection := session.DB(testDb).C(testCollection)
+	dbDocuments := []bson.M{}
+	// Count via scan because 'count' command can be an approximation
+	err = collection.Find(nil).All(&dbDocuments)
+	if err != nil {
+		return 0, err
+	}
+	return len(dbDocuments), nil
+}
+
 // getBasicToolOptions returns a test helper to instantiate the session provider
 // for calls to StreamDocument
 func getBasicToolOptions() *options.ToolOptions {
@@ -101,7 +118,7 @@ func NewMongoImport() (*MongoImport, error) {
 }
 
 func TestSplitInlineHeader(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("handle normal, untyped headers", t, func() {
 		fields := []string{"foo.bar", "baz", "boo"}
 		header := strings.Join(fields, ",")
@@ -126,7 +143,7 @@ func TestSplitInlineHeader(t *testing.T) {
 }
 
 func TestMongoImportValidateSettings(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no collection is given", func() {
@@ -363,7 +380,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 }
 
 func TestGetSourceReader(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Given a mongoimport instance, on calling getSourceReader", t,
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
@@ -397,7 +414,7 @@ func TestGetSourceReader(t *testing.T) {
 }
 
 func TestGetInputReader(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("should parse --fields using valid csv escaping", func() {
 			imp, err := NewMongoImport()
@@ -499,7 +516,7 @@ func TestGetInputReader(t *testing.T) {
 }
 
 func TestImportDocuments(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	Convey("With a mongoimport instance", t, func() {
 		Reset(func() {
 			sessionProvider, err := db.NewSessionProvider(*getBasicToolOptions())
@@ -511,7 +528,7 @@ func TestImportDocuments(t *testing.T) {
 				t.Fatalf("error getting session: %v", err)
 			}
 			defer session.Close()
-			session.DB(testDb).C(testCollection).DropCollection()
+			session.DB(testDb).C(testCollection).RemoveAll(nil)
 		})
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
@@ -782,11 +799,42 @@ func TestImportDocuments(t *testing.T) {
 			_, err = imp.ImportDocuments()
 			So(err, ShouldNotBeNil)
 		})
+		Convey("CSV import with --mode=upsert/--upsertFields with a nested upsert field should succeed when repeated", func() {
+			imp, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			imp.InputOptions.Type = CSV
+			imp.InputOptions.File = "testdata/test_nested_upsert.csv"
+			imp.InputOptions.HeaderLine = true
+			imp.IngestOptions.Mode = modeUpsert
+			imp.upsertFields = []string{"level1.level2.key1"}
+			numImported, err := imp.ImportDocuments()
+			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 1)
+			n, err := countDocuments(imp.SessionProvider)
+			So(err, ShouldBeNil)
+			So(n, ShouldEqual, 1)
+
+			// Repeat must succeed
+			imp, err = NewMongoImport()
+			So(err, ShouldBeNil)
+			imp.InputOptions.Type = CSV
+			imp.InputOptions.File = "testdata/test_nested_upsert.csv"
+			imp.InputOptions.HeaderLine = true
+			imp.IngestOptions.Mode = modeUpsert
+			imp.upsertFields = []string{"level1.level2.key1"}
+			numImported, err = imp.ImportDocuments()
+			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 1)
+			n, err = countDocuments(imp.SessionProvider)
+			So(err, ShouldBeNil)
+			So(n, ShouldEqual, 1)
+		})
 	})
 }
 
 // Regression test for TOOLS-1694 to prevent issue from TOOLS-1115
 func TestHiddenOptionsDefaults(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a new mongoimport with empty options", t, func() {
 		imp, err := NewMongoImport()
 		imp.ToolOptions = options.New("", "", options.EnabledOptions{})

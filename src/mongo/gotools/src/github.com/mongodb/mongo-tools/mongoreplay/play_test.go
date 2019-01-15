@@ -11,9 +11,12 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/mongodb/mongo-tools/common/testtype"
 )
 
 func TestRepeatGeneration(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	recOp := &RecordedOp{
 		Seen: &PreciseTime{time.Now()},
 	}
@@ -67,6 +70,7 @@ func TestRepeatGeneration(t *testing.T) {
 }
 
 func TestPlayOpEOF(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	ops := []RecordedOp{{
 		Seen: &PreciseTime{time.Now()},
 	}, {

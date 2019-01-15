@@ -54,7 +54,7 @@ static int importCertStoreToX509_STORE(
     int status = 1;
     X509* x509Cert = NULL;
     HCERTSTORE systemStore =
-        CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, (HCRYPTPROV)NULL, storeLocation, storeName);
+        CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, (HCRYPTPROV)NULL, storeLocation | CERT_STORE_READONLY_FLAG, storeName);
     if (systemStore == NULL) {
 	formatError(GetLastError(),"error opening system CA store",err,err_len);
         status = 0;

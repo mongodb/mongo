@@ -18,8 +18,8 @@ import (
 var (
 	UserAdmin              = "uAdmin"
 	UserAdminPassword      = "password"
-	CreatedUserNameEnv     = "AUTH_USERNAME"
-	CreatedUserPasswordEnv = "AUTH_PASSWORD"
+	CreatedUserNameEnv     = "TOOLS_TESTING_AUTH_USERNAME"
+	CreatedUserPasswordEnv = "TOOLS_TESTING_AUTH_PASSWORD"
 )
 
 // Initialize a user admin, using the already-connected session passed in.

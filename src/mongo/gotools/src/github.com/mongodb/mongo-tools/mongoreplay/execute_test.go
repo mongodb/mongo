@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	mgo "github.com/10gen/llmgo"
+	"github.com/mongodb/mongo-tools/common/testtype"
 )
 
 func TestCompleteReply(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	context := NewExecutionContext(&StatCollector{}, nil, &ExecutionOptions{})
 
 	// AddFromWire takes a recorded request and a live reply to the re-execution

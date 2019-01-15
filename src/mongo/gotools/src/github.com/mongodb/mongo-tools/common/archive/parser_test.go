@@ -12,6 +12,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -52,6 +53,7 @@ var term = []byte{0xFF, 0xFF, 0xFF, 0xFF}
 var notTerm = []byte{0xFF, 0xFF, 0xFF, 0xFE}
 
 func TestParsing(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a parser with a simple parser consumer", t, func() {
 		tc := &testConsumer{}

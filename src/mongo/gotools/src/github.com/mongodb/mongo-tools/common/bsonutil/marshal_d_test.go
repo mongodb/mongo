@@ -8,6 +8,7 @@ package bsonutil
 
 import (
 	"encoding/json"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"strings"
@@ -15,6 +16,7 @@ import (
 )
 
 func TestMarshalDMarshalJSON(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a valid bson.D", t, func() {
 		testD := bson.D{
@@ -82,6 +84,7 @@ func TestMarshalDMarshalJSON(t *testing.T) {
 }
 
 func TestFindValueByKey(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Given a bson.D document and a specific key", t, func() {
 		subDocument := &bson.D{
 			bson.DocElem{Name: "field4", Value: "c"},
@@ -110,6 +113,7 @@ func TestFindValueByKey(t *testing.T) {
 }
 
 func TestEscapedKey(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Given a bson.D document with a key that requires escaping", t, func() {
 		document := bson.D{
 			bson.DocElem{Name: `foo"bar`, Value: "a"},

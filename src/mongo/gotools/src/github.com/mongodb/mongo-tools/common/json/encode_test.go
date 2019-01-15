@@ -15,6 +15,8 @@ import (
 	"reflect"
 	"testing"
 	"unicode"
+
+	"github.com/mongodb/mongo-tools/common/testtype"
 )
 
 type Optionals struct {
@@ -57,6 +59,7 @@ var optionalsExpected = `{
 }`
 
 func TestOmitEmpty(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var o Optionals
 	o.Sw = "something"
 	o.Mr = map[string]interface{}{}
@@ -84,6 +87,7 @@ var stringTagExpected = `{
 }`
 
 func TestStringTag(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var s StringTag
 	s.BoolStr = true
 	s.IntStr = 42
@@ -113,6 +117,7 @@ type renamedByteSlice []byte
 type renamedRenamedByteSlice []renamedByte
 
 func TestEncodeRenamedByteSlice(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	s := renamedByteSlice("abc")
 	result, err := Marshal(s)
 	if err != nil {
@@ -133,6 +138,7 @@ func TestEncodeRenamedByteSlice(t *testing.T) {
 }
 
 func TestFloatSpecialValues(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	_, err := Marshal(math.NaN())
 	if err != nil {
 		t.Errorf("Got error for NaN: %v", err)
@@ -188,6 +194,7 @@ func (ValText) MarshalText() ([]byte, error) {
 }
 
 func TestRefValMarshal(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var s = struct {
 		R0 Ref
 		R1 *Ref
@@ -232,6 +239,7 @@ func (CText) MarshalText() ([]byte, error) {
 }
 
 func TestMarshalerEscaping(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var c C1
 	want := `"\u003c\u0026\u003e"`
 	b, err := Marshal(c)
@@ -260,6 +268,7 @@ type MyStruct struct {
 }
 
 func TestAnonymousNonstruct(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var i IntType = 11
 	a := MyStruct{i}
 	const want = `{"IntType":11}`
@@ -295,6 +304,7 @@ type BugX struct {
 
 // Issue 5245.
 func TestEmbeddedBug(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	v := BugB{
 		BugA{"A"},
 		"B",
@@ -335,6 +345,7 @@ type BugY struct {
 
 // Test that a field with a tag dominates untagged fields.
 func TestTaggedFieldDominates(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	v := BugY{
 		BugA{"BugA"},
 		BugD{"BugD"},
@@ -358,6 +369,7 @@ type BugZ struct {
 }
 
 func TestDuplicatedFieldDisappears(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	v := BugZ{
 		BugA{"BugA"},
 		BugC{"BugC"},
@@ -378,6 +390,7 @@ func TestDuplicatedFieldDisappears(t *testing.T) {
 }
 
 func TestStringBytes(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	// Test that encodeState.stringBytes and encodeState.string use the same encoding.
 	es := &encodeState{}
 	var r []rune
@@ -424,6 +437,7 @@ func TestStringBytes(t *testing.T) {
 }
 
 func TestIssue6458(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	type Foo struct {
 		M RawMessage
 	}
@@ -448,6 +462,7 @@ func TestIssue6458(t *testing.T) {
 }
 
 func TestHTMLEscape(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var b, want bytes.Buffer
 	m := `{"M":"<html>foo &` + "\xe2\x80\xa8 \xe2\x80\xa9" + `</html>"}`
 	want.Write([]byte(`{"M":"\u003chtml\u003efoo \u0026\u2028 \u2029\u003c/html\u003e"}`))

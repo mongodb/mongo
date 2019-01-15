@@ -18,7 +18,7 @@ import (
 )
 
 func TestJSONArrayStreamDocument(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a JSON array input reader", t, func() {
 		var jsonFile, fileHandle *os.File
 		Convey("an error should be thrown if a plain JSON document is supplied", func() {
@@ -81,7 +81,7 @@ func TestJSONArrayStreamDocument(t *testing.T) {
 }
 
 func TestJSONPlainStreamDocument(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a plain JSON input reader", t, func() {
 		var jsonFile, fileHandle *os.File
 		Convey("string valued JSON documents should be imported properly", func() {
@@ -184,7 +184,7 @@ func TestJSONPlainStreamDocument(t *testing.T) {
 }
 
 func TestReadJSONArraySeparator(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With an array JSON input reader", t, func() {
 		Convey("reading a JSON array separator should consume [",
 			func() {
@@ -250,7 +250,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 }
 
 func TestJSONConvert(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a JSON input reader", t, func() {
 		Convey("calling convert on a JSONConverter should return the expected BSON document", func() {
 			jsonConverter := JSONConverter{

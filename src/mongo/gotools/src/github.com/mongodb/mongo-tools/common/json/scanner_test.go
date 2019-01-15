@@ -11,6 +11,7 @@ package json
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	"math"
 	"math/rand"
 	"reflect"
@@ -49,6 +50,7 @@ var ex1i = `[
 ]`
 
 func TestCompact(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var buf bytes.Buffer
 	for _, tt := range examples {
 		buf.Reset()
@@ -69,6 +71,7 @@ func TestCompact(t *testing.T) {
 }
 
 func TestCompactSeparators(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	// U+2028 and U+2029 should be escaped inside strings.
 	// They should not appear outside strings.
 	tests := []struct {
@@ -88,6 +91,7 @@ func TestCompactSeparators(t *testing.T) {
 }
 
 func TestIndent(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	var buf bytes.Buffer
 	for _, tt := range examples {
 		buf.Reset()
@@ -110,6 +114,7 @@ func TestIndent(t *testing.T) {
 // Tests of a large random structure.
 
 func TestCompactBig(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	initBig()
 	var buf bytes.Buffer
 	if err := Compact(&buf, jsonBig); err != nil {
@@ -124,6 +129,7 @@ func TestCompactBig(t *testing.T) {
 }
 
 func TestIndentBig(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	initBig()
 	var buf bytes.Buffer
 	if err := Indent(&buf, jsonBig, "", "\t"); err != nil {
@@ -172,6 +178,7 @@ var indentErrorTests = []indentErrorTest{
 }
 
 func TestIndentErrors(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	for i, tt := range indentErrorTests {
 		var slice []uint8
 		buf := bytes.NewBuffer(slice)
@@ -185,6 +192,7 @@ func TestIndentErrors(t *testing.T) {
 }
 
 func TestNextValueBig(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	initBig()
 	var scan scanner
 	item, rest, err := nextValue(jsonBig, &scan)
@@ -213,6 +221,7 @@ func TestNextValueBig(t *testing.T) {
 var benchScan scanner
 
 func BenchmarkSkipValue(b *testing.B) {
+	testtype.SkipUnlessBenchmarkType(b, testtype.UnitTestType)
 	initBig()
 	for i := 0; i < b.N; i++ {
 		nextValue(jsonBig, &benchScan)
@@ -221,6 +230,7 @@ func BenchmarkSkipValue(b *testing.B) {
 }
 
 func diff(t *testing.T, a, b []byte) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	for i := 0; ; i++ {
 		if i >= len(a) || i >= len(b) || a[i] != b[i] {
 			j := i - 10

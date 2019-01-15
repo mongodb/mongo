@@ -8,12 +8,14 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"math"
 	"testing"
 )
 
 func TestInfinityValue(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When unmarshalling JSON with Infinity values", t, func() {
 

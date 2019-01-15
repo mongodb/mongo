@@ -19,7 +19,7 @@ import (
 )
 
 func TestKerberos(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.KerberosTestType)
+	testtype.SkipUnlessTestType(t, testtype.KerberosTestType)
 
 	Convey("Should be able to run mongoexport with Kerberos auth", t, func() {
 		opts, err := testutil.GetKerberosOptions()

@@ -33,7 +33,7 @@ func readBSONFile(file string, t *testing.T) (stat *status.ServerStatus) {
 }
 
 func TestStatLine(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	defaultHeaders := make([]string, len(line.CondHeaders))
 	for i, h := range line.CondHeaders {
@@ -103,7 +103,7 @@ func TestStatLine(t *testing.T) {
 }
 
 func TestIsMongos(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	runCheck := func(process string) bool {
 		return status.IsMongos(&status.ServerStatus{

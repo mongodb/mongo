@@ -8,13 +8,14 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"math"
 	"testing"
 )
 
 func TestDBRefValue(t *testing.T) {
-
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("When unmarshalling JSON with DBRef values", t, func() {
 
 		Convey("works for a single key", func() {

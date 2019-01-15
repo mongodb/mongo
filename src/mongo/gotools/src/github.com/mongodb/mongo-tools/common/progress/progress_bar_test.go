@@ -15,9 +15,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mongodb/mongo-tools/common/testtype"
 )
 
 func TestBasicProgressBar(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	writeBuffer := &bytes.Buffer{}
 
@@ -66,6 +69,7 @@ func TestBasicProgressBar(t *testing.T) {
 }
 
 func TestProgressBarWithNoMax(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar with no max value", t, func() {
@@ -87,6 +91,7 @@ func TestProgressBarWithNoMax(t *testing.T) {
 }
 
 func TestBarConcurrency(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar", t, func() {
@@ -123,6 +128,7 @@ func TestBarConcurrency(t *testing.T) {
 }
 
 func TestBarDrawing(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Drawing some test bars and checking their character counts", t, func() {
 		Convey("20 wide @ 50%", func() {
 			b := drawBar(20, .5)
@@ -170,6 +176,7 @@ func TestBarDrawing(t *testing.T) {
 }
 
 func TestBarUnits(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar with IsBytes==true", t, func() {

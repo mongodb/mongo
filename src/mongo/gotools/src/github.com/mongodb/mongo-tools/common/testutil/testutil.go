@@ -38,7 +38,7 @@ func GetBareSessionProvider() (*db.SessionProvider, *options.ToolOptions, error)
 	var toolOptions *options.ToolOptions
 
 	// get ToolOptions from URI or defaults
-	if uri := os.Getenv("MONGOD"); uri != "" {
+	if uri := os.Getenv("TOOLS_TESTING_MONGOD"); uri != "" {
 		fakeArgs := []string{"--uri=" + uri}
 		toolOptions = options.New("mongodump", "", options.EnabledOptions{URI: true})
 		toolOptions.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)

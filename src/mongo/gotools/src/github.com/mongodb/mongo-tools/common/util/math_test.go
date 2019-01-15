@@ -16,7 +16,7 @@ import (
 
 func TestMaxInt(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When finding the maximum of two ints", t, func() {
 
@@ -32,7 +32,7 @@ func TestMaxInt(t *testing.T) {
 
 func TestNumberConverter(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a number converter for float32", t, func() {
 		floatConverter := newNumberConverter(reflect.TypeOf(float32(0)))
@@ -62,7 +62,7 @@ func TestNumberConverter(t *testing.T) {
 
 func TestUInt32Converter(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a series of test values, conversions should pass", t, func() {
 		out, err := ToUInt32(int64(99))

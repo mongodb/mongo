@@ -24,7 +24,7 @@ func init() {
 }
 
 func TestTypedHeaderParser(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Using 'zip.string(),number.double(),foo.auto()'", t, func() {
 		var headers = []string{"zip.string()", "number.double()", "foo.auto()", `bar.date(January 2\, \(2006\))`}
@@ -82,6 +82,7 @@ func TestTypedHeaderParser(t *testing.T) {
 }
 
 func TestAutoHeaderParser(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Using 'zip,number'", t, func() {
 		var headers = []string{"zip", "number", "foo"}
 		var colSpecs = ParseAutoHeaders(headers)
@@ -94,7 +95,7 @@ func TestAutoHeaderParser(t *testing.T) {
 }
 
 func TestFieldParsers(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Using FieldAutoParser", t, func() {
 		var p, _ = NewFieldParser(ctAuto, "")

@@ -16,6 +16,7 @@
 *temp*
 
 bin/
+testing_output/
 
 vendor/pkg
 

@@ -8,11 +8,13 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
 func TestSingleQuotedKeys(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When unmarshalling JSON with single quotes around its keys", t, func() {
 
@@ -48,6 +50,7 @@ func TestSingleQuotedKeys(t *testing.T) {
 }
 
 func TestSingleQuotedValues(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When unmarshalling JSON with single quotes around its values", t, func() {
 

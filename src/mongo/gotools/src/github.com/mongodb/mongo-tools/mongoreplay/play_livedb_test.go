@@ -15,6 +15,7 @@ import (
 
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
+	"github.com/mongodb/mongo-tools/common/testtype"
 )
 
 const (
@@ -112,6 +113,9 @@ func getPrimaryPort(session *mgo.Session) (string, error) {
 }
 
 func TestMain(m *testing.M) {
+	if !testtype.HasTestType(testtype.MongoReplayTestType) {
+		os.Exit(0)
+	}
 	err := setConnectionURL()
 	if err != nil {
 		panic(err)
@@ -131,6 +135,7 @@ func TestMain(m *testing.M) {
 // completed. It then checks its BufferedStatCollector to ensure the inserts
 // match what we expected
 func TestOpInsertLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -229,6 +234,7 @@ func TestOpInsertLiveDB(t *testing.T) {
 // verify they were completed. It then checks its BufferedStatCollector to
 // ensure the update matches what we expected.
 func TestUpdateOpLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -345,6 +351,7 @@ func TestUpdateOpLiveDB(t *testing.T) {
 // It generates inserts and queries and sends them to the main execution of mongoreplay.
 // TestQueryOp then examines a BufferedStatCollector to ensure the queries executed as expected
 func TestQueryOpLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -429,6 +436,7 @@ func TestQueryOpLiveDB(t *testing.T) {
 // based on the original query. It then Uses a BufferedStatCollector to ensure
 // the getmores executed as expected
 func TestOpGetMoreLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -457,6 +465,7 @@ func TestOpGetMoreLiveDB(t *testing.T) {
 // BufferedStatCollector to ensure that each getmore played against the database
 // is executed and receives the response expected
 func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -576,6 +585,7 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 // ensure that each killcursors played against the database is executed and
 // receives the response expected
 func TestOpKillCursorsLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -696,6 +706,7 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 	}
 }
 func TestCommandOpInsertLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -782,6 +793,7 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 }
 
 func TestCommandOpFindLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -870,6 +882,7 @@ func TestCommandOpFindLiveDB(t *testing.T) {
 }
 
 func TestCommandOpGetMoreLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if isMongosTestServer {
 		t.Skipf("Skipping OpCommand test against mongos")
 	}
@@ -902,6 +915,7 @@ func TestCommandOpGetMoreLiveDB(t *testing.T) {
 // completed. It then checks its BufferedStatCollector to ensure the inserts
 // match what we expected
 func TestMsgOpInsertLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -983,6 +997,7 @@ func TestMsgOpInsertLiveDB(t *testing.T) {
 }
 
 func TestMsgOpGetMoreLiveDB(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -1028,6 +1043,7 @@ func getmoreTestHelper(t *testing.T,
 	getmoreFunc getmoreGeneratorFunc,
 	replyFunc replyGeneratorFunc,
 	findFunc findGeneratorFunc) {
+	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
 
 	var requestID int32 = 2
 	numInserts := 20

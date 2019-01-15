@@ -8,12 +8,14 @@ package bsonutil
 
 import (
 	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
 )
 
 func TestObjectIdValue(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When converting JSON with ObjectId values", t, func() {
 

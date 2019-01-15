@@ -9,11 +9,13 @@ package text
 import (
 	"bytes"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
 func TestUpdateWidths(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Using a grid writer, the cached column width", t, func() {
 		gw := GridWriter{}
 		defaultWidths := []int{1, 2, 3, 4}
@@ -51,6 +53,7 @@ func writeData(gw *GridWriter) {
 }
 
 func TestWriteGrid(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Test grid writer with no min width", t, func() {
 		gw := GridWriter{}
 		writeData(&gw)

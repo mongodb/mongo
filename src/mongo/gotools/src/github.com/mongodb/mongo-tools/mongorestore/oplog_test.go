@@ -20,7 +20,7 @@ import (
 
 func TestTimestampStringParsing(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Testing some possible timestamp strings:", t, func() {
 		Convey("123:456 [should pass]", func() {
@@ -75,7 +75,7 @@ func TestTimestampStringParsing(t *testing.T) {
 
 func TestValidOplogLimitChecking(t *testing.T) {
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a MongoRestore instance with oplogLimit of 5:0", t, func() {
 		mr := &MongoRestore{
@@ -126,7 +126,7 @@ func TestValidOplogLimitChecking(t *testing.T) {
 }
 
 func TestOplogRestore(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
@@ -185,7 +185,7 @@ func TestOplogRestore(t *testing.T) {
 }
 
 func TestOplogRestoreTools2002(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")

@@ -8,11 +8,13 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
 func TestHexadecimalNumber(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	value := "0x123"
 	intValue := 0x123
 

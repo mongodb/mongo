@@ -44,12 +44,12 @@ Testing
 To run unit and integration tests:
 
 ```
-go test -v -test.types=unit,integration
+go test -v ./... 
 ```
+If TOOLS_TESTING_UNIT is set to "true" in the environment, unit tests will run.
+If TOOLS_TESTING_INTEGRATION is set to "true" in the environment, integration tests will run.
 
-This should be run in all package directories - common, mongorestore, mongoexport, etc. 
-
-The `test.types` flag indicates what kinds of tests to run. Integration tests require a `mongod` (running on port 33333) while unit tests do not.
+Integration tests require a `mongod` (running on port 33333) while unit tests do not.
 
 To run the quality assurance tests, you need to have the latest stable version of the rebuilt tools, `mongod`, `mongos`, and `mongo` in your current working directory. 
 

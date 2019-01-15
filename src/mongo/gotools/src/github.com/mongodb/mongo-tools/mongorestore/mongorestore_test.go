@@ -33,7 +33,7 @@ var (
 )
 
 func TestMongorestore(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
@@ -89,7 +89,7 @@ func TestMongorestore(t *testing.T) {
 }
 
 func TestMongorestoreCantPreserveUUID(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
@@ -132,7 +132,7 @@ func TestMongorestoreCantPreserveUUID(t *testing.T) {
 }
 
 func TestMongorestorePreserveUUID(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")

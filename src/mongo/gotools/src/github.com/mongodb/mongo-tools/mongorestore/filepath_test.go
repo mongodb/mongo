@@ -62,7 +62,7 @@ func TestCreateAllIntents(t *testing.T) {
 	var mr *MongoRestore
 	var buff bytes.Buffer
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = newMongoRestore()
@@ -126,7 +126,7 @@ func TestCreateIntentsForDB(t *testing.T) {
 	var mr *MongoRestore
 	var buff bytes.Buffer
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = newMongoRestore()
@@ -174,6 +174,7 @@ func TestCreateIntentsForDB(t *testing.T) {
 }
 
 func TestCreateIntentsRenamed(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a test MongoRestore", t, func() {
 		mr := newMongoRestore()
 		mr.renamer, _ = ns.NewRenamer([]string{"db1.*"}, []string{"db4.test.*"})
@@ -209,7 +210,7 @@ func TestCreateIntentsRenamed(t *testing.T) {
 
 func TestHandlingBSON(t *testing.T) {
 	var mr *MongoRestore
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = newMongoRestore()
@@ -249,7 +250,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 	var mr *MongoRestore
 	var buff bytes.Buffer
 
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a test MongoRestore", t, func() {
 		buff = bytes.Buffer{}

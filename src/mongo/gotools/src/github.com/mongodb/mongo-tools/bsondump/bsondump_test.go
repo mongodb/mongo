@@ -10,13 +10,19 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestBsondump(t *testing.T) {
-
+	// TOOLS-2179 filed to figure out why this is neccessary
+	if runtime.GOOS == "windows" {
+		t.SkipNow()
+	}
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Test bsondump reading from stdin and writing to stdout", t, func() {
 		cmd := exec.Command("../bin/bsondump")
 

@@ -12,7 +12,6 @@ mongo_tools_variables:
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
     mac_task_list: &macos_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -42,7 +41,6 @@ mongo_tools_variables:
       - name: unit
       - name: replay-dist
     rhel_x86_64_task_list: &rhel_x86_64_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -77,7 +75,6 @@ mongo_tools_variables:
       - name: native-cert-ssl
       - name: replay-dist
     rhel_x86_64_enterprise_task_list: &rhel_x86_64_enterprise_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -95,7 +92,6 @@ mongo_tools_variables:
       # Disabled due to TOOLS-2116
       # - name: replay-replay_test
     ubuntu_x86_64_task_list: &ubuntu_x86_64_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -129,7 +125,6 @@ mongo_tools_variables:
       - name: native-cert-ssl
       - name: replay-dist
     ubuntu_x86_64_enterprise_task_list: &ubuntu_x86_64_enterprise_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -146,7 +141,6 @@ mongo_tools_variables:
       # Disabled due to TOOLS-2108
       # - name: replay-replay_test
     ubuntu_x86_64_race_task_list: &ubuntu_x86_64_race_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -161,7 +155,6 @@ mongo_tools_variables:
       # Disabled due to TOOLS-2108
       # - name: replay-replay_test
     windows_64_task_list: &windows_64_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -202,7 +195,6 @@ mongo_tools_variables:
       - name: native-cert-ssl
       - name: unit
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -227,7 +219,6 @@ mongo_tools_variables:
       - name: unit
       - name: native-cert-ssl
     rhel71_ppc64le_enterprise_task_list: &rhel71_ppc64le_enterprise_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -248,7 +239,6 @@ mongo_tools_variables:
       # Disabled due to TOOLS-2108
       # - name: replay-replay_test
     rhel67_s390x_enterprise_task_list: &rhel67_s390x_enterprise_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -270,7 +260,6 @@ mongo_tools_variables:
       # Disabled due to TOOLS-2108
       # - name: replay-replay_test
     ubuntu1604_arm64_ssl_task_list: &ubuntu1604_arm64_ssl_tasks
-      - name: db
       - name: dist
       - name: integration
       - name: integration-auth
@@ -451,7 +440,7 @@ functions:
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
         cd ${package}
-        go test -ldflags "$(print_ldflags)" ${coverage_args} ${args} -tags "$(print_tags ${build_tags})" -test.v > unit.suite
+        go test -ldflags "$(print_ldflags)" ${coverage_args} -tags "$(print_tags ${build_tags})" -test.v > unit.suite
         export exitcode=$?
         cat unit.suite
         cp unit.suite $basedir/.
@@ -497,40 +486,16 @@ functions:
 
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
-        cwd=$(pwd)
-        # run unit tests under common package
-        for i in archive bsonutil db/tlsgo failpoint intents json log options progress text util; do
-            cd $cwd/common/$i
-            COMMON_SUBPKG=$(basename $i)
-            COVERAGE_ARGS=""
-            if [ "${run_coverage}" ]; then
-                COVERAGE_ARGS="-coverprofile=coverage_$COMMON_SUBPKG.out"
-            fi;
-            go test -ldflags "$(print_ldflags)" $COVERAGE_ARGS ${args} -tags "$(print_tags failpoints ${build_tags})" -test.v > $COMMON_SUBPKG.suite
-            if [ $? -ne 0 ]; then
-                echo "suite failed, will exit with error on finish"
-                export exitcode=1
-            fi
-            cat $COMMON_SUBPKG.suite
-            cp $COMMON_SUBPKG.suite $cwd
-        done
-
-        #TODO mongotop needs a test
-        for i in mongoimport mongoexport mongostat mongorestore mongodump mongofiles; do
-            cd $cwd/$i
-            COVERAGE_ARGS=""
-            if [ "${run_coverage}" ]; then
-                COVERAGE_ARGS="-coverprofile=coverage_$i.out"
-            fi;
-            go test -ldflags "$(print_ldflags)" $COVERAGE_ARGS ${args} -tags "$(print_tags ${build_tags})" -test.v > $i.suite
-            if [ $? -ne 0 ]; then
-                echo "suite failed, will exit with error on finish"
-                export exitcode=1
-            fi
-            cat $i.suite
-            cp $i.suite $cwd
-        done
-        exit $exitcode
+        if [ "${UNIT_TEST}" = "true" ]; then
+          export TOOLS_TESTING_UNIT="true"
+        fi;
+        if [ "${run_coverage}" = "true" ]; then
+            export RUN_COVERAGE="true"
+        fi
+        export ON_EVERGREEN="true"
+        export TOOLS_BUILD_TAGS=${build_tags}
+        ./runTests.sh -v
+        exit $?
 
   "run tool integration tests":
     command: shell.exec
@@ -547,29 +512,29 @@ functions:
         set -v
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
-
+        if [ "${KERBEROS_TEST}" = "true" ]; then
+          export TOOLS_TESTING_KERBEROS="true"
+        elif [ "${USE_SSL}" = "true" ]; then
+          export TOOLS_TESTING_SSL="true"
+          export TOOLS_TESTING_INTEGRATION="true"
+        fi;
+        if [ "${AUTH_TEST}" = "true" ]; then
+          export TOOLS_TESTING_AUTH="true"
+          export TOOLS_TESTING_INTEGRATION="true"
+        fi;
+        if [ "${INT_TEST}" = "true" ]; then
+          export TOOLS_TESTING_INTEGRATION="true"
+        fi;
         if [ "${create_mongod_users_command}" != "" ]; then
-          export AUTH_USERNAME=${auth_username}
-          export AUTH_PASSWORD=${auth_password}
+          export TOOLS_TESTING_AUTH_USERNAME=${auth_username}
+          export TOOLS_TESTING_AUTH_PASSWORD=${auth_password}
           echo "${create_mongod_users_command}" | ./bin/mongo${extension} ${mongo_args} admin
         fi;
+        export ON_EVERGREEN="true"
+        export TOOLS_BUILD_TAGS="${build_tags}"
+        ./runTests.sh -v
+        exit $?
 
-        for i in mongoimport mongoexport mongostat mongorestore mongodump mongofiles; do
-            cd $i
-            COVERAGE_ARGS=""
-            if [ "${run_coverage}" ]; then
-                COVERAGE_ARGS="-coverprofile=coverage_$i.out"
-            fi;
-            go test -ldflags "$(print_ldflags)" $COVERAGE_ARGS -test.v ${args} -tags "$(print_tags ${build_tags})" > $i.suite
-            if [ $? -ne 0 ]; then
-                echo "suite failed, will exit with error on finish"
-                export exitcode=1
-            fi
-            cat $i.suite
-            cp $i.suite ../.
-            cd ..
-        done
-        exit $exitcode
 
   "create coverage reports":
     command: shell.exec
@@ -826,7 +791,7 @@ functions:
           set -e
           ./bin/mongo --nodb --eval 'assert.soon(function(x){try{var d = new Mongo("localhost:${mongod_port}"); return true} catch(e){return false}}, "timed out connection")'
 
-  "run go_test" :
+  "run replay go_test" :
   - command: shell.exec
     type: test
     params:
@@ -837,6 +802,10 @@ functions:
         set -e
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
+        
+        if [ "${TESTING_REPLAY}" = "true" ]; then
+            export TOOLS_TESTING_REPLAY="true"
+        fi
         ${environment_vars} go test -ldflags "$(print_ldflags)" ${additional_args} -v > ${filename}.suite
 
 
@@ -893,24 +862,6 @@ timeout:
 
 
 tasks:
-- name: db
-  commands:
-    - func: "fetch source"
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/db"
-          - key: "args"
-            value: "${args} -test.types=db"
-    - func: "download mongod"
-      vars:
-        mongo_version: "4.0"
-    - func: "start mongod"
-    - func: "wait for mongod to be ready"
-    - func: "setup integration test"
-    - func: "run unit test"
-
 - name: dist
   depends_on:
   commands:
@@ -976,16 +927,14 @@ tasks:
   commands:
     - func: "fetch source"
     - command: expansions.update
-      params:
-        updates:
-          - key: "args"
-            value: "${args} -test.types=${integration_test_args}"
     - func: "download mongod"
       vars:
         mongo_version: "4.0"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
+      vars:
+          INT_TEST: "true" 
 
 - name: integration-auth
   commands:
@@ -994,8 +943,6 @@ tasks:
     - command: expansions.update
       params:
         updates:
-          - key: "args"
-            value: "${args} -test.types=${integration_test_args},auth"
           - key: "mongod_args"
             concat: " --auth"
           - key: "auth_username"
@@ -1010,6 +957,9 @@ tasks:
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
+      vars:
+          INT_TEST: "true"
+          AUTH_TEST: "true"
 
 - name: kerberos
   commands:
@@ -1022,6 +972,8 @@ tasks:
             value: "${args} -test.types=kerberos"
     - func: "setup integration test"
     - func: "run tool integration tests"
+      vars:
+          KERBEROS_TEST: "true"
 
 - name: legacy30
   depends_on:
@@ -1416,12 +1368,11 @@ tasks:
 - name: unit
   commands:
     - command: expansions.update
-      params:
-        updates:
-          - key: "run_coverage"
-            value: "true"
     - func: "fetch source"
     - func: "run tool unit tests"
+      vars:
+          UNIT_TEST: "true"
+          run_coverage: "true"
     - func: "create coverage reports"
     - command: expansions.update
       params:
@@ -1526,11 +1477,12 @@ tasks:
       mongo_version: "4.0"
   - func: "start mongod"
   - func: "wait for mongod to be ready"
-  - func: "run go_test"
+  - func: "run replay go_test"
     vars:
         filename: playtest
         environment_vars: DB_PORT=${mongod_port}
         additional_args: github.com/mongodb/mongo-tools/mongoreplay
+        TESTING_REPLAY: true
 
 - name: replay-sharded_test
   depends_on:
@@ -1550,11 +1502,12 @@ tasks:
     vars:
       mongo_version: "4.0"
   - func: "create sharded_cluster"
-  - func: "run go_test"
+  - func: "run replay go_test"
     vars:
         filename: sharded
         environment_vars: DB_PORT=${mongod_port}
         additional_args: github.com/mongodb/mongo-tools/mongoreplay --run "LiveDB"
+        TESTING_REPLAY: true
 
 - name: replay-auth_test
   depends_on:
@@ -1580,11 +1533,12 @@ tasks:
   - func: "create auth_user"
     vars:
         mongod_port: ${mongod_port}
-  - func: "run go_test"
+  - func: "run replay go_test"
     vars:
         filename: authtest
         environment_vars: AUTH=1 DB_PORT=${mongod_port}
         additional_args: github.com/mongodb/mongo-tools/mongoreplay --run "(LiveDB)|(Authed)"
+        TESTING_REPLAY: true
 
 - name: replay-repl_test
   depends_on:
@@ -1606,11 +1560,12 @@ tasks:
   - func: "create repl_set"
     vars:
         mongod_port: ${mongod_port}
-  - func: "run go_test"
+  - func: "run replay go_test"
     vars:
         filename: repltest
         environment_vars: DB_PORT=${mongod_port}
         additional_args: github.com/mongodb/mongo-tools/mongoreplay --run "LiveDB"
+        TESTING_REPLAY: true
 
 - name: replay-replay_test
   depends_on:
@@ -1804,6 +1759,8 @@ buildvariants:
     resmoke_use_ssl: _ssl
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     integration_test_args: "integration,ssl"
+    USE_SSL: "true"
+
   tasks: *rhel_x86_64_ssl_tasks
 
 - name: rhel62-enterprise
@@ -1924,6 +1881,7 @@ buildvariants:
     resmoke_use_ssl: _ssl
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     integration_test_args: "integration,ssl"
+    USE_SSL: "true"
   tasks: *ubuntu_x86_64_ssl_tasks
 
 - name: ubuntu1604-enterprise
@@ -2005,6 +1963,7 @@ buildvariants:
     arch: "win32/x86_64"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     integration_test_args: "integration,ssl"
+    USE_SSL: "true"
   tasks: *windows_64_ssl_tasks
 
 - name: windows-64-enterprise
@@ -2052,6 +2011,7 @@ buildvariants:
     arch: "linux/arm64"
     edition: ssl
     integration_test_args: integration
+    USE_SSL: "true"
   tasks: *ubuntu1604_arm64_ssl_tasks
 
 #######################################

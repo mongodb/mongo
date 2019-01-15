@@ -8,11 +8,13 @@ package json
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
 func TestNewKeyword(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When unmarshalling JSON using the new keyword", t, func() {
 

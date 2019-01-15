@@ -28,7 +28,7 @@ var (
 )
 
 func TestKerberosAuthMechanism(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.KerberosTestType)
+	testtype.SkipUnlessTestType(t, testtype.KerberosTestType)
 
 	Convey("should be able to successfully connect", t, func() {
 		connector := &db.VanillaDBConnector{}

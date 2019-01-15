@@ -19,7 +19,7 @@ import (
 )
 
 func TestWriteCSV(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With a CSV export output", t, func() {
 		fields := []string{"_id", "x", " y", "z.1.a"}
@@ -78,6 +78,7 @@ func TestWriteCSV(t *testing.T) {
 }
 
 func TestExtractDField(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a test bson.D", t, func() {
 		b := []interface{}{"inner", bsonutil.MarshalD{{"inner2", 1}}}
 		c := bsonutil.MarshalD{{"x", 5}}

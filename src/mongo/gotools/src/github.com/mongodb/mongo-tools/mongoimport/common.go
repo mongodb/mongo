@@ -219,13 +219,20 @@ func getUpsertValue(field string, document bson.D) interface{} {
 	left := field[0:index]
 	subDoc, _ := bsonutil.FindValueByKey(left, &document)
 	if subDoc == nil {
+		log.Logvf(log.DebugHigh, "no subdoc found for '%v'", left)
 		return nil
 	}
-	subDocD, ok := subDoc.(bson.D)
-	if !ok {
+	switch subDoc.(type) {
+	case bson.D:
+		subDocD := subDoc.(bson.D)
+		return getUpsertValue(field[index+1:], subDocD)
+	case *bson.D:
+		subDocD := subDoc.(*bson.D)
+		return getUpsertValue(field[index+1:], *subDocD)
+	default:
+		log.Logvf(log.DebugHigh, "subdoc found for '%v', but couldn't coerce to bson.D", left)
 		return nil
 	}
-	return getUpsertValue(field[index+1:], subDocD)
 }
 
 // filterIngestError accepts a boolean indicating if a non-nil error should be,

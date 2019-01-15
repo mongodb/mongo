@@ -12,9 +12,12 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"testing"
+
+	"github.com/mongodb/mongo-tools/common/testtype"
 )
 
 func TestBufferlessBSONSource(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	var testValues = []bson.M{
 		{"_": bson.Binary{Kind: 0x80, Data: []byte("apples")}},
 		{"_": bson.Binary{Kind: 0x80, Data: []byte("bananas")}},

@@ -12,11 +12,14 @@ import (
 
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 // Regression test for TOOLS-1741
 func TestWriteConcernWithURIParsing(t *testing.T) {
+
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With an IngestOptions and ToolsOptions", t, func() {
 
 		// create an 'EnabledOptions' to determine what options should be able to be

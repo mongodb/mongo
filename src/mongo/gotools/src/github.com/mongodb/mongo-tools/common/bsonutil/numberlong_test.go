@@ -8,11 +8,13 @@ package bsonutil
 
 import (
 	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
 func TestNumberLongValue(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When converting JSON with NumberLong values", t, func() {
 

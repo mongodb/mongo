@@ -34,7 +34,7 @@ var (
 )
 
 func TestMongorestoreShortArchive(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
@@ -90,7 +90,7 @@ func TestMongorestoreShortArchive(t *testing.T) {
 }
 
 func TestMongorestoreArchiveWithOplog(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")

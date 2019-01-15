@@ -11,6 +11,7 @@ package json
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -45,6 +46,7 @@ var foldTests = []struct {
 }
 
 func TestFold(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	for i, tt := range foldTests {
 		if got := tt.fn([]byte(tt.s), []byte(tt.t)); got != tt.want {
 			t.Errorf("%d. %q, %q = %v; want %v", i, tt.s, tt.t, got, tt.want)
@@ -57,6 +59,7 @@ func TestFold(t *testing.T) {
 }
 
 func TestFoldAgainstUnicode(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	const bufSize = 5
 	buf1 := make([]byte, 0, bufSize)
 	buf2 := make([]byte, 0, bufSize)

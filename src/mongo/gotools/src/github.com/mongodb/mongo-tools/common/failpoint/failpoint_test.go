@@ -16,7 +16,7 @@ import (
 )
 
 func TestFailpointParsing(t *testing.T) {
-	testtype.VerifyTestType(t, testtype.UnitTestType)
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("With test args", t, func() {
 		args := "foo=bar,baz,biz=,=a"

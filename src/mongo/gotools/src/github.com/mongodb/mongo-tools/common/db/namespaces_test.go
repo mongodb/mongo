@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -22,6 +23,7 @@ type stripDBFromNamespaceTestCase struct {
 }
 
 func TestStripDBFromNamespace(t *testing.T) {
+	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("When testing StripDBFromNamespace with cases", t, func() {
 		testCases := []stripDBFromNamespaceTestCase{
 			{
