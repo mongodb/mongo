@@ -195,7 +195,7 @@ protected:
         return guard->hasReadyRequests();
     }
 
-    void scheduleErrorResponse(executor::ResponseStatus rs) {
+    void scheduleErrorResponse(executor::TaskExecutor::ResponseStatus rs) {
         invariant(!rs.isOK());
         rs.elapsedMillis = Milliseconds(0);
         executor::NetworkInterfaceMock* net = network();

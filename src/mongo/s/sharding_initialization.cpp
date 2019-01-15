@@ -67,6 +67,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -120,6 +121,21 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
+std::unique_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
+    std::unique_ptr<NetworkInterface> net) {
+    auto executor =
+        stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>([] {
+                                                      ThreadPool::Options opts;
+                                                      opts.poolName = "Sharding-Fixed";
+                                                      opts.maxThreads =
+                                                          ThreadPool::Options::kUnlimited;
+                                                      return opts;
+                                                  }()),
+                                                  std::move(net));
+
+    return stdx::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
+}
+
 std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     std::unique_ptr<NetworkInterface> fixedNet,
     rpc::ShardingEgressMetadataHookBuilder metadataHookBuilder,
@@ -140,7 +156,7 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     }
 
     // Add executor used to perform non-performance critical work.
-    auto fixedExec = makeShardingTaskExecutor(std::move(fixedNet));
+    auto fixedExec = makeShardingFixedTaskExecutor(std::move(fixedNet));
 
     auto executorPool = stdx::make_unique<TaskExecutorPool>();
     executorPool->addExecutors(std::move(executors), std::move(fixedExec));

@@ -1,7 +1,6 @@
 /**
  * Test that a new primary that gets elected will properly perform shard initialization.
  */
-
 (function() {
     "use strict";
 
@@ -9,6 +8,7 @@
 
     var replTest = new ReplSetTest({nodes: 3});
     replTest.startSet({shardsvr: ''});
+
     var nodes = replTest.nodeList();
     replTest.initiate({
         _id: replTest.name,
@@ -41,7 +41,7 @@
         shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 'majority'}}));
 
     replTest.stopMaster();
-    replTest.waitForMaster();
+    replTest.waitForMaster(30000);
 
     primaryConn = replTest.getPrimary();
 
@@ -55,5 +55,4 @@
     replTest.stopSet();
 
     st.stop();
-
 })();

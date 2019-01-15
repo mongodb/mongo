@@ -42,9 +42,6 @@
 #include "mongo/util/future.h"
 
 namespace mongo {
-
-class BSONObjBuilder;
-
 namespace executor {
 
 MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
