@@ -131,37 +131,14 @@ bool isUnixDomainSocket(const std::string& hostname) {
     return end(hostname) != std::find(begin(hostname), end(hostname), '/');
 }
 
-struct BIOFree {
-    void operator()(BIO* const p) noexcept {
-        // Assumes that BIO_free succeeds.
-        if (p) {
-            ::BIO_free(p);
-        }
-    }
-};
-using UniqueBIO = std::unique_ptr<BIO, BIOFree>;
+using UniqueBIO = std::unique_ptr<BIO, OpenSSLDeleter<decltype(::BIO_free), ::BIO_free>>;
 
 #ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
-struct EC_KEYFree {
-    void operator()(EC_KEY* const ec_key) noexcept {
-        if (ec_key) {
-            ::EC_KEY_free(ec_key);
-        }
-    }
-};
-
-using UniqueEC_KEY = std::unique_ptr<EC_KEY, EC_KEYFree>;
+using UniqueEC_KEY =
+    std::unique_ptr<EC_KEY, OpenSSLDeleter<decltype(::EC_KEY_free), ::EC_KEY_free>>;
 #endif
 
-struct BIGNUMFree {
-    void operator()(BIGNUM* const bn) noexcept {
-        if (bn) {
-            ::BN_free(bn);
-        }
-    }
-};
-
-using UniqueBIGNUM = std::unique_ptr<BIGNUM, BIGNUMFree>;
+using UniqueBIGNUM = std::unique_ptr<BIGNUM, OpenSSLDeleter<decltype(::BN_free), ::BN_free>>;
 
 UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
     UniqueBIO rv(::BIO_new_mem_buf(v.data(), v.size()));
@@ -384,16 +361,6 @@ private:
 std::vector<std::unique_ptr<stdx::recursive_mutex>> SSLThreadInfo::_mutex;
 SSLThreadInfo::ThreadIDManager SSLThreadInfo::_idManager;
 
-namespace {
-// We only want to free SSL_CTX objects if they have been populated. OpenSSL seems to perform this
-// check before freeing them, but because it does not document this, we should protect ourselves.
-void free_ssl_context(SSL_CTX* ctx) {
-    if (ctx != nullptr) {
-        SSL_CTX_free(ctx);
-    }
-}
-}  // namespace
-
 class SSLConnectionOpenSSL : public SSLConnectionInterface {
 public:
     SSL* ssl;
@@ -416,17 +383,12 @@ public:
 
 ////////////////////////////////////////////////////////////////
 
-using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&free_ssl_context)>;
+using UniqueSSLContext =
+    std::unique_ptr<SSL_CTX, OpenSSLDeleter<decltype(::SSL_CTX_free), ::SSL_CTX_free>>;
 static const int BUFFER_SIZE = 8 * 1024;
 static const int DATE_LEN = 128;
 
-struct UniqueX509Free {
-    void operator()(X509* ptr) const {
-        X509_free(ptr);
-    }
-};
-
-using UniqueX509 = std::unique_ptr<X509, UniqueX509Free>;
+using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
 
 class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
@@ -799,8 +761,8 @@ SSLConnectionOpenSSL::~SSLConnectionOpenSSL() {
 }
 
 SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
-    : _serverContext(nullptr, free_ssl_context),
-      _clientContext(nullptr, free_ssl_context),
+    : _serverContext(nullptr),
+      _clientContext(nullptr),
 #if defined(__APPLE__)
       _systemCACertificates(_getSystemCerts()),
 #endif
@@ -1047,7 +1009,7 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
 bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
                                                    const SSLParams& params,
                                                    ConnectionDirection direction) {
-    *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()), free_ssl_context);
+    *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()));
 
     uassertStatusOK(initSSLContext(contextPtr->get(), params, direction));
 

@@ -90,6 +90,24 @@ typedef SSLContextRef SSLConnectionType;
 #error "Unknown SSL Provider"
 #endif
 
+
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+/*
+ * There are a number of OpenSSL types that we want to be able to use with unique_ptr that have a
+ * custom OpenSSL deleter function. This template implements a stateless deleter for types with
+ * C free functions:
+ * using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(::X509_free), ::X509_free>>;
+ */
+template <typename Deleter, Deleter* impl>
+struct OpenSSLDeleter {
+    template <typename Obj>
+    void operator()(Obj* ptr) const {
+        if (ptr != nullptr) {
+            impl(ptr);
+        }
+    }
+};
+#endif
 /**
  * Maintain per connection SSL state for the Sock class. Used by SSLManagerInterface to perform SSL
  * operations.
