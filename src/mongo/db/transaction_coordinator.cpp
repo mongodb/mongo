@@ -35,6 +35,7 @@
 #include "mongo/db/transaction_coordinator.h"
 
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/db/transaction_coordinator_futures_util.h"
 #include "mongo/util/log.h"
 
@@ -146,11 +147,12 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
     // Helper lambda to get the decision either from the document passed in or from the participants
     // (by performing 'phase one' of two-phase commit).
     auto getDecision = [&]() -> Future<CoordinatorCommitDecision> {
-        if (!doc.getDecision()) {
+        auto decision = doc.getDecision();
+        if (!decision) {
             return _runPhaseOne(participantShards);
         } else {
-            return (*doc.getDecision() == "commit")
-                ? CoordinatorCommitDecision{txn::CommitDecision::kCommit, *doc.getCommitTimestamp()}
+            return (decision->decision == txn::CommitDecision::kCommit)
+                ? CoordinatorCommitDecision{txn::CommitDecision::kCommit, decision->commitTimestamp}
                 : CoordinatorCommitDecision{txn::CommitDecision::kAbort, boost::none};
         }
     };
@@ -234,6 +236,57 @@ void TransactionCoordinator::_transitionToDone(stdx::unique_lock<stdx::mutex> lk
     for (auto&& promise : promisesToTrigger) {
         promise.emplaceValue();
     }
+}
+
+StatusWith<CoordinatorCommitDecision> CoordinatorCommitDecision::fromBSON(const BSONObj& doc) {
+    CoordinatorCommitDecision decision;
+
+    for (const auto& e : doc) {
+        const auto fieldName = e.fieldNameStringData();
+
+        if (fieldName == "decision") {
+            if (e.type() != String) {
+                return Status(ErrorCodes::TypeMismatch, "decision must be a string");
+            }
+
+            if (e.str() == "commit") {
+                decision.decision = txn::CommitDecision::kCommit;
+            } else if (e.str() == "abort") {
+                decision.decision = txn::CommitDecision::kAbort;
+            } else {
+                return Status(ErrorCodes::BadValue, "decision must be either 'abort' or 'commit'");
+            }
+        } else if (fieldName == "commitTimestamp") {
+            if (e.type() != bsonTimestamp && e.type() != Date) {
+                return Status(ErrorCodes::TypeMismatch, "commit timestamp must be a timestamp");
+            }
+            decision.commitTimestamp = {e.timestamp()};
+        }
+    }
+
+    if (decision.decision == txn::CommitDecision::kAbort && decision.commitTimestamp) {
+        return Status(ErrorCodes::BadValue, "abort decision cannot have a timestamp");
+    }
+    if (decision.decision == txn::CommitDecision::kCommit && !decision.commitTimestamp) {
+        return Status(ErrorCodes::BadValue, "commit decision must have a timestamp");
+    }
+
+    return decision;
+}
+
+BSONObj CoordinatorCommitDecision::toBSON() const {
+    BSONObjBuilder builder;
+
+    if (decision == txn::CommitDecision::kCommit) {
+        builder.append("decision", "commit");
+    } else {
+        builder.append("decision", "abort");
+    }
+    if (commitTimestamp) {
+        builder.append("commitTimestamp", *commitTimestamp);
+    }
+
+    return builder.obj();
 }
 
 }  // namespace mongo

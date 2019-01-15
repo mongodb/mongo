@@ -30,11 +30,20 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/logical_session_id.h"
+        - "mongo/db/transaction_coordinator.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
     - "mongo/s/sharding_types.idl"
+
+types:
+    CoordinatorCommitDecision:
+        bson_serialization_type: object
+        description: "An object representing the coordinator's commit decision."
+        cpp_type: "TransactionCoordinator::CoordinatorCommitDecision"
+        serializer: "TransactionCoordinator::CoordinatorCommitDecision::toBSON"
+        deserializer: "TransactionCoordinator::CoordinatorCommitDecision::fromBSONThrowing"
 
 structs:
     TransactionCoordinatorDocument:
@@ -49,11 +58,8 @@ structs:
                 type: array<shard_id>
                 description: "The list of transaction participants."
             decision:
-                type: string
-                description: "The coordinator's decision for the transaction, that is, 'commit' or 'abort'. Only set if the coordinator has made a decision."
                 optional: true
-                # TODO (SERVER-38324): Add validator that the string is 'abort' or 'commit'
-            commitTimestamp:
-                type: timestamp
-                description: "The clusterTime at which the participants should make the transaction's writes visible. Only set if the coordinator decided to commit."
-                optional: true
+                type: CoordinatorCommitDecision
+                description: "The coordinator's decision for the transaction including the decision
+                              ('commit' or 'abort') and a commit timestamp (if the decision is
+                              'commit'). Only set if the coordinator has made a decision."

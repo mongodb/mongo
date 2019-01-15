@@ -40,11 +40,15 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/transaction_coordinator.h"
+#include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/db/transaction_coordinator_futures_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+
+#include "mongo/bson/bsontypes.h"
 
 namespace mongo {
 namespace {
@@ -321,20 +325,18 @@ void persistDecisionBlocking(OperationContext* opCtx,
             // either has no decision or the same decision. The document may have the same decision
             // if an earlier attempt to write the decision failed waiting for writeConcern.
             BSONObj noDecision = BSON(TransactionCoordinatorDocument::kDecisionFieldName
-                                      << BSON("$exists" << false)
-                                      << "commitTimestamp"
                                       << BSON("$exists" << false));
             BSONObj sameDecision;
             if (commitTimestamp) {
                 sameDecision = BSON(TransactionCoordinatorDocument::kDecisionFieldName
-                                    << "commit"
-                                    << TransactionCoordinatorDocument::kCommitTimestampFieldName
-                                    << *commitTimestamp);
+                                    << BSON(TransactionCoordinatorDocument::kDecisionFieldName
+                                            << "commit"
+                                            << "commitTimestamp"
+                                            << *commitTimestamp));
             } else {
-                sameDecision = BSON(TransactionCoordinatorDocument::kDecisionFieldName
-                                    << "abort"
-                                    << TransactionCoordinatorDocument::kCommitTimestampFieldName
-                                    << BSON("$exists" << false));
+                sameDecision =
+                    BSON(TransactionCoordinatorDocument::kDecisionFieldName
+                         << BSON(TransactionCoordinatorDocument::kDecisionFieldName << "abort"));
             }
             entry.setQ(BSON(TransactionCoordinatorDocument::kIdFieldName
                             << sessionInfo.toBSON()
@@ -347,12 +349,14 @@ void persistDecisionBlocking(OperationContext* opCtx,
             TransactionCoordinatorDocument doc;
             doc.setId(sessionInfo);
             doc.setParticipants(std::move(participantList));
+            TransactionCoordinator::CoordinatorCommitDecision decision;
             if (commitTimestamp) {
-                doc.setDecision("commit"_sd);
-                doc.setCommitTimestamp(commitTimestamp);
+                decision.decision = txn::CommitDecision::kCommit;
+                decision.commitTimestamp = commitTimestamp;
             } else {
-                doc.setDecision("abort"_sd);
+                decision.decision = txn::CommitDecision::kAbort;
             }
+            doc.setDecision(decision);
             entry.setU(doc.toBSON());
 
             return entry;

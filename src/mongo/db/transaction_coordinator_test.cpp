@@ -35,6 +35,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/db/transaction_coordinator_test_fixture.h"
 #include "mongo/util/log.h"
 
@@ -47,9 +48,6 @@ const StatusWith<BSONObj> kNoSuchTransaction =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
 const Timestamp kDummyPrepareTimestamp = Timestamp(1, 1);
-
-const std::string kAbortDecision{"abort"};
-const std::string kCommitDecision{"commit"};
 
 StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp) {
     return BSON("ok" << 1 << "prepareTimestamp" << timestamp);
@@ -385,7 +383,7 @@ protected:
         LogicalSessionId expectedLsid,
         TxnNumber expectedTxnNum,
         std::vector<ShardId> expectedParticipants,
-        boost::optional<std::string> expectedDecision = boost::none,
+        boost::optional<txn::CommitDecision> expectedDecision = boost::none,
         boost::optional<Timestamp> expectedCommitTimestamp = boost::none) {
         ASSERT(doc.getId().getSessionId());
         ASSERT_EQUALS(*doc.getId().getSessionId(), expectedLsid);
@@ -394,17 +392,18 @@ protected:
 
         ASSERT(doc.getParticipants() == expectedParticipants);
 
+        auto decision = doc.getDecision();
         if (expectedDecision) {
-            ASSERT_EQUALS(*expectedDecision, doc.getDecision()->toString());
+            ASSERT(*expectedDecision == decision->decision);
         } else {
-            ASSERT(!doc.getDecision());
+            ASSERT(!decision);
         }
 
         if (expectedCommitTimestamp) {
-            ASSERT(doc.getCommitTimestamp());
-            ASSERT_EQUALS(*expectedCommitTimestamp, *doc.getCommitTimestamp());
-        } else {
-            ASSERT(!doc.getCommitTimestamp());
+            ASSERT(decision->commitTimestamp);
+            ASSERT_EQUALS(*expectedCommitTimestamp, *decision->commitTimestamp);
+        } else if (decision) {
+            ASSERT(!decision->commitTimestamp);
         }
     }
 
@@ -433,11 +432,11 @@ protected:
                                   lsid,
                                   txnNumber,
                                   participants,
-                                  kCommitDecision,
+                                  txn::CommitDecision::kCommit,
                                   *commitTimestamp);
         } else {
             assertDocumentMatches(
-                allCoordinatorDocs[0], lsid, txnNumber, participants, kAbortDecision);
+                allCoordinatorDocs[0], lsid, txnNumber, participants, txn::CommitDecision::kAbort);
         }
     }
 

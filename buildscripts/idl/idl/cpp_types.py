@@ -520,7 +520,9 @@ class _CppTypeOptional(_CppTypeDelegating):
     def get_setter_body(self, member_name, validator_method_name):
         # type: (unicode, unicode) -> unicode
         convert = self._base.get_transform_to_storage_type("value.get()")
-        if convert:
+        if convert or validator_method_name:
+            if not convert:
+                convert = "value.get()"
             return common.template_args(
                 textwrap.dedent("""\
                             if (value.is_initialized()) {

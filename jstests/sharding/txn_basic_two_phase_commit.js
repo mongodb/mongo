@@ -40,11 +40,11 @@
                            .getCollection("transaction_coordinators")
                            .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
         assert.neq(null, coordDoc);
-        assert.eq(expectedDecision, coordDoc.decision);
+        assert.eq(expectedDecision, coordDoc.decision.decision);
         if (expectedDecision === "commit") {
-            assert.neq(null, coordDoc.commitTimestamp);
+            assert.neq(null, coordDoc.decision.commitTimestamp);
         } else {
-            assert.eq(null, coordDoc.commitTimestamp);
+            assert.eq(null, coordDoc.decision.commitTimestamp);
         }
     };
 

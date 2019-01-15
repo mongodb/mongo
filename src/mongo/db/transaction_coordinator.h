@@ -56,6 +56,25 @@ public:
     struct CoordinatorCommitDecision {
         txn::CommitDecision decision;
         boost::optional<Timestamp> commitTimestamp;
+
+        /**
+         * Parses a CoordinatorCommitDecision from the object.
+         */
+        static StatusWith<CoordinatorCommitDecision> fromBSON(const BSONObj& obj);
+
+        /**
+         * Returns an instance of CoordinatorCommitDecision from an object.
+         *
+         * Throws if the object cannot be deserialized.
+         */
+        static CoordinatorCommitDecision fromBSONThrowing(const BSONObj& obj) {
+            return uassertStatusOK(fromBSON(obj));
+        };
+
+        /**
+         * Returns the BSON representation of this object.
+         */
+        BSONObj toBSON() const;
     };
 
     /**
@@ -233,5 +252,4 @@ inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
     // clang-format on
     return stream;
 }
-
 }  // namespace mongo
