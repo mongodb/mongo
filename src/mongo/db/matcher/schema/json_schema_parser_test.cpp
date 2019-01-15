@@ -115,26 +115,11 @@ TEST(JSONSchemaParserTest, NestedTypeObjectTranslatesCorrectly) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
-    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {
-                                            a: {
-                                                $_internalSchemaObjectMatch: {
-                                                    $or: [
-                                                        {$nor: [{b: {$exists: true}}]},
-                                                        {b: {$_internalSchemaType: [2]}}
-                                                    ]
-                                                }
-                                            }
-                                        },
-                                        {a: {$_internalSchemaType: [3]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+    ASSERT_SERIALIZES_TO(
+        optimizedResult,
+        fromjson("{$or: [{a: {$not: {$exists: true }}}, {$and: [{a: {$_internalSchemaObjectMatch: "
+                 "{$or: [{b: {$not: {$exists: true}}}, {b: {$_internalSchemaType: [2]}}]}}}, {a: "
+                 "{$_internalSchemaType: [3]}}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelNonObjectTypeTranslatesCorrectly) {
@@ -150,12 +135,9 @@ TEST(JSONSchemaParserTest, TypeNumberTranslatesCorrectly) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
-    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {num: {$_internalSchemaType: ['number']}}
-                            ]
-                        })"));
+    ASSERT_SERIALIZES_TO(optimizedResult,
+                         fromjson("{$or: [{num: {$not: {$exists: true }}}, {num: "
+                                  "{ $_internalSchemaType: [ 'number' ]}}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeNumber) {
@@ -163,17 +145,9 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeNumber) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
-    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$lte: 0 }},
-                                        {num: {$_internalSchemaType: ['number']}}
-                                    ]
-                                }
-                            ]
-                        })"));
+    ASSERT_SERIALIZES_TO(optimizedResult,
+                         fromjson("{$or: [{num: {$not: {$exists: true}}}, {$and: [{num: {$lte: "
+                                  "0}}, {num: {$_internalSchemaType: ['number']}}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithBsonTypeLong) {
@@ -182,17 +156,9 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithBsonTypeLong) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
-    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$lte: 0}},
-                                        {num: {$_internalSchemaType: [18]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+    ASSERT_SERIALIZES_TO(optimizedResult,
+                         fromjson("{$or: [{num: {$not: {$exists: true}}}, {$and: [{num: {$lte: "
+                                  "0}}, {num: {$_internalSchemaType: [18]}}]}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeString) {
@@ -200,12 +166,9 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithTypeString) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
-    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {num: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+    ASSERT_SERIALIZES_TO(
+        optimizedResult,
+        fromjson("{$or: [{num: {$not: {$exists: true }}}, {num: {$_internalSchemaType: [2]}}]}"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
@@ -214,11 +177,11 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithNoType) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-        $or: [
-            {$nor: [{num: {$exists: true}}]},
-            {$nor: [{ num: {$_internalSchemaType: ['number']}}]},
-            {num: {$lte: 0}}]
-        })"));
+                $or:
+                    [{num: {$not: {$exists : true}}},
+                     {num: {$not: {$_internalSchemaType: ["number"]}}},
+                     {num: {$lte: 0}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMaximumIsNotANumber) {
@@ -245,16 +208,10 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeNumber) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$gte: 0}},
-                                        {num: {$_internalSchemaType: ['number']}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists : true}}},
+                     {$and: [ {num: {$gte: 0}}, {num: {$_internalSchemaType: ["number"]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMaxLengthIsNonIntegralDouble) {
@@ -271,16 +228,10 @@ TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithIntegralDouble) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {foo: {$_internalSchemaMaxLength: 5}},
-                                        {foo: {$_internalSchemaType: [2]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}},
+                     {$and: [ {foo: {$_internalSchemaMaxLength: 5}}, {foo: {$_internalSchemaType: [2]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithTypeString) {
@@ -290,18 +241,10 @@ TEST(JSONSchemaParserTest, MaxLengthTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {
-                                    $nor: [{foo: {$exists: true}}]
-                                },
-                                {
-                                    $and: [
-                                        {foo: {$_internalSchemaMaxLength: 5}},
-                                        {foo: { $_internalSchemaType: [2]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists : true}}},
+                     {$and: [ {foo: {$_internalSchemaMaxLength: 5}}, {foo: {$_internalSchemaType: [2]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithBsonTypeLong) {
@@ -311,16 +254,10 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithBsonTypeLong) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$gte: 0}},
-                                        { num: { $_internalSchemaType: [18]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}},
+                     {$and: [ {num: {$gte: 0}}, {num: {$_internalSchemaType: [18]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
@@ -329,12 +266,11 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {num: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}}, {num: {$_internalSchemaType: [2]}}]
+                })"));
 }
+
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
     BSONObj schema = fromjson("{properties: {num: {minimum: 0}}}");
@@ -342,12 +278,11 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithNoType) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {$nor: [{num: {$_internalSchemaType: ['number']}}]},
-                                {num: {$gte: 0}}
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}},
+                     {num: {$not: {$_internalSchemaType: ["number"]}}},
+                     {num: {$gte: 0}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
@@ -358,16 +293,10 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumTrue) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$lt: 0}},
-                                        {num: {$_internalSchemaType: [18]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}},
+                     {$and: [ {num: {$lt: 0}}, {num: {$_internalSchemaType: [18]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) {
@@ -378,16 +307,10 @@ TEST(JSONSchemaParserTest, MaximumTranslatesCorrectlyWithExclusiveMaximumFalse) 
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$lte: 0}},
-                                        {num: {$_internalSchemaType: [18]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}},
+                     {$and: [ {num: {$lte: 0}}, {num: {$_internalSchemaType: [18]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMaximumIsPresentButMaximumIsNot) {
@@ -410,16 +333,10 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumTrue) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$gt: 0}},
-                                        {num: {$_internalSchemaType: [18]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}},
+                     {$and: [ {num: {$gt: 0}}, {num: {$_internalSchemaType: [18]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) {
@@ -430,16 +347,10 @@ TEST(JSONSchemaParserTest, MinimumTranslatesCorrectlyWithExclusiveMinimumFalse) 
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{num: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {num: {$gte: 0}},
-                                        {num: {$_internalSchemaType: [18]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{num: {$not: {$exists: true}}},
+                     {$and: [ {num: {$gte: 0}}, {num: {$_internalSchemaType: [18]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfExclusiveMinimumIsPresentButMinimumIsNot) {
@@ -480,16 +391,10 @@ TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithTypeString) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {foo: {$_internalSchemaMinLength: 5}},
-                                        {foo: {$_internalSchemaType: [2]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}},
+                     {$and: [ {foo: {$_internalSchemaMinLength: 5}}, {foo: {$_internalSchemaType: [2]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithIntegralDouble) {
@@ -499,16 +404,10 @@ TEST(JSONSchemaParserTest, MinLengthTranslatesCorrectlyWithIntegralDouble) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {foo: {$_internalSchemaMinLength: 5}},
-                                        {foo: {$_internalSchemaType: [2]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}},
+                     {$and: [ {foo: {$_internalSchemaMinLength: 5}}, {foo: {$_internalSchemaType: [2]}}]}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMinimumIsNotANumber) {
@@ -529,9 +428,9 @@ TEST(JSONSchemaParserTest, PatternTranslatesCorrectlyWithString) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
-    BSONObj expected =
+    auto expected =
         BSON("$or" << BSON_ARRAY(
-                 BSON("$nor" << BSON_ARRAY(BSON("foo" << BSON("$exists" << true))))
+                 BSON("foo" << BSON("$not" << BSON("$exists" << true)))
                  << BSON("$and" << BSON_ARRAY(
                              BSON("foo" << BSON("$regex"
                                                 << "abc"))
@@ -564,16 +463,14 @@ TEST(JSONSchemaParserTest, MultipleOfTranslatesCorrectlyWithTypeNumber) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {foo: {$_internalSchemaFmod: [NumberDecimal('5.3'), 0]}},
-                                        {foo: {$_internalSchemaType: ['number']}}
-                                    ]
-                                }
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}}, {
+                        $and: [
+                            {foo: {$_internalSchemaFmod: [ NumberDecimal('5.3'), 0]}},
+                            {foo: {$_internalSchemaType: ["number"]}}
+                        ]
+                    }]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfAllOfIsNotAnArray) {
@@ -601,26 +498,15 @@ TEST(JSONSchemaParserTest, AllOfTranslatesCorrectly) {
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     auto expectedResult = fromjson(
         R"({
-            $or: [
-                {$nor: [{foo: {$exists: true}}]},
-                {
-                    $and: [
-                        {
-                            $or: [
-                                {$nor: [{foo:{ $_internalSchemaType: ['number']}}]},
-                                {foo: {$gte: 0}}
-                            ]
-                        },
-                        {
-                            $or: [
-                                {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
-                                {foo: {$lte: 10}}
-                            ]
-                        }
-                    ]
-                }
-            ]
-        })");
+            $or:
+                [{foo: {$not: {$exists: true}}},
+                 {
+                   $and : [
+                       {$or: [ {foo: {$not: {$_internalSchemaType: ["number"]}}}, {foo: {$gte: 0}}]},
+                       {$or: [ {foo: {$not: {$_internalSchemaType: ["number"]}}}, {foo: {$lte: 10}}]}
+                   ]
+                 }]
+            })");
     ASSERT_SERIALIZES_TO(optimizedResult, expectedResult);
 }
 
@@ -630,11 +516,9 @@ TEST(JSONSchemaParserTest, TopLevelAllOfTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {foo: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}}, {foo: {$_internalSchemaType: [2]}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfAnyOfIsNotAnArray) {
@@ -661,12 +545,11 @@ TEST(JSONSchemaParserTest, AnyOfTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {foo: {$_internalSchemaType: ['number']}},
-                                {foo: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}},
+                     {foo: {$_internalSchemaType: ["number"]}},
+                     {foo: {$_internalSchemaType: [2]}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelAnyOfTranslatesCorrectly) {
@@ -675,11 +558,9 @@ TEST(JSONSchemaParserTest, TopLevelAnyOfTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {foo: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}}, {foo: {$_internalSchemaType: [2]}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfOneOfIsNotAnArray) {
@@ -706,26 +587,15 @@ TEST(JSONSchemaParserTest, OneOfTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {
-                                    $_internalSchemaXor: [
-                                        {
-                                            $or: [
-                                                {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
-                                                {foo: {$gte: 0}}
-                                            ]
-                                        },
-                                        {
-                                            $or: [
-                                                {$nor: [{foo: {$_internalSchemaType: ['number']}}]},
-                                                {foo: {$lte: 10}}
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        })"));
+        $or:
+            [{foo: {$not: {$exists: true}}},
+             {
+               $_internalSchemaXor : [
+                   {$or: [ {foo: {$not: {$_internalSchemaType: ["number"]}}}, {foo: {$gte : 0}}]},
+                   {$or: [ {foo: {$not: {$_internalSchemaType: ["number"]}}}, {foo: {$lte : 10}}]}
+               ]
+             }]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelOneOfTranslatesCorrectly) {
@@ -734,11 +604,9 @@ TEST(JSONSchemaParserTest, TopLevelOneOfTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {foo: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}}, {foo: {$_internalSchemaType: [2]}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfNotIsNotAnObject) {
@@ -759,11 +627,9 @@ TEST(JSONSchemaParserTest, NotTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {$nor: [{ foo: {$_internalSchemaType: ['number']}}]}
-                            ]
-                        })"));
+                $or:
+                    [{foo: {$not: {$exists: true}}}, {foo: {$not: {$_internalSchemaType: ['number']}}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelNotTranslatesCorrectly) {
@@ -772,15 +638,9 @@ TEST(JSONSchemaParserTest, TopLevelNotTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $nor: [
-                                {
-                                    $or: [
-                                        {$nor: [{foo: {$exists: true}}]},
-                                        {foo: {$_internalSchemaType: [2]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+        $nor:
+            [{$or: [ {foo: {$not: {$exists: true}}}, {foo: {$_internalSchemaType: [2]}}]}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMinItemsIsNotANumber) {
@@ -808,12 +668,11 @@ TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNoType) {
     ASSERT_OK(result.getStatus());
     optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                                {a: {$_internalSchemaMinItems: 1}}
-                            ]
-                        })"));
+                $or:
+                    [{a: {$not: {$exists: true}}},
+                     {a: {$not: {$_internalSchemaType: [4]}}},
+                     {a: {$_internalSchemaMinItems: 1}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithArrayType) {
@@ -822,16 +681,10 @@ TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithArrayType) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {a: {$_internalSchemaMinItems: 1}},
-                                        {a: {$_internalSchemaType: [4]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {$and: [ {a: {$_internalSchemaMinItems: 1}}, {a: {$_internalSchemaType: [4]}}]}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNonArrayType) {
@@ -840,11 +693,9 @@ TEST(JSONSchemaParserTest, MinItemsTranslatesCorrectlyWithNonArrayType) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {a: {$_internalSchemaType: ['number']}}
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}}, {a: {$_internalSchemaType: ["number"]}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfMaxItemsIsNotANumber) {
@@ -872,12 +723,11 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNoType) {
     ASSERT_OK(result.getStatus());
     optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                                {a: {$_internalSchemaMaxItems: 1}}
-                            ]
-                        })"));
+                $or:
+                    [{a: {$not: {$exists: true}}},
+                     {a: {$not: {$_internalSchemaType: [4]}}},
+                     {a: {$_internalSchemaMaxItems: 1}}]
+                })"));
 }
 
 TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithArrayType) {
@@ -886,16 +736,10 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithArrayType) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {a: {$_internalSchemaMaxItems: 1}},
-                                        {a: {$_internalSchemaType: [4]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {$and: [ {a: {$_internalSchemaMaxItems: 1}}, {a: {$_internalSchemaType: [4]}}]}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNonArrayType) {
@@ -904,11 +748,9 @@ TEST(JSONSchemaParserTest, MaxItemsTranslatesCorrectlyWithNonArrayType) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {a: {$_internalSchemaType: [2]}}
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists : true}}}, {a: {$_internalSchemaType: [2]}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, RequiredFailsToParseIfNotAnArray) {
@@ -963,21 +805,14 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyWithMultipleElements) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{x: {$exists: true}}]},
-                                {$nor: [{x: {$_internalSchemaType: [3]}}]},
-                                {
-                                    x: {
-                                        $_internalSchemaObjectMatch: {
-                                            $and: [
-                                                {y: {$exists: true}},
-                                                {z: {$exists: true}}
-                                            ]
-                                        }
-                                    }
-                                }
-                            ]
-                        })"));
+        $or:
+            [{x: {$not: {$exists: true}}}, {x: {$not: {$_internalSchemaType: [3]}}}, {
+                x: {
+                    $_internalSchemaObjectMatch:
+                        {$and: [ {y: {$exists: true}}, {z: {$exists: true}}]}
+                }
+            }]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsideProperties) {
@@ -986,12 +821,11 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsideProperties) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{x: {$exists: true}}]},
-                                {$nor: [{x: {$_internalSchemaType: [3]}}]},
-                                {x: {$_internalSchemaObjectMatch: {y: {$exists: true }}}}
-                            ]
-                        })"));
+        $or:
+            [{x: {$not: {$exists: true}}},
+             {x: {$not: {$_internalSchemaType: [3]}}},
+             {x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblingProperties) {
@@ -1002,31 +836,24 @@ TEST(JSONSchemaParserTest, RequiredTranslatesCorrectlyInsidePropertiesWithSiblin
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     auto expectedResult = fromjson(
         R"({
-            $or: [
-                {$nor: [{x: {$exists: true}}]},
-                {
-                    $and: [
-                        {
-                            $or: [
-                                {$nor: [{x: {$_internalSchemaType: [3]}}]},
-                                {
-                                    x: {
-                                        $_internalSchemaObjectMatch: {
-                                            y: {$_internalSchemaType: ['number']}
-                                        }
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            $or: [
-                                {$nor: [{x: {$_internalSchemaType: [3]}}]},
-                                {x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}}
-                            ]
-                        }
-                    ]
-                }
-            ]
+        $or:
+            [{x: {$not: {$exists: true}}},
+             {
+               $and: [
+                   {
+                     $or: [
+                         {x: {$not: {$_internalSchemaType: [3]}}},
+                         {x: {$_internalSchemaObjectMatch: {y : {$_internalSchemaType: ["number"]}}}}
+                     ]
+                   },
+                   {
+                     $or: [
+                         {x: {$not: {$_internalSchemaType: [3]}}},
+                         {x: {$_internalSchemaObjectMatch: {y: {$exists: true}}}}
+                     ]
+                   }
+               ]
+             }]
         })");
     ASSERT_SERIALIZES_TO(optimizedResult, expectedResult);
 }
@@ -1150,15 +977,13 @@ TEST(JSONSchemaParserTest, NestedMinPropertiesTranslatesCorrectlyWithoutRequired
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     auto expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{obj: {$exists: true}}]},
-                {
-                    $and: [
-                        {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 2}}},
-                        {obj: {$_internalSchemaType: [3]}}
-                    ]
-                }
-            ]
+        $or:
+            [{obj: {$not: {$exists: true}}}, {
+                $and: [
+                    {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMinProperties: 2}}},
+                    {obj: {$_internalSchemaType: [3]}}
+                ]
+            }]
         })");
     ASSERT_SERIALIZES_TO(optimizedResult, expectedResult);
 }
@@ -1170,15 +995,13 @@ TEST(JSONSchemaParserTest, NestedMaxPropertiesTranslatesCorrectlyWithoutRequired
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     auto expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{obj: {$exists: true}}]},
-                {
-                    $and: [
-                        {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}},
-                        {obj: {$_internalSchemaType: [3]}}
-                    ]
-                }
-            ]
+        $or:
+            [{obj: {$not: {$exists: true}}}, {
+                $and: [
+                    {obj: {$_internalSchemaObjectMatch: {$_internalSchemaMaxProperties: 2}}},
+                    {obj: {$_internalSchemaType: [3]}}
+                ]
+            }]
         })");
     ASSERT_SERIALIZES_TO(optimizedResult, expectedResult);
 }
@@ -1268,11 +1091,9 @@ TEST(JSONSchemaParserTest, CanTranslateNestedTypeArray) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {a: {$_internalSchemaType: ['number', 3]}}
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}}, {a: {$_internalSchemaType: [ "number", 3 ]}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, CanTranslateNestedBsonTypeArray) {
@@ -1281,11 +1102,9 @@ TEST(JSONSchemaParserTest, CanTranslateNestedBsonTypeArray) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {a: {$_internalSchemaType: ['number', 7]}}
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}}, {a: {$_internalSchemaType: [ "number", 7 ]}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, DependenciesFailsToParseIfNotAnObject) {
@@ -1330,17 +1149,11 @@ TEST(JSONSchemaParserTest, TopLevelSchemaDependencyTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $_internalSchemaCond: [
-                                {a: {$exists: true}},
-                                {
-                                    $or: [
-                                        {$nor: [{b: {$exists: true}}]},
-                                        {b: {$_internalSchemaType: [2]}}
-                                    ]
-                                },
-                                {$alwaysTrue: 1}
-                            ]
-                        })"));
+        $_internalSchemaCond:
+            [{a: {$exists: true}},
+             {$or: [ {b: {$not: {$exists: true}}}, {b: {$_internalSchemaType: [2]}}]},
+             {$alwaysTrue: 1}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelPropertyDependencyTranslatesCorrectly) {
@@ -1369,31 +1182,29 @@ TEST(JSONSchemaParserTest, NestedSchemaDependencyTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {
-                                    $_internalSchemaCond: [
-                                        {a: {$_internalSchemaObjectMatch: {b: {$exists: true}}}},
-                                        {
-                                            $or: [
-                                                {$nor: [{a: {$_internalSchemaType: [3]}}]},
-                                                {
-                                                    a: {
-                                                        $_internalSchemaObjectMatch: {
-                                                            $or: [
-                                                                {$nor: [{c: {$exists: true}}]},
-                                                                {c: {$_internalSchemaType: [3]}}
-                                                            ]
-                                                        }
-                                                    }
-                                                }
-                                            ]
-                                        },
-                                        {$alwaysTrue: 1}
+        $or:
+            [{a: {$not: {$exists: true}}}, {
+                $_internalSchemaCond: [
+                    {a: {$_internalSchemaObjectMatch : {b: {$exists: true}}}},
+                    {
+                      $or : [
+                          {a: {$not: {$_internalSchemaType: [3]}}},
+                          {
+                            a: {
+                                $_internalSchemaObjectMatch : {
+                                    $or : [
+                                        {c: {$not: {$exists: true}}},
+                                        {c: {$_internalSchemaType: [3]}}
                                     ]
                                 }
-                            ]
-                        })"));
+                            }
+                          }
+                      ]
+                    },
+                    {$alwaysTrue : 1}
+                ]
+            }]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, NestedPropertyDependencyTranslatesCorrectly) {
@@ -1403,21 +1214,19 @@ TEST(JSONSchemaParserTest, NestedPropertyDependencyTranslatesCorrectly) {
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     auto expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{a: {$exists: true}}]},
-                {
-                    $_internalSchemaCond: [
-                        {a: {$_internalSchemaObjectMatch: {b: {$exists: true}}}},
-                        {
-                            $and: [
-                                {a: {$_internalSchemaObjectMatch: {c: {$exists: true}}}},
-                                {a: {$_internalSchemaObjectMatch: {d: {$exists: true}}}}
-                            ]
-                        },
-                        {$alwaysTrue: 1}
-                    ]
-                }
-            ]
+        $or:
+            [{a: {$not: {$exists: true}}}, {
+                $_internalSchemaCond: [
+                    {a: {$_internalSchemaObjectMatch : {b : {$exists : true}}}},
+                    {
+                      $and: [
+                          {a: {$_internalSchemaObjectMatch: {c: {$exists: true}}}},
+                          {a: {$_internalSchemaObjectMatch: {d: {$exists: true}}}}
+                      ]
+                    },
+                    {$alwaysTrue: 1}
+                ]
+            }]
         })");
     ASSERT_SERIALIZES_TO(optimizedResult, expectedResult);
 }
@@ -1606,23 +1415,20 @@ TEST(JSONSchemaParserTest, NestedAdditionalPropertiesTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{obj: {$exists: true}}]},
-                                {$nor: [{obj: {$_internalSchemaType: [3]}}]},
-                                {
-                                    obj: {
-                                        $_internalSchemaObjectMatch: {
-                                            $_internalSchemaAllowedProperties: {
-                                                properties: [],
-                                                namePlaceholder: "i",
-                                                patternProperties: [],
-                                                otherwise: {i: {$_internalSchemaType: ['number']}}
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        })"));
+        $or:
+            [{obj: {$not: {$exists: true}}}, {obj: {$not: {$_internalSchemaType: [3]}}}, {
+                obj: {
+                    $_internalSchemaObjectMatch: {
+                        $_internalSchemaAllowedProperties: {
+                            properties: [],
+                            namePlaceholder: "i",
+                            patternProperties: [],
+                            otherwise: {i: {$_internalSchemaType: ["number"]}}
+                        }
+                    }
+                }
+            }]
+        })"));
 }
 
 TEST(JSONSchemaParserTest,
@@ -1694,12 +1500,11 @@ TEST(JSONSchemaParserTest, UniqueItemsTranslatesCorrectlyWithNoType) {
     ASSERT_OK(result.getStatus());
     optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                                {a: {$_internalSchemaUniqueItems: true}}
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {a: {$not: {$_internalSchemaType: [4]}}},
+             {a: {$_internalSchemaUniqueItems: true}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, UniqueItemsTranslatesCorrectlyWithTypeArray) {
@@ -1708,16 +1513,10 @@ TEST(JSONSchemaParserTest, UniqueItemsTranslatesCorrectlyWithTypeArray) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {
-                                    $and: [
-                                        {a: {$_internalSchemaUniqueItems: true}},
-                                        {a: {$_internalSchemaType: [4]}}
-                                    ]
-                                }
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {$and: [ {a: {$_internalSchemaUniqueItems: true}}, {a: {$_internalSchemaType: [4]}}]}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, CorrectlyIgnoresUnknownKeywordsParameterIsSet) {
@@ -1812,46 +1611,39 @@ TEST(JSONSchemaParserTest, ItemsParsesSuccessfullyAsArrayInNestedSchema) {
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     auto expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{a: {$exists: true}}]},
-                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                {
-                    $and: [
-                        {
-                            a: {
-                                $_internalSchemaMatchArrayIndex: {
-                                    index: 0,
-                                    namePlaceholder: "i",
-                                    expression: {
-                                        $or: [
-                                            {$nor: [{i: {$_internalSchemaType: [2]}}]},
-                                            {i: {$_internalSchemaMaxLength: 4}}
-                                        ]
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            a: {
-                                $_internalSchemaMatchArrayIndex: {
-                                    index: 1,
-                                    namePlaceholder: "i",
-                                    expression: {
-                                        $or: [
-                                            {
-                                                $nor: [
-                                                    {i: {$_internalSchemaType: ['number']}}
-                                                ]
-                                            },
-                                            {i: {$gte: 0}}
-                                        ]
-                                    }
-                                }
-                            }
-                        }
-                    ]
-                }
-            ]
+        $or:
+            [{a: {$not: {$exists: true}}}, {a: {$not: {$_internalSchemaType: [4]}}}, {
+                $and: [
+                    {
+                      a: {
+                          $_internalSchemaMatchArrayIndex: {
+                              index: 0,
+                              namePlaceholder: "i",
+                              expression: {
+                                  $or: [
+                                      {i: {$not: {$_internalSchemaType: [2]}}},
+                                      {i: {$_internalSchemaMaxLength: 4}}
+                                  ]
+                              }
+                          }
+                      }
+                    },
+                    {
+                      a: {
+                          $_internalSchemaMatchArrayIndex : {
+                              index: 1,
+                              namePlaceholder: "i",
+                              expression: {
+                                  $or: [
+                                      {i : {$not: {$_internalSchemaType: ["number"]}}},
+                                      {i: {$gte: 0}}
+                                  ]
+                              }
+                          }
+                      }
+                    }
+                ]
+            }]
         })");
     ASSERT_SERIALIZES_TO(optimizedResult, expectedResult);
 }
@@ -1862,19 +1654,11 @@ TEST(JSONSchemaParserTest, ItemsParsesSuccessfullyAsObjectInNestedSchema) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{a: {$exists: true}}]},
-                                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                                {
-                                    a: {
-                                        $_internalSchemaAllElemMatchFromIndex: [
-                                            0,
-                                            {i: {$_internalSchemaType: [2]}}
-                                        ]
-                                    }
-                                }
-                            ]
-                        })"));
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {a: {$not: {$_internalSchemaType: [4]}}},
+             {a: {$_internalSchemaAllElemMatchFromIndex : [ 0, {i: {$_internalSchemaType: [2]}}]}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, FailsToParseIfAdditionalItemsIsNotAnObjectOrBoolean) {
@@ -1922,11 +1706,10 @@ TEST(JSONSchemaParserTest, AdditionalItemsTranslatesSucessfullyAsBooleanInNested
     auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
     auto expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{a: {$exists: true}}]},
-                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                {a: {$_internalSchemaAllElemMatchFromIndex: [0, {$alwaysTrue: 1}]}}
-            ]
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {a: {$not: {$_internalSchemaType: [4]}}},
+             {a: {$_internalSchemaAllElemMatchFromIndex: [0, {$alwaysTrue: 1}]}}]
         })");
     ASSERT_SERIALIZES_TO(optimizedExpr, expectedResult);
 
@@ -1936,11 +1719,10 @@ TEST(JSONSchemaParserTest, AdditionalItemsTranslatesSucessfullyAsBooleanInNested
     optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
     expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{a: {$exists: true}}]},
-                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                {a: {$_internalSchemaAllElemMatchFromIndex: [0, {$alwaysFalse: 1}]}}
-            ]
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {a: {$not: {$_internalSchemaType: [4]}}},
+             {a: {$_internalSchemaAllElemMatchFromIndex: [0, {$alwaysFalse: 1}]}}]
         })");
     ASSERT_SERIALIZES_TO(optimizedExpr, expectedResult);
 }
@@ -1987,23 +1769,17 @@ TEST(JSONSchemaParserTest, AdditionalItemsGeneratesEmptyExpressionIfItemsAnObjec
     auto optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
     auto expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{a: {$exists: true}}]},
-                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                {
-                    a: {
-                        $_internalSchemaAllElemMatchFromIndex: [
-                            0,
-                            {
-                                $or: [
-                                    {$nor: [{i: {$_internalSchemaType: ['number']}}]},
-                                    {i: {$gte: 7}}
-                                ]
-                            }
-                        ]
-                    }
-                }
-            ]
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {a: {$not: {$_internalSchemaType: [4]}}},
+             {
+               a: {
+                   $_internalSchemaAllElemMatchFromIndex: [
+                       0,
+                       {$or: [ {i: {$not: {$_internalSchemaType: ["number"]}}}, {i: {$gte: 7}}]}
+                   ]
+               }
+             }]
         })");
     ASSERT_SERIALIZES_TO(optimizedExpr, expectedResult);
 
@@ -2013,23 +1789,17 @@ TEST(JSONSchemaParserTest, AdditionalItemsGeneratesEmptyExpressionIfItemsAnObjec
     optimizedExpr = MatchExpression::optimize(std::move(expr.getValue()));
     expectedResult = fromjson(R"(
         {
-            $or: [
-                {$nor: [{a: {$exists: true}}]},
-                {$nor: [{a: {$_internalSchemaType: [4]}}]},
-                {
-                    a: {
-                        $_internalSchemaAllElemMatchFromIndex: [
-                            0,
-                            {
-                                $or: [
-                                    {$nor: [{i: {$_internalSchemaType: ['number']}}]},
-                                    {i: {$gte: 7}}
-                                ]
-                            }
-                        ]
-                    }
-                }
-            ]
+        $or:
+            [{a: {$not: {$exists: true}}},
+             {a: {$not: {$_internalSchemaType: [4]}}},
+             {
+               a: {
+                   $_internalSchemaAllElemMatchFromIndex : [
+                       0,
+                       {$or: [ {i: {$not: {$_internalSchemaType: ["number"]}}}, {i: {$gte: 7}}]}
+                   ]
+               }
+             }]
         })");
     ASSERT_SERIALIZES_TO(optimizedExpr, expectedResult);
 }
@@ -2062,13 +1832,12 @@ TEST(JSONSchemaParserTest, EnumTranslatesCorrectly) {
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"({
-                            $or: [
-                                {$nor: [{foo: {$exists: true}}]},
-                                {foo: {$_internalSchemaEq: 1}},
-                                {foo: {$_internalSchemaEq: "2"}},
-                                {foo: {$_internalSchemaEq: [3]}}
-                            ]
-                        })"));
+        $or:
+            [{foo: {$not: {$exists: true}}},
+             {foo: {$_internalSchemaEq: 1}},
+             {foo: {$_internalSchemaEq: "2"}},
+             {foo: {$_internalSchemaEq: [3]}}]
+        })"));
 }
 
 TEST(JSONSchemaParserTest, TopLevelEnumTranslatesCorrectly) {

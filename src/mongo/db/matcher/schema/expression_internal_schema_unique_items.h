@@ -76,7 +76,7 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-    void serialize(BSONObjBuilder* builder) const final;
+    BSONObj getSerializedRightHandSide() const final;
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 

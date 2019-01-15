@@ -78,12 +78,12 @@ public:
         debug << "\n";
     }
 
-    void serialize(BSONObjBuilder* out) const final {
-        BSONObjBuilder subBuilder(out->subobjStart(path()));
+    BSONObj getSerializedRightHandSide() const final {
+        BSONObjBuilder subBuilder;
         BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
         _typeSet.toBSONArray(&arrBuilder);
         arrBuilder.doneFast();
-        subBuilder.doneFast();
+        return subBuilder.obj();
     }
 
     bool equivalent(const MatchExpression* other) const final {

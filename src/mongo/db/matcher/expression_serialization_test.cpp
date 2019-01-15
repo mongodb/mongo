@@ -260,6 +260,47 @@ TEST(SerializeBasic, ExpressionElemMatchValueWithEmptyStringSerializesCorrectly)
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
+TEST(SerializeBasic, ExpressionElemMatchValueWithNotEqualSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$elemMatch: {$ne: 1}}}"),
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$elemMatch: {$not: {$eq: 1}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: [{a: 1, b: -1}, {a: -1, b: 1}]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: [{a: 1, b: 1}, {a: 0, b: 0}]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: [1, 0]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionElemMatchValueWithNotLessThanGreaterThanSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{x: {$elemMatch: {$not: {$lt: 10, $gt: 5}}}}"),
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$elemMatch: {$not: {$lt: 10, $gt: 5}}}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    auto obj = fromjson("{x: [5]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 TEST(SerializeBasic, ExpressionSizeSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{x: {$size: 2}}"),
@@ -375,7 +416,7 @@ TEST(SerializeBasic, ExpressionNeSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$eq: {a: 1}}}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$eq: {a: 1}}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: {a: 1}}");
@@ -397,8 +438,8 @@ TEST(SerializeBasic, ExpressionNeWithRegexObjectSerializesCorrectly) {
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$eq" << BSON("$regex"
-                                                                               << "abc"))))));
+                      BSON("x" << BSON("$not" << BSON("$eq" << BSON("$regex"
+                                                                    << "abc")))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: {a: 1}}");
@@ -629,7 +670,7 @@ TEST(SerializeBasic, ExpressionExistsFalseSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$exists: true}}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$exists: true}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 1}");
@@ -712,7 +753,7 @@ TEST(SerializeBasic, ExpressionNinSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$in: [1, 2, 3]}}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$in: [1, 2, 3]}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 1}");
@@ -736,7 +777,7 @@ TEST(SerializeBasic, ExpressionNinWithRegexValueSerializesCorrectly) {
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      fromjson("{$nor: [{x: {$in: [/abc/, /def/, /xyz/]}}]}"));
+                      fromjson("{x: {$not: {$in: [/abc/, /def/, /xyz/]}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -841,7 +882,7 @@ TEST(SerializeBasic, ExpressionNotSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{$and: [{x: {$eq: 3}}]}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$eq: 3}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 3}");
@@ -861,8 +902,7 @@ TEST(SerializeBasic, ExpressionNotWithMultipleChildrenSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      fromjson("{$nor: [{$and: [{x: {$lt: 1}}, {x: {$gt: 3}}]}]}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$lt: 1, $gt: 3}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 2}");
@@ -882,8 +922,7 @@ TEST(SerializeBasic, ExpressionNotWithBitTestSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      fromjson("{$nor: [{$and: [{x: {$bitsAnySet: [1, 3]}}]}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$not: {$bitsAnySet: [1, 3]}}}"));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 2}");
@@ -904,8 +943,8 @@ TEST(SerializeBasic, ExpressionNotWithRegexObjSerializesCorrectly) {
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
-                                                                 << "a.b")))));
+                      BSON("x" << BSON("$not" << BSON("$regex"
+                                                      << "a.b"))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -926,8 +965,8 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueSerializesCorrectly) {
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
-                                                                 << "a.b")))));
+                      BSON("x" << BSON("$not" << BSON("$regex"
+                                                      << "a.b"))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -948,10 +987,10 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
-                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
-                                                                 << "a.b"
-                                                                 << "$options"
-                                                                 << "i")))));
+                      BSON("x" << BSON("$not" << BSON("$regex"
+                                                      << "a.b"
+                                                      << "$options"
+                                                      << "i"))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -973,10 +1012,9 @@ TEST(SerializeBasic, ExpressionNotWithGeoSerializesCorrectly) {
                          expCtx,
                          ExtensionsCallbackNoop(),
                          MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_BSONOBJ_EQ(
-        *reserialized.getQuery(),
-        fromjson("{$nor: [{$and: [{x: {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: "
-                 "[[[ 0, 0 ], [5, 0], [5, 5], [0, 5], [0, 0]]]}}}}]}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{x: {$not: {$geoIntersects: {$geometry: {type: 'Polygon', "
+                               "coordinates: [[[0, 0], [5, 0], [5, 5], [0, 5], [0, 0]]]}}}}}"));
 
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
     BSONObj obj =

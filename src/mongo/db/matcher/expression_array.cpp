@@ -103,10 +103,10 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int level
     _sub->debugString(debug, level + 1);
 }
 
-void ElemMatchObjectMatchExpression::serialize(BSONObjBuilder* out) const {
+BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide() const {
     BSONObjBuilder subBob;
     _sub->serialize(&subBob);
-    out->append(path(), BSON("$elemMatch" << subBob.obj()));
+    return BSON("$elemMatch" << subBob.obj());
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
@@ -178,7 +178,7 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level)
     }
 }
 
-void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
+BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide() const {
     BSONObjBuilder emBob;
 
     for (unsigned i = 0; i < _subs.size(); i++) {
@@ -187,7 +187,8 @@ void ElemMatchValueMatchExpression::serialize(BSONObjBuilder* out) const {
         BSONObj predObj = predicate.obj();
         emBob.appendElements(predObj.firstElement().embeddedObject());
     }
-    out->append(path(), BSON("$elemMatch" << emBob.obj()));
+
+    return BSON("$elemMatch" << emBob.obj());
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptimizer() const {
@@ -226,8 +227,8 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int level) const {
     }
 }
 
-void SizeMatchExpression::serialize(BSONObjBuilder* out) const {
-    out->append(path(), BSON("$size" << _size));
+BSONObj SizeMatchExpression::getSerializedRightHandSide() const {
+    return BSON("$size" << _size);
 }
 
 bool SizeMatchExpression::equivalent(const MatchExpression* other) const {

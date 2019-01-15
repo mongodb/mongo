@@ -1375,12 +1375,6 @@ StatusWithMatchExpression parseNot(StringData name,
         return parseStatus;
     }
 
-    for (size_t i = 0; i < theAnd->numChildren(); i++) {
-        if (theAnd->getChild(i)->matchType() == MatchExpression::REGEX) {
-            return {ErrorCodes::BadValue, "$not cannot have a regex"};
-        }
-    }
-
     return {stdx::make_unique<NotMatchExpression>(theAnd.release())};
 }
 

@@ -48,13 +48,8 @@ Matcher::Matcher(const BSONObj& pattern,
                  const ExtensionsCallback& extensionsCallback,
                  const MatchExpressionParser::AllowedFeatureSet allowedFeatures)
     : _pattern(pattern) {
-    StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(pattern, expCtx, extensionsCallback, allowedFeatures);
-    uassert(16810,
-            mongoutils::str::stream() << "bad query: " << statusWithMatcher.getStatus().toString(),
-            statusWithMatcher.isOK());
-
-    _expression = std::move(statusWithMatcher.getValue());
+    _expression = uassertStatusOK(
+        MatchExpressionParser::parse(pattern, expCtx, extensionsCallback, allowedFeatures));
 }
 
 bool Matcher::matches(const BSONObj& doc, MatchDetails* details) const {

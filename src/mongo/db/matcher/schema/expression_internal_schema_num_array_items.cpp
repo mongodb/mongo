@@ -51,10 +51,10 @@ void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debu
     debug << "\n";
 }
 
-void InternalSchemaNumArrayItemsMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONObjBuilder subBob(out->subobjStart(path()));
-    subBob.append(_name, _numItems);
-    subBob.doneFast();
+BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide() const {
+    BSONObjBuilder objBuilder;
+    objBuilder.append(_name, _numItems);
+    return objBuilder.obj();
 }
 
 bool InternalSchemaNumArrayItemsMatchExpression::equivalent(const MatchExpression* other) const {
