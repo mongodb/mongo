@@ -197,7 +197,8 @@ def update_suite_config(suite_config, roots=None, excludes=None):
     if excludes:
         # This must be a misc file, if the exclude_files section exists, extend it, otherwise,
         # create it.
-        if "exclude_files" in suite_config["selector"]:
+        if "exclude_files" in suite_config["selector"] and \
+                suite_config["selector"]["exclude_files"]:
             suite_config["selector"]["exclude_files"] += excludes
         else:
             suite_config["selector"]["exclude_files"] = excludes
