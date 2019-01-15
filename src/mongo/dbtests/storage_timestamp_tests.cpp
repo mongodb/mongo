@@ -2430,9 +2430,8 @@ public:
             // Create a background index via `applyOps`. We will timestamp the beginning at
             // `startBuildTs` and the end, due to manipulation of the logical clock, should be
             // timestamped at `endBuildTs`.
-            const auto beforeBuildTime = _clock->reserveTicks(3);
+            const auto beforeBuildTime = _clock->reserveTicks(2);
             const auto startBuildTs = beforeBuildTime.addTicks(1).asTimestamp();
-            const auto endBuildTs = beforeBuildTime.addTicks(3).asTimestamp();
 
             // Grab the existing idents to identify the ident created by the index build.
             auto kvStorageEngine =
@@ -2471,22 +2470,10 @@ public:
             assertIdentsMissingAtTimestamp(
                 kvCatalog, "", indexIdent, beforeBuildTime.asTimestamp());
             assertIdentsExistAtTimestamp(kvCatalog, "", indexIdent, startBuildTs);
-            if (Foreground) {
-                // In the Foreground case, the index build should start and finish at
-                // `startBuildTs`.
-                ASSERT_TRUE(
-                    getIndexMetaData(getMetaDataAtTime(kvCatalog, nss, startBuildTs), "field_1")
-                        .ready);
-            } else {
-                // In the Background case, the index build should not be "ready" at `startBuildTs`.
-                ASSERT_FALSE(
-                    getIndexMetaData(getMetaDataAtTime(kvCatalog, nss, startBuildTs), "field_1")
-                        .ready);
-                assertIdentsExistAtTimestamp(kvCatalog, "", indexIdent, endBuildTs);
-                ASSERT_TRUE(
-                    getIndexMetaData(getMetaDataAtTime(kvCatalog, nss, endBuildTs), "field_1")
-                        .ready);
-            }
+
+            // In all cases, the index build should start and finish at `startBuildTs`.
+            ASSERT_TRUE(
+                getIndexMetaData(getMetaDataAtTime(kvCatalog, nss, startBuildTs), "field_1").ready);
         }
     }
 };
