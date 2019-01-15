@@ -36,10 +36,13 @@
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 
 namespace {
 
 using mongo::fromjson;
+using mongo::makeGuard;
+using mongo::ScopeGuard;
 
 class StitchSupportTest : public mongo::unittest::Test {
 protected:
@@ -110,6 +113,7 @@ protected:
             collator =
                 stitch_support_v1_collator_create(lib, fromjson(collatorObj).objdata(), nullptr);
         }
+        ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
 
         stitch_support_v1_matcher* matcher = nullptr;
         if (match) {
@@ -117,6 +121,7 @@ protected:
                 stitch_support_v1_matcher_create(lib, fromjson(match).objdata(), collator, nullptr);
             ASSERT(matcher);
         }
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
 
         stitch_support_v1_update* update = stitch_support_v1_update_create(
             lib,
@@ -126,19 +131,17 @@ protected:
             collator,
             status);
         ASSERT(update);
+        ON_BLOCK_EXIT([update] { stitch_support_v1_update_destroy(update); });
 
         char* updateResult = stitch_support_v1_update_apply(
             update, fromjson(document).objdata(), updateDetails, status);
-        ASSERT_EQ(0, stitch_support_v1_status_get_code(status));
+        ASSERT_EQ(0, stitch_support_v1_status_get_code(status))
+            << stitch_support_v1_status_get_error(status) << ":"
+            << stitch_support_v1_status_get_explanation(status);
         ASSERT(updateResult);
-
-        stitch_support_v1_update_destroy(update);
-        stitch_support_v1_matcher_destroy(matcher);
-        stitch_support_v1_collator_destroy(collator);
+        ON_BLOCK_EXIT([updateResult] { free(updateResult); });
 
         ASSERT_BSONOBJ_EQ(mongo::BSONObj(updateResult), expectedResult);
-
-        free(updateResult);
     }
 
     const std::string getModifiedPaths() {
