@@ -51,12 +51,12 @@ public:
     ~update_guard() = default;
 
     // Only move construction is permitted so that synchronized_value may return update_guard
-    update_guard(update_guard&&);
+    update_guard(update_guard&&) = default;
+    update_guard& operator=(update_guard&&) = default;
 
-    // Disallow any copy or move
+    // Disallow any copy
     update_guard(update_guard const&) = delete;
     update_guard& operator=(update_guard const&) = delete;
-    update_guard&& operator=(update_guard&&) = delete;
 
     T& operator*() noexcept {
         return _value;
@@ -82,7 +82,7 @@ public:
 
 private:
     // Held lock from synchronized_value
-    stdx::lock_guard<stdx::mutex> _lock;
+    stdx::unique_lock<stdx::mutex> _lock;
 
     // Reference to the value from synchronized_value
     T& _value;
@@ -101,12 +101,12 @@ public:
     ~const_update_guard() = default;
 
     // Only move construction is permitted so that synchronized_value may return const_update_guard
-    const_update_guard(const_update_guard&&);
+    const_update_guard(const_update_guard&&) = default;
+    const_update_guard& operator=(const_update_guard&&) = default;
 
-    // Disallow any copy or move
+    // Disallow any copy
     const_update_guard(const_update_guard const&) = delete;
     const_update_guard& operator=(const_update_guard const&) = delete;
-    const_update_guard&& operator=(const_update_guard&&) = delete;
 
     T& operator*() const noexcept {
         return _value;
@@ -122,7 +122,7 @@ public:
 
 private:
     // Held lock from synchronized_value
-    stdx::lock_guard<stdx::mutex> _lock;
+    stdx::unique_lock<stdx::mutex> _lock;
 
     // Reference to the value from synchronized_value
     const T& _value;
