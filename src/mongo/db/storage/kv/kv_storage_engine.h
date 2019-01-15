@@ -390,9 +390,9 @@ private:
     void _dumpCatalog(OperationContext* opCtx);
 
     /**
-     * Called when the checkpoint timestamp advances in the KVEngine.
+     * Called when the oldest timestamp advances in the KVEngine.
      */
-    void _onCheckpointTimestampChanged(const Timestamp& checkpointTimestamp);
+    void _onOldestTimestampChanged(const Timestamp& oldestTimestamp);
 
     class RemoveDBChange;
 
@@ -406,8 +406,8 @@ private:
     // Manages drop-pending idents. Requires access to '_engine'.
     KVDropPendingIdentReaper _dropPendingIdentReaper;
 
-    // Listener for checkpoint timestamp changes.
-    TimestampMonitor::TimestampListener _checkpointTimestampListener;
+    // Listener for oldest timestamp changes.
+    TimestampMonitor::TimestampListener _oldestTimestampListener;
 
     const bool _supportsDocLocking;
     const bool _supportsDBLocking;
