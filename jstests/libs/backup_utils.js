@@ -24,6 +24,28 @@ function extendBackupCursor(mongo, backupId, extendTo) {
         [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}], {maxTimeMS: 10000});
 }
 
+function startHeartbeatThread(host, backupCursor, session, stopCounter) {
+    let cursorId = tojson(backupCursor._cursorid);
+    let lsid = tojson(session.getSessionId());
+
+    let heartbeatBackupCursor = function(host, cursorId, lsid, stopCounter) {
+        const conn = new Mongo(host);
+        const db = conn.getDB("admin");
+        while (stopCounter.getCount() > 0) {
+            let res = assert.commandWorked(db.runCommand({
+                getMore: eval("(" + cursorId + ")"),
+                collection: "$cmd.aggregate",
+                lsid: eval("(" + lsid + ")")
+            }));
+            sleep(10 * 1000);
+        }
+    };
+
+    heartbeater = new ScopedThread(heartbeatBackupCursor, host, cursorId, lsid, stopCounter);
+    heartbeater.start();
+    return heartbeater;
+}
+
 /**
  * Exhaust the backup cursor and copy all the listed files to the destination directory. If `async`
  * is true, this function will spawn a ScopedThread doing the copy work and return the thread along
