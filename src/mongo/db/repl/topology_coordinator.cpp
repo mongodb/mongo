@@ -1183,8 +1183,16 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
     }
 
     for (auto&& memberData : _memberData) {
+        const auto isArbiter = _rsConfig.getMemberAt(memberData.getMemberId()).isArbiter();
+
+        // We do not count arbiters towards the write concern.
+        if (isArbiter) {
+            continue;
+        }
+
         const OpTime& memberOpTime =
             durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
+
         if (memberOpTime >= targetOpTime) {
             --numNodes;
         }
