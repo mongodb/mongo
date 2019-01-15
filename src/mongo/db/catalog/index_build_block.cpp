@@ -160,7 +160,8 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
         invariant(_indexBuildInterceptor->areAllConstraintsChecked(_opCtx));
     }
 
-    log() << "index build: done building index " << _indexName << "";
+    log() << "index build: done building index " << _indexName << " on ns "
+          << _collection->ns().ns();
 
     _collection->indexBuildSuccess(_opCtx, _entry);
 
