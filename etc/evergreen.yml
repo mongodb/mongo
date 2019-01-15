@@ -13636,6 +13636,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel72-zseries-build
+  - name: concurrency_replication_multi_stmt_txn
     distros:
     - rhel72-zseries-build
   - name: concurrency_sharded_replication
