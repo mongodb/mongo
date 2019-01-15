@@ -74,9 +74,12 @@ inline Status errorCodeToStatus(const std::error_code& ec) {
     if (ec == asio::error::try_again || ec == asio::error::would_block) {
 #endif
         return {ErrorCodes::NetworkTimeout, "Socket operation timed out"};
-    } else if (ec == asio::error::eof || ec == asio::error::connection_reset ||
-               ec == asio::error::network_reset) {
-        return {ErrorCodes::HostUnreachable, "Connection was closed"};
+    } else if (ec == asio::error::eof) {
+        return {ErrorCodes::HostUnreachable, "Connection closed by peer"};
+    } else if (ec == asio::error::connection_reset) {
+        return {ErrorCodes::HostUnreachable, "Connection reset by peer"};
+    } else if (ec == asio::error::network_reset) {
+        return {ErrorCodes::HostUnreachable, "Connection reset by network"};
     }
 
     // If the ec.category() is a mongoErrorCategory() then this error was propogated from
