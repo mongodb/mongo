@@ -66,10 +66,10 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug, int leve
     debug << "\n";
 }
 
-void InternalSchemaEqMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONObjBuilder eqObj(out->subobjStart(path()));
+BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide() const {
+    BSONObjBuilder eqObj;
     eqObj.appendAs(_rhsElem, kName);
-    eqObj.doneFast();
+    return eqObj.obj();
 }
 
 bool InternalSchemaEqMatchExpression::equivalent(const MatchExpression* other) const {

@@ -240,6 +240,10 @@ public:
     }
 
 private:
+    static boost::optional<StringData> getPathIfNotWithSinglePathMatchExpressionTree(
+        MatchExpression* exp);
+    static void serializeNotExpressionToNor(MatchExpression* exp, BSONObjBuilder* out);
+
     ExpressionOptimizerFunc getOptimizer() const final;
 
     std::unique_ptr<MatchExpression> _exp;

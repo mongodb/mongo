@@ -375,18 +375,16 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithDefaults) {
 }
 
 TEST_F(StitchSupportTest, CheckMatchWorksWithStatus) {
-    ASSERT_EQ("bad query: BadValue: unknown operator: $bogus",
-              checkMatchStatus("{a: {$bogus: 1}}", "{a: 1}"));
-    ASSERT_EQ("bad query: BadValue: $where is not allowed in this context",
+    ASSERT_EQ("unknown operator: $bogus", checkMatchStatus("{a: {$bogus: 1}}", "{a: 1}"));
+    ASSERT_EQ("$where is not allowed in this context",
               checkMatchStatus("{$where: 'this.a == 1'}", "{a: 1}"));
-    ASSERT_EQ("bad query: BadValue: $text is not allowed in this context",
+    ASSERT_EQ("$text is not allowed in this context",
               checkMatchStatus("{$text: {$search: 'stitch'}}", "{a: 'stitch lib'}"));
-    ASSERT_EQ(
-        "bad query: BadValue: $geoNear, $near, and $nearSphere are not allowed in this context",
-        checkMatchStatus(
-            "{location: {$near: {$geometry: {type: 'Point', "
-            "coordinates: [ -73.9667, 40.78 ] }, $minDistance: 10, $maxDistance: 500}}}",
-            "{type: 'Point', 'coordinates': [100.0, 0.0]}"));
+    ASSERT_EQ("$geoNear, $near, and $nearSphere are not allowed in this context",
+              checkMatchStatus(
+                  "{location: {$near: {$geometry: {type: 'Point', "
+                  "coordinates: [ -73.9667, 40.78 ] }, $minDistance: 10, $maxDistance: 500}}}",
+                  "{type: 'Point', 'coordinates': [100.0, 0.0]}"));
 
     // 'check_match' cannot actually fail so we do not test it with a status.
 }

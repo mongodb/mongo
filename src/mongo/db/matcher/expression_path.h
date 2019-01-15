@@ -118,6 +118,18 @@ public:
         }
     }
 
+    void serialize(BSONObjBuilder* out) const override {
+        out->append(path(), getSerializedRightHandSide());
+    }
+
+    /**
+     * Returns a BSONObj that represents the right-hand-side of a PathMatchExpression. Used for
+     * serialization of PathMatchExpression in cases where we do not want to serialize the path in
+     * line with the expression. For example {x: {$not: {$eq: 1}}}, where $eq is the
+     * PathMatchExpression.
+     */
+    virtual BSONObj getSerializedRightHandSide() const = 0;
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final {
         if (!_path.empty()) {

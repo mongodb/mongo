@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_path.h"
 
 namespace mongo {
 
@@ -317,17 +318,80 @@ void NotMatchExpression::debugString(StringBuilder& debug, int level) const {
     _exp->debugString(debug, level + 1);
 }
 
-void NotMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONObjBuilder childBob;
-    _exp->serialize(&childBob);
+boost::optional<StringData> NotMatchExpression::getPathIfNotWithSinglePathMatchExpressionTree(
+    MatchExpression* exp) {
+    if (auto pathMatch = dynamic_cast<PathMatchExpression*>(exp)) {
+        return pathMatch->path();
+    }
 
+    if (exp->matchType() == MatchExpression::MatchType::AND && exp->numChildren() > 0) {
+        boost::optional<StringData> path;
+        for (size_t i = 0; i < exp->numChildren(); ++i) {
+            auto pathMatchChild = dynamic_cast<PathMatchExpression*>(exp->getChild(i));
+            if (!pathMatchChild) {
+                return boost::none;
+            }
+
+            if (path && path != pathMatchChild->path()) {
+                return boost::none;
+            } else if (!path) {
+                path = pathMatchChild->path();
+            }
+        }
+
+        invariant(path);
+        return path;
+    }
+
+    return boost::none;
+}
+
+void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp, BSONObjBuilder* out) {
+    BSONObjBuilder childBob;
+    exp->serialize(&childBob);
     BSONObj tempObj = childBob.obj();
 
-    // We don't know what the inner object is, and thus whether serializing to $not will result in a
-    // parseable MatchExpression. As a fix, we change it to $nor, which is always parseable.
     BSONArrayBuilder tBob(out->subarrayStart("$nor"));
     tBob.append(tempObj);
     tBob.doneFast();
+}
+
+void NotMatchExpression::serialize(BSONObjBuilder* out) const {
+    if (_exp->matchType() == MatchType::AND && _exp->numChildren() == 0) {
+        out->append("$alwaysFalse", 1);
+        return;
+    }
+
+    // When a $not contains an expression that is not a PathMatchExpression tree representing a
+    // single path, we transform to a $nor.
+    // There are trees constructed to represent JSONSchema that require a nor representation to
+    // be valid. Here is an example:
+    // JSONSchema:
+    //    {properties: {foo: {type: "string", not: {maxLength: 4}}}}
+    // MatchExpression tree generated:
+    //    {foo: {$not: {$or: [{$not: {$_internalSchemaType: [ 2 ]}},
+    //                        {$_internalSchemaMaxLength: 4}]}}}
+    boost::optional<StringData> path = getPathIfNotWithSinglePathMatchExpressionTree(_exp.get());
+    if (!path) {
+        return serializeNotExpressionToNor(_exp.get(), out);
+    }
+
+    BSONObjBuilder pathBob(out->subobjStart(*path));
+
+    if (_exp->matchType() == MatchType::AND) {
+        BSONObjBuilder notBob(pathBob.subobjStart("$not"));
+        for (size_t x = 0; x < _exp->numChildren(); ++x) {
+            auto* pathMatchExpression = dynamic_cast<PathMatchExpression*>(_exp->getChild(x));
+            invariant(pathMatchExpression);
+            notBob.appendElements(pathMatchExpression->getSerializedRightHandSide());
+        }
+        notBob.doneFast();
+    } else {
+        auto* pathMatchExpression = dynamic_cast<PathMatchExpression*>(_exp.get());
+        invariant(pathMatchExpression);
+        pathBob.append("$not", pathMatchExpression->getSerializedRightHandSide());
+    }
+    pathBob.doneFast();
 }
 
 bool NotMatchExpression::equivalent(const MatchExpression* other) const {

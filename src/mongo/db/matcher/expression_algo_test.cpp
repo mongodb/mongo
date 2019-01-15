@@ -868,7 +868,7 @@ TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
     BSONObjBuilder firstBob;
     splitExpr.first->serialize(&firstBob);
 
-    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{$and: [{x: {$gt: 4}}]}]}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{x: {$not: {$gt: 4}}}"));
     ASSERT_FALSE(splitExpr.second);
 }
 
@@ -912,12 +912,11 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
     splitExpr.second->serialize(&secondBob);
 
     ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
-    ASSERT_BSONOBJ_EQ(
-        secondBob.obj(),
-        fromjson("{$and: [{$nor: [{$and: [{x: {$size: 2}}]}]}, {$nor: [{x: {$gt: 4}}, {$and: "
-                 "[{$nor: [{$and: [{x: "
-                 "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(),
+                      fromjson("{$and: [{x: {$not: {$size: 2}}}, {$nor: [{x: {$gt: 4}}, {$and: "
+                               "[{x: {$not: {$eq: 1}}}, {y: {$eq: 3}}]}]}]}"));
 }
+
 
 TEST(SplitMatchExpression, ShouldNotExtractPrefixOfDottedPathAsIndependent) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {'a.b': 1}, {'a.c': 1}]}");

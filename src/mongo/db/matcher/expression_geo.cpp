@@ -386,10 +386,10 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void GeoMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONObjBuilder subobj(out->subobjStart(path()));
+BSONObj GeoMatchExpression::getSerializedRightHandSide() const {
+    BSONObjBuilder subobj;
     subobj.appendElements(_rawObj);
-    subobj.doneFast();
+    return subobj.obj();
 }
 
 bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
@@ -444,10 +444,10 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int level) const 
     debug << "\n";
 }
 
-void GeoNearMatchExpression::serialize(BSONObjBuilder* out) const {
-    BSONObjBuilder subobj(out->subobjStart(path()));
-    subobj.appendElements(_rawObj);
-    subobj.doneFast();
+BSONObj GeoNearMatchExpression::getSerializedRightHandSide() const {
+    BSONObjBuilder objBuilder;
+    objBuilder.appendElements(_rawObj);
+    return objBuilder.obj();
 }
 
 bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {

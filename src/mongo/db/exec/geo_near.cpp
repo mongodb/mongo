@@ -516,6 +516,10 @@ public:
     // These won't be called.
     //
 
+    BSONObj getSerializedRightHandSide() const final {
+        MONGO_UNREACHABLE;
+    }
+
     void debugString(StringBuilder& debug, int level = 0) const final {
         MONGO_UNREACHABLE;
     }

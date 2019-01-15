@@ -733,10 +733,15 @@ TEST(PipelineOptimizationTest, MatchWithNorOnlySplitsIndependentChildren) {
         "[{$unwind: {path: '$a'}}, "
         "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}, {b: {$eq: 2}} ]}}]";
     string outputPipe =
-        "[{$match: {$nor: [{b: {$eq: 2}}]}}, "
-        "{$unwind: {path: '$a'}}, "
-        "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}]}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+        R"(
+        [{$match: {b: {$not: {$eq: 2}}}},
+         {$unwind: {path: '$a'}},
+         {$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}]}}])";
+    string serializedPipe = R"(
+        [{$match: {$nor: [{b: {$eq: 2}}]}},
+         {$unwind: {path: '$a'}},
+         {$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}]}}])";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchWithOrDoesNotSplit) {
@@ -994,10 +999,15 @@ TEST(PipelineOptimizationTest, NorCanSplitAcrossProjectWithRename) {
         "[{$project: {_id: false, x: true, y: '$z'}},"
         "{$match: {$nor: [{w: {$eq: 1}}, {y: {$eq: 1}}]}}]";
     string outputPipe =
-        "[{$match: {$nor: [{z: {$eq: 1}}]}},"
-        "{$project: {_id: false, x: true, y: '$z'}},"
-        "{$match: {$nor: [{w: {$eq: 1}}]}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+        R"([{$match: {z : {$not: {$eq: 1}}}},
+             {$project: {_id: false, x: true, y: "$z"}},
+             {$match: {w: {$not: {$eq: 1}}}}])";
+    string serializedPipe = R"(
+        [{$match: {$nor: [ {z : {$eq: 1}}]}},
+         {$project: {_id: false, x: true, y: "$z"}},
+         {$match: {$nor: [ {w: {$eq: 1}}]}}]
+        )";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, MatchCanMoveAcrossSeveralRenames) {
@@ -1012,7 +1022,13 @@ TEST(PipelineOptimizationTest, MatchCanMoveAcrossSeveralRenames) {
         "{$match: {z: {$eq: 2}}},"
         "{$addFields: {b: '$c'}},"
         "{$project: {_id: true, z: true, a: '$b'}}]";
-    assertPipelineOptimizesTo(inputPipe, outputPipe);
+    string serializedPipe = R"(
+        [{$match: {d : {$eq: 1}}},
+         {$project: {_id: false, c: "$d"}},
+         {$match: {z : {$eq: 2}}},
+         {$addFields: {b: "$c"}},
+         {$project: {_id: true, z: true, a: "$b"}}])";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
 TEST(PipelineOptimizationTest, RenameShouldNotBeAppliedToDependentMatch) {

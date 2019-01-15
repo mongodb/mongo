@@ -68,10 +68,10 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
         _expression->equivalent(other->_expression.get());
 }
 
-void InternalSchemaMatchArrayIndexMatchExpression::serialize(BSONObjBuilder* builder) const {
-    BSONObjBuilder pathSubobj(builder->subobjStart(path()));
+BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide() const {
+    BSONObjBuilder objBuilder;
     {
-        BSONObjBuilder matchArrayElemSubobj(pathSubobj.subobjStart(kName));
+        BSONObjBuilder matchArrayElemSubobj(objBuilder.subobjStart(kName));
         matchArrayElemSubobj.append("index", _index);
         matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder().value_or(""));
         {
@@ -81,7 +81,7 @@ void InternalSchemaMatchArrayIndexMatchExpression::serialize(BSONObjBuilder* bui
         }
         matchArrayElemSubobj.doneFast();
     }
-    pathSubobj.doneFast();
+    return objBuilder.obj();
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::shallowClone()
