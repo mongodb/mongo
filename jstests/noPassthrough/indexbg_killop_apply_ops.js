@@ -1,6 +1,8 @@
 /**
- * Confirms that background index builds started through applyOps on a primary cannot be aborted
- * using killop.
+ * Confirms that background index builds started through applyOps on a primary can be aborted using
+ * killop. This is because primaries run background index builds in the foreground when run through
+ * applyOps.
+ *
  * @tags: [requires_replication]
  */
 (function() {
@@ -46,25 +48,32 @@
             },
         ]
     };
-    const createIdx =
-        startParallelShell('db.adminCommand(' + tojson(applyOpsCmd) + ')', primary.port);
+    const createIdx = startParallelShell(
+        'assert.commandWorked(db.adminCommand(' + tojson(applyOpsCmd) + '))', primary.port);
 
     // When the index build starts, find its op id.
     const opId = IndexBuildTest.waitForIndexBuildToStart(testDB);
+
+    // CurOp output should contain the current state of the index builder such as the build UUID
+    // and build phase.
+    IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, false);
 
     // Kill the index build. This should have no effect.
     assert.commandWorked(testDB.killOp(opId));
 
     // Wait for the index build to stop.
-    IndexBuildTest.resumeIndexBuilds(primary);
-    IndexBuildTest.waitForIndexBuildToStop(testDB);
+    try {
+        IndexBuildTest.waitForIndexBuildToStop(testDB);
+    } finally {
+        IndexBuildTest.resumeIndexBuilds(primary);
+    }
 
-    // Expect successful createIndex command invocation in parallel shell because applyOps returns
-    // immediately after starting the background index build in a separate thread.
-    createIdx();
+    const exitCode = createIdx({checkExitSuccess: false});
+    assert.neq(
+        0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
 
     // Check that index was created on the primary despite the attempted killOp().
-    IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
     rst.stopSet();
 })();
