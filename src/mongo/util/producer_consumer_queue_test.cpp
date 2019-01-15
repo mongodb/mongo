@@ -295,20 +295,16 @@ PRODUCER_CONSUMER_QUEUE_TEST(popsWithTimeout, runTimeoutPermutations<false, fals
     typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
 
     helper
-        .runThread("Consumer",
-                   [&](OperationContext* opCtx) {
-                       ASSERT_THROWS_CODE(
-                           pcq.pop(opCtx), DBException, ErrorCodes::ExceededTimeLimit);
+        .runThread(
+            "Consumer",
+            [&](OperationContext* opCtx) {
+                ASSERT_THROWS_CODE(pcq.pop(opCtx), DBException, ErrorCodes::ExceededTimeLimit);
 
-                       std::vector<MoveOnly> vec;
-                       ASSERT_THROWS_CODE(pcq.popMany(std::back_inserter(vec), opCtx),
-                                          DBException,
-                                          ErrorCodes::ExceededTimeLimit);
+                ASSERT_THROWS_CODE(pcq.popMany(opCtx), DBException, ErrorCodes::ExceededTimeLimit);
 
-                       ASSERT_THROWS_CODE(pcq.popManyUpTo(1000, std::back_inserter(vec), opCtx),
-                                          DBException,
-                                          ErrorCodes::ExceededTimeLimit);
-                   })
+                ASSERT_THROWS_CODE(
+                    pcq.popManyUpTo(1000, opCtx), DBException, ErrorCodes::ExceededTimeLimit);
+            })
         .join();
 
     ASSERT_EQUALS(pcq.getStats().queueDepth, 0ul);
@@ -508,9 +504,8 @@ PRODUCER_CONSUMER_QUEUE_TEST(popManyPopWithBlocking, runPermutations<false, fals
 
     auto consumer = helper.runThread("Consumer", [&](OperationContext* opCtx) {
         for (int i = 0; i < 10; i = i + 2) {
-            std::vector<MoveOnly> out;
-
-            pcq.popMany(std::back_inserter(out), opCtx);
+            std::deque<MoveOnly> out;
+            std::tie(out, std::ignore) = pcq.popMany(opCtx);
 
             ASSERT_EQUALS(out.size(), 2ul);
             ASSERT_EQUALS(out[0], MoveOnly(i));
@@ -543,10 +538,10 @@ PRODUCER_CONSUMER_QUEUE_TEST(popManyUpToPopWithBlocking, runPermutations<false, 
 
     auto consumer = helper.runThread("Consumer", [&](OperationContext* opCtx) {
         for (int i = 0; i < 10; i = i + 2) {
-            std::vector<MoveOnly> out;
-
+            std::deque<MoveOnly> out;
             size_t spent;
-            std::tie(spent, std::ignore) = pcq.popManyUpTo(2, std::back_inserter(out), opCtx);
+
+            std::tie(out, spent) = pcq.popManyUpTo(2, opCtx);
 
             ASSERT_EQUALS(spent, 2ul);
             ASSERT_EQUALS(out.size(), 2ul);
@@ -578,32 +573,41 @@ PRODUCER_CONSUMER_QUEUE_TEST(popManyUpToPopWithBlockingWithSpecialCost,
 
     auto consumer = helper.runThread("Consumer", [&](OperationContext* opCtx) {
         {
-            std::vector<MoveOnly> out;
+            std::deque<MoveOnly> out;
             size_t spent;
-            std::tie(spent, std::ignore) = pcq.popManyUpTo(5, std::back_inserter(out), opCtx);
+            std::tie(out, spent) = pcq.popManyUpTo(5, opCtx);
 
-            ASSERT_EQUALS(spent, 6ul);
-            ASSERT_EQUALS(out.size(), 3ul);
+            ASSERT_EQUALS(spent, 3ul);
+            ASSERT_EQUALS(out.size(), 2ul);
             ASSERT_EQUALS(out[0], MoveOnly(1));
             ASSERT_EQUALS(out[1], MoveOnly(2));
-            ASSERT_EQUALS(out[2], MoveOnly(3));
         }
 
         {
-            std::vector<MoveOnly> out;
+            std::deque<MoveOnly> out;
             size_t spent;
-            std::tie(spent, std::ignore) = pcq.popManyUpTo(15, std::back_inserter(out), opCtx);
+            std::tie(out, spent) = pcq.popManyUpTo(15, opCtx);
 
-            ASSERT_EQUALS(spent, 9ul);
-            ASSERT_EQUALS(out.size(), 2ul);
-            ASSERT_EQUALS(out[0], MoveOnly(4));
-            ASSERT_EQUALS(out[1], MoveOnly(5));
+            ASSERT_EQUALS(spent, 12ul);
+            ASSERT_EQUALS(out.size(), 3ul);
+            ASSERT_EQUALS(out[0], MoveOnly(3));
+            ASSERT_EQUALS(out[1], MoveOnly(4));
+            ASSERT_EQUALS(out[2], MoveOnly(5));
+        }
+
+        {
+            std::deque<MoveOnly> out;
+            size_t spent;
+            std::tie(out, spent) = pcq.popManyUpTo(5, opCtx);
+
+            ASSERT_EQUALS(spent, 0ul);
+            ASSERT_EQUALS(out.size(), 0ul);
         }
     });
 
     auto producer = helper.runThread("Producer", [&](OperationContext* opCtx) {
         std::vector<MoveOnly> vec;
-        for (int i = 1; i < 6; ++i) {
+        for (int i = 1; i <= 6; ++i) {
             vec.emplace_back(MoveOnly(i));
         }
 
@@ -613,7 +617,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(popManyUpToPopWithBlockingWithSpecialCost,
     consumer.join();
     producer.join();
 
-    ASSERT_EQUALS(pcq.getStats().queueDepth, 0ul);
+    ASSERT_EQUALS(pcq.getStats().queueDepth, 6ul);
 }
 
 PRODUCER_CONSUMER_QUEUE_TEST(singleProducerMultiConsumer, runPermutations<false, true>) {
@@ -818,9 +822,8 @@ PRODUCER_CONSUMER_QUEUE_TEST(pipeCompiles, runPermutations<false, false>) {
     ASSERT(producer.tryPush(MoveOnly(1)));
 
     ASSERT_EQUALS(consumer.pop(), MoveOnly(1));
-    std::vector<MoveOnly> out;
-    ASSERT_EQUALS(consumer.popManyUpTo(1ul, std::back_inserter(out)).first, 1ul);
-    ASSERT_EQUALS(consumer.popMany(std::back_inserter(out)).first, 1ul);
+    ASSERT_EQUALS(consumer.popManyUpTo(1ul).second, 1ul);
+    ASSERT_EQUALS(consumer.popMany().second, 1ul);
     ASSERT_FALSE(consumer.tryPop());
 
     producer.close();
