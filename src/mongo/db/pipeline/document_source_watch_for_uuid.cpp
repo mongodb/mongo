@@ -1,6 +1,5 @@
-
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,51 +27,33 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/s/query/router_exec_stage.h"
+#include "mongo/db/pipeline/document_source_watch_for_uuid.h"
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/query/document_source_router_adapter.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/resume_token.h"
 
 namespace mongo {
 
-/**
- * Inserts a pipeline into the router execution tree, drawing results from the input stage, feeding
- * them through the pipeline, and outputting the results of the pipeline.
- */
-class RouterStagePipeline final : public RouterExecStage {
-public:
-    RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
-                        std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
+DocumentSource::GetNextResult DocumentSourceWatchForUUID::getNext() {
+    pExpCtx->checkForInterrupt();
 
-    StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext execContext) final;
+    auto nextInput = pSource->getNext();
+    if (!nextInput.isAdvanced())
+        return nextInput;
 
-    void kill(OperationContext* opCtx) final;
+    // This single-collection stream was opened before the collection was created, and the pipeline
+    // does not know its UUID. When we see the first event, we update our expression context with
+    // the UUID drawn from that event's resume token.
+    if (!pExpCtx->uuid) {
+        auto resumeToken = ResumeToken::parse(
+            nextInput.getDocument()[DocumentSourceChangeStream::kIdField].getDocument());
+        pExpCtx->uuid = resumeToken.getData().uuid;
+    }
 
-    bool remotesExhausted() final;
+    // Forward the result without modification.
+    return nextInput;
+}
 
-    std::size_t getNumRemotes() const final;
-
-    BSONObj getPostBatchResumeToken() final;
-
-protected:
-    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-    void doReattachToOperationContext() final;
-
-    void doDetachFromOperationContext() final;
-
-private:
-    BSONObj _setPostBatchResumeTokenUUID(BSONObj pbrt) const;
-    void _validateAndRecordSortKey(const Document& doc);
-
-    boost::intrusive_ptr<DocumentSourceRouterAdapter> _routerAdapter;
-    std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
-    RouterExecStage* _mergeCursorsStage = nullptr;
-    bool _mongosOnlyPipeline = false;
-
-    BSONObj _latestSortKey;
-};
 }  // namespace mongo

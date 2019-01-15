@@ -104,7 +104,7 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
     if (tokenData.version > 0) {
         out << ", tokenType: " << tokenData.tokenType;
     }
-    out << ", applyOpsIndex" << tokenData.applyOpsIndex;
+    out << ", applyOpsIndex: " << tokenData.applyOpsIndex;
     if (tokenData.version > 0) {
         out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
     }

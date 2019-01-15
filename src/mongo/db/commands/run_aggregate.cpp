@@ -366,7 +366,7 @@ Status runAggregate(OperationContext* opCtx,
                 uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, true));
             }
 
-            if (!origNss.isCollectionlessAggregateNS()) {
+            if (liteParsedPipeline.shouldResolveUUIDAndCollation()) {
                 // AutoGetCollectionForReadCommand will raise an error if 'origNss' is a view.
                 AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
 

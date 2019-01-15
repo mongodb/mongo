@@ -655,9 +655,14 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         postBatchResumeToken = pinnedCursor.getValue().getPostBatchResumeToken();
     }
 
+    // If the cursor has been exhausted, we will communicate this by returning a CursorId of zero.
+    auto idToReturn =
+        (cursorState == ClusterCursorManager::CursorState::Exhausted ? CursorId(0)
+                                                                     : request.cursorid);
+
     // For empty batches, or in the case where the final result was added to the batch rather than
     // being stashed, we update the PBRT here to ensure that it is the most recent available.
-    if (!stashedResult) {
+    if (idToReturn && !stashedResult) {
         postBatchResumeToken = pinnedCursor.getValue().getPostBatchResumeToken();
     }
 
@@ -665,10 +670,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.
     pinnedCursor.getValue().returnCursor(cursorState);
-
-    CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
-        ? CursorId(0)
-        : request.cursorid;
 
     // Set nReturned and whether the cursor has been exhausted.
     CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);

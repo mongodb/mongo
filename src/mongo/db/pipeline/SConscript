@@ -305,6 +305,7 @@ pipelineeEnv.Library(
         "cluster_aggregation_planner.cpp",
         'document_source_tee_consumer.cpp',
         'document_source_unwind.cpp',
+        'document_source_watch_for_uuid.cpp',
         'mongo_process_common.cpp',
         'pipeline.cpp',
         'sequential_document_cache.cpp',

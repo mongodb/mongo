@@ -692,15 +692,17 @@ BSONObj getDefaultCollationForUnshardedCollection(const BSONObj collectionInfo) 
 std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
     const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
     const NamespaceString& nss,
-    const AggregationRequest& request) {
+    const AggregationRequest& request,
+    const LiteParsedPipeline& litePipe) {
     const bool collectionIsSharded = (routingInfo && routingInfo->cm());
     const bool collectionIsNotSharded = (routingInfo && !routingInfo->cm());
 
-    // Because collectionless aggregations are generally run against the 'admin' database, the
-    // standard logic will attempt to resolve its non-existent UUID and collation by sending a
-    // specious 'listCollections' command to the config servers. To prevent this, we immediately
-    // return the user-defined collation if one exists, or an empty BSONObj otherwise.
-    if (nss.isCollectionlessAggregateNS()) {
+    // If the LiteParsedPipeline reports that we should not attempt to resolve the namespace's UUID
+    // and collation, we immediately return the user-defined collation if one exists, or an empty
+    // BSONObj otherwise. For instance, because collectionless aggregations generally run against
+    // the 'admin' database, the standard logic would attempt to resolve its non-existent UUID and
+    // collation by sending a specious 'listCollections' command to the config servers.
+    if (!litePipe.shouldResolveUUIDAndCollation()) {
         return {request.getCollation(), boost::none};
     }
 
@@ -965,7 +967,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     // Populate the collection UUID and the appropriate collation to use.
-    auto collInfo = getCollationAndUUID(routingInfo, namespaces.executionNss, request);
+    auto collInfo = getCollationAndUUID(routingInfo, namespaces.executionNss, request, litePipe);
     BSONObj collationObj = collInfo.first;
     boost::optional<UUID> uuid = collInfo.second;
 
