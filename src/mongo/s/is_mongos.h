@@ -31,9 +31,25 @@
 #pragma once
 
 namespace mongo {
-/** Returns true when the running process is `mongos` and false otherwise. */
+
+/**
+ * Returns true when the running process is `mongos` and false otherwise.
+ */
 bool isMongos();
 
-/** Set the global state flag indicating whether the running process is `mongos` or not. */
+/**
+ * Set the global state flag indicating whether the running process is `mongos` or not.
+ */
 void setMongos(const bool state = true);
+
+/**
+ * Returns whether this node is config server or a shard.
+ */
+bool isClusterNode();
+
+/**
+ * Returns whether this node is config server, shard or mongos.
+ */
+bool isClusterNodeOrRouter();
+
 }  // namespace mongo

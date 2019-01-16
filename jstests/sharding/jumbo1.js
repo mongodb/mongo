@@ -9,10 +9,7 @@
 
     var db = s.getDB("test");
 
-    var big = "";
-    while (big.length < 10000) {
-        big += ".";
-    }
+    const big = 'X'.repeat(10000);
 
     // Create sufficient documents to create a jumbo chunk, and use the same shard key in all of
     // them so that the chunk cannot be split.
@@ -52,10 +49,10 @@
         s.getDB('config').chunks.findOne({ns: 'test.foo', min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
     assert.eq(
         s.shard1.shardName, jumboChunk.shard, 'jumbo chunk ' + tojson(jumboChunk) + ' was moved');
+
     // TODO: SERVER-26531 Make sure that balancer marked the first chunk as jumbo.
     // Assumption: balancer favors moving the lowest valued chunk out of a shard.
     // assert(jumboChunk.jumbo, tojson(jumboChunk));
 
     s.stop();
-
 })();

@@ -54,10 +54,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view_catalog.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_initialization.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 

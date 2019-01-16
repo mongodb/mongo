@@ -28,18 +28,31 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/is_mongos.h"
+
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 namespace {
 bool mongosState = false;
 }  // namespace
-}  // namespace mongo
 
-bool mongo::isMongos() {
+bool isMongos() {
     return mongosState;
 }
 
-void mongo::setMongos(const bool state) {
+void setMongos(const bool state) {
     mongosState = state;
 }
+
+bool isClusterNode() {
+    return serverGlobalParams.clusterRole != ClusterRole::None;
+}
+
+bool isClusterNodeOrRouter() {
+    return isClusterNode() || isMongos();
+}
+
+}  // namespace mongo

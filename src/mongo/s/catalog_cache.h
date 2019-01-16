@@ -228,6 +228,12 @@ public:
     void invalidateShardedCollection(const NamespaceString& nss);
 
     /**
+     * Non-blocking method, which removes the entire specified collection from the cache (resulting
+     * in full refresh on subsequent access)
+     */
+    void purgeCollection(const NamespaceString& nss);
+
+    /**
      * Non-blocking method, which removes the entire specified database (including its collections)
      * from the cache.
      */

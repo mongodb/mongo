@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -40,7 +41,6 @@
 namespace mongo {
 
 class BalancerConfiguration;
-class CatalogCache;
 class ClusterCursorManager;
 class OperationContext;
 class ServiceContext;
@@ -52,8 +52,7 @@ class TaskExecutorPool;
 }  // namespace executor
 
 /**
- * Holds the global sharding context. Single instance exists for a running server. Exists on
- * both MongoD and MongoS.
+ * Contains the sharding context for a running server. Exists on both MongoD and MongoS.
  */
 class Grid {
 public:
@@ -121,10 +120,6 @@ public:
         return _catalogClient.get();
     }
 
-    /**
-     * Can return nullptr. For example, if this is a mongod that is not a shard server. This is
-     * always present on mongos after startup.
-     */
     CatalogCache* catalogCache() const {
         return _catalogCache.get();
     }
