@@ -373,12 +373,13 @@ def absl_get_nodes(val):
             yield table["slots_"][item]
 
 
-class AbslNodeHashSetPrinter(object):
-    """Pretty-printer for absl::node_hash_set<>."""
+class AbslHashSetPrinterBase(object):
+    """Pretty-printer base class for absl::[node/flat]_hash_set<>."""
 
-    def __init__(self, val):
-        """Initialize absl::node_hash_set."""
+    def __init__(self, val, to_str):
+        """Initialize absl::[node/flat]_hash_set."""
         self.val = val
+        self.to_str = to_str
 
     @staticmethod
     def display_hint():
@@ -386,9 +387,18 @@ class AbslNodeHashSetPrinter(object):
         return 'array'
 
     def to_string(self):
-        """Return absl::node_hash_set for printing."""
-        return "absl::node_hash_set<%s> with %s elems " % (self.val.type.template_argument(0),
-                                                           self.val["size_"])
+        """Return absl::[node/flat]_hash_set for printing."""
+        return "absl::%s_hash_set<%s> with %s elems " % (self.to_str,
+                                                         self.val.type.template_argument(0),
+                                                         self.val["size_"])
+
+
+class AbslNodeHashSetPrinter(AbslHashSetPrinterBase):
+    """Pretty-printer for absl::node_hash_set<>."""
+
+    def __init__(self, val):
+        """Initialize absl::node_hash_set."""
+        AbslHashSetPrinterBase.__init__(self, val, "node")
 
     def children(self):
         """Children."""
@@ -398,12 +408,28 @@ class AbslNodeHashSetPrinter(object):
             count += 1
 
 
-class AbslNodeHashMapPrinter(object):
-    """Pretty-printer for absl::node_hash_map<>."""
+class AbslFlatHashSetPrinter(AbslHashSetPrinterBase):
+    """Pretty-printer for absl::flat_hash_set<>."""
 
     def __init__(self, val):
-        """Initialize absl::node_hash_map."""
+        """Initialize absl::flat_hash_set."""
+        AbslHashSetPrinterBase.__init__(self, val, "flat")
+
+    def children(self):
+        """Children."""
+        count = 0
+        for val in absl_get_nodes(self.val):
+            yield (str(count), val.reference_value())
+            count += 1
+
+
+class AbslHashMapPrinterBase(object):
+    """Pretty-printer base class for absl::[node/flat]_hash_map<>."""
+
+    def __init__(self, val, to_str):
+        """Initialize absl::[node/flat]_hash_map."""
         self.val = val
+        self.to_str = to_str
 
     @staticmethod
     def display_hint():
@@ -411,16 +437,39 @@ class AbslNodeHashMapPrinter(object):
         return 'map'
 
     def to_string(self):
-        """Return absl::node_hash_map for printing."""
-        return "absl::node_hash_map<%s, %s> with %s elems " % (self.val.type.template_argument(0),
-                                                               self.val.type.template_argument(1),
-                                                               self.val["size_"])
+        """Return absl::[node/flat]_hash_map for printing."""
+        return "absl::%s_hash_map<%s, %s> with %s elems " % (self.to_str,
+                                                             self.val.type.template_argument(0),
+                                                             self.val.type.template_argument(1),
+                                                             self.val["size_"])
+
+
+class AbslNodeHashMapPrinter(AbslHashMapPrinterBase):
+    """Pretty-printer for absl::node_hash_map<>."""
+
+    def __init__(self, val):
+        """Initialize absl::node_hash_map."""
+        AbslHashMapPrinterBase.__init__(self, val, "node")
 
     def children(self):
         """Children."""
         for kvp in absl_get_nodes(self.val):
             yield ('key', kvp['first'])
             yield ('value', kvp['second'])
+
+
+class AbslFlatHashMapPrinter(AbslHashMapPrinterBase):
+    """Pretty-printer for absl::flat_hash_map<>."""
+
+    def __init__(self, val):
+        """Initialize absl::flat_hash_map."""
+        AbslHashMapPrinterBase.__init__(self, val, "flat")
+
+    def children(self):
+        """Children."""
+        for kvp in absl_get_nodes(self.val):
+            yield ('key', kvp['key'])
+            yield ('value', kvp['value'])
 
 
 def find_match_brackets(search, opening='<', closing='>'):
@@ -514,6 +563,8 @@ def build_pretty_printer():
     pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
     pp.add('node_hash_map', 'absl::node_hash_map', True, AbslNodeHashMapPrinter)
     pp.add('node_hash_set', 'absl::node_hash_set', True, AbslNodeHashSetPrinter)
+    pp.add('flat_hash_map', 'absl::flat_hash_map', True, AbslFlatHashMapPrinter)
+    pp.add('flat_hash_set', 'absl::flat_hash_set', True, AbslFlatHashSetPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
