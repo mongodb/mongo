@@ -112,6 +112,7 @@ public:
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
+    Date_t now() override;
 
 private:
     transport::ReactorHandle _reactor;
@@ -127,13 +128,13 @@ public:
                  transport::ConnectSSLMode sslMode,
                  size_t generation,
                  NetworkConnectionHook* onConnectHook)
-        : TLTypeFactory::Type(factory),
+        : ConnectionInterface(generation),
+          TLTypeFactory::Type(factory),
           _reactor(reactor),
           _serviceContext(serviceContext),
           _timer(factory->makeTimer()),
           _peer(std::move(peer)),
           _sslMode(sslMode),
-          _generation(generation),
           _onConnectHook(onConnectHook) {}
     ~TLConnection() {
         // Release must be the first expression of this dtor
@@ -144,26 +145,18 @@ public:
         cancelAsync();
     }
 
-    void indicateSuccess() override;
-    void indicateFailure(Status status) override;
-    void indicateUsed() override;
     const HostAndPort& getHostAndPort() const override;
     transport::ConnectSSLMode getSslMode() const override;
     bool isHealthy() override;
     AsyncDBClient* client();
+    Date_t now() override;
 
 private:
-    Date_t getLastUsed() const override;
-    const Status& getStatus() const override;
-
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
     void setup(Milliseconds timeout, SetupCallback cb) override;
-    void resetToUnknown() override;
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
     void cancelAsync();
-
-    size_t getGeneration() const override;
 
 private:
     transport::ReactorHandle _reactor;
@@ -172,11 +165,8 @@ private:
 
     HostAndPort _peer;
     transport::ConnectSSLMode _sslMode;
-    size_t _generation;
     NetworkConnectionHook* const _onConnectHook;
     AsyncDBClient::Handle _client;
-    Date_t _lastUsed;
-    Status _status = ConnectionPool::kConnectionStateUnknown;
 };
 
 }  // namespace connection_pool_asio

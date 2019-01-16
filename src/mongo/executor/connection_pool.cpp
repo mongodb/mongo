@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kConnectionPool
 
 #include "mongo/platform/basic.h"
 
@@ -53,6 +53,36 @@
 
 namespace mongo {
 namespace executor {
+
+void ConnectionPool::ConnectionInterface::indicateUsed() {
+    // It is illegal to attempt to use a connection after calling indicateFailure().
+    invariant(_status.isOK() || _status == ConnectionPool::kConnectionStateUnknown);
+    _lastUsed = now();
+}
+
+void ConnectionPool::ConnectionInterface::indicateSuccess() {
+    _status = Status::OK();
+}
+
+void ConnectionPool::ConnectionInterface::indicateFailure(Status status) {
+    _status = std::move(status);
+}
+
+Date_t ConnectionPool::ConnectionInterface::getLastUsed() const {
+    return _lastUsed;
+}
+
+const Status& ConnectionPool::ConnectionInterface::getStatus() const {
+    return _status;
+}
+
+void ConnectionPool::ConnectionInterface::resetToUnknown() {
+    _status = ConnectionPool::kConnectionStateUnknown;
+}
+
+size_t ConnectionPool::ConnectionInterface::getGeneration() const {
+    return _generation;
+}
 
 /**
  * A pool for a specific HostAndPort

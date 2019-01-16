@@ -115,12 +115,8 @@ void TLTimer::cancelTimeout() {
     _timer->cancel();
 }
 
-void TLConnection::indicateSuccess() {
-    _status = Status::OK();
-}
-
-void TLConnection::indicateFailure(Status status) {
-    _status = std::move(status);
+Date_t TLTimer::now() {
+    return _reactor->now();
 }
 
 const HostAndPort& TLConnection::getHostAndPort() const {
@@ -137,20 +133,6 @@ bool TLConnection::isHealthy() {
 
 AsyncDBClient* TLConnection::client() {
     return _client.get();
-}
-
-void TLConnection::indicateUsed() {
-    // It is illegal to attempt to use a connection after calling indicateFailure().
-    invariant(_status.isOK() || _status == ConnectionPool::kConnectionStateUnknown);
-    _lastUsed = _reactor->now();
-}
-
-Date_t TLConnection::getLastUsed() const {
-    return _lastUsed;
-}
-
-const Status& TLConnection::getStatus() const {
-    return _status;
 }
 
 void TLConnection::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
@@ -292,10 +274,6 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     LOG(2) << "Finished connection setup.";
 }
 
-void TLConnection::resetToUnknown() {
-    _status = ConnectionPool::kConnectionStateUnknown;
-}
-
 void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     auto anchor = shared_from_this();
 
@@ -309,10 +287,10 @@ void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
             return;
         }
 
-        _status = {ErrorCodes::HostUnreachable, "Timed out refreshing host"};
+        indicateFailure({ErrorCodes::HostUnreachable, "Timed out refreshing host"});
         _client->cancel();
 
-        handler->promise.setError(_status);
+        handler->promise.setError(getStatus());
     });
 
     _client
@@ -328,17 +306,18 @@ void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
 
             cancelTimeout();
 
-            _status = status;
             if (status.isOK()) {
+                indicateSuccess();
                 handler->promise.emplaceValue();
             } else {
+                indicateFailure(status);
                 handler->promise.setError(status);
             }
         });
 }
 
-size_t TLConnection::getGeneration() const {
-    return _generation;
+Date_t TLConnection::now() {
+    return _reactor->now();
 }
 
 void TLConnection::cancelAsync() {
