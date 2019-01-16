@@ -41,11 +41,14 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
     : _indexCatalogEntry(entry),
@@ -122,6 +125,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
     bool atEof = false;
     while (!atEof) {
+        opCtx->checkForInterrupt();
 
         // Stashed records should be inserted into a batch first.
         if (stashed) {
@@ -179,9 +183,11 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         cursor->save();
         wuow.commit();
 
-        cursor->restore();
-
         progress->hit(batch.size());
+
+        // Lock yielding will only happen if we are holding intent locks.
+        _tryYield(opCtx);
+        cursor->restore();
 
         // Account for more writes coming in during a batch.
         progress->setTotalWhileRunning(_sideWritesCounter.loadRelaxed() - appliedAtStart);
@@ -249,6 +255,41 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         *keysDeleted += numDeleted;
     }
     return Status::OK();
+}
+
+void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
+    // Never yield while holding locks that prevent writes to the collection: only yield while
+    // holding intent locks. This check considers all locks in the hierarchy that would cover this
+    // mode.
+    if (opCtx->lockState()->isCollectionLockedForMode(_indexCatalogEntry->ns(), MODE_S)) {
+        return;
+    }
+    DEV {
+        const NamespaceString nss(_indexCatalogEntry->ns());
+        invariant(!opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
+        invariant(!opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    }
+
+    // Releasing locks means a new snapshot should be acquired when restored.
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    auto locker = opCtx->lockState();
+    Locker::LockSnapshot snapshot;
+    invariant(locker->saveLockStateAndUnlock(&snapshot));
+
+
+    // Track the number of yields in CurOp.
+    CurOp::get(opCtx)->yielded();
+
+    MONGO_FAIL_POINT_BLOCK(hangDuringIndexBuildDrainYield, config) {
+        StringData ns{config.getData().getStringField("namespace")};
+        if (ns == _indexCatalogEntry->ns()) {
+            log() << "Hanging index build during drain yield";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringIndexBuildDrainYield);
+        }
+    }
+
+    locker->restoreLockState(opCtx, snapshot);
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {

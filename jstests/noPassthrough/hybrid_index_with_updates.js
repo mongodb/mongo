@@ -12,9 +12,9 @@
     let conn = MongoRunner.runMongod();
     let testDB = conn.getDB('test');
 
-    let turnFailPointOn = function(failPointName, i) {
+    let turnFailPointOn = function(failPointName, data) {
         assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: failPointName, mode: "alwaysOn", data: {"i": i}}));
+            {configureFailPoint: failPointName, mode: "alwaysOn", data: data || {}}));
     };
 
     let turnFailPointOff = function(failPointName) {
@@ -56,7 +56,7 @@
     assert.eq(totalDocs, testDB.hybrid.count());
 
     // Hang the build after the first document.
-    let stopKey = 1;
+    let stopKey = {'i': 1};
     turnFailPointOn("hangBeforeIndexBuildOf", stopKey);
 
     // Start the background build.
@@ -64,7 +64,7 @@
         assert.commandWorked(db.hybrid.createIndex({i: 1}, {background: true}));
     }, conn.port);
 
-    checkLog.contains(conn, "Hanging before index build of i=" + stopKey);
+    checkLog.contains(conn, "Hanging before index build of i=1");
 
     // Phase 1: Collection scan and external sort
     // Insert documents while doing the bulk build.
@@ -81,6 +81,9 @@
     // Phase 2: First drain
     // Do some updates, inserts and deletes after the bulk builder has finished.
 
+    // Hang after yielding
+    turnFailPointOn("hangDuringIndexBuildDrainYield", {namespace: testDB.hybrid.getFullName()});
+
     // Enable pause after first drain.
     turnFailPointOn("hangAfterIndexBuildFirstDrain");
 
@@ -89,6 +92,16 @@
 
     // Allow first drain to start.
     turnFailPointOff("hangAfterIndexBuildDumpsInsertsFromBulk");
+
+    // Ensure the operation yields during the drain, then attempt some operations.
+    checkLog.contains(conn, "Hanging index build during drain yield");
+    assert.commandFailedWithCode(testDB.runCommand({drop: 'hybrid'}),
+                                 ErrorCodes.BackgroundOperationInProgressForNamespace);
+    assert.commandFailedWithCode(testDB.runCommand({dropIndexes: "hybrid", indexes: "*"}),
+                                 ErrorCodes.BackgroundOperationInProgressForNamespace);
+    assert.commandWorked(testDB.hybrid.insert({i: "during yield"}));
+    assert.commandWorked(testDB.hybrid.remove({i: "during yield"}));
+    turnFailPointOff("hangDuringIndexBuildDrainYield");
 
     // Wait for first drain to finish.
     checkLog.contains(conn, "Hanging after index build first drain");
