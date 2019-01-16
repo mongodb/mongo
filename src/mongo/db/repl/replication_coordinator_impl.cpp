@@ -1742,7 +1742,7 @@ void ReplicationCoordinatorImpl::_killOperationsOnStepDown(OperationContext* opC
     // Destroy all stashed transaction resources, in order to release locks.
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsLocalKillTransactions(
+    killSessionsAbortUnpreparedTransactions(
         opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
 }
 

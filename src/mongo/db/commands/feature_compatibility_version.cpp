@@ -181,7 +181,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
             // Abort all open transactions when downgrading the featureCompatibilityVersion.
             SessionKiller::Matcher matcherAllSessions(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-            killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
+            killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
         }
     });
 }

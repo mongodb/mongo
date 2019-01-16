@@ -84,22 +84,25 @@ void killSessionsAction(
 
 }  // namespace
 
-void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher,
-                                       ErrorCodes::Error reason) {
-    killSessionsAction(opCtx,
-                       matcher,
-                       [](const ObservableSession&) { return true; },
-                       [](OperationContext* opCtx, const SessionToKill& session) {
-                           TransactionParticipant::get(session.get())->abortArbitraryTransaction();
-                       },
-                       reason);
+void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
+                                             const SessionKiller::Matcher& matcher,
+                                             ErrorCodes::Error reason) {
+    killSessionsAction(
+        opCtx,
+        matcher,
+        [](const ObservableSession& session) {
+            return !TransactionParticipant::get(session.get())->transactionIsPrepared();
+        },
+        [](OperationContext* opCtx, const SessionToKill& session) {
+            TransactionParticipant::get(session.get())->abortArbitraryTransaction();
+        },
+        reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,
                                         SessionKiller::UniformRandomBitGenerator* urbg) {
-    killSessionsLocalKillTransactions(opCtx, matcher);
+    killSessionsAbortUnpreparedTransactions(opCtx, matcher);
     uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
 
     auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
