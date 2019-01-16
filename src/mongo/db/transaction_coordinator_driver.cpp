@@ -590,6 +590,11 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                         LOG(3) << "Prepare stopped retrying due to retrying being cancelled";
                         return PrepareResponse{shardId, boost::none, boost::none};
                     }
+
+                    if (!isRetryableError(status.code())) {
+                        return PrepareResponse{shardId, CommitDecision::kAbort, boost::none};
+                    }
+
                     uassertStatusOK(status);
                     MONGO_UNREACHABLE;
                 });
