@@ -433,6 +433,21 @@ add_option('disable-warnings-as-errors',
     nargs=0,
 )
 
+add_option('distance-expression-non-bson',
+    help="Uses Do not uses BSON to pass the values to the distance expressions. You can pass a regular float vector.",
+    nargs=0,
+)
+
+add_option('distance-expression-use-avx2',
+    help="Uses BSON to pass the values to the distance expressions",
+    nargs=0,
+)
+
+add_option('distance-expression-use-avx512',
+    help="Uses BSON to pass the values to the distance expressions",
+    nargs=0,
+)
+
 add_option('detect-odr-violations',
     help="Have the linker try to detect ODR violations, if supported",
     nargs=0,
@@ -1813,6 +1828,23 @@ if env.TargetOSIs('posix'):
     if env.TargetOSIs('linux', 'darwin', 'solaris'):
         if not has_option("disable-warnings-as-errors"):
             env.Append( CCFLAGS=["-Werror"] )
+        if has_option(distance-expression-non-bson):
+            env.Append( CCFLAGS=["-DDISTANCE_EXPRESSION_NOT_BSON"] )
+        else:
+            if not has_option("distance-expression-use-avx512"):
+                if has_option("distance-expression-use-avx2"):
+                    env.Append( CCFLAGS=["-mavx2"] )
+                    env.Append( CCFLAGS=["-march=haswell"] )
+                    env.Append( CCFLAGS=["-mtune=intel"] )
+                    env.Append( CCFLAGS=["-fopenmp"] )
+                    env.Append( CCFLAGS=["-O3"] )
+                    env.Append( CCFLAGS=["-DUSE_AVX2"] )
+            else:
+                env.Append( CCFLAGS=["-march=skylake-avx512"] )
+                env.Append( CCFLAGS=["-mtune=skylake-avx512"] )
+                env.Append( CCFLAGS=["-fopenmp"] )
+                env.Append( CCFLAGS=["-O3"] )
+                env.Append( CCFLAGS=["-DUSE_AVX512"] )
 
     env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
     if env.ToolchainIs('clang'):

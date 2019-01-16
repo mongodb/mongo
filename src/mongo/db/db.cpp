@@ -309,6 +309,27 @@ ExitCode _initAndListen(int listenPort) {
         l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
     }
 
+    {
+        LogstreamBuilder l = log(LogComponent::kControl);
+
+        l << "Distance Expression Info: ";
+
+#ifdef DISTANCE_EXPRESSION_NOT_BSON 
+        l << "Not using BSON";
+#else 
+        l << "Using BSON";
+#ifdef USE_AVX512
+        l << " - With AVX512";
+#else
+#if USE_AVX2
+        l << " - With AVX2";
+#endif
+#endif
+#endif
+
+        l << std::endl;
+    }
+
     DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
 #if defined(_WIN32)

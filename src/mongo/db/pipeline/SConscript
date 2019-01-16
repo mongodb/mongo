@@ -136,6 +136,10 @@ env.Library(
     source=[
         'expression.cpp',
         'expression_trigonometric.cpp',
+        'expression_distance.cpp',
+        'expression_distance_avx2.cpp',
+        'expression_distance_avx512.cpp',
+        'expression_distance_non_bson.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
