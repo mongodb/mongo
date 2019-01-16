@@ -49,6 +49,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/server_read_concern_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
@@ -226,6 +227,7 @@ public:
              BSONObjBuilder& result) override {
         // Although it is a command, a find command gets counted as a query.
         globalOpCounters.gotQuery();
+        ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx));
 
         // Parse the command BSON to a QueryRequest.
         const bool isExplain = false;

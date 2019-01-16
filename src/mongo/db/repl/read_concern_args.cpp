@@ -104,6 +104,10 @@ bool ReadConcernArgs::hasLevel() const {
     return _level.is_initialized();
 }
 
+bool ReadConcernArgs::hasOriginalLevel() const {
+    return _originalLevel.is_initialized();
+}
+
 boost::optional<OpTime> ReadConcernArgs::getArgsOpTime() const {
     return _opTime;
 }
@@ -184,6 +188,7 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                                             << " must be either 'local', 'majority', "
                                                "'linearizable', 'available', or 'snapshot'");
             }
+            _originalLevel = _level;
         } else {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "Unrecognized option in " << kReadConcernFieldName
@@ -268,7 +273,7 @@ Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
                                     << "' is provided");
     }
 
-    _originalLevel = _level ? *_level : ReadConcernLevel::kLocalReadConcern;
+    _originalLevel = _level;
     _level = ReadConcernLevel::kSnapshotReadConcern;
     return Status::OK();
 }

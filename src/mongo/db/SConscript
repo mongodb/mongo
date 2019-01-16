@@ -621,12 +621,14 @@ env.Library(
     source=[
         'catalog_raii.cpp',
         'retryable_writes_stats.cpp',
+        'server_read_concern_metrics.cpp',
         'server_transactions_metrics.cpp',
         'session.cpp',
         'session_catalog.cpp',
         'single_transaction_stats.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
+        env.Idlc('read_concern_stats.idl')[0],
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[

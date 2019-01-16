@@ -121,6 +121,11 @@ public:
     bool hasLevel() const;
 
     /**
+     * Checks whether _originalLevel is explicitly set.
+     */
+    bool hasOriginalLevel() const;
+
+    /**
      * Returns the opTime. Deprecated: will be replaced with getArgsAfterClusterTime.
      */
     boost::optional<OpTime> getArgsOpTime() const;
