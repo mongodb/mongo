@@ -302,5 +302,51 @@ TEST_F(SplitVectorTest, NoMaxChunkSize) {
     ASSERT_EQUALS(status.code(), ErrorCodes::InvalidOptions);
 }
 
+const NamespaceString kJumboNss = NamespaceString("foo", "bar2");
+const std::string kJumboPattern = "a";
+
+class SplitVectorJumboTest : public ShardServerTestFixture {
+public:
+    void setUp() {
+        ShardServerTestFixture::setUp();
+
+        DBDirectClient dbclient(operationContext());
+        ASSERT_TRUE(dbclient.createCollection(kJumboNss.ns()));
+        dbclient.createIndex(kJumboNss.ns(), BSON(kJumboPattern << 1));
+
+        // Insert 10000 documents into the collection with the same shard key value.
+        BSONObjBuilder builder;
+        builder.append(kJumboPattern, 1);
+        BSONObj obj = builder.obj();
+        for (int i = 0; i < 1000; i++) {
+            dbclient.insert(kJumboNss.toString(), obj);
+        }
+        ASSERT_EQUALS(1000ULL, dbclient.count(kJumboNss.toString()));
+    }
+
+    const long long& getDocSizeBytes() {
+        return docSizeBytes;
+    }
+
+private:
+    // Number of bytes in each of the same-size documents we insert into the collection.
+    const long long docSizeBytes = BSON(kJumboPattern << 1).objsize();
+};
+
+TEST_F(SplitVectorJumboTest, JumboChunk) {
+    std::vector<BSONObj> splitKeys = unittest::assertGet(splitVector(operationContext(),
+                                                                     kJumboNss,
+                                                                     BSON(kJumboPattern << 1),
+                                                                     BSON(kJumboPattern << 1),
+                                                                     BSON(kJumboPattern << 2),
+                                                                     false,
+                                                                     boost::none,
+                                                                     boost::none,
+                                                                     boost::none,
+                                                                     getDocSizeBytes() * 1LL));
+
+    ASSERT_EQUALS(splitKeys.size(), 0UL);
+}
+
 }  // namespace
 }  // namespace mongo
