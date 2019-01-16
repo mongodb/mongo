@@ -28,11 +28,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -45,32 +48,58 @@ public:
         return true;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "flush all router config";
+    void help(std::stringstream& help) const override {
+        help << "Flushes the cached routing information for a single collection, entire database "
+                "(and its collections) or all databases, which would cause full reload from the "
+                "config server on the next access.\n"
+                "Usage:\n"
+                "{flushRouterConfig: 1} flushes all databases\n"
+                "{flushRouterConfig: 'db'} flushes only the given database (and its collections)\n"
+                "{flushRouterconfig: 'db.coll'} flushes only the given collection";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) override {
         ActionSet actions;
         actions.addAction(ActionType::flushRouterConfig);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        auto const grid = Grid::get(opCtx);
+        uassert(ErrorCodes::ShardingStateNotInitialized,
+                "Sharding is not enabled",
+                grid->isShardingInitialized());
+
+        auto const catalogCache = grid->catalogCache();
+
+        const auto argumentElem = cmdObj.firstElement();
+        if (argumentElem.isNumber() || argumentElem.isBoolean()) {
+            LOG(0) << "Routing metadata flushed for all databases";
+            catalogCache->purgeAllDatabases();
+        } else {
+            const auto ns = argumentElem.checkAndGetStringData();
+            if (nsIsDbOnly(ns)) {
+                LOG(0) << "Routing metadata flushed for database " << ns;
+                catalogCache->purgeDatabase(ns);
+            } else {
+                const NamespaceString nss(ns);
+                LOG(0) << "Routing metadata flushed for collection " << nss;
+                catalogCache->purgeCollection(nss);
+            }
+        }
 
         result.appendBool("flushed", true);
         return true;

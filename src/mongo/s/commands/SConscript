@@ -9,7 +9,8 @@ env.Library(
     target='shared_cluster_commands',
     source=[
         'cluster_commands_helpers.cpp',
-        'cluster_get_shard_map_cmd.cpp',
+        'flush_router_config_cmd.cpp',
+        'get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
@@ -42,7 +43,6 @@ env.Library(
         'cluster_explain_cmd.cpp',
         'cluster_find_and_modify_cmd.cpp',
         'cluster_find_cmd.cpp',
-        'cluster_flush_router_config_cmd.cpp',
         'cluster_fsync_cmd.cpp',
         'cluster_ftdc_commands.cpp',
         'cluster_get_last_error_cmd.cpp',

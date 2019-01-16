@@ -55,12 +55,10 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_initialization.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 // Causes the server to hang when it attempts to assign UUIDs to the provided database (or all

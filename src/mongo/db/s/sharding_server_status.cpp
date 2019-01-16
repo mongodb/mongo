@@ -34,18 +34,14 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/server_options.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 
 namespace mongo {
 namespace {
-
-bool isClusterNode() {
-    return serverGlobalParams.clusterRole != ClusterRole::None;
-}
 
 class ShardingServerStatus final : public ServerStatusSection {
 public:

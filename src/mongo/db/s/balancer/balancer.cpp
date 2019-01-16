@@ -385,7 +385,7 @@ void Balancer::_mainThread() {
 
                     shardingContext->catalogClient()
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
-                        .transitional_ignore();
+                        .ignore();
                 }
 
                 LOG(1) << "*** End of balancing round";
