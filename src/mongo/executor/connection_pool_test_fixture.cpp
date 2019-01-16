@@ -77,29 +77,21 @@ void TimerImpl::fireIfNecessary() {
     }
 }
 
+Date_t TimerImpl::now() {
+    return _global->now();
+}
+
 std::set<TimerImpl*> TimerImpl::_timers;
 
 ConnectionImpl::ConnectionImpl(const HostAndPort& hostAndPort, size_t generation, PoolImpl* global)
-    : _hostAndPort(hostAndPort),
+    : ConnectionInterface(generation),
+      _hostAndPort(hostAndPort),
       _timer(global),
       _global(global),
-      _id(_idCounter++),
-      _generation(generation) {}
+      _id(_idCounter++) {}
 
-void ConnectionImpl::indicateUsed() {
-    _lastUsed = _global->now();
-}
-
-void ConnectionImpl::indicateSuccess() {
-    _status = Status::OK();
-}
-
-void ConnectionImpl::indicateFailure(Status status) {
-    _status = std::move(status);
-}
-
-void ConnectionImpl::resetToUnknown() {
-    _status = ConnectionPool::kConnectionStateUnknown;
+Date_t ConnectionImpl::now() {
+    return _timer.now();
 }
 
 size_t ConnectionImpl::id() const {
@@ -168,14 +160,6 @@ size_t ConnectionImpl::refreshQueueDepth() {
     return _refreshQueue.size();
 }
 
-Date_t ConnectionImpl::getLastUsed() const {
-    return _lastUsed;
-}
-
-const Status& ConnectionImpl::getStatus() const {
-    return _status;
-}
-
 void ConnectionImpl::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
     _timer.setTimeout(timeout, cb);
 }
@@ -225,10 +209,6 @@ void ConnectionImpl::refresh(Milliseconds timeout, RefreshCallback cb) {
         connPtr->indicateUsed();
         refreshCb(connPtr, callback());
     }
-}
-
-size_t ConnectionImpl::getGeneration() const {
-    return _generation;
 }
 
 std::deque<ConnectionImpl::PushSetupCallback> ConnectionImpl::_pushSetupQueue;

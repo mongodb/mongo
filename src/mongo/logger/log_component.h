@@ -69,6 +69,7 @@ public:
         kBridge,
         kTracking,
         kTransaction,
+        kConnectionPool,
         kNumLogComponents
     };
 
