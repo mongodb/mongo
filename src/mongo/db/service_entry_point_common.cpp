@@ -69,6 +69,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_read_concern_metrics.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/snapshot_window_util.h"
@@ -952,6 +953,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
                          const ServiceEntryPointCommon::Hooks& behaviors) {
     invariant(!nss.isCommand());
     globalOpCounters.gotQuery();
+    ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx));
 
     DbMessage d(m);
     QueryMessage q(d);

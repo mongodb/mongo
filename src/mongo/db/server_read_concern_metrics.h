@@ -1,0 +1,71 @@
+
+/**
+ *    Copyright (C) 2018-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#pragma once
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern_stats_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/service_context.h"
+
+namespace mongo {
+
+/**
+ * Container for server-wide statistics on readConcern levels used by operations.
+ */
+class ServerReadConcernMetrics {
+    MONGO_DISALLOW_COPYING(ServerReadConcernMetrics);
+
+public:
+    ServerReadConcernMetrics() = default;
+
+    static ServerReadConcernMetrics* get(ServiceContext* service);
+    static ServerReadConcernMetrics* get(OperationContext* opCtx);
+
+    /**
+     * Updates counter for the level of 'readConcernArgs'.
+     */
+    void recordReadConcern(const repl::ReadConcernArgs& readConcernArgs);
+
+    /**
+     * Appends the accumulated stats to a readConcern stats object.
+     */
+    void updateStats(ReadConcernStats* stats, OperationContext* opCtx);
+
+private:
+    AtomicWord<unsigned long long> _levelAvailableCount{0};
+    AtomicWord<unsigned long long> _levelLinearizableCount{0};
+    AtomicWord<unsigned long long> _levelLocalCount{0};
+    AtomicWord<unsigned long long> _levelMajorityCount{0};
+    AtomicWord<unsigned long long> _levelSnapshotCount{0};
+    AtomicWord<unsigned long long> _noLevelCount{0};
+};
+
+}  // namespace mongo
