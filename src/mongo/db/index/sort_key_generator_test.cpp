@@ -136,35 +136,39 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithStringIsFatal,
            "Invariant failure elt.type() == BSONType::Object") {
-    stdx::make_unique<SortKeyGenerator>(BSON("a"
-                                             << "foo"),
-                                        nullptr);
+    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+        stdx::make_unique<SortKeyGenerator>(BSON("a"
+                                                 << "foo"),
+                                            nullptr);
 }
 
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWhoseObjectHasMultipleKeysIsFatal,
            "Invariant failure elt.embeddedObject().nFields() == 1") {
-    stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
-                                                         << "textScore"
-                                                         << "extra"
-                                                         << 1)),
-                                        nullptr);
+    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+        stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
+                                                             << "textScore"
+                                                             << "extra"
+                                                             << 1)),
+                                            nullptr);
 }
 
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithNonMetaObjectSortIsFatal,
            "Invariant failure metaElem.fieldNameStringData() == \"$meta\"_sd") {
-    stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$unknown"
-                                                         << "textScore")),
-                                        nullptr);
+    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+        stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$unknown"
+                                                             << "textScore")),
+                                            nullptr);
 }
 
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithUnknownMetaKeywordIsFatal,
            "Invariant failure metaElem.valueStringData() == \"randVal\"_sd") {
-    stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
-                                                         << "unknown")),
-                                        nullptr);
+    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+        stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
+                                                             << "unknown")),
+                                            nullptr);
 }
 
 DEATH_TEST(SortKeyGeneratorTest,

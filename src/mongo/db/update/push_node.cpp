@@ -227,16 +227,22 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
         result = ModifyResult::kNormalUpdate;
     }
 
-    // We insert all the rest of the elements after the one we just inserted.
-    std::accumulate(std::next(valuesToPush.begin()),
-                    valuesToPush.end(),
-                    firstElementToInsert,
-                    [&document](auto& insertAfter, auto& valueToInsert) {
-                        auto nextElementToInsert =
-                            document.makeElementWithNewFieldName(StringData(), valueToInsert);
-                        invariant(insertAfter.addSiblingRight(nextElementToInsert));
-                        return nextElementToInsert;
-                    });
+    // We insert all the rest of the elements after the one we just
+    // inserted.
+    //
+    // TODO: The use of std::accumulate here is maybe questionable
+    // given that we are ignoring the return value. MSVC flagged this,
+    // and we worked around by tagging the result as unused.
+    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+        std::accumulate(std::next(valuesToPush.begin()),
+                        valuesToPush.end(),
+                        firstElementToInsert,
+                        [&document](auto& insertAfter, auto& valueToInsert) {
+                            auto nextElementToInsert =
+                                document.makeElementWithNewFieldName(StringData(), valueToInsert);
+                            invariant(insertAfter.addSiblingRight(nextElementToInsert));
+                            return nextElementToInsert;
+                        });
 
     return result;
 }

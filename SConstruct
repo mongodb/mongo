@@ -475,8 +475,8 @@ add_option('cache-dir',
 )
 
 add_option("cxx-std",
-    choices=["14", "17"],
-    default="14",
+    choices=["17"],
+    default="17",
     help="Select the C++ langauge standard to build with",
 )
 
@@ -1614,43 +1614,77 @@ elif env.TargetOSIs('windows'):
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
     # Temporary fixes to allow compilation with VS2017
-    env.Append( CPPDEFINES=[ "_SILENCE_FPOS_SEEKPOS_DEPRECATION_WARNING" ] )
+    env.Append(CPPDEFINES=[
+        "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS",
+        "_SILENCE_FPOS_SEEKPOS_DEPRECATION_WARNING",
+    ])
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
     env.Append(CCFLAGS=["/EHsc","/W3"])
 
-    # some warnings we don't like:
-    # c4355
-    # 'this' : used in base member initializer list
-    #    The this pointer is valid only within nonstatic member functions. It cannot be used in the initializer list for a base class.
-    # c4800
-    # 'type' : forcing value to bool 'true' or 'false' (performance warning)
-    #    This warning is generated when a value that is not bool is assigned or coerced into type bool.
-    # c4267
-    # 'var' : conversion from 'size_t' to 'type', possible loss of data
-    # When compiling with /Wp64, or when compiling on a 64-bit operating system, type is 32 bits but size_t is 64 bits when compiling for 64-bit targets. To fix this warning, use size_t instead of a type.
-    # c4244
-    # 'conversion' conversion from 'type1' to 'type2', possible loss of data
-    #  An integer type is converted to a smaller integer type.
-    # c4290
-    #  C++ exception specification ignored except to indicate a function is not __declspec(nothrow
-    #  A function is declared using exception specification, which Visual C++ accepts but does not
-    #  implement
-    # c4068
-    #  unknown pragma -- added so that we can specify unknown pragmas for other compilers
-    # c4351
-    #  on extremely old versions of MSVC (pre 2k5), default constructing an array member in a
-    #  constructor's initialization list would not zero the array members "in some cases".
-    #  since we don't target MSVC versions that old, this warning is safe to ignore.
-    # c4373
-    #  Older versions of MSVC would fail to make a function in a derived class override a virtual
-    #  function in the parent, when defined inline and at least one of the parameters is made const.
-    #  The behavior is incorrect under the standard.  MSVC is fixed now, and the warning exists
-    #  merely to alert users who may have relied upon the older, non-compliant behavior.  Our code
-    #  should not have any problems with the older behavior, so we can just disable this warning.
-    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244",
-                         "/wd4290", "/wd4068", "/wd4351", "/wd4373"] )
+    # Suppress some warnings we don't like, or find necessary to
+    # suppress. Please keep this list alphabetized and commented.
+    env.Append(CCFLAGS=[
+
+        # C4068: unknown pragma. added so that we can specify unknown
+        # pragmas for other compilers.
+        "/wd4068",
+
+        # C4244: 'conversion' conversion from 'type1' to 'type2',
+        # possible loss of data. An integer type is converted to a
+        # smaller integer type.
+        "/wd4244",
+
+        # C4267: 'var' : conversion from 'size_t' to 'type', possible
+        # loss of data. When compiling with /Wp64, or when compiling
+        # on a 64-bit operating system, type is 32 bits but size_t is
+        # 64 bits when compiling for 64-bit targets. To fix this
+        # warning, use size_t instead of a type.
+        "/wd4267",
+
+        # C4290: C++ exception specification ignored except to
+        # indicate a function is not __declspec(nothrow). A function
+        # is declared using exception specification, which Visual C++
+        # accepts but does not implement.
+        "/wd4290",
+
+        # C4351: On extremely old versions of MSVC (pre 2k5), default
+        # constructing an array member in a constructor's
+        # initialization list would not zero the array members "in
+        # some cases". Since we don't target MSVC versions that old,
+        # this warning is safe to ignore.
+        "/wd4351",
+
+        # C4355: 'this' : used in base member initializer list. The
+        # this pointer is valid only within nonstatic member
+        # functions. It cannot be used in the initializer list for a
+        # base class
+        "/wd4355",
+
+        # C4373: Older versions of MSVC would fail to make a function
+        # in a derived class override a virtual function in the
+        # parent, when defined inline and at least one of the
+        # parameters is made const. The behavior is incorrect under
+        # the standard. MSVC is fixed now, and the warning exists
+        # merely to alert users who may have relied upon the older,
+        # non-compliant behavior. Our code should not have any
+        # problems with the older behavior, so we can just disable
+        # this warning.
+        "/wd4373",
+
+        # C4800: 'type' : forcing value to bool 'true' or 'false'
+        # (performance warning). This warning is generated when a
+        # value that is not bool is assigned or coerced into type
+        # bool.
+        "/wd4800",
+
+        # C5041: out-of-line definition for constexpr static data
+        # member is not needed and is deprecated in C++17. We still
+        # have these, but we don't want to fix them up before we roll
+        # over to C++17.
+        "/wd5041",
+    ])
 
     # mozjs-60 requires the following
     #  'declaration' : no matching operator delete found; memory will not be freed if
@@ -2373,15 +2407,10 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('msvc'):
         myenv.AppendUnique(CXXFLAGS=['/Zc:__cplusplus'])
-        if get_option('cxx-std') == "14":
-            myenv.AppendUnique(CCFLAGS=['/std:c++14'])
-        elif get_option('cxx-std') == "17":
+        if get_option('cxx-std') == "17":
             myenv.AppendUnique(CCFLAGS=['/std:c++17'])
     else:
-        if get_option('cxx-std') == "14":
-            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++14'):
-                myenv.ConfError('Compiler does not honor -std=c++14')
-        elif get_option('cxx-std') == "17":
+        if get_option('cxx-std') == "17":
             if not AddToCXXFLAGSIfSupported(myenv, '-std=c++17'):
                 myenv.ConfError('Compiler does not honor -std=c++17')
 
@@ -2390,21 +2419,6 @@ def doConfigure(myenv):
 
     if using_system_version_of_cxx_libraries():
         print( 'WARNING: System versions of C++ libraries must be compiled with C++14/17 support' )
-
-    def CheckCxx14(context):
-        test_body = """
-        #if __cplusplus < 201402L
-        #error
-        #endif
-        auto DeducedReturnTypesAreACXX14Feature() {
-            return 0;
-        }
-        """
-
-        context.Message('Checking for C++14... ')
-        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-        context.Result(ret)
-        return ret
 
     def CheckCxx17(context):
         test_body = """
@@ -2420,15 +2434,11 @@ def doConfigure(myenv):
         return ret
 
     conf = Configure(myenv, help=False, custom_tests = {
-        'CheckCxx14' : CheckCxx14,
         'CheckCxx17' : CheckCxx17,
     })
 
-    if not conf.CheckCxx14():
-        myenv.ConfError('C++14 support is required to build MongoDB')
-
     if get_option('cxx-std') == "17" and not conf.CheckCxx17():
-        myenv.ConfError('C++17 was requested, but the compiler appears not to offer it')
+        myenv.ConfError('C++17 support is required to build MongoDB')
 
     conf.Finish()
 
