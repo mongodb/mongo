@@ -45,11 +45,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
-// Global grid instance
 const auto grid = ServiceContext::declareDecoration<Grid>();
-}
+}  // namespace
 
 Grid::Grid() = default;
 

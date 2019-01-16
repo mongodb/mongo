@@ -430,7 +430,9 @@ env.Library(
     source=[
         'is_mongos.cpp',
     ],
-    LIBDEPS=[],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_options_core',
+    ],
 )
 
 env.CppUnitTest(

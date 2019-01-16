@@ -383,6 +383,17 @@ void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
     itDb->second[nss.ns()]->needsRefresh = true;
 }
 
+void CatalogCache::purgeCollection(const NamespaceString& nss) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    auto itDb = _collectionsByDb.find(nss.db());
+    if (itDb == _collectionsByDb.end()) {
+        return;
+    }
+
+    itDb->second.erase(nss.ns());
+}
+
 void CatalogCache::purgeDatabase(StringData dbName) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _databases.erase(dbName);
