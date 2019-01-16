@@ -230,7 +230,7 @@ public:
 
     explicit SortedFileWriter(const SortOptions& opts,
                               const std::string& fileName,
-                              const unsigned int fileStartOffset,
+                              const std::streampos fileStartOffset,
                               const Settings& settings = Settings());
 
     void addAlreadySorted(const Key&, const Value&);
@@ -246,7 +246,7 @@ public:
     /**
      * Only call this after done() has been called to set the end offset.
      */
-    unsigned int getFileEndOffset() {
+    std::streampos getFileEndOffset() {
         invariant(!_file.is_open());
         return _fileEndOffset;
     }
@@ -262,8 +262,8 @@ private:
     // Tracks where in the file we started and finished writing the sorted data range so that the
     // information can be given to the Iterator in done(), and to the user via getFileEndOffset()
     // for the next SortedFileWriter instance using the same file.
-    unsigned int _fileStartOffset;
-    unsigned int _fileEndOffset;
+    std::streampos _fileStartOffset;
+    std::streampos _fileEndOffset;
 };
 }
 

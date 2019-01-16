@@ -157,8 +157,8 @@ public:
     typedef std::pair<Key, Value> Data;
 
     FileIterator(const std::string& fileName,
-                 unsigned int fileStartOffset,
-                 unsigned int fileEndOffset,
+                 std::streampos fileStartOffset,
+                 std::streampos fileEndOffset,
                  const Settings& settings)
         : _settings(settings),
           _done(false),
@@ -289,8 +289,14 @@ private:
     void read(void* out, size_t size) {
         invariant(_file.is_open());
 
-        if (static_cast<unsigned int>(_file.tellg()) >= _fileEndOffset) {
-            invariant(static_cast<unsigned int>(_file.tellg()) == _fileEndOffset);
+        const std::streampos offset = _file.tellg();
+        uassert(51049,
+                str::stream() << "error reading file \"" << _fileName << "\": "
+                              << myErrnoWithDescription(),
+                offset >= 0);
+
+        if (offset >= _fileEndOffset) {
+            invariant(offset == _fileEndOffset);
             _done = true;
             return;
         }
@@ -307,9 +313,9 @@ private:
     bool _done;
     std::unique_ptr<char[]> _buffer;
     std::unique_ptr<BufReader> _bufferReader;
-    std::string _fileName;          // File containing the sorted data range.
-    unsigned int _fileStartOffset;  // File offset at which the sorted data range starts.
-    unsigned int _fileEndOffset;    // File offset at which the sorted data range ends.
+    std::string _fileName;            // File containing the sorted data range.
+    std::streampos _fileStartOffset;  // File offset at which the sorted data range starts.
+    std::streampos _fileEndOffset;    // File offset at which the sorted data range ends.
     std::ifstream _file;
 };
 
@@ -576,7 +582,7 @@ private:
     const Settings _settings;
     SortOptions _opts;
     std::string _fileName;
-    unsigned int _nextSortedFileWriterOffset = 0;
+    std::streampos _nextSortedFileWriterOffset = 0;
     bool _done = false;
     size_t _memUsed;
     std::deque<Data> _data;                         // the "current" data
@@ -870,7 +876,7 @@ private:
     const Settings _settings;
     SortOptions _opts;
     std::string _fileName;
-    unsigned int _nextSortedFileWriterOffset = 0;
+    std::streampos _nextSortedFileWriterOffset = 0;
     bool _done = false;
     size_t _memUsed;
     std::vector<Data> _data;  // the "current" data. Organized as max-heap if size == limit.
@@ -894,7 +900,7 @@ private:
 template <typename Key, typename Value>
 SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
                                                const std::string& fileName,
-                                               const unsigned int fileStartOffset,
+                                               const std::streampos fileStartOffset,
                                                const Settings& settings)
     : _settings(settings) {
     namespace str = mongoutils::str;
@@ -992,7 +998,7 @@ void SortedFileWriter<Key, Value>::spill() {
 template <typename Key, typename Value>
 SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     spill();
-    long currentFileOffset = _file.tellp();
+    std::streampos currentFileOffset = _file.tellp();
     uassert(50980,
             str::stream() << "error fetching current file descriptor offset in file \"" << _fileName
                           << "\": "
@@ -1001,9 +1007,7 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
 
     // In case nothing was written to disk, use _fileStartOffset because tellp() may not be
     // initialized on all systems upon opening the file.
-    _fileEndOffset = static_cast<unsigned int>(currentFileOffset) < _fileStartOffset
-        ? _fileStartOffset
-        : static_cast<unsigned int>(currentFileOffset);
+    _fileEndOffset = currentFileOffset < _fileStartOffset ? _fileStartOffset : currentFileOffset;
     _file.close();
 
     return new sorter::FileIterator<Key, Value>(
