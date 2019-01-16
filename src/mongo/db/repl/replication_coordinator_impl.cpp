@@ -3223,12 +3223,17 @@ std::set<OpTime> ReplicationCoordinatorImpl::getStableOpTimeCandidates_forTest()
     return _stableOpTimeCandidates;
 }
 
-boost::optional<OpTime> ReplicationCoordinatorImpl::getStableOpTime_forTest() {
+boost::optional<OpTime> ReplicationCoordinatorImpl::recalculateStableOpTime_forTest() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    return _getStableOpTime(lk);
+    return _recalculateStableOpTime(lk);
 }
 
-boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime(WithLock lk) {
+void ReplicationCoordinatorImpl::recalculateStableOpTime() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _recalculateStableOpTime(lk);
+}
+
+boost::optional<OpTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
     auto commitPoint = _topCoord->getLastCommittedOpTime();
     if (_currentCommittedSnapshot) {
         auto snapshotOpTime = *_currentCommittedSnapshot;
@@ -3264,7 +3269,7 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime(WithLock lk
 
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     // Get the current stable optime.
-    auto stableOpTime = _getStableOpTime(lk);
+    auto stableOpTime = _recalculateStableOpTime(lk);
 
     // If there is a valid stable optime, set it for the storage engine, and then remove any
     // old, unneeded stable optime candidates.

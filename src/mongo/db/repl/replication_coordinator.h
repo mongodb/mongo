@@ -813,6 +813,13 @@ public:
      */
     virtual bool setContainsArbiter() const = 0;
 
+    /**
+     * Getter that exposes _recalculateStableOpTime to the Transaction Participant so we can
+     * recalculate the stable timestamp when needed.
+     */
+    virtual void recalculateStableOpTime() = 0;
+
+
 protected:
     ReplicationCoordinator();
 };

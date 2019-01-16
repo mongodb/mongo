@@ -4206,7 +4206,7 @@ TEST_F(StableOpTimeTest, ClearOpTimeCandidatesPastCommonPointAfterRollback) {
     // Make sure the stable optime candidate set has been cleared of all entries past the common
     // point.
     opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
-    auto stableOpTime = repl->getStableOpTime_forTest();
+    auto stableOpTime = repl->recalculateStableOpTime_forTest();
     ASSERT(stableOpTime);
     expectedOpTimeCandidates = {*stableOpTime};
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);

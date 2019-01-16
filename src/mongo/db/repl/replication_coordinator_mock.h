@@ -288,6 +288,8 @@ public:
 
     virtual bool setContainsArbiter() const override;
 
+    virtual void recalculateStableOpTime() override;
+
 private:
     AtomicWord<unsigned long long> _snapshotNameGenerator;
     ServiceContext* const _service;

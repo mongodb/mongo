@@ -494,5 +494,9 @@ bool ReplicationCoordinatorMock::setContainsArbiter() const {
     return false;
 }
 
+void ReplicationCoordinatorMock::recalculateStableOpTime() {
+    return;
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -232,6 +232,8 @@ public:
 
     bool setContainsArbiter() const override;
 
+    void recalculateStableOpTime() override;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

@@ -1160,6 +1160,12 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
             CurOp::get(opCtx)->debug().storageStats);
     }
 
+    // After writing down the commit oplog entry and adding a finishOpTime to
+    // ServerTransactionsMetrics, recalculate the stable optime to ensure we correctly advance
+    // the stable timestamp.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    replCoord->recalculateStableOpTime();
+
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
     _cleanUpTxnResourceOnOpCtx(lk, opCtx, TerminationCause::kCommitted);
