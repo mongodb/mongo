@@ -254,7 +254,7 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
         // Warn for keys that are more numerous than maxChunkSize allows.
         for (auto it = tooFrequentKeys.cbegin(); it != tooFrequentKeys.cend(); ++it) {
             warning() << "possible low cardinality key detected in " << nss.toString()
-                      << " - key is " << prettyKey(idx->keyPattern(), *it);
+                      << " - key is " << redact(prettyKey(idx->keyPattern(), *it));
         }
 
         // Remove the sentinel at the beginning before returning
