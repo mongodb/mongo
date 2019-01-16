@@ -404,7 +404,7 @@ public:
                     if (node->_children[i] != nullptr) {
                         // If there is a sub-tree found, it must have data, therefore it's necessary
                         // to traverse to the right most node.
-                        _current = node->child(i).get();
+                        _current = node->_children[i].get();
                         _traverseRightSubtree();
                         return;
                     }
@@ -560,7 +560,7 @@ public:
         size_t depth = prev->_depth + prev->_trieKey.size();
         while (depth < key.size()) {
             uint8_t c = static_cast<uint8_t>(charKey[depth]);
-            node = prev->child(c).get();
+            node = prev->_children[c].get();
             if (node == nullptr) {
                 return false;
             }
@@ -623,7 +623,7 @@ public:
 
         // 'parent' may only have one child, in which case we need to evaluate whether or not
         // this node is redundant.
-        parent->compressIfSingleChild();
+        _compressOnlyChild(parent);
 
         return true;
     }
@@ -689,7 +689,7 @@ public:
             if (idx != UINT8_MAX)
                 context.push_back(std::make_pair(node, idx + 1));
 
-            if (idx >= node->_children.size() || !node->_children[idx])
+            if (!node->_children[idx])
                 break;
 
             node = node->_children[idx].get();
@@ -735,7 +735,7 @@ public:
             std::tie(node, idx) = context.back();
             context.pop_back();
 
-            for (auto iter = idx + node->_children.begin(); iter < node->_children.end(); ++iter) {
+            for (auto iter = idx + node->_children.begin(); iter != node->_children.end(); ++iter) {
                 if (!(*iter))
                     continue;
 
@@ -779,7 +779,7 @@ public:
         return std::distance(iter1, iter2);
     }
 
-    std::string toString() {
+    std::string to_string_for_test() {
         return _walkTree(_root.get(), 0);
     }
 
@@ -810,40 +810,6 @@ private:
 
         virtual ~Node() = default;
 
-
-        /**
-         * Compresses a child node into its parent if necessary. This is required when an erase
-         * results in a node with no value and only one child.
-         */
-        void compressIfSingleChild() {
-            // Don't compress if this node has an actual value associated with it or is the root.
-            if (_data || _trieKey.empty()) {
-                return;
-            }
-
-            // Determine if this node has only one child.
-            std::shared_ptr<Node> onlyChild = nullptr;
-
-            for (size_t i = 0; i < _children.size(); ++i) {
-                if (_children[i] != nullptr) {
-                    if (onlyChild != nullptr) {
-                        return;
-                    }
-                    onlyChild = _children[i];
-                }
-            }
-
-            // Append the child's key onto the parent.
-            for (char item : onlyChild->_trieKey) {
-                _trieKey.push_back(item);
-            }
-
-            if (onlyChild->_data) {
-                _data.emplace(onlyChild->_data->first, onlyChild->_data->second);
-            }
-            _children = onlyChild->_children;
-        }
-
         friend void swap(Node& first, Node& second) {
             std::swap(first.trieKey, second.trieKey);
             std::swap(first.depth, second.depth);
@@ -864,25 +830,11 @@ private:
             return true;
         }
 
-        std::shared_ptr<Node> child(uint8_t nr) const {
-            return nr < _children.size() ? _children[nr] : nullptr;
-        }
-
-        std::shared_ptr<Node>& child(uint8_t nr) {
-            while (_children.size() <= nr)
-                _children.emplace_back(nullptr);
-            return _children[nr];
-        }
-
-        const std::vector<std::shared_ptr<Node>>& children() const {
-            return _children;
-        }
-
     protected:
         unsigned int _depth = 0;
         std::vector<uint8_t> _trieKey;
         boost::optional<value_type> _data;
-        std::vector<std::shared_ptr<Node>> _children;
+        std::array<std::shared_ptr<Node>, 256> _children;
     };
 
     /**
@@ -959,9 +911,8 @@ private:
         }
         ret.push_back('\n');
 
-        for (auto& child : node->_children) {
+        for (auto child : node->_children) {
             if (child != nullptr) {
-                ret.append(std::to_string(child.use_count()));
                 ret.append(_walkTree(child.get(), depth + 1));
             }
         }
@@ -988,7 +939,7 @@ private:
 
         depth = _root->_depth + _root->_trieKey.size();
         uint8_t childFirstChar = static_cast<uint8_t>(charKey[depth]);
-        auto node = _root->child(childFirstChar);
+        auto node = _root->_children[childFirstChar];
 
         while (node != nullptr) {
 
@@ -1005,7 +956,7 @@ private:
             depth = node->_depth + node->_trieKey.size();
 
             childFirstChar = static_cast<uint8_t>(charKey[depth]);
-            node = node->child(childFirstChar);
+            node = node->_children[childFirstChar];
         }
 
         return nullptr;
@@ -1062,7 +1013,7 @@ private:
             if (node.use_count() - 1 > 1) {
                 // Copy node on a modifying operation when it isn't owned uniquely.
                 node = std::make_shared<Node>(*node);
-                prev->child(childFirstChar) = node;
+                prev->_children[childFirstChar] = node;
             }
 
             // 'node' is uniquely owned at this point, so we are free to modify it.
@@ -1095,7 +1046,7 @@ private:
 
                 // Change the current node's trieKey and make a child of the new node.
                 newKey = _makeKey(node->_trieKey, mismatchIdx, node->_trieKey.size() - mismatchIdx);
-                newNode->child(newKey.front()) = node;
+                newNode->_children[newKey.front()] = node;
 
                 node->_trieKey = newKey;
                 node->_depth = newNode->_depth + newNode->_trieKey.size();
@@ -1112,7 +1063,7 @@ private:
                 // Update an internal node.
                 if (!value) {
                     node->_data = boost::none;
-                    node->compressIfSingleChild();
+                    _compressOnlyChild(node.get());
                 } else {
                     _root->_count++;
                     _root->_dataSize += value->second.size();
@@ -1127,7 +1078,7 @@ private:
             childFirstChar = static_cast<uint8_t>(charKey[depth]);
 
             prev = node.get();
-            node = node->child(childFirstChar);
+            node = node->_children[childFirstChar];
         }
 
         // Add a completely new child to a node. The new key at this depth does not
@@ -1175,7 +1126,7 @@ private:
         if (value) {
             newNode->_data.emplace(value->first, value->second);
         }
-        node->child(key.front()) = newNode;
+        node->_children[key.front()] = newNode;
         return newNode.get();
     }
 
@@ -1196,7 +1147,7 @@ private:
 
         while (depth < key.size()) {
             uint8_t c = static_cast<uint8_t>(charKey[depth]);
-            node = node->child(c).get();
+            node = node->_children[c].get();
             context.push_back(node);
             depth = node->_depth + node->_trieKey.size();
         }
@@ -1221,6 +1172,39 @@ private:
     }
 
     /**
+     * Compresses a child node into its parent if necessary. This is required when an erase results
+     * in a node with no value and only one child.
+     */
+    void _compressOnlyChild(Node* node) {
+        // Don't compress if this node has an actual value associated with it or is the root.
+        if (node->_data || node->_trieKey.empty()) {
+            return;
+        }
+
+        // Determine if this node has only one child.
+        std::shared_ptr<Node> onlyChild = nullptr;
+
+        for (size_t i = 0; i < node->_children.size(); ++i) {
+            if (node->_children[i] != nullptr) {
+                if (onlyChild != nullptr) {
+                    return;
+                }
+                onlyChild = node->_children[i];
+            }
+        }
+
+        // Append the child's key onto the parent.
+        for (char item : onlyChild->_trieKey) {
+            node->_trieKey.push_back(item);
+        }
+
+        if (onlyChild->_data) {
+            node->_data.emplace(onlyChild->_data->first, onlyChild->_data->second);
+        }
+        node->_children = onlyChild->_children;
+    }
+
+    /**
      * Rebuilds the context by replacing stale raw pointers with the new pointers. The pointers
      * can become stale when running an operation that copies the node on modification, like
      * insert or erase.
@@ -1230,7 +1214,7 @@ private:
         context[0] = replaceNode;
 
         for (size_t node = 1; node < context.size(); node++) {
-            replaceNode = replaceNode->child(trieKeyIndex[node - 1]).get();
+            replaceNode = replaceNode->_children[trieKeyIndex[node - 1]].get();
             context[node] = replaceNode;
         }
     }
@@ -1255,13 +1239,13 @@ private:
         for (size_t idx = 1; idx < context.size(); idx++) {
             node = context[idx];
 
-            if (prev->child(node->_trieKey.front()).use_count() > 1) {
+            if (prev->_children[node->_trieKey.front()].use_count() > 1) {
                 std::shared_ptr<Node> nodeCopy = std::make_shared<Node>(*node);
-                prev->child(nodeCopy->_trieKey.front()) = nodeCopy;
+                prev->_children[nodeCopy->_trieKey.front()] = nodeCopy;
                 context[idx] = nodeCopy.get();
                 prev = nodeCopy.get();
             } else {
-                prev = prev->child(node->_trieKey.front()).get();
+                prev = prev->_children[node->_trieKey.front()].get();
             }
         }
 
@@ -1376,9 +1360,9 @@ private:
             // Since _makeBranchUnique may make changes to the pointer addresses in recursive calls.
             current = context.back();
 
-            Node* node = current->child(key).get();
-            Node* baseNode = base->child(key).get();
-            Node* otherNode = other->child(key).get();
+            Node* node = current->_children[key].get();
+            Node* baseNode = base->_children[key].get();
+            Node* otherNode = other->_children[key].get();
 
             if (!node && !baseNode && !otherNode)
                 continue;
@@ -1396,7 +1380,7 @@ private:
                     // modifications that go on in _makeBranchUnique.
                     _rebuildContext(context, trieKeyIndex);
 
-                    current->child(key) = other->child(key);
+                    current->_children[key] = other->_children[key];
                 } else if (!otherNode || (baseNode && baseNode != otherNode)) {
                     // Either the master tree and working tree remove the same branch, or the master
                     // tree updated the branch while the working tree removed the branch, resulting
@@ -1409,12 +1393,12 @@ private:
 
                     current = _makeBranchUnique(context);
                     _rebuildContext(context, trieKeyIndex);
-                    current->child(key) = nullptr;
+                    current->_children[key] = nullptr;
                 } else if (baseNode && otherNode && baseNode == node) {
                     // If base and current point to the same node, then master changed.
                     current = _makeBranchUnique(context);
                     _rebuildContext(context, trieKeyIndex);
-                    current->child(key) = other->child(key);
+                    current->_children[key] = other->_children[key];
                 }
             } else if (baseNode && otherNode && baseNode != otherNode) {
                 // If all three are unique and leaf nodes, then it is a merge conflict.
@@ -1454,10 +1438,10 @@ private:
     Node* _begin(Node* root) const noexcept {
         Node* node = root;
         while (!node->_data) {
-            if (node->children().empty())
+            if (node->_children.empty())
                 return nullptr;
 
-            for (auto child : node->children()) {
+            for (auto child : node->_children) {
                 if (child != nullptr) {
                     node = child.get();
                     break;
