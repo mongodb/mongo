@@ -14,7 +14,7 @@ client = MongoClient()
 db = client["test_speed"]
 
 vec_size = 4096
-num_documents = 1500
+num_documents = 150000
 fill_data_base = True
 iterations = 10
 functions = ['no_op', 'cossim', 'chi2', 'euclidean', 'squared_euclidean', 'manhattan', 'no_op']
