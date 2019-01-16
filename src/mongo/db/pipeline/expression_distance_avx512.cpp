@@ -43,6 +43,11 @@ Value ExpressionEuclidean::evaluateImpl(
         r += *pPackVal;
     }
 
+    for (size_t i = 0; i < p_uiSize % uiPackSize; ++i, ++p_pData1, ++p_pData2) {
+        float fDiff = *p_pData1 - *p_pData2;
+        r += fDiff * fDiff;
+    }
+
     return Value(double(std::sqrt(r)));
 }
 
@@ -86,6 +91,15 @@ Value ExpressionCosineSimilarity::evaluateImpl(
         norm_b += *pPackNorm_b;
     }
 
+    for (size_t i = 0; i < p_uiSize % uiPackSize; ++i, ++p_pData1, ++p_pData2) {
+        float a = *p_pData1;
+        float b = *p_pData2;
+
+        dot += a * b;
+        norm_a += a * a;
+        norm_b += b * b;
+    }
+
     float result = 1 - ( dot / ( (std::sqrt(norm_a*norm_b) + FLT_MIN) ));
     return Value(double(result));
 }
@@ -122,6 +136,15 @@ Value ExpressionChi2::evaluateImpl(
         r += *pPackVal;
     }
 
+    for (size_t i = 0; i < p_uiSize % uiPackSize; ++i, ++p_pData1, ++p_pData2) {
+        float a = *p_pData1;
+        float b = *p_pData2;
+	    float t = a + b;
+        float diff = a - b;
+
+        r += (diff * diff) / ( t + FLT_MIN);
+    }
+
     return Value(double(r));
 }
 
@@ -145,6 +168,11 @@ Value ExpressionSquaredEuclidean::evaluateImpl(
     float r = 0.0f;
     for (size_t i = 0; i < uiPackSize; ++i, ++pPackVal) {
         r += *pPackVal;
+    }
+
+    for (size_t i = 0; i < p_uiSize % uiPackSize; ++i, ++p_pData1, ++p_pData2) {
+        float diff = *p_pData1 - *p_pData2;
+        r += diff * diff;
     }
 
     return Value(double(r));
@@ -182,6 +210,10 @@ Value ExpressionManhattan::evaluateImpl(
     float r = 0.0f;
     for (size_t i = 0; i < uiPackSize; ++i, ++pPackVal) {
         r += *pPackVal;
+    }
+
+    for (size_t i = 0; i < p_uiSize % uiPackSize; ++i, ++p_pData1, ++p_pData2) {
+        r += std::fabs( *p_pData1 - *p_pData2 );
     }
 
     return Value( double(r) );
