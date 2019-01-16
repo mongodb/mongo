@@ -134,9 +134,12 @@ env.Library(
 env.Library(
     target='catalog_raii',
     source=[
+        '$BUILD_DIR/mongo/db/server_read_concern_metrics.cpp',
         'catalog_raii.cpp',
+        env.Idlc('$BUILD_DIR/mongo/db/read_concern_stats.idl')[0],
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/views/views',
