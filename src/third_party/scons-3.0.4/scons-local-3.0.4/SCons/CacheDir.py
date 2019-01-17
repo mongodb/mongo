@@ -46,10 +46,12 @@ def CacheRetrieveFunc(target, source, env):
     t = target[0]
     fs = t.fs
     cd = env.get_CacheDir()
+    cd.requests += 1
     cachedir, cachefile = cd.cachepath(t)
     if not fs.exists(cachefile):
         cd.CacheDebug('CacheRetrieve(%s):  %s not in cache\n', t, cachefile)
         return 1
+    cd.hits += 1
     cd.CacheDebug('CacheRetrieve(%s):  retrieving from %s\n', t, cachefile)
     if SCons.Action.execute_actions:
         if fs.islink(cachefile):
@@ -139,6 +141,8 @@ warned = dict()
 class CacheDir(object):
 
     def __init__(self, path):
+        self.requests = 0
+        self.hits = 0
         self.path = path
         self.current_cache_debug = None
         self.debugFP = None
@@ -194,7 +198,7 @@ class CacheDir(object):
             except ValueError:
                 msg = "Failed to read cache configuration for " + path
                 raise SCons.Errors.EnvironmentError(msg)
-            
+
 
     def CacheDebug(self, fmt, target, cachefile):
         if cache_debug != self.current_cache_debug:
@@ -207,6 +211,16 @@ class CacheDir(object):
             self.current_cache_debug = cache_debug
         if self.debugFP:
             self.debugFP.write(fmt % (target, os.path.split(cachefile)[1]))
+            self.debugFP.write("requests: %d, hits: %d, misses: %d, hit rate: %.2f%%\n" % 
+                (self.requests, self.hits, self.misses, self.hit_ratio))
+
+    @property
+    def hit_ratio(self):
+        return (100.0 * self.hits / self.requests if self.requests > 0 else 100)
+
+    @property
+    def misses(self):
+        return self.requests - self.hits
 
     def is_enabled(self):
         return cache_enabled and not self.path is None
