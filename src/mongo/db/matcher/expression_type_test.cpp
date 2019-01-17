@@ -250,6 +250,14 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataMD5Type) {
     ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
 }
 
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataEncryptType) {
+    BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::Encrypt));
+    BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::newUUID));
+    InternalSchemaBinDataSubTypeExpression type("", BinDataType::Encrypt);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
     BSONObj match = BSON("a" << BSONBinData(NULL, 0, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(NULL, 0, BinDataType::Function));

@@ -1417,6 +1417,21 @@ class BinData5 : public Base {
     }
 };
 
+class BinData6 : public Base {
+    virtual BSONObj bson() const {
+        char z[3];
+        z[0] = 'a';
+        z[1] = 'b';
+        z[2] = 'c';
+        BSONObjBuilder b;
+        b.appendBinData("a", 3, Encrypt, z);
+        return b.obj();
+    }
+    virtual string json() const {
+        return "{ \"a\" : { \"$binary\" : \"YWJj\", \"$type\" : \"06\" } }";
+    }
+};
+
 class BinData80 : public Base {
     virtual BSONObj bson() const {
         char z[3];
@@ -2805,6 +2820,7 @@ public:
         add<FromJsonTests::BinData3>();
         add<FromJsonTests::BinData4>();
         add<FromJsonTests::BinData5>();
+        add<FromJsonTests::BinData6>();
         add<FromJsonTests::BinData80>();
         add<FromJsonTests::BinDataPaddedSingle>();
         add<FromJsonTests::BinDataPaddedDouble>();
