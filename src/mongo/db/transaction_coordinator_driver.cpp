@@ -206,9 +206,21 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::persistParticipantList(
     const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
-    return _scheduler.scheduleWork([lsid, txnNumber, participantList](OperationContext* opCtx) {
-        persistParticipantListBlocking(opCtx, lsid, txnNumber, participantList);
-    });
+    return txn::doWhile(_scheduler,
+                        boost::none /* no need for a backoff */,
+                        [](const Status& s) {
+                            // 'Interrupted' is the error code delivered for killOp sent by a user.
+                            // Note, we do not want to retry on other interruption errors, like
+                            // InterruptedDueToStepDown.
+                            return s.code() == ErrorCodes::Interrupted;
+                        },
+                        [this, lsid, txnNumber, participantList] {
+                            return _scheduler.scheduleWork(
+                                [lsid, txnNumber, participantList](OperationContext* opCtx) {
+                                    persistParticipantListBlocking(
+                                        opCtx, lsid, txnNumber, participantList);
+                                });
+                        });
 }
 
 Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
@@ -392,9 +404,19 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
     TxnNumber txnNumber,
     std::vector<ShardId> participantList,
     const boost::optional<Timestamp>& commitTimestamp) {
-    return _scheduler.scheduleWork(
-        [lsid, txnNumber, participantList, commitTimestamp](OperationContext* opCtx) {
-            persistDecisionBlocking(opCtx, lsid, txnNumber, participantList, commitTimestamp);
+    return txn::doWhile(
+        _scheduler,
+        boost::none /* no need for a backoff */,
+        [](const Status& s) {
+            // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
+            // want to retry on other interruption errors, like InterruptedDueToStepDown.
+            return s.code() == ErrorCodes::Interrupted;
+        },
+        [this, lsid, txnNumber, participantList, commitTimestamp] {
+            return _scheduler.scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
+                OperationContext* opCtx) {
+                persistDecisionBlocking(opCtx, lsid, txnNumber, participantList, commitTimestamp);
+            });
         });
 }
 
@@ -502,9 +524,20 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSessionId& lsid,
                                                                 TxnNumber txnNumber) {
-    return _scheduler.scheduleWork([lsid, txnNumber](OperationContext* opCtx) {
-        deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
-    });
+    return txn::doWhile(_scheduler,
+                        boost::none /* no need for a backoff */,
+                        [](const Status& s) {
+                            // 'Interrupted' is the error code delivered for killOp sent by a
+                            // user. Note, we do not want to retry on other interruption errors,
+                            // like InterruptedDueToStepDown.
+                            return s.code() == ErrorCodes::Interrupted;
+                        },
+                        [this, lsid, txnNumber] {
+                            return _scheduler.scheduleWork(
+                                [lsid, txnNumber](OperationContext* opCtx) {
+                                    deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
+                                });
+                        });
 }
 
 std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAllCoordinatorDocs(
@@ -532,7 +565,12 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
     return txn::doWhile(
         _scheduler,
         kExponentialBackoff,
-        [](StatusWith<PrepareResponse> s) { return isRetryableError(s.getStatus().code()); },
+        [](StatusWith<PrepareResponse> swPrepareResponse) {
+            // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
+            // want to retry on other interruption errors, like InterruptedDueToStepDown.
+            return swPrepareResponse.getStatus().code() == ErrorCodes::Interrupted ||
+                isRetryableError(swPrepareResponse.getStatus().code());
+        },
         [ this, shardId, commandObj = commandObj.getOwned() ] {
             return _scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
@@ -591,7 +629,8 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                         return PrepareResponse{shardId, boost::none, boost::none};
                     }
 
-                    if (!isRetryableError(status.code())) {
+                    if (!(isRetryableError(status.code()) ||
+                          status.code() == ErrorCodes::Interrupted)) {
                         return PrepareResponse{shardId, CommitDecision::kAbort, boost::none};
                     }
 
@@ -606,7 +645,11 @@ Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
     return txn::doWhile(
         _scheduler,
         kExponentialBackoff,
-        [](const Status& s) { return isRetryableError(s.code()); },
+        [](const Status& s) {
+            // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
+            // want to retry on other interruption errors, like InterruptedDueToStepDown.
+            return s.code() == ErrorCodes::Interrupted || isRetryableError(s.code());
+        },
         [ this, shardId, commandObj = commandObj.getOwned() ] {
             return _scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {

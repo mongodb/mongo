@@ -74,7 +74,7 @@ public:
                 when,
                 [ this, task = std::forward<Callable>(task), taskCompletionPromise ](
                     const executor::TaskExecutor::CallbackArgs&) mutable noexcept {
-                    ThreadClient tc(_serviceContext);
+                    ThreadClient tc("TransactionCoordinator", _serviceContext);
                     auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
                     taskCompletionPromise->setWith([&] { return task(uniqueOpCtx.get()); });
                 }));

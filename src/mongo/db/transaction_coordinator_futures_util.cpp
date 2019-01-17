@@ -39,11 +39,14 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace txn {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangWhileTargetingRemoteHost);
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
@@ -150,6 +153,11 @@ Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
     return scheduleWork([shardId, readPref](OperationContext* opCtx) {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+
+        if (MONGO_FAIL_POINT(hangWhileTargetingRemoteHost)) {
+            LOG(0) << "Hit hangWhileTargetingRemoteHost failpoint";
+        }
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
 
         // TODO (SERVER-35678): Return a SemiFuture<HostAndPort> rather than using a blocking call
         return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
