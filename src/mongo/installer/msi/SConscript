@@ -51,7 +51,20 @@ except WindowsError:
     Return()
 
 # Combine and set the full merge module path
-env['MERGEMODULESBASEPATH'] = os.path.join(vsinstall_path, "VC", "Redist", "MSVC", re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1), "MergeModules")
+redist_root = os.path.join(vsinstall_path, "VC", "Redist", "MSVC")
+redist_path = os.path.join(redist_root, re.match("v(\d+\.\d+\.\d+)\.\d+", vslib_version).group(1))
+
+# Fallback to directory search if we don't find the expected version
+if not os.path.isdir(redist_path):
+    dirs = os.listdir(redist_root)
+    dirs.sort()
+    for dir in reversed(dirs):
+        candidate = os.path.join(redist_root, dir)
+        if os.path.isdir(candidate):
+            redist_path = candidate
+            break
+
+env['MERGEMODULESBASEPATH'] = os.path.join(redist_path, "MergeModules")
 
 sourcesList = [ "BinaryFragment.wxs",
             "FeatureFragment.wxs",
