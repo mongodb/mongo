@@ -260,6 +260,8 @@ Status repairCollections(OperationContext* opCtx,
         status = rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexNameObjs.getValue());
         if (!status.isOK())
             return status;
+
+        engine->flushAllFiles(opCtx, true);
     }
     return Status::OK();
 }
@@ -310,34 +312,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
     if (!status.isOK()) {
         severe() << "Failed to repair database " << dbName << ": " << status.reason();
         return status;
-    }
-
-    DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(opCtx, dbName);
-
-    std::list<std::string> colls;
-    dbce->getCollectionNamespaces(&colls);
-
-    for (std::list<std::string>::const_iterator it = colls.begin(); it != colls.end(); ++it) {
-        // Don't check for interrupt after starting to repair a collection otherwise we can
-        // leave data in an inconsistent state. Interrupting between collections is ok, however.
-        opCtx->checkForInterrupt();
-
-        log() << "Repairing collection " << *it;
-
-        Status status = engine->repairRecordStore(opCtx, *it);
-        if (!status.isOK())
-            return status;
-
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(*it);
-        auto swIndexNameObjs = getIndexNameObjs(opCtx, dbce, cce);
-        if (!swIndexNameObjs.isOK())
-            return swIndexNameObjs.getStatus();
-
-        status = rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexNameObjs.getValue());
-        if (!status.isOK())
-            return status;
-
-        engine->flushAllFiles(opCtx, true);
     }
 
     return Status::OK();
