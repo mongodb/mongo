@@ -13,7 +13,6 @@ import subprocess
 import sys
 import textwrap
 import uuid
-import multiprocessing
 
 import SCons
 
@@ -35,6 +34,7 @@ from buildscripts import utils
 from buildscripts import moduleconfig
 
 import libdeps
+import psutil
 
 atexit.register(mongo.print_build_failures)
 
@@ -549,7 +549,10 @@ add_option('msvc-debugging-format',
 )
 
 add_option('jlink',
-        help="Limit link concurrency to given value",
+        help="Limit link concurrency. Takes either an integer to limit to or a"
+        " float between 0 and 1.0 whereby jobs will be multiplied to get the final"
+        " jlink value."
+        "\n\nExample: --jlink=0.75 --jobs 8 will result in a jlink value of 6",
         const=0.5,
         default=None,
         nargs='?',
@@ -3759,16 +3762,13 @@ env.Alias("distsrc", "distsrc-tgz")
 # the values below set with SetOption will be overwritten.
 #
 # Default j to the number of CPUs on the system. Note: in containers this
-# reports the number of CPUs for the host system. We're relying on the standard
-# library here and perhaps in a future version of Python it will instead report
-# the correct number when in a container.
-try:
-    env.SetOption('num_jobs', multiprocessing.cpu_count())
-# On some platforms (like Windows) on Python 2.7 multiprocessing.cpu_count
-# is not implemented. After we upgrade to Python 3.4+ we can use alternative
-# methods that are cross-platform.
-except NotImplementedError:
-    pass
+# reports the number of CPUs for the host system. Perhaps in a future version of
+# psutil it will instead report the correct number when in a container.
+#
+# psutil.cpu_count returns None when it can't determine the number. This always
+# fails on BSD's for example.
+if psutil.cpu_count() is not None:
+    env.SetOption('num_jobs', psutil.cpu_count())
 
 
 # Do this as close to last as possible before reading SConscripts, so
