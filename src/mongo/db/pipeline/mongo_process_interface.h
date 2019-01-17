@@ -161,9 +161,7 @@ public:
                                      BSONObjBuilder* builder) const = 0;
 
     /**
-     * Gets the collection options for the collection given by 'nss'. Throws
-     * ErrorCodes::CommandNotSupportedOnView if 'nss' describes a view. Future callers may want to
-     * parameterize this behavior.
+     * Gets the collection options for the collection given by 'nss'.
      */
     virtual BSONObj getCollectionOptions(const NamespaceString& nss) = 0;
 

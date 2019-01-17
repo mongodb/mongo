@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-class DocumentSourceSkip final : public DocumentSource {
+class DocumentSourceSkip final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static constexpr StringData kStageName = "$skip"_sd;
 
@@ -84,12 +84,11 @@ public:
         return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields
     }
 
-    /**
-     * The $skip stage must run on the merging half of the pipeline.
-     */
-    boost::optional<MergingLogic> mergingLogic() final {
-        // {shardsStage, mergingStage, sortPattern}
-        return MergingLogic{nullptr, this, boost::none};
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+    MergingLogic mergingLogic() final {
+        return {this};
     }
 
     long long getSkip() const {

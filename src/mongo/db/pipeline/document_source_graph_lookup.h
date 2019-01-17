@@ -67,10 +67,6 @@ public:
         return constraints;
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);
         return DepsTracker::State::SEE_NEXT;

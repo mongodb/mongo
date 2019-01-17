@@ -52,10 +52,6 @@ public:
                 ChangeStreamRequirement::kWhitelist};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
     /**
      * Attempts to duplicate the redact-safe portion of a subsequent $match before the $redact
      * stage.

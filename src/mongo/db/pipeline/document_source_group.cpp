@@ -950,7 +950,11 @@ Document DocumentSourceGroup::makeDocument(const Value& id,
     return out.freeze();
 }
 
-boost::optional<DocumentSource::MergingLogic> DocumentSourceGroup::mergingLogic() {
+intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
+    return this;  // No modifications necessary when on shard
+}
+
+NeedsMergerDocumentSource::MergingLogic DocumentSourceGroup::mergingLogic() {
     intrusive_ptr<DocumentSourceGroup> mergingGroup(new DocumentSourceGroup(pExpCtx));
     mergingGroup->setDoingMerge(true);
 
@@ -969,8 +973,7 @@ boost::optional<DocumentSource::MergingLogic> DocumentSourceGroup::mergingLogic(
         mergingGroup->addAccumulator(copiedAccumuledField);
     }
 
-    // {shardsStage, mergingStage, sortPattern}
-    return MergingLogic{this, mergingGroup, boost::none};
+    return {mergingGroup};
 }
 
 bool DocumentSourceGroup::pathIncludedInGroupKeys(const std::string& dottedPath) const {

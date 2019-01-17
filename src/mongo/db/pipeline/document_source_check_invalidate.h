@@ -58,10 +58,6 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
         // would result in it being created twice.

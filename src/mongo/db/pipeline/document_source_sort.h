@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-class DocumentSourceSort final : public DocumentSource {
+class DocumentSourceSort final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static constexpr StringData kStageName = "$sort"_sd;
     enum class SortKeySerialization {
@@ -83,7 +83,8 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
-    boost::optional<MergingLogic> mergingLogic() final;
+    boost::intrusive_ptr<DocumentSource> getShardSource() final;
+    MergingLogic mergingLogic() final;
     bool canRunInParallelBeforeOut(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
 

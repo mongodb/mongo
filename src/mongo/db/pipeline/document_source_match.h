@@ -162,10 +162,6 @@ public:
         const std::string& path,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
 protected:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);

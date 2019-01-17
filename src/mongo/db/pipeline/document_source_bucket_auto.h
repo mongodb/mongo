@@ -43,7 +43,7 @@ namespace mongo {
  * The $bucketAuto stage takes a user-specified number of buckets and automatically determines
  * boundaries such that the values are approximately equally distributed between those buckets.
  */
-class DocumentSourceBucketAuto final : public DocumentSource {
+class DocumentSourceBucketAuto final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -62,9 +62,11 @@ public:
     /**
      * The $bucketAuto stage must be run on the merging shard.
      */
-    boost::optional<MergingLogic> mergingLogic() final {
-        // {shardsStage, mergingStage, sortPattern}
-        return MergingLogic{nullptr, this, boost::none};
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+    MergingLogic mergingLogic() final {
+        return {this};
     }
 
     static const uint64_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;

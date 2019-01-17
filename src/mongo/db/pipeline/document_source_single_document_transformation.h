@@ -72,10 +72,6 @@ public:
         return constraints;
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
     TransformerInterface::TransformerType getType() const {
         return _parsedTransform->getType();
     }

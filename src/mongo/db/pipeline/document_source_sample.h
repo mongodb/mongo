@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-class DocumentSourceSample final : public DocumentSource {
+class DocumentSourceSample final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static constexpr StringData kStageName = "$sample"_sd;
 
@@ -58,7 +58,8 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    boost::optional<MergingLogic> mergingLogic() final;
+    boost::intrusive_ptr<DocumentSource> getShardSource() final;
+    MergingLogic mergingLogic() final;
 
     long long getSampleSize() const {
         return _size;

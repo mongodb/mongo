@@ -117,10 +117,6 @@ public:
         return constraints;
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

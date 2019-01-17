@@ -390,7 +390,8 @@ bool Pipeline::requiredToRunOnMongos() const {
     for (auto&& stage : _sources) {
         // If this pipeline is capable of splitting before the mongoS-only stage, then the pipeline
         // as a whole is not required to run on mongoS.
-        if (_splitState == SplitState::kUnsplit && stage->mergingLogic()) {
+        if (_splitState == SplitState::kUnsplit &&
+            dynamic_cast<NeedsMergerDocumentSource*>(stage.get())) {
             return false;
         }
 

@@ -98,10 +98,6 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
-    boost::optional<MergingLogic> mergingLogic() override {
-        return boost::none;
-    }
-
     // Return documents from front of queue.
     std::deque<GetNextResult> queue;
 

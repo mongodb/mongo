@@ -216,26 +216,6 @@ public:
         Document _result;
     };
 
-    /**
-     * A struct representing the information needed to execute this stage on a distributed
-     * collection.
-     */
-    struct MergingLogic {
-
-        // A stage which executes on each shard in parallel, or nullptr if nothing can be done in
-        // parallel. For example, a partial $group before a subsequent global $group.
-        boost::intrusive_ptr<DocumentSource> shardsStage = nullptr;
-
-        // A stage which executes after merging all the results together, or nullptr if nothing is
-        // necessary after merging. For example, a $limit stage.
-        boost::intrusive_ptr<DocumentSource> mergingStage = nullptr;
-
-        // If set, each document is expected to have sort key metadata which will be serialized in
-        // the '$sortKey' field. 'inputSortPattern' will then be used to describe which fields are
-        // ascending and which fields are descending when merging the streams together.
-        boost::optional<BSONObj> inputSortPattern = boost::none;
-    };
-
     virtual ~DocumentSource() {}
 
     /**
@@ -474,26 +454,6 @@ public:
         return DepsTracker::State::NOT_SUPPORTED;
     }
 
-    /**
-     * If this stage can be run in parallel across a distributed collection, returns boost::none.
-     * Otherwise, returns a struct representing what needs to be done to merge each shard's pipeline
-     * into a single stream of results. Must not mutate the existing source object; if different
-     * behaviour is required, a new source should be created and configured appropriately. It is an
-     * error for the returned MergingLogic to have identical pointers for 'shardsStage' and
-     * 'mergingStage'.
-     */
-    virtual boost::optional<MergingLogic> mergingLogic() = 0;
-
-    /**
-     * Returns true if it would be correct to execute this stage in parallel across the shards in
-     * cases where the final stage is an $out. For example, a $group stage which is just merging the
-     * groups from the shards can be run in parallel since it will preserve the shard key.
-     */
-    virtual bool canRunInParallelBeforeOut(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
-        return false;
-    }
-
 protected:
     explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -545,6 +505,61 @@ private:
      */
     virtual Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
+};
+
+/**
+ * This class marks DocumentSources that should be split between the merger and the shards. See
+ * Pipeline::Optimizations::Sharded::findSplitPoint() for details.
+ */
+class NeedsMergerDocumentSource {
+public:
+    /**
+     * A struct representing the information needed to merge the cursors for the shards half of this
+     * pipeline. If 'inputSortPattern' is set, each document is expected to have sort key metadata
+     * which will be serialized in the '$sortKey' field. 'inputSortPattern' will then be used to
+     * describe which fields are ascending and which fields are descending when merging the streams
+     * together.
+     */
+    struct MergingLogic {
+        MergingLogic(boost::intrusive_ptr<DocumentSource>&& mergingStage,
+                     boost::optional<BSONObj> inputSortPattern = boost::none)
+            : mergingStage(std::move(mergingStage)), inputSortPattern(inputSortPattern) {}
+
+        boost::intrusive_ptr<DocumentSource> mergingStage;
+        boost::optional<BSONObj> inputSortPattern;
+    };
+
+    /**
+     * Returns a source to be run on the shards, or NULL if no work should be done on the shards for
+     * this stage. Must not mutate the existing source object; if different behaviour is required in
+     * the split-pipeline case, a new source should be created and configured appropriately. It is
+     * an error for getShardSource() to return a pointer to the same object as getMergeSource(),
+     * since this can result in the source being stitched into both the shard and merge pipelines
+     * when the latter is executed on mongoS.
+     */
+    virtual boost::intrusive_ptr<DocumentSource> getShardSource() = 0;
+
+    /**
+     * Returns a struct representing what needs to be done to merge each shard's pipeline into a
+     * single stream of results. Must not mutate the existing source object; if different behaviour
+     * is required, a new source should be created and configured appropriately. It is an error for
+     * mergingLogic() to return a pointer to the same object as getShardSource().
+     */
+    virtual MergingLogic mergingLogic() = 0;
+
+    /**
+     * Returns true if it would be correct to execute this stage in parallel across the shards in
+     * cases where the final stage is an $out. For example, a $group stage which is just merging the
+     * groups from the shards can be run in parallel since it will preserve the shard key.
+     */
+    virtual bool canRunInParallelBeforeOut(
+        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+        return false;
+    }
+
+protected:
+    // It is invalid to delete through a NeedsMergerDocumentSource-typed pointer.
+    virtual ~NeedsMergerDocumentSource() {}
 };
 
 }  // namespace mongo

@@ -55,10 +55,6 @@ public:
                 TransactionRequirement::kAllowed};
     }
 
-    boost::optional<MergingLogic> mergingLogic() final {
-        return boost::none;
-    }
-
     static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         long long size,

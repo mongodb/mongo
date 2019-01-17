@@ -117,22 +117,17 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
     return sample;
 }
 
+intrusive_ptr<DocumentSource> DocumentSourceSample::getShardSource() {
+    return this;
+}
 
-boost::optional<DocumentSource::MergingLogic> DocumentSourceSample::mergingLogic() {
+NeedsMergerDocumentSource::MergingLogic DocumentSourceSample::mergingLogic() {
     // On the merger we need to merge the pre-sorted documents by their random values, then limit to
-    // the number we need.
-    MergingLogic logic;
-    logic.shardsStage = this;
-    if (_size > 0) {
-        logic.mergingStage = DocumentSourceLimit::create(pExpCtx, _size);
-    }
-
-    // Here we don't use 'randSortSpec' because it uses a metadata sort which the merging logic does
-    // not understand. The merging logic will use the serialized sort key, and this sort pattern is
-    // just used to communicate ascending/descending information. A pattern like {$meta: "randVal"}
-    // is neither ascending nor descending, and so will not be useful when constructing the merging
-    // logic.
-    logic.inputSortPattern = BSON("$rand" << -1);
-    return logic;
+    // the number we need. Here we don't use 'randSortSpec' because it uses a metadata sort which
+    // the merging logic does not understand. The merging logic will use the serialized sort key,
+    // and this sort pattern is just used to communicate ascending/descending information. A pattern
+    // like {$meta: "randVal"} is neither ascending nor descending, and so will not be useful when
+    // constructing the merging logic.
+    return {_size > 0 ? DocumentSourceLimit::create(pExpCtx, _size) : nullptr, BSON("$rand" << -1)};
 }
 }  // namespace mongo
