@@ -87,10 +87,6 @@ public:
         std::abort();
     }
 
-    CursorManager* getCursorManager() const {
-        std::abort();
-    }
-
     bool requiresIdIndex() const {
         std::abort();
     }

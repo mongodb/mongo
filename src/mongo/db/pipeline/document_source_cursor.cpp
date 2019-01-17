@@ -140,7 +140,7 @@ void DocumentSourceCursor::loadBatch() {
         // still held if '_exec' did not end in an error. If '_exec' encountered an error during a
         // yield, the locks might be yielded.
         if (state != PlanExecutor::DEAD && state != PlanExecutor::FAILURE) {
-            cleanupExecutor(autoColl);
+            cleanupExecutor();
         }
     }
 
@@ -266,33 +266,7 @@ void DocumentSourceCursor::doDispose() {
 
 void DocumentSourceCursor::cleanupExecutor() {
     invariant(_exec);
-    auto* opCtx = pExpCtx->opCtx;
-    // We need to be careful to not use AutoGetCollection here, since we only need the lock to
-    // protect potential access to the Collection's CursorManager, and AutoGetCollection may throw
-    // if this namespace has since turned into a view. Using Database::getCollection() will simply
-    // return nullptr if the collection has since turned into a view. In this case, '_exec' will
-    // already have been marked as killed when the collection was dropped, and we won't need to
-    // access the CursorManager to properly dispose of it.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    auto lockMode = getLockModeForQuery(opCtx);
-    AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
-    Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), lockMode);
-    auto collection = dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
-    auto cursorManager = collection ? collection->getCursorManager() : nullptr;
-    _exec->dispose(opCtx, cursorManager);
-
-    // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather
-    // execution stats.
-    if (!pExpCtx->explain) {
-        _exec.reset();
-    }
-}
-
-void DocumentSourceCursor::cleanupExecutor(const AutoGetCollectionForRead& readLock) {
-    invariant(_exec);
-    auto cursorManager =
-        readLock.getCollection() ? readLock.getCollection()->getCursorManager() : nullptr;
-    _exec->dispose(pExpCtx->opCtx, cursorManager);
+    _exec->dispose(pExpCtx->opCtx);
 
     // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather
     // execution stats.

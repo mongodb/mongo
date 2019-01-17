@@ -189,11 +189,6 @@ private:
     void cleanupExecutor();
 
     /**
-     * Destroys and de-registers '_exec'. '_exec' must be non-null.
-     */
-    void cleanupExecutor(const AutoGetCollectionForRead& readLock);
-
-    /**
      * Reads a batch of data from '_exec'. Subclasses can specify custom behavior to be performed on
      * each document by overloading transformBSONObjToDocument().
      */

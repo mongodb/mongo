@@ -90,17 +90,13 @@ public:
      * Closes the specified database. Must be called with the database locked in X-mode.
      * No background jobs must be in progress on the database when this function is called.
      */
-    virtual void close(OperationContext* const opCtx,
-                       const StringData ns,
-                       const std::string& reason) = 0;
+    virtual void close(OperationContext* opCtx, const StringData ns) = 0;
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
      * Will uassert if any background jobs are running when this function is called.
-     *
-     * @param reason The reason for close.
      */
-    virtual void closeAll(OperationContext* const opCtx, const std::string& reason) = 0;
+    virtual void closeAll(OperationContext* opCtx) = 0;
 
     /**
      * Returns the set of existing database names that differ only in casing.

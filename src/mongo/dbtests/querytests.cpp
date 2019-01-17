@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -1261,11 +1262,7 @@ public:
     }
 
     size_t numCursorsOpen() {
-        AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(_ns));
-        Collection* collection = ctx.getCollection();
-        if (!collection)
-            return 0;
-        return collection->getCursorManager()->numCursors();
+        return CursorManager::getGlobalCursorManager()->numCursors();
     }
 
     const char* ns() {

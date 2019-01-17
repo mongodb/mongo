@@ -135,7 +135,7 @@ MONGO_INITIALIZER(GlobalCursorIdCache)(InitializerContext* context) {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(GlobalCursorManager, ("GlobalCursorIdCache"))
 (InitializerContext* context) {
-    globalCursorManager.reset(new CursorManager({}));
+    globalCursorManager.reset(new CursorManager());
     return Status::OK();
 }
 
@@ -228,51 +228,7 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
 }
 
 std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t now) {
-    size_t totalTimedOut = 0;
-
-    // Time out the cursors from the global cursor manager.
-    totalTimedOut += globalCursorManager->timeoutCursors(opCtx, now);
-
-    // Compute the set of collection names that we have to time out cursors for.
-    vector<NamespaceString> todo;
-    {
-        stdx::lock_guard<SimpleMutex> lk(_mutex);
-        for (auto&& entry : _idToNss) {
-            todo.push_back(entry.second);
-        }
-    }
-
-    // For each collection, time out its cursors under the collection lock (to prevent the
-    // collection from going away during the erase).
-    for (const auto& nsTodo : todo) {
-        // We need to be careful to not use an AutoGet* helper, since we only need the lock to
-        // protect potential access to the Collection's CursorManager, and those helpers may
-        // do things we don't want here, like check the shard version or throw an exception if this
-        // namespace has since turned into a view. Using Database::getCollection() will simply
-        // return nullptr if the collection has since turned into a view. In this case, the cursors
-        // will already have been cleaned up when the collection was dropped, so there will be none
-        // left to time out.
-        //
-        // Additionally, we need to use the UninterruptibleLockGuard to ensure the lock acquisition
-        // will not throw due to an interrupt. This method can be called from a background thread so
-        // we do not want to throw any exceptions.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetDb dbLock(opCtx, nsTodo.db(), MODE_IS);
-        Lock::CollectionLock collLock(opCtx->lockState(), nsTodo.ns(), MODE_IS);
-        if (!dbLock.getDb()) {
-            continue;
-        }
-
-        Collection* const collection = dbLock.getDb()->getCollection(opCtx, nsTodo);
-        if (!collection) {
-            // The 'nsTodo' collection has been dropped since we held _mutex. We can safely skip it.
-            continue;
-        }
-
-        totalTimedOut += collection->getCursorManager()->timeoutCursors(opCtx, now);
-    }
-
-    return totalTimedOut;
+    return globalCursorManager->timeoutCursors(opCtx, now);
 }
 
 }  // namespace
@@ -280,31 +236,6 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 template <typename Visitor>
 void GlobalCursorIdCache::visitAllCursorManagers(OperationContext* opCtx, Visitor* visitor) {
     (*visitor)(*globalCursorManager);
-
-    // Compute the set of collection names that we have to get sessions for
-    vector<NamespaceString> namespaces;
-    {
-        stdx::lock_guard<SimpleMutex> lk(_mutex);
-        for (auto&& entry : _idToNss) {
-            namespaces.push_back(entry.second);
-        }
-    }
-
-    // For each collection, get its sessions under the collection lock (to prevent the
-    // collection from going away during the erase).
-    for (auto&& ns : namespaces) {
-        AutoGetCollection ctx(opCtx, ns, MODE_IS);
-        if (!ctx.getDb()) {
-            continue;
-        }
-
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            continue;
-        }
-
-        (*visitor)(*(collection->getCursorManager()));
-    }
 }
 
 // ---
@@ -366,32 +297,14 @@ Status CursorManager::withCursorManager(OperationContext* opCtx,
                                         CursorId id,
                                         const NamespaceString& nss,
                                         stdx::function<Status(CursorManager*)> callback) {
-    boost::optional<AutoGetCollectionForReadCommand> readLock;
-    CursorManager* cursorManager = nullptr;
-
-    if (CursorManager::isGloballyManagedCursor(id)) {
-        cursorManager = CursorManager::getGlobalCursorManager();
-    } else {
-        readLock.emplace(opCtx, nss);
-        Collection* collection = readLock->getCollection();
-        if (!collection) {
-            return {ErrorCodes::CursorNotFound,
-                    str::stream() << "collection does not exist: " << nss.ns()};
-        }
-        cursorManager = collection->getCursorManager();
-    }
-    invariant(cursorManager);
-
+    auto cursorManager = CursorManager::getGlobalCursorManager();
     return callback(cursorManager);
 }
 
 // --------------------------
 
-CursorManager::CursorManager(NamespaceString nss)
-    : _nss(std::move(nss)),
-      _collectionCacheRuntimeId(_nss.isEmpty() ? 0
-                                               : globalCursorIdCache->registerCursorManager(_nss)),
-      _random(stdx::make_unique<PseudoRandom>(globalCursorIdCache->nextSeed())),
+CursorManager::CursorManager()
+    : _random(stdx::make_unique<PseudoRandom>(globalCursorIdCache->nextSeed())),
       _cursorMap(stdx::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {
@@ -652,7 +565,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     stdx::lock_guard<SimpleMutex> lock(_registrationLock);
     CursorId cursorId = allocateCursorId_inlock();
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
-        new ClientCursor(std::move(cursorParams), this, cursorId, opCtx, now));
+        new ClientCursor(std::move(cursorParams), cursorId, opCtx, now));
 
     // Register this cursor for lookup by transaction.
     if (opCtx->getLogicalSessionId() && opCtx->getTxnNumber()) {

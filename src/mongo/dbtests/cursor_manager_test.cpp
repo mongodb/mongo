@@ -50,6 +50,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -91,7 +92,7 @@ public:
     }
 
     virtual ~CursorManagerTest() {
-        _cursorManager.invalidateAll(_opCtx.get(), true, "end of test");
+        useCursorManager()->invalidateAll(_opCtx.get(), true, "end of test");
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor() {
@@ -119,7 +120,7 @@ public:
     }
 
     ClientCursorPin makeCursor(OperationContext* opCtx) {
-        return _cursorManager.registerCursor(opCtx, makeParams(opCtx));
+        return useCursorManager()->registerCursor(opCtx, makeParams(opCtx));
     }
 
     ClockSourceMock* useClock() {
@@ -127,7 +128,7 @@ public:
     }
 
     CursorManager* useCursorManager() {
-        return &_cursorManager;
+        return CursorManager::getGlobalCursorManager();
     }
 
 protected:
@@ -136,7 +137,6 @@ protected:
 
 private:
     ClockSourceMock* _clock;
-    CursorManager _cursorManager{NamespaceString{}};
 };
 
 class CursorManagerTestCustomOpCtx : public CursorManagerTest {
@@ -240,6 +240,7 @@ TEST_F(CursorManagerTest, InvalidatePinnedCursor) {
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
          ClientCursorParams::LockPolicy::kLocksInternally});
+    auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
 
     // If the cursor is pinned, it sticks around, even after invalidation.
     ASSERT_EQUALS(1U, cursorManager->numCursors());
@@ -254,7 +255,6 @@ TEST_F(CursorManagerTest, InvalidatePinnedCursor) {
     const Status status = WorkingSetCommon::getMemberObjectStatus(objOut);
     ASSERT(status.reason().find(invalidateReason) != std::string::npos);
 
-    cursorPin.release();
     ASSERT_EQUALS(0U, cursorManager->numCursors());
 }
 
@@ -417,6 +417,7 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsThatAreStillPinnedShouldNotTimeou
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
          ClientCursorParams::LockPolicy::kLocksInternally});
+    auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
     const bool collectionGoingAway = false;
     cursorManager->invalidateAll(
         _opCtx.get(), collectionGoingAway, "KilledCursorsShouldTimeoutTest");

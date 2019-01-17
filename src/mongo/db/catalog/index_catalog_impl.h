@@ -153,9 +153,7 @@ public:
      *
      * Use this method to notify the IndexCatalog that the spec for this index has changed.
      *
-     * It is invalid to dereference 'oldDesc' after calling this method.  This method broadcasts
-     * an invalidateAll() on the cursor manager to notify other users of the IndexCatalog that
-     * this descriptor is now invalid.
+     * It is invalid to dereference 'oldDesc' after calling this method.
      */
     const IndexDescriptor* refreshEntry(OperationContext* opCtx,
                                         const IndexDescriptor* oldDesc) override;

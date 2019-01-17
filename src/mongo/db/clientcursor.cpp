@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
@@ -79,7 +80,6 @@ long long ClientCursor::totalOpen() {
 }
 
 ClientCursor::ClientCursor(ClientCursorParams params,
-                           CursorManager* cursorManager,
                            CursorId cursorId,
                            OperationContext* operationUsingCursor,
                            Date_t now)
@@ -89,7 +89,6 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _lsid(operationUsingCursor->getLogicalSessionId()),
       _txnNumber(operationUsingCursor->getTxnNumber()),
       _readConcernArgs(params.readConcernArgs),
-      _cursorManager(cursorManager),
       _originatingCommand(params.originatingCommandObj),
       _queryOptions(params.queryOptions),
       _lockPolicy(params.lockPolicy),
@@ -98,7 +97,6 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _lastUseDate(now),
       _createdDate(now),
       _planSummary(Explain::getPlanSummary(_exec.get())) {
-    invariant(_cursorManager);
     invariant(_exec);
     invariant(_operationUsingCursor);
 
@@ -131,7 +129,7 @@ void ClientCursor::dispose(OperationContext* opCtx) {
         return;
     }
 
-    _exec->dispose(opCtx, _cursorManager);
+    _exec->dispose(opCtx);
     _disposed = true;
 }
 
@@ -163,7 +161,6 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor)
     : _opCtx(opCtx), _cursor(cursor) {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
-    invariant(_cursor->_cursorManager);
     invariant(!_cursor->_disposed);
 
     // We keep track of the number of cursors currently pinned. The cursor can become unpinned
@@ -216,24 +213,13 @@ void ClientCursorPin::release() {
     if (!_cursor)
         return;
 
-    // Note it's not safe to dereference _cursor->_cursorManager unless we know we haven't been
-    // killed. If we're not locked we assume we haven't been killed because we're working with the
-    // global cursor manager which never kills cursors.
-    dassert(_opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS) ||
-            _cursor->_cursorManager->isGlobalManager());
-
     invariant(_cursor->_operationUsingCursor);
 
-    if (_cursor->getExecutor()->isMarkedAsKilled()) {
-        // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
-        // call dispose() and delete it.
-        deleteUnderlying();
-    } else {
-        // Unpin the cursor under the collection cursor manager lock.
-        _cursor->_cursorManager->unpin(
-            _opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
-        cursorStatsOpenPinned.decrement();
-    }
+    // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
+    // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
+    CursorManager::getGlobalCursorManager()->unpin(
+        _opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
+    cursorStatsOpenPinned.decrement();
 
     _cursor = nullptr;
 }
@@ -242,22 +228,15 @@ void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     // Note the following subtleties of this method's implementation:
-    // - We must unpin the cursor before destruction, since it is an error to delete a pinned
-    //   cursor.
-    // - In addition, we must deregister the cursor before unpinning, since it is an
-    //   error to unpin a registered cursor without holding the cursor manager lock (note that
-    //   we can't simply unpin with the cursor manager lock here, since we need to guarantee
-    //   exclusive ownership of the cursor when we are deleting it).
+    // - We must unpin the cursor (by clearing the '_operationUsingCursor' field) before
+    //   destruction, since it is an error to delete a pinned cursor.
+    // - In addition, we must deregister the cursor before clearing the '_operationUsingCursor'
+    //   field, since it is an error to unpin a registered cursor without holding the appropriate
+    //   cursor manager mutex. By first deregistering the cursor, we ensure that no other thread can
+    //   access '_cursor', meaning that it is safe for us to write to '_operationUsingCursor'
+    //   without holding the CursorManager mutex.
 
-    // Note it's not safe to dereference _cursor->_cursorManager unless we know we haven't been
-    // killed. If we're not locked we assume we haven't been killed because we're working with the
-    // global cursor manager which never kills cursors.
-    dassert(_opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS) ||
-            _cursor->_cursorManager->isGlobalManager());
-
-    if (!_cursor->getExecutor()->isMarkedAsKilled()) {
-        _cursor->_cursorManager->deregisterCursor(_cursor);
-    }
+    CursorManager::getGlobalCursorManager()->deregisterCursor(_cursor);
 
     // Make sure the cursor is disposed and unpinned before being destroyed.
     _cursor->dispose(_opCtx);

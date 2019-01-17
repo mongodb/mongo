@@ -44,7 +44,6 @@
 namespace mongo {
 
 class Collection;
-class CursorManager;
 class RecoveryUnit;
 
 /**
@@ -305,7 +304,6 @@ private:
      * private. See cursor_manager.h for more details.
      */
     ClientCursor(ClientCursorParams params,
-                 CursorManager* cursorManager,
                  CursorId cursorId,
                  OperationContext* operationUsingCursor,
                  Date_t now);
@@ -357,8 +355,6 @@ private:
 
     const repl::ReadConcernArgs _readConcernArgs;
 
-    CursorManager* _cursorManager;
-
     // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
     // an error to use a ClientCursor once it has been disposed.
     bool _disposed = false;
@@ -383,28 +379,17 @@ private:
     // The underlying query execution machinery. Must be non-null.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 
-    //
-    // The following fields are used by the CursorManager and the ClientCursorPin. In most
-    // conditions, they can only be used while holding the CursorManager's mutex. Exceptions
-    // include:
-    //   - If the ClientCursor is pinned, the CursorManager will never change '_isPinned' until
-    //     asked to by the ClientCursorPin.
-    //   - It is safe to read '_killed' while holding a collection lock, which must be held when
-    //     interacting with a ClientCursorPin.
-    //   - A ClientCursorPin can access these members after deregistering the cursor from the
-    //     CursorManager, at which point it has sole ownership of the ClientCursor.
-    //
-
     // While a cursor is being used by a client, it is marked as "pinned" by setting
     // _operationUsingCursor to the current OperationContext.
     //
-    // Cursors always come into existence in a pinned state (this must be non-null at construction).
+    // Cursors always come into existence in a pinned state ('_operationUsingCursor' must be
+    // non-null at construction).
     //
     // To write to this field one of the following must be true:
     // 1) You have a lock on the appropriate partition in CursorManager and the cursor is unpinned
     // (the field is null).
-    // 2) You own the cursor and the cursor manager it was associated with is gone (this can only
-    // happen in ClientCursorPin). In this case, nobody else will try to pin the cursor.
+    // 2) The cursor has already been deregistered from the CursorManager. In this case, nobody else
+    // will try to pin the cursor.
     //
     // To read this field one of the following must be true:
     // 1) You have a lock on the appropriate partition in CursorManager.
@@ -431,9 +416,7 @@ private:
  *
  * A pin extends the lifetime of a ClientCursor object until the pin's release. Pinned ClientCursor
  * objects cannot not be killed due to inactivity, and cannot be immediately erased by user kill
- * requests (though they can be marked as interrupted). When a CursorManager is destroyed (e.g. by
- * a collection drop), ownership of any still-pinned ClientCursor objects is transferred to their
- * managing ClientCursorPin objects.
+ * requests (though they can be marked as interrupted).
  *
  * Example usage:
  * {
@@ -448,14 +431,10 @@ private:
  *     // Use cursor. Pin automatically released on block exit.
  * }
  *
- * Clients that wish to access ClientCursor objects owned by collection cursor managers must hold
- * the collection lock while calling any pin method, including pin acquisition by the RAII
- * constructor and pin release by the RAII destructor.  This guards from a collection drop (which
- * requires an exclusive lock on the collection) occurring concurrently with the pin request or
- * unpin request.
- *
- * Clients that wish to access ClientCursor objects owned by the global cursor manager need not
- * hold any locks; the global cursor manager can only be destroyed by a process exit.
+ * Callers need not hold any lock manager locks in order to obtain or release a client cursor pin.
+ * However, in order to use the ClientCursor itself, locks may need to be acquired. Whether locks
+ * are needed to use the ClientCursor can be determined by consulting the ClientCursor's lock
+ * policy.
  */
 class ClientCursorPin {
     MONGO_DISALLOW_COPYING(ClientCursorPin);
@@ -479,9 +458,8 @@ public:
     ~ClientCursorPin();
 
     /**
-     * Releases the pin.  It does not delete the underlying cursor unless ownership has passed
-     * to us after kill.  Turns into a no-op if release() or deleteUnderlying() have already
-     * been called on this pin.
+     * Releases the pin without deleting the underlying cursor. Turns into a no-op if release() or
+     * deleteUnderlying() have already been called on this pin.
      */
     void release();
 

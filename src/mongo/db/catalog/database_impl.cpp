@@ -184,16 +184,11 @@ DatabaseImpl::~DatabaseImpl() {
         delete i->second;
 }
 
-void DatabaseImpl::close(OperationContext* opCtx, const std::string& reason) {
+void DatabaseImpl::close(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
     // Clear cache of oplog Collection pointer.
     repl::oplogCheckCloseDatabase(opCtx, this);
-
-    for (auto&& pair : _collections) {
-        auto* coll = pair.second;
-        coll->getCursorManager()->invalidateAll(opCtx, true, reason);
-    }
 }
 
 Status DatabaseImpl::validateDBName(StringData dbname) {
@@ -656,31 +651,20 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
 
     // We want to destroy the Collection object before telling the StorageEngine to destroy the
     // RecordStore.
-    _clearCollectionCache(
-        opCtx, fullns.toString(), "collection dropped", /*collectionGoingAway*/ true);
+    invariant(_name == fullns.db());
+    auto it = _collections.find(fullns.toString());
+
+    if (it != _collections.end()) {
+        // Takes ownership of the collection
+        opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
+        _collections.erase(it);
+    }
 
     auto uuid = collection->uuid();
     auto uuidString = uuid ? uuid.get().toString() : "no UUID";
     log() << "Finishing collection drop for " << fullns << " (" << uuidString << ").";
 
     return _dbEntry->dropCollection(opCtx, fullns.toString());
-}
-
-void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
-                                         StringData fullns,
-                                         const std::string& reason,
-                                         bool collectionGoingAway) {
-    verify(_name == nsToDatabaseSubstring(fullns));
-    CollectionMap::const_iterator it = _collections.find(fullns.toString());
-
-    if (it == _collections.end())
-        return;
-
-    // Takes ownership of the collection
-    opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
-
-    it->second->getCursorManager()->invalidateAll(opCtx, collectionGoingAway, reason);
-    _collections.erase(it);
 }
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, StringData ns) const {
@@ -728,16 +712,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     if (!collToRename) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
-
-    string clearCacheReason = str::stream() << "renamed collection '" << fromNS << "' to '" << toNS
-                                            << "'";
-
-    // Notify the cursor manager that it should kill all the cursors in the source and target
-    // collections. This is currently necessary since the query layer is not prepared for cursors to
-    // survive collection renames.
-    auto sourceManager = collToRename->getCursorManager();
-    invariant(sourceManager);
-    sourceManager->invalidateAll(opCtx, /*collectionGoingAway*/ true, clearCacheReason);
 
     log() << "renameCollection: renaming collection " << collToRename->uuid()->toString()
           << " from " << fromNS << " to " << toNS;

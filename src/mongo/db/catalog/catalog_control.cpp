@@ -80,8 +80,7 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
 
     // Close all databases.
     log() << "closeCatalog: closing all databases";
-    constexpr auto reason = "closing databases for closeCatalog";
-    databaseHolder->closeAll(opCtx, reason);
+    databaseHolder->closeAll(opCtx);
 
     // Close the storage engine's catalog.
     log() << "closeCatalog: closing storage engine catalog";

@@ -44,7 +44,6 @@ class BSONObj;
 class CappedInsertNotifier;
 struct CappedInsertNotifierData;
 class Collection;
-class CursorManager;
 class PlanExecutor;
 class PlanStage;
 class PlanYieldPolicy;
@@ -164,8 +163,7 @@ public:
          */
         Deleter() = default;
 
-        inline Deleter(OperationContext* opCtx, CursorManager* cursorManager)
-            : _opCtx(opCtx), _cursorManager(cursorManager) {}
+        inline Deleter(OperationContext* opCtx) : _opCtx(opCtx) {}
 
         /**
          * If an owner of a std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> wants to assume
@@ -185,7 +183,7 @@ public:
                 // It is illegal to invoke operator() on a default constructed Deleter.
                 invariant(_opCtx);
                 if (!_dismissed) {
-                    execPtr->dispose(_opCtx, _cursorManager);
+                    execPtr->dispose(_opCtx);
                 }
                 delete execPtr;
             } catch (...) {
@@ -196,7 +194,6 @@ public:
 
     private:
         OperationContext* _opCtx = nullptr;
-        CursorManager* _cursorManager = nullptr;
 
         bool _dismissed = false;
     };
@@ -404,8 +401,7 @@ public:
 
     /**
      * Cleans up any state associated with this PlanExecutor. Must be called before deleting this
-     * PlanExecutor. It is illegal to use a PlanExecutor after calling dispose(). 'cursorManager'
-     * may be null.
+     * PlanExecutor. It is illegal to use a PlanExecutor after calling dispose().
      *
      * There are multiple cleanup scenarios:
      *  - This PlanExecutor will only ever use one OperationContext. In this case the
@@ -415,7 +411,7 @@ public:
      *    is the owner's responsibility to call dispose() with a valid OperationContext before
      *    deleting the PlanExecutor.
      */
-    virtual void dispose(OperationContext* opCtx, CursorManager* cursorManager) = 0;
+    virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
      * Helper method to aid in displaying an ExecState for debug or other recreational purposes.

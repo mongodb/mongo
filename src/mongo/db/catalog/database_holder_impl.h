@@ -47,9 +47,9 @@ public:
 
     void dropDb(OperationContext* opCtx, Database* db) override;
 
-    void close(OperationContext* opCtx, StringData ns, const std::string& reason) override;
+    void close(OperationContext* opCtx, StringData ns) override;
 
-    void closeAll(OperationContext* opCtx, const std::string& reason) override;
+    void closeAll(OperationContext* opCtx) override;
 
     std::set<std::string> getNamesWithConflictingCasing(StringData name) override;
 

@@ -282,7 +282,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
     // Close the db and invalidate all current users and caches.
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    databaseHolder->close(opCtx, dbName, "database closed for repair");
+    databaseHolder->close(opCtx, dbName);
     ON_BLOCK_EXIT([databaseHolder, &dbName, &opCtx] {
         try {
             // Ensure that we don't trigger an exception when attempting to take locks.

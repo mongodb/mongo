@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -204,7 +203,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutorImpl::ma
                                          collection,
                                          std::move(nss),
                                          yieldPolicy);
-    PlanExecutor::Deleter planDeleter(opCtx, collection ? collection->getCursorManager() : nullptr);
+    PlanExecutor::Deleter planDeleter(opCtx);
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
 
     // Perform plan selection, if necessary.
@@ -654,7 +653,7 @@ void PlanExecutorImpl::markAsKilled(Status killStatus) {
     }
 }
 
-void PlanExecutorImpl::dispose(OperationContext* opCtx, CursorManager* cursorManager) {
+void PlanExecutorImpl::dispose(OperationContext* opCtx) {
     if (_currentState == kDisposed) {
         return;
     }

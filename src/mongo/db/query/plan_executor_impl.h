@@ -71,7 +71,7 @@ public:
     bool isEOF() final;
     Status executePlan() final;
     void markAsKilled(Status killStatus) final;
-    void dispose(OperationContext* opCtx, CursorManager* cursorManager) final;
+    void dispose(OperationContext* opCtx) final;
     void enqueue(const BSONObj& obj) final;
     BSONObjSet getOutputSorts() const final;
     bool isMarkedAsKilled() const final;

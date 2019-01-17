@@ -40,6 +40,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/change_stream_proxy.h"
 #include "mongo/db/exec/working_set_common.h"

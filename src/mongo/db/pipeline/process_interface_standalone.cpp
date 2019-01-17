@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/document_source_cursor.h"

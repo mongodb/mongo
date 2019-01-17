@@ -47,7 +47,7 @@ public:
 
 
     // closes files and other cleanup see below.
-    void close(OperationContext* opCtx, const std::string& reason) final;
+    void close(OperationContext* opCtx) final;
 
     const std::string& name() const final {
         return _name;
@@ -185,16 +185,6 @@ private:
     void _checkCanCreateCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const CollectionOptions& options);
-
-    /**
-     * Deregisters and invalidates all cursors on collection 'fullns'.  Callers must specify
-     * 'reason' for why the cache is being cleared. If 'collectionGoingAway' is false,
-     * unpinned cursors will not be killed.
-     */
-    void _clearCollectionCache(OperationContext* opCtx,
-                               StringData fullns,
-                               const std::string& reason,
-                               bool collectionGoingAway);
 
     /**
      * Completes a collection drop by removing all the indexes and removing the collection itself

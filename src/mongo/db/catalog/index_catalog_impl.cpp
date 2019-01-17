@@ -742,11 +742,6 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
 
     BackgroundOperation::assertNoBgOpInProgForNs(_collection->ns().ns());
 
-    // there may be pointers pointing at keys in the btree(s).  kill them.
-    // TODO: can this can only clear cursors on this index?
-    _collection->getCursorManager()->invalidateAll(
-        opCtx, false, "all indexes on collection dropped");
-
     // make sure nothing in progress
     massert(17348,
             "cannot dropAllIndexes when index builds in progress",
@@ -879,17 +874,6 @@ Status IndexCatalogImpl::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* 
     // Pulling indexName/indexNamespace out as they are needed post descriptor release.
     string indexName = entry->descriptor()->indexName();
     string indexNamespace = entry->descriptor()->indexNamespace();
-
-    // If any cursors could be using this index, invalidate them. Note that we do not use indexes
-    // until they are ready, so we do not need to invalidate anything if the index fails while it
-    // is being built.
-    //
-    // TODO only kill cursors that are actually using the index rather than everything on this
-    // collection.
-    if (entry->isReady(opCtx)) {
-        _collection->getCursorManager()->invalidateAll(
-            opCtx, false, str::stream() << "index '" << indexName << "' dropped");
-    }
 
     // --------- START REAL WORK ----------
     audit::logDropIndex(&cc(), indexName, _collection->ns().ns());
@@ -1136,13 +1120,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     const std::string indexName = oldDesc->indexName();
     invariant(_collection->getCatalogEntry()->isIndexReady(opCtx, indexName));
-
-    // Notify other users of the IndexCatalog that we're about to invalidate 'oldDesc'.
-    const bool collectionGoingAway = false;
-    _collection->getCursorManager()->invalidateAll(
-        opCtx,
-        collectionGoingAway,
-        str::stream() << "definition of index '" << indexName << "' changed");
 
     // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
     // invalid and should not be dereferenced.

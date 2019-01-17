@@ -101,10 +101,6 @@ public:
         return _recordStore;
     }
 
-    CursorManager* getCursorManager() const final {
-        return _cursorManager.get();
-    }
-
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const final {
@@ -414,8 +410,6 @@ private:
 
     ValidationAction _validationAction;
     ValidationLevel _validationLevel;
-
-    std::unique_ptr<CursorManager> _cursorManager;
 
     // Notifier object for awaitData. Threads polling a capped collection for new data can wait
     // on this object until notified of the arrival of new data.

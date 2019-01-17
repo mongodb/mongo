@@ -42,6 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
