@@ -30,9 +30,8 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 #include <map>
-#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/operation_context.h"
@@ -110,13 +109,13 @@ public:
      * Returns a string representation of the map from LogicalSessionId to the list of TxnNumbers
      * with TransactionCoordinators currently in the catalog.
      */
-    std::string toString();
+    std::string toString() const;
 
 private:
-    /**
-     * Protects the state below.
-     */
-    stdx::mutex _mutex;
+    // Map of transaction coordinators, ordered in decreasing transaction number with the most
+    // recent transaction at the front
+    using TransactionCoordinatorMap =
+        std::map<TxnNumber, std::shared_ptr<TransactionCoordinator>, std::greater<TxnNumber>>;
 
     /**
      * Blocks in an interruptible wait until the catalog is not marked as having a stepup in
@@ -124,22 +123,22 @@ private:
      */
     void _waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
 
-    std::string _toString(WithLock wl);
-
     /**
-     * Contains TransactionCoordinator objects by session id and transaction number. May contain
-     * more than one coordinator per session. All coordinators for a session that do not correspond
-     * to the latest transaction should either be in the process of committing or aborting.
+     * Constructs a string representation of all the coordinators registered on the catalog.
      */
-    LogicalSessionIdMap<std::map<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
-        _coordinatorsBySession;
+    std::string _toString(WithLock wl) const;
 
-    /**
-     * Used only for testing. Contains TransactionCoordinator objects which have completed their
-     * commit coordination and would normally be expunged from memory.
-     */
-    LogicalSessionIdMap<std::map<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
-        _coordinatorsBySessionDefunct;
+    // Protects the state below.
+    mutable stdx::mutex _mutex;
+
+    // Contains TransactionCoordinator objects by session id and transaction number. May contain
+    // more than one coordinator per session. All coordinators for a session that do not correspond
+    // to the latest transaction should either be in the process of committing or aborting.
+    LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySession;
+
+    // Used only for testing. Contains TransactionCoordinator objects which have completed their
+    // commit coordination and would normally be expunged from memory.
+    LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySessionDefunct;
 
     /**
      * Whether a thread is actively executing a stepUp task.
@@ -152,9 +151,7 @@ private:
      */
     stdx::condition_variable _noStepUpInProgressCv;
 
-    /**
-     * Notified when the last coordinator is removed from the catalog.
-     */
+    // Notified when the last coordinator is removed from the catalog.
     stdx::condition_variable _noActiveCoordinatorsCv;
 };
 

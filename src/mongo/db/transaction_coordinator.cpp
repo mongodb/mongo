@@ -72,12 +72,11 @@ CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
 
 TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                                                const LogicalSessionId& lsid,
-                                               const TxnNumber& txnNumber)
+                                               TxnNumber txnNumber)
     : _serviceContext(serviceContext),
       _driver(serviceContext),
       _lsid(lsid),
-      _txnNumber(txnNumber),
-      _state(CoordinatorState::kInit) {}
+      _txnNumber(txnNumber) {}
 
 TransactionCoordinator::~TransactionCoordinator() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -173,6 +172,11 @@ Future<void> TransactionCoordinator::onCompletion() {
     auto completionPromiseFuture = makePromiseFuture<void>();
     _completionPromises.push_back(std::move(completionPromiseFuture.promise));
     return std::move(completionPromiseFuture.future);
+}
+
+SharedSemiFuture<txn::CommitDecision> TransactionCoordinator::getDecision() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    return _finalDecisionPromise.getFuture();
 }
 
 void TransactionCoordinator::cancelIfCommitNotYetStarted() {

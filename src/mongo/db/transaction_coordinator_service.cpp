@@ -34,16 +34,12 @@
 
 #include "mongo/db/transaction_coordinator_service.h"
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -56,6 +52,8 @@ const auto transactionCoordinatorServiceDecoration =
 
 TransactionCoordinatorService::TransactionCoordinatorService()
     : _coordinatorCatalog(std::make_shared<TransactionCoordinatorCatalog>()) {}
+
+TransactionCoordinatorService::~TransactionCoordinatorService() = default;
 
 TransactionCoordinatorService* TransactionCoordinatorService::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
@@ -209,6 +207,6 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx) {
     invariant(status);
 }
 
-void TransactionCoordinatorService::onStepDown(OperationContext* opCtx) {}
+void TransactionCoordinatorService::onStepDown() {}
 
 }  // namespace mongo

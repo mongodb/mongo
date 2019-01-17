@@ -42,7 +42,6 @@
 namespace mongo {
 namespace {
 
-const Timestamp kDummyTimestamp = Timestamp::min();
 const Date_t kCommitDeadline = Date_t::max();
 
 const BSONObj kDummyWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
@@ -197,24 +196,6 @@ public:
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
     TxnNumber _txnNumber{1};
 };
-
-/**
- * Fixture that during setUp automatically creates a coordinator for a default lsid/txnNumber pair.
- */
-class TransactionCoordinatorServiceTestSingleTxn : public TransactionCoordinatorServiceTest {
-public:
-    void setUp() final {
-        TransactionCoordinatorServiceTest::setUp();
-        TransactionCoordinatorService::get(operationContext())
-            ->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
-    }
-
-    TransactionCoordinatorService* coordinatorService() {
-        return TransactionCoordinatorService::get(operationContext());
-    }
-};
-
-}  // namespace
 
 TEST_F(TransactionCoordinatorServiceTest, CreateCoordinatorOnNewSessionSucceeds) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
@@ -553,6 +534,23 @@ TEST_F(TransactionCoordinatorServiceTest,
                operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
 }
 
+
+/**
+ * Fixture that during setUp automatically creates a coordinator for a default lsid/txnNumber pair.
+ */
+class TransactionCoordinatorServiceTestSingleTxn : public TransactionCoordinatorServiceTest {
+public:
+    void setUp() final {
+        TransactionCoordinatorServiceTest::setUp();
+        TransactionCoordinatorService::get(operationContext())
+            ->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
+    }
+
+    TransactionCoordinatorService* coordinatorService() {
+        return TransactionCoordinatorService::get(operationContext());
+    }
+};
+
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,
        CoordinateCommitReturnsCorrectCommitDecisionOnAbort) {
 
@@ -624,4 +622,5 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
               static_cast<int>(commitDecisionFuture2.get()));
 }
 
+}  // namespace
 }  // namespace mongo

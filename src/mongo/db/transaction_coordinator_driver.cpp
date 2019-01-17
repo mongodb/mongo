@@ -113,7 +113,7 @@ std::string buildParticipantListString(const std::vector<ShardId>& participantLi
 }  // namespace
 
 TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* service)
-    : _scheduler(service) {}
+    : _scheduler(std::make_unique<txn::AsyncWorkScheduler>(service)) {}
 
 TransactionCoordinatorDriver::~TransactionCoordinatorDriver() = default;
 
@@ -210,7 +210,7 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::persistParticipantList(
     const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
-    return txn::doWhile(_scheduler,
+    return txn::doWhile(*_scheduler,
                         boost::none /* no need for a backoff */,
                         [](const Status& s) {
                             // 'Interrupted' is the error code delivered for killOp sent by a user.
@@ -219,7 +219,7 @@ Future<void> TransactionCoordinatorDriver::persistParticipantList(
                             return s.code() == ErrorCodes::Interrupted;
                         },
                         [this, lsid, txnNumber, participantList] {
-                            return _scheduler.scheduleWork(
+                            return _scheduler->scheduleWork(
                                 [lsid, txnNumber, participantList](OperationContext* opCtx) {
                                     persistParticipantListBlocking(
                                         opCtx, lsid, txnNumber, participantList);
@@ -249,7 +249,7 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
     // Asynchronously aggregate all prepare responses to find the decision and max prepare timestamp
     // (used for commit), stopping the aggregation and preventing any further retries as soon as an
     // abort decision is received. Return a future containing the result.
-    return collect(
+    return txn::collect(
         std::move(responses),
         // Initial value
         txn::PrepareVoteConsensus{boost::none, boost::none},
@@ -414,7 +414,7 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
     std::vector<ShardId> participantList,
     const boost::optional<Timestamp>& commitTimestamp) {
     return txn::doWhile(
-        _scheduler,
+        *_scheduler,
         boost::none /* no need for a backoff */,
         [](const Status& s) {
             // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
@@ -422,7 +422,7 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
             return s.code() == ErrorCodes::Interrupted;
         },
         [this, lsid, txnNumber, participantList, commitTimestamp] {
-            return _scheduler.scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
+            return _scheduler->scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
                 OperationContext* opCtx) {
                 persistDecisionBlocking(opCtx, lsid, txnNumber, participantList, commitTimestamp);
             });
@@ -533,7 +533,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSessionId& lsid,
                                                                 TxnNumber txnNumber) {
-    return txn::doWhile(_scheduler,
+    return txn::doWhile(*_scheduler,
                         boost::none /* no need for a backoff */,
                         [](const Status& s) {
                             // 'Interrupted' is the error code delivered for killOp sent by a
@@ -542,7 +542,7 @@ Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSes
                             return s.code() == ErrorCodes::Interrupted;
                         },
                         [this, lsid, txnNumber] {
-                            return _scheduler.scheduleWork(
+                            return _scheduler->scheduleWork(
                                 [lsid, txnNumber](OperationContext* opCtx) {
                                     deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
                                 });
@@ -572,7 +572,7 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
 Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
     const ShardId& shardId, const BSONObj& commandObj) {
     return txn::doWhile(
-        _scheduler,
+        *_scheduler,
         kExponentialBackoff,
         [](StatusWith<PrepareResponse> swPrepareResponse) {
             // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
@@ -581,7 +581,7 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                 isRetryableError(swPrepareResponse.getStatus().code());
         },
         [ this, shardId, commandObj = commandObj.getOwned() ] {
-            return _scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
+            return _scheduler->scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
                     auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
@@ -652,7 +652,7 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
 Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
     const ShardId& shardId, const BSONObj& commandObj) {
     return txn::doWhile(
-        _scheduler,
+        *_scheduler,
         kExponentialBackoff,
         [](const Status& s) {
             // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
@@ -660,7 +660,7 @@ Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
             return s.code() == ErrorCodes::Interrupted || isRetryableError(s.code());
         },
         [ this, shardId, commandObj = commandObj.getOwned() ] {
-            return _scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
+            return _scheduler->scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
                     auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);

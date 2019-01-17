@@ -169,4 +169,8 @@ ThreadClient::~ThreadClient() {
     currentClient.reset(nullptr);
 }
 
+Client* ThreadClient::get() const {
+    return &cc();
+}
+
 }  // namespace mongo

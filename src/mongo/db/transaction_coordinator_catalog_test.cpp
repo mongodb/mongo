@@ -38,10 +38,8 @@
 namespace mongo {
 namespace {
 
-const Timestamp dummyTimestamp = Timestamp::min();
-
 class TransactionCoordinatorCatalogTest : public ShardServerTestFixture {
-public:
+protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
         _coordinatorCatalog = std::make_shared<TransactionCoordinatorCatalog>();

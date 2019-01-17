@@ -57,7 +57,21 @@ AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext)
     : _serviceContext(serviceContext),
       _executor(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()) {}
 
-AsyncWorkScheduler::~AsyncWorkScheduler() = default;
+AsyncWorkScheduler::~AsyncWorkScheduler() {
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        invariant(_activeOpContexts.empty());
+        invariant(_activeHandles.empty());
+        invariant(_childSchedulers.empty());
+    }
+
+    if (!_parent)
+        return;
+
+    stdx::lock_guard<stdx::mutex> lg(_parent->_mutex);
+    _parent->_childSchedulers.erase(_itToRemove);
+    _parent = nullptr;
+}
 
 Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemoteCommand(
     const ShardId& shardId, const ReadPreferenceSetting& readPref, const BSONObj& commandObj) {
@@ -77,40 +91,33 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
         // rather than going through the host targeting below. This ensures that the state changes
         // for the participant and coordinator occur sequentially on a single branch of replica set
         // history. See SERVER-38142 for details.
-        return scheduleWork([ shardId,
-                              commandObj = commandObj.getOwned() ](OperationContext * opCtx) {
-            // Note: This internal authorization is tied to the lifetime of 'opCtx', which is
+        return scheduleWork([ this, shardId, commandObj = commandObj.getOwned() ](OperationContext *
+                                                                                  opCtx) {
+            // NOTE: This internal authorization is tied to the lifetime of client, which will be
             // destroyed by 'scheduleWork' immediately after this lambda ends.
-            AuthorizationSession::get(Client::getCurrent())->grantInternalAuthorization();
+            AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
 
             LOG(3) << "Coordinator going to send command " << commandObj << " to shard " << shardId;
 
-            auto start = Date_t::now();
+            const auto service = opCtx->getServiceContext();
+            auto start = _executor->now();
 
             auto requestOpMsg =
                 OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, commandObj).serialize();
-            const auto replyOpMsg = OpMsg::parseOwned(opCtx->getServiceContext()
-                                                          ->getServiceEntryPoint()
-                                                          ->handleRequest(opCtx, requestOpMsg)
-                                                          .response);
+            const auto replyOpMsg = OpMsg::parseOwned(
+                service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).response);
 
             // Document sequences are not yet being used for responses.
             invariant(replyOpMsg.sequences.empty());
 
             // 'ResponseStatus' is the response format of a remote request sent over the network, so
             // we simulate that format manually here, since we sent the request over the loopback.
-            return ResponseStatus{replyOpMsg.body.getOwned(), Date_t::now() - start};
+            return ResponseStatus{replyOpMsg.body.getOwned(), _executor->now() - start};
         });
     }
 
-    // Manually simulate a futures interface to the TaskExecutor by creating this promise-future
-    // pair and setting the promise from inside the callback passed to the TaskExecutor.
-    auto promiseAndFuture = makePromiseFuture<ResponseStatus>();
-    auto sharedPromise =
-        std::make_shared<Promise<ResponseStatus>>(std::move(promiseAndFuture.promise));
-
-    _targetHostAsync(shardId, readPref)
-        .then([ this, shardId, sharedPromise, commandObj = commandObj.getOwned(), readPref ](
+    return _targetHostAsync(shardId, readPref)
+        .then([ this, shardId, commandObj = commandObj.getOwned(), readPref ](
             HostAndPort shardHostAndPort) mutable {
             LOG(3) << "Coordinator sending command " << commandObj << " to shard " << shardId;
 
@@ -120,32 +127,86 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                                                    readPref.toContainingBSON(),
                                                    nullptr);
 
-            uassertStatusOK(_executor->scheduleRemoteCommand(
-                request, [ commandObj = commandObj.getOwned(),
-                           shardId,
-                           sharedPromise ](const RemoteCommandCallbackArgs& args) mutable {
+            auto pf = makePromiseFuture<ResponseStatus>();
+
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            uassertStatusOK(_shutdownStatus);
+
+            auto scheduledCommandHandle =
+                uassertStatusOK(_executor->scheduleRemoteCommand(request, [
+                    this,
+                    commandObj = std::move(commandObj),
+                    shardId = std::move(shardId),
+                    promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))
+                ](const RemoteCommandCallbackArgs& args) mutable noexcept {
                     LOG(3) << "Coordinator shard got response " << args.response.data << " for "
                            << commandObj << " to " << shardId;
                     auto status = args.response.status;
                     // Only consider actual failures to send the command as errors.
                     if (status.isOK()) {
-                        sharedPromise->emplaceValue(args.response);
+                        promise->emplaceValue(std::move(args.response));
                     } else {
-                        sharedPromise->setError(status);
+                        promise->setError([&] {
+                            if (status == ErrorCodes::CallbackCanceled) {
+                                stdx::unique_lock<stdx::mutex> ul(_mutex);
+                                return _shutdownStatus.isOK() ? status : _shutdownStatus;
+                            }
+                            return status;
+                        }());
                     }
                 }));
+
+            auto it =
+                _activeHandles.emplace(_activeHandles.begin(), std::move(scheduledCommandHandle));
+
+            ul.unlock();
+
+            return std::move(pf.future).tapAll(
+                [ this, it = std::move(it) ](StatusWith<ResponseStatus> s) {
+                    stdx::lock_guard<stdx::mutex> lg(_mutex);
+                    _activeHandles.erase(it);
+                });
         })
-        .onError([ shardId, commandObj = commandObj.getOwned(), sharedPromise ](Status s) {
+        .tapError([ shardId, commandObj = commandObj.getOwned() ](Status s) {
             LOG(3) << "Coordinator shard failed to target command " << commandObj << " to shard "
                    << shardId << causedBy(s);
+        });
+}
 
-            sharedPromise->setError(s);
-        })
-        .getAsync([](Status) {});
+std::unique_ptr<AsyncWorkScheduler> AsyncWorkScheduler::makeChildScheduler() {
+    auto child = stdx::make_unique<AsyncWorkScheduler>(_serviceContext);
 
-    // Do not wait for the callback to run. The continuation on the future corresponding to
-    // 'sharedPromise' will reschedule the remote request if necessary.
-    return std::move(promiseAndFuture.future);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (!_shutdownStatus.isOK())
+        child->shutdown(_shutdownStatus);
+
+    child->_parent = this;
+    child->_itToRemove = _childSchedulers.emplace(_childSchedulers.begin(), child.get());
+
+    return child;
+}
+
+void AsyncWorkScheduler::shutdown(Status status) {
+    invariant(!status.isOK());
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (!_shutdownStatus.isOK())
+        return;
+
+    _shutdownStatus = std::move(status);
+
+    for (const auto& it : _activeOpContexts) {
+        stdx::lock_guard<Client> clientLock(*it->getClient());
+        _serviceContext->killOperation(clientLock, it.get(), _shutdownStatus.code());
+    }
+
+    for (const auto& it : _activeHandles) {
+        _executor->cancel(it);
+    }
+
+    for (auto& child : _childSchedulers) {
+        child->shutdown(_shutdownStatus);
+    }
 }
 
 Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,

@@ -46,7 +46,7 @@ class TransactionCoordinator {
 public:
     TransactionCoordinator(ServiceContext* serviceContext,
                            const LogicalSessionId& lsid,
-                           const TxnNumber& txnNumber);
+                           TxnNumber txnNumber);
     ~TransactionCoordinator();
 
     /**
@@ -124,10 +124,7 @@ public:
      *
      * TODO (SERVER-37364): Remove this when it is no longer needed by the coordinator service.
      */
-    SharedSemiFuture<txn::CommitDecision> getDecision() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _finalDecisionPromise.getFuture();
-    }
+    SharedSemiFuture<txn::CommitDecision> getDecision();
 
     /**
      * If runCommit has not yet been called, this will transition this coordinator object to
@@ -189,40 +186,26 @@ private:
     // this coordinator.
     TransactionCoordinatorDriver _driver;
 
-    /**
-     * The logical session id of the transaction that this coordinator is coordinating.
-     */
+    // The lsid + transaction number that this coordinator is coordinating
     const LogicalSessionId _lsid;
-
-    /**
-     * The transaction number of the transaction that this coordinator is coordinating.
-     */
     const TxnNumber _txnNumber;
 
-    /**
-     * Protects _state, _finalDecisionPromise, and _completionPromises.
-     */
-    stdx::mutex _mutex;
+    // Protects the state below
+    mutable stdx::mutex _mutex;
 
-    /**
-     * The current state of the coordinator in the commit process.
-     */
-    CoordinatorState _state;
+    // Stores the current state of the coordinator in the commit process.
+    CoordinatorState _state{CoordinatorState::kInit};
 
-    /**
-     * A promise that will contain the final decision made by the coordinator (whether to commit or
-     * abort). This is only known once all responses to prepare have been received from all
-     * participants, and the collective decision has been persisted to
-     * config.transactionCommitDecisions.
-     */
+    // Promise which will contain the final decision made by the coordinator (whether to commit or
+    // abort). This is only known once all responses to prepare have been received from all
+    // participants, and the collective decision has been majority persisted to
+    // config.transactionCommitDecisions.
     SharedPromise<txn::CommitDecision> _finalDecisionPromise;
 
-    /**
-     * A list of all promises corresponding to futures that were returned to callers of
-     * onCompletion.
-     *
-     * TODO (SERVER-38346): Remove this when SharedSemiFuture supports continuations.
-     */
+    // A list of all promises corresponding to futures that were returned to callers of
+    // onCompletion.
+    //
+    // TODO (SERVER-38346): Remove this when SharedSemiFuture supports continuations.
     std::vector<Promise<void>> _completionPromises;
 };
 

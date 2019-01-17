@@ -232,7 +232,7 @@ public:
     Future<void> sendDecisionToParticipantShard(const ShardId& shardId, const BSONObj& commandObj);
 
 private:
-    txn::AsyncWorkScheduler _scheduler;
+    std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
 
     // TODO (SERVER-38522): Remove once AsyncWorkScheduler is used for cancellation
     AtomicWord<bool> _cancelled{false};

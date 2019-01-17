@@ -247,6 +247,14 @@ public:
     ThreadClient(const ThreadClient&) = delete;
     ThreadClient(ThreadClient&&) = delete;
     void operator=(const ThreadClient&) = delete;
+
+    Client* get() const;
+    Client* operator->() const {
+        return get();
+    }
+    Client& operator*() const {
+        return *get();
+    }
 };
 
 /**

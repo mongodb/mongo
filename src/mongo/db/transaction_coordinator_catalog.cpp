@@ -129,12 +129,12 @@ TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx, Logic
     }
 
     const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
-    const auto& lastCoordinatorOnSession = coordinatorsForSession.rbegin();
 
-    // Should never have empty map for a session. Entries for sessions with no transactions should
-    // be removed.
-    invariant(lastCoordinatorOnSession != coordinatorsForSession.rend());
+    // We should never have empty map for a session because entries for sessions with no
+    // transactions are removed
+    invariant(!coordinatorsForSession.empty());
 
+    const auto& lastCoordinatorOnSession = coordinatorsForSession.begin();
     return std::make_pair(lastCoordinatorOnSession->first, lastCoordinatorOnSession->second);
 }
 
@@ -214,12 +214,12 @@ void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<s
         _noStepUpInProgressCv, lk, [this]() { return !_stepUpInProgress; });
 }
 
-std::string TransactionCoordinatorCatalog::toString() {
+std::string TransactionCoordinatorCatalog::toString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _toString(lk);
 }
 
-std::string TransactionCoordinatorCatalog::_toString(WithLock wl) {
+std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {
     StringBuilder ss;
     ss << "[";
     for (auto coordinatorsForSession = _coordinatorsBySession.begin();

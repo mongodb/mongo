@@ -51,6 +51,10 @@ public:
     AsyncWorkScheduler(ServiceContext* serviceContext);
     ~AsyncWorkScheduler();
 
+    /**
+     * Schedules the specified callable to execute asynchronously and returns a future which will be
+     * set with its result.
+     */
     template <class Callable>
     Future<FutureContinuationResult<Callable, OperationContext*>> scheduleWork(
         Callable&& task) noexcept {
@@ -70,19 +74,45 @@ public:
         auto pf = makePromiseFuture<ReturnType>();
         auto taskCompletionPromise = std::make_shared<Promise<ReturnType>>(std::move(pf.promise));
         try {
-            uassertStatusOK(_executor->scheduleWorkAt(
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            uassertStatusOK(_shutdownStatus);
+
+            auto scheduledWorkHandle = uassertStatusOK(_executor->scheduleWorkAt(
                 when,
                 [ this, task = std::forward<Callable>(task), taskCompletionPromise ](
                     const executor::TaskExecutor::CallbackArgs&) mutable noexcept {
-                    ThreadClient tc("TransactionCoordinator", _serviceContext);
-                    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-                    taskCompletionPromise->setWith([&] { return task(uniqueOpCtx.get()); });
+                    taskCompletionPromise->setWith([&] {
+                        ThreadClient tc("TransactionCoordinator", _serviceContext);
+                        stdx::unique_lock<stdx::mutex> ul(_mutex);
+                        uassertStatusOK(_shutdownStatus);
+
+                        auto uniqueOpCtxIter = _activeOpContexts.emplace(
+                            _activeOpContexts.begin(), tc->makeOperationContext());
+                        ul.unlock();
+
+                        auto scopedGuard = makeGuard([&] {
+                            ul.lock();
+                            _activeOpContexts.erase(uniqueOpCtxIter);
+                        });
+
+                        return task(uniqueOpCtxIter->get());
+                    });
                 }));
+
+            auto it =
+                _activeHandles.emplace(_activeHandles.begin(), std::move(scheduledWorkHandle));
+
+            ul.unlock();
+
+            return std::move(pf.future).tapAll(
+                [ this, it = std::move(it) ](StatusOrStatusWith<ReturnType> s) {
+                    stdx::lock_guard<stdx::mutex> lg(_mutex);
+                    _activeHandles.erase(it);
+                });
         } catch (const DBException& ex) {
             taskCompletionPromise->setError(ex.toStatus());
+            return std::move(pf.future);
         }
-
-        return std::move(pf.future);
     }
 
     /**
@@ -92,7 +122,29 @@ public:
     Future<executor::TaskExecutor::ResponseStatus> scheduleRemoteCommand(
         const ShardId& shardId, const ReadPreferenceSetting& readPref, const BSONObj& commandObj);
 
+    /**
+     * Allows sub-tasks on this scheduler to be grouped together and works-around the fact that
+     * futures are not cancellable.
+     *
+     * Shutting down the returned child scheduler has no effect on the parent. Shutting down the
+     * parent scheduler also shuts down all child schedulers and prevents new ones from starting.
+     */
+    std::unique_ptr<AsyncWorkScheduler> makeChildScheduler();
+
+    /**
+     * Non-blocking method, which interrupts all currently active scheduled commands or tasks and
+     * prevents any new ones from starting.
+     * After this method is called, all returned futures, which haven't yet been signalled will be
+     * set to the specified status. Attempting to schedule any new operations will return ready
+     * futures set to the specified status.
+     *
+     * Must not be called with Status::OK.
+     */
+    void shutdown(Status status);
+
 private:
+    using ChildIteratorsList = std::list<AsyncWorkScheduler*>;
+
     /**
      * Finds the host and port for a shard.
      */
@@ -104,6 +156,27 @@ private:
 
     // Cached reference to the executor to use
     executor::TaskExecutor* const _executor;
+
+    // If this work scheduler was constructed through 'makeChildScheduler', points to the parent
+    // scheduler and contains the iterator from the parent, which needs to be removed on destruction
+    AsyncWorkScheduler* _parent{nullptr};
+    ChildIteratorsList::iterator _itToRemove;
+
+    // Mutex to protect the shared state below
+    stdx::mutex _mutex;
+
+    // If shutdown() is called, this contains the first status that was passed to it and is an
+    // indication that no more operations can be scheduled
+    Status _shutdownStatus{Status::OK()};
+
+    // Any active scheduled work will have its operation context stored here
+    std::list<ServiceContext::UniqueOperationContext> _activeOpContexts;
+
+    // Any active scheduled work or network operation will have its TaskExecutor handle stored here
+    std::list<executor::TaskExecutor::CallbackHandle> _activeHandles;
+
+    // Any outstanding child schedulers created though 'makeChildScheduler'
+    ChildIteratorsList _childSchedulers;
 };
 
 enum class ShouldStopIteration { kYes, kNo };

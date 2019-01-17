@@ -30,25 +30,17 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/transaction_coordinator_catalog.h"
-#include "mongo/util/future.h"
 
 namespace mongo {
 
-class ShardId;
-class OperationContext;
-class ServiceContext;
-
-class TransactionCoordinatorService final {
+class TransactionCoordinatorService {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorService);
 
 public:
     TransactionCoordinatorService();
-    ~TransactionCoordinatorService() = default;
+    ~TransactionCoordinatorService();
 
     /**
      * Retrieves the TransactionCoordinatorService associated with the service or operation context.
@@ -100,7 +92,7 @@ public:
      *    async task to continue coordinating its commit.
      */
     void onStepUp(OperationContext* opCtx);
-    void onStepDown(OperationContext* opCtx);
+    void onStepDown();
 
 private:
     std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;

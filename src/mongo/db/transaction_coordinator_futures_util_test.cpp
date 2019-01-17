@@ -41,6 +41,8 @@ namespace mongo {
 namespace txn {
 namespace {
 
+using Barrier = unittest::Barrier;
+
 TEST(TransactionCoordinatorFuturesUtilTest, CollectReturnsInitValueWhenInputIsEmptyVector) {
     std::vector<Future<int>> futures;
     auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
@@ -167,7 +169,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkSucceeds) {
     ASSERT(!future.isReady());
 
     pf.promise.emplaceValue(5);
-    ASSERT_EQ(5, future.get(operationContext()));
+    ASSERT_EQ(5, future.get());
 }
 
 TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkThrowsException) {
@@ -186,8 +188,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkThrowsException) {
     ASSERT(!future.isReady());
 
     pf.promise.emplaceValue(5);
-    ASSERT_THROWS_CODE(
-        future.get(operationContext()), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::InternalError);
 }
 
 TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkInSucceeds) {
@@ -213,7 +214,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkInSucceeds) {
         ASSERT(future.isReady());
     }
 
-    ASSERT_EQ(5, future.get(operationContext()));
+    ASSERT_EQ(5, future.get());
 }
 
 TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsOK) {
@@ -229,7 +230,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsOK) {
         return objResponse;
     });
 
-    const auto& response = future.get(operationContext());
+    const auto& response = future.get();
     ASSERT(response.isOK());
     ASSERT_BSONOBJ_EQ(objResponse, response.data);
 }
@@ -247,7 +248,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsNotOK) {
         return objResponse;
     });
 
-    const auto& response = future.get(operationContext());
+    const auto& response = future.get();
     ASSERT(response.isOK());
     ASSERT_BSONOBJ_EQ(objResponse, response.data);
 }
@@ -270,11 +271,157 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandsOneOKAndOneError) {
         return BSON("ok" << 0 << "responseData" << 3);
     });
 
-    const auto& response2 = future2.get(operationContext());
+    const auto& response2 = future2.get();
     ASSERT(response2.isOK());
 
-    const auto& response1 = future1.get(operationContext());
+    const auto& response1 = future1.get();
     ASSERT(response1.isOK());
+}
+
+TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsRunningBlockedTasks) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    Barrier barrier(2);
+
+    auto future = async.scheduleWork([&barrier](OperationContext* opCtx) {
+        barrier.countDownAndWait();
+        opCtx->sleepFor(Hours(6));
+    });
+
+    barrier.countDownAndWait();
+    ASSERT(!future.isReady());
+
+    async.shutdown({ErrorCodes::InternalError, "Test internal error"});
+
+    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::InternalError);
+}
+
+TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsNotYetScheduledTasks) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    AtomicWord<int> numInvocations{0};
+
+    auto future1 =
+        async.scheduleWorkIn(Milliseconds(1), [&numInvocations](OperationContext* opCtx) {
+            numInvocations.addAndFetch(1);
+        });
+
+    auto future2 =
+        async.scheduleWorkIn(Milliseconds(1), [&numInvocations](OperationContext* opCtx) {
+            numInvocations.addAndFetch(1);
+        });
+
+    ASSERT(!future1.isReady());
+    ASSERT(!future2.isReady());
+    ASSERT_EQ(0, numInvocations.load());
+
+    async.shutdown({ErrorCodes::InternalError, "Test internal error"});
+    ASSERT_EQ(0, numInvocations.load());
+
+    ASSERT_THROWS_CODE(future1.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(future2.get(), AssertionException, ErrorCodes::InternalError);
+
+    ASSERT_EQ(0, numInvocations.load());
+}
+
+TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsRemoteCommandsWhichAreBlockedWaitingForResponse) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    auto future1 = async.scheduleRemoteCommand(
+        kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
+
+    auto future2 = async.scheduleRemoteCommand(
+        kShardIds[2], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
+
+    // Wait till at least one of the two commands above gets scheduled
+    network()->waitForWork();
+
+    ASSERT(!future1.isReady());
+    ASSERT(!future2.isReady());
+
+    async.shutdown({ErrorCodes::InternalError, "Test internal error"});
+
+    ASSERT_THROWS_CODE(future1.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(future2.get(), AssertionException, ErrorCodes::InternalError);
+}
+
+TEST_F(AsyncWorkSchedulerTest, ShutdownChildSchedulerOnlyInterruptsChildTasks) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    auto futureFromParent = async.scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Parent"); });
+
+    auto childAsync1 = async.makeChildScheduler();
+    auto childFuture1 = childAsync1->scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Child1"); });
+
+    auto childAsync2 = async.makeChildScheduler();
+    auto childFuture2 = childAsync2->scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Child2"); });
+
+    childAsync1->shutdown({ErrorCodes::InternalError, "Test error"});
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Milliseconds(1));
+    }
+
+    ASSERT_EQ("Parent", futureFromParent.get());
+    ASSERT_THROWS_CODE(childFuture1.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_EQ("Child2", childFuture2.get());
+}
+
+TEST_F(AsyncWorkSchedulerTest, ShutdownParentSchedulerInterruptsAllChildTasks) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    auto futureFromParent = async.scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Parent"); });
+
+    auto childAsync1 = async.makeChildScheduler();
+    auto childFuture1 = childAsync1->scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Child1"); });
+
+    auto childAsync2 = async.makeChildScheduler();
+    auto childFuture2 = childAsync2->scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Child2"); });
+
+    async.shutdown({ErrorCodes::InternalError, "Test error"});
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Milliseconds(1));
+    }
+
+    ASSERT_THROWS_CODE(futureFromParent.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(childFuture1.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(childFuture2.get(), AssertionException, ErrorCodes::InternalError);
+}
+
+TEST_F(AsyncWorkSchedulerTest, MakeChildSchedulerAfterShutdownParentScheduler) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    // Shut down the parent scheduler immediately
+    async.shutdown({ErrorCodes::InternalError, "Test error"});
+
+    auto futureFromParent = async.scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Parent"); });
+
+    auto childAsync1 = async.makeChildScheduler();
+    auto childFuture1 = childAsync1->scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Child1"); });
+
+    auto childAsync2 = async.makeChildScheduler();
+    auto childFuture2 = childAsync2->scheduleWorkIn(
+        Milliseconds(1), [](OperationContext* opCtx) { return std::string("Child2"); });
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Milliseconds(1));
+    }
+
+    ASSERT_THROWS_CODE(futureFromParent.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(childFuture1.get(), AssertionException, ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(childFuture2.get(), AssertionException, ErrorCodes::InternalError);
 }
 
 
@@ -294,7 +441,7 @@ TEST_F(DoWhileTest, LoopBodyExecutesAtLeastOnceWithBackoff) {
 
     ASSERT(future.isReady());
     ASSERT_EQ(1, numLoops);
-    ASSERT_EQ(1, future.get(operationContext()));
+    ASSERT_EQ(1, future.get());
 }
 
 TEST_F(DoWhileTest, LoopBodyExecutesManyIterationsWithoutBackoff) {
@@ -309,7 +456,7 @@ TEST_F(DoWhileTest, LoopBodyExecutesManyIterationsWithoutBackoff) {
                           },
                           [&remainingLoops] { return Future<int>::makeReady(--remainingLoops); });
 
-    ASSERT_EQ(0, future.get(operationContext()));
+    ASSERT_EQ(0, future.get());
     ASSERT_EQ(0, remainingLoops);
 }
 
@@ -350,7 +497,27 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
         ASSERT_EQ(3, numLoops);
     }
 
-    ASSERT_EQ(3, future.get(operationContext()));
+    ASSERT_EQ(3, future.get());
+}
+
+TEST_F(DoWhileTest, LoopObeysShutdown) {
+    AsyncWorkScheduler async(getServiceContext());
+
+    int numLoops = 0;
+    auto future =
+        doWhile(async,
+                boost::none,
+                [](const StatusWith<int>& status) { return status != ErrorCodes::InternalError; },
+                [&numLoops] { return Future<int>::makeReady(++numLoops); });
+
+    // Wait for at least one loop
+    while (numLoops == 0)
+        sleepFor(Milliseconds(25));
+
+    ASSERT(!future.isReady());
+    async.shutdown({ErrorCodes::InternalError, "Test internal error"});
+
+    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::InternalError);
 }
 
 }  // namespace
