@@ -90,7 +90,9 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override;
+    void onTransactionPrepare(OperationContext* opCtx,
+                              const OplogSlot& prepareOpTime,
+                              std::vector<repl::ReplOperation>& statements) override;
 
     bool onTransactionPrepareThrowsException = false;
     bool transactionPrepared = false;
@@ -98,12 +100,15 @@ public:
 
     void onTransactionCommit(OperationContext* opCtx,
                              boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp) override;
+                             boost::optional<Timestamp> commitTimestamp,
+                             std::vector<repl::ReplOperation>& statements) override;
     bool onTransactionCommitThrowsException = false;
     bool transactionCommitted = false;
-    stdx::function<void(boost::optional<OplogSlot>, boost::optional<Timestamp>)>
+    stdx::function<void(
+        boost::optional<OplogSlot>, boost::optional<Timestamp>, std::vector<repl::ReplOperation>&)>
         onTransactionCommitFn = [](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                   boost::optional<Timestamp> commitTimestamp) {};
+                                   boost::optional<Timestamp> commitTimestamp,
+                                   std::vector<repl::ReplOperation>& statements) {};
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override;
@@ -120,9 +125,11 @@ public:
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
-void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) {
+void OpObserverMock::onTransactionPrepare(OperationContext* opCtx,
+                                          const OplogSlot& prepareOpTime,
+                                          std::vector<repl::ReplOperation>& statements) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    OpObserverNoop::onTransactionPrepare(opCtx, prepareOpTime);
+    OpObserverNoop::onTransactionPrepare(opCtx, prepareOpTime, statements);
 
     uassert(ErrorCodes::OperationFailed,
             "onTransactionPrepare() failed",
@@ -133,7 +140,8 @@ void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSl
 
 void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
                                          boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                         boost::optional<Timestamp> commitTimestamp) {
+                                         boost::optional<Timestamp> commitTimestamp,
+                                         std::vector<repl::ReplOperation>& statements) {
     if (commitOplogEntryOpTime) {
         invariant(commitTimestamp);
         ASSERT_FALSE(opCtx->lockState()->inAWriteUnitOfWork());
@@ -144,12 +152,12 @@ void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
         ASSERT(opCtx->lockState()->inAWriteUnitOfWork());
     }
 
-    OpObserverNoop::onTransactionCommit(opCtx, commitOplogEntryOpTime, commitTimestamp);
+    OpObserverNoop::onTransactionCommit(opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
     uassert(ErrorCodes::OperationFailed,
             "onTransactionCommit() failed",
             !onTransactionCommitThrowsException);
     transactionCommitted = true;
-    onTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp);
+    onTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp, statements);
 }
 
 void OpObserverMock::onTransactionAbort(OperationContext* opCtx,
@@ -511,12 +519,15 @@ TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransac
 
     auto originalFn = _opObserver->onTransactionCommitFn;
     _opObserver->onTransactionCommitFn = [&](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                             boost::optional<Timestamp> commitTimestamp) {
-        originalFn(commitOplogEntryOpTime, commitTimestamp);
+                                             boost::optional<Timestamp> commitTimestamp,
+                                             std::vector<repl::ReplOperation>& statements) {
+        originalFn(commitOplogEntryOpTime, commitTimestamp, statements);
         ASSERT(commitOplogEntryOpTime);
         ASSERT(commitTimestamp);
 
         ASSERT_GT(*commitTimestamp, prepareTimestamp);
+
+        ASSERT(statements.empty());
     };
 
     txnParticipant->commitPreparedTransaction(opCtx(), commitTS);
@@ -548,11 +559,13 @@ TEST_F(TxnParticipantTest, CommitTransactionDoesNotSetCommitTimestampOnUnprepare
 
     auto originalFn = _opObserver->onTransactionCommitFn;
     _opObserver->onTransactionCommitFn = [&](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                             boost::optional<Timestamp> commitTimestamp) {
-        originalFn(commitOplogEntryOpTime, commitTimestamp);
+                                             boost::optional<Timestamp> commitTimestamp,
+                                             std::vector<repl::ReplOperation>& statements) {
+        originalFn(commitOplogEntryOpTime, commitTimestamp, statements);
         ASSERT_FALSE(commitOplogEntryOpTime);
         ASSERT_FALSE(commitTimestamp);
         ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
+        ASSERT(statements.empty());
     };
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -696,7 +709,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfAddTransactionOperationAndAbort) {
                        ErrorCodes::NoSuchTransaction);
 }
 
-TEST_F(TxnParticipantTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAbort) {
+TEST_F(TxnParticipantTest, ConcurrencyOfRetrieveCompletedTransactionOperationsAndAbort) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
@@ -704,8 +717,22 @@ TEST_F(TxnParticipantTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAb
     // The transaction may be aborted without checking out the txnParticipant.
     txnParticipant->abortArbitraryTransaction();
 
-    // An endTransactionAndRetrieveOperations() after an abort should uassert.
-    ASSERT_THROWS_CODE(txnParticipant->endTransactionAndRetrieveOperations(opCtx()),
+    // A retrieveCompletedTransactionOperations() after an abort should uassert.
+    ASSERT_THROWS_CODE(txnParticipant->retrieveCompletedTransactionOperations(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(TxnParticipantTest, ConcurrencyOfClearOperationsInMemory) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+
+    // The transaction may be aborted without checking out the txnParticipant.
+    txnParticipant->abortArbitraryTransaction();
+
+    // An clearOperationsInMemory() after an abort should uassert.
+    ASSERT_THROWS_CODE(txnParticipant->clearOperationsInMemory(opCtx()),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -867,12 +894,15 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedCommitDoesNotAbortTransacti
 
     auto originalFn = _opObserver->onTransactionCommitFn;
     _opObserver->onTransactionCommitFn = [&](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                             boost::optional<Timestamp> commitTimestamp) {
-        originalFn(commitOplogEntryOpTime, commitTimestamp);
+                                             boost::optional<Timestamp> commitTimestamp,
+                                             std::vector<repl::ReplOperation>& statements) {
+        originalFn(commitOplogEntryOpTime, commitTimestamp, statements);
         ASSERT(commitOplogEntryOpTime);
         ASSERT(commitTimestamp);
 
         ASSERT_GT(*commitTimestamp, prepareTimestamp);
+
+        ASSERT(statements.empty());
 
         // The transaction may be aborted without checking out the txnParticipant.
         txnParticipant->abortArbitraryTransaction();
@@ -984,12 +1014,15 @@ TEST_F(TxnParticipantTest, ArbitraryAbortDuringPreparedCommitDoesNotAbortTransac
 
     auto originalFn = _opObserver->onTransactionCommitFn;
     _opObserver->onTransactionCommitFn = [&](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                             boost::optional<Timestamp> commitTimestamp) {
-        originalFn(commitOplogEntryOpTime, commitTimestamp);
+                                             boost::optional<Timestamp> commitTimestamp,
+                                             std::vector<repl::ReplOperation>& statements) {
+        originalFn(commitOplogEntryOpTime, commitTimestamp, statements);
         ASSERT(commitOplogEntryOpTime);
         ASSERT(commitTimestamp);
 
         ASSERT_GT(*commitTimestamp, prepareTimestamp);
+
+        ASSERT(statements.empty());
 
         // The transaction may be aborted without checking out the txnParticipant.
         auto func = [&](OperationContext* opCtx) { txnParticipant->abortArbitraryTransaction(); };
@@ -1211,7 +1244,8 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
     auto sessionId = *opCtx()->getLogicalSessionId();
     auto txnNum = *opCtx()->getTxnNumber();
     _opObserver->onTransactionCommitFn = [&](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                             boost::optional<Timestamp> commitTimestamp) {
+                                             boost::optional<Timestamp> commitTimestamp,
+                                             std::vector<repl::ReplOperation>& statements) {
         // This should never happen.
         auto func = [&](OperationContext* opCtx) {
             opCtx->setLogicalSessionId(sessionId);

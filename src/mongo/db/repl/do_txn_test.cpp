@@ -63,7 +63,8 @@ public:
      */
     void onTransactionCommit(OperationContext* opCtx,
                              boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp) override;
+                             boost::optional<Timestamp> commitTimestamp,
+                             std::vector<repl::ReplOperation>& statements) override;
 
     // If present, holds the applyOps oplog entry written out by the ObObserverImpl
     // onTransactionCommit.
@@ -72,7 +73,8 @@ public:
 
 void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
                                          boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                         boost::optional<Timestamp> commitTimestamp) {
+                                         boost::optional<Timestamp> commitTimestamp,
+                                         std::vector<repl::ReplOperation>& statements) {
     ASSERT(!commitOplogEntryOpTime) << commitOplogEntryOpTime->opTime;
     ASSERT(!commitTimestamp) << *commitTimestamp;
 

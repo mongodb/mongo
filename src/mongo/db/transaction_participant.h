@@ -303,11 +303,19 @@ public:
     void addTransactionOperation(OperationContext* opCtx, const repl::ReplOperation& operation);
 
     /**
-     * Returns and clears the stored operations for an multi-document (non-autocommit) transaction,
-     * and marks the transaction as closed.  It is illegal to attempt to add operations to the
-     * transaction after this is called.
+     * Returns a reference to the stored operations for a completed multi-document (non-autocommit)
+     * transaction. "Completed" implies that no more operations will be added to the transaction.
+     * It is legal to call this method only when the transaction state is in progress or committed.
      */
-    std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations(OperationContext* opCtx);
+    std::vector<repl::ReplOperation>& retrieveCompletedTransactionOperations(
+        OperationContext* opCtx);
+
+    /**
+     * Clears the stored operations for an multi-document (non-autocommit) transaction, marking
+     * the transaction as closed.  It is illegal to attempt to add operations to the transaction
+     * after this is called.
+     */
+    void clearOperationsInMemory(OperationContext* opCtx);
 
     /**
      * Yield or reacquire locks for prepared transacitons, used on replication state transition.
@@ -537,6 +545,12 @@ public:
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _txnState.transitionTo(lk, TransactionState::kPrepared);
     }
+
+    void transitionToCommittingWithPrepareforTest() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _txnState.transitionTo(lk, TransactionState::kCommittingWithPrepare);
+    }
+
 
     void transitionToAbortedWithoutPrepareforTest() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

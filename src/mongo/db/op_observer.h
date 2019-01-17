@@ -287,18 +287,25 @@ public:
      * If the transaction was prepared, then 'commitOplogEntryOpTime' is passed in to be used as the
      * OpTime of the oplog entry. The 'commitTimestamp' is the timestamp at which the multi-document
      * transaction was committed. Either these fields should both be 'none' or neither should.
+     *
+     * The 'statements' are the list of CRUD operations to be applied in this transaction.
      */
     virtual void onTransactionCommit(OperationContext* opCtx,
                                      boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                     boost::optional<Timestamp> commitTimestamp) = 0;
+                                     boost::optional<Timestamp> commitTimestamp,
+                                     std::vector<repl::ReplOperation>& statements) = 0;
 
     /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be
      * called when a transaction is active.
      *
      * The 'prepareOpTime' is passed in to be used as the OpTime of the oplog entry.
+     *
+     * The 'statements' are the list of CRUD operations to be applied in this transaction.
      */
-    virtual void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) = 0;
+    virtual void onTransactionPrepare(OperationContext* opCtx,
+                                      const OplogSlot& prepareOpTime,
+                                      std::vector<repl::ReplOperation>& statements) = 0;
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the

@@ -684,7 +684,11 @@ TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
                   << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
     txnParticipant->addTransactionOperation(opCtx(), operation);
     txnParticipant->addTransactionOperation(opCtx(), operation);
-    ASSERT_THROWS_CODE(opObserver().onTransactionCommit(opCtx(), boost::none, boost::none),
+    ASSERT_THROWS_CODE(opObserver().onTransactionCommit(
+                           opCtx(),
+                           boost::none,
+                           boost::none,
+                           txnParticipant->retrieveCompletedTransactionOperations(opCtx())),
                        AssertionException,
                        ErrorCodes::TransactionTooLarge);
 }
@@ -730,7 +734,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     {
         WriteUnitOfWork wuow(opCtx());
         OplogSlot slot = repl::getNextOpTime(opCtx());
-        opObserver().onTransactionPrepare(opCtx(), slot);
+        opObserver().onTransactionPrepare(
+            opCtx(), slot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
         opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
     }
 
@@ -805,7 +810,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
         txnParticipant->transitionToPreparedforTest();
         const auto prepareSlot = repl::getNextOpTime(opCtx());
         prepareTimestamp = prepareSlot.opTime.getTimestamp();
-        opObserver().onTransactionPrepare(opCtx(), prepareSlot);
+        opObserver().onTransactionPrepare(
+            opCtx(), prepareSlot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
 
         commitSlot = repl::getNextOpTime(opCtx());
     }
@@ -813,7 +819,13 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
     opCtx()->lockState()->unsetMaxLockTimeout();
-    opObserver().onTransactionCommit(opCtx(), commitSlot, prepareTimestamp);
+
+    txnParticipant->transitionToCommittingWithPrepareforTest();
+    opObserver().onTransactionCommit(
+        opCtx(),
+        commitSlot,
+        prepareTimestamp,
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
 
     repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
     auto oplogIter = oplogInterface.makeIterator();
@@ -869,7 +881,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
 
         txnParticipant->transitionToPreparedforTest();
         const auto prepareSlot = repl::getNextOpTime(opCtx());
-        opObserver().onTransactionPrepare(opCtx(), prepareSlot);
+        opObserver().onTransactionPrepare(
+            opCtx(), prepareSlot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
         abortSlot = repl::getNextOpTime(opCtx());
     }
 
@@ -947,7 +960,8 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
     {
         WriteUnitOfWork wuow(opCtx());
         OplogSlot slot = repl::getNextOpTime(opCtx());
-        opObserver().onTransactionPrepare(opCtx(), slot);
+        opObserver().onTransactionPrepare(
+            opCtx(), slot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
         opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
     }
 
@@ -972,7 +986,8 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
         WriteUnitOfWork wuow(opCtx());
         OplogSlot slot = repl::getNextOpTime(opCtx());
         prepareOpTime = slot.opTime;
-        opObserver().onTransactionPrepare(opCtx(), slot);
+        opObserver().onTransactionPrepare(
+            opCtx(), slot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
         opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
     }
 
@@ -1003,7 +1018,8 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
     {
         WriteUnitOfWork wuow(opCtx());
         OplogSlot slot = repl::getNextOpTime(opCtx());
-        opObserver().onTransactionPrepare(opCtx(), slot);
+        opObserver().onTransactionPrepare(
+            opCtx(), slot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
         opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
         txnParticipant->transitionToPreparedforTest();
         abortSlot = repl::getNextOpTime(opCtx());
@@ -1039,7 +1055,11 @@ TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesT
         opObserver().onInserts(opCtx(), nss, uuid, insert.begin(), insert.end(), false);
     }
 
-    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
+    opObserver().onTransactionCommit(
+        opCtx(),
+        boost::none,
+        boost::none,
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
     opCtx()->getWriteUnitOfWork()->commit();
 
     assertTxnRecord(txnNum(), {}, DurableTxnStateEnum::kCommitted);
@@ -1050,7 +1070,11 @@ TEST_F(OpObserverTransactionTest,
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
 
-    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
+    opObserver().onTransactionCommit(
+        opCtx(),
+        boost::none,
+        boost::none,
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
 
     txnParticipant->stashTransactionResources(opCtx());
 
@@ -1069,7 +1093,8 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
         WriteUnitOfWork wuow(opCtx());
         OplogSlot slot = repl::getNextOpTime(opCtx());
         prepareOpTime = slot.opTime;
-        opObserver().onTransactionPrepare(opCtx(), slot);
+        opObserver().onTransactionPrepare(
+            opCtx(), slot, txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
         opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
         txnParticipant->transitionToPreparedforTest();
     }
@@ -1081,7 +1106,13 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
     // Mimic committing the transaction.
     opCtx()->setWriteUnitOfWork(nullptr);
     opCtx()->lockState()->unsetMaxLockTimeout();
-    opObserver().onTransactionCommit(opCtx(), commitSlot, prepareOpTime.getTimestamp());
+
+    txnParticipant->transitionToCommittingWithPrepareforTest();
+    opObserver().onTransactionCommit(
+        opCtx(),
+        commitSlot,
+        prepareOpTime.getTimestamp(),
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
 
     assertTxnRecord(txnNum(), commitOpTime, DurableTxnStateEnum::kCommitted);
 }
@@ -1113,7 +1144,11 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
-    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
+    opObserver().onTransactionCommit(
+        opCtx(),
+        boost::none,
+        boost::none,
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
@@ -1190,7 +1225,11 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
-    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
+    opObserver().onTransactionCommit(
+        opCtx(),
+        boost::none,
+        boost::none,
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");
@@ -1243,7 +1282,11 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, false, boost::none);
-    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
+    opObserver().onTransactionCommit(
+        opCtx(),
+        boost::none,
+        boost::none,
+        txnParticipant->retrieveCompletedTransactionOperations(opCtx()));
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");

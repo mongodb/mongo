@@ -160,9 +160,12 @@ public:
 
     void onTransactionCommit(OperationContext* opCtx,
                              boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp) final {}
+                             boost::optional<Timestamp> commitTimestamp,
+                             std::vector<repl::ReplOperation>& statements) final {}
 
-    void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) final {}
+    void onTransactionPrepare(OperationContext* opCtx,
+                              const OplogSlot& prepareOpTime,
+                              std::vector<repl::ReplOperation>& statements) final {}
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}

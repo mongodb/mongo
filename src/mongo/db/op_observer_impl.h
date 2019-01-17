@@ -140,8 +140,11 @@ public:
                        OptionalCollectionUUID uuid);
     void onTransactionCommit(OperationContext* opCtx,
                              boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp) final;
-    void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) final;
+                             boost::optional<Timestamp> commitTimestamp,
+                             std::vector<repl::ReplOperation>& statements) final;
+    void onTransactionPrepare(OperationContext* opCtx,
+                              const OplogSlot& prepareOpTime,
+                              std::vector<repl::ReplOperation>& statments) final;
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
