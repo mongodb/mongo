@@ -58,7 +58,6 @@ using std::vector;
 
 namespace {
 void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
-    bool firstTime = true;
     for (std::list<std::string>::const_iterator it = nsToCheck.begin(); it != nsToCheck.end();
          ++it) {
         NamespaceString nss(*it);
@@ -102,18 +101,6 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
             log() << "found " << indexesToBuild.size() << " interrupted index build(s) on "
                   << nss.ns();
 
-            if (firstTime) {
-                log() << "note: restart the server with --noIndexBuildRetry "
-                      << "to skip index rebuilds";
-                firstTime = false;
-            }
-
-            if (!serverGlobalParams.indexBuildRetry) {
-                log() << "  not rebuilding interrupted indexes";
-                wunit.commit();
-                continue;
-            }
-
             uassertStatusOK(indexer.init(indexesToBuild));
 
             wunit.commit();
@@ -127,7 +114,6 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
             wunit.commit();
         } catch (const DBException& e) {
             error() << "Index rebuilding did not complete: " << redact(e);
-            log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
             // If anything went wrong, leave the indexes partially built so that we pick them up
             // again on restart.
             indexer.abortWithoutCleanup();
