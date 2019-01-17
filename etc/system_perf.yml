@@ -301,6 +301,11 @@ functions:
         script: |
           ../src/dsi/dsi/run-dsi detect-changes
     - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          ../src/dsi/dsi/run-dsi detect-outliers
+    - command: shell.exec
       type : test
       params:
         working_dir: work
