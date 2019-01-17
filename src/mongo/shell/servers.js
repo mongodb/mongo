@@ -1177,6 +1177,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                             argArray.push(...['--rocksdbCacheSizeGB',
                                               jsTest.options().storageEngineCacheSizeGB]);
                         }
+                    } else if (jsTest.options().storageEngine === "inMemory") {
+                        if (jsTest.options().storageEngineCacheSizeGB &&
+                            !argArrayContains("--inMemorySizeGB")) {
+                            argArray.push(
+                                ...["--inMemorySizeGB", jsTest.options().storageEngineCacheSizeGB]);
+                        }
                     }
                     // apply setParameters for mongod. The 'setParameters' field should be given as
                     // a plain JavaScript object, where each key is a parameter name and the value

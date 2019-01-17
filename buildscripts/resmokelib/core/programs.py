@@ -107,7 +107,9 @@ def mongod_program(  # pylint: disable=too-many-branches
         "wiredTigerIndexConfigString": config.WT_INDEX_CONFIG,
     }
 
-    if config.STORAGE_ENGINE == "rocksdb":
+    if config.STORAGE_ENGINE == "inMemory":
+        shortcut_opts["inMemorySizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
+    elif config.STORAGE_ENGINE == "rocksdb":
         shortcut_opts["rocksdbCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
     elif config.STORAGE_ENGINE == "wiredTiger" or config.STORAGE_ENGINE is None:
         shortcut_opts["wiredTigerCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
