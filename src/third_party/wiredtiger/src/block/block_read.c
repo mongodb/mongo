@@ -120,7 +120,7 @@ __wt_bm_corrupt_dump(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	size_t chunk, i, nchunks;
 
-#define	WT_CORRUPT_FMT	"{%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "}"
+#define	WT_CORRUPT_FMT	"{%" PRIuMAX ", %" PRIu32 ", %#" PRIx32 "}"
 	if (buf->size == 0) {
 		__wt_errx(session,
 		    WT_CORRUPT_FMT ": empty buffer, no dump available",
@@ -226,7 +226,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	uint32_t page_checksum;
 
 	__wt_verbose(session, WT_VERB_READ,
-	    "off %" PRIuMAX ", size %" PRIu32 ", checksum %" PRIu32,
+	    "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32,
 	    (uintmax_t)offset, size, checksum);
 
 	WT_STAT_CONN_INCR(session, block_read);
@@ -276,8 +276,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			__wt_errx(session,
 			    "%s: read checksum error for %" PRIu32 "B block at "
 			    "offset %" PRIuMAX ": calculated block checksum "
-			    "of %" PRIu32 " doesn't match expected checksum "
-			    "of %" PRIu32,
+			    "of %#" PRIx32 " doesn't match expected checksum "
+			    "of %#" PRIx32,
 			    block->name,
 			    size, (uintmax_t)offset, page_checksum, checksum);
 	} else
@@ -285,8 +285,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			__wt_errx(session,
 			    "%s: read checksum error for %" PRIu32 "B block at "
 			    "offset %" PRIuMAX ": block header checksum "
-			    "of %" PRIu32 " doesn't match expected checksum "
-			    "of %" PRIu32,
+			    "of %#" PRIx32 " doesn't match expected checksum "
+			    "of %#" PRIx32,
 			    block->name,
 			    size, (uintmax_t)offset, swap.checksum, checksum);
 

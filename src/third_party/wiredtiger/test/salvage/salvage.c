@@ -30,20 +30,16 @@
 
 #include <assert.h>
 
-#define	DUMP	"__slvg.dump"			/* Dump file */
-#define	LOAD	"__slvg.load"			/* Build file */
-#define	RSLT	"__slvg.result"			/* Result file */
-#define	SLVG	"__slvg.slvg"			/* Salvage file */
+#define	HOME		"WT_TEST"
+#define	DUMP		"WT_TEST/__slvg.dump"	/* Dump file */
+#define	LOAD		"WT_TEST/__slvg.load"	/* Build file */
+#define	LOAD_URI	"file:__slvg.load"	/* Build URI */
+#define	RSLT		"WT_TEST/__slvg.result"	/* Result file */
+#define	SLVG		"WT_TEST/__slvg.slvg"	/* Salvage file */
+#define	SLVG_URI	"file:__slvg.slvg"	/* Salvage URI */
 
 #define	PSIZE	(2 * 1024)
 #define	OSIZE	(PSIZE / 20)
-
-#define	CHECK(x) do {							\
-	if (!(x)) {							\
-		fprintf(stderr, "%s: failed\n", #x);			\
-		assert(0);						\
-	}								\
-} while (0)
 
 void build(int, int, int);
 void copy(u_int, u_int);
@@ -162,8 +158,9 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	CHECK(system("rm -f WiredTiger* __slvg.*") == 0);
-	CHECK((res_fp = fopen(RSLT, "w")) != NULL);
+	testutil_make_work_dir(HOME);
+
+	testutil_assert((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*
 	 * Each run builds the LOAD file, and then appends the first page of
@@ -435,7 +432,7 @@ run(int r)
 		exit(EXIT_FAILURE);
 	}
 
-	CHECK(fclose(res_fp) == 0);
+	testutil_assert(fclose(res_fp) == 0);
 
 	process();
 
@@ -446,6 +443,8 @@ run(int r)
 		    "check failed, salvage results were incorrect\n");
 		exit(EXIT_FAILURE);
 	}
+
+	testutil_clean_work_dir(HOME);
 }
 
 /*
@@ -478,10 +477,10 @@ build(int ikey, int ivalue, int cnt)
 	 * Disable logging: we're modifying files directly, we don't want to
 	 * run recovery.
 	 */
-	CHECK(wiredtiger_open(
-	    NULL, NULL, "create,log=(enabled=false)", &conn) == 0);
-	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
-	CHECK(session->drop(session, "file:" LOAD, "force") == 0);
+	testutil_check(wiredtiger_open(
+	    HOME, NULL, "create,log=(enabled=false)", &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->drop(session, LOAD_URI, "force"));
 
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
@@ -511,9 +510,9 @@ build(int ikey, int ivalue, int cnt)
 	default:
 		assert(0);
 	}
-	CHECK(session->create(session, "file:" LOAD, config) == 0);
-	CHECK(session->open_cursor(
-	    session, "file:" LOAD, NULL, "bulk,append", &cursor) == 0);
+	testutil_check(session->create(session, LOAD_URI, config));
+	testutil_check(session->open_cursor(
+	    session, LOAD_URI, NULL, "bulk,append", &cursor));
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
 		switch (page_type) {			/* Build the key. */
 		case WT_PAGE_COL_FIX:
@@ -540,7 +539,7 @@ build(int ikey, int ivalue, int cnt)
 			value.size = 20;
 			cursor->set_value(cursor, &value);
 		}
-		CHECK(cursor->insert(cursor) == 0);
+		testutil_check(cursor->insert(cursor));
 	}
 
 	/*
@@ -550,10 +549,10 @@ build(int ikey, int ivalue, int cnt)
 	 */
 	new_slvg = !file_exists(SLVG);
 	if (new_slvg) {
-		CHECK(session->drop(session, "file:" SLVG, "force") == 0);
-		CHECK(session->create(session, "file:" SLVG, config) == 0);
+		testutil_check(session->drop(session, SLVG_URI, "force"));
+		testutil_check(session->create(session, SLVG_URI, config));
 	}
-	CHECK(conn->close(conn, 0) == 0);
+	testutil_check(conn->close(conn, 0));
 	if (new_slvg)
 		(void)remove(SLVG);
 }
@@ -568,9 +567,11 @@ copy(u_int gen, u_int recno)
 	FILE *ifp, *ofp;
 	WT_BLOCK_HEADER *blk;
 	WT_PAGE_HEADER *dsk;
+	uint64_t recno64;
+	uint32_t cksum32, gen32;
 	char buf[PSIZE];
 
-	CHECK((ifp = fopen(LOAD, "r")) != NULL);
+	testutil_assert((ifp = fopen(LOAD, "r")) != NULL);
 
 	/*
 	 * If the salvage file doesn't exist, then we're creating it:
@@ -578,31 +579,47 @@ copy(u_int gen, u_int recno)
 	 * Otherwise, we are appending to an existing file.
 	 */
 	if (file_exists(SLVG))
-		CHECK((ofp = fopen(SLVG, "a")) != NULL);
+		testutil_assert((ofp = fopen(SLVG, "a")) != NULL);
 	else {
-		CHECK((ofp = fopen(SLVG, "w")) != NULL);
-		CHECK(fread(buf, 1, PSIZE, ifp) == PSIZE);
-		CHECK(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+		testutil_assert((ofp = fopen(SLVG, "w")) != NULL);
+		testutil_assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		testutil_assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 
 	/*
 	 * If there's data, copy/update the first formatted page.
 	 */
 	if (gen != 0) {
-		CHECK(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
-		CHECK(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		testutil_assert(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
+		testutil_assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
+
+		/*
+		 * Page headers are written in little-endian format, swap before
+		 * calculating the checksum on big-endian hardware. Checksums
+		 * always returned in little-endian format, no swap is required.
+		 */
+		gen32 = gen;
+		recno64 = recno;
+#ifdef WORDS_BIGENDIAN
+		gen32 = __wt_bswap32(gen32);
+		recno64 = __wt_bswap64(recno64);
+#endif
 		dsk = (void *)buf;
 		if (page_type != WT_PAGE_ROW_LEAF)
-			dsk->recno = recno;
-		dsk->write_gen = gen;
+			dsk->recno = recno64;
+		dsk->write_gen = gen32;
 		blk = WT_BLOCK_HEADER_REF(buf);
 		blk->checksum = 0;
-		blk->checksum = __wt_checksum(dsk, PSIZE);
-		CHECK(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+		cksum32 = __wt_checksum(dsk, PSIZE);
+#ifdef WORDS_BIGENDIAN
+		cksum32 = __wt_bswap32(cksum32);
+#endif
+		blk->checksum = cksum32;
+		testutil_assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 
-	CHECK(fclose(ifp) == 0);
-	CHECK(fclose(ofp) == 0);
+	testutil_assert(fclose(ifp) == 0);
+	testutil_assert(fclose(ofp) == 0);
 }
 
 /*
@@ -627,35 +644,35 @@ process(void)
 		    progname));
 	strcat(config, "log=(enabled=false),");
 
-	CHECK(wiredtiger_open(NULL, NULL, config, &conn) == 0);
-	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
-	CHECK(session->salvage(session, "file:" SLVG, 0) == 0);
-	CHECK(conn->close(conn, 0) == 0);
+	testutil_check(wiredtiger_open(HOME, NULL, config, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->salvage(session, SLVG_URI, 0));
+	testutil_check(conn->close(conn, 0));
 
 	/* Verify. */
-	CHECK(wiredtiger_open(NULL, NULL, config, &conn) == 0);
-	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
-	CHECK(session->verify(session, "file:" SLVG, 0) == 0);
-	CHECK(conn->close(conn, 0) == 0);
+	testutil_check(wiredtiger_open(HOME, NULL, config, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->verify(session, SLVG_URI, 0));
+	testutil_check(conn->close(conn, 0));
 
 	/* Dump. */
-	CHECK((fp = fopen(DUMP, "w")) != NULL);
-	CHECK(wiredtiger_open(NULL, NULL, config, &conn) == 0);
-	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
-	CHECK(session->open_cursor(
-	    session, "file:" SLVG, NULL, "dump=print", &cursor) == 0);
+	testutil_assert((fp = fopen(DUMP, "w")) != NULL);
+	testutil_check(wiredtiger_open(HOME, NULL, config, &conn));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->open_cursor(
+	    session, SLVG_URI, NULL, "dump=print", &cursor));
 	while (cursor->next(cursor) == 0) {
 		if (page_type == WT_PAGE_ROW_LEAF) {
-			CHECK(cursor->get_key(cursor, &key) == 0);
-			CHECK(fputs(key, fp) >= 0);
-			CHECK(fputc('\n', fp) >= 0);
+			testutil_check(cursor->get_key(cursor, &key));
+			testutil_assert(fputs(key, fp) >= 0);
+			testutil_assert(fputc('\n', fp) >= 0);
 		}
-		CHECK(cursor->get_value(cursor, &value) == 0);
-		CHECK(fputs(value, fp) >= 0);
-		CHECK(fputc('\n', fp) >= 0);
+		testutil_check(cursor->get_value(cursor, &value));
+		testutil_assert(fputs(value, fp) >= 0);
+		testutil_assert(fputc('\n', fp) >= 0);
 	}
-	CHECK(conn->close(conn, 0) == 0);
-	CHECK(fclose(fp) == 0);
+	testutil_check(conn->close(conn, 0));
+	testutil_assert(fclose(fp) == 0);
 }
 
 /*
@@ -669,7 +686,7 @@ empty(int cnt)
 
 	if (page_type == WT_PAGE_COL_FIX)
 		for (i = 0; i < cnt; ++i)
-			CHECK(fputs("\\00\n", res_fp));
+			testutil_assert(fputs("\\00\n", res_fp));
 }
 
 /*

@@ -14,4 +14,4 @@ TESTS = $(noinst_PROGRAMS)
 LOG_COMPILER = $(TEST_WRAPPER)
 
 clean-local:
-	rm -rf WiredTiger* __slvg* core.* *.core
+	rm -rf core.* *.core WT_TEST

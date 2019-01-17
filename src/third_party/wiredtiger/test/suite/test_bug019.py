@@ -61,9 +61,9 @@ class test_bug019(wttest.WiredTigerTestCase):
         c.close()
 
     # Wait for a log file to be pre-allocated. Avoid timing problems, but
-    # assert a file is created within 30 seconds.
+    # assert a file is created within 90 seconds.
     def prepfiles(self):
-        for i in range(1,30):
+        for i in range(1,90):
                 f = fnmatch.filter(os.listdir('.'), "*Prep*")
                 if f:
                         return f

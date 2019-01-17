@@ -374,7 +374,7 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    session, block_byte_write_checkpoint, align_size);
 
 	__wt_verbose(session, WT_VERB_WRITE,
-	    "off %" PRIuMAX ", size %" PRIuMAX ", checksum %" PRIu32,
+	    "off %" PRIuMAX ", size %" PRIuMAX ", checksum %#" PRIx32,
 	    (uintmax_t)offset, (uintmax_t)align_size, checksum);
 
 	*offsetp = offset;

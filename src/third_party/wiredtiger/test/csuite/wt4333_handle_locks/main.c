@@ -338,6 +338,12 @@ main(int argc, char *argv[])
 	u_int i, n;
 	int ch;
 
+	/*
+	 * Bypass this test for valgrind. It has a fairly low thread limit.
+	 */
+	if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
+		return (EXIT_SUCCESS);
+
 	(void)testutil_set_progname(argv);
 	__wt_random_init_seed(NULL, &rnd);
 
