@@ -2060,10 +2060,8 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
-        if (wru->inActiveTxn() && !opCtx->lockState()->isNoop() &&
-            !opCtx->lockState()->isCollectionLockedForMode(_ns, MODE_X)) {
-            throw WriteConflictException();
-        }
+        invariant(!wru->inActiveTxn() ||
+                  opCtx->lockState()->isCollectionLockedForMode(_ns, MODE_X));
         wru->setIsOplogReader();
     }
 
@@ -2113,10 +2111,8 @@ std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
-        if (wru->inActiveTxn() && !opCtx->lockState()->isNoop() &&
-            !opCtx->lockState()->isCollectionLockedForMode(_ns, MODE_X)) {
-            throw WriteConflictException();
-        }
+        invariant(!wru->inActiveTxn() ||
+                  opCtx->lockState()->isCollectionLockedForMode(_ns, MODE_X));
         wru->setIsOplogReader();
     }
 
