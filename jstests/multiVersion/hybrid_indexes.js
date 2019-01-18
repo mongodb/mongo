@@ -44,11 +44,9 @@
             ", ns: \"test.hybrid_indexes\", background: " + background + " } using method: " +
             expected;
         print(msg);
-        assert.soon(
-            () => rawMongoProgramOutput().indexOf(msg) >= 0, "Index build not started", 1000);
+        assert.soon(() => rawMongoProgramOutput().indexOf(msg) >= 0, "Index build not started");
         assert.soon(() => rawMongoProgramOutput().indexOf("Hanging before index build of i=0") >= 0,
-                    "Index build not hanging",
-                    1000);
+                    "Index build not hanging");
 
         if (expected === "Background" || expected === "Hybrid") {
             assert.commandWorked(testColl.insert({i: 1}));
