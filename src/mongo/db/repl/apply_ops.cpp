@@ -68,6 +68,9 @@ namespace {
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
+// If enabled, causes _applyPrepareTransaction to hang before preparing the transaction participant.
+MONGO_FAIL_POINT_DEFINE(applyOpsHangBeforePreparingTransaction);
+
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
  */
@@ -315,8 +318,16 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         return status;
     }
     invariant(!entry.getOpTime().isNull());
+
+    if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
+        LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        applyOpsHangBeforePreparingTransaction);
+    }
+
     transaction.prepareTransaction(opCtx, entry.getOpTime());
     transaction.stashTransactionResources(opCtx);
+
     return Status::OK();
 }
 

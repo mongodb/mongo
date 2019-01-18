@@ -106,6 +106,7 @@ public:
 
 private:
     OperationContextSession _operationContextSession;
+    OperationContext* const _opCtx;
 };
 
 }  // namespace mongo

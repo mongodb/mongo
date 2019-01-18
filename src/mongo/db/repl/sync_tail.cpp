@@ -434,7 +434,8 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
                 &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
             ] {
                 auto opCtx = cc().makeOperationContext();
-                status = func(opCtx.get(), &writer, st, &workerMultikeyPathInfo);
+                status = opCtx->runWithoutInterruption(
+                    [&] { return func(opCtx.get(), &writer, st, &workerMultikeyPathInfo); });
             }));
         }
     }

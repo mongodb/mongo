@@ -242,7 +242,7 @@ void MongoDOperationContextSession::checkOut(OperationContext* opCtx, const std:
 
 MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
     OperationContext* opCtx)
-    : _operationContextSession(opCtx) {
+    : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
     const auto clientTxnNumber = *opCtx->getTxnNumber();
 
@@ -250,7 +250,12 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
     txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, clientTxnNumber);
 }
 
-MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() =
-    default;
+MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() {
+    const auto txnParticipant = TransactionParticipant::get(_opCtx);
+    // A session on secondaries should never be checked back in with a TransactionParticipant that
+    // isn't prepared, aborted, or committed.
+    invariant(!txnParticipant.inMultiDocumentTransaction() ||
+              txnParticipant.transactionIsPrepared());
+}
 
 }  // namespace mongo

@@ -88,6 +88,7 @@ selector:
   - jstests/sharding/txn_two_phase_commit_killop.js
   - jstests/sharding/txn_two_phase_commit_recover_decision.js
   - jstests/sharding/txn_two_phase_commit_wait_for_majority_commit_after_stepup.js
+  - jstests/sharding/txn_being_applied_to_secondary_cannot_be_killed.js
   - jstests/sharding/txn_writes_during_movechunk.js
   - jstests/sharding/update_sharded.js
   - jstests/sharding/shard_existing_coll_chunk_count.js
