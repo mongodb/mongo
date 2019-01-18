@@ -139,7 +139,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
         if (isMongos(db)) {
             assertWhenOwnDB.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assertWhenOwnDB.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
             assertWhenOwnDB.commandWorked(db.adminCommand(
                 {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}}));
         }
@@ -150,6 +149,10 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, [db, collName, cluster]);
+
+        // `shardCollection()` requires a shard key index to be in place on the output collection,
+        // as we may be sharding a non-empty collection.
+        assertWhenOwnDB.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
     };
 
     return $config;
