@@ -68,6 +68,22 @@ env.Library(
 )
 
 env.Library(
+    target='server_read_concern_write_concern_metrics',
+    source=[
+        'server_read_concern_metrics.cpp',
+        'server_write_concern_metrics.cpp',
+        env.Idlc('read_concern_stats.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='fill_locker_info',
     source=[
         'fill_locker_info.cpp',

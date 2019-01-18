@@ -29,12 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/server_read_concern_metrics.h"
+#include "mongo/db/stats/server_read_concern_metrics.h"
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/read_concern_stats_gen.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

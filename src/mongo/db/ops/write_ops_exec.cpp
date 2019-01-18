@@ -67,6 +67,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -391,6 +392,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 opCtx, collection->getCollection(), batch.begin(), batch.end(), fromMigrate);
             lastOpFixer->finishedOpSuccessfully();
             globalOpCounters.gotInserts(batch.size());
+            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(
+                opCtx->getWriteConcern(), batch.size());
             SingleWriteResult result;
             result.setN(1);
 
@@ -409,6 +412,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     // for batches that failed all-at-once inserting.
     for (auto it = batch.begin(); it != batch.end(); ++it) {
         globalOpCounters.gotInsert();
+        ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+            opCtx->getWriteConcern());
         try {
             writeConflictRetry(opCtx, "insert", wholeOp.getNamespace().ns(), [&] {
                 try {
@@ -538,6 +543,8 @@ WriteResult performInserts(OperationContext* opCtx,
 
         if (canContinue && !fixedDoc.isOK()) {
             globalOpCounters.gotInsert();
+            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+                opCtx->getWriteConcern());
             try {
                 uassertStatusOK(fixedDoc.getStatus());
                 MONGO_UNREACHABLE;
@@ -563,6 +570,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
             !(opCtx->getTxnNumber() && op.getMulti()));
 
     globalOpCounters.gotUpdate();
+    ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -715,6 +723,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
             !(opCtx->getTxnNumber() && op.getMulti()));
 
     globalOpCounters.gotDelete();
+    ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());

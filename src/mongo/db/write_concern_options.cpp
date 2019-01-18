@@ -147,8 +147,10 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
 
     if (wEl.isNumber()) {
         wNumNodes = wEl.numberInt();
+        usedDefaultW = false;
     } else if (wEl.type() == String) {
         wMode = wEl.valuestrsafe();
+        usedDefaultW = false;
     } else if (wEl.eoo() || wEl.type() == jstNULL || wEl.type() == Undefined) {
         wNumNodes = 1;
     } else {
@@ -162,6 +164,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
     const BSONObj& cmdObj, const std::string& dbName, const WriteConcernOptions& defaultWC) {
     WriteConcernOptions writeConcern = defaultWC;
     writeConcern.usedDefault = true;
+    writeConcern.usedDefaultW = true;
     if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
         writeConcern.wNumNodes = 1;
     }

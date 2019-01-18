@@ -50,9 +50,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/server_read_concern_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 

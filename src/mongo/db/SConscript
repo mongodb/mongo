@@ -859,6 +859,7 @@ env.Library(
         "service_context_d",
         "startup_warnings_mongod",
         "stats/counters",
+        'stats/server_read_concern_write_concern_metrics',
         "stats/serveronly",
         "stats/top",
         "storage/devnull/storage_devnull",
