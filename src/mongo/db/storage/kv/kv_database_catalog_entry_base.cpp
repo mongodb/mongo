@@ -46,107 +46,6 @@
 
 namespace mongo {
 
-using std::string;
-using std::vector;
-
-class KVDatabaseCatalogEntryBase::AddCollectionChange : public RecoveryUnit::Change {
-public:
-    AddCollectionChange(OperationContext* opCtx,
-                        KVDatabaseCatalogEntryBase* dce,
-                        StringData collection,
-                        StringData ident)
-        : _opCtx(opCtx), _dce(dce), _collection(collection.toString()), _ident(ident.toString()) {}
-
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        // Intentionally ignoring failure
-        MONGO_COMPILER_VARIABLE_UNUSED auto status =
-            _dce->_engine->getEngine()->dropIdent(_opCtx, _ident);
-
-        const CollectionMap::iterator it = _dce->_collections.find(_collection);
-        if (it != _dce->_collections.end()) {
-            delete it->second;
-            _dce->_collections.erase(it);
-        }
-    }
-
-    OperationContext* const _opCtx;
-    KVDatabaseCatalogEntryBase* const _dce;
-    const std::string _collection;
-    const std::string _ident;
-};
-
-class KVDatabaseCatalogEntryBase::RemoveCollectionChange : public RecoveryUnit::Change {
-public:
-    RemoveCollectionChange(OperationContext* opCtx,
-                           KVDatabaseCatalogEntryBase* dce,
-                           OptionalCollectionUUID uuid,
-                           StringData collection,
-                           StringData ident,
-                           KVCollectionCatalogEntry* entry)
-        : _opCtx(opCtx),
-          _dce(dce),
-          _uuid(uuid),
-          _collection(collection.toString()),
-          _ident(ident.toString()),
-          _entry(entry) {}
-
-    virtual void commit(boost::optional<Timestamp> commitTimestamp) {
-        delete _entry;
-
-        // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
-        // collection, we should never see it again anyway.
-        auto engine = _dce->_engine;
-        auto storageEngine = engine->getStorageEngine();
-        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
-            log() << "Deferring table drop for collection '" << _collection
-                  << (_uuid ? " (" + _uuid->toString() + ")'" : "") << ". Ident: " << _ident
-                  << ", commit timestamp: " << commitTimestamp;
-            engine->addDropPendingIdent(*commitTimestamp, NamespaceString(_collection), _ident);
-        } else {
-            auto kvEngine = engine->getEngine();
-            MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
-        }
-    }
-
-    virtual void rollback() {
-        _dce->_collections[_collection] = _entry;
-    }
-
-    OperationContext* const _opCtx;
-    KVDatabaseCatalogEntryBase* const _dce;
-    OptionalCollectionUUID _uuid;
-    const std::string _collection;
-    const std::string _ident;
-    KVCollectionCatalogEntry* const _entry;
-};
-
-class KVDatabaseCatalogEntryBase::RenameCollectionChange final : public RecoveryUnit::Change {
-public:
-    RenameCollectionChange(KVDatabaseCatalogEntryBase* dce,
-                           KVCollectionCatalogEntry* coll,
-                           NamespaceString fromNs,
-                           NamespaceString toNs)
-        : _dce(dce), _coll(coll), _fromNs(std::move(fromNs)), _toNs(std::move(toNs)) {}
-
-    void commit(boost::optional<Timestamp>) override {}
-
-    void rollback() override {
-        auto it = _dce->_collections.find(_toNs.ns());
-        invariant(it != _dce->_collections.end());
-        invariant(it->second == _coll);
-        _dce->_collections[_fromNs.ns()] = _coll;
-        _dce->_collections.erase(_toNs.ns());
-        _coll->setNs(_fromNs);
-    }
-
-private:
-    KVDatabaseCatalogEntryBase* const _dce;
-    KVCollectionCatalogEntry* const _coll;
-    const NamespaceString _fromNs;
-    const NamespaceString _toNs;
-};
-
 KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase(StringData db,
                                                        KVStorageEngineInterface* engine)
     : DatabaseCatalogEntry(db), _engine(engine) {}
@@ -179,11 +78,11 @@ int64_t KVDatabaseCatalogEntryBase::sizeOnDisk(OperationContext* opCtx) const {
             continue;
         size += coll->getRecordStore()->storageSize(opCtx);
 
-        vector<string> indexNames;
+        std::vector<std::string> indexNames;
         coll->getAllIndexes(opCtx, &indexNames);
 
         for (size_t i = 0; i < indexNames.size(); i++) {
-            string ident =
+            std::string ident =
                 _engine->getCatalog()->getIndexIdent(opCtx, coll->ns().ns(), indexNames[i]);
             size += _engine->getEngine()->getIdentSize(opCtx, ident);
         }
@@ -245,7 +144,7 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    string ident = _engine->getCatalog()->getCollectionIdent(nss.ns());
+    std::string ident = _engine->getCatalog()->getCollectionIdent(nss.ns());
 
     status =
         _engine->getEngine()->createGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
@@ -262,7 +161,16 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
         }
     }
 
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, nss.ns(), ident));
+    opCtx->recoveryUnit()->onRollback([ opCtx, dce = this, nss, ident ]() {
+        // Intentionally ignoring failure
+        dce->_engine->getEngine()->dropIdent(opCtx, ident).ignore();
+
+        const CollectionMap::iterator it = dce->_collections.find(nss.ns());
+        if (it != dce->_collections.end()) {
+            delete it->second;
+            dce->_collections.erase(it);
+        }
+    });
 
     auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
     invariant(rs);
@@ -313,15 +221,15 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
                                                     StringData toNS,
                                                     bool stayTemp) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
-
-    RecordStore* originalRS = NULL;
+    const NamespaceString fromNss(fromNS);
+    const NamespaceString toNss(toNS);
 
     CollectionMap::const_iterator it = _collections.find(fromNS.toString());
     if (it == _collections.end()) {
         return Status(ErrorCodes::NamespaceNotFound, "rename cannot find collection");
     }
 
-    originalRS = it->second->getRecordStore();
+    RecordStore* originalRS = it->second->getRecordStore();
 
     it = _collections.find(toNS.toString());
     if (it != _collections.end()) {
@@ -353,20 +261,28 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
     _collections[toNS.toString()] = collectionCatalogEntry;
     _collections.erase(itFrom);
 
-    collectionCatalogEntry->setNs(NamespaceString{toNS});
+    collectionCatalogEntry->setNs(toNss);
 
     // Register a Change which, on rollback, will reinstall the collection catalog entry in the
     // collections map so that it is associated with 'fromNS', not 'toNS'.
-    opCtx->recoveryUnit()->registerChange(new RenameCollectionChange(
-        this, collectionCatalogEntry, NamespaceString{fromNS}, NamespaceString{toNS}));
+    opCtx->recoveryUnit()->onRollback([ dce = this, collectionCatalogEntry, fromNss, toNss ]() {
+        auto it = dce->_collections.find(toNss.ns());
+        invariant(it != dce->_collections.end());
+        invariant(it->second == collectionCatalogEntry);
+        dce->_collections[fromNss.ns()] = collectionCatalogEntry;
+        dce->_collections.erase(toNss.ns());
+        collectionCatalogEntry->setNs(fromNss);
+
+    });
 
     return Status::OK();
 }
 
 Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, StringData ns) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    NamespaceString nss(ns);
 
-    CollectionMap::const_iterator it = _collections.find(ns.toString());
+    CollectionMap::const_iterator it = _collections.find(nss.toString());
     if (it == _collections.end()) {
         return Status(ErrorCodes::NamespaceNotFound, "cannnot find collection to drop");
     }
@@ -396,10 +312,27 @@ Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, Strin
 
     // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to
     // drop the collection only on WUOW::commit().
-    opCtx->recoveryUnit()->registerChange(
-        new RemoveCollectionChange(opCtx, this, uuid, ns, ident, it->second));
+    opCtx->recoveryUnit()->onCommit([ opCtx, dce = this, nss, uuid, ident, entry = it->second ](
+        boost::optional<Timestamp> commitTimestamp) {
+        delete entry;
 
-    _collections.erase(ns.toString());
+        auto engine = dce->_engine;
+        auto storageEngine = engine->getStorageEngine();
+        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
+            log() << "Deferring table drop for collection '" << nss << "' (" << uuid << ")"
+                  << ". Ident: " << ident << ", commit timestamp: " << commitTimestamp;
+            engine->addDropPendingIdent(*commitTimestamp, nss, ident);
+        } else {
+            // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
+            // collection, we should never see it again anyway.
+            auto kvEngine = engine->getEngine();
+            kvEngine->dropIdent(opCtx, ident).ignore();
+        }
+    });
+
+    opCtx->recoveryUnit()->onRollback(
+        [ dce = this, nss, entry = it->second ]() { dce->_collections[nss.toString()] = entry; });
+    _collections.erase(nss.toString());
 
     return Status::OK();
 }
