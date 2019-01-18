@@ -111,6 +111,9 @@ public:
 
     // True if the default write concern was used.
     bool usedDefault = false;
+
+    // True if the default 'w' value of w:1 was used.
+    bool usedDefaultW = false;
 };
 
 }  // namespace mongo
