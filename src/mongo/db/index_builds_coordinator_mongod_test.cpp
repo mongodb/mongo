@@ -32,6 +32,7 @@
 #include "mongo/db/index_builds_coordinator_mongod.h"
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -50,19 +51,25 @@ private:
     void tearDown() override;
 
 public:
-    void createCollection(const NamespaceString& nss);
+    /**
+     * Creates a collection with a default CollectionsOptions and the given UUID.
+     */
+    void createCollection(const NamespaceString& nss, CollectionUUID uuid);
 
+    const CollectionUUID _testFooUUID = UUID::gen();
     const NamespaceString _testFooNss = NamespaceString("test.foo");
+    const CollectionUUID _testBarUUID = UUID::gen();
     const NamespaceString _testBarNss = NamespaceString("test.bar");
+    const CollectionUUID _othertestFooUUID = UUID::gen();
     const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
 };
 
 void IndexBuildsCoordinatorMongodTest::setUp() {
     CatalogTestFixture::setUp();
-    createCollection(_testFooNss);
-    createCollection(_testBarNss);
-    createCollection(_othertestFooNss);
+    createCollection(_testFooNss, _testFooUUID);
+    createCollection(_testBarNss, _testBarUUID);
+    createCollection(_othertestFooNss, _othertestFooUUID);
     _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
 }
 
@@ -74,15 +81,11 @@ void IndexBuildsCoordinatorMongodTest::tearDown() {
     CatalogTestFixture::tearDown();
 }
 
-void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& nss) {
-    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
-}
-
-UUID getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-    Collection* coll = autoColl.getCollection();
-    ASSERT(coll);
-    return coll->uuid().get();
+void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& nss,
+                                                        CollectionUUID uuid) {
+    CollectionOptions options;
+    options.uuid = uuid;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 }
 
 std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::string> keys) {
@@ -100,19 +103,21 @@ TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
-    SharedSemiFuture<void> testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
-        operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
+    auto testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
+        operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
 
     // Attempt and fail to register an index build on _testFooNss with the same index name, while
     // the prior build is still running.
     ASSERT_EQ(ErrorCodes::IndexKeySpecsConflict,
               _indexBuildsCoord
                   ->buildIndex(
-                      operationContext(), _testFooNss, makeSpecs(_testFooNss, {"b"}), UUID::gen())
+                      operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"b"}), UUID::gen())
                   .getStatus());
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
-    ASSERT_OK(testFoo1Future.getNoThrow());
+    auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
+    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
 }
 
 // Incrementally registering index builds and checking both that the registration was successful and
@@ -121,14 +126,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
-    UUID testFooUUID = getCollectionUUID(operationContext(), _testFooNss);
-    SharedSemiFuture<void> testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
-        operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
+    auto testFoo1Future = assertGet(_indexBuildsCoord->buildIndex(
+        operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.db()), 1);
-    ASSERT(_indexBuildsCoord->inProgForCollection(testFooUUID));
+    ASSERT(_indexBuildsCoord->inProgForCollection(_testFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testFooNss.db()));
-    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(testFooUUID),
+    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID),
                        AssertionException,
                        ErrorCodes::BackgroundOperationInProgressForNamespace);
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoBgOpInProgForDb(_testFooNss.db()),
@@ -136,13 +140,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                        ErrorCodes::BackgroundOperationInProgressForDatabase);
 
     // Register a second index build on _testFooNss.
-    SharedSemiFuture<void> testFoo2Future = assertGet(_indexBuildsCoord->buildIndex(
-        operationContext(), _testFooNss, makeSpecs(_testFooNss, {"c", "d"}), UUID::gen()));
+    auto testFoo2Future = assertGet(_indexBuildsCoord->buildIndex(
+        operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"c", "d"}), UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.db()), 2);
-    ASSERT(_indexBuildsCoord->inProgForCollection(testFooUUID));
+    ASSERT(_indexBuildsCoord->inProgForCollection(_testFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testFooNss.db()));
-    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(testFooUUID),
+    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID),
                        AssertionException,
                        ErrorCodes::BackgroundOperationInProgressForNamespace);
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoBgOpInProgForDb(_testFooNss.db()),
@@ -150,14 +154,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                        ErrorCodes::BackgroundOperationInProgressForDatabase);
 
     // Register an index build on a different collection _testBarNss.
-    UUID testBarUUID = getCollectionUUID(operationContext(), _testBarNss);
-    SharedSemiFuture<void> testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
-        operationContext(), _testBarNss, makeSpecs(_testBarNss, {"x", "y"}), UUID::gen()));
+    auto testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
+        operationContext(), _testBarUUID, makeSpecs(_testBarNss, {"x", "y"}), UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testBarNss.db()), 3);
-    ASSERT(_indexBuildsCoord->inProgForCollection(testBarUUID));
+    ASSERT(_indexBuildsCoord->inProgForCollection(_testBarUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testBarNss.db()));
-    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(testBarUUID),
+    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testBarUUID),
                        AssertionException,
                        ErrorCodes::BackgroundOperationInProgressForNamespace);
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoBgOpInProgForDb(_testBarNss.db()),
@@ -165,17 +168,16 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                        ErrorCodes::BackgroundOperationInProgressForDatabase);
 
     // Register an index build on a collection in a different database _othertestFoo.
-    UUID othertestFooUUID = getCollectionUUID(operationContext(), _othertestFooNss);
-    SharedSemiFuture<void> othertestFooFuture =
+    auto othertestFooFuture =
         assertGet(_indexBuildsCoord->buildIndex(operationContext(),
-                                                _othertestFooNss,
+                                                _othertestFooUUID,
                                                 makeSpecs(_othertestFooNss, {"r", "s"}),
                                                 UUID::gen()));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_othertestFooNss.db()), 1);
-    ASSERT(_indexBuildsCoord->inProgForCollection(othertestFooUUID));
+    ASSERT(_indexBuildsCoord->inProgForCollection(_othertestFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_othertestFooNss.db()));
-    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(othertestFooUUID),
+    ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_othertestFooUUID),
                        AssertionException,
                        ErrorCodes::BackgroundOperationInProgressForNamespace);
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoBgOpInProgForDb(_othertestFooNss.db()),
@@ -184,14 +186,25 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
-    ASSERT_OK(testFoo1Future.getNoThrow());
-    ASSERT_OK(testFoo2Future.getNoThrow());
-    ASSERT_OK(testBarFuture.getNoThrow());
-    ASSERT_OK(othertestFooFuture.getNoThrow());
+    auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
+    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
 
-    _indexBuildsCoord->assertNoIndexBuildInProgForCollection(testFooUUID);
-    _indexBuildsCoord->assertNoIndexBuildInProgForCollection(testBarUUID);
-    _indexBuildsCoord->assertNoIndexBuildInProgForCollection(othertestFooUUID);
+    indexCatalogStats = unittest::assertGet(testFoo2Future.getNoThrow());
+    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+
+    indexCatalogStats = unittest::assertGet(testBarFuture.getNoThrow());
+    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+
+    indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
+    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+
+    _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID);
+    _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testBarUUID);
+    _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_othertestFooUUID);
 
     _indexBuildsCoord->assertNoBgOpInProgForDb(_testFooNss.db());
     _indexBuildsCoord->assertNoBgOpInProgForDb(_othertestFooNss.db());
@@ -205,43 +218,47 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
 // ScopedStopNewCollectionIndexBuilds and ScopedStopNewDatabaseIndexBuilds are present on a
 // collection or database name.
 TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
-    UUID testFooUUID = getCollectionUUID(operationContext(), _testFooNss);
-
     {
         _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
         // Create a scoped object to block new index builds ONLY on _testFooNss.
-        ScopedStopNewCollectionIndexBuilds scopedStop(_indexBuildsCoord.get(), testFooUUID);
+        ScopedStopNewCollectionIndexBuilds scopedStop(_indexBuildsCoord.get(), _testFooUUID);
 
         // Registering an index build on _testFooNss should fail.
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   _indexBuildsCoord
                       ->buildIndex(operationContext(),
-                                   _testFooNss,
+                                   _testFooUUID,
                                    makeSpecs(_testFooNss, {"a", "b"}),
                                    UUID::gen())
                       .getStatus());
 
         // Registering index builds on other collections and databases should still succeed.
-        SharedSemiFuture<void> testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
-            operationContext(), _testBarNss, makeSpecs(_testBarNss, {"c", "d"}), UUID::gen()));
-        SharedSemiFuture<void> othertestFooFuture =
+        auto testBarFuture = assertGet(_indexBuildsCoord->buildIndex(
+            operationContext(), _testBarUUID, makeSpecs(_testBarNss, {"c", "d"}), UUID::gen()));
+        auto othertestFooFuture =
             assertGet(_indexBuildsCoord->buildIndex(operationContext(),
-                                                    _othertestFooNss,
+                                                    _othertestFooUUID,
                                                     makeSpecs(_othertestFooNss, {"e", "f"}),
                                                     UUID::gen()));
 
         _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
-        ASSERT_OK(testBarFuture.getNoThrow());
-        ASSERT_OK(othertestFooFuture.getNoThrow());
+        auto indexCatalogStats = unittest::assertGet(testBarFuture.getNoThrow());
+        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
+        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
     }
 
     {
         // Check that the scoped object correctly cleared.
-        SharedSemiFuture<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
-            operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
-        ASSERT_OK(testFooFuture.getNoThrow());
+        auto testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
+            operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
+        auto indexCatalogStats = unittest::assertGet(testFooFuture.getNoThrow());
+        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
     }
 
     {
@@ -254,48 +271,52 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   _indexBuildsCoord
                       ->buildIndex(operationContext(),
-                                   _testFooNss,
+                                   _testFooUUID,
                                    makeSpecs(_testFooNss, {"a", "b"}),
                                    UUID::gen())
                       .getStatus());
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   _indexBuildsCoord
                       ->buildIndex(operationContext(),
-                                   _testBarNss,
+                                   _testBarUUID,
                                    makeSpecs(_testBarNss, {"c", "d"}),
                                    UUID::gen())
                       .getStatus());
 
         // Registering index builds on another database should still succeed.
-        SharedSemiFuture<void> othertestFooFuture =
+        auto othertestFooFuture =
             assertGet(_indexBuildsCoord->buildIndex(operationContext(),
-                                                    _othertestFooNss,
+                                                    _othertestFooUUID,
                                                     makeSpecs(_othertestFooNss, {"e", "f"}),
                                                     UUID::gen()));
 
         _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
-        ASSERT_OK(othertestFooFuture.getNoThrow());
+        auto indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
+        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
     }
 
     {
         // Check that the scoped object correctly cleared.
-        SharedSemiFuture<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
-            operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
-        ASSERT_OK(testFooFuture.getNoThrow());
+        auto testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
+            operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
+        auto indexCatalogStats = unittest::assertGet(testFooFuture.getNoThrow());
+        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
     }
 
     {
         // Test concurrency of multiple scoped objects to block an index builds.
 
-        ScopedStopNewCollectionIndexBuilds scopedStop(_indexBuildsCoord.get(), testFooUUID);
+        ScopedStopNewCollectionIndexBuilds scopedStop(_indexBuildsCoord.get(), _testFooUUID);
         {
-            ScopedStopNewCollectionIndexBuilds scopedStop(_indexBuildsCoord.get(), testFooUUID);
+            ScopedStopNewCollectionIndexBuilds scopedStop(_indexBuildsCoord.get(), _testFooUUID);
 
             ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                       _indexBuildsCoord
                           ->buildIndex(operationContext(),
-                                       _testFooNss,
+                                       _testFooUUID,
                                        makeSpecs(_testFooNss, {"a", "b"}),
                                        UUID::gen())
                           .getStatus());
@@ -303,7 +324,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   _indexBuildsCoord
                       ->buildIndex(operationContext(),
-                                   _testFooNss,
+                                   _testFooUUID,
                                    makeSpecs(_testFooNss, {"a", "b"}),
                                    UUID::gen())
                       .getStatus());
@@ -311,9 +332,11 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
 
     {
         // Check that the scoped object correctly cleared.
-        SharedSemiFuture<void> testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
-            operationContext(), _testFooNss, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
-        ASSERT_OK(testFooFuture.getNoThrow());
+        auto testFooFuture = assertGet(_indexBuildsCoord->buildIndex(
+            operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
+        auto indexCatalogStats = unittest::assertGet(testFooFuture.getNoThrow());
+        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
     }
 }
 

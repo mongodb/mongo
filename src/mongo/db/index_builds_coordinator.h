@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/collection_index_builds_tracker.h"
 #include "mongo/db/database_index_builds_tracker.h"
@@ -90,12 +91,16 @@ public:
      * Sets up the in-memory and persisted state of the index build. A Future is returned upon which
      * the user can await the build result.
      *
+     * On a successful index build, calling Future::get(), or Future::getNoThrows(), returns index
+     * catalog statistics.
+     *
      * Returns an error status if there are any errors setting up the index build.
      */
-    virtual StatusWith<SharedSemiFuture<void>> buildIndex(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const std::vector<BSONObj>& specs,
-                                                          const UUID& buildUUID) = 0;
+    virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> buildIndex(
+        OperationContext* opCtx,
+        CollectionUUID collectionUUID,
+        const std::vector<BSONObj>& specs,
+        const UUID& buildUUID) = 0;
 
     /**
      * TODO: not yet implemented.

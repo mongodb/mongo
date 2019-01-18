@@ -103,7 +103,10 @@ Status IndexBuildsManager::finishConstraintPhase(const UUID& buildUUID) {
     return Status::OK();
 }
 
-Status IndexBuildsManager::commitIndexBuild(const UUID& buildUUID) {
+Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const UUID& buildUUID,
+                                            OnCommitFn onCommitFn) {
     auto multiIndexBlockPtr = _getBuilder(buildUUID);
     // TODO: verify that the index builder is in the expected state.
 

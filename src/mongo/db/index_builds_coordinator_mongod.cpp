@@ -78,11 +78,11 @@ void IndexBuildsCoordinatorMongod::shutdown() {
     _threadPool.join();
 }
 
-StatusWith<SharedSemiFuture<void>> IndexBuildsCoordinatorMongod::buildIndex(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::vector<BSONObj>& specs,
-    const UUID& buildUUID) {
+StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
+IndexBuildsCoordinatorMongod::buildIndex(OperationContext* opCtx,
+                                         CollectionUUID collectionUUID,
+                                         const std::vector<BSONObj>& specs,
+                                         const UUID& buildUUID) {
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
         std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
@@ -94,11 +94,6 @@ StatusWith<SharedSemiFuture<void>> IndexBuildsCoordinatorMongod::buildIndex(
         }
         indexNames.push_back(name);
     }
-
-    UUID collectionUUID = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return autoColl.getCollection()->uuid().get();
-    }();
 
     auto replIndexBuildState =
         std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, indexNames, specs);
@@ -187,7 +182,9 @@ void IndexBuildsCoordinatorMongod::_runIndexBuild(OperationContext* opCtx,
 
     _unregisterIndexBuild(lk, opCtx, replState);
 
-    replState->sharedPromise.emplaceValue();
+    // TODO(SERVER-37643): Fill in index catalog stats.
+    ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
+    replState->sharedPromise.emplaceValue(indexCatalogStats);
 
     return;
 }

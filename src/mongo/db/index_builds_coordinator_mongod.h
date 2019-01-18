@@ -69,10 +69,11 @@ public:
      *
      * Returns an error status if there are any errors setting up the index build.
      */
-    StatusWith<SharedSemiFuture<void>> buildIndex(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const std::vector<BSONObj>& specs,
-                                                  const UUID& buildUUID) override;
+    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> buildIndex(
+        OperationContext* opCtx,
+        CollectionUUID collectionUUID,
+        const std::vector<BSONObj>& specs,
+        const UUID& buildUUID) override;
 
     void signalChangeToPrimaryMode() override;
     void signalChangeToSecondaryMode() override;

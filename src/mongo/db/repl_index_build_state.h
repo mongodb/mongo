@@ -104,7 +104,11 @@ struct ReplIndexBuildState {
 
     // Communicates the final outcome of the index build to any callers waiting upon the associated
     // SharedSemiFuture(s).
-    SharedPromise<void> sharedPromise;
+    using IndexCatalogStats = struct {
+        int numIndexesBefore = 0;
+        int numIndexesAfter = 0;
+    };
+    SharedPromise<IndexCatalogStats> sharedPromise;
 
     // There is a period of time where the index build is registered on the coordinator, but an
     // index builder does not yet exist. Since a signal cannot be set on the index builder at that

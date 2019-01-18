@@ -43,11 +43,11 @@ namespace mongo {
 
 void IndexBuildsCoordinatorEmbedded::shutdown() {}
 
-StatusWith<SharedSemiFuture<void>> IndexBuildsCoordinatorEmbedded::buildIndex(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const std::vector<BSONObj>& specs,
-    const UUID& buildUUID) {
+StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
+IndexBuildsCoordinatorEmbedded::buildIndex(OperationContext* opCtx,
+                                           CollectionUUID collectionUUID,
+                                           const std::vector<BSONObj>& specs,
+                                           const UUID& buildUUID) {
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
         std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
@@ -59,11 +59,6 @@ StatusWith<SharedSemiFuture<void>> IndexBuildsCoordinatorEmbedded::buildIndex(
         }
         indexNames.push_back(name);
     }
-
-    UUID collectionUUID = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return autoColl.getCollection()->uuid().get();
-    }();
 
     auto replIndexBuildState =
         std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, indexNames, specs);
@@ -128,7 +123,8 @@ void IndexBuildsCoordinatorEmbedded::_runIndexBuild(OperationContext* opCtx,
 
     _unregisterIndexBuild(lk, opCtx, replState);
 
-    replState->sharedPromise.emplaceValue();
+    ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
+    replState->sharedPromise.emplaceValue(indexCatalogStats);
 
     return;
 }

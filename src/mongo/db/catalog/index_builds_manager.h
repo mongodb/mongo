@@ -36,6 +36,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -118,7 +119,11 @@ public:
      *
      * TODO: Not yet implemented.
      */
-    Status commitIndexBuild(const UUID& buildUUID);
+    using OnCommitFn = stdx::function<void(const BSONObj& spec)>;
+    Status commitIndexBuild(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const UUID& buildUUID,
+                            OnCommitFn onCommitFn);
 
     /**
      * Signals the index build to be aborted and returns without waiting for completion.
