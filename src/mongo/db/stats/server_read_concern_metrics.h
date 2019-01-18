@@ -31,9 +31,9 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/read_concern_stats_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/read_concern_stats_gen.h"
 
 namespace mongo {
 

@@ -682,7 +682,6 @@ env.Library(
     source=[
         'catalog_raii.cpp',
         'retryable_writes_stats.cpp',
-        'server_read_concern_metrics.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
         'single_transaction_stats.cpp',
@@ -692,7 +691,6 @@ env.Library(
         'transaction_participant.cpp',
         's/recover_transaction_decision_from_local_participant.cpp',
         env.Idlc('session_txn_record.idl')[0],
-        env.Idlc('read_concern_stats.idl')[0],
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
@@ -895,6 +893,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',

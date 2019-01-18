@@ -83,6 +83,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
@@ -275,6 +276,10 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
     opCounters->gotInsert();
+    if (opCtx->writesAreReplicated()) {
+        ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+            opCtx->getWriteConcern());
+    }
 
     const auto constraints =
         ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss)
@@ -1102,10 +1107,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
     // Choose opCounters based on running on standalone/primary or secondary by checking
     // whether writes are replicated. Atomic applyOps command is an exception, which runs
     // on primary/standalone but disables write replication.
-    OpCounters* opCounters =
-        (mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated())
-        ? &globalOpCounters
-        : &replOpCounters;
+    const bool shouldUseGlobalOpCounters =
+        mode == repl::OplogApplication::Mode::kApplyOpsCmd || opCtx->writesAreReplicated();
+    OpCounters* opCounters = shouldUseGlobalOpCounters ? &globalOpCounters : &replOpCounters;
 
     std::array<StringData, 8> names = {"ts", "t", "o", "ui", "ns", "op", "b", "o2"};
     std::array<BSONElement, 8> fields;
@@ -1317,6 +1321,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
             wuow.commit();
             for (auto entry : insertObjs) {
                 opCounters->gotInsert();
+                if (shouldUseGlobalOpCounters) {
+                    ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+                        opCtx->getWriteConcern());
+                }
                 if (incrementOpsAppliedStats) {
                     incrementOpsAppliedStats();
                 }
@@ -1324,6 +1332,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
         } else {
             // Single insert.
             opCounters->gotInsert();
+            if (shouldUseGlobalOpCounters) {
+                ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+                    opCtx->getWriteConcern());
+            }
 
             // No _id.
             // This indicates an issue with the upstream server:
@@ -1420,6 +1432,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
     } else if (*opType == 'u') {
         opCounters->gotUpdate();
+        if (shouldUseGlobalOpCounters) {
+            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
+                opCtx->getWriteConcern());
+        }
 
         auto idField = o2["_id"];
         uassert(ErrorCodes::NoSuchKey,
@@ -1502,6 +1518,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
     } else if (*opType == 'd') {
         opCounters->gotDelete();
+        if (shouldUseGlobalOpCounters) {
+            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(
+                opCtx->getWriteConcern());
+        }
 
         auto idField = o["_id"];
         uassert(ErrorCodes::NoSuchKey,
