@@ -2,6 +2,7 @@
 
 Import('env')
 Import("has_option")
+Import("get_option")
 Import('ssl_provider')
 
 env = env.Clone()
@@ -70,57 +71,47 @@ env.Library(
     ]
 )
 
-env.Library(
-    target='ssl_manager_impl',
-    source=[
-        "private/ssl_expiration.cpp",
-        "ssl_manager.cpp",
-        "ssl_parameters.cpp",
-        "ssl_manager_%s.cpp" % (ssl_provider) if not ssl_provider == "none" else [],
-        "ssl_stream.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth_rolename',
-        '$BUILD_DIR/third_party/shim_asio',
-        'network',
-        'socket',
-        'ssl_options',
-        'ssl_types',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
-        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
-        '$BUILD_DIR/mongo/db/commands/server_status',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/server_parameters',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/util/winutil',
-    ],
-)
-
-env.Library(
-    target='ssl_manager_none',
-    source=[
-        "ssl_manager_none.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'ssl_options',
-    ],
-)
-
-
-env.Library(
-    target='ssl_manager',
-    source=[
-        "ssl_dummy.cpp",
-    ],
-    LIBDEPS=[
-        'ssl_manager_impl' if has_option('ssl') else 'ssl_manager_none',
-    ],
-)
+if not get_option('ssl') == 'off':
+    env.Library(
+        target='ssl_manager',
+        source=[
+            "private/ssl_expiration.cpp",
+            "ssl_manager.cpp",
+            "ssl_parameters.cpp",
+            "ssl_manager_%s.cpp" % (ssl_provider),
+            "ssl_stream.cpp",
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/auth/auth_rolename',
+            '$BUILD_DIR/third_party/shim_asio',
+            'network',
+            'socket',
+            'ssl_options',
+            'ssl_types',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+            '$BUILD_DIR/mongo/db/auth/internal_user_auth',
+            '$BUILD_DIR/mongo/db/commands/server_status',
+            '$BUILD_DIR/mongo/db/server_options_core',
+            '$BUILD_DIR/mongo/db/server_parameters',
+            '$BUILD_DIR/mongo/db/service_context',
+            '$BUILD_DIR/mongo/util/background_job',
+            '$BUILD_DIR/mongo/util/winutil',
+        ]
+    )
+else:
+    env.Library(
+        target='ssl_manager',
+        source=[
+            "ssl_manager_none.cpp",
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            'ssl_options',
+        ],
+    )
 
 env.CppUnitTest(
     target='network_test',
