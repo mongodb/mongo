@@ -14,11 +14,12 @@ var cursor;
 var res;
 
 //
-// Simple positive test for query: a ~300ms query with a 100ms time limit should be aborted.
+// Simple positive test for query: a ~100 second query with a 100ms time limit should be aborted.
 //
 
 t.drop();
-t.insert([{}, {}, {}]);
+assert.writeOK(t.insert(Array.from({length: 1000}, _ => ({}))));
+
 cursor = t.find({
     $where: function() {
         sleep(100);
