@@ -247,8 +247,10 @@ typedef struct stitch_support_v1_collator stitch_support_v1_collator;
  * This function will fail if the collationBSON is invalid. On failure, it returns NULL and
  * populates the 'status' object if it is not NULL.
  */
-STITCH_SUPPORT_API stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
-    stitch_support_v1_lib* lib, const char* collationBSON, stitch_support_v1_status* const status);
+STITCH_SUPPORT_API stitch_support_v1_collator* MONGO_API_CALL
+stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
+                                  const uint8_t* collationBSON,
+                                  stitch_support_v1_status* const status);
 
 /**
  * Destroys a valid stitch_support_v1_collator object.
@@ -285,7 +287,7 @@ typedef struct stitch_support_v1_matcher stitch_support_v1_matcher;
  */
 STITCH_SUPPORT_API stitch_support_v1_matcher* MONGO_API_CALL
 stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
-                                 const char* filterBSON,
+                                 const uint8_t* filterBSON,
                                  stitch_support_v1_collator* collator,
                                  stitch_support_v1_status* status);
 
@@ -316,7 +318,7 @@ stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher);
  */
 STITCH_SUPPORT_API int MONGO_API_CALL
 stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
-                              const char* documentBSON,
+                              const uint8_t* documentBSON,
                               bool* isMatch,
                               stitch_support_v1_status* status);
 
@@ -360,7 +362,7 @@ typedef struct stitch_support_v1_projection stitch_support_v1_projection;
  */
 STITCH_SUPPORT_API stitch_support_v1_projection* MONGO_API_CALL
 stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
-                                    const char* specBSON,
+                                    const uint8_t* specBSON,
                                     stitch_support_v1_matcher* matcher,
                                     stitch_support_v1_collator* collator,
                                     stitch_support_v1_status* status);
@@ -391,9 +393,9 @@ stitch_support_v1_projection_destroy(stitch_support_v1_projection* const project
  * that the associated matcher matches the input document. A non-matching input document will
  * trigger an assertion failure.
  */
-STITCH_SUPPORT_API char* MONGO_API_CALL
+STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
 stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
-                                   const char* documentBSON,
+                                   const uint8_t* documentBSON,
                                    stitch_support_v1_status* status);
 
 /**
@@ -468,8 +470,8 @@ typedef struct stitch_support_v1_update stitch_support_v1_update;
  */
 STITCH_SUPPORT_API stitch_support_v1_update* MONGO_API_CALL
 stitch_support_v1_update_create(stitch_support_v1_lib* lib,
-                                const char* updateBSON,
-                                const char* arrayFiltersBSON,
+                                const uint8_t* updateBSON,
+                                const uint8_t* arrayFiltersBSON,
                                 stitch_support_v1_matcher* matcher,
                                 stitch_support_v1_collator* collator,
                                 stitch_support_v1_status* status);
@@ -500,9 +502,9 @@ stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
  * that the associated matcher matches the input document. A non-matching input document will
  * trigger an assertion failure.
  */
-STITCH_SUPPORT_API char* MONGO_API_CALL
+STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
 stitch_support_v1_update_apply(stitch_support_v1_update* const update,
-                               const char* documentBSON,
+                               const uint8_t* documentBSON,
                                stitch_support_v1_update_details* update_details,
                                stitch_support_v1_status* status);
 
@@ -513,7 +515,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
  * This function can be called at any time to deallocate a BSON buffer and will not invalidate any
  * library object.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL stitch_support_v1_bson_free(char* bson);
+STITCH_SUPPORT_API void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -382,6 +382,22 @@ int capi_status_get_code(const stitch_support_v1_status* const status) noexcept 
     return status->statusImpl.exception_code;
 }
 
+/**
+ * toInterfaceType changes the compiler's interpretation from our internal BSON type 'char*' to
+ * 'uint8_t*' which is the interface type of the Stitch library.
+ */
+auto toInterfaceType(char* bson) noexcept {
+    return static_cast<uint8_t*>(static_cast<void*>(bson));
+}
+
+/**
+ * fromInterfaceType changes the compiler's interpretation from 'uint8_t*' which is the BSON
+ * interface type of the Stitch library to our internal type 'char*'.
+ */
+auto fromInterfaceType(const uint8_t* bson) noexcept {
+    return static_cast<const char*>(static_cast<const void*>(bson));
+}
+
 }  // namespace
 }  // namespace mongo
 
@@ -418,10 +434,12 @@ void MONGO_API_CALL stitch_support_v1_status_destroy(stitch_support_v1_status* c
     delete status;
 }
 
-stitch_support_v1_collator* MONGO_API_CALL stitch_support_v1_collator_create(
-    stitch_support_v1_lib* lib, const char* collationBSON, stitch_support_v1_status* const status) {
+stitch_support_v1_collator* MONGO_API_CALL
+stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
+                                  const uint8_t* collationBSON,
+                                  stitch_support_v1_status* const status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj collationSpecExpr(collationBSON);
+        mongo::BSONObj collationSpecExpr(mongo::fromInterfaceType(collationBSON));
         return mongo::collator_create(lib, collationSpecExpr);
     });
 }
@@ -433,11 +451,11 @@ void MONGO_API_CALL stitch_support_v1_collator_destroy(stitch_support_v1_collato
 
 stitch_support_v1_matcher* MONGO_API_CALL
 stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
-                                 const char* filterBSON,
+                                 const uint8_t* filterBSON,
                                  stitch_support_v1_collator* collator,
                                  stitch_support_v1_status* const status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj filter(filterBSON);
+        mongo::BSONObj filter(mongo::fromInterfaceType(filterBSON));
         return mongo::matcher_create(lib, filter, collator);
     });
 }
@@ -449,12 +467,12 @@ void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher*
 
 stitch_support_v1_projection* MONGO_API_CALL
 stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
-                                    const char* specBSON,
+                                    const uint8_t* specBSON,
                                     stitch_support_v1_matcher* matcher,
                                     stitch_support_v1_collator* collator,
                                     stitch_support_v1_status* const status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj spec(specBSON);
+        mongo::BSONObj spec(mongo::fromInterfaceType(specBSON));
         return mongo::projection_create(lib, spec, matcher, collator);
     });
 }
@@ -466,21 +484,21 @@ stitch_support_v1_projection_destroy(stitch_support_v1_projection* const project
 }
 
 int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
-                                                 const char* documentBSON,
+                                                 const uint8_t* documentBSON,
                                                  bool* isMatch,
                                                  stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj document(documentBSON);
+        mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
         *isMatch = matcher->matcher.matches(document, nullptr);
     });
 }
 
-char* MONGO_API_CALL
+uint8_t* MONGO_API_CALL
 stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
-                                   const char* documentBSON,
+                                   const uint8_t* documentBSON,
                                    stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj document(documentBSON);
+        mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
 
         auto outputResult = projection->projectionExec.project(document);
         auto outputObj = uassertStatusOK(outputResult);
@@ -492,21 +510,22 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
                 output);
 
         static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
-        return output;
+        return mongo::toInterfaceType(output);
     });
 }
 
 stitch_support_v1_update* MONGO_API_CALL
 stitch_support_v1_update_create(stitch_support_v1_lib* lib,
-                                const char* updateExprBSON,
-                                const char* arrayFiltersBSON,
+                                const uint8_t* updateExprBSON,
+                                const uint8_t* arrayFiltersBSON,
                                 stitch_support_v1_matcher* matcher,
                                 stitch_support_v1_collator* collator,
                                 stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj updateExpr(updateExprBSON);
+        mongo::BSONObj updateExpr(mongo::fromInterfaceType(updateExprBSON));
         mongo::BSONArray arrayFilters(
-            (arrayFiltersBSON ? mongo::BSONObj(arrayFiltersBSON) : mongo::BSONObj()));
+            (arrayFiltersBSON ? mongo::BSONObj(mongo::fromInterfaceType(arrayFiltersBSON))
+                              : mongo::BSONObj()));
         return mongo::update_create(lib, updateExpr, arrayFilters, matcher, collator);
     });
 }
@@ -516,13 +535,13 @@ void MONGO_API_CALL stitch_support_v1_update_destroy(stitch_support_v1_update* c
     static_cast<void>(enterCXX(nullStatus, [=]() { delete update; }));
 }
 
-char* MONGO_API_CALL
+uint8_t* MONGO_API_CALL
 stitch_support_v1_update_apply(stitch_support_v1_update* const update,
-                               const char* documentBSON,
+                               const uint8_t* documentBSON,
                                stitch_support_v1_update_details* update_details,
                                stitch_support_v1_status* status) {
     return enterCXX(mongo::getStatusImpl(status), [&]() {
-        mongo::BSONObj document(documentBSON);
+        mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
         std::string matchedField;
 
         if (update->updateDriver.needMatchDetails()) {
@@ -568,7 +587,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
             update_details->modifiedPaths = modifiedPaths.serialize();
         }
 
-        return output;
+        return mongo::toInterfaceType(output);
     });
 }
 
@@ -593,7 +612,7 @@ const char* MONGO_API_CALL stitch_support_v1_update_details_path(
     return update_details->modifiedPaths[path_index].c_str();
 }
 
-void MONGO_API_CALL stitch_support_v1_bson_free(char* bson) {
+void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson) {
     mongo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete[](bson); }));
 }
