@@ -41,12 +41,18 @@
 #define	WT_SESSION_IS_CHECKPOINT(s)					\
 	((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
 
-#define	WT_TS_NONE	0		/* No (or earliest) timestamp) */
-#define	WT_TS_FIXME	37		/* Fake timestamp */
-#define	WT_TS_MAX	UINT64_MAX	/* Valid after start time */
+#define	WT_TS_NONE	0		/* Beginning of time */
+#define	WT_TS_MAX	UINT64_MAX	/* End of time */
 
-					/* Bytes to hold a hex timestamp */
-#define	WT_TS_HEX_SIZE	(2 * sizeof(wt_timestamp_t) + 1)
+/*
+ * We format timestamps in a couple of ways, declare appropriate sized buffers.
+ * Hexadecimal is 2x the size of the value. MongoDB format (high/low pairs of
+ * 4B unsigned integers, with surrounding parenthesis and dividing comma), is
+ * 2x the maximum digits from a 4B unsigned integer + 3. Both sizes include a
+ * trailing nul byte as well.
+ */
+#define	WT_TS_HEX_STRING_SIZE	(2 * sizeof(wt_timestamp_t) + 1)
+#define	WT_TS_INT_STRING_SIZE	(2 * 10 + 3 + 1)
 
 /*
  * Perform an operation at the specified isolation level.

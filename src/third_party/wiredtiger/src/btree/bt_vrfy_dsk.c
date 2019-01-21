@@ -17,13 +17,13 @@ static int __verify_dsk_chunk(
 static int __verify_dsk_col_fix(
 	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
 static int __verify_dsk_col_int(
-	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_ADDR *);
 static int __verify_dsk_col_var(
-	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_ADDR *);
 static int __verify_dsk_memsize(
 	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_CELL *);
 static int __verify_dsk_row(
-	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_ADDR *);
 
 #define	WT_ERR_VRFY(session, ...) do {					\
 	if (!(F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)))		\
@@ -55,8 +55,8 @@ static int __verify_dsk_row(
  *	Verify a single block as read from disk.
  */
 int
-__wt_verify_dsk_image(WT_SESSION_IMPL *session,
-    const char *tag, const WT_PAGE_HEADER *dsk, size_t size, bool empty_page_ok)
+__wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag,
+    const WT_PAGE_HEADER *dsk, size_t size, WT_ADDR *addr, bool empty_page_ok)
 {
 	uint8_t flags;
 	const uint8_t *p, *end;
@@ -177,14 +177,14 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 	}
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
-		return (__verify_dsk_col_int(session, tag, dsk));
+		return (__verify_dsk_col_int(session, tag, dsk, addr));
 	case WT_PAGE_COL_FIX:
 		return (__verify_dsk_col_fix(session, tag, dsk));
 	case WT_PAGE_COL_VAR:
-		return (__verify_dsk_col_var(session, tag, dsk));
+		return (__verify_dsk_col_var(session, tag, dsk, addr));
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		return (__verify_dsk_row(session, tag, dsk));
+		return (__verify_dsk_row(session, tag, dsk, addr));
 	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 		return (__verify_dsk_chunk(session, tag, dsk, dsk->u.datalen));
@@ -200,8 +200,141 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 int
 __wt_verify_dsk(WT_SESSION_IMPL *session, const char *tag, WT_ITEM *buf)
 {
-	return (
-	    __wt_verify_dsk_image(session, tag, buf->data, buf->size, false));
+	return (__wt_verify_dsk_image(
+	    session, tag, buf->data, buf->size, NULL, false));
+}
+
+/*
+ * __verify_dsk_ts_addr_cmp --
+ *	Do a cell timestamp check against the parent.
+ */
+static int
+__verify_dsk_ts_addr_cmp(WT_SESSION_IMPL *session, uint32_t cell_num,
+    const char *ts1_name, wt_timestamp_t ts1,
+    const char *ts2_name, wt_timestamp_t ts2,
+    bool gt, const char *tag)
+{
+	const char *ts1_bp, *ts2_bp;
+	char ts1_buf[32], ts2_buf[32];
+
+	if (gt && ts1 >= ts2)
+		return (0);
+	if (!gt && ts1 <= ts2)
+		return (0);
+
+	switch (ts1) {
+	case WT_TS_MAX:
+		ts1_bp = "WT_TS_MAX";
+		break;
+	case WT_TS_NONE:
+		ts1_bp = "WT_TS_NONE";
+		break;
+	default:
+		WT_RET(
+		    __wt_snprintf(ts1_buf, sizeof(ts1_buf), "%" PRIu64, ts1));
+		ts1_bp = ts1_buf;
+		break;
+	}
+	switch (ts2) {
+	case WT_TS_MAX:
+		ts2_bp = "WT_TS_MAX";
+		break;
+	case WT_TS_NONE:
+		ts2_bp = "WT_TS_NONE";
+		break;
+	default:
+		WT_RET(
+		    __wt_snprintf(ts2_buf, sizeof(ts2_buf), "%" PRIu64, ts2));
+		ts2_bp = ts2_buf;
+		break;
+	}
+	WT_RET_MSG(session, WT_ERROR,
+	    "cell %" PRIu32 " on page at %s failed verification with %s "
+	    "time of %s, %s the parent's %s time of %s",
+	    cell_num, tag,
+	    ts1_name, ts1_bp,
+	    gt ? "less than" : "greater than",
+	    ts2_name, ts2_bp);
+}
+
+/*
+ * __verify_dsk_ts --
+ *	Verify a cell's timestamps.
+ */
+static int
+__verify_dsk_ts(WT_SESSION_IMPL *session,
+    WT_CELL_UNPACK *unpack, uint32_t cell_num, WT_ADDR *addr, const char *tag)
+{
+	/*
+	 * Check timestamp order, and optionally, against a parent address.
+	 * Timestamps in the parent address aren't necessarily an exact match,
+	 * but should be within the boundaries of the parent reference.
+	 *
+	 * There's no checking if timestamps should appear on a page because the
+	 * cell-unpacking code hides it by always returning "durable" timestamps
+	 * if they don't appear on the page.
+	 */
+	switch (unpack->type) {
+	case WT_CELL_ADDR_DEL:
+	case WT_CELL_ADDR_INT:
+	case WT_CELL_ADDR_LEAF:
+	case WT_CELL_ADDR_LEAF_NO:
+		if (unpack->oldest_start_ts > unpack->newest_start_ts)
+			WT_RET_VRFY(session,
+			"cell %" PRIu32 " on page at %s has an oldest start "
+			"timestamp newer than its newest start timestamp",
+			cell_num - 1, tag);
+		if (unpack->newest_start_ts > unpack->newest_stop_ts)
+			WT_RET_VRFY(session,
+			"cell %" PRIu32 " on page at %s has a newest start "
+			"timestamp newer than its newest stop timestamp",
+			cell_num - 1, tag);
+
+		if (addr == NULL)
+			break;
+		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
+		    "oldest start", unpack->oldest_start_ts,
+		    "oldest start", addr->oldest_start_ts,
+		    true, tag));
+		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
+		    "newest start", unpack->newest_start_ts,
+		    "newest start", addr->newest_start_ts,
+		    false, tag));
+		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
+		    "newest stop", unpack->newest_stop_ts,
+		    "newest stop", addr->newest_stop_ts,
+		    false, tag));
+		break;
+	case WT_CELL_DEL:
+	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_COPY:
+	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_VALUE_SHORT:
+		if (unpack->start_ts > unpack->stop_ts)
+			WT_RET_VRFY(session,
+			"cell %" PRIu32 " on page at %s has a start timestamp "
+			"newer than its stop timestamp ",
+			cell_num - 1, tag);
+
+		if (addr == NULL)
+			break;
+		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
+		    "start", unpack->start_ts,
+		    "oldest start", addr->oldest_start_ts,
+		    true, tag));
+		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
+		    "start", unpack->start_ts,
+		    "newest start", addr->newest_start_ts,
+		    false, tag));
+		WT_RET(__verify_dsk_ts_addr_cmp(session, cell_num - 1,
+		    "stop", unpack->stop_ts,
+		    "newest stop", addr->newest_stop_ts,
+		    false, tag));
+		break;
+	}
+
+	return (0);
 }
 
 /*
@@ -209,8 +342,8 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *tag, WT_ITEM *buf)
  *	Walk a WT_PAGE_ROW_INT or WT_PAGE_ROW_LEAF disk page and verify it.
  */
 static int
-__verify_dsk_row(
-    WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER *dsk)
+__verify_dsk_row(WT_SESSION_IMPL *session,
+    const char *tag, const WT_PAGE_HEADER *dsk, WT_ADDR *addr)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -312,6 +445,9 @@ __verify_dsk_row(
 			last_cell_type = WAS_VALUE;
 			break;
 		}
+
+		/* Check timestamps. */
+		WT_ERR(__verify_dsk_ts(session, unpack, cell_num, addr, tag));
 
 		/* Check if any referenced item has an invalid address. */
 		switch (cell_type) {
@@ -503,8 +639,8 @@ err:		if (ret == 0)
  *	Walk a WT_PAGE_COL_INT disk page and verify it.
  */
 static int
-__verify_dsk_col_int(
-    WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER *dsk)
+__verify_dsk_col_int(WT_SESSION_IMPL *session,
+    const char *tag, const WT_PAGE_HEADER *dsk, WT_ADDR *addr)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -532,6 +668,9 @@ __verify_dsk_col_int(
 		    session, cell_num, tag, unpack->raw, dsk->type));
 		WT_RET(__err_cell_type(
 		    session, cell_num, tag, unpack->type, dsk->type));
+
+		/* Check timestamps. */
+		WT_RET(__verify_dsk_ts(session, unpack, cell_num, addr, tag));
 
 		/* Check if any referenced item is entirely in the file. */
 		ret = bm->addr_invalid(bm, session, unpack->data, unpack->size);
@@ -567,8 +706,8 @@ __verify_dsk_col_fix(
  *	Walk a WT_PAGE_COL_VAR disk page and verify it.
  */
 static int
-__verify_dsk_col_var(
-    WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER *dsk)
+__verify_dsk_col_var(WT_SESSION_IMPL *session,
+    const char *tag, const WT_PAGE_HEADER *dsk, WT_ADDR *addr)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -604,6 +743,9 @@ __verify_dsk_col_var(
 		WT_RET(__err_cell_type(
 		    session, cell_num, tag, unpack->type, dsk->type));
 		cell_type = unpack->type;
+
+		/* Check timestamps. */
+		WT_RET(__verify_dsk_ts(session, unpack, cell_num, addr, tag));
 
 		/* Check if any referenced item is entirely in the file. */
 		if (cell_type == WT_CELL_VALUE_OVFL) {

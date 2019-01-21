@@ -590,7 +590,7 @@ timestamp(void *arg)
 	WT_CONNECTION *conn;
 	WT_DECL_RET;
 	WT_SESSION *session;
-	char buf[64];
+	char buf[WT_TS_HEX_STRING_SIZE + 64];
 	bool done;
 
 	(void)(arg);

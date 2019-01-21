@@ -130,6 +130,7 @@ Eron
 FALLOC
 FALLTHROUGH
 FH
+FIXME
 FLD
 FLSv
 FLv
@@ -737,6 +738,7 @@ fdopen
 fextend
 ffc
 fff
+ffffffffffffffff
 fflush
 ffs
 fgetc

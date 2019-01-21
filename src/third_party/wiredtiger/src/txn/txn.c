@@ -1395,8 +1395,8 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 int
 __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 {
-	char hex_timestamp[4][WT_TS_HEX_SIZE];
 	const char *iso_tag;
+	char ts_string[4][WT_TS_INT_STRING_SIZE];
 
 	WT_NOT_READ(iso_tag, "INVALID");
 	switch (txn->isolation) {
@@ -1410,11 +1410,14 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 		iso_tag = "WT_ISO_SNAPSHOT";
 		break;
 	}
-	__wt_timestamp_to_hex_string(hex_timestamp[0], txn->commit_timestamp);
-	__wt_timestamp_to_hex_string(hex_timestamp[1], txn->durable_timestamp);
-	__wt_timestamp_to_hex_string(
-	    hex_timestamp[2], txn->first_commit_timestamp);
-	__wt_timestamp_to_hex_string(hex_timestamp[3], txn->read_timestamp);
+	__wt_timestamp_to_string(
+	    txn->commit_timestamp, ts_string[0], sizeof(ts_string[0]));
+	__wt_timestamp_to_string(
+	    txn->durable_timestamp, ts_string[1], sizeof(ts_string[1]));
+	__wt_timestamp_to_string(
+	    txn->first_commit_timestamp, ts_string[2], sizeof(ts_string[2]));
+	__wt_timestamp_to_string(
+	    txn->read_timestamp, ts_string[3], sizeof(ts_string[3]));
 	WT_RET(__wt_msg(session,
 	    "mod count: %u"
 	    ", snap min: %" PRIu64
@@ -1428,10 +1431,10 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 	    txn->mod_count,
 	    txn->snap_min,
 	    txn->snap_max,
-	    hex_timestamp[0],
-	    hex_timestamp[1],
-	    hex_timestamp[2],
-	    hex_timestamp[3],
+	    ts_string[0],
+	    ts_string[1],
+	    ts_string[2],
+	    ts_string[3],
 	    txn->flags,
 	    iso_tag));
 	return (0);
@@ -1450,7 +1453,7 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *s;
 	uint64_t id;
 	uint32_t i, session_cnt;
-	char hex_timestamp[3][WT_TS_HEX_SIZE];
+	char ts_string[WT_TS_INT_STRING_SIZE];
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
@@ -1465,18 +1468,18 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	    "metadata_pinned ID: %" PRIu64, txn_global->metadata_pinned));
 	WT_RET(__wt_msg(session, "oldest ID: %" PRIu64, txn_global->oldest_id));
 
-	__wt_timestamp_to_hex_string(
-	    hex_timestamp[0], txn_global->commit_timestamp);
-	WT_RET(__wt_msg(session, "commit timestamp: %s", hex_timestamp[0]));
-	__wt_timestamp_to_hex_string(
-	    hex_timestamp[0], txn_global->oldest_timestamp);
-	WT_RET(__wt_msg(session, "oldest timestamp: %s", hex_timestamp[0]));
-	__wt_timestamp_to_hex_string(
-	    hex_timestamp[0], txn_global->pinned_timestamp);
-	WT_RET(__wt_msg(session, "pinned timestamp: %s", hex_timestamp[0]));
-	__wt_timestamp_to_hex_string(
-	    hex_timestamp[0], txn_global->stable_timestamp);
-	WT_RET(__wt_msg(session, "stable timestamp: %s", hex_timestamp[0]));
+	__wt_timestamp_to_string(
+	    txn_global->commit_timestamp, ts_string, sizeof(ts_string));
+	WT_RET(__wt_msg(session, "commit timestamp: %s", ts_string));
+	__wt_timestamp_to_string(
+	    txn_global->oldest_timestamp, ts_string, sizeof(ts_string));
+	WT_RET(__wt_msg(session, "oldest timestamp: %s", ts_string));
+	__wt_timestamp_to_string(
+	    txn_global->pinned_timestamp, ts_string, sizeof(ts_string));
+	WT_RET(__wt_msg(session, "pinned timestamp: %s", ts_string));
+	__wt_timestamp_to_string(
+	    txn_global->stable_timestamp, ts_string, sizeof(ts_string));
+	WT_RET(__wt_msg(session, "stable timestamp: %s", ts_string));
 	WT_RET(__wt_msg(session, "has_commit_timestamp: %s",
 	    txn_global->has_commit_timestamp ? "yes" : "no"));
 	WT_RET(__wt_msg(session, "has_oldest_timestamp: %s",

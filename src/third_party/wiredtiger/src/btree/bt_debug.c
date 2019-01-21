@@ -1169,7 +1169,7 @@ __debug_modify(WT_DBG *ds, WT_UPDATE *upd)
 static int
 __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 {
-	char hex_timestamp[WT_TS_HEX_SIZE];
+	char ts_string[WT_TS_INT_STRING_SIZE];
 
 	for (; upd != NULL; upd = upd->next) {
 		switch (upd->type) {
@@ -1201,15 +1201,12 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 			break;
 		}
 		if (upd->txnid == WT_TXN_ABORTED)
-			WT_RET(ds->f(ds, "\t" "txn aborted"));
+			WT_RET(ds->f(ds, "\t" "txn id aborted"));
 		else
 			WT_RET(ds->f(ds, "\t" "txn id %" PRIu64, upd->txnid));
-
-		if (upd->timestamp != WT_TS_NONE) {
-			__wt_timestamp_to_hex_string(
-			    hex_timestamp, upd->timestamp);
-			WT_RET(ds->f(ds, ", stamp %s", hex_timestamp));
-		}
+		__wt_timestamp_to_string(
+		    upd->timestamp, ts_string, sizeof(ts_string));
+		WT_RET(ds->f(ds, ", ts %s", ts_string));
 		WT_RET(ds->f(ds, "\n"));
 	}
 	return (0);
@@ -1271,8 +1268,7 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char hex_ts_start[WT_TS_HEX_SIZE], hex_ts_stop[WT_TS_HEX_SIZE];
-	const char *type;
+	char ts_string[3][WT_TS_INT_STRING_SIZE];
 
 	session = ds->session;
 
@@ -1310,35 +1306,48 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		break;
 	}
 
-	if (unpack->start_ts != WT_TS_NONE || unpack->stop_ts != WT_TS_NONE) {
-		__wt_timestamp_to_hex_string(hex_ts_start, unpack->start_ts);
-		__wt_timestamp_to_hex_string(hex_ts_stop, unpack->stop_ts);
-		WT_RET(ds->f(ds, ", ts %s-%s", hex_ts_start, hex_ts_stop));
+	/* Dump timestamps. */
+	switch (unpack->raw) {
+	case WT_CELL_ADDR_DEL:
+	case WT_CELL_ADDR_INT:
+	case WT_CELL_ADDR_LEAF:
+	case WT_CELL_ADDR_LEAF_NO:
+		__wt_timestamp_to_string(unpack->oldest_start_ts,
+		    ts_string[0], sizeof(ts_string[0]));
+		__wt_timestamp_to_string(unpack->newest_start_ts,
+		    ts_string[1], sizeof(ts_string[1]));
+		__wt_timestamp_to_string(unpack->newest_stop_ts,
+		    ts_string[2], sizeof(ts_string[2]));
+		WT_RET(ds->f(ds,
+		    ", ts %s,%s,%s", ts_string[0], ts_string[1], ts_string[2]));
+		break;
+	case WT_CELL_DEL:
+	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_COPY:
+	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_VALUE_SHORT:
+		__wt_timestamp_to_string(unpack->start_ts,
+		    ts_string[0], sizeof(ts_string[0]));
+		__wt_timestamp_to_string(unpack->stop_ts,
+		    ts_string[1], sizeof(ts_string[1]));
+		WT_RET(ds->f(ds, ", ts %s-%s", ts_string[0], ts_string[1]));
+		break;
 	}
 
 	/* Dump addresses. */
 	switch (unpack->raw) {
 	case WT_CELL_ADDR_DEL:
-		type = "addr/del";
-		goto addr;
 	case WT_CELL_ADDR_INT:
-		type = "addr/int";
-		goto addr;
 	case WT_CELL_ADDR_LEAF:
-		type = "addr/leaf";
-		goto addr;
 	case WT_CELL_ADDR_LEAF_NO:
-		type = "addr/leaf-no";
-		goto addr;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_KEY_OVFL_RM:
 	case WT_CELL_VALUE_OVFL:
 	case WT_CELL_VALUE_OVFL_RM:
-		type = "ovfl";
-addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
-		ret = ds->f(ds, ", %s %s", type,
-		    __wt_addr_string(
-		    session, unpack->data, unpack->size, buf));
+		WT_RET(__wt_scr_alloc(session, 128, &buf));
+		ret = ds->f(ds, ", %s",
+		    __wt_addr_string(session, unpack->data, unpack->size, buf));
 		__wt_scr_free(session, &buf);
 		WT_RET(ret);
 		break;

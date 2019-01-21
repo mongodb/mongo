@@ -127,7 +127,7 @@ thread_ts_run(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	THREAD_DATA *td;
-	char tscfg[64], ts_buf[WT_TS_HEX_SIZE];
+	char tscfg[64], ts_string[WT_TS_HEX_STRING_SIZE];
 
 	td = (THREAD_DATA *)arg;
 
@@ -141,7 +141,7 @@ thread_ts_run(void *arg)
 		 */
 		testutil_check(pthread_rwlock_wrlock(&ts_lock));
 		ret = td->conn->query_timestamp(
-		    td->conn, ts_buf, "get=all_committed");
+		    td->conn, ts_string, "get=all_committed");
 		testutil_check(pthread_rwlock_unlock(&ts_lock));
 		testutil_assert(ret == 0 || ret == WT_NOTFOUND);
 		if (ret == 0) {
@@ -153,7 +153,7 @@ thread_ts_run(void *arg)
 			testutil_check(__wt_snprintf(
 			    tscfg, sizeof(tscfg),
 			    "oldest_timestamp=%s,stable_timestamp=%s",
-			    ts_buf, ts_buf));
+			    ts_string, ts_string));
 			testutil_check(
 			    td->conn->set_timestamp(td->conn, tscfg));
 		}
@@ -177,7 +177,7 @@ thread_ckpt_run(void *arg)
 	uint32_t sleep_time;
 	int i;
 	bool first_ckpt;
-	char buf[128];
+	char ts_string[WT_TS_HEX_STRING_SIZE];
 
 	__wt_random_init(&rnd);
 
@@ -198,8 +198,8 @@ thread_ckpt_run(void *arg)
 		testutil_check(session->checkpoint(
 		    session, "use_timestamp=true"));
 		testutil_check(td->conn->query_timestamp(
-		    td->conn, buf, "get=last_checkpoint"));
-		testutil_assert(sscanf(buf, "%" SCNx64, &stable) == 1);
+		    td->conn, ts_string, "get=last_checkpoint"));
+		testutil_assert(sscanf(ts_string, "%" SCNx64, &stable) == 1);
 		printf("Checkpoint %d complete at stable %"
 		    PRIu64 ".\n", i, stable);
 		fflush(stdout);
@@ -558,6 +558,7 @@ main(int argc, char *argv[])
 	int ch, status, ret;
 	const char *working_dir;
 	char buf[512], fname[64], kname[64], statname[1024];
+	char ts_string[WT_TS_HEX_STRING_SIZE];
 	bool fatal, rand_th, rand_time, verify_only;
 
 	(void)testutil_set_progname(argv);
@@ -739,8 +740,9 @@ main(int argc, char *argv[])
 	stable_val = 0;
 	if (use_ts) {
 		testutil_check(
-		    conn->query_timestamp(conn, buf, "get=recovery"));
-		testutil_assert(sscanf(buf, "%" SCNx64, &stable_val) == 1);
+		    conn->query_timestamp(conn, ts_string, "get=recovery"));
+		testutil_assert(
+		    sscanf(ts_string, "%" SCNx64, &stable_val) == 1);
 		printf("Got stable_val %" PRIu64 "\n", stable_val);
 	}
 

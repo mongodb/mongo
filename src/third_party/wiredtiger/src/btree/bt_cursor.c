@@ -305,7 +305,13 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
 		/* The search function doesn't check for empty pages. */
 		if (page->entries == 0)
 			return (0);
-		WT_ASSERT(session, cbt->slot < page->entries);
+		/*
+		 * In case of prepare conflict, the slot might not have a valid
+		 * value, if the update in the insert list of a new page
+		 * scanned is in prepared state.
+		 */
+		WT_ASSERT(session,
+		    cbt->slot == UINT32_MAX || cbt->slot < page->entries);
 
 		/*
 		 * Column-store updates are stored as "insert" objects. If
@@ -330,7 +336,13 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp, bool *valid)
 		/* The search function doesn't check for empty pages. */
 		if (page->entries == 0)
 			return (0);
-		WT_ASSERT(session, cbt->slot < page->entries);
+		/*
+		 * In case of prepare conflict, the slot might not have a valid
+		 * value, if the update in the insert list of a new page
+		 * scanned is in prepared state.
+		 */
+		WT_ASSERT(session,
+		    cbt->slot == UINT32_MAX || cbt->slot < page->entries);
 
 		/*
 		 * See above: for row-store, no insert object can have the same

@@ -592,7 +592,7 @@ OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, search_near, (self))
 %typemap(argout) (uint64_t *recnop) { $result = PyLong_FromUnsignedLongLong(*$1); }
 
 /* Handle returned hexadecimal timestamps. */
-%typemap(in,numinputs=0) (char *hex_timestamp) (char tsbuf[WT_TS_HEX_SIZE]) { $1 = tsbuf; }
+%typemap(in,numinputs=0) (char *hex_timestamp) (char tsbuf[WT_TS_HEX_STRING_SIZE]) { $1 = tsbuf; }
 %typemap(argout) (char *hex_timestamp) {
 	if (*$1)
 		$result = SWIG_FromCharPtr($1);

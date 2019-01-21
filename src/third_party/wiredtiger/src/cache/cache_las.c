@@ -545,8 +545,7 @@ __las_insert_block_verbose(
 	double pct_dirty, pct_full;
 	uint64_t ckpt_gen_current, ckpt_gen_last;
 	uint32_t btree_id;
-	char hex_timestamp[WT_TS_HEX_SIZE];
-	const char *ts;
+	char ts_string[WT_TS_INT_STRING_SIZE];
 
 	btree_id = btree->id;
 
@@ -570,10 +569,10 @@ __las_insert_block_verbose(
 	    ckpt_gen_last, ckpt_gen_current))) {
 		(void)__wt_eviction_clean_needed(session, &pct_full);
 		(void)__wt_eviction_dirty_needed(session, &pct_dirty);
+		__wt_timestamp_to_string(
+		    multi->page_las.unstable_timestamp,
+		    ts_string, sizeof(ts_string));
 
-		__wt_timestamp_to_hex_string(
-		    hex_timestamp, multi->page_las.unstable_timestamp);
-		ts = hex_timestamp;
 		__wt_verbose(session,
 		    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
 		    "Page reconciliation triggered lookaside write "
@@ -584,7 +583,7 @@ __las_insert_block_verbose(
 		    "cache use: %2.3f%%",
 		    btree_id, multi->page_las.las_pageid,
 		    multi->page_las.max_txn,
-		    ts,
+		    ts_string,
 		    multi->page_las.skew_newest ? "newest" : "not newest",
 		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
 		    pct_dirty, pct_full);

@@ -922,7 +922,7 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	uint64_t retry, time_start, time_stop, timediff;
+	uint64_t time_start, time_stop, timediff;
 	bool did_work, signalled;
 
 	session = arg;
@@ -949,7 +949,6 @@ __log_server(void *arg)
 	 * takes to sync out an earlier file.
 	 */
 	did_work = true;
-	retry = 0;
 	while (F_ISSET(conn, WT_CONN_SERVER_LOG)) {
 		/*
 		 * Slots depend on future activity.  Force out buffered
@@ -994,24 +993,7 @@ __log_server(void *arg)
 					ret = __log_archive_once(session, 0);
 					__wt_writeunlock(
 					    session, &log->log_archive_lock);
-					/*
-					 * It is possible that an external
-					 * process on some systems may prevent
-					 * removal. If we get a permission
-					 * error, retry a few times.
-					 */
-					if (ret == EACCES &&
-					    retry < WT_RETRY_MAX) {
-						retry++;
-						WT_NOT_READ(ret, 0);
-					} else {
-						/*
-						 * Return the error if there is
-						 * one or reset on success.
-						 */
-						WT_ERR(ret);
-						retry = 0;
-					}
+					WT_ERR(ret);
 				} else
 					__wt_verbose(session, WT_VERB_LOG, "%s",
 					    "log_archive: Blocked due to open "
