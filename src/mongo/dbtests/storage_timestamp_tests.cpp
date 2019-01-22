@@ -47,6 +47,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -1876,6 +1877,135 @@ public:
     }
 };
 
+template <bool SimulatePrimary>
+class TimestampIndexBuildDrain : public StorageTimestampTest {
+public:
+    void run() {
+        const bool SimulateSecondary = !SimulatePrimary;
+        if (SimulateSecondary) {
+            // The MemberState is inspected during index builds to use a "ghost" write to timestamp
+            // index completion.
+            ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_SECONDARY}));
+        }
+
+        NamespaceString nss("unittests.timestampIndexBuildDrain");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+        // Build an index on `{a: 1}`.
+        MultiIndexBlock indexer(_opCtx, autoColl.getCollection());
+        const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
+        BSONObj indexInfoObj;
+        {
+            // Primaries do not have a wrapping `TimestampBlock`; secondaries do.
+            const Timestamp commitTimestamp =
+                SimulatePrimary ? Timestamp::min() : beforeIndexBuild.addTicks(1).asTimestamp();
+            TimestampBlock tsBlock(_opCtx, commitTimestamp);
+
+            // Secondaries will also be in an `UnreplicatedWritesBlock` that prevents the `logOp`
+            // from making creating an entry.
+            boost::optional<repl::UnreplicatedWritesBlock> unreplicated;
+            if (SimulateSecondary) {
+                unreplicated.emplace(_opCtx);
+            }
+
+            auto swIndexInfoObj = indexer.init({BSON("v" << 2 << "unique" << true << "name"
+                                                         << "a_1"
+                                                         << "ns"
+                                                         << nss.ns()
+                                                         << "key"
+                                                         << BSON("a" << 1))});
+            ASSERT_OK(swIndexInfoObj.getStatus());
+            indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
+        }
+
+        const LogicalTime afterIndexInit = _clock->reserveTicks(1);
+
+        // Insert a document that will be intercepted and need to be drained. This timestamp will
+        // become the lastApplied time.
+        const LogicalTime firstInsert = _clock->reserveTicks(1);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 0 << "a" << 1),
+                                           firstInsert.asTimestamp(),
+                                           presentTerm));
+            wuow.commit();
+            ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        }
+
+        // Index build drain will timestamp writes from the side table into the index with the
+        // lastApplied timestamp. This is because these writes are not associated with any specific
+        // oplog entry.
+        ASSERT_EQ(repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                      ->getMyLastAppliedOpTime()
+                      .getTimestamp(),
+                  firstInsert.asTimestamp());
+
+        ASSERT_OK(indexer.drainBackgroundWrites());
+
+        auto indexCatalog = autoColl.getCollection()->getIndexCatalog();
+        const IndexCatalogEntry* buildingIndex = indexCatalog->getEntry(
+            indexCatalog->findIndexByName(_opCtx, "a_1", /* includeUnfinished */ true));
+        ASSERT(buildingIndex);
+
+        {
+            // Before the drain, there are no writes to apply.
+            OneOffRead oor(_opCtx, afterIndexInit.asTimestamp());
+            ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+        }
+
+        // Note: In this case, we can't observe a state where all writes are not applied, because
+        // the index build drain effectively rewrites history by retroactively committing the drain
+        // at the same time as the first insert, meaning there is no point-in-time with undrained
+        // writes. This is fine, as long as the drain does not commit at a time before this insert.
+
+        {
+            // At time of the first insert, all writes are applied.
+            OneOffRead oor(_opCtx, firstInsert.asTimestamp());
+            ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+        }
+
+        // Insert a second document that will be intercepted and need to be drained.
+        const LogicalTime secondInsert = _clock->reserveTicks(1);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 1 << "a" << 2),
+                                           secondInsert.asTimestamp(),
+                                           presentTerm));
+            wuow.commit();
+            ASSERT_EQ(2, itCount(autoColl.getCollection()));
+        }
+
+        // Advance the lastApplied optime to observe a point before the drain where there are
+        // un-drained writes.
+        const LogicalTime afterSecondInsert = _clock->reserveTicks(1);
+        setReplCoordAppliedOpTime(repl::OpTime(afterSecondInsert.asTimestamp(), presentTerm));
+
+        ASSERT_OK(indexer.drainBackgroundWrites());
+
+        {
+            // At time of the second insert, there are un-drained writes.
+            OneOffRead oor(_opCtx, secondInsert.asTimestamp());
+            ASSERT_FALSE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+        }
+
+        {
+            // After the second insert, also the lastApplied time, all writes are applied.
+            OneOffRead oor(_opCtx, afterSecondInsert.asTimestamp());
+            ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
+        }
+
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            ASSERT_OK(indexer.commit());
+            wuow.commit();
+        }
+    }
+};
+
 class TimestampMultiIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
@@ -2689,6 +2819,8 @@ public:
         // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
+        add<TimestampIndexBuildDrain<false>>();
+        add<TimestampIndexBuildDrain<true>>();
         add<TimestampMultiIndexBuilds>();
         add<TimestampMultiIndexBuildsDuringRename>();
         add<TimestampIndexDrops>();

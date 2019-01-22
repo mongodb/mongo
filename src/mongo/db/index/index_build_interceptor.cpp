@@ -34,7 +34,9 @@
 #include "mongo/db/index/index_build_interceptor.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
@@ -90,8 +92,25 @@ const std::string& IndexBuildInterceptor::getConstraintViolationsTableIdent() co
 
 
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
-                                                   const InsertDeleteOptions& options) {
+                                                   const InsertDeleteOptions& options,
+                                                   RecoveryUnit::ReadSource readSource) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    // Callers may request to read at a specific timestamp so that no drained writes are timestamped
+    // earlier than their original write timestamp. Also ensure that leaving this function resets
+    // the ReadSource to its original value.
+    auto resetReadSourceGuard =
+        makeGuard([ opCtx, prevReadSource = opCtx->recoveryUnit()->getTimestampReadSource() ] {
+            opCtx->recoveryUnit()->abandonSnapshot();
+            opCtx->recoveryUnit()->setTimestampReadSource(prevReadSource);
+        });
+
+    if (readSource != RecoveryUnit::ReadSource::kUnset) {
+        opCtx->recoveryUnit()->abandonSnapshot();
+        opCtx->recoveryUnit()->setTimestampReadSource(readSource);
+    } else {
+        resetReadSourceGuard.dismiss();
+    }
 
     // These are used for logging only.
     int64_t totalDeleted = 0;
@@ -174,23 +193,36 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
         invariant(!batch.empty());
 
+        cursor->save();
+
         // If we are here, either we have reached the end of the table or the batch is full, so
         // insert everything in one WriteUnitOfWork, and delete each inserted document from the side
         // writes table.
-        WriteUnitOfWork wuow(opCtx);
-        for (auto& operation : batch) {
-            auto status =
-                _applyWrite(opCtx, operation.second, options, &totalInserted, &totalDeleted);
-            if (!status.isOK()) {
-                return status;
+        auto status = writeConflictRetry(opCtx, "index build drain", _indexCatalogEntry->ns(), [&] {
+            WriteUnitOfWork wuow(opCtx);
+            for (auto& operation : batch) {
+                auto status =
+                    _applyWrite(opCtx, operation.second, options, &totalInserted, &totalDeleted);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                // Delete the document from the table as soon as it has been inserted into the
+                // index. This ensures that no key is ever inserted twice and no keys are skipped.
+                _sideWritesTable->rs()->deleteRecord(opCtx, operation.first);
             }
 
-            // Delete the document from the table as soon as it has been inserted into the index.
-            // This ensures that no key is ever inserted twice and no keys are skipped.
-            _sideWritesTable->rs()->deleteRecord(opCtx, operation.first);
+            // For rollback to work correctly, these writes need to be timestamped. The actual time
+            // is not important, as long as it not older than the most recent visible side write.
+            IndexTimestampHelper::setGhostCommitTimestampForWrite(
+                opCtx, NamespaceString(_indexCatalogEntry->ns()));
+
+            wuow.commit();
+            return Status::OK();
+        });
+        if (!status.isOK()) {
+            return status;
         }
-        cursor->save();
-        wuow.commit();
 
         progress->hit(batch.size());
 
@@ -250,7 +282,10 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             }
         }
 
-        *keysInserted += result.numInserted;
+        int64_t numInserted = result.numInserted;
+        *keysInserted += numInserted;
+        opCtx->recoveryUnit()->onRollback(
+            [keysInserted, numInserted] { *keysInserted -= numInserted; });
     } else {
         invariant(opType == Op::kDelete);
         DEV invariant(strcmp(operation.getStringField("op"), "d") == 0);
@@ -262,6 +297,8 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         }
 
         *keysDeleted += numDeleted;
+        opCtx->recoveryUnit()->onRollback(
+            [keysDeleted, numDeleted] { *keysDeleted -= numDeleted; });
     }
     return Status::OK();
 }

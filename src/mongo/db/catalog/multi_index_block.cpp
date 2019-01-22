@@ -573,7 +573,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(std::set<RecordId>* dupRecords) {
     return Status::OK();
 }
 
-Status MultiIndexBlock::drainBackgroundWrites() {
+Status MultiIndexBlock::drainBackgroundWrites(RecoveryUnit::ReadSource readSource) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -595,7 +595,7 @@ Status MultiIndexBlock::drainBackgroundWrites() {
         if (!interceptor)
             continue;
 
-        auto status = interceptor->drainWritesIntoIndex(_opCtx, _indexes[i].options);
+        auto status = interceptor->drainWritesIntoIndex(_opCtx, _indexes[i].options, readSource);
         if (!status.isOK()) {
             return status;
         }

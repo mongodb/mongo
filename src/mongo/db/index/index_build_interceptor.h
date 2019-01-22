@@ -88,9 +88,16 @@ public:
      *
      * This is resumable, so subsequent calls will start the scan at the record immediately
      * following the last inserted record from a previous call to drainWritesIntoIndex.
+     *
+     * When 'readSource' is not kUnset, perform the drain by reading at the timestamp described by
+     * the ReadSource. This will always reset the ReadSource to its original value before returning.
+     * The drain otherwise reads at the pre-existing ReadSource on the RecoveryUnit. This may be
+     * necessary by callers that can only guarantee consistency of data up to a certain point in
+     * time.
      */
-    Status drainWritesIntoIndex(OperationContext* opCtx, const InsertDeleteOptions& options);
-
+    Status drainWritesIntoIndex(OperationContext* opCtx,
+                                const InsertDeleteOptions& options,
+                                RecoveryUnit::ReadSource readSource);
 
     /**
      * Returns 'true' if there are no visible records remaining to be applied from the side writes

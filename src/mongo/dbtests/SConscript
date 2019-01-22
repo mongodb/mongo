@@ -125,6 +125,7 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
         "$BUILD_DIR/mongo/db/index/index_access_methods",
+        "$BUILD_DIR/mongo/db/index/index_build_interceptor",
         "$BUILD_DIR/mongo/db/logical_clock",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
         "$BUILD_DIR/mongo/db/pipeline/document_value_test_util",

@@ -257,6 +257,17 @@ private:
     Timestamp _beginTransactionAtAllCommittedTimestamp(WT_SESSION* session);
 
     /**
+     * Starts a transaction at the no-overlap timestamp. Returns the timestamp the transaction
+     * was started at.
+     */
+    Timestamp _beginTransactionAtNoOverlapTimestamp(WT_SESSION* session);
+
+    /**
+     * Returns the timestamp at which the current transaction is reading.
+     */
+    Timestamp _getTransactionReadTimestamp(WT_SESSION* session);
+
+    /**
      * Transitions to new state.
      */
     void _setState(State newState);

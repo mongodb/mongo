@@ -189,36 +189,16 @@ Status CollectionBulkLoaderImpl::commit() {
         }
 
         if (_idIndexBlock) {
-            // Delete dups.
+            // Gather RecordIds for uninserted duplicate keys to delete.
             std::set<RecordId> dups;
             // Do not do inside a WriteUnitOfWork (required by dumpInsertsFromBulk).
             auto status = _idIndexBlock->dumpInsertsFromBulk(&dups);
             if (!status.isOK()) {
                 return status;
             }
-            for (auto&& it : dups) {
-                writeConflictRetry(
-                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
-                        WriteUnitOfWork wunit(_opCtx.get());
-                        _autoColl->getCollection()->deleteDocument(_opCtx.get(),
-                                                                   kUninitializedStmtId,
-                                                                   it,
-                                                                   nullptr /** OpDebug **/,
-                                                                   false /* fromMigrate */,
-                                                                   true /* noWarn */);
-                        wunit.commit();
-                    });
-            }
-            status = _idIndexBlock->drainBackgroundWrites();
-            if (!status.isOK()) {
-                return status;
-            }
-            status = _idIndexBlock->checkConstraints();
-            if (!status.isOK()) {
-                return status;
-            }
 
-            // Commit _id index, without dups.
+            // Commit _id index without duplicate keys even though there may still be documents
+            // with duplicate _ids. These duplicates will be deleted in the following step.
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
@@ -231,6 +211,22 @@ Status CollectionBulkLoaderImpl::commit() {
                 });
             if (!status.isOK()) {
                 return status;
+            }
+
+            // Delete duplicate records after committing the index so these writes are not
+            // intercepted by the still in-progress index builder.
+            for (auto&& it : dups) {
+                writeConflictRetry(
+                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
+                        WriteUnitOfWork wunit(_opCtx.get());
+                        _autoColl->getCollection()->deleteDocument(_opCtx.get(),
+                                                                   kUninitializedStmtId,
+                                                                   it,
+                                                                   nullptr /** OpDebug **/,
+                                                                   false /* fromMigrate */,
+                                                                   true /* noWarn */);
+                        wunit.commit();
+                    });
             }
         }
         _stats.endBuildingIndexes = Date_t::now();

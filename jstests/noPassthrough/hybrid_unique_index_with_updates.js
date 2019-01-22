@@ -3,14 +3,18 @@
  * of hybrid unique index builds. This test inserts a duplicate document at different phases of an
  * index build to confirm that the resulting behavior is failure.
  *
- * @tags: [requires_document_locking]
+ * @tags: [requires_document_locking, requires_replication]
  */
 (function() {
     "use strict";
 
     load("jstests/libs/check_log.js");
 
-    let conn = MongoRunner.runMongod();
+    let replSetTest = new ReplSetTest({name: "hybrid_updates", nodes: 2});
+    replSetTest.startSet();
+    replSetTest.initiate();
+
+    let conn = replSetTest.getPrimary();
     let testDB = conn.getDB('test');
 
     // Run 'func' while failpoint is enabled.
@@ -53,7 +57,7 @@
     /**
      * Run a background index build on a unique index under different configurations. Introduce
      * duplicate keys on the index that may cause it to fail or succeed, depending on the following
-     * optional parmeters:
+     * optional parameters:
      * {
      *   // Which operation used to introduce a duplicate key.
      *   operation {string}: "insert", "update"
@@ -153,5 +157,5 @@
         runTest({operation: "update", resolve: false, phase: i});
     }
 
-    MongoRunner.stopMongod(conn);
+    replSetTest.stopSet();
 })();

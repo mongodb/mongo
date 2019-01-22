@@ -476,5 +476,4 @@ public:
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 };
-
 }  // namespace mongo

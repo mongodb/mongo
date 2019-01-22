@@ -388,6 +388,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     int wtRet;
     if (commit) {
         if (!_commitTimestamp.isNull()) {
+            // There is currently no scenario where it is intentional to commit before the current
+            // read timestamp.
+            invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
+
             const std::string conf = "commit_timestamp=" + integerToHex(_commitTimestamp.asULL());
             invariantWTOK(s->timestamp_transaction(s, conf.c_str()));
             _isTimestamped = true;
@@ -456,40 +460,54 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
     // this timestamp to inform visiblity of operations, it is therefore necessary to open a
     // transaction to establish a read timestamp, but only for ReadSources that are expected to have
     // read timestamps.
-    if (_timestampReadSource == ReadSource::kUnset ||
-        _timestampReadSource == ReadSource::kNoTimestamp) {
-        return boost::none;
+    switch (_timestampReadSource) {
+        case ReadSource::kUnset:
+        case ReadSource::kNoTimestamp:
+            return boost::none;
+        case ReadSource::kMajorityCommitted:
+            // This ReadSource depends on a previous call to obtainMajorityCommittedSnapshot() and
+            // does not require an open transaction to return a valid timestamp.
+            invariant(!_majorityCommittedSnapshot.isNull());
+            return _majorityCommittedSnapshot;
+        case ReadSource::kProvided:
+            // The read timestamp is set by the user and does not require a transaction to be open.
+            invariant(!_readAtTimestamp.isNull());
+            return _readAtTimestamp;
+
+        // The following ReadSources can only establish a read timestamp when a transaction is
+        // opened.
+        case ReadSource::kNoOverlap:
+        case ReadSource::kLastApplied:
+        case ReadSource::kLastAppliedSnapshot:
+        case ReadSource::kAllCommittedSnapshot:
+            break;
     }
 
-    // This ReadSource depends on a previous call to obtainMajorityCommittedSnapshot() and does not
-    // require an open transaction to return a valid timestamp.
-    if (_timestampReadSource == ReadSource::kMajorityCommitted) {
-        invariant(!_majorityCommittedSnapshot.isNull());
-        return _majorityCommittedSnapshot;
-    }
-
-    // The read timestamp is set by the user and does not require a transaction to be open.
-    if (_timestampReadSource == ReadSource::kProvided) {
-        invariant(!_readAtTimestamp.isNull());
-        return _readAtTimestamp;
-    }
-
-    // The following ReadSources can only establish a read timestamp when a transaction is opened.
+    // Ensure a transaction is opened.
     getSession();
 
-    if (_timestampReadSource == ReadSource::kLastAppliedSnapshot ||
-        _timestampReadSource == ReadSource::kAllCommittedSnapshot) {
-        invariant(!_readAtTimestamp.isNull());
-        return _readAtTimestamp;
-    }
+    switch (_timestampReadSource) {
+        case ReadSource::kLastApplied:
+            // The lastApplied timestamp is not always available, so it is not possible to invariant
+            // that it exists as other ReadSources do.
+            if (!_readAtTimestamp.isNull()) {
+                return _readAtTimestamp;
+            }
+            return boost::none;
+        case ReadSource::kNoOverlap:
+        case ReadSource::kLastAppliedSnapshot:
+        case ReadSource::kAllCommittedSnapshot:
+            invariant(!_readAtTimestamp.isNull());
+            return _readAtTimestamp;
 
-    // The lastApplied timestamp is not always available, so it is not possible to invariant that
-    // it exists as other ReadSources do.
-    if (_timestampReadSource == ReadSource::kLastApplied && !_readAtTimestamp.isNull()) {
-        return _readAtTimestamp;
+        // The follow ReadSources returned values in the first switch block.
+        case ReadSource::kUnset:
+        case ReadSource::kNoTimestamp:
+        case ReadSource::kMajorityCommitted:
+        case ReadSource::kProvided:
+            MONGO_UNREACHABLE;
     }
-
-    return boost::none;
+    MONGO_UNREACHABLE;
 }
 
 void WiredTigerRecoveryUnit::_txnOpen() {
@@ -529,6 +547,10 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             } else {
                 WiredTigerBeginTxnBlock(session, _ignorePrepared).done();
             }
+            break;
+        }
+        case ReadSource::kNoOverlap: {
+            _readAtTimestamp = _beginTransactionAtNoOverlapTimestamp(session);
             break;
         }
         case ReadSource::kAllCommittedSnapshot: {
@@ -576,12 +598,60 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllCommittedTimestamp(WT_SE
     // Since this is not in a critical section, we might have rounded to oldest between
     // calling getAllCommitted and setTimestamp.  We need to get the actual read timestamp we
     // used.
+    auto readTimestamp = _getTransactionReadTimestamp(session);
+    txnOpen.done();
+    return readTimestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSION* session) {
+
+    auto lastApplied = _sessionCache->snapshotManager().getLocalSnapshot();
+    Timestamp allCommitted = Timestamp(_oplogManager->fetchAllCommittedValue(session->connection));
+
+    // When using timestamps for reads and writes, it's important that readers and writers don't
+    // overlap with the timestamps they use. In other words, at any point in the system there should
+    // be a timestamp T such that writers only commit at times greater than T and readers only read
+    // at, or earlier than T. This time T is called the no-overlap point. Using the `kNoOverlap`
+    // ReadSource will compute the most recent known time that is safe to read at.
+
+    // The no-overlap point is computed as the minimum of the storage engine's all-committed time
+    // and replication's last applied time. On primaries, the last applied time is updated as
+    // transactions commit, which is not necessarily in the order they appear in the oplog. Thus
+    // the all-committed time is an appropriate value to read at.
+
+    // On secondaries, however, the all-committed time, as computed by the storage engine, can
+    // advance before oplog application completes a batch. This is because the all-committed time
+    // is only computed correctly if the storage engine is informed of commit timestamps in
+    // increasing order. Because oplog application processes a batch of oplog entries out of order,
+    // the timestamping requirement is not satisfied. Secondaries, however, only update the last
+    // applied time after a batch completes. Thus last applied is a valid no-overlap point on
+    // secondaries.
+
+    // By taking the minimum of the two values, storage can compute a legal time to read at without
+    // knowledge of the replication state. The no-overlap point is the minimum of the all-committed
+    // time, which represents the point where no transactions will commit any earlier, and
+    // lastApplied, which represents the highest optime a node has applied, a point no readers
+    // should read afterward.
+    Timestamp readTimestamp = (lastApplied) ? std::min(*lastApplied, allCommitted) : allCommitted;
+
+    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared);
+    auto status =
+        txnOpen.setTimestamp(readTimestamp, WiredTigerBeginTxnBlock::RoundToOldest::kRound);
+    fassert(51061, status);
+
+    // We might have rounded to oldest between calling getAllCommitted and setTimestamp.  We need to
+    // get the actual read timestamp we used.
+    readTimestamp = _getTransactionReadTimestamp(session);
+    txnOpen.done();
+    return readTimestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::_getTransactionReadTimestamp(WT_SESSION* session) {
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
     auto wtstatus = session->query_timestamp(session, buf, "get=read");
     invariantWTOK(wtstatus);
     uint64_t read_timestamp;
     fassert(50949, parseNumberFromStringWithBase(buf, 16, &read_timestamp));
-    txnOpen.done();
     return Timestamp(read_timestamp);
 }
 
@@ -595,6 +665,10 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
               str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
                             << " and trying to set WUOW timestamp to "
                             << timestamp.toString());
+    invariant(_readAtTimestamp.isNull() || timestamp >= _readAtTimestamp,
+              str::stream() << "future commit timestamp " << timestamp.toString()
+                            << " cannot be older than read timestamp "
+                            << _readAtTimestamp.toString());
 
     _lastTimestampSet = timestamp;
 

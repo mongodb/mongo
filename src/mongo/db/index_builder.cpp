@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -61,48 +62,6 @@ namespace {
 
 const StringData kIndexesFieldName = "indexes"_sd;
 const StringData kCommandName = "createIndexes"_sd;
-
-/**
- * Returns true if writes to the catalog entry for the input namespace require being
- * timestamped. A ghost write is when the operation is not committed with an oplog entry and
- * implies the caller will look at the logical clock to choose a time to use.
- */
-bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) {
-    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr.")) {
-        return false;
-    }
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().usingReplSets()) {
-        return false;
-    }
-
-    // If there is a commit timestamp already assigned, there's no need to explicitly assign a
-    // timestamp. This case covers foreground index builds.
-    if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-        return false;
-    }
-
-    // Only oplog entries (including a user's `applyOps` command) construct indexes via
-    // `IndexBuilder`. Nodes in `startup` may not yet have initialized the `LogicalClock`, however
-    // index builds during startup replication recovery must be timestamped. These index builds
-    // are foregrounded and timestamp their catalog writes with a "commit timestamp". Nodes in the
-    // oplog application phase of initial sync (`startup2`) must not timestamp index builds before
-    // the `initialDataTimestamp`.
-    const auto memberState = replCoord->getMemberState();
-    if (memberState.startup() || memberState.startup2()) {
-        return false;
-    }
-
-    // When in rollback via refetch, it's valid for all writes to be untimestamped. Additionally,
-    // it's illegal to timestamp a write later than the timestamp associated with the node exiting
-    // the rollback state. This condition opts for being conservative.
-    if (!serverGlobalParams.enableMajorityReadConcern && memberState.rollback()) {
-        return false;
-    }
-
-    return true;
-}
 
 // Synchronization tools when replication spawns a background index in a new thread.
 // The bool is 'true' when a new background index has started in a new thread but the
@@ -305,43 +264,46 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         return status;
     }
 
-    {
-        // Perform the first drain while holding an intent lock.
-        Lock::CollectionLock collLock(opCtx->lockState(), ns.ns(), MODE_IX);
-        status = indexer.drainBackgroundWrites();
-    }
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Perform the second drain while stopping inserts into the collection.
-    {
-        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
-        status = indexer.drainBackgroundWrites();
-    }
-    if (!status.isOK()) {
-        return status;
-    }
-
     if (buildInBackground) {
+        {
+            // Perform the first drain while holding an intent lock.
+            Lock::CollectionLock collLock(opCtx->lockState(), ns.ns(), MODE_IX);
+
+            // Read at a point in time so that the drain, which will timestamp writes at
+            // lastApplied, can never commit writes earlier than its read timestamp.
+            status = indexer.drainBackgroundWrites(RecoveryUnit::ReadSource::kNoOverlap);
+        }
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Perform the second drain while stopping inserts into the collection.
+        {
+            Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
+            status = indexer.drainBackgroundWrites();
+        }
+        if (!status.isOK()) {
+            return status;
+        }
+
         opCtx->recoveryUnit()->abandonSnapshot();
 
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         dbLock->relockWithMode(MODE_X);
-    }
 
-    // Perform the third and final drain after releasing a shared lock and reacquiring an
-    // exclusive lock on the database.
-    status = indexer.drainBackgroundWrites();
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Only perform constraint checking when enforced (on primaries).
-    if (_indexConstraints == IndexConstraints::kEnforce) {
-        status = indexer.checkConstraints();
+        // Perform the third and final drain after releasing a shared lock and reacquiring an
+        // exclusive lock on the database.
+        status = indexer.drainBackgroundWrites();
         if (!status.isOK()) {
             return status;
+        }
+
+        // Only perform constraint checking when enforced (on primaries).
+        if (_indexConstraints == IndexConstraints::kEnforce) {
+            status = indexer.checkConstraints();
+            if (!status.isOK()) {
+                return status;
+            }
         }
     }
 
@@ -355,16 +317,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
             return status;
         }
 
-        if (requiresGhostCommitTimestamp(opCtx, ns)) {
-            auto status = opCtx->recoveryUnit()->setTimestamp(
-                LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
-            if (status.code() == ErrorCodes::BadValue) {
-                log() << "Temporarily could not timestamp the index build commit, retrying. "
-                      << status.reason();
-                throw WriteConflictException();
-            }
-            fassert(50701, status);
-        }
+        IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, ns);
         wunit.commit();
         return Status::OK();
     });

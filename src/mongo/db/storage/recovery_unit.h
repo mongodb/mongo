@@ -190,6 +190,7 @@ public:
      * Returns the Timestamp being used by this recovery unit or boost::none if not reading from
      * a point in time. Any point in time returned will reflect one of the following:
      *  - when using ReadSource::kProvided, the timestamp provided.
+     *  - when using ReadSource::kNoOverlap, the timestamp chosen by the storage engine.
      *  - when using ReadSource::kLastAppliedSnapshot, the timestamp chosen using the storage
      * engine's last applied timestamp.
      *  - when using ReadSource::kAllCommittedSnapshot, the timestamp chosen using the storage
@@ -294,7 +295,7 @@ public:
     }
 
     /**
-     * The ReadSource indicates which exteral or provided timestamp to read from for future
+     * The ReadSource indicates which external or provided timestamp to read from for future
      * transactions.
      */
     enum ReadSource {
@@ -310,6 +311,10 @@ public:
          * Read from the majority all-commmitted timestamp.
          */
         kMajorityCommitted,
+        /**
+         * Read from the latest timestamp where no future transactions will commit at or before.
+         */
+        kNoOverlap,
         /**
          * Read from the last applied timestamp. New transactions start at the most up-to-date
          * timestamp.

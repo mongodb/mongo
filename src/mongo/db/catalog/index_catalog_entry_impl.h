@@ -98,6 +98,10 @@ public:
         return _indexBuildInterceptor;
     }
 
+    const IndexBuildInterceptor* indexBuildInterceptor() const final {
+        return _indexBuildInterceptor;
+    }
+
     void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
         _indexBuildInterceptor = interceptor;
     }

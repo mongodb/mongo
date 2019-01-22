@@ -141,9 +141,13 @@ public:
      * before calling commit(), stop writes on the collection by holding a S or X while calling this
      * method.
      *
+     * When 'readSource' is not kUnset, perform the drain by reading at the timestamp described by
+     * the ReadSource.
+     *
      * Must not be in a WriteUnitOfWork.
      */
-    Status drainBackgroundWrites();
+    Status drainBackgroundWrites(
+        RecoveryUnit::ReadSource readSource = RecoveryUnit::ReadSource::kUnset);
 
     /**
      * Check any constraits that may have been temporarily violated during the index build for

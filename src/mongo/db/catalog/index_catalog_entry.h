@@ -79,6 +79,8 @@ public:
 
     virtual IndexBuildInterceptor* indexBuildInterceptor() = 0;
 
+    virtual const IndexBuildInterceptor* indexBuildInterceptor() const = 0;
+
     virtual void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) = 0;
 
     virtual const Ordering& ordering() const = 0;
