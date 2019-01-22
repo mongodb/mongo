@@ -3025,14 +3025,17 @@ void buildPreparedDurationString(StringBuilder* sb,
 /*
  * Builds the entire expected transaction info string and returns it.
  */
-std::string buildTransactionInfoString(OperationContext* opCtx,
-                                       TransactionParticipant* txnParticipant,
-                                       std::string terminationCause,
-                                       const LogicalSessionId sessionId,
-                                       const TxnNumber txnNum,
-                                       const int metricValue,
-                                       const bool wasPrepared,
-                                       bool autocommitVal = false) {
+std::string buildTransactionInfoString(
+    OperationContext* opCtx,
+    TransactionParticipant* txnParticipant,
+    std::string terminationCause,
+    const LogicalSessionId sessionId,
+    const TxnNumber txnNum,
+    const int metricValue,
+    const bool wasPrepared,
+    bool autocommitVal = false,
+    boost::optional<repl::OpTime> prepareOpTime = boost::none,
+    boost::optional<repl::OpTime> oldestOplogEntryOpTime = boost::none) {
     // Calling transactionInfoForLog to get the actual transaction info string.
     const auto lockerInfo =
         opCtx->lockState()->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase());
@@ -3080,23 +3083,41 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
     // prepareReadConflicts:1 writeConflicts:1 terminationCause:committed timeActiveMicros:3
     // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
     // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {
-    // acquireCount: { W: 1 } } } 0ms, wasPrepared:1, totalPreparedDurationMicros: 10
+    // acquireCount: { W: 1 } } } wasPrepared:1 totalPreparedDurationMicros:10
+    // prepareOpTime:<OpTime> oldestOplogEntryOpTime:<OpTime> finishOpTime:<OpTime> 0ms
     StringBuilder expectedTransactionInfo;
     expectedTransactionInfo << parametersInfo.str() << readTimestampInfo.str()
                             << singleTransactionStatsInfo.str()
                             << " terminationCause:" << terminationCause
                             << timeActiveAndInactiveInfo.str() << " numYields:" << 0
-                            << " locks:" << locks.done().toString() << " "
-                            << duration_cast<Milliseconds>(
-                                   txnParticipant->getSingleTransactionStatsForTest().getDuration(
-                                       tickSource, tickSource->getTicks()))
+                            << " locks:" << locks.done().toString()
                             << " wasPrepared:" << wasPrepared;
     if (wasPrepared) {
         StringBuilder totalPreparedDuration;
         buildPreparedDurationString(
             &totalPreparedDuration, txnParticipant, tickSource, tickSource->getTicks());
         expectedTransactionInfo << totalPreparedDuration.str();
+        expectedTransactionInfo << " prepareOpTime:"
+                                << (prepareOpTime ? prepareOpTime->toString()
+                                                  : txnParticipant->getPrepareOpTime().toString());
     }
+    if (txnParticipant->getOldestOplogEntryOpTimeForTest()) {
+        ASSERT(!oldestOplogEntryOpTime);
+        expectedTransactionInfo << " oldestOplogEntryOpTime:"
+                                << txnParticipant->getOldestOplogEntryOpTimeForTest()->toString();
+    }
+    if (oldestOplogEntryOpTime) {
+        ASSERT(!txnParticipant->getOldestOplogEntryOpTimeForTest());
+        expectedTransactionInfo << " oldestOplogEntryOpTime:" << oldestOplogEntryOpTime->toString();
+    }
+    if (txnParticipant->getFinishOpTimeForTest()) {
+        expectedTransactionInfo << " finishOpTime:"
+                                << txnParticipant->getFinishOpTimeForTest()->toString();
+    }
+    expectedTransactionInfo << ", "
+                            << duration_cast<Milliseconds>(
+                                   txnParticipant->getSingleTransactionStatsForTest().getDuration(
+                                       tickSource, tickSource->getTicks()));
     return expectedTransactionInfo.str();
 }
 
@@ -3429,6 +3450,7 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
 
     serverGlobalParams.slowMS = 10;
     tickSource->advance(Microseconds(11 * 1000));
+    auto prepareOpTime = txnParticipant->getPrepareOpTime();
 
     startCapturingLogMessages();
     txnParticipant->abortActiveTransaction(opCtx());
@@ -3444,7 +3466,10 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
                                    *opCtx()->getLogicalSessionId(),
                                    *opCtx()->getTxnNumber(),
                                    metricValue,
-                                   true);
+                                   true,
+                                   false,
+                                   prepareOpTime,
+                                   prepareOpTime);
 
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }

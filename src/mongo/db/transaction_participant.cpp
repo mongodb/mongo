@@ -1664,10 +1664,6 @@ std::string TransactionParticipant::_transactionInfoForLog(
     if (singleTransactionStats.getOpDebug()->storageStats)
         s << " storage:" << singleTransactionStats.getOpDebug()->storageStats->toBSON().toString();
 
-    // Total duration of the transaction.
-    s << " "
-      << duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick));
-
     // It is possible for a slow transaction to have aborted in the prepared state if an
     // exception was thrown before prepareTransaction succeeds.
     const auto totalPreparedDuration = durationCount<Microseconds>(
@@ -1676,7 +1672,20 @@ std::string TransactionParticipant::_transactionInfoForLog(
     s << " wasPrepared:" << txnWasPrepared;
     if (txnWasPrepared) {
         s << " totalPreparedDurationMicros:" << totalPreparedDuration;
+        s << " prepareOpTime:" << _prepareOpTime.toString();
     }
+
+    if (_oldestOplogEntryOpTime) {
+        s << " oldestOplogEntryOpTime:" << _oldestOplogEntryOpTime->toString();
+    }
+
+    if (_finishOpTime) {
+        s << " finishOpTime:" << _finishOpTime->toString();
+    }
+
+    // Total duration of the transaction.
+    s << ", "
+      << duration_cast<Milliseconds>(singleTransactionStats.getDuration(tickSource, curTick));
 
     return s.str();
 }

@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -516,6 +515,16 @@ public:
     repl::OpTime getSpeculativeTransactionReadOpTimeForTest() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _speculativeTransactionReadOpTime;
+    }
+
+    boost::optional<repl::OpTime> getFinishOpTimeForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _finishOpTime;
+    }
+
+    boost::optional<repl::OpTime> getOldestOplogEntryOpTimeForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _oldestOplogEntryOpTime;
     }
 
     const Locker* getTxnResourceStashLockerForTest() const {
