@@ -517,10 +517,12 @@ void PipelineD::addCursorSource(Collection* collection,
     intrusive_ptr<DocumentSourceCursor> pSource =
         DocumentSourceCursor::create(collection, std::move(exec), expCtx);
 
-    // Note the query, sort, and projection for explain.
+    // Add the cursor to the pipeline first so that it's correctly disposed of as part of the
+    // pipeline if an exception is thrown during this method.
+    pipeline->addInitialSource(pSource);
+
     pSource->setQuery(queryObj);
     pSource->setSort(sortObj);
-
     if (deps.hasNoRequirements()) {
         pSource->shouldProduceEmptyDocs();
     }
@@ -537,7 +539,6 @@ void PipelineD::addCursorSource(Collection* collection,
 
         pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
     }
-    pipeline->addInitialSource(pSource);
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
