@@ -790,12 +790,28 @@ int _main(int argc, char* argv[], char** envp) {
     parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
     parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
 
-    bool usingPassword = !shellGlobalParams.password.empty();
+    if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
+        stringstream ss;
+        ss << "DB.prototype._defaultAuthenticationMechanism = \"" << escape(authMechanisms.get())
+           << "\";" << endl;
+        mongo::shell_utils::_dbConnect += ss.str();
+    }
+
+    if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
+        stringstream ss;
+        ss << "DB.prototype._defaultGssapiServiceName = \"" << escape(gssapiServiveName.get())
+           << "\";" << endl;
+        mongo::shell_utils::_dbConnect += ss.str();
+    }
+
     if (!shellGlobalParams.nodb) {  // connect to db
+        bool usingPassword = !shellGlobalParams.password.empty();
+
         if (mechanismRequiresPassword(parsedURI) &&
             (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
             usingPassword = true;
         }
+
         if (usingPassword && parsedURI.getPassword().empty()) {
             if (!shellGlobalParams.password.empty()) {
                 parsedURI.setPassword(stdx::as_const(shellGlobalParams.password));
@@ -803,75 +819,27 @@ int _main(int argc, char* argv[], char** envp) {
                 parsedURI.setPassword(mongo::askPassword());
             }
         }
+
         if (parsedURI.getUser().empty() && !shellGlobalParams.username.empty()) {
             parsedURI.setUser(stdx::as_const(shellGlobalParams.username));
         }
 
         stringstream ss;
-        if (mongo::serverGlobalParams.quiet.load())
-            ss << "__quiet = true;";
-        ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString() << "\");";
+        if (mongo::serverGlobalParams.quiet.load()) {
+            ss << "__quiet = true;" << endl;
+        }
+
+        ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString() << "\");" << endl;
 
         if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
             // If the --retryWrites cmdline argument or retryWrites URI param was specified, then
             // replace the global `db` object with a DB object started in a session. The resulting
             // Mongo connection checks its _retryWrites property.
-            ss << "db = db.getMongo().startSession().getDatabase(db.getName());";
+            ss << "db = db.getMongo().startSession().getDatabase(db.getName());" << endl;
         }
 
-        mongo::shell_utils::_dbConnect = ss.str();
+        mongo::shell_utils::_dbConnect += ss.str();
     }
-
-    // Construct the authentication-related code to execute on shell startup.
-    //
-    // This constructs and immediately executes an anonymous function, to avoid
-    // the shell's default behavior of printing statement results to the console.
-    //
-    // It constructs a statement of the following form:
-    //
-    // (function() {
-    //    // Set default authentication mechanism and, maybe, authenticate.
-    //  }())
-    stringstream authStringStream;
-    authStringStream << "(function() { " << endl;
-
-
-    if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
-        authStringStream << "DB.prototype._defaultAuthenticationMechanism = \""
-                         << escape(authMechanisms.get()) << "\";" << endl;
-    }
-
-    if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
-        authStringStream << "DB.prototype._defaultGssapiServiceName = \""
-                         << escape(gssapiServiveName.get()) << "\";" << endl;
-    }
-
-    if (!shellGlobalParams.nodb &&
-        (!parsedURI.getUser().empty() ||
-         parsedURI.getOption("authMechanism").get_value_or("") == "MONGODB-X509")) {
-        authStringStream << "var username = \"" << escape(parsedURI.getUser()) << "\";" << endl;
-        if (usingPassword) {
-            authStringStream << "var password = \"" << escape(parsedURI.getPassword()) << "\";"
-                             << endl;
-        }
-        authStringStream << "var authDb = db.getSiblingDB(\""
-                         << escape(parsedURI.getAuthenticationDatabase()) << "\");" << endl;
-
-        authStringStream << "authDb._authOrThrow({ ";
-        if (!parsedURI.getUser().empty()) {
-            authStringStream << saslCommandUserFieldName << ": username ";
-        }
-        if (usingPassword) {
-            authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
-        }
-        if (const auto gssapiHostNameKey = parsedURI.getOption("gssapiHostName")) {
-            authStringStream << ", " << saslCommandServiceHostnameFieldName << ": \""
-                             << escape(gssapiHostNameKey.get()) << '"' << endl;
-        }
-        authStringStream << "});" << endl;
-    }
-    authStringStream << "}())";
-    mongo::shell_utils::_dbAuth = authStringStream.str();
 
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
     mongo::ScriptEngine::setup();

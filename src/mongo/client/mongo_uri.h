@@ -249,7 +249,7 @@ private:
           _retryWrites(std::move(retryWrites)),
           _options(std::move(options)) {}
 
-    BSONObj _makeAuthObjFromOptions(int maxWireVersion) const;
+    boost::optional<BSONObj> _makeAuthObjFromOptions(int maxWireVersion) const;
 
     static MongoURI parseImpl(const std::string& url);
 

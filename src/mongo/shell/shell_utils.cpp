@@ -78,7 +78,6 @@ MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
 namespace shell_utils {
 
 std::string _dbConnect;
-std::string _dbAuth;
 
 const char* argv0 = 0;
 void RecordMyLocation(const char* _argv0) {
@@ -343,9 +342,6 @@ void initScope(Scope& scope) {
 
     if (!_dbConnect.empty()) {
         uassert(12513, "connect failed", scope.exec(_dbConnect, "(connect)", false, true, false));
-    }
-    if (!_dbAuth.empty()) {
-        uassert(12514, "login failed", scope.exec(_dbAuth, "(auth)", true, true, false));
     }
 }
 
