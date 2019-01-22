@@ -163,6 +163,12 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     assert.commandWorked(testDB.user.ensureIndex({loc: '2d'}));
     assert.commandWorked(
         testDB.user.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10}));
+
+    // TODO: SERVER-38961 Remove when simultaneous index builds complete.
+    // Run a no-op command and wait for it to be applied on secondaries. Due to the asynchronous
+    // completion nature of indexes on secondaries, we can guarantee an index build is complete
+    // on all secondaries once all secondaries have applied this collMod command.
+    assert.commandWorked(testDB.runCommand({collMod: 'user', usePowerOf2Sizes: true}));
     assert.commandWorked(testDB.runCommand({getLastError: 1, w: NODE_COUNT}));
 
     // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
