@@ -238,6 +238,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch(opCtx);
 
+        _state = kCloning;
         // Having the metadata manager registered on the collection sharding state is what indicates
         // that a chunk on that collection is being migrated. With an active migration, write
         // operations require the cloner to be present in order to track changes to the chunk which
@@ -249,7 +250,6 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         auto csr = CollectionShardingRuntime::get(opCtx, getNss());
         auto lockedCsr = CollectionShardingRuntimeLock::lockExclusive(opCtx, csr);
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
-        _state = kCloning;
     }
 
     Status startCloneStatus = _cloneDriver->startClone(opCtx);
