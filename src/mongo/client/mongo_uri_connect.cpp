@@ -28,14 +28,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/mongo_uri.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/util/mongoutils/str.h"
@@ -85,19 +84,18 @@ BSONObj parseAuthMechanismProperties(const std::string& propStr) {
 
 }  // namespace
 
-BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
+boost::optional<BSONObj> MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
+    // Usually, a username is required to authenticate.
+    // However X509 based authentication may, and typically does,
+    // omit the username, inferring it from the client certificate instead.
+    bool usernameRequired = true;
+
     BSONObjBuilder bob;
-
-    // Add the username and optional password
-    invariant(!_user.empty());
-    std::string username(_user);  // may have to tack on service realm before we append
-
-    if (!_password.empty())
+    if (!_password.empty()) {
         bob.append(saslCommandPasswordFieldName, _password);
+    }
 
-    OptionsMap::const_iterator it;
-
-    it = _options.find("authSource");
+    auto it = _options.find("authSource");
     if (it != _options.end()) {
         bob.append(saslCommandUserDBFieldName, it->second);
     } else if (!_database.empty()) {
@@ -109,11 +107,20 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
     it = _options.find("authMechanism");
     if (it != _options.end()) {
         bob.append(saslCommandMechanismFieldName, it->second);
+        if (it->second == auth::kMechanismMongoX509) {
+            usernameRequired = false;
+        }
     } else if (maxWireVersion >= 3) {
         bob.append(saslCommandMechanismFieldName, kAuthMechScramSha1);
     } else {
         bob.append(saslCommandMechanismFieldName, kAuthMechMongoCR);
     }
+
+    if (usernameRequired && _user.empty()) {
+        return boost::none;
+    }
+
+    std::string username(_user);  // may have to tack on service realm before we append
 
     it = _options.find("authMechanismProperties");
     if (it != _options.end()) {
@@ -134,6 +141,12 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
         // if we specified a realm, we just append it to the username as the SASL code
         // expects it that way.
         if (hasRealmProp) {
+            if (username.empty()) {
+                // In practice, this won't actually occur since
+                // this block corresponds to GSSAPI, while username
+                // may only be omitted with MOGNODB-X509.
+                return boost::none;
+            }
             username.append("@").append(parsed[kAuthServiceRealm].String());
         }
     }
@@ -143,7 +156,9 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
         bob.append(saslCommandServiceNameFieldName, it->second);
     }
 
-    bob.append("user", username);
+    if (!username.empty()) {
+        bob.append("user", username);
+    }
 
     return bob.obj();
 }
@@ -167,9 +182,11 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         return nullptr;
     }
 
-    if (!_user.empty()) {
-        ret->auth(_makeAuthObjFromOptions(ret->getMaxWireVersion()));
+    auto optAuthObj = _makeAuthObjFromOptions(ret->getMaxWireVersion());
+    if (optAuthObj) {
+        ret->auth(optAuthObj.get());
     }
+
     return ret.release();
 }
 

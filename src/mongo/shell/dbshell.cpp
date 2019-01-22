@@ -832,57 +832,6 @@ int _main(int argc, char* argv[], char** envp) {
         mongo::shell_utils::_dbConnect = ss.str();
     }
 
-    // Construct the authentication-related code to execute on shell startup.
-    //
-    // This constructs and immediately executes an anonymous function, to avoid
-    // the shell's default behavior of printing statement results to the console.
-    //
-    // It constructs a statement of the following form:
-    //
-    // (function() {
-    //    // Set default authentication mechanism and, maybe, authenticate.
-    //  }())
-    stringstream authStringStream;
-    authStringStream << "(function() { " << endl;
-
-
-    if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
-        authStringStream << "DB.prototype._defaultAuthenticationMechanism = \""
-                         << escape(authMechanisms.get()) << "\";" << endl;
-    }
-
-    if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
-        authStringStream << "DB.prototype._defaultGssapiServiceName = \""
-                         << escape(gssapiServiveName.get()) << "\";" << endl;
-    }
-
-    if (!shellGlobalParams.nodb &&
-        (!parsedURI.getUser().empty() ||
-         parsedURI.getOption("authMechanism").get_value_or("") == "MONGODB-X509")) {
-        authStringStream << "var username = \"" << escape(parsedURI.getUser()) << "\";" << endl;
-        if (usingPassword) {
-            authStringStream << "var password = \"" << escape(parsedURI.getPassword()) << "\";"
-                             << endl;
-        }
-        authStringStream << "var authDb = db.getSiblingDB(\""
-                         << escape(parsedURI.getAuthenticationDatabase()) << "\");" << endl;
-
-        authStringStream << "authDb._authOrThrow({ ";
-        if (!parsedURI.getUser().empty()) {
-            authStringStream << saslCommandUserFieldName << ": username ";
-        }
-        if (usingPassword) {
-            authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
-        }
-        if (const auto gssapiHostNameKey = parsedURI.getOption("gssapiHostName")) {
-            authStringStream << ", " << saslCommandServiceHostnameFieldName << ": \""
-                             << escape(gssapiHostNameKey.get()) << '"' << endl;
-        }
-        authStringStream << "});" << endl;
-    }
-    authStringStream << "}())";
-    mongo::shell_utils::_dbAuth = authStringStream.str();
-
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
     mongo::ScriptEngine::setup();
     mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
