@@ -180,13 +180,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .hidden()
         .setDefault(moe::Value("synchronous"));
 
-#if MONGO_ENTERPRISE_ENCRYPTDB
-    options->addOptionChaining("security.redactClientLogData",
-                               "redactClientLogData",
-                               moe::Switch,
-                               "Redact client data written to the diagnostics log");
-#endif
-
     options->addOptionChaining("processManagement.pidFilePath",
                                "pidfilepath",
                                moe::String,
