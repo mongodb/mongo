@@ -876,6 +876,11 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
         }
 
         try {
+            // This shouldn't cause deadlocks with other prepared txns, because the acquisition
+            // of RSTL lock inside abortActiveTransaction will be no-op since we already have it.
+            // This abortGuard gets dismissed before we release the RSTL while transitioning to
+            // prepared.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             abortActiveTransaction(opCtx);
         } catch (...) {
             // It is illegal for aborting a prepared transaction to fail for any reason, so we crash
@@ -1072,6 +1077,8 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
     opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
 
     try {
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
         // On secondary, we generate a fake empty oplog slot, since it's not used by opObserver.
         OplogSlot commitOplogSlot;
         boost::optional<OplogSlotReserver> oplogSlotReserver;
