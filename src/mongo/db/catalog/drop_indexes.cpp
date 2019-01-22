@@ -40,6 +40,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -225,9 +226,12 @@ Status dropIndexes(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
+        BackgroundOperation::assertNoBgOpInProgForNs(nss);
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
+            collection->uuid().get());
+
         WriteUnitOfWork wunit(opCtx);
         OldClientContext ctx(opCtx, nss.ns());
-        BackgroundOperation::assertNoBgOpInProgForNs(nss);
 
         Status status = wrappedRun(opCtx, collection, cmdObj, result);
         if (!status.isOK()) {

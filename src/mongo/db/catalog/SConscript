@@ -355,6 +355,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'collection',
         'uuid_catalog',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/repair_database',
         '$BUILD_DIR/mongo/db/service_context',
     ],
@@ -368,6 +369,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'catalog_control',
         'database_holder',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )
@@ -436,6 +438,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/views/views',

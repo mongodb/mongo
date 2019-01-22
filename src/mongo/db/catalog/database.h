@@ -176,6 +176,9 @@ public:
      *
      * If we are applying a 'drop' oplog entry on a secondary, 'dropOpTime' will contain the optime
      * of the oplog entry.
+     *
+     * The caller should hold a DB X lock and ensure there are no index builds in progress on the
+     * collection.
      */
     virtual Status dropCollection(OperationContext* const opCtx,
                                   const StringData fullns,

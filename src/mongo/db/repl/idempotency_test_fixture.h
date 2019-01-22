@@ -95,8 +95,8 @@ protected:
     OplogEntry insert(const BSONObj& obj);
     template <class IdType>
     OplogEntry update(IdType _id, const BSONObj& obj);
-    OplogEntry buildIndex(const BSONObj& indexSpec, const BSONObj& options, UUID uuid);
-    OplogEntry dropIndex(const std::string& indexName);
+    OplogEntry buildIndex(const BSONObj& indexSpec, const BSONObj& options, const UUID& uuid);
+    OplogEntry dropIndex(const std::string& indexName, const UUID& uuid);
     virtual Status resetState();
 
     /**

@@ -515,12 +515,10 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     uassertNamespaceNotIndex(fullns.toString(), "dropCollection");
 
-    BackgroundOperation::assertNoBgOpInProgForNs(fullns);
-
     // Make sure no indexes builds are in progress.
     // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
-    massert(40461,
+    massert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             str::stream() << "cannot drop collection " << fullns << " (" << uuidString << ") when "
                           << numIndexesInProgress
                           << " index builds in progress.",
@@ -695,8 +693,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       bool stayTemp) {
     audit::logRenameCollection(&cc(), fromNS, toNS);
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
-    BackgroundOperation::assertNoBgOpInProgForNs(fromNS);
-    BackgroundOperation::assertNoBgOpInProgForNs(toNS);
 
     const NamespaceString fromNSS(fromNS);
     const NamespaceString toNSS(toNS);
@@ -712,6 +708,20 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     Collection* collToRename = getCollection(opCtx, fromNSS);
     if (!collToRename) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
+    }
+    invariant(!collToRename->getIndexCatalog()->haveAnyIndexesInProgress(),
+              mongoutils::str::stream()
+                  << "cannot perform operation: an index build is currently running for "
+                     "collection "
+                  << fromNSS);
+
+    Collection* toColl = getCollection(opCtx, toNSS);
+    if (toColl) {
+        invariant(!toColl->getIndexCatalog()->haveAnyIndexesInProgress(),
+                  mongoutils::str::stream()
+                      << "cannot perform operation: an index build is currently running for "
+                         "collection "
+                      << toNSS);
     }
 
     log() << "renameCollection: renaming collection " << collToRename->uuid()->toString()

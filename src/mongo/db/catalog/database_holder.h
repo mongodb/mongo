@@ -81,7 +81,8 @@ public:
      * doesn't notify the replication subsystem or do any other consistency checks, so it should
      * not be used directly from user commands.
      *
-     * Must be called with the specified database locked in X mode.
+     * Must be called with the specified database locked in X mode. The caller must ensure no index
+     * builds are in progress on the database.
      */
     virtual void dropDb(OperationContext* opCtx, Database* db) = 0;
 
@@ -94,6 +95,8 @@ public:
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
      * Will uassert if any background jobs are running when this function is called.
+     *
+     * The caller must hold the global X lock and ensure there are no index builds in progress.
      */
     virtual void closeAll(OperationContext* opCtx) = 0;
 

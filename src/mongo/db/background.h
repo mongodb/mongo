@@ -61,6 +61,7 @@ public:
     static bool inProgForDb(StringData db);
     static int numInProgForDb(StringData db);
     static bool inProgForNs(StringData ns);
+    static void assertNoBgOpInProg();
     static void assertNoBgOpInProgForDb(StringData db);
     static void assertNoBgOpInProgForNs(StringData ns);
     static void awaitNoBgOpInProgForDb(StringData db);

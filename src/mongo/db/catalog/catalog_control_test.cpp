@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -112,6 +113,10 @@ void CatalogControlTest::setUp() {
         auto storageEngine = std::make_unique<MockStorageEngine>();
         serviceContext->setStorageEngine(std::move(storageEngine));
         DatabaseHolder::set(serviceContext.get(), std::make_unique<DatabaseHolderMock>());
+        // Only need the IndexBuildsCoordinator to call into and check whether there are any index
+        // builds in progress.
+        IndexBuildsCoordinator::set(serviceContext.get(),
+                                    std::make_unique<IndexBuildsCoordinatorMongod>());
         setGlobalServiceContext(std::move(serviceContext));
     }
 
