@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
 
 #include "mongo/platform/basic.h"
 
@@ -43,6 +43,7 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -138,6 +139,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             MongoDOperationContextSession ocs(newOpCtx.get());
             auto txnParticipant =
                 TransactionParticipant::get(OperationContextSession::get(newOpCtx.get()));
+            LOG(3) << "Restoring locks of prepared transaction. SessionId: " << sessionId.getId()
+                   << " TxnNumber: " << txnParticipant->getActiveTxnNumber();
             txnParticipant->refreshLocksForPreparedTransaction(newOpCtx.get(), false);
         }
     }

@@ -40,7 +40,7 @@ const PrepareHelpers = (function() {
 
         // End the transaction on the shell session.
         if (res.ok) {
-            session.commitTransaction();
+            session.commitTransaction_forTesting();
         } else {
             session.abortTransaction_forTesting();
         }

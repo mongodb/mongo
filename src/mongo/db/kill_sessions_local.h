@@ -66,4 +66,9 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx);
  */
 void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx);
 
+/**
+ * Yields locks of prepared transactions.
+ */
+void yieldLocksForPreparedTransactions(OperationContext* opCtx);
+
 }  // namespace mongo

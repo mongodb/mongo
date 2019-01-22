@@ -178,4 +178,36 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
         });
 }
 
+void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
+    // Create a new opCtx because we need an empty locker to refresh the locks.
+    auto newClient = opCtx->getServiceContext()->makeClient("prepared-txns-yield-locks");
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = cc().makeOperationContext();
+
+    // Scan the sessions again to get the list of all sessions with prepared transaction
+    // to yield their locks.
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(newOpCtx.get())});
+    killSessionsAction(
+        newOpCtx.get(),
+        matcherAllSessions,
+        [](const ObservableSession& session) {
+            return TransactionParticipant::get(session.get())->transactionIsPrepared();
+        },
+        [](OperationContext* killerOpCtx, const SessionToKill& session) {
+            auto const txnParticipant = TransactionParticipant::get(session.get());
+            // Yield locks for prepared transactions.
+            // When scanning and killing operations, all prepared transactions are included in the
+            // list. Even though new sessions may be created after the scan, none of them can become
+            // prepared during stepdown, since the RSTL has been enqueued, preventing any new
+            // writes.
+            if (txnParticipant->transactionIsPrepared()) {
+                LOG(3) << "Yielding locks of prepared transaction. SessionId: "
+                       << session.getSessionId().getId()
+                       << " TxnNumber: " << txnParticipant->getActiveTxnNumber();
+                txnParticipant->refreshLocksForPreparedTransaction(killerOpCtx, true);
+            }
+        });
+}
+
 }  // namespace mongo

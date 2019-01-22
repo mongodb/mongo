@@ -1974,6 +1974,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     }
 
     // Stepdown success!
+
+    // Yield locks for prepared transactions.
+    yieldLocksForPreparedTransactions(opCtx);
+
     onExitGuard.dismiss();
     updateMemberState();
 

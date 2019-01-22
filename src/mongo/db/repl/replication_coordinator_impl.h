@@ -474,6 +474,21 @@ private:
         void startKillOpThread();
 
         /**
+         * On stepdown, we need to kill all write operations and all transactional operations,
+         * so that unprepared and prepared transactions can release or yield their locks.
+         * The required ordering between stepdown steps is:
+         * 1) Enqueue RSTL in X mode.
+         * 2) Kill all write operations and operations with S locks
+         * 3) Abort unprepared transactions.
+         * 4) Repeat step 2) and 3) until the stepdown thread can acquire RSTL.
+         * 5) Yield locks of all prepared transactions.
+         *
+         * Since prepared transactions don't hold RSTL, step 1) to step 3) make sure all
+         * running transactions that may hold RSTL finish, get killed or yield their locks,
+         * so that we can acquire RSTL at step 4). Holding the locks of prepared transactions
+         * until step 5) guarantees if any conflict operations (e.g. DDL operations) failed
+         * to be killed for any reason, we will get a deadlock instead of a silent data corruption.
+         *
          * Loops continuously to kill all user operations that have global lock except in IS mode.
          * And, aborts all stashed (inactive) transactions.
          * Terminates once killSignaled is set true.

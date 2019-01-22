@@ -1097,7 +1097,12 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
-        opObserver->onTransactionCommit(opCtx, commitOplogSlot, commitTimestamp);
+
+        {
+            // Once the transaction is committed, the oplog entry must be written.
+            UninterruptibleLockGuard lockGuard(opCtx->lockState());
+            opObserver->onTransactionCommit(opCtx, commitOplogSlot, commitTimestamp);
+        }
 
         lk.lock();
         _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);

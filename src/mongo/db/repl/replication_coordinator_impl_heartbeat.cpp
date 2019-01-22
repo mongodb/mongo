@@ -40,6 +40,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -395,6 +396,9 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
         rstlLock.waitForLockUntil(Date_t::max());
     }
+
+    // Yield locks for prepared transactions.
+    yieldLocksForPreparedTransactions(opCtx.get());
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
