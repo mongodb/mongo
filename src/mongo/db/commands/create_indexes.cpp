@@ -251,7 +251,12 @@ bool runCreateIndexes(OperationContext* opCtx,
     if (!db) {
         db = databaseHolder->openDb(opCtx, ns.db());
     }
-    DatabaseShardingState::get(db).checkDbVersion(opCtx);
+
+    {
+        auto& dss = DatabaseShardingState::get(db);
+        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        dss.checkDbVersion(opCtx, dssLock);
+    }
 
     Collection* collection = db->getCollection(opCtx, ns);
     if (collection) {
@@ -380,7 +385,9 @@ bool runCreateIndexes(OperationContext* opCtx,
 
         auto db = databaseHolder->getDb(opCtx, ns.db());
         if (db) {
-            DatabaseShardingState::get(db).checkDbVersion(opCtx);
+            auto& dss = DatabaseShardingState::get(db);
+            auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+            dss.checkDbVersion(opCtx, dssLock);
         }
 
         invariant(db);

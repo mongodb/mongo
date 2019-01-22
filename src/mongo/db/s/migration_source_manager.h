@@ -77,7 +77,7 @@ public:
      * a CollectionShardingRuntime that has its ResourceMutex locked.
      */
     static MigrationSourceManager* get(CollectionShardingRuntime* csr,
-                                       CollectionShardingRuntimeLock& csrLock);
+                                       CollectionShardingRuntime::CSRLock& csrLock);
 
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be

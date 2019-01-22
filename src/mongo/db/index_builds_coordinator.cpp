@@ -536,7 +536,9 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
             auto databaseHolder = DatabaseHolder::get(opCtx);
             auto db = databaseHolder->getDb(opCtx, nss.db());
             if (db) {
-                DatabaseShardingState::get(db).checkDbVersion(opCtx);
+                auto& dss = DatabaseShardingState::get(db);
+                auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+                dss.checkDbVersion(opCtx, dssLock);
             }
 
             invariant(db,

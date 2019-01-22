@@ -157,7 +157,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto sourceDB = databaseHolder->getDb(opCtx, source.db());
     if (sourceDB) {
-        DatabaseShardingState::get(sourceDB).checkDbVersion(opCtx);
+        auto& dss = DatabaseShardingState::get(sourceDB);
+        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        dss.checkDbVersion(opCtx, dssLock);
     }
     Collection* const sourceColl = sourceDB ? sourceDB->getCollection(opCtx, source) : nullptr;
     if (!sourceColl) {

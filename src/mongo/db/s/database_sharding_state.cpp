@@ -48,25 +48,26 @@ const Database::Decoration<DatabaseShardingState> DatabaseShardingState::get =
 
 DatabaseShardingState::DatabaseShardingState() = default;
 
-void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
+void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx, DSSLock&) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
-void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
+void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx, DSSLock&) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     _critSec.enterCriticalSectionCommitPhase();
 }
 
 void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx,
-                                                boost::optional<DatabaseVersion> newDbVersion) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+                                                boost::optional<DatabaseVersion> newDbVersion,
+                                                DSSLock&) {
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IX));
     _critSec.exitCriticalSection();
     _dbVersion = newDbVersion;
 }
 
-boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
-    OperationContext* opCtx) const {
+boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationContext* opCtx,
+                                                                     DSSLock&) const {
     if (!opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X)) {
         invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IS));
     }
@@ -74,14 +75,15 @@ boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
 }
 
 void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
-                                         boost::optional<DatabaseVersion> newDbVersion) {
+                                         boost::optional<DatabaseVersion> newDbVersion,
+                                         DSSLock&) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     log() << "setting this node's cached database version for " << get.owner(this)->name() << " to "
           << (newDbVersion ? newDbVersion->toBSON() : BSONObj());
     _dbVersion = newDbVersion;
 }
 
-void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
+void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) const {
     invariant(opCtx->lockState()->isLocked());
     const auto dbName = get.owner(this)->name();
 
@@ -109,12 +111,13 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
             databaseVersion::equal(*clientDbVersion, *_dbVersion));
 }
 
-MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager() {
+MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager(DSSLock&) {
     return _sourceMgr;
 }
 
 void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
-                                                        MovePrimarySourceManager* sourceMgr) {
+                                                        MovePrimarySourceManager* sourceMgr,
+                                                        DSSLock&) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     invariant(sourceMgr);
     invariant(!_sourceMgr);
@@ -122,8 +125,8 @@ void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
     _sourceMgr = sourceMgr;
 }
 
-void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx, DSSLock&) {
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IX));
     _sourceMgr = nullptr;
 }
 

@@ -185,26 +185,6 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadat
     return _metadataManager->getActiveMetadata(_metadataManager, atClusterTime);
 }
 
-CollectionShardingRuntimeLock::CollectionShardingRuntimeLock(OperationContext* opCtx,
-                                                             CollectionShardingRuntime* csr,
-                                                             LockMode lockMode)
-    : _lock([&]() -> CSRLock {
-          invariant(lockMode == MODE_IS || lockMode == MODE_X);
-          return (lockMode == MODE_IS
-                      ? CSRLock(Lock::SharedLock(opCtx->lockState(), csr->_stateChangeMutex))
-                      : CSRLock(Lock::ExclusiveLock(opCtx->lockState(), csr->_stateChangeMutex)));
-      }()) {}
-
-CollectionShardingRuntimeLock CollectionShardingRuntimeLock::lock(OperationContext* opCtx,
-                                                                  CollectionShardingRuntime* csr) {
-    return CollectionShardingRuntimeLock(opCtx, csr, MODE_IS);
-}
-
-CollectionShardingRuntimeLock CollectionShardingRuntimeLock::lockExclusive(
-    OperationContext* opCtx, CollectionShardingRuntime* csr) {
-    return CollectionShardingRuntimeLock(opCtx, csr, MODE_X);
-}
-
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
     : _nss(std::move(ns)), _opCtx(opCtx) {
     AutoGetCollection autoColl(_opCtx,

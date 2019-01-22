@@ -89,7 +89,11 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         // We use AutoGetOrCreateDb the first time just in case movePrimary was called before any
         // data was inserted into the database.
         AutoGetOrCreateDb autoDb(opCtx, getNss().toString(), MODE_X);
-        DatabaseShardingState::get(autoDb.getDb()).setMovePrimarySourceManager(opCtx, this);
+
+        auto& dss = DatabaseShardingState::get(autoDb.getDb());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+
+        dss.setMovePrimarySourceManager(opCtx, this, dssLock);
     }
 
     _state = kCloning;
@@ -146,8 +150,11 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
+        auto& dss = DatabaseShardingState::get(autoDb.getDb());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
-        DatabaseShardingState::get(autoDb.getDb()).enterCriticalSectionCatchUpPhase(opCtx);
+        dss.enterCriticalSectionCatchUpPhase(opCtx, dssLock);
     }
 
     _state = kCriticalSection;
@@ -195,9 +202,12 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
+        auto& dss = DatabaseShardingState::get(autoDb.getDb());
+        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+
         // Read operations must begin to wait on the critical section just before we send the
         // commit operation to the config server
-        DatabaseShardingState::get(autoDb.getDb()).enterCriticalSectionCommitPhase(opCtx);
+        dss.enterCriticalSectionCommitPhase(opCtx, dssLock);
     }
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -244,7 +254,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         // this node can accept writes for this collection as a proxy for it being primary.
         if (!validateStatus.isOK()) {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+            AutoGetDb autoDb(opCtx, getNss().toString(), MODE_IX);
 
             if (!autoDb.getDb()) {
                 uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -253,7 +263,10 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             }
 
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+                auto& dss = DatabaseShardingState::get(autoDb.getDb());
+                auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+
+                dss.setDbVersion(opCtx, boost::none, dssLock);
                 uassertStatusOK(validateStatus.withContext(
                     str::stream() << "Unable to verify movePrimary commit for database: "
                                   << getNss().ns()
@@ -345,13 +358,16 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
     {
         // Unregister from the database's sharding state if we're still registered.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_IX);
 
         if (autoDb.getDb()) {
-            DatabaseShardingState::get(autoDb.getDb()).clearMovePrimarySourceManager(opCtx);
+            auto& dss = DatabaseShardingState::get(autoDb.getDb());
+            auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, &dss);
+
+            dss.clearMovePrimarySourceManager(opCtx, dssLock);
 
             // Leave the critical section if we're still registered.
-            DatabaseShardingState::get(autoDb.getDb()).exitCriticalSection(opCtx, boost::none);
+            dss.exitCriticalSection(opCtx, boost::none, dssLock);
         }
     }
 

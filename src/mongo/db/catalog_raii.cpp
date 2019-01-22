@@ -59,7 +59,9 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
     if (_db) {
-        DatabaseShardingState::get(_db).checkDbVersion(opCtx);
+        auto& dss = DatabaseShardingState::get(_db);
+        auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+        dss.checkDbVersion(opCtx, dssLock);
     }
 }
 
@@ -171,7 +173,9 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
         _db = databaseHolder->openDb(opCtx, dbName, &_justCreated);
     }
 
-    DatabaseShardingState::get(_db).checkDbVersion(opCtx);
+    auto& dss = DatabaseShardingState::get(_db);
+    auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+    dss.checkDbVersion(opCtx, dssLock);
 }
 
 ConcealUUIDCatalogChangesBlock::ConcealUUIDCatalogChangesBlock(OperationContext* opCtx)

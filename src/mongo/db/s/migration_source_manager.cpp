@@ -122,7 +122,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
-                                                    CollectionShardingRuntimeLock& csrLock) {
+                                                    CollectionShardingRuntime::CSRLock& csrLock) {
     return msmForCsr(csr);
 }
 
@@ -255,7 +255,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
                                    opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                        Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
         auto csr = CollectionShardingRuntime::get(opCtx, getNss());
-        auto lockedCsr = CollectionShardingRuntimeLock::lockExclusive(opCtx, csr);
+        auto lockedCsr = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
     }
 
