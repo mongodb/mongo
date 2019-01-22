@@ -34,10 +34,12 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/db/transaction_coordinator_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -62,7 +64,7 @@ const StatusWith<BSONObj> kPrepareOkButWriteConcernError =
     BSON("ok" << 1 << "prepareTimestamp" << Timestamp(1, 1) << "writeConcernError"
               << kDummyWriteConcernError);
 
-class TransactionCoordinatorServiceTest : public TransactionCoordinatorTestFixture {
+class TransactionCoordinatorServiceTestFixture : public TransactionCoordinatorTestFixture {
 public:
     // Prepare responses
 
@@ -191,6 +193,107 @@ public:
 
         // Wait for abort to complete.
         commitDecisionFuture.get();
+    }
+
+    auto* service() const {
+        return TransactionCoordinatorService::get(operationContext());
+    }
+};
+
+
+using TransactionCoordinatorServiceStepUpStepDownTest = TransactionCoordinatorServiceTestFixture;
+
+TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsFailBeforeStepUpStarts) {
+    ASSERT_THROWS_CODE(service()->createCoordinator(
+                           operationContext(), makeLogicalSessionIdForTest(), 0, kCommitDeadline),
+                       AssertionException,
+                       ErrorCodes::NotMaster);
+
+    ASSERT_THROWS_CODE(service()->coordinateCommit(
+                           operationContext(), makeLogicalSessionIdForTest(), 0, kTwoShardIdSet),
+                       AssertionException,
+                       ErrorCodes::NotMaster);
+
+    ASSERT_THROWS_CODE(
+        service()->recoverCommit(operationContext(), makeLogicalSessionIdForTest(), 0),
+        AssertionException,
+        ErrorCodes::NotMaster);
+}
+
+TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsBlockBeforeStepUpCompletes) {
+    service()->onStepUp(operationContext(), Milliseconds(1));
+    auto stepDownGuard = makeGuard([&] { service()->onStepDown(); });
+
+    ASSERT_THROWS_CODE(operationContext()->runWithDeadline(
+                           Date_t::now() + Milliseconds{5},
+                           ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                           [&] {
+                               return service()->coordinateCommit(operationContext(),
+                                                                  makeLogicalSessionIdForTest(),
+                                                                  0,
+                                                                  kTwoShardIdSet);
+                           }),
+                       AssertionException,
+                       ErrorCodes::NetworkInterfaceExceededTimeLimit);
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Milliseconds(1));
+    }
+
+    ASSERT(service()->coordinateCommit(
+               operationContext(), makeLogicalSessionIdForTest(), 0, kTwoShardIdSet) ==
+           boost::none);
+}
+
+TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepUpFailsDueToBadCoordinatorDocument) {
+    DBDirectClient client(operationContext());
+    client.insert(NamespaceString::kTransactionCoordinatorsNamespace.ns(), BSON("IllegalKey" << 1));
+    ASSERT_EQ("", client.getLastError());
+
+    service()->onStepUp(operationContext());
+    auto stepDownGuard = makeGuard([&] { service()->onStepDown(); });
+
+    ASSERT_THROWS_CODE(service()->coordinateCommit(
+                           operationContext(), makeLogicalSessionIdForTest(), 0, kTwoShardIdSet),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+
+    ASSERT_THROWS_CODE(
+        service()->recoverCommit(operationContext(), makeLogicalSessionIdForTest(), 0),
+        AssertionException,
+        ErrorCodes::TypeMismatch);
+}
+
+TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, StepDownBeforeStepUpTaskCompleted) {
+    // Call step-up with 1ms delay (meaning it will not actually execute until time is manually
+    // advanced on the underlying executor)
+    service()->onStepUp(operationContext(), Milliseconds(1));
+
+    // Should cancel all outstanding tasks (including the recovery task started by onStepUp above,
+    // which has not yet run)
+    service()->onStepDown();
+
+    // Do another onStepUp to ensure it runs successfully
+    service()->onStepUp(operationContext());
+
+    // Step-down the service so that the destructor does not complain
+    service()->onStepDown();
+}
+
+
+class TransactionCoordinatorServiceTest : public TransactionCoordinatorServiceTestFixture {
+protected:
+    void setUp() override {
+        TransactionCoordinatorServiceTestFixture::setUp();
+
+        service()->onStepUp(operationContext());
+    }
+
+    void tearDown() override {
+        service()->onStepDown();
+
+        TransactionCoordinatorServiceTestFixture::tearDown();
     }
 
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};

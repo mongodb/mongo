@@ -48,8 +48,7 @@ namespace mongo {
  * itself from the config.txnCommitDecisions collection, which will be done on transition to
  * primary (whether from startup or ordinary step up).
  */
-class TransactionCoordinatorCatalog
-    : public std::enable_shared_from_this<TransactionCoordinatorCatalog> {
+class TransactionCoordinatorCatalog {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorCatalog);
 
 public:
@@ -94,16 +93,15 @@ public:
     void remove(LogicalSessionId lsid, TxnNumber txnNumber);
 
     /**
-     * Waits for the catalog to no longer be marked as in stepup and then marks the catalog as in
-     * stepup and waits for all active coordinators from the previous term to complete (either
-     * successfully or with an error) and be removed from the catalog.
-     */
-    void enterStepUp(OperationContext* opCtx);
-
-    /**
      * Marks no stepup in progress and signals that no stepup is in progress.
      */
-    void exitStepUp();
+    void exitStepUp(Status status);
+
+    /**
+     * Blocking method, which waits for all coordinators registered on the catalog to complete
+     * (after this returns, it is guaranteed that all onCompletion futures have been set)
+     */
+    void join();
 
     /**
      * Returns a string representation of the map from LogicalSessionId to the list of TxnNumbers
@@ -140,16 +138,20 @@ private:
     // commit coordination and would normally be expunged from memory.
     LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySessionDefunct;
 
-    /**
-     * Whether a thread is actively executing a stepUp task.
-     */
-    bool _stepUpInProgress{false};
+    // Stores the result of the coordinator catalog's recovery attempt (the status passed to
+    // exitStepUp). This is what the values mean:
+    //
+    // stepUpCompletionStatus = none - brand new created object (exitStepUp has not been called
+    // yet). All calls will block.
+    // stepUpCompletionStatus = OK - recovery completed successfully, transactions can be
+    // coordinated
+    // stepUpCompletionStatus = error - recovery completed with an error, transactions cannot be
+    // coordinated (all methods will fail with this error)
+    boost::optional<Status> _stepUpCompletionStatus;
 
-    /**
-     * Notified when the *current* in-progress stepUp task has completed, i.e., _stepUpInProgress
-     * becomes false.
-     */
-    stdx::condition_variable _noStepUpInProgressCv;
+    // Signaled when recovery of the catalog completes (when _stepUpCompletionStatus transitions
+    // from none to either OK or error)
+    stdx::condition_variable _stepUpCompleteCv;
 
     // Notified when the last coordinator is removed from the catalog.
     stdx::condition_variable _noActiveCoordinatorsCv;

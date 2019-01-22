@@ -580,10 +580,9 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
     OperationContext* opCtx) {
     std::vector<TransactionCoordinatorDocument> allCoordinatorDocs;
 
-    Query query;
     DBDirectClient client(opCtx);
     auto coordinatorDocsCursor =
-        client.query(NamespaceString::kTransactionCoordinatorsNamespace, query);
+        client.query(NamespaceString::kTransactionCoordinatorsNamespace, Query{});
 
     while (coordinatorDocsCursor->more()) {
         // TODO (SERVER-38307): Try/catch around parsing the document and skip the document if it

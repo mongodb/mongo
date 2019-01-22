@@ -90,12 +90,52 @@ public:
      * 2. Read all pending commit tasks from the config.transactionCoordinators collection.
      * 3. Create TransactionCoordinator objects in memory for each pending commit and launch an
      *    async task to continue coordinating its commit.
+     *
+     * The 'recoveryDelay' argument is only used for testing in order to simulate recovery taking
+     * long time.
      */
-    void onStepUp(OperationContext* opCtx);
+    void onStepUp(OperationContext* opCtx, Milliseconds recoveryDelayForTesting = Milliseconds(0));
     void onStepDown();
 
+    /**
+     * Called when an already established replica set is added as a shard to a cluster. Ensures that
+     * the TransactionCoordinator service is started up if the replica set is currently primary.
+     */
+    void onShardingInitialization(OperationContext* opCtx, bool isPrimary);
+
 private:
-    std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
+    struct CatalogAndScheduler {
+        CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
+
+        txn::AsyncWorkScheduler scheduler;
+        TransactionCoordinatorCatalog catalog;
+
+        boost::optional<Future<void>> recoveryTaskCompleted;
+    };
+
+    /**
+     * Returns the current catalog + scheduler if stepUp has started, otherwise throws a NotMaster
+     * exception.
+     */
+    std::shared_ptr<CatalogAndScheduler> _getCatalogAndScheduler(OperationContext* opCtx);
+
+    /**
+     * Blocking call which waits for the previous stepUp/stepDown round to join and ensures all
+     * tasks scheduled by that round have completed.
+     */
+    void _joinPreviousRound();
+
+    // Contains the catalog + scheduler, which was active at the last step-down attempt (if any).
+    // Set at onStepDown and destroyed at onStepUp, which are always invoked sequentially by the
+    // replication machinery, so there is no need to explicitly synchronize it
+    std::shared_ptr<CatalogAndScheduler> _catalogAndSchedulerToCleanup;
+
+    // Protects the state below
+    mutable stdx::mutex _mutex;
+
+    // The catalog + scheduler instantiated at the last step-up attempt. When nullptr, it means
+    // onStepUp has not been called yet after the last stepDown (or construction).
+    std::shared_ptr<CatalogAndScheduler> _catalogAndScheduler;
 };
 
 }  // namespace mongo

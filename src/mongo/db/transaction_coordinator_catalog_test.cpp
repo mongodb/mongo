@@ -42,11 +42,12 @@ class TransactionCoordinatorCatalogTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        _coordinatorCatalog = std::make_shared<TransactionCoordinatorCatalog>();
+
+        _coordinatorCatalog.emplace();
+        _coordinatorCatalog->exitStepUp(Status::OK());
     }
 
     void tearDown() override {
-        _coordinatorCatalog.reset();
         // Make sure all of the coordinators are in a committed/aborted state before they are
         // destroyed. Otherwise, the coordinator's destructor will invariant because it will still
         // have outstanding futures that have not been completed (the one to remove itself from the
@@ -60,31 +61,25 @@ protected:
         ShardServerTestFixture::tearDown();
     }
 
-    TransactionCoordinatorCatalog& coordinatorCatalog() {
-        return *_coordinatorCatalog;
-    }
-
     void createCoordinatorInCatalog(OperationContext* opCtx,
                                     LogicalSessionId lsid,
                                     TxnNumber txnNumber) {
         auto newCoordinator =
             std::make_shared<TransactionCoordinator>(getServiceContext(), lsid, txnNumber);
 
-        coordinatorCatalog().insert(opCtx, lsid, txnNumber, newCoordinator);
+        _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
         _coordinatorsForTest.push_back(newCoordinator);
     }
 
-private:
-    // Note: MUST be shared_ptr due to use of std::enable_shared_from_this
-    std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
+    boost::optional<TransactionCoordinatorCatalog> _coordinatorCatalog;
+
     std::vector<std::shared_ptr<TransactionCoordinator>> _coordinatorsForTest;
 };
 
 TEST_F(TransactionCoordinatorCatalogTest, GetOnSessionThatDoesNotExistReturnsNone) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumber txnNumber = 1;
-
-    auto coordinator = coordinatorCatalog().get(operationContext(), lsid, txnNumber);
+    auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
     ASSERT(coordinator == nullptr);
 }
 
@@ -93,16 +88,15 @@ TEST_F(TransactionCoordinatorCatalogTest,
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumber txnNumber = 1;
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto coordinatorInCatalog = coordinatorCatalog().get(operationContext(), lsid, txnNumber + 1);
+    auto coordinatorInCatalog = _coordinatorCatalog->get(operationContext(), lsid, txnNumber + 1);
     ASSERT(coordinatorInCatalog == nullptr);
 }
-
 
 TEST_F(TransactionCoordinatorCatalogTest, CreateFollowedByGetReturnsCoordinator) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumber txnNumber = 1;
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto coordinatorInCatalog = coordinatorCatalog().get(operationContext(), lsid, txnNumber);
+    auto coordinatorInCatalog = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
     ASSERT(coordinatorInCatalog != nullptr);
 }
 
@@ -113,7 +107,7 @@ TEST_F(TransactionCoordinatorCatalogTest, SecondCreateForSessionDoesNotOverwrite
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber1);
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber2);
 
-    auto coordinator1InCatalog = coordinatorCatalog().get(operationContext(), lsid, txnNumber1);
+    auto coordinator1InCatalog = _coordinatorCatalog->get(operationContext(), lsid, txnNumber1);
     ASSERT(coordinator1InCatalog != nullptr);
 }
 
@@ -130,7 +124,7 @@ DEATH_TEST_F(TransactionCoordinatorCatalogTest,
 TEST_F(TransactionCoordinatorCatalogTest, GetLatestOnSessionWithNoCoordinatorsReturnsNone) {
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     auto latestTxnNumAndCoordinator =
-        coordinatorCatalog().getLatestOnSession(operationContext(), lsid);
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
     ASSERT_FALSE(latestTxnNumAndCoordinator);
 }
 
@@ -140,7 +134,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     TxnNumber txnNumber = 1;
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
     auto latestTxnNumAndCoordinator =
-        coordinatorCatalog().getLatestOnSession(operationContext(), lsid);
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
 
     ASSERT_TRUE(latestTxnNumAndCoordinator);
     ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber);
@@ -150,13 +144,13 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     LogicalSessionId lsid = makeLogicalSessionIdForTest();
     TxnNumber txnNumber = 1;
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber);
-    auto coordinator = coordinatorCatalog().get(operationContext(), lsid, txnNumber);
+    auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
 
     coordinator->cancelIfCommitNotYetStarted();
     ASSERT(coordinator->onCompletion().isReady());
 
     auto latestTxnNumAndCoordinator =
-        coordinatorCatalog().getLatestOnSession(operationContext(), lsid);
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
     ASSERT_FALSE(latestTxnNumAndCoordinator);
 }
 
@@ -168,7 +162,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber1);
     createCoordinatorInCatalog(operationContext(), lsid, txnNumber2);
     auto latestTxnNumAndCoordinator =
-        coordinatorCatalog().getLatestOnSession(operationContext(), lsid);
+        _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
 
     ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber2);
 }
