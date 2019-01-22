@@ -241,6 +241,9 @@
                 }
 
                 if (primaryInfo.hash !== secondaryInfo.hash) {
+                    print("DBHash mismatch found for collection with uuid: " + uuid +
+                          ". Primary info: " + tojsononeline(primaryInfo) + ". Secondary info: " +
+                          tojsononeline(secondaryInfo));
                     const diff = rst.getCollectionDiffUsingSessions(
                         primarySession, secondarySession, dbName, primaryInfo.uuid);
 
