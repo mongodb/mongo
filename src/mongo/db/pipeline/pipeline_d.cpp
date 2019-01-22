@@ -330,10 +330,18 @@ void PipelineD::prepareCursorSource(Collection* collection,
                         expCtx, sampleSize, idString, numRecords));
                 }
 
-                addCursorSource(
-                    pipeline,
-                    DocumentSourceCursor::create(collection, std::move(exec), expCtx),
-                    pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata));
+                // The order in which we evaluate these arguments is significant. We'd like to be
+                // sure that the DocumentSourceCursor is created _last_, because if we run into a
+                // case where a DocumentSourceCursor has been created (yet hasn't been put into a
+                // Pipeline) and an exception is thrown, an invariant will trigger in the
+                // DocumentSourceCursor. This is a design flaw in DocumentSourceCursor.
+
+                // TODO SERVER-37453 this should no longer be necessary when we no don't need locks
+                // to destroy a PlanExecutor.
+                auto deps = pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata);
+                addCursorSource(pipeline,
+                                DocumentSourceCursor::create(collection, std::move(exec), expCtx),
+                                std::move(deps));
                 return;
             }
         }
@@ -766,6 +774,10 @@ void PipelineD::addCursorSource(Pipeline* pipeline,
                                 const BSONObj& queryObj,
                                 const BSONObj& sortObj,
                                 const BSONObj& projectionObj) {
+    // Add the cursor to the pipeline first so that it's correctly disposed of as part of the
+    // pipeline if an exception is thrown during this method.
+    pipeline->addInitialSource(cursor);
+
     cursor->setQuery(queryObj);
     cursor->setSort(sortObj);
     if (deps.hasNoRequirements()) {
@@ -784,7 +796,6 @@ void PipelineD::addCursorSource(Pipeline* pipeline,
 
         cursor->setProjection(deps.toProjection(), deps.toParsedDeps());
     }
-    pipeline->addInitialSource(std::move(cursor));
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
