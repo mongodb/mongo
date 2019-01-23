@@ -28,7 +28,7 @@ import mongo.toolchain as mongo_toolchain
 import mongo.generators as mongo_generators
 
 EnsurePythonVersion(2, 7)
-EnsureSConsVersion(2, 5)
+EnsureSConsVersion(3, 0, 4)
 
 from buildscripts import utils
 from buildscripts import moduleconfig
