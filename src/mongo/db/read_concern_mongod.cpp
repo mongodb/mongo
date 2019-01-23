@@ -410,10 +410,12 @@ MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
            << " to become committed, current commit point: " << replCoord->getLastCommittedOpTime();
 
     if (!opCtx->hasDeadline()) {
-        // TODO (SERVER-38727): Replace this with a user specified timeout value, to address the
-        // fact that getMore commands do not respect maxTimeMS properly. Currently, this hard-coded
-        // value represents the maximum time we are ever willing to wait for an optime to majority
-        // commit when doing a speculative majority read. We make this value rather conservative.
+        // This hard-coded value represents the maximum time we are willing to wait for an optime to
+        // majority commit when doing a speculative majority read if no maxTimeMS value has been set
+        // for the command. We make this value rather conservative. This exists primarily to address
+        // the fact that getMore commands do not respect maxTimeMS properly. In this case, we still
+        // want speculative majority reads to time out after some period if an optime cannot
+        // majority commit.
         auto timeout = Seconds(15);
         opCtx->setDeadlineAfterNowBy(timeout, ErrorCodes::MaxTimeMSExpired);
     }
