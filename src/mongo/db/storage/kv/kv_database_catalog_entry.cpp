@@ -222,7 +222,8 @@ Status KVDatabaseCatalogEntry::createCollection(OperationContext* txn,
     // Mark collation feature as in use if the collection has a non-simple default collation.
     if (!options.collation.isEmpty()) {
         const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
-        if (_engine->getCatalog()->getFeatureTracker()->isNonRepairableFeatureInUse(txn, feature)) {
+        if (!_engine->getCatalog()->getFeatureTracker()->isNonRepairableFeatureInUse(txn,
+                                                                                     feature)) {
             _engine->getCatalog()->getFeatureTracker()->markNonRepairableFeatureAsInUse(txn,
                                                                                         feature);
         }

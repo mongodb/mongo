@@ -99,12 +99,20 @@
     testDB.dropDatabase();
 
     // We set the featureCompatibilityVersion back to 3.4 in order to use the "collation" option.
+    // Creating a collection with a non-default collation will set the catalog's
+    // isNonRepairableFeatureInUse bit, which should prevent a 3.2 mongod process from trying to use
+    // this catalog at all. Note that we set autoIndexId to false so that we can avoid creating a
+    // v=2 _id index. A v=2 would also prevent a 3.2 mongod process from using this catalog, but we
+    // check for that later in this test.
     assert.commandWorked(conn.getDB("admin").runCommand({setFeatureCompatibilityVersion: "3.4"}));
     assert.commandWorked(
-        testDB.createCollection("simplecollator", {collation: {locale: "simple"}}));
+        testDB.createCollection("nonsimple", {autoIndexId: false, collation: {locale: "fr"}}));
 
-    // Downgrade should fail because we have an _id index with v=2 on the "test.simplecollator"
-    // collection.
+    // Attempt to downgrade by setting featureCompatibiltyVersion to 3.2 and then shutting down the
+    // 3.4 mongod and starting up the 3.2 mongod. The 3.2 mongod will accept the
+    // featureCompatibilityVersion, but it should fail when it sees the isNonRepairableFeatureInUse
+    // bit.
+    assert.commandWorked(conn.getDB("admin").runCommand({setFeatureCompatibilityVersion: "3.2"}));
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod(downgradeOptions);
     assert.eq(null,
