@@ -56,9 +56,16 @@ public:
     GetModPathsReturn getModifiedPaths() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        // TODO SERVER-27533 Until we remove the restriction of only performing lookups from mongos,
+        // this stage must run on mongos if the output collection is sharded.
+        HostTypeRequirement hostRequirement =
+            (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from))
+            ? HostTypeRequirement::kMongoS
+            : HostTypeRequirement::kPrimaryShard;
+
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,
-                                     HostTypeRequirement::kPrimaryShard,
+                                     hostRequirement,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kAllowed,
                                      TransactionRequirement::kAllowed);

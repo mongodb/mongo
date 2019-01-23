@@ -189,14 +189,6 @@ public:
         return _requiredPrivileges;
     }
 
-    /**
-     * Returns true if 'nss' is in the list of foreign namespaces for this DocumentSource. By
-     * default, no involved namespace is allowed to be sharded.
-     */
-    bool allowShardedForeignCollection(NamespaceString nss) const {
-        return (_foreignNssSet.find(nss) == _foreignNssSet.end());
-    }
-
 protected:
     stdx::unordered_set<NamespaceString> _foreignNssSet;
 
