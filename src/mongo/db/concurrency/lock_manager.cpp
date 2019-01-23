@@ -279,8 +279,8 @@ struct LockHead {
 
     // Doubly-linked list of requests, which have not been granted yet because they conflict
     // with the set of granted modes. Requests are queued at the end of the queue and are
-    // granted from the beginning forward, which gives these locks FIFO ordering. Exceptions
-    // are high-priority locks, such as the MMAP V1 flush lock.
+    // granted from the beginning forward, which gives these locks FIFO ordering. Exceptions to the
+    // FIFO rule are strong lock requests for global resources, such as MODE_X for Global.
     LockRequestList conflictList;
 
     // Counts the conflicting requests for each of the lock modes. These counts should exactly

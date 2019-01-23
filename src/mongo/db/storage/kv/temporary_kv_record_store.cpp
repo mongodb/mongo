@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -44,6 +45,10 @@ TemporaryKVRecordStore::~TemporaryKVRecordStore() {
 }
 
 void TemporaryKVRecordStore::deleteTemporaryTable(OperationContext* opCtx) {
+    // Need at least Global IS before calling into the storage engine, to protect against it being
+    // destructed while we're using it.
+    invariant(opCtx->lockState()->isReadLocked());
+
     auto status = _kvEngine->dropIdent(opCtx, _rs->getIdent());
     fassert(
         51032,

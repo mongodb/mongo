@@ -82,6 +82,16 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
         collection->infoCache()->clearQueryCache();
     }
 
+    // Make lock acquisition uninterruptible.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // Lock the collection if it's not already locked.
+    boost::optional<Lock::DBLock> dbLock;
+    boost::optional<Lock::CollectionLock> collLock;
+    if (!opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X)) {
+        dbLock.emplace(opCtx, collection->ns().db(), MODE_IX);
+        collLock.emplace(opCtx, collection->ns(), MODE_X);
+    }
+
     if (!_needToCleanup || _indexes.empty()) {
         // The temp tables cannot be dropped in commit() because commit() can be called multiple
         // times on write conflict errors and the drop does not rollback in WUOWs.
@@ -92,9 +102,6 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
         _buildIsCleanedUp = true;
         return;
     }
-
-    // Make lock acquisition uninterruptible because onOpMessage() can take locks.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
     while (true) {
         try {
@@ -659,6 +666,15 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
 
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx) {
     _setStateToAbortedIfNotCommitted("aborted without cleanup"_sd);
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
+    // underneath us.
+    boost::optional<Lock::GlobalLock> lk;
+    if (!opCtx->lockState()->isWriteLocked()) {
+        lk.emplace(opCtx, MODE_IS);
+    }
+
     for (auto& index : _indexes) {
         index.block->deleteTemporaryTables(opCtx);
     }

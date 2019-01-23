@@ -385,7 +385,7 @@ public:
         // The global lock is handled differently from all other locks.
         LockMode globalMode;
 
-        // The non-global non-flush locks held, sorted by granularity.  That is, locks[i] is
+        // The non-global locks held, sorted by granularity.  That is, locks[i] is
         // coarser or as coarse as locks[i + 1].
         std::vector<OneLock> locks;
     };

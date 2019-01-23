@@ -88,6 +88,11 @@ public:
         // The PlanExecutor is no longer capable of executing. The caller may extract stats from the
         // underlying plan stages, but should not attempt to do anything else with the executor
         // other than dispose() and destroy it.
+        //
+        // N.B.: If the plan's YieldPolicy allows yielding, FAILURE can be returned on interrupt,
+        // and any locks acquired might possibly be released, regardless of the use of any RAII
+        // locking helpers such as AutoGetCollection.  Code must be written to expect this
+        // situation.
         FAILURE,
     };
 
@@ -100,7 +105,8 @@ public:
         // getNext() due to a required index or collection becoming invalid during yield. If this
         // occurs, getNext() will produce an error during yield recovery and will return FAILURE.
         // Additionally, this will handle all WriteConflictExceptions that occur while processing
-        // the query.
+        // the query.  With this yield policy, it is possible for getNext() to return FAILURE with
+        // locks released, if the operation is killed while yielding.
         YIELD_AUTO,
 
         // This will handle WriteConflictExceptions that occur while processing the query, but will

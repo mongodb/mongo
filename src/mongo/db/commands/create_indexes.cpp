@@ -360,10 +360,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // The 'indexer' can throw, so ensure the build cleanup occurs.
     ON_BLOCK_EXIT([&] {
-        if (!exclusiveCollectionLock) {
-            opCtx->recoveryUnit()->abandonSnapshot();
-            exclusiveCollectionLock.emplace(opCtx, ns, MODE_X);
-        }
+        opCtx->recoveryUnit()->abandonSnapshot();
         if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
             // Set a flag to leave the persisted index build state intact when cleanUpAfterBuild()
             // is called below. The index build will be found on server startup.

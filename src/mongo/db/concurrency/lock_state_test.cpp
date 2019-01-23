@@ -455,7 +455,7 @@ TEST_F(LockerImplTest, DefaultLocker) {
     locker.lockGlobal(MODE_IX);
     locker.lock(resId, MODE_X);
 
-    // Make sure the flush lock IS NOT held
+    // Make sure only Global and TestDB resources are locked.
     Locker::LockerInfo info;
     locker.getLockerInfo(&info, boost::none);
     ASSERT(!info.waitingResource.isValid());

@@ -1239,7 +1239,6 @@ env.Library(
         'query/plan_executor_impl.cpp',
         'query/plan_ranker.cpp',
         'query/plan_yield_policy.cpp',
-        'query/query_yield.cpp',
         'query/stage_builder.cpp',
         'run_op_kill_cursors.cpp',
     ],

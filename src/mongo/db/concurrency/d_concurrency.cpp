@@ -271,6 +271,9 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
     _opCtx->lockState()->unlock(_id);
     _mode = newMode;
 
+    // Verify we still have at least the Global resource locked.
+    invariant(_opCtx->lockState()->isLocked());
+
     _opCtx->lockState()->lock(_opCtx, _id, _mode);
     _result = LOCK_OK;
 }

@@ -673,8 +673,8 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     stateOut->locks.clear();
     stateOut->globalMode = MODE_NONE;
 
-    // First, we look at the global lock.  There is special handling for this (as the flush
-    // lock goes along with it) so we store it separately from the more pedestrian locks.
+    // First, we look at the global lock.  There is special handling for this so we store it
+    // separately from the more pedestrian locks.
     LockRequestsMap::Iterator globalRequest = _requests.find(resourceIdGlobal);
     if (!globalRequest) {
         // If there's no global lock there isn't really anything to do. Check that.
@@ -727,7 +727,7 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 }
 
 void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSnapshot& state) {
-    // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
+    // We shouldn't be restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());
     invariant(_modeForTicket == MODE_NONE);
     invariant(_clientState.load() == kInactive);
@@ -790,8 +790,8 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
     globalStats.recordAcquisition(_id, resId, mode);
     _stats.recordAcquisition(resId, mode);
 
-    // Give priority to the full modes for global, parallel batch writer mode,
-    // and flush lock so we don't stall global operations such as shutdown or flush.
+    // Give priority to the full modes for Global, PBWM, and RSTL resources so we don't stall global
+    // operations such as shutdown or stepdown.
     const ResourceType resType = resId.getType();
     if (resType == RESOURCE_GLOBAL) {
         if (mode == MODE_S || mode == MODE_X) {
@@ -799,7 +799,7 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
             request->compatibleFirst = true;
         }
     } else if (resType != RESOURCE_MUTEX) {
-        // This is all sanity checks that the global and flush locks are always be acquired
+        // This is all sanity checks that the global locks are always be acquired
         // before any other lock has been acquired and they must be in sync with the nesting.
         DEV {
             const LockRequestsMap::Iterator itGlobal = _requests.find(resourceIdGlobal);
