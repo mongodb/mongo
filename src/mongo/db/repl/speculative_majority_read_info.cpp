@@ -61,16 +61,11 @@ bool SpeculativeMajorityReadInfo::isSpeculativeRead() const {
     return _isSpeculativeRead;
 }
 
-void SpeculativeMajorityReadInfo::setSpeculativeReadOpTime(const OpTime& opTime) {
+void SpeculativeMajorityReadInfo::setSpeculativeReadOpTimeForward(const OpTime& opTime) {
     invariant(_isSpeculativeRead);
-    if (!_speculativeReadOpTime) {
-        // Set the read optime for the first time.
-        _speculativeReadOpTime = opTime;
-    } else {
-        // If an optime was already provided, only an optime >= the previous one is allowed.
-        invariant(opTime >= _speculativeReadOpTime);
-        _speculativeReadOpTime = opTime;
-    }
+    // Set the optime initially if needed. Update it only if the given optime is greater.
+    _speculativeReadOpTime =
+        _speculativeReadOpTime ? std::max(*_speculativeReadOpTime, opTime) : opTime;
 }
 
 boost::optional<OpTime> SpeculativeMajorityReadInfo::getSpeculativeReadOpTime() {

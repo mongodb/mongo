@@ -61,7 +61,7 @@ TEST(SpeculativeMajorityReadInfo, SetSpeculativeRead) {
 TEST(SpeculativeMajorityReadInfo, SetSpeculativeReadOpTime) {
     SpeculativeMajorityReadInfo readInfo;
     readInfo.setIsSpeculativeRead();
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(1, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(1, 0), 1));
     auto readOpTime = readInfo.getSpeculativeReadOpTime();
     ASSERT(readInfo.isSpeculativeRead());
     ASSERT(readOpTime);
@@ -72,7 +72,7 @@ DEATH_TEST(SpeculativeMajorityReadInfo,
            CannotSetSpeculativeReadOpTimeOnNonSpeculativeRead,
            "Invariant failure") {
     SpeculativeMajorityReadInfo readInfo;
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(1, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(1, 0), 1));
 }
 
 TEST(SpeculativeMajorityReadInfo, SpeculativeReadOpTimesCanMonotonicallyIncrease) {
@@ -80,34 +80,38 @@ TEST(SpeculativeMajorityReadInfo, SpeculativeReadOpTimesCanMonotonicallyIncrease
     readInfo.setIsSpeculativeRead();
 
     // Set the initial read optime.
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(1, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(1, 0), 1));
     auto readOpTime = readInfo.getSpeculativeReadOpTime();
     ASSERT(readInfo.isSpeculativeRead());
     ASSERT(readOpTime);
 
     // Allowed to keep the optime the same.
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(1, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(1, 0), 1));
     readOpTime = readInfo.getSpeculativeReadOpTime();
     ASSERT(readOpTime);
     ASSERT_EQ(*readOpTime, OpTime(Timestamp(1, 0), 1));
 
     // Allowed to increase the optime.
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(2, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(2, 0), 1));
     readOpTime = readInfo.getSpeculativeReadOpTime();
     ASSERT(readOpTime);
     ASSERT_EQ(*readOpTime, OpTime(Timestamp(2, 0), 1));
 }
 
-DEATH_TEST(SpeculativeMajorityReadInfo, SpeculativeReadOpTimeCannotDecrease, "Invariant failure") {
+TEST(SpeculativeMajorityReadInfo, SpeculativeReadOpTimeCannotDecrease) {
     SpeculativeMajorityReadInfo readInfo;
     readInfo.setIsSpeculativeRead();
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(2, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(2, 0), 1));
     auto readOpTime = readInfo.getSpeculativeReadOpTime();
     ASSERT(readInfo.isSpeculativeRead());
     ASSERT(readOpTime);
 
     // Optime cannot decrease.
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(1, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(1, 0), 1));
+
+    ASSERT(readInfo.isSpeculativeRead());
+    ASSERT(readOpTime);
+    ASSERT_EQ(*readOpTime, OpTime(Timestamp(2, 0), 1));
 }
 
 TEST(SpeculativeMajorityReadInfo, SetSpeculativeReadIsIdempotent) {
@@ -124,7 +128,7 @@ TEST(SpeculativeMajorityReadInfo, SetSpeculativeReadIsIdempotent) {
     ASSERT(readInfo.isSpeculativeRead());
     ASSERT_FALSE(readInfo.getSpeculativeReadOpTime());
 
-    readInfo.setSpeculativeReadOpTime(OpTime(Timestamp(1, 0), 1));
+    readInfo.setSpeculativeReadOpTimeForward(OpTime(Timestamp(1, 0), 1));
     ASSERT(readInfo.isSpeculativeRead());
     ASSERT(readInfo.getSpeculativeReadOpTime());
 

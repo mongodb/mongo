@@ -86,12 +86,12 @@ public:
      *
      * May only be called if this operation has already been marked as a speculative read.
      *
-     * If no read optime has been set already, then it is valid to call this method with any optime.
-     * If an optime has already been set, then any subsequent call to this method must provide an
-     * optime that is greater than or equal to the optime provided in the previous call. This
-     * guarantees that the speculative read optime monotonically increases.
+     * If no read optime has been set already, then this will set the speculative read optime to the
+     * optime given. If a speculative read optime has already been set at T, then any subsequent
+     * call to this method with an optime T' only updates the speculative read optime if T' > T.
+     * This guarantees that speculative read optimes advance monotonically.
      */
-    void setSpeculativeReadOpTime(const OpTime& opTime);
+    void setSpeculativeReadOpTimeForward(const OpTime& opTime);
 
     /**
      * Get the speculative read optime for this operation, if one exists.
