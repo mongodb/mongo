@@ -21,10 +21,13 @@
     const secondary = rst.getSecondary();
     const testDB = primary.getDB(dbName);
 
+    // Make sure collection creation is checkpointed.
+    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 0}]}));
+    assert.commandWorked(primary.getDB("admin").runCommand({fsync: 1}));
+
     // Stop secondary's oplog application so the dropCollection can never be committed.
     assert.commandWorked(
         secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
-    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 0}]}));
     assert.commandWorked(testDB.runCommand({drop: collName}));
 
     // Wait until the first phase (renaming) is done on the primary.
