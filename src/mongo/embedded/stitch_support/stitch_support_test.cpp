@@ -92,8 +92,8 @@ protected:
     auto checkMatch(const char* filterJSON,
                     std::vector<const char*> documentsJSON,
                     stitch_support_v1_collator* collator = nullptr) {
-        auto matcher =
-            stitch_support_v1_matcher_create(lib, toBSONForAPI(filterJSON).first, collator, nullptr);
+        auto matcher = stitch_support_v1_matcher_create(
+            lib, toBSONForAPI(filterJSON).first, collator, nullptr);
         ASSERT(matcher);
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
         return std::all_of(
@@ -110,8 +110,8 @@ protected:
                           stitch_support_v1_collator* collator = nullptr) {
         auto matchStatus = stitch_support_v1_status_create();
         ON_BLOCK_EXIT([matchStatus] { stitch_support_v1_status_destroy(matchStatus); });
-        auto matcher =
-            stitch_support_v1_matcher_create(lib, toBSONForAPI(filterJSON).first, collator, matchStatus);
+        auto matcher = stitch_support_v1_matcher_create(
+            lib, toBSONForAPI(filterJSON).first, collator, matchStatus);
         if (matcher) {
             stitch_support_v1_matcher_destroy(matcher);
             FAIL("Expected stich_support_v1_matcher_create to fail");
@@ -133,8 +133,8 @@ protected:
                          bool denyProjectionCollator = false) {
         stitch_support_v1_matcher* matcher = nullptr;
         if (filterJSON) {
-            matcher =
-                stitch_support_v1_matcher_create(lib, toBSONForAPI(filterJSON).first, collator, nullptr);
+            matcher = stitch_support_v1_matcher_create(
+                lib, toBSONForAPI(filterJSON).first, collator, nullptr);
             ASSERT(matcher);
         }
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
@@ -172,8 +172,8 @@ protected:
 
         stitch_support_v1_matcher* matcher = nullptr;
         if (filterJSON) {
-            matcher =
-                stitch_support_v1_matcher_create(lib, toBSONForAPI(filterJSON).first, collator, nullptr);
+            matcher = stitch_support_v1_matcher_create(
+                lib, toBSONForAPI(filterJSON).first, collator, nullptr);
             ASSERT(matcher);
         }
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
@@ -200,29 +200,31 @@ protected:
                      const char* collatorObj = nullptr) {
         stitch_support_v1_collator* collator = nullptr;
         if (collatorObj) {
-            collator = stitch_support_v1_collator_create(lib, toBSONForAPI(collatorObj).first, nullptr);
+            collator =
+                stitch_support_v1_collator_create(lib, toBSONForAPI(collatorObj).first, nullptr);
         }
         ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
 
         stitch_support_v1_matcher* matcher = nullptr;
         if (match) {
-            matcher = stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, collator, nullptr);
+            matcher =
+                stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, collator, nullptr);
             ASSERT(matcher);
         }
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
 
-        stitch_support_v1_update* update =
-            stitch_support_v1_update_create(lib,
-                                            toBSONForAPI(expr).first,
-                                            arrayFilters ? toBSONForAPI(arrayFilters).first : nullptr,
-                                            matcher,
-                                            collator,
-                                            status);
+        stitch_support_v1_update* update = stitch_support_v1_update_create(
+            lib,
+            toBSONForAPI(expr).first,
+            arrayFilters ? toBSONForAPI(arrayFilters).first : nullptr,
+            matcher,
+            collator,
+            status);
         ASSERT(update);
         ON_BLOCK_EXIT([update] { stitch_support_v1_update_destroy(update); });
 
-        auto updateResult =
-            stitch_support_v1_update_apply(update, toBSONForAPI(document).first, updateDetails, status);
+        auto updateResult = stitch_support_v1_update_apply(
+            update, toBSONForAPI(document).first, updateDetails, status);
         ASSERT_EQ(0, stitch_support_v1_status_get_code(status))
             << stitch_support_v1_status_get_error(status) << ":"
             << stitch_support_v1_status_get_explanation(status);
@@ -242,24 +244,26 @@ protected:
 
         stitch_support_v1_collator* collator = nullptr;
         if (collatorObj) {
-            collator = stitch_support_v1_collator_create(lib, toBSONForAPI(collatorObj).first, nullptr);
+            collator =
+                stitch_support_v1_collator_create(lib, toBSONForAPI(collatorObj).first, nullptr);
         }
         ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
 
         stitch_support_v1_matcher* matcher = nullptr;
         if (match) {
-            matcher = stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, collator, nullptr);
+            matcher =
+                stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, collator, nullptr);
             ASSERT(matcher);
         }
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
 
-        stitch_support_v1_update* update =
-            stitch_support_v1_update_create(lib,
-                                            toBSONForAPI(expr).first,
-                                            arrayFilters ? toBSONForAPI(arrayFilters).first : nullptr,
-                                            matcher,
-                                            collator,
-                                            updateStatus);
+        stitch_support_v1_update* update = stitch_support_v1_update_create(
+            lib,
+            toBSONForAPI(expr).first,
+            arrayFilters ? toBSONForAPI(arrayFilters).first : nullptr,
+            matcher,
+            collator,
+            updateStatus);
 
         if (!update) {
             ASSERT_EQ(STITCH_SUPPORT_V1_ERROR_EXCEPTION,
