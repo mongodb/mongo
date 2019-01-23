@@ -97,6 +97,9 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            CommandHelpers::handleMarkKillOnClientDisconnect(
+                opCtx, !Pipeline::aggSupportsWriteConcern(_request.body));
+
             const auto aggregationRequest = uassertStatusOK(
                 AggregationRequest::parseFromBSON(_dbName, _request.body, boost::none));
             uassertStatusOK(runAggregate(opCtx,

@@ -546,7 +546,9 @@ void execCommandDatabase(OperationContext* opCtx,
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
     BSONObjBuilder extraFieldsBuilder;
     auto startOperationTime = getClientOperationTime(opCtx);
+
     auto invocation = command->parse(opCtx, request);
+
     OperationSessionInfoFromClient sessionOptions;
 
     try {
@@ -1203,6 +1205,8 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         dbresponse = receivedCommands(opCtx, m, behaviors);
     } else if (op == dbQuery) {
         invariant(!isCommand);
+        opCtx->markKillOnClientDisconnect();
+
         dbresponse = receivedQuery(opCtx, nsString, c, m, behaviors);
     } else if (op == dbGetMore) {
         dbresponse = receivedGetMore(opCtx, m, currentOp, &forceLog);

@@ -435,6 +435,8 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
         const auto nss(NamespaceString::makeListCollectionsNSS(dbName));
 
         BSONObj newCmd = cmdObj;
@@ -502,6 +504,8 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
         const NamespaceString nss(parseNs(dbName, cmdObj));
         const auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));

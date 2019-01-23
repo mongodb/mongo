@@ -229,6 +229,7 @@ public:
          *   --Generate response to send to the client.
          */
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
             // Although it is a command, a find command gets counted as a query.
             globalOpCounters.gotQuery();
             ServerReadConcernMetrics::get(opCtx)->recordReadConcern(

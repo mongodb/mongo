@@ -276,6 +276,7 @@ bool CmdSaslStart::run(OperationContext* opCtx,
                        const std::string& db,
                        const BSONObj& cmdObj,
                        BSONObjBuilder& result) {
+    opCtx->markKillOnClientDisconnect();
     Client* client = opCtx->getClient();
     AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
 
@@ -310,6 +311,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
                           const std::string& db,
                           const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
+    opCtx->markKillOnClientDisconnect();
     Client* client = Client::getCurrent();
     std::unique_ptr<AuthenticationSession> sessionGuard;
     AuthenticationSession::swap(client, sessionGuard);

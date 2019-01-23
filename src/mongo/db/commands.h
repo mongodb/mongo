@@ -56,6 +56,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DECLARE(failCommand);
+MONGO_FAIL_POINT_DECLARE(waitInCommandMarkKillOnClientDisconnect);
 
 class Command;
 class CommandInvocation;
@@ -228,6 +229,12 @@ struct CommandHelpers {
      * Possibly uasserts according to the "failCommand" fail point.
      */
     static void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName);
+
+    /**
+     * Handles marking kill on client disconnect.
+     */
+    static void handleMarkKillOnClientDisconnect(OperationContext* opCtx,
+                                                 bool shouldMarkKill = true);
 };
 
 /**

@@ -55,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -470,6 +471,7 @@ Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName)
 constexpr StringData CommandHelpers::kHelpFieldName;
 
 MONGO_FAIL_POINT_DEFINE(failCommand);
+MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
 
 bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                         StringData cmdName,
@@ -527,6 +529,28 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, Strin
             uasserted(ErrorCodes::Error(errorCode),
                       "Failing command due to 'failCommand' failpoint");
         }
+    }
+}
+
+void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
+                                                      bool shouldMarkKill) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
+    if (shouldMarkKill) {
+        opCtx->markKillOnClientDisconnect();
+    }
+
+    MONGO_FAIL_POINT_BLOCK_IF(
+        waitInCommandMarkKillOnClientDisconnect, options, [&](const BSONObj& obj) {
+            const auto& clientMetadata =
+                ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
+
+            return clientMetadata && (clientMetadata->getApplicationName() == obj["appName"].str());
+        }) {
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        waitInCommandMarkKillOnClientDisconnect);
     }
 }
 

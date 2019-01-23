@@ -163,6 +163,7 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto query = extractQuery(cmdObj);

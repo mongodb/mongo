@@ -78,6 +78,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
         if (!seenIsMaster) {

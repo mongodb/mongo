@@ -174,6 +174,7 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& ns
 
 unsigned long long DBDirectClient::count(
     const string& ns, const BSONObj& query, int options, int limit, int skip) {
+    DirectClientScope directClientScope(_opCtx);
     BSONObj cmdObj = _countCmd(ns, query, options, limit, skip);
 
     NamespaceString nsString(ns);

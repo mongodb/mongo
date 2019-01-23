@@ -247,6 +247,7 @@ public:
              const string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) final {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         unique_ptr<MatchExpression> matcher;
         const auto as = AuthorizationSession::get(opCtx->getClient());
 

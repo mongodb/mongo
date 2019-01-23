@@ -104,6 +104,9 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            CommandHelpers::handleMarkKillOnClientDisconnect(
+                opCtx, !Pipeline::aggSupportsWriteConcern(_request.body));
+
             auto bob = reply->getBodyBuilder();
             _runAggCommand(opCtx, _dbName, _request.body, boost::none, &bob);
         }

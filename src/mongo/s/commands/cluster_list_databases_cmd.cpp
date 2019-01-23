@@ -84,6 +84,8 @@ public:
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
         IDLParserErrorContext ctx("listDatabases");
         auto cmd = ListDatabasesCommand::parse(ctx, cmdObj);
         auto* as = AuthorizationSession::get(opCtx->getClient());

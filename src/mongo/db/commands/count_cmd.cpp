@@ -180,6 +180,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommand> ctx;

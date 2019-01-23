@@ -128,6 +128,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
         uassertStatusOK(

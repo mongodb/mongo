@@ -237,6 +237,8 @@ public:
         return _writesAreReplicated;
     }
 
+    void markKillOnClientDisconnect();
+
     /**
      * Marks this operation as killed so that subsequent calls to checkForInterrupt and
      * checkForInterruptNoAssert by the thread executing the operation will start returning the
@@ -463,6 +465,8 @@ private:
     ErrorCodes::Error _timeoutError = ErrorCodes::ExceededTimeLimit;
     bool _ignoreInterrupts = false;
     bool _hasArtificialDeadline = false;
+    bool _markKillOnClientDisconnect = false;
+    Date_t _lastClientCheck;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
     // user-specified maxTime. This is tracked with microsecond granularity for the purpose of

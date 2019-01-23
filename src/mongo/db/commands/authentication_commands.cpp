@@ -232,6 +232,7 @@ public:
              const std::string&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         auto n = getNextNonce();
         std::stringstream ss;
         ss << std::hex << n;
@@ -253,6 +254,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
                           const std::string& dbname,
                           const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
+    CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
     if (!serverGlobalParams.quiet.load()) {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
         log() << " authenticate db: " << dbname << " " << cmdToLog;

@@ -237,6 +237,7 @@ public:
              const string&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
+        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.
         */
