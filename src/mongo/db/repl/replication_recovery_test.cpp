@@ -72,6 +72,16 @@ public:
         _recoveryTimestamp = recoveryTimestamp;
     }
 
+    bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _supportsRecoverToStableTimestamp;
+    }
+
+    void setSupportsRecoverToStableTimestamp(bool supports) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _supportsRecoverToStableTimestamp = supports;
+    }
+
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _supportsRecoveryTimestamp;
@@ -97,6 +107,7 @@ private:
     Timestamp _initialDataTimestamp = Timestamp::min();
     boost::optional<Timestamp> _recoveryTimestamp = boost::none;
     Timestamp _pointInTimeReadTimestamp = {};
+    bool _supportsRecoverToStableTimestamp = true;
     bool _supportsRecoveryTimestamp = true;
 };
 
@@ -543,14 +554,14 @@ void ReplicationRecoveryTest::testRecoveryAppliesDocumentsWhenAppliedThroughIsBe
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehind) {
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(true);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     bool hasStableTimestamp = false;
     bool hasStableCheckpoint = false;
     testRecoveryAppliesDocumentsWhenAppliedThroughIsBehind(hasStableTimestamp, hasStableCheckpoint);
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehindNoRTT) {
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(false);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(false);
     bool hasStableTimestamp = false;
     bool hasStableCheckpoint = false;
     testRecoveryAppliesDocumentsWhenAppliedThroughIsBehind(hasStableTimestamp, hasStableCheckpoint);
@@ -886,7 +897,7 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
 
     const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
     getStorageInterfaceRecovery()->setPointInTimeReadTimestamp(Timestamp(1, 0));
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(true);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
     getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
     _setUpOplog(opCtx, getStorageInterface(), {1});
@@ -934,7 +945,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
     auto opCtx = getOperationContext();
 
     const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(true);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
     getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
     _setUpOplog(opCtx, getStorageInterface(), {1});
@@ -997,7 +1008,7 @@ DEATH_TEST_F(ReplicationRecoveryTest,
     auto opCtx = getOperationContext();
 
     const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(true);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
     getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
     _setUpOplog(opCtx, getStorageInterface(), {1});
@@ -1031,7 +1042,7 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
     auto opCtx = getOperationContext();
 
     const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(true);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
     getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
     _setUpOplog(opCtx, getStorageInterface(), {1});
@@ -1108,7 +1119,7 @@ TEST_F(ReplicationRecoveryTest,
     // when updating the transactions table during startup recovery when the table already reflects
     // the committed transaction.
     const auto appliedThrough = OpTime(Timestamp(2, 2), 1);
-    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(true);
+    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
     getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
     getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
     _setUpOplog(opCtx, getStorageInterface(), {1});

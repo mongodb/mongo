@@ -165,6 +165,8 @@ public:
 
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
+    bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override;
+
     bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override;

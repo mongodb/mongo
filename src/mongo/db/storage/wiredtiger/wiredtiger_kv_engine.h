@@ -211,6 +211,8 @@ public:
      */
     void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
+    bool supportsRecoverToStableTimestamp() const override;
+
     bool supportsRecoveryTimestamp() const override;
 
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
