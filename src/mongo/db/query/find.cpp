@@ -353,6 +353,31 @@ Message getMore(OperationContext* opCtx,
 
     *isCursorAuthorized = true;
 
+    // Only used by the failpoints.
+    const auto dropAndReaquireReadLock = [&] {
+        // Make sure an interrupted operation does not prevent us from reacquiring the lock.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+        readLock.reset();
+        readLock.emplace(opCtx, NamespaceString(ns));
+    };
+
+    // On early return, get rid of the cursor.
+    auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
+
+    // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the
+    // 'msg' field of this operation's CurOp to signal that we've hit this point and then
+    // repeatedly release and re-acquire the collection readLock at regular intervals until
+    // the failpoint is released. This is done in order to avoid deadlocks caused by the
+    // pinned-cursor failpoints in this file (see SERVER-21997).
+    if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitAfterPinningCursorBeforeGetMoreBatch,
+                                                         opCtx,
+                                                         "waitAfterPinningCursorBeforeGetMoreBatch",
+                                                         dropAndReaquireReadLock);
+    }
+
+
     const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 
     if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
@@ -421,9 +446,11 @@ Message getMore(OperationContext* opCtx,
     // accumulate over the course of a cursor's lifetime.
     PlanSummaryStats preExecutionStats;
     Explain::getSummaryStats(*exec, &preExecutionStats);
-    if (MONGO_FAIL_POINT(legacyGetMoreWaitWithCursor)) {
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &legacyGetMoreWaitWithCursor, opCtx, "legacyGetMoreWaitWithCursor", nullptr);
+    if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
+                                                         opCtx,
+                                                         "waitWithPinnedCursorDuringGetMoreBatch",
+                                                         nullptr);
     }
 
     generateBatch(ntoreturn, cursorPin.getCursor(), &bb, &numResults, &state);
@@ -478,8 +505,6 @@ Message getMore(OperationContext* opCtx,
     // ClientCursorPin is declared after our lock is declared, this will happen under the lock if
     // any locking was necessary.
     if (!shouldSaveCursorGetMore(state, exec, cursorPin->isTailable())) {
-        cursorPin.deleteUnderlying();
-
         // cc is now invalid, as is the executor
         cursorid = 0;
         curOp.debug().cursorExhausted = true;
@@ -487,6 +512,7 @@ Message getMore(OperationContext* opCtx,
         LOG(5) << "getMore NOT saving client cursor, ended with state "
                << PlanExecutor::statestr(state);
     } else {
+        cursorFreer.dismiss();
         // Continue caching the ClientCursor.
         cursorPin->incNReturnedSoFar(numResults);
         cursorPin->incNBatches();
@@ -503,6 +529,18 @@ Message getMore(OperationContext* opCtx,
             // (for use by future getmore ops).
             cursorPin->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
         }
+    }
+
+    // We're about to unpin or delete the cursor as the ClientCursorPin goes out of scope.
+    // If the 'waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch' failpoint is active, we
+    // set the 'msg' field of this operation's CurOp to signal that we've hit this point and
+    // then spin until the failpoint is released.
+    if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
+            opCtx,
+            "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
+            dropAndReaquireReadLock);
     }
 
     QueryResult::View qr = bb.buf();
@@ -603,6 +641,9 @@ std::string runQuery(OperationContext* opCtx,
         opCtx->setDeadlineAfterNowBy(Milliseconds{qr.getMaxTimeMS()}, ErrorCodes::MaxTimeMSExpired);
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &waitInFindBeforeMakingBatch, opCtx, "waitInFindBeforeMakingBatch");
 
     // Run the query.
     // bb is used to hold query results

@@ -45,6 +45,8 @@ MONGO_FAIL_POINT_DEFINE(disableAwaitDataForGetMoreCmd);
 
 MONGO_FAIL_POINT_DEFINE(waitAfterPinningCursorBeforeGetMoreBatch);
 
+MONGO_FAIL_POINT_DEFINE(waitWithPinnedCursorDuringGetMoreBatch);
+
 MONGO_FAIL_POINT_DEFINE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 
 const OperationContext::Decoration<AwaitDataState> awaitDataState =

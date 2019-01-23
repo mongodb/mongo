@@ -48,7 +48,7 @@
     });
 
     // Test OP_GET_MORE (legacy read mode) against a mongod.
-    failPointName = "legacyGetMoreWaitWithCursor";
+    failPointName = "waitWithPinnedCursorDuringGetMoreBatch";
     const db = conn.getDB("test");
     db.getMongo().forceReadMode("legacy");
     withPinnedCursor({
