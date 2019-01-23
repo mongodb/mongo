@@ -149,38 +149,6 @@ struct CommandHelpers {
     static BSONObj appendMajorityWriteConcern(const BSONObj& cmdObj);
 
     /**
-     * Returns true if the provided argument is one that is handled by the command processing layer
-     * and should generally be ignored by individual command implementations. In particular,
-     * commands that fail on unrecognized arguments must not fail for any of these.
-     */
-    static bool isGenericArgument(StringData arg) {
-        // Not including "help" since we don't pass help requests through to the command parser.
-        // If that changes, it should be added. When you add to this list, consider whether you
-        // should also change the filterCommandRequestForPassthrough() function.
-        return arg == "$audit" ||                        //
-            arg == "$client" ||                          //
-            arg == "$configServerState" ||               //
-            arg == "$db" ||                              //
-            arg == "allowImplicitCollectionCreation" ||  //
-            arg == "$oplogQueryData" ||                  //
-            arg == "$queryOptions" ||                    //
-            arg == "$readPreference" ||                  //
-            arg == "$replData" ||                        //
-            arg == "$clusterTime" ||                     //
-            arg == "maxTimeMS" ||                        //
-            arg == "readConcern" ||                      //
-            arg == "databaseVersion" ||                  //
-            arg == "shardVersion" ||                     //
-            arg == "tracking_info" ||                    //
-            arg == "writeConcern" ||                     //
-            arg == "lsid" ||                             //
-            arg == "txnNumber" ||                        //
-            arg == "autocommit" ||                       //
-            arg == "startTransaction" ||                 //
-            false;  // These comments tell clang-format to keep this line-oriented.
-    }
-
-    /**
      * Rewrites cmdObj into a format safe to blindly forward to shards.
      *
      * This performs 2 transformations:
