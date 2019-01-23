@@ -124,6 +124,14 @@ public:
      */
     static const uint64_t kMetadataTableId = 0;
 
+    void setIdleExpireTime(Date_t idleExpireTime) {
+        _idleExpireTime = idleExpireTime;
+    }
+
+    Date_t getIdleExpireTime() const {
+        return _idleExpireTime;
+    }
+
 private:
     friend class WiredTigerSessionCache;
 
@@ -148,6 +156,7 @@ private:
     uint64_t _cursorGen;
     int _cursorsOut;
     bool _dropQueuedIdentsAtSessionEnd = true;
+    Date_t _idleExpireTime;
 };
 
 /**
@@ -157,7 +166,7 @@ private:
 class WiredTigerSessionCache {
 public:
     WiredTigerSessionCache(WiredTigerKVEngine* engine);
-    WiredTigerSessionCache(WT_CONNECTION* conn);
+    WiredTigerSessionCache(WT_CONNECTION* conn, ClockSource* cs);
     ~WiredTigerSessionCache();
 
     /**
@@ -179,6 +188,16 @@ public:
      * shuttingDown, but otherwise is thread safe.
      */
     std::unique_ptr<WiredTigerSession, WiredTigerSessionDeleter> getSession();
+
+    /**
+     * Get a count of idle sessions in the session cache.
+     */
+    size_t getIdleSessionsCount();
+
+    /**
+     * Closes all cached sessions whose idle expiration time has been reached.
+     */
+    void closeExpiredIdleSessions(int64_t idleTimeMillis);
 
     /**
      * Free all cached sessions and ensures that previously acquired sessions will be freed on
@@ -254,8 +273,9 @@ public:
     }
 
 private:
-    WiredTigerKVEngine* _engine;  // not owned, might be NULL
-    WT_CONNECTION* _conn;         // not owned
+    WiredTigerKVEngine* _engine;      // not owned, might be NULL
+    WT_CONNECTION* _conn;             // not owned
+    ClockSource* const _clockSource;  // not owned
     WiredTigerSnapshotManager _snapshotManager;
 
     // Used as follows:

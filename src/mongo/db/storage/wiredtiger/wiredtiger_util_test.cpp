@@ -44,6 +44,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/system_clock_source.h"
 
 namespace mongo {
 
@@ -57,6 +58,7 @@ public:
         ss << "create,";
         ss << extraStrings;
         string config = ss.str();
+        _fastClockSource = stdx::make_unique<SystemClockSource>();
         int ret = wiredtiger_open(dbpath.toString().c_str(), NULL, config.c_str(), &_conn);
         ASSERT_OK(wtRCToStatus(ret));
         ASSERT(_conn);
@@ -67,9 +69,13 @@ public:
     WT_CONNECTION* getConnection() const {
         return _conn;
     }
+    ClockSource* getClockSource() {
+        return _fastClockSource.get();
+    }
 
 private:
     WT_CONNECTION* _conn;
+    std::unique_ptr<ClockSource> _fastClockSource;
 };
 
 class WiredTigerUtilHarnessHelper {
@@ -77,7 +83,7 @@ public:
     WiredTigerUtilHarnessHelper(StringData extraStrings)
         : _dbpath("wt_test"),
           _connection(_dbpath.path(), extraStrings),
-          _sessionCache(_connection.getConnection()) {}
+          _sessionCache(_connection.getConnection(), _connection.getClockSource()) {}
 
 
     WiredTigerSessionCache* getSessionCache() {

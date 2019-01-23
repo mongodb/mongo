@@ -48,6 +48,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/system_clock_source.h"
 
 namespace mongo {
 namespace {
@@ -61,7 +62,8 @@ public:
         int ret = wiredtiger_open(_dbpath.path().c_str(), NULL, config, &_conn);
         invariantWTOK(ret);
 
-        _sessionCache = new WiredTigerSessionCache(_conn);
+        _fastClockSource = stdx::make_unique<SystemClockSource>();
+        _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
     }
 
     ~MyHarnessHelper() final {
@@ -99,6 +101,7 @@ public:
 
 private:
     unittest::TempDir _dbpath;
+    std::unique_ptr<ClockSource> _fastClockSource;
     WT_CONNECTION* _conn;
     WiredTigerSessionCache* _sessionCache;
     WiredTigerOplogManager _oplogManager;
