@@ -280,6 +280,7 @@
         saslStart: {skip: "primary only"},
         serverStatus: {skip: "does not return user data"},
         setCommittedSnapshot: {skip: "does not return user data"},
+        setIndexCommitQuorum: {skip: "primary only"},
         setFeatureCompatibilityVersion: {skip: "primary only"},
         setFreeMonitoring: {skip: "primary only"},
         setParameter: {skip: "does not return user data"},

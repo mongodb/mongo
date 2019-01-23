@@ -294,6 +294,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='set_index_commit_quorum_idl',
+    source=[
+        env.Idlc('set_index_commit_quorum.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
 
 # Commands that should only be present in mongod
 env.Library(
@@ -325,7 +335,6 @@ env.Library(
         "txn_cmds.cpp",
         "user_management_commands.cpp",
         "vote_commit_index_build_command.cpp",
-        env.Idlc('set_index_commit_quorum.idl')[0],
         env.Idlc('vote_commit_index_build.idl')[0],
     ],
     LIBDEPS=[
@@ -365,6 +374,7 @@ env.Library(
         'mongod_fsync',
         'profile_common',
         'servers',
+        'set_index_commit_quorum_idl',
         'shell_protocol',
         'standalone',
         'test_commands_enabled',

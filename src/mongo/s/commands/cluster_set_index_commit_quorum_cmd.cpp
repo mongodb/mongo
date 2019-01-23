@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -37,12 +37,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_index_commit_quorum_gen.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/write_concern_options.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
 
 /**
@@ -86,8 +84,16 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(IndexBuildsCoordinator::get(opCtx)->setCommitQuorum(
-                request().getNamespace(), request().getIndexNames(), request().getCommitQuorum()));
+            BSONObj cmdObj = request().toBSON(BSONObj());
+            LOG(1) << "setIndexCommitQuorum: " << request().getNamespace()
+                   << " cmd:" << redact(cmdObj);
+
+            scatterGatherOnlyVersionIfUnsharded(
+                opCtx,
+                request().getNamespace(),
+                CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                ReadPreferenceSetting::get(opCtx),
+                Shard::RetryPolicy::kNotIdempotent);
         }
 
     private:
