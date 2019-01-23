@@ -63,11 +63,15 @@ MONGO_FAIL_POINT_DECLARE(waitInFindBeforeMakingBatch);
 // tests.
 MONGO_FAIL_POINT_DECLARE(disableAwaitDataForGetMoreCmd);
 
-// Enabling this fail point will cause the getMore command to busy wait after pinning the cursor
+// Enabling this fail point will cause getMores to busy wait after pinning the cursor
 // but before we have started building the batch, until the fail point is disabled.
 MONGO_FAIL_POINT_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
 
-// Enabling this failpoint will cause the getMore to wait just before it unpins its cursor after it
+// Enabling this fail point will cause getMores to busy wait after setting up the plan executor and
+// before beginning the batch.
+MONGO_FAIL_POINT_DECLARE(waitWithPinnedCursorDuringGetMoreBatch);
+
+// Enabling this failpoint will cause getMores to wait just before it unpins its cursor after it
 // has completed building the current batch.
 MONGO_FAIL_POINT_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 

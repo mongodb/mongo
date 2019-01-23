@@ -72,8 +72,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
 
-MONGO_FAIL_POINT_DEFINE(waitWithPinnedCursorDuringGetMoreBatch);
-
 /**
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the lsid of 'cursor'.
@@ -340,26 +338,6 @@ public:
                 readLock.emplace(opCtx, _request.nss);
             };
 
-            // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the
-            // 'msg' field of this operation's CurOp to signal that we've hit this point and then
-            // repeatedly release and re-acquire the collection readLock at regular intervals until
-            // the failpoint is released. This is done in order to avoid deadlocks caused by the
-            // pinned-cursor failpoints in this file (see SERVER-21997).
-            MONGO_FAIL_POINT_BLOCK(waitAfterPinningCursorBeforeGetMoreBatch, options) {
-                const BSONObj& data = options.getData();
-                if (data["shouldNotdropLock"].booleanSafe()) {
-                    dropAndReaquireReadLock = []() {};
-                }
-
-                CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                    &waitAfterPinningCursorBeforeGetMoreBatch,
-                    opCtx,
-                    "waitAfterPinningCursorBeforeGetMoreBatch",
-                    dropAndReaquireReadLock,
-                    false,
-                    _request.nss);
-            }
-
             // A user can only call getMore on their own cursor. If there were multiple users
             // authenticated when the cursor was created, then at least one of them must be
             // authenticated in order to run getMore on the cursor.
@@ -406,6 +384,26 @@ public:
 
             // On early return, get rid of the cursor.
             auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
+
+            // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the
+            // 'msg' field of this operation's CurOp to signal that we've hit this point and then
+            // repeatedly release and re-acquire the collection readLock at regular intervals until
+            // the failpoint is released. This is done in order to avoid deadlocks caused by the
+            // pinned-cursor failpoints in this file (see SERVER-21997).
+            MONGO_FAIL_POINT_BLOCK(waitAfterPinningCursorBeforeGetMoreBatch, options) {
+                const BSONObj& data = options.getData();
+                if (data["shouldNotdropLock"].booleanSafe()) {
+                    dropAndReaquireReadLock = []() {};
+                }
+
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &waitAfterPinningCursorBeforeGetMoreBatch,
+                    opCtx,
+                    "waitAfterPinningCursorBeforeGetMoreBatch",
+                    dropAndReaquireReadLock,
+                    false,
+                    _request.nss);
+            }
 
             // We must respect the read concern from the cursor.
             applyCursorReadConcern(opCtx, cursorPin->getReadConcernArgs());
