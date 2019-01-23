@@ -33,16 +33,18 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/recover_transaction_decision_from_local_participant.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -230,10 +232,13 @@ public:
                     opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
             }
 
-            // Since the coordinator *will* have written the decision from another OperationContext,
-            // and a participant *may* have written the decision on another OperationContext, ensure
-            // waiting for the client's writeConcern of the decision.
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            ON_BLOCK_EXIT([opCtx] {
+                // Since a commit decision will have been written from another OperationContext (by
+                // either the coordinator or participant), ensure waiting for the client's
+                // writeConcern of the decision.
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+            });
 
             if (commitDecisionFuture) {
                 // The commit coordination is still ongoing. Block waiting for the decision.
@@ -255,7 +260,64 @@ public:
                    << opCtx->getTxnNumber() << " on session "
                    << opCtx->getLogicalSessionId()->toBSON();
 
-            recoverDecisionFromLocalParticipantOrAbortLocalParticipant(opCtx);
+            // Recover the decision from the local participant by sending abortTransaction to this
+            // node and inverting the response (i.e., a success response is converted to
+            // NoSuchTransaction; a TransactionCommitted response is converted to success). Do not
+            // pass writeConcern; if the coordinateCommitTransaction command ends up throwing
+            // NoSuchTransaction and the client sent a non-default writeConcern, the
+            // coordinateCommitTransaction command's post-amble will do a no-op write and wait for
+            // the client's writeConcern.
+            BSONObj abortRequestObj =
+                BSON("abortTransaction" << 1 << "lsid" << opCtx->getLogicalSessionId()->toBSON()
+                                        << "txnNumber"
+                                        << *opCtx->getTxnNumber()
+                                        << "autocommit"
+                                        << false);
+
+            BSONObj abortResponseObj;
+
+            const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+            auto cbHandle = uassertStatusOK(executor->scheduleWork([
+                serviceContext = opCtx->getServiceContext(),
+                &abortResponseObj,
+                abortRequestObj = abortRequestObj.getOwned()
+            ](const executor::TaskExecutor::CallbackArgs& cbArgs) {
+                ThreadClient threadClient(serviceContext);
+                auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
+                auto opCtx = uniqueOpCtx.get();
+
+                AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+
+                auto requestOpMsg =
+                    OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, abortRequestObj)
+                        .serialize();
+                const auto replyOpMsg = OpMsg::parseOwned(serviceContext->getServiceEntryPoint()
+                                                              ->handleRequest(opCtx, requestOpMsg)
+                                                              .response);
+
+                invariant(replyOpMsg.sequences.empty());
+                abortResponseObj = replyOpMsg.body.getOwned();
+            }));
+            executor->wait(cbHandle, opCtx);
+
+            const auto abortStatus = getStatusFromCommandResult(abortResponseObj);
+
+            // Since the abortTransaction was sent without writeConcern, there should not be a
+            // writeConcern error.
+            invariant(getWriteConcernStatusFromCommandResult(abortResponseObj).isOK());
+
+            LOG(3) << "coordinateCommitTransaction got response " << abortStatus << " for "
+                   << abortRequestObj << " used to recover decision from local participant";
+
+            // If the abortTransaction succeeded, return that the transaction aborted.
+            uassert(ErrorCodes::NoSuchTransaction, "transaction aborted", !abortStatus.isOK());
+
+            // If the abortTransaction returned that the transaction committed, return
+            // ok, otherwise return whatever the abortTransaction errored with (which may be
+            // NoSuchTransaction).
+            uassert(abortStatus.code(),
+                    abortStatus.reason(),
+                    abortStatus.code() == ErrorCodes::TransactionCommitted);
         }
 
     private:

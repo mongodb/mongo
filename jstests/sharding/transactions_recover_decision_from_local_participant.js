@@ -7,10 +7,13 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/write_concern_util.js");
+
     // The test modifies config.transactions, which must be done outside of a session.
     TestData.disableImplicitSessions = true;
 
-    let st = new ShardingTest({shards: 2, mongos: 2});
+    let st =
+        new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {rsOptions: {verbose: 2}}});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', st.shard0.name);
@@ -23,16 +26,19 @@
     let testDB = st.s0.getDB('test');
     assert.commandWorked(testDB.runCommand({insert: 'user', documents: [{x: -10}, {x: 10}]}));
 
-    let coordinatorConn = st.rs0.getPrimary();
+    let coordinatorReplSetTest = st.rs0;
+    let coordinatorPrimaryConn = coordinatorReplSetTest.getPrimary();
 
-    const runCoordinateCommit = function(txnNumber, participantList) {
-        return coordinatorConn.adminCommand({
+    const runCoordinateCommit = function(txnNumber, participantList, writeConcern) {
+        writeConcern = writeConcern || {};
+        return coordinatorPrimaryConn.adminCommand(Object.merge({
             coordinateCommitTransaction: 1,
             participants: participantList,
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false
-        });
+        },
+                                                                writeConcern));
     };
 
     const startNewTransactionThroughMongos = function() {
@@ -60,14 +66,16 @@
         return res.recoveryToken;
     };
 
-    const sendCommitViaOtherMongos = function(lsid, txnNumber, recoveryToken) {
-        return st.s1.getDB('admin').runCommand({
+    const sendCommitViaOtherMongos = function(lsid, txnNumber, recoveryToken, writeConcern) {
+        writeConcern = writeConcern || {};
+        return st.s1.getDB('admin').runCommand(Object.merge({
             commitTransaction: 1,
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false,
             recoveryToken: recoveryToken
-        });
+        },
+                                                            writeConcern));
     };
 
     // TODO (SERVER-37364): Once coordinateCommit returns as soon as the decision is made durable,
@@ -100,7 +108,6 @@
                                      ErrorCodes.NoSuchTransaction);
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
                                      ErrorCodes.NoSuchTransaction);
-
         assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
 
@@ -116,8 +123,46 @@
             autocommit: false
         }));
         assert.commandWorked(runCoordinateCommit(txnNumber, participantList));
-
         assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+
+        jsTest.log(
+            "coordinateCommit sent after coordinator finished coordinating a commit decision but coordinator node can't majority commit writes");
+        ++txnNumber;
+
+        recoveryToken = startNewTransactionThroughMongos();
+        assert.commandWorked(testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"}
+        }));
+
+        // While the coordinator primary cannot majority commit writes, coordinateCommitTransaction
+        // returns ok:1 with a writeConcern error.
+
+        stopReplicationOnSecondaries(coordinatorReplSetTest);
+
+        // Do a write on the coordinator to bump the coordinator node's system last OpTime.
+        coordinatorPrimaryConn.getDB("dummy").getCollection("dummy").insert({dummy: 1});
+
+        let res = runCoordinateCommit(
+            txnNumber, participantList, {writeConcern: {w: "majority", wtimeout: 500}});
+        assert.eq(1, res.ok, tojson(res));
+        checkWriteConcernTimedOut(res);
+
+        res = sendCommitViaOtherMongos(
+            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority", wtimeout: 500}});
+        assert.eq(1, res.ok, tojson(res));
+        checkWriteConcernTimedOut(res);
+
+        // Once the coordinator primary can majority commit writes again,
+        // coordinateCommitTransaction returns ok:1 without a writeConcern error.
+        restartReplicationOnSecondaries(coordinatorReplSetTest);
+        assert.commandWorked(
+            runCoordinateCommit(txnNumber, participantList, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(sendCommitViaOtherMongos(
+            lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}}));
 
         jsTest.log(
             "coordinateCommit sent for lower transaction number than last number participant saw.");
@@ -129,7 +174,7 @@
 
         jsTest.log("coordinateCommit sent after session is reaped.");
         assert.writeOK(
-            coordinatorConn.getDB("config").transactions.remove({}, false /* justOne */));
+            coordinatorPrimaryConn.getDB("config").transactions.remove({}, false /* justOne */));
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
                                      ErrorCodes.NoSuchTransaction);
 
@@ -140,22 +185,14 @@
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber + 1, participantList),
                                      ErrorCodes.NoSuchTransaction);
 
-        // Expedite aborting the transaction on the non-coordinator shard.
-        // The previous transaction should abort because sending coordinateCommit with a higher
-        // transaction number against the coordinator should have caused the local participant on
-        // the coordinator to abort.
-        assert.commandFailedWithCode(testDB.adminCommand({
+        // We can still commit the active transaction with the lower transaction number.
+        assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
             txnNumber: NumberLong(txnNumber),
             autocommit: false
-        }),
-                                     ErrorCodes.NoSuchTransaction);
-
-        // Previous commit already discarded the coordinator since it aborted, so we get
-        // "transaction too old" instead.
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
-                                     ErrorCodes.TransactionTooOld);
+        }));
+        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
     };
 
     // Test with a real participant list, to simulate retrying through main router.

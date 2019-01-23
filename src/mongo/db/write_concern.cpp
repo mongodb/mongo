@@ -82,7 +82,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     if (writeConcern.usedDefault && serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
         !opCtx->getClient()->isInDirectClient() &&
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+        (opCtx->getClient()->session() &&
+         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient))) {
         // Upconvert the writeConcern of any incoming requests from internal connections (i.e.,
         // from other nodes in the cluster) to "majority." This protects against internal code that
         // does not specify writeConcern when writing to the config server.

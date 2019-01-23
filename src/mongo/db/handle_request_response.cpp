@@ -49,7 +49,7 @@ BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
         || code == ErrorCodes::LockTimeout                                //
         || code == ErrorCodes::PreparedTransactionInProgress;
 
-    if (commandName == "commitTransaction") {
+    if (commandName == "commitTransaction" || commandName == "coordinateCommitTransaction") {
         // NoSuchTransaction is determined based on the data. It's safe to retry the whole
         // transaction, only if the data cannot be rolled back.
         isTransientTransactionError |=

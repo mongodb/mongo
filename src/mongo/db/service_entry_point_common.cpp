@@ -359,8 +359,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
                                  CommandInvocation* invocation,
                                  TransactionParticipant* txnParticipant,
                                  const OperationSessionInfoFromClient& sessionOptions,
-                                 rpc::ReplyBuilderInterface* replyBuilder) try {
-
+                                 rpc::ReplyBuilderInterface* replyBuilder) {
     if (!opCtx->getClient()->isInDirectClient()) {
         txnParticipant->beginOrContinue(*sessionOptions.getTxnNumber(),
                                         sessionOptions.getAutocommit(),
@@ -421,11 +420,6 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     // Stash or commit the transaction when the command succeeds.
     txnParticipant->stashTransactionResources(opCtx);
     guard.dismiss();
-} catch (const ExceptionFor<ErrorCodes::NoSuchTransaction>&) {
-    if (!opCtx->getWriteConcern().usedDefault) {
-        TransactionParticipant::performNoopWriteForNoSuchTransaction(opCtx);
-    }
-    throw;
 }
 
 bool runCommandImpl(OperationContext* opCtx,
@@ -489,7 +483,11 @@ bool runCommandImpl(OperationContext* opCtx,
             } else {
                 invocation->run(opCtx, replyBuilder);
             }
-        } catch (const DBException&) {
+        } catch (const DBException& ex) {
+            if (ex.toStatus().code() == ErrorCodes::NoSuchTransaction &&
+                !opCtx->getWriteConcern().usedDefault) {
+                TransactionParticipant::performNoopWriteForNoSuchTransaction(opCtx);
+            }
             waitForWriteConcern(*extraFieldsBuilder);
             throw;
         }

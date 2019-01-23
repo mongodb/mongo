@@ -9,11 +9,13 @@
 
     const dbName = "test";
     const collName = "transient_txn_error_labels_with_write_concern";
-    const rst = new ReplSetTest({name: collName, nodes: 2});
-    const config = rst.getReplSetConfig();
-    config.members[1].priority = 0;
-    rst.startSet();
-    rst.initiate(config);
+
+    // We are testing coordinateCommitTransaction, which requires the nodes to be started with
+    // --shardsvr.
+    const st = new ShardingTest(
+        {config: 1, mongos: 1, shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}});
+    const rst = st.rs0;
+
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();
     assert.eq(primary, rst.nodes[0]);
@@ -38,64 +40,71 @@
     assert(!res.hasOwnProperty("errorLabels"));
     restartServerReplication(rst.getSecondaries());
 
-    jsTest.log(
-        "commitTransaction should wait for write concern even if it returns NoSuchTransaction");
-    rst.awaitReplication();
-    stopServerReplication(rst.getSecondaries());
-    // Use a txnNumber that is one higher than the server has tracked.
-    res = sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
-        autocommit: false,
-        writeConcern: writeConcernMajority
-    });
-    checkWriteConcernTimedOut(res);
-    assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+    function runNoSuchTransactionTests(cmd, cmdName) {
+        jsTest.log("Running NoSuchTransaction tests for " + cmdName);
+        assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
-    jsTest.log("NoSuchTransaction with write concern error is not transient");
-    assert(!res.hasOwnProperty("errorLabels"));
+        jsTest.log(cmdName + " should wait for write concern even if it returns NoSuchTransaction");
+        rst.awaitReplication();
+        stopServerReplication(rst.getSecondaries());
+        // Use a txnNumber that is one higher than the server has tracked.
+        res = sessionDb.adminCommand(Object.assign(Object.assign({}, cmd), {
+            txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+            autocommit: false,
+            writeConcern: writeConcernMajority
+        }));
+        checkWriteConcernTimedOut(res);
+        assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
 
-    jsTest.log("NoSuchTransaction without write concern error is transient");
-    restartServerReplication(rst.getSecondaries());
-    // Use a txnNumber that is one higher than the server has tracked.
-    res = sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
-        autocommit: false,
-        writeConcern: {w: "majority"}  // Wait with a long timeout.
-    });
-    assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
-    assert(!res.hasOwnProperty("writeConcernError"), res);
-    assert.eq(res["errorLabels"], ["TransientTransactionError"], res);
+        jsTest.log("NoSuchTransaction with write concern error is not transient");
+        assert(!res.hasOwnProperty("errorLabels"));
 
-    jsTest.log("If the noop write for NoSuchTransaction cannot occur, the error is not transient");
-    assert.commandWorked(testDB.getSiblingDB("local").createCollection("todrop"));
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "alwaysOn"}));
-    // Create a pending drop on a collection in the local database. This will hold an X lock on
-    // the local database.
-    let awaitDrop =
-        startParallelShell(() => assert(db.getSiblingDB("local")["todrop"].drop()), rst.ports[0]);
-    checkLog.contains(testDB.getMongo(), "hangDuringDropCollection fail point enabled");
-    // The server will attempt to perform a noop write, since the command returns
-    // NoSuchTransaction. The noop write will time out acquiring a lock on the local database.
-    // This should not be a TransientTransactionError, since the server has not successfully
-    // replicated a write to confirm that it is primary.
-    // Use a txnNumber that is one higher than the server has tracked.
-    res = sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
-        autocommit: false,
-        writeConcern: writeConcernMajority,
-        maxTimeMS: 1000
-    });
-    assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
-    assert(!res.hasOwnProperty("errorLabels"));
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "off"}));
-    awaitDrop();
+        jsTest.log("NoSuchTransaction without write concern error is transient");
+        restartServerReplication(rst.getSecondaries());
+        // Use a txnNumber that is one higher than the server has tracked.
+        res = sessionDb.adminCommand(Object.assign(Object.assign({}, cmd), {
+            txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+            autocommit: false,
+            writeConcern: {w: "majority"}  // Wait with a long timeout.
+        }));
+        assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+        assert(!res.hasOwnProperty("writeConcernError"), res);
+        assert.eq(res["errorLabels"], ["TransientTransactionError"], res);
+
+        jsTest.log(
+            "If the noop write for NoSuchTransaction cannot occur, the error is not transient");
+        assert.commandWorked(testDB.getSiblingDB("local").createCollection("todrop"));
+        assert.commandWorked(testDB.adminCommand(
+            {configureFailPoint: "hangDuringDropCollection", mode: "alwaysOn"}));
+        // Create a pending drop on a collection in the local database. This will hold an X lock on
+        // the local database.
+        let awaitDrop = startParallelShell(() => assert(db.getSiblingDB("local")["todrop"].drop()),
+                                           rst.ports[0]);
+        checkLog.contains(testDB.getMongo(), "hangDuringDropCollection fail point enabled");
+        // The server will attempt to perform a noop write, since the command returns
+        // NoSuchTransaction. The noop write will time out acquiring a lock on the local database.
+        // This should not be a TransientTransactionError, since the server has not successfully
+        // replicated a write to confirm that it is primary.
+        // Use a txnNumber that is one higher than the server has tracked.
+        res = sessionDb.adminCommand(Object.assign(Object.assign({}, cmd), {
+            txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+            autocommit: false,
+            writeConcern: writeConcernMajority,
+            maxTimeMS: 1000
+        }));
+        assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
+        assert(!res.hasOwnProperty("errorLabels"));
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "off"}));
+        awaitDrop();
+    }
+
+    runNoSuchTransactionTests({commitTransaction: 1}, "commitTransaction");
+
+    runNoSuchTransactionTests({coordinateCommitTransaction: 1, participants: []},
+                              "coordinateCommitTransaction");
 
     session.endSession();
 
-    rst.stopSet();
+    st.stop();
 }());
