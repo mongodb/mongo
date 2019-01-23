@@ -80,6 +80,12 @@ protected:
     boost::optional<BSONObj> getNextBson() final;
 
 private:
+    /**
+     * Set the speculative majority read optime if we have scanned the oplog up to a certain
+     * timestamp.
+     */
+    void _setSpeculativeReadOpTime();
+
     Timestamp _latestOplogTimestamp;
     BSONObj _postBatchResumeToken;
 };
