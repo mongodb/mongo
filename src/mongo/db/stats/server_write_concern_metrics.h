@@ -55,6 +55,7 @@ public:
      */
     void recordWriteConcernForInserts(const WriteConcernOptions& writeConcernOptions,
                                       size_t numInserts) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _insertMetrics.recordWriteConcern(writeConcernOptions, numInserts);
     }
 
@@ -69,6 +70,7 @@ public:
      * Updates the update metrics according to the 'w' value of 'writeConcernOptions'.
      */
     void recordWriteConcernForUpdate(const WriteConcernOptions& writeConcernOptions) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _updateMetrics.recordWriteConcern(writeConcernOptions);
     }
 
@@ -76,6 +78,7 @@ public:
      * Updates the delete metrics according to the 'w' value of 'writeConcernOptions'.
      */
     void recordWriteConcernForDelete(const WriteConcernOptions& writeConcernOptions) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _deleteMetrics.recordWriteConcern(writeConcernOptions);
     }
 
