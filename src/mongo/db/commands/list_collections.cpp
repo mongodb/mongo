@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
@@ -70,6 +71,9 @@ using std::vector;
 using stdx::make_unique;
 
 namespace {
+
+// Failpoint which causes to hang "listCollections" cmd after acquiring the DB lock.
+MONGO_FAIL_POINT_DEFINE(hangBeforeListCollections);
 
 /**
  * Determines if 'matcher' is an exact match on the "name" field. If so, returns a vector of all the
@@ -283,6 +287,13 @@ public:
         {
             AutoGetDb autoDb(opCtx, dbname, MODE_IS);
             Database* db = autoDb.getDb();
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,
+                                                             opCtx,
+                                                             "hangBeforeListCollections",
+                                                             []() {},
+                                                             false,
+                                                             cursorNss);
 
             auto ws = make_unique<WorkingSet>();
             auto root = make_unique<QueuedDataStage>(opCtx, ws.get());

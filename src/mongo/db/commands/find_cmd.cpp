@@ -346,8 +346,12 @@ public:
                 return;
             }
 
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &waitInFindBeforeMakingBatch, opCtx, "waitInFindBeforeMakingBatch");
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitInFindBeforeMakingBatch,
+                                                             opCtx,
+                                                             "waitInFindBeforeMakingBatch",
+                                                             []() {},
+                                                             false,
+                                                             nss);
 
             const QueryRequest& originalQR = exec->getCanonicalQuery()->getQueryRequest();
 

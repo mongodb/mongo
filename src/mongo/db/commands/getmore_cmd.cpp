@@ -332,7 +332,7 @@ public:
             }
 
             // Only used by the failpoints.
-            const auto dropAndReaquireReadLock = [&readLock, opCtx, this]() {
+            stdx::function<void()> dropAndReaquireReadLock = [&readLock, opCtx, this]() {
                 // Make sure an interrupted operation does not prevent us from reacquiring the lock.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
@@ -345,12 +345,19 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
-            if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+            MONGO_FAIL_POINT_BLOCK(waitAfterPinningCursorBeforeGetMoreBatch, options) {
+                const BSONObj& data = options.getData();
+                if (data["shouldNotdropLock"].booleanSafe()) {
+                    dropAndReaquireReadLock = []() {};
+                }
+
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
                     opCtx,
                     "waitAfterPinningCursorBeforeGetMoreBatch",
-                    dropAndReaquireReadLock);
+                    dropAndReaquireReadLock,
+                    false,
+                    _request.nss);
             }
 
             // A user can only call getMore on their own cursor. If there were multiple users

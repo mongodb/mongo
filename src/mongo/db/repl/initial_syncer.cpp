@@ -97,6 +97,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
 // Failpoint which stops the applier.
 MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 
+// Failpoint which causes the initial sync function to hang afte cloning all databases.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterDataCloning);
+
 namespace {
 using namespace executor;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -904,6 +907,17 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
                                              std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     log() << "Finished cloning data: " << redact(databaseClonerFinishStatus)
           << ". Beginning oplog replay.";
+
+    if (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning)) {
+        // This could have been done with a scheduleWorkAt but this is used only by JS tests where
+        // we run with multiple threads so it's fine to spin on this thread.
+        // This log output is used in js tests so please leave it.
+        log() << "initial sync - initialSyncHangAfterDataCloning fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning) && !_isShuttingDown()) {
+            mongo::sleepsecs(1);
+        }
+    }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto status = _checkForShutdownAndConvertStatus_inlock(databaseClonerFinishStatus,

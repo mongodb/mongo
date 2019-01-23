@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
 #include "mongo/db/query/explain.h"
@@ -53,6 +54,9 @@ namespace {
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
+
+// Failpoint which causes to hang "count" cmd after acquiring the DB lock.
+MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
 
 /**
  * Implements the MongoD side of the count command.
@@ -180,6 +184,9 @@ public:
                     CommandHelpers::parseNsOrUUID(dbname, cmdObj),
                     AutoGetCollection::ViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
+
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, false, nss);
 
         const bool isExplain = false;
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);

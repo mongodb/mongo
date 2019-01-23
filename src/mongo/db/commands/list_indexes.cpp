@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
@@ -59,6 +60,9 @@ using std::vector;
 using stdx::make_unique;
 
 namespace {
+
+// Failpoint which causes to hang "listIndexes" cmd after acquiring the DB lock.
+MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 
 /**
  * Lists the indexes for a given collection.
@@ -146,6 +150,9 @@ public:
             invariant(cce);
 
             nss = ctx.getNss();
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, false, nss);
 
             vector<string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {

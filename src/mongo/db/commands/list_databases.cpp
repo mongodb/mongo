@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -49,6 +50,9 @@ namespace {
 static const StringData kFilterField{"filter"};
 static const StringData kNameField{"name"};
 static const StringData kNameOnlyField{"nameOnly"};
+
+// Failpoint which causes to hang "listDatabases" cmd after acquiring global lock in IS mode.
+MONGO_FAIL_POINT_DEFINE(hangBeforeListDatabases);
 }  // namespace
 
 using std::set;
@@ -132,6 +136,8 @@ public:
         StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
         {
             Lock::GlobalLock lk(opCtx, MODE_IS);
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
             storageEngine->listDatabases(&dbNames);
         }
 
