@@ -100,8 +100,9 @@ def get_config_options(cmd_line_options, config_file):
     # pylint: disable=too-many-locals
     config_file_data = read_config.read_config_file(config_file)
 
-    fallback_num_sub_suites = read_config.get_config_value(
-        "fallback_num_sub_suites", cmd_line_options, config_file_data, required=True)
+    fallback_num_sub_suites = int(
+        read_config.get_config_value("fallback_num_sub_suites", cmd_line_options, config_file_data,
+                                     required=True))
     max_sub_suites = read_config.get_config_value("max_sub_suites", cmd_line_options,
                                                   config_file_data)
     project = read_config.get_config_value("project", cmd_line_options, config_file_data,
@@ -534,6 +535,10 @@ class Main(object):
         try:
             evg_stats = self.get_evg_stats(self.config_options.project, start_date, end_date,
                                            self.config_options.task, self.config_options.variant)
+            if not evg_stats:
+                # This is probably a new suite, since there is no test history, just use the
+                # fallback values.
+                return self.calculate_fallback_suites()
             target_execution_time_secs = self.config_options.target_resmoke_time * 60
             return self.calculate_suites_from_evg_stats(evg_stats, target_execution_time_secs)
         except requests.HTTPError as err:
@@ -572,9 +577,9 @@ class Main(object):
     def calculate_fallback_suites(self):
         """Divide tests into a fixed number of suites."""
         num_suites = self.config_options.fallback_num_sub_suites
-        tests = self.list_tests()
+        self.test_list = self.list_tests()
         suites = [Suite() for _ in range(num_suites)]
-        for idx, test_file in enumerate(tests):
+        for idx, test_file in enumerate(self.test_list):
             suites[idx % num_suites].add_test(test_file, 0)
         return suites
 

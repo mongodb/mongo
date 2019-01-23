@@ -473,6 +473,7 @@ class MainTest(unittest.TestCase):
                 self.assertEqual(10, len(suite.tests))
 
     def test_calculate_suites_fallback(self):
+        n_tests = 100
         response = Mock()
         response.status_code = requests.codes.SERVICE_UNAVAILABLE
         evg = Mock()
@@ -482,13 +483,32 @@ class MainTest(unittest.TestCase):
         main.options = Mock()
         main.options.execution_time_minutes = 10
         main.config_options = self.get_mock_options()
-        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(100)])
+        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(n_tests)])
 
         suites = main.calculate_suites(_DATE, _DATE)
 
         self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
         for suite in suites:
             self.assertEqual(50, len(suite.tests))
+
+        self.assertEqual(n_tests, len(main.test_list))
+
+    def test_calculate_suites_uses_fallback_for_no_results(self):
+        n_tests = 100
+        evg = Mock()
+        evg.test_stats.return_value = []
+
+        main = grt.Main(evg)
+        main.options = Mock()
+        main.config_options = self.get_mock_options()
+        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(n_tests)])
+        suites = main.calculate_suites(_DATE, _DATE)
+
+        self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
+        for suite in suites:
+            self.assertEqual(50, len(suite.tests))
+
+        self.assertEqual(n_tests, len(main.test_list))
 
     def test_calculate_suites_error(self):
         response = Mock()
