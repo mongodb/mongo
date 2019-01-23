@@ -68,13 +68,11 @@ public:
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                         RemoteCommandRequest& request,
                         RemoteCommandCompletionFn&& onFinish,
-                        const transport::BatonHandle& baton) override;
+                        const BatonHandle& baton) override;
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                       const transport::BatonHandle& baton) override;
-    Status setAlarm(Date_t when,
-                    unique_function<void()> action,
-                    const transport::BatonHandle& baton) override;
+                       const BatonHandle& baton) override;
+    Status setAlarm(Date_t when, unique_function<void()> action) override;
 
     bool onNetworkThread() override;
 
@@ -117,7 +115,7 @@ private:
     Future<RemoteCommandResponse> _onAcquireConn(std::shared_ptr<CommandState> state,
                                                  Future<RemoteCommandResponse> future,
                                                  CommandState::ConnHandle conn,
-                                                 const transport::BatonHandle& baton);
+                                                 const BatonHandle& baton);
 
     std::string _instanceName;
     ServiceContext* _svcCtx;

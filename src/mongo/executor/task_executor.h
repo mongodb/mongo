@@ -239,7 +239,7 @@ public:
     virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
         const RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,
-        const transport::BatonHandle& baton = nullptr) = 0;
+        const BatonHandle& baton = nullptr) = 0;
 
     /**
      * If the callback referenced by "cbHandle" hasn't already executed, marks it as

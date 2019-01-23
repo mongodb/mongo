@@ -1,6 +1,6 @@
 
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,40 +28,51 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/transport/baton.h"
-#include "mongo/transport/transport_layer.h"
+#include <vector>
+
+#include "mongo/db/baton.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
-namespace transport {
 
-namespace {
+class OperationContext;
 
-AtomicWord<uint64_t> reactorTimerIdCounter(0);
+/**
+ * The most basic Baton implementation.
+ */
+class DefaultBaton : public Baton {
+public:
+    explicit DefaultBaton(OperationContext* opCtx);
 
-}  // namespace
+    ~DefaultBaton();
 
-const Status TransportLayer::SessionUnknownStatus =
-    Status(ErrorCodes::TransportSessionUnknown, "TransportLayer does not own the Session.");
+    void markKillOnClientDisconnect() noexcept override;
 
-const Status TransportLayer::ShutdownStatus =
-    Status(ErrorCodes::ShutdownInProgress, "TransportLayer is in shutdown.");
+    void schedule(unique_function<void(OperationContext*)> func) noexcept override;
 
-const Status TransportLayer::TicketSessionUnknownStatus = Status(
-    ErrorCodes::TransportSessionUnknown, "TransportLayer does not own the Ticket's Session.");
+    void notify() noexcept override;
 
-const Status TransportLayer::TicketSessionClosedStatus = Status(
-    ErrorCodes::TransportSessionClosed, "Operation attempted on a closed transport Session.");
+    Waitable::TimeoutState run_until(ClockSource* clkSource, Date_t oldDeadline) noexcept override;
 
-ReactorTimer::ReactorTimer() : _id(reactorTimerIdCounter.addAndFetch(1)) {}
+    void run(ClockSource* clkSource) noexcept override;
 
-BatonHandle TransportLayer::makeDefaultBaton(OperationContext* opCtx) {
-    return opCtx->getServiceContext()->makeBaton(opCtx);
-}
+private:
+    void detachImpl() noexcept override;
 
-}  // namespace transport
+    stdx::mutex _mutex;
+    stdx::condition_variable _cv;
+    bool _notified = false;
+    bool _sleeping = false;
+
+    OperationContext* _opCtx;
+
+    bool _hasIngressSocket = false;
+
+    std::vector<unique_function<void(OperationContext*)>> _scheduled;
+};
+
 }  // namespace mongo

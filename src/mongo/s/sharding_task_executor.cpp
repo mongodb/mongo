@@ -115,7 +115,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWorkAt(Da
 StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
-    const transport::BatonHandle& baton) {
+    const BatonHandle& baton) {
 
     // schedule the user's callback if there is not opCtx
     if (!request.opCtx) {

@@ -90,7 +90,7 @@ public:
 
     static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 
-    BatonHandle makeBaton(OperationContext* opCtx) override {
+    BatonHandle makeBaton(OperationContext* opCtx) const override {
         stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
         // TODO: figure out what to do about managers with more than one transport layer.
         invariant(_tls.size() == 1);

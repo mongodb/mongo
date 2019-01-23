@@ -772,10 +772,9 @@ public:
                                                    ShouldFailRequestFn shouldFailRequest)
         : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
 
-    StatusWith<CallbackHandle> scheduleRemoteCommand(
-        const executor::RemoteCommandRequest& request,
-        const RemoteCommandCallbackFn& cb,
-        const transport::BatonHandle& baton = nullptr) override {
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override {
         if (_shouldFailRequest(request)) {
             return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
         }

@@ -56,9 +56,11 @@
 #endif
 
 // session_asio.h has some header dependencies that require it to be the last header.
+
 #ifdef __linux__
 #include "mongo/transport/baton_asio_linux.h"
 #endif
+
 #include "mongo/transport/session_asio.h"
 
 namespace mongo {
@@ -79,7 +81,7 @@ public:
 
     void cancel(const BatonHandle& baton = nullptr) override {
         // If we have a baton try to cancel that.
-        if (baton && baton->cancelTimer(*this)) {
+        if (baton && baton->networking() && baton->networking()->cancelTimer(*this)) {
             LOG(2) << "Canceled via baton, skipping asio cancel.";
             return;
         }
@@ -90,8 +92,9 @@ public:
 
 
     Future<void> waitUntil(Date_t expiration, const BatonHandle& baton = nullptr) override {
-        if (baton) {
-            return _asyncWait([&] { return baton->waitUntil(*this, expiration); }, baton);
+        if (baton && baton->networking()) {
+            return _asyncWait([&] { return baton->networking()->waitUntil(*this, expiration); },
+                              baton);
         } else {
             return _asyncWait([&] { _timer->expires_at(expiration.toSystemTimePoint()); });
         }
@@ -875,8 +878,8 @@ SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
 }
 #endif
 
-BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) {
 #ifdef __linux__
+BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) const {
     auto baton = std::make_shared<BatonASIO>(opCtx);
 
     {
@@ -885,11 +888,9 @@ BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) {
         opCtx->setBaton(baton);
     }
 
-    return std::move(baton);
-#else
-    return nullptr;
-#endif
+    return baton;
 }
+#endif
 
 }  // namespace transport
 }  // namespace mongo

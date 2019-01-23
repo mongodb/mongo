@@ -227,15 +227,15 @@ private:
         explicit BatonDetacher(OperationContext* opCtx);
         ~BatonDetacher();
 
-        transport::Baton& operator*() const {
+        Baton& operator*() const {
             return *_baton;
         }
 
-        transport::Baton* operator->() const noexcept {
+        Baton* operator->() const noexcept {
             return _baton.get();
         }
 
-        operator transport::BatonHandle() const {
+        operator BatonHandle() const {
             return _baton;
         }
 
@@ -244,7 +244,7 @@ private:
         }
 
     private:
-        transport::BatonHandle _baton;
+        BatonHandle _baton;
     };
 
     /**

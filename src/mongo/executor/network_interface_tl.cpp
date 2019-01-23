@@ -173,7 +173,7 @@ Date_t NetworkInterfaceTL::now() {
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         RemoteCommandRequest& request,
                                         RemoteCommandCompletionFn&& onFinish,
-                                        const transport::BatonHandle& baton) {
+                                        const BatonHandle& baton) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
@@ -280,14 +280,19 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     if (baton) {
         // If we have a baton, we want to get back to the baton thread immediately after we get a
         // connection
-        std::move(connFuture).getAsync([
-            baton,
-            rw = std::move(remainingWork)
-        ](StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
-            baton->schedule([ rw = std::move(rw), swConn = std::move(swConn) ]() mutable {
-                std::move(rw)(std::move(swConn));
+        std::move(connFuture)
+            .getAsync([ baton, reactor = _reactor.get(), rw = std::move(remainingWork) ](
+                StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
+                baton->schedule([ rw = std::move(rw),
+                                  swConn = std::move(swConn) ](OperationContext * opCtx) mutable {
+                    if (opCtx) {
+                        std::move(rw)(std::move(swConn));
+                    } else {
+                        std::move(rw)(Status(ErrorCodes::ShutdownInProgress,
+                                             "baton is detached, failing operation"));
+                    }
+                });
             });
-        });
     } else {
         // otherwise we're happy to run inline
         std::move(connFuture)
@@ -306,7 +311,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
     std::shared_ptr<CommandState> state,
     Future<RemoteCommandResponse> future,
     CommandState::ConnHandle conn,
-    const transport::BatonHandle& baton) {
+    const BatonHandle& baton) {
     if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsAfterAcquireConn)) {
         conn->indicateSuccess();
         return future;
@@ -416,7 +421,7 @@ void NetworkInterfaceTL::_eraseInUseConn(const TaskExecutor::CallbackHandle& cbH
 }
 
 void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                       const transport::BatonHandle& baton) {
+                                       const BatonHandle& baton) {
     stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
     auto it = _inProgress.find(cbHandle);
     if (it == _inProgress.end()) {
@@ -445,19 +450,13 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
     }
 }
 
-Status NetworkInterfaceTL::setAlarm(Date_t when,
-                                    unique_function<void()> action,
-                                    const transport::BatonHandle& baton) {
+Status NetworkInterfaceTL::setAlarm(Date_t when, unique_function<void()> action) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
     if (when <= now()) {
-        if (baton) {
-            baton->schedule(std::move(action));
-        } else {
-            _reactor->schedule(transport::Reactor::kPost, std::move(action));
-        }
+        _reactor->schedule(transport::Reactor::kPost, std::move(action));
         return Status::OK();
     }
 
@@ -469,39 +468,34 @@ Status NetworkInterfaceTL::setAlarm(Date_t when,
         _inProgressAlarms.insert(alarmTimer);
     }
 
-    alarmTimer->waitUntil(when, baton)
-        .getAsync(
-            [ this, weakTimer, action = std::move(action), when, baton ](Status status) mutable {
-                auto alarmTimer = weakTimer.lock();
-                if (!alarmTimer) {
-                    return;
-                } else {
-                    stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-                    _inProgressAlarms.erase(alarmTimer);
+    alarmTimer->waitUntil(when, nullptr)
+        .getAsync([ this, weakTimer, action = std::move(action), when ](Status status) mutable {
+            auto alarmTimer = weakTimer.lock();
+            if (!alarmTimer) {
+                return;
+            } else {
+                stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+                _inProgressAlarms.erase(alarmTimer);
+            }
+
+            auto nowVal = now();
+            if (nowVal < when) {
+                warning() << "Alarm returned early. Expected at: " << when
+                          << ", fired at: " << nowVal;
+                const auto status = setAlarm(when, std::move(action));
+                if ((!status.isOK()) && (status != ErrorCodes::ShutdownInProgress)) {
+                    fassertFailedWithStatus(50785, status);
                 }
 
-                auto nowVal = now();
-                if (nowVal < when) {
-                    warning() << "Alarm returned early. Expected at: " << when
-                              << ", fired at: " << nowVal;
-                    const auto status = setAlarm(when, std::move(action), baton);
-                    if ((!status.isOK()) && (status != ErrorCodes::ShutdownInProgress)) {
-                        fassertFailedWithStatus(50785, status);
-                    }
+                return;
+            }
 
-                    return;
-                }
-
-                if (status.isOK()) {
-                    if (baton) {
-                        baton->schedule(std::move(action));
-                    } else {
-                        _reactor->schedule(transport::Reactor::kPost, std::move(action));
-                    }
-                } else if (status != ErrorCodes::CallbackCanceled) {
-                    warning() << "setAlarm() received an error: " << status;
-                }
-            });
+            if (status.isOK()) {
+                _reactor->schedule(transport::Reactor::kPost, std::move(action));
+            } else if (status != ErrorCodes::CallbackCanceled) {
+                warning() << "setAlarm() received an error: " << status;
+            }
+        });
     return Status::OK();
 }
 

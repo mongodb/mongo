@@ -114,7 +114,7 @@ public:
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                         RemoteCommandRequest& request,
                         RemoteCommandCompletionFn&& onFinish,
-                        const transport::BatonHandle& baton = nullptr) override;
+                        const BatonHandle& baton = nullptr) override;
 
     /**
      * If the network operation is in the _unscheduled or _processing queues, moves the operation
@@ -123,14 +123,12 @@ public:
      * called after the task has already completed, but its callback has not yet been run.
      */
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                       const transport::BatonHandle& baton = nullptr) override;
+                       const BatonHandle& baton = nullptr) override;
 
     /**
      * Not implemented.
      */
-    Status setAlarm(Date_t when,
-                    unique_function<void()> action,
-                    const transport::BatonHandle& baton = nullptr) override;
+    Status setAlarm(Date_t when, unique_function<void()> action) override;
 
     bool onNetworkThread() override;
 

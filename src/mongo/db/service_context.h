@@ -511,6 +511,11 @@ public:
      */
     void setServiceExecutor(std::unique_ptr<transport::ServiceExecutor> exec);
 
+    /**
+     * Creates a delayed execution baton with basic functionality
+     */
+    BatonHandle makeBaton(OperationContext* opCtx) const;
+
 private:
     class ClientObserverHolder {
     public:

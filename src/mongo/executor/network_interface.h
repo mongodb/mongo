@@ -144,12 +144,11 @@ public:
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
                                 RemoteCommandCompletionFn&& onFinish,
-                                const transport::BatonHandle& baton = nullptr) = 0;
+                                const BatonHandle& baton = nullptr) = 0;
 
-    Future<TaskExecutor::ResponseStatus> startCommand(
-        const TaskExecutor::CallbackHandle& cbHandle,
-        RemoteCommandRequest& request,
-        const transport::BatonHandle& baton = nullptr) {
+    Future<TaskExecutor::ResponseStatus> startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                                      RemoteCommandRequest& request,
+                                                      const BatonHandle& baton = nullptr) {
         auto pf = makePromiseFuture<TaskExecutor::ResponseStatus>();
 
         auto status = startCommand(
@@ -171,7 +170,7 @@ public:
      * completed.
      */
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                               const transport::BatonHandle& baton = nullptr) = 0;
+                               const BatonHandle& baton = nullptr) = 0;
 
     /**
      * Sets an alarm, which schedules "action" to run no sooner than "when".
@@ -187,9 +186,7 @@ public:
      * Any callbacks invoked from setAlarm must observe onNetworkThread to
      * return true. See that method for why.
      */
-    virtual Status setAlarm(Date_t when,
-                            unique_function<void()> action,
-                            const transport::BatonHandle& baton = nullptr) = 0;
+    virtual Status setAlarm(Date_t when, unique_function<void()> action) = 0;
 
     /**
      * Returns true if called from a thread dedicated to networking. I.e. not a

@@ -108,7 +108,7 @@ std::string NetworkInterfaceMock::getHostName() {
 Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
                                           RemoteCommandRequest& request,
                                           RemoteCommandCompletionFn&& onFinish,
-                                          const transport::BatonHandle& baton) {
+                                          const BatonHandle& baton) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
     }
@@ -140,8 +140,7 @@ void NetworkInterfaceMock::setHandshakeReplyForHost(
     }
 }
 
-void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle,
-                                         const transport::BatonHandle& baton) {
+void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle, const BatonHandle& baton) {
     invariant(!inShutdown());
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -171,9 +170,7 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(
     }
 }
 
-Status NetworkInterfaceMock::setAlarm(const Date_t when,
-                                      unique_function<void()> action,
-                                      const transport::BatonHandle& baton) {
+Status NetworkInterfaceMock::setAlarm(const Date_t when, unique_function<void()> action) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
     }

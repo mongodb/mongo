@@ -47,33 +47,32 @@ public:
      * Does not own target executor.
      */
     TaskExecutorProxy(executor::TaskExecutor* executor);
-    virtual ~TaskExecutorProxy();
+    ~TaskExecutorProxy();
 
     executor::TaskExecutor* getExecutor() const;
     void setExecutor(executor::TaskExecutor* executor);
 
-    virtual void startup() override;
-    virtual void shutdown() override;
-    virtual void join() override;
-    virtual void appendDiagnosticBSON(BSONObjBuilder* builder) const override;
-    virtual Date_t now() override;
-    virtual StatusWith<EventHandle> makeEvent() override;
-    virtual void signalEvent(const EventHandle& event) override;
-    virtual StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) override;
-    virtual void waitForEvent(const EventHandle& event) override;
-    virtual StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
-                                                     const EventHandle& event,
-                                                     Date_t deadline) override;
-    virtual StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override;
-    virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override;
-    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
-        const executor::RemoteCommandRequest& request,
-        const RemoteCommandCallbackFn& cb,
-        const transport::BatonHandle& baton = nullptr) override;
-    virtual void cancel(const CallbackHandle& cbHandle) override;
-    virtual void wait(const CallbackHandle& cbHandle,
-                      Interruptible* interruptible = Interruptible::notInterruptible()) override;
-    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
+    void startup() override;
+    void shutdown() override;
+    void join() override;
+    void appendDiagnosticBSON(BSONObjBuilder* builder) const override;
+    Date_t now() override;
+    StatusWith<EventHandle> makeEvent() override;
+    void signalEvent(const EventHandle& event) override;
+    StatusWith<CallbackHandle> onEvent(const EventHandle& event, CallbackFn work) override;
+    void waitForEvent(const EventHandle& event) override;
+    StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
+                                             const EventHandle& event,
+                                             Date_t deadline) override;
+    StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override;
+    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override;
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override;
+    void cancel(const CallbackHandle& cbHandle) override;
+    void wait(const CallbackHandle& cbHandle,
+              Interruptible* interruptible = Interruptible::notInterruptible()) override;
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
 private:
     // Not owned by us.

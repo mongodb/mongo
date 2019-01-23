@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/baton.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
@@ -46,8 +47,6 @@ namespace transport {
 
 class TransportLayer;
 class Session;
-class Baton;
-using BatonHandle = std::shared_ptr<Baton>;
 
 using SessionHandle = std::shared_ptr<Session>;
 using ConstSessionHandle = std::shared_ptr<const Session>;
@@ -107,7 +106,7 @@ public:
      * Source (receive) a new Message from the remote host for this Session.
      */
     virtual StatusWith<Message> sourceMessage() = 0;
-    virtual Future<Message> asyncSourceMessage(const transport::BatonHandle& handle = nullptr) = 0;
+    virtual Future<Message> asyncSourceMessage(const BatonHandle& handle = nullptr) = 0;
 
     /**
      * Sink (send) a Message to the remote host for this Session.
@@ -115,15 +114,14 @@ public:
      * Async version will keep the buffer alive until the operation completes.
      */
     virtual Status sinkMessage(Message message) = 0;
-    virtual Future<void> asyncSinkMessage(Message message,
-                                          const transport::BatonHandle& handle = nullptr) = 0;
+    virtual Future<void> asyncSinkMessage(Message message, const BatonHandle& handle = nullptr) = 0;
 
     /**
      * Cancel any outstanding async operations. There is no way to cancel synchronous calls.
      * Futures will finish with an ErrorCodes::CallbackCancelled error if they haven't already
      * completed.
      */
-    virtual void cancelAsyncOperations(const transport::BatonHandle& handle = nullptr) = 0;
+    virtual void cancelAsyncOperations(const BatonHandle& handle = nullptr) = 0;
 
     /**
     * This should only be used to detect when the remote host has disappeared without
@@ -155,14 +153,14 @@ public:
      *
      * The 'kPending' tag is only for new sessions; callers should not set it directly.
      */
-    virtual void setTags(TagMask tagsToSet);
+    void setTags(TagMask tagsToSet);
 
     /**
      * Atomically clears all of the session tags specified in the 'tagsToUnset' bit field. If the
      * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this
      * function also clears that tag as part of the same atomic operation.
      */
-    virtual void unsetTags(TagMask tagsToUnset);
+    void unsetTags(TagMask tagsToUnset);
 
     /**
      * Loads the session tags, passes them to 'mutateFunc' and then stores the result of that call
@@ -175,9 +173,9 @@ public:
      * of the 'mutateFunc' call. The 'kPending' tag is only for new sessions; callers should never
      * try to set it.
      */
-    virtual void mutateTags(const stdx::function<TagMask(TagMask)>& mutateFunc);
+    void mutateTags(const stdx::function<TagMask(TagMask)>& mutateFunc);
 
-    virtual TagMask getTags() const;
+    TagMask getTags() const;
 
 protected:
     Session();

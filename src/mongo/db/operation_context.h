@@ -184,14 +184,14 @@ public:
     /**
      * Sets a transport Baton on the operation.  This will trigger the Baton on markKilled.
      */
-    void setBaton(const transport::BatonHandle& baton) {
+    void setBaton(const BatonHandle& baton) {
         _baton = baton;
     }
 
     /**
      * Retrieves the baton associated with the operation.
      */
-    const transport::BatonHandle& getBaton() const {
+    const BatonHandle& getBaton() const {
         return _baton;
     }
 
@@ -436,13 +436,17 @@ private:
 
     // A transport Baton associated with the operation. The presence of this object implies that a
     // client thread is doing it's own async networking by blocking on it's own thread.
-    transport::BatonHandle _baton;
+    BatonHandle _baton;
 
     // If non-null, _waitMutex and _waitCV are the (mutex, condition variable) pair that the
     // operation is currently waiting on inside a call to waitForConditionOrInterrupt...().
+    //
+    // _waitThread is the calling thread's thread id.
+    //
     // All access guarded by the Client's lock.
     stdx::mutex* _waitMutex = nullptr;
     stdx::condition_variable* _waitCV = nullptr;
+    stdx::thread::id _waitThread;
 
     // If _waitMutex and _waitCV are non-null, this is the number of threads in a call to markKilled
     // actively attempting to kill the operation. If this value is non-zero, the operation is inside

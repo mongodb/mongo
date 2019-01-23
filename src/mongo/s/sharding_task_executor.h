@@ -69,10 +69,9 @@ public:
                                              Date_t deadline) override;
     StatusWith<CallbackHandle> scheduleWork(CallbackFn work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommand(
-        const RemoteCommandRequest& request,
-        const RemoteCommandCallbackFn& cb,
-        const transport::BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override;
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;

@@ -67,14 +67,14 @@ class ThreadPoolTaskExecutor::CallbackState : public TaskExecutor::CallbackState
 public:
     static std::shared_ptr<CallbackState> make(CallbackFn&& cb,
                                                Date_t readyDate,
-                                               const transport::BatonHandle& baton) {
+                                               const BatonHandle& baton) {
         return std::make_shared<CallbackState>(std::move(cb), readyDate, baton);
     }
 
     /**
      * Do not call directly. Use make.
      */
-    CallbackState(CallbackFn&& cb, Date_t theReadyDate, const transport::BatonHandle& baton)
+    CallbackState(CallbackFn&& cb, Date_t theReadyDate, const BatonHandle& baton)
         : callback(std::move(cb)), readyDate(theReadyDate), baton(baton) {}
 
     virtual ~CallbackState() = default;
@@ -102,7 +102,7 @@ public:
     bool isNetworkOperation = false;
     AtomicWord<bool> isFinished{false};
     boost::optional<stdx::condition_variable> finishedCondition;
-    transport::BatonHandle baton;
+    BatonHandle baton;
 };
 
 class ThreadPoolTaskExecutor::EventState : public TaskExecutor::EventState {
@@ -350,21 +350,23 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
         return cbHandle;
     }
     lk.unlock();
-    _net->setAlarm(when,
-                   [this, cbHandle] {
-                       auto cbState =
-                           checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
-                       if (cbState->canceled.load()) {
-                           return;
-                       }
-                       stdx::unique_lock<stdx::mutex> lk(_mutex);
-                       if (cbState->canceled.load()) {
-                           return;
-                       }
-                       scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
-                   },
-                   nullptr)
-        .transitional_ignore();
+
+    auto status = _net->setAlarm(when, [this, cbHandle] {
+        auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
+        if (cbState->canceled.load()) {
+            return;
+        }
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        if (cbState->canceled.load()) {
+            return;
+        }
+        scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
+    });
+
+    if (!status.isOK()) {
+        cancel(cbHandle.getValue());
+        return status;
+    }
 
     return cbHandle;
 }
@@ -406,7 +408,7 @@ const auto initialSyncPauseCmds =
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
-    const transport::BatonHandle& baton) {
+    const BatonHandle& baton) {
 
     if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
         // We are only going to pause on these failpoints if the command issued is for the
@@ -537,7 +539,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::enqueueCallback
 }
 
 ThreadPoolTaskExecutor::WorkQueue ThreadPoolTaskExecutor::makeSingletonWorkQueue(
-    CallbackFn work, const transport::BatonHandle& baton, Date_t when) {
+    CallbackFn work, const BatonHandle& baton, Date_t when) {
     WorkQueue result;
     result.emplace_front(CallbackState::make(std::move(work), when, baton));
     result.front()->iter = result.begin();
@@ -592,7 +594,17 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
 
     for (const auto& cbState : todo) {
         if (cbState->baton) {
-            cbState->baton->schedule([this, cbState] { runCallback(std::move(cbState)); });
+            cbState->baton->schedule([this, cbState](OperationContext* opCtx) {
+                if (opCtx) {
+                    runCallback(std::move(cbState));
+                    return;
+                }
+
+                cbState->canceled.store(1);
+                const auto status =
+                    _pool->schedule([this, cbState] { runCallback(std::move(cbState)); });
+                invariant(status.isOK() || status == ErrorCodes::ShutdownInProgress);
+            });
         } else {
             const auto status =
                 _pool->schedule([this, cbState] { runCallback(std::move(cbState)); });

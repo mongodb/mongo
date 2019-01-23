@@ -62,9 +62,8 @@ public:
                                   Milliseconds timeout);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
-        executor::RemoteCommandRequest request, const transport::BatonHandle& baton = nullptr);
-    Future<rpc::UniqueReply> runCommand(OpMsgRequest request,
-                                        const transport::BatonHandle& baton = nullptr);
+        executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);
+    Future<rpc::UniqueReply> runCommand(OpMsgRequest request, const BatonHandle& baton = nullptr);
 
     Future<void> authenticate(const BSONObj& params);
 
@@ -73,7 +72,7 @@ public:
     Future<void> initWireVersion(const std::string& appName,
                                  executor::NetworkConnectionHook* const hook);
 
-    void cancel(const transport::BatonHandle& baton = nullptr);
+    void cancel(const BatonHandle& baton = nullptr);
 
     bool isStillConnected();
 
@@ -83,7 +82,7 @@ public:
     const HostAndPort& local() const;
 
 private:
-    Future<Message> _call(Message request, const transport::BatonHandle& baton = nullptr);
+    Future<Message> _call(Message request, const BatonHandle& baton = nullptr);
     BSONObj _buildIsMasterRequest(const std::string& appName,
                                   executor::NetworkConnectionHook* hook);
     void _parseIsMasterResponse(BSONObj request,

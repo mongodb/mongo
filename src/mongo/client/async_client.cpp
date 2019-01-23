@@ -193,7 +193,7 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
     });
 }
 
-Future<Message> AsyncDBClient::_call(Message request, const transport::BatonHandle& baton) {
+Future<Message> AsyncDBClient::_call(Message request, const BatonHandle& baton) {
     auto swm = _compressorManager.compressMessage(request);
     if (!swm.isOK()) {
         return swm.getStatus();
@@ -219,8 +219,7 @@ Future<Message> AsyncDBClient::_call(Message request, const transport::BatonHand
         });
 }
 
-Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
-                                                   const transport::BatonHandle& baton) {
+Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request, const BatonHandle& baton) {
     invariant(_negotiatedProtocol);
     auto requestMsg = rpc::messageFromOpMsgRequest(*_negotiatedProtocol, std::move(request));
     return _call(std::move(requestMsg), baton)
@@ -230,7 +229,7 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
 }
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
-    executor::RemoteCommandRequest request, const transport::BatonHandle& baton) {
+    executor::RemoteCommandRequest request, const BatonHandle& baton) {
     auto clkSource = _svcCtx->getPreciseClockSource();
     auto start = clkSource->now();
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
@@ -246,7 +245,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
         });
 }
 
-void AsyncDBClient::cancel(const transport::BatonHandle& baton) {
+void AsyncDBClient::cancel(const BatonHandle& baton) {
     _session->cancelAsyncOperations(baton);
 }
 
