@@ -1,4 +1,7 @@
 // Test the creation of views with various options.
+// @tags: [
+//   assumes_superuser_permissions,
+// ]
 
 (function() {
     "use strict";

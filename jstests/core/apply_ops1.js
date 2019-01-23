@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount]
+// @tags: [
+//   assumes_superuser_permissions,
+//   requires_fastcount,
+//   requires_non_retryable_commands,
+// ]
 
 (function() {
     "use strict";

@@ -4,6 +4,7 @@
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
+//   uses_testing_only_commands,
 // ]
 
 // Test basic delete stage functionality.

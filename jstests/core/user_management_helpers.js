@@ -1,4 +1,5 @@
 // @tags: [
+//   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
 //   creates_and_authenticates_user,
 //   requires_auth,

@@ -1,4 +1,7 @@
 // Test mongo shell connect strings.
+// @tags: [
+//   uses_multiple_connections,
+// ]
 (function() {
     'use strict';
 

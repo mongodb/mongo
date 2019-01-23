@@ -1,4 +1,7 @@
 // SERVER-16676 Make sure compact doesn't leave the collection with bad indexes
+// @tags: [
+//   uses_multiple_connections,
+// ]
 // SERVER-16967 Make sure compact doesn't crash while collections are being dropped
 // in a different database.
 

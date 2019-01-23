@@ -1,7 +1,10 @@
 // Tests that the namespace being watched cannot be a system namespace.
 // Mark as assumes_read_preference_unchanged since reading from the non-replicated "system.profile"
 // collection results in a failure in the secondary reads suite.
-// @tags: [assumes_read_preference_unchanged]
+// @tags: [
+//   assumes_read_preference_unchanged,
+//   assumes_superuser_permissions,
+// ]
 (function() {
     "use strict";
 

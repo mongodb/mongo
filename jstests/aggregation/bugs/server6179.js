@@ -1,4 +1,7 @@
 // SERVER-6179: support for two $groups in sharded agg
+// @tags: [
+//   requires_spawning_own_processes,
+// ]
 (function() {
     'use strict';
 

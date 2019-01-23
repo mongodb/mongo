@@ -1,4 +1,7 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   assumes_superuser_permissions,
+//   does_not_support_stepdowns,
+// ]
 
 // Tests that index validation succeeds for long keys when failIndexKeyTooLong is set to false.
 // See: SERVER-22234

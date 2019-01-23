@@ -1,5 +1,8 @@
 /**
  * Tests that long-running operations show up in currentOp and report the locks they are holding.
+ * @tags: [
+ *   assumes_superuser_permissions,
+ * ]
  */
 (function() {
     "use strict";

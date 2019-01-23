@@ -3,7 +3,11 @@
 // Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
 // startSession may cause this test to fail to find the returned sessionId.
 // Uses features that require featureCompatibilityVersion 3.6.
-// @tags: [does_not_support_stepdowns, requires_fcv36]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_fcv36,
+//   uses_testing_only_commands,
+// ]
 
 (function() {
     'use strict';

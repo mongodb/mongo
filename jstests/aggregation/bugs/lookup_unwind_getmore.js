@@ -3,6 +3,9 @@
  * changes as it unwinds the results.
  *
  * This test was designed to reproduce SERVER-22537.
+ * @tags: [
+ *   requires_spawning_own_processes,
+ * ]
  */
 (function() {
     'use strict';

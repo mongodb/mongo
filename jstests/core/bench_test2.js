@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   uses_multiple_connections,
+ * ]
+ */
 t = db.bench_test2;
 t.drop();
 

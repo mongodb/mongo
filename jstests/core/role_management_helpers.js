@@ -1,7 +1,8 @@
 // @tags: [
-//     requires_non_retryable_commands,
-//     requires_auth,
-//     assumes_write_concern_unchanged,
+//   assumes_superuser_permissions,
+//   assumes_write_concern_unchanged,
+//   requires_auth,
+//   requires_non_retryable_commands,
 // ]
 
 // This test is a basic sanity check of the shell helpers for manipulating role objects

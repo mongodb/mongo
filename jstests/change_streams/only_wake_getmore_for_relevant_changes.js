@@ -1,4 +1,7 @@
 // Test that an insert to an unrelated collection will not cause a $changeStream getMore to
+// @tags: [
+//   uses_multiple_connections,
+// ]
 // return early.
 (function() {
     "use strict";

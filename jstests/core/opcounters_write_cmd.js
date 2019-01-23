@@ -1,4 +1,7 @@
 // Test that opcounters get incremented properly.
+// @tags: [
+//   uses_multiple_connections,
+// ]
 // Legacy write mode test also available at jstests/gle.
 
 var mongo = new Mongo(db.getMongo().host);

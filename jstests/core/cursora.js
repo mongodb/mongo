@@ -1,4 +1,9 @@
-// @tags: [requires_getmore, requires_non_retryable_writes, requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   requires_getmore,
+//   requires_non_retryable_writes,
+//   uses_multiple_connections,
+// ]
 
 t = db.cursora;
 

@@ -1,4 +1,7 @@
 // In SERVER-23725, $graphLookup was introduced. In this file, we test that the expression behaves
+// @tags: [
+//   requires_spawning_own_processes,
+// ]
 // correctly on a sharded collection.
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 

@@ -1,4 +1,7 @@
 // Ensure an index cannot be created on system.indexes
+// @tags: [
+//   assumes_superuser_permissions,
+// ]
 (function() {
     var t = db.getSiblingDB("indexes_on_indexes");
     t.dropDatabase();

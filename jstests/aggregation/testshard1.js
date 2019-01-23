@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_spawning_own_processes,
+// ]
+
 load('jstests/aggregation/extras/utils.js');
 load('jstests/libs/analyze_plan.js');  // For planHasStage.
 
