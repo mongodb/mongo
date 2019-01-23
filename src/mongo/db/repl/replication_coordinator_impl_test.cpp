@@ -110,7 +110,7 @@ struct OpTimeWithTermOne {
  */
 void killOperation(OperationContext* opCtx) {
     stdx::lock_guard<Client> lkClient(*opCtx->getClient());
-    opCtx->getServiceContext()->killOperation(opCtx);
+    opCtx->getServiceContext()->killOperation(lkClient, opCtx);
 }
 
 TEST_F(ReplCoordTest, IsMasterIsFalseDuringStepdown) {

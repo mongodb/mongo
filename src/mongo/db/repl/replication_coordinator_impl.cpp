@@ -1772,7 +1772,7 @@ void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
                 GlobalLockAcquisitionTracker::get(toKill);
             if (closeConnectionsOnStepdown.load() || globalLockTracker.getGlobalWriteLocked() ||
                 globalLockTracker.getGlobalSharedLockTaken()) {
-                serviceCtx->killOperation(toKill, ErrorCodes::InterruptedDueToStepDown);
+                serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToStepDown);
             }
         }
     }

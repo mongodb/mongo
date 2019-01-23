@@ -617,7 +617,7 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id, bool shou
         {
             stdx::unique_lock<Client> lk(*cursor->_operationUsingCursor->getClient());
             cursor->_operationUsingCursor->getServiceContext()->killOperation(
-                cursor->_operationUsingCursor, ErrorCodes::CursorKilled);
+                lk, cursor->_operationUsingCursor, ErrorCodes::CursorKilled);
         }
 
         if (shouldAudit) {

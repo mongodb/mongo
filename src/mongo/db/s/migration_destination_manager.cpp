@@ -402,7 +402,7 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
             }
         } catch (...) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            opCtx->getServiceContext()->killOperation(opCtx, ErrorCodes::Error(51008));
+            opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Error(51008));
             log() << "Batch insertion failed " << causedBy(redact(exceptionToStatus()));
         }
     }};

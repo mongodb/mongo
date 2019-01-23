@@ -287,7 +287,7 @@ void ServiceContext::setKillAllOperations() {
         stdx::lock_guard<Client> lk(*client);
         auto opCtxToKill = client->getOperationContext();
         if (opCtxToKill) {
-            killOperation(opCtxToKill, ErrorCodes::InterruptedAtShutdown);
+            killOperation(lk, opCtxToKill, ErrorCodes::InterruptedAtShutdown);
         }
     }
 
@@ -301,7 +301,7 @@ void ServiceContext::setKillAllOperations() {
     }
 }
 
-void ServiceContext::killOperation(OperationContext* opCtx, ErrorCodes::Error killCode) {
+void ServiceContext::killOperation(WithLock, OperationContext* opCtx, ErrorCodes::Error killCode) {
     opCtx->markKilled(killCode);
 
     for (const auto listener : _killOpListeners) {

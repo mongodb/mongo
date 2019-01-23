@@ -47,6 +47,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
@@ -355,10 +356,10 @@ public:
     /**
      * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed.
      * Caller must own the lock on opCtx->getClient, and opCtx->getServiceContext() must be the same
-     *as
-     * this service context.
+     * as this service context. WithLock expects that the client lock be passed in.
      **/
-    void killOperation(OperationContext* opCtx,
+    void killOperation(WithLock,
+                       OperationContext* opCtx,
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
