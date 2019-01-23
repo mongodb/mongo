@@ -142,8 +142,6 @@ TEST(BSONObjCensorTests, Strings) {
                        << "not a password"
                        << "security.kmip.clientCertificatePassword"
                        << "this password should be censored"
-                       << "security.ldap.bind.queryPassword"
-                       << "this password should be censored"
                        << "middlearg"
                        << "also not a password"
                        << "processManagement.windowsService.servicePassword"
@@ -154,8 +152,6 @@ TEST(BSONObjCensorTests, Strings) {
     BSONObj res = BSON("firstarg"
                        << "not a password"
                        << "security.kmip.clientCertificatePassword"
-                       << "<password>"
-                       << "security.ldap.bind.queryPassword"
                        << "<password>"
                        << "middlearg"
                        << "also not a password"
@@ -174,9 +170,6 @@ TEST(BSONObjCensorTests, Arrays) {
                        << "security.kmip.clientCertificatePassword"
                        << BSON_ARRAY("first censored password"
                                      << "next censored password")
-                       << "security.ldap.bind.queryPassword"
-                       << BSON_ARRAY("first censored password"
-                                     << "next censored password")
                        << "middlearg"
                        << "also not a password"
                        << "processManagement.windowsService.servicePassword"
@@ -188,9 +181,6 @@ TEST(BSONObjCensorTests, Arrays) {
     BSONObj res = BSON("firstarg"
                        << "not a password"
                        << "security.kmip.clientCertificatePassword"
-                       << BSON_ARRAY("<password>"
-                                     << "<password>")
-                       << "security.ldap.bind.queryPassword"
                        << BSON_ARRAY("<password>"
                                      << "<password>")
                        << "middlearg"
