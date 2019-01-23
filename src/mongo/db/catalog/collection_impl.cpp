@@ -228,7 +228,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
 }
 
 CollectionImpl::~CollectionImpl() {
-    verify(ok());
+    invariant(ok());
     if (isCapped()) {
         _recordStore->setCappedCallback(nullptr);
         _cappedNotifier->kill();

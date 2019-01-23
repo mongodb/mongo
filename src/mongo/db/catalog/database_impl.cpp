@@ -34,8 +34,10 @@
 #include "mongo/db/catalog/database_impl.h"
 
 #include <algorithm>
-#include <boost/filesystem/operations.hpp>
 #include <memory>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
@@ -81,105 +83,69 @@ namespace mongo {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
-}  // namespace
 
-using std::endl;
-using std::list;
-using std::set;
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-using std::vector;
+/**
+ * Move entry in 'map' from key 'from' to key 'to'.
+ */
+void renameKey(Database::CollectionMap* map, std::string from, std::string to) {
+    invariant(!map->count(to), "from == " + from + ", to == " + to);
+    auto it = map->find(from);
+    invariant(it != map->end(), "from == " + from + " , to == " + to);
+    auto val = std::move(it->second);
+    map->erase(it);
+    map->emplace(to, std::move(val));
+}
+
+std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
+                                                      DatabaseCatalogEntry* dbEntry,
+                                                      const NamespaceString& nss) {
+
+    std::unique_ptr<CollectionCatalogEntry> cce(dbEntry->getCollectionCatalogEntry(nss.ns()));
+    std::unique_ptr<RecordStore> rs(dbEntry->getRecordStore(nss.ns()));
+    auto uuid = cce->getCollectionOptions(opCtx).uuid;
+    invariant(rs,
+              str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
+                            << uuid);
+    // TODO(SERVER-40126): Add something like:
+    // uassert(ErrorCodes::MustDowngrade,
+    //        str::stream() << "Record store has no UUID. Collection: " << nss.ns(),
+    //        uuid);
+
+    auto coll = std::make_unique<CollectionImpl>(
+        opCtx, nss.ns(), uuid, cce.release(), rs.release(), dbEntry);
+    // We are not in a WUOW only when we are called from Database::init(). There is no need
+    // to rollback UUIDCatalog changes because we are initializing existing collections.
+    if (uuid) {
+        auto&& uuidCatalog = UUIDCatalog::get(opCtx);
+        if (!opCtx->lockState()->inAWriteUnitOfWork()) {
+            uuidCatalog.registerUUIDCatalogEntry(uuid.get(), coll.get());
+        } else {
+            uuidCatalog.onCreateCollection(opCtx, coll.get(), uuid.get());
+        }
+    }
+
+    return coll;
+}
+
+Status validateDBNameForWindows(StringData dbname) {
+    const std::vector<std::string> windowsReservedNames = {
+        "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
+        "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
+
+    std::string lower(dbname.toString());
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+    if (std::count(windowsReservedNames.begin(), windowsReservedNames.end(), lower))
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "db name \"" << dbname << "\" is a reserved name");
+    return Status::OK();
+}
+}  // namespace
 
 void uassertNamespaceNotIndex(StringData ns, StringData caller) {
     uassert(17320,
             str::stream() << "cannot do " << caller << " on namespace with a $ in it: " << ns,
             NamespaceString::normal(ns));
-}
-
-class DatabaseImpl::AddCollectionChange : public RecoveryUnit::Change {
-public:
-    AddCollectionChange(OperationContext* opCtx, DatabaseImpl* db, StringData ns)
-        : _opCtx(opCtx), _db(db), _ns(ns.toString()) {}
-
-    virtual void commit(boost::optional<Timestamp> commitTime) {
-        CollectionMap::const_iterator it = _db->_collections.find(_ns);
-
-        if (it == _db->_collections.end())
-            return;
-
-        // Ban reading from this collection on committed reads on snapshots before now.
-        if (commitTime) {
-            it->second->setMinimumVisibleSnapshot(commitTime.get());
-        }
-    }
-
-    virtual void rollback() {
-        CollectionMap::const_iterator it = _db->_collections.find(_ns);
-
-        if (it == _db->_collections.end())
-            return;
-
-        delete it->second;
-        _db->_collections.erase(it);
-    }
-
-    OperationContext* const _opCtx;
-    DatabaseImpl* const _db;
-    const std::string _ns;
-};
-
-class DatabaseImpl::RemoveCollectionChange : public RecoveryUnit::Change {
-public:
-    // Takes ownership of coll (but not db).
-    RemoveCollectionChange(DatabaseImpl* db, Collection* coll) : _db(db), _coll(coll) {}
-
-    virtual void commit(boost::optional<Timestamp>) {
-        delete _coll;
-    }
-
-    virtual void rollback() {
-        Collection*& inMap = _db->_collections[_coll->ns().ns()];
-        invariant(!inMap);
-        inMap = _coll;
-    }
-
-    DatabaseImpl* const _db;
-    Collection* const _coll;
-};
-
-class DatabaseImpl::RenameCollectionChange final : public RecoveryUnit::Change {
-public:
-    RenameCollectionChange(DatabaseImpl* db,
-                           Collection* coll,
-                           NamespaceString fromNs,
-                           NamespaceString toNs)
-        : _db(db), _coll(coll), _fromNs(std::move(fromNs)), _toNs(std::move(toNs)) {}
-
-    void commit(boost::optional<Timestamp> commitTime) override {
-        // Ban reading from this collection on committed reads on snapshots before now.
-        if (commitTime) {
-            _coll->setMinimumVisibleSnapshot(commitTime.get());
-        }
-    }
-
-    void rollback() override {
-        auto it = _db->_collections.find(_toNs.ns());
-        invariant(it != _db->_collections.end());
-        invariant(it->second == _coll);
-        _db->_collections[_fromNs.ns()] = _coll;
-        _db->_collections.erase(_toNs.ns());
-    }
-
-    DatabaseImpl* const _db;
-    Collection* const _coll;
-    const NamespaceString _fromNs;
-    const NamespaceString _toNs;
-};
-
-DatabaseImpl::~DatabaseImpl() {
-    for (CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i)
-        delete i->second;
 }
 
 void DatabaseImpl::close(OperationContext* opCtx) {
@@ -196,69 +162,20 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
     if (dbname.size() >= 64)
         return Status(ErrorCodes::BadValue, "db name is too long");
 
-    if (dbname.find('.') != string::npos)
+    if (dbname.find('.') != std::string::npos)
         return Status(ErrorCodes::BadValue, "db name cannot contain a .");
 
-    if (dbname.find(' ') != string::npos)
+    if (dbname.find(' ') != std::string::npos)
         return Status(ErrorCodes::BadValue, "db name cannot contain a space");
 
 #ifdef _WIN32
-    static const char* windowsReservedNames[] = {
-        "con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4", "com5", "com6", "com7",
-        "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
-
-    string lower(dbname.toString());
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-
-    for (size_t i = 0; i < (sizeof(windowsReservedNames) / sizeof(char*)); ++i) {
-        if (lower == windowsReservedNames[i]) {
-            stringstream errorString;
-            errorString << "db name \"" << dbname.toString() << "\" is a reserved name";
-            return Status(ErrorCodes::BadValue, errorString.str());
-        }
-    }
+    return validateDBNameForWindows(dbname);
 #endif
 
     return Status::OK();
 }
 
-Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    Collection* collection = getCollection(opCtx, nss);
-
-    if (collection) {
-        return collection;
-    }
-
-    unique_ptr<CollectionCatalogEntry> cce(_dbEntry->getCollectionCatalogEntry(nss.ns()));
-    auto uuid = cce->getCollectionOptions(opCtx).uuid;
-
-    unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
-    if (rs.get() == nullptr) {
-        severe() << "Record store did not exist. Collection: " << nss << " UUID: "
-                 << (uuid ? uuid->toString() : "none");  // if cce exists, so should this
-        fassertFailedNoTrace(50936);
-    }
-
-    // Not registering AddCollectionChange since this is for collections that already exist.
-    auto coll = new CollectionImpl(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
-    if (uuid) {
-        // We are not in a WUOW only when we are called from Database::init(). There is no need
-        // to rollback UUIDCatalog changes because we are initializing existing collections.
-        auto&& uuidCatalog = UUIDCatalog::get(opCtx);
-        if (!opCtx->lockState()->inAWriteUnitOfWork()) {
-            uuidCatalog.registerUUIDCatalogEntry(uuid.get(), coll);
-        } else {
-            uuidCatalog.onCreateCollection(opCtx, coll, uuid.get());
-        }
-    }
-
-    return coll;
-}
-
-DatabaseImpl::DatabaseImpl(const StringData name,
-                           DatabaseCatalogEntry* const dbEntry,
-                           uint64_t epoch)
+DatabaseImpl::DatabaseImpl(const StringData name, DatabaseCatalogEntry* dbEntry, uint64_t epoch)
     : _name(name.toString()),
       _dbEntry(dbEntry),
       _epoch(epoch),
@@ -280,12 +197,16 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
     _profile = serverGlobalParams.defaultProfile;
 
-    list<string> collections;
+    std::list<std::string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
 
+    invariant(_collections.empty());
     for (auto ns : collections) {
         NamespaceString nss(ns);
-        _collections[ns] = _getOrCreateCollectionInstance(opCtx, nss);
+        auto ownedCollection = _createCollectionInstance(opCtx, _dbEntry, nss);
+        Collection* collection = ownedCollection.get();
+        invariant(collection);
+        _collections[ns] = std::make_pair(std::move(ownedCollection), collection);
     }
 
     // At construction time of the viewCatalog, the _collections map wasn't initialized yet, so no
@@ -306,7 +227,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    list<string> collections;
+    std::list<std::string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
 
     for (auto ns : collections) {
@@ -394,7 +315,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     long long indexSize = 0;
 
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
-    list<string> collections;
+    std::list<std::string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
 
 
@@ -604,9 +525,25 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     return Status::OK();
 }
 
+class DatabaseImpl::FinishDropChange : public RecoveryUnit::Change {
+public:
+    FinishDropChange(CollectionMap* map, std::string key, CollectionMap::mapped_type value)
+        : _map(map), _key(key), _value(std::move(value)) {}
+    void commit(boost::optional<Timestamp>) override {
+        _value.first.reset();
+    }
+    void rollback() override {
+        _map->emplace(_key, std::move(_value));
+    }
+    CollectionMap* _map;
+    std::string _key;
+    CollectionMap::mapped_type _value;
+};
+
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& fullns,
                                            Collection* collection) {
+    invariant(_name == fullns.db());
     LOG(1) << "dropCollection: " << fullns << " - dropAllIndexes start";
     collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
@@ -615,13 +552,15 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
 
     // We want to destroy the Collection object before telling the StorageEngine to destroy the
     // RecordStore.
-    invariant(_name == fullns.db());
     auto it = _collections.find(fullns.toString());
 
     if (it != _collections.end()) {
         // Takes ownership of the collection
-        opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
+        auto value = std::move(it->second);
         _collections.erase(it);
+        // Register a Change to reinstall the Collection* in the collections map on rollback.
+        opCtx->recoveryUnit()->registerChange(
+            new FinishDropChange(&_collections, fullns.toString(), std::move(value)));
     }
 
     auto uuid = collection->uuid();
@@ -681,22 +620,28 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
 
-    Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
+    Status status = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
     // Make 'toNS' map to the collection instead of 'fromNS'.
-    _collections.erase(fromNS);
-    _collections[toNS] = collToRename;
+    renameKey(&_collections, fromNSS.ns(), toNSS.ns());
 
     // Set the namespace of 'collToRename' from within the UUIDCatalog. This is necessary because
     // the UUIDCatalog mutex synchronizes concurrent access to the collection's namespace for
     // callers that may not hold a collection lock.
     UUIDCatalog::get(opCtx).setCollectionNamespace(opCtx, collToRename, fromNSS, toNSS);
 
-    // Register a Change which, on rollback, will reinstall the Collection* in the collections map
-    // so that it is associated with 'fromNS', not 'toNS'.
-    opCtx->recoveryUnit()->registerChange(
-        new RenameCollectionChange(this, collToRename, fromNSS, toNSS));
+    opCtx->recoveryUnit()->onCommit([collToRename](auto commitTime) {
+        // Ban reading from this collection on committed reads on snapshots before now.
+        if (commitTime) {
+            collToRename->setMinimumVisibleSnapshot(commitTime.get());
+        }
+    });
 
-    return s;
+    // Register a rollback handler, will reinstall the Collection* in the collections map
+    // so that it is associated with 'fromNS', not 'toNS'.
+    opCtx->recoveryUnit()->onRollback(
+        [ map = &_collections, fromNSS, toNSS ]() { renameKey(map, toNSS.ns(), fromNSS.ns()); });
+
+    return status;
 }
 
 Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx,
@@ -815,10 +760,20 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     massertStatusOK(
         _dbEntry->createCollection(opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
 
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
-    Collection* collection = _getOrCreateCollectionInstance(opCtx, nss);
+    opCtx->recoveryUnit()->onRollback([ db = this, nss ]() { db->_collections.erase(nss.ns()); });
+
+
+    invariant(!_collections.count(ns));
+    auto ownedCollection = _createCollectionInstance(opCtx, _dbEntry, nss);
+    Collection* collection = ownedCollection.get();
     invariant(collection);
-    _collections[ns] = collection;
+    _collections[ns] = std::make_pair(std::move(ownedCollection), collection);
+    opCtx->recoveryUnit()->onCommit([collection](auto commitTime) {
+        // Ban reading from this collection on committed reads on snapshots before now.
+        if (commitTime)
+            collection->setMinimumVisibleSnapshot(commitTime.get());
+    });
+
 
     BSONObj fullIdIndexSpec;
 
