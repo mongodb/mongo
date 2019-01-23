@@ -127,12 +127,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
     auto client = sc->makeClient(__FILE__);
     auto opCtx = client->makeOperationContext();
 
-    if (auto baton = sc->getTransportLayer()->makeBaton(opCtx.get())) {
-        auto future = handle->runCommandRequest(ecr, baton);
-        const auto batonGuard = makeGuard([&] { baton->detach(); });
-
-        future.get(opCtx.get());
-    }
+    handle->runCommandRequest(ecr, opCtx->getBaton()).get(opCtx.get());
 }
 
 TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {

@@ -253,10 +253,17 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         stdx::lock_guard<Client> lk(*client);
         client->setOperationContext(opCtx.get());
     }
+    if (_transportLayer) {
+        _transportLayer->makeBaton(opCtx.get());
+    } else {
+        makeBaton(opCtx.get());
+    }
     return UniqueOperationContext(opCtx.release());
 };
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
+    opCtx->getBaton()->detach();
+
     auto client = opCtx->getClient();
     if (client && client->session()) {
         _numCurrentOps.subtractAndFetch(1);

@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/functional.h"
@@ -110,14 +111,11 @@ public:
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
 
     virtual BatonHandle makeBaton(OperationContext* opCtx) const {
-        return makeDefaultBaton(opCtx);
+        return opCtx->getServiceContext()->makeBaton(opCtx);
     }
 
 protected:
     TransportLayer() = default;
-
-private:
-    static BatonHandle makeDefaultBaton(OperationContext* opCtx);
 };
 
 class ReactorTimer {

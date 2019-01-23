@@ -216,38 +216,6 @@ private:
     };
 
     /**
-     * We have to make sure to detach the baton if we throw in construction.  We also need a baton
-     * that lives longer than this type (because it can end up in callbacks that won't actually
-     * modify it).
-     *
-     * TODO: work out actual lifetime semantics for a baton.  For now, leaving this as a wort in ARS
-     */
-    class BatonDetacher {
-    public:
-        explicit BatonDetacher(OperationContext* opCtx);
-        ~BatonDetacher();
-
-        Baton& operator*() const {
-            return *_baton;
-        }
-
-        Baton* operator->() const noexcept {
-            return _baton.get();
-        }
-
-        operator BatonHandle() const {
-            return _baton;
-        }
-
-        explicit operator bool() const noexcept {
-            return static_cast<bool>(_baton);
-        }
-
-    private:
-        BatonHandle _baton;
-    };
-
-    /**
      * Cancels all outstanding requests on the TaskExecutor and sets the _stopRetrying flag.
      */
     void _cancelPendingRequests();
@@ -291,7 +259,6 @@ private:
     OperationContext* _opCtx;
 
     executor::TaskExecutor* _executor;
-    BatonDetacher _baton;
 
     // The metadata obj to pass along with the command remote. Used to indicate that the command is
     // ok to run on secondaries.

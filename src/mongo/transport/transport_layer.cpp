@@ -59,9 +59,5 @@ const Status TransportLayer::TicketSessionClosedStatus = Status(
 
 ReactorTimer::ReactorTimer() : _id(reactorTimerIdCounter.addAndFetch(1)) {}
 
-BatonHandle TransportLayer::makeDefaultBaton(OperationContext* opCtx) {
-    return opCtx->getServiceContext()->makeBaton(opCtx);
-}
-
 }  // namespace transport
 }  // namespace mongo
