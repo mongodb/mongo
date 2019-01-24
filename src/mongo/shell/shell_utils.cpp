@@ -49,6 +49,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
+#include <pwd.h>
 
 namespace mongo {
 
@@ -100,10 +101,14 @@ BSONElement singleArg(const BSONObj& args) {
 }
 
 const char* getUserDir() {
+  const char* homedir;
 #ifdef _WIN32
     return getenv("USERPROFILE");
 #else
-    return getenv("HOME");
+    if((homedir = getenv("HOME")) == NULL) {
+      homedir = getpwuid(geteuid())->pw_dir;
+    };
+    return homedir;
 #endif
 }
 
