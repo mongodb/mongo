@@ -228,12 +228,12 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
     {
         const session = this.getDB().getSession();
 
-        const readPreference = session._serverSession.client.getReadPreference(session);
+        const readPreference = session._getSessionAwareClient().getReadPreference(session);
         if (readPreference !== null) {
             cursor.readPref(readPreference.mode, readPreference.tags);
         }
 
-        const readConcern = session._serverSession.client.getReadConcern(session);
+        const readConcern = session._getSessionAwareClient().getReadConcern(session);
         if (readConcern !== null) {
             cursor.readConcern(readConcern.level);
         }

@@ -508,7 +508,6 @@ var {
         let _nextStatementId = 0;
         let _lastUsed = new Date();
 
-        this.client = new SessionAwareClient(client);
         if (!serverSupports(kWireVersionSupportingLogicalSession)) {
             throw new DriverSession.UnsupportedError(
                 "Logical Sessions are only supported on server versions 3.6 and greater.");
@@ -811,8 +810,9 @@ var {
             // writeConcern should only be specified on commit or abort. If a writeConcern is
             // not specified from the default transaction options, it will be inherited from
             // the session.
-            if (this.client.getWriteConcern(driverSession) !== undefined) {
-                cmd.writeConcern = this.client.getWriteConcern(driverSession);
+            const sessionAwareClient = driverSession._getSessionAwareClient();
+            if (sessionAwareClient.getWriteConcern(driverSession) !== undefined) {
+                cmd.writeConcern = sessionAwareClient.getWriteConcern(driverSession);
             }
             if (_txnOptions.getTxnWriteConcern() !== undefined) {
                 cmd.writeConcern = _txnOptions.getTxnWriteConcern();
@@ -822,7 +822,7 @@ var {
             let res;
             try {
                 // run command against the admin database.
-                res = this.client.runCommand(driverSession, "admin", cmd, 0);
+                res = sessionAwareClient.runCommand(driverSession, "admin", cmd, 0);
             } finally {
                 if (commandName === "commitTransaction") {
                     setTxnState("committed");
@@ -836,6 +836,8 @@ var {
 
     function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         var driverSessionConstructor = function(client, options = defaultOptions) {
+            const sessionAwareClient = new SessionAwareClient(client);
+
             let _options = options;
             let _hasEnded = false;
 
@@ -855,7 +857,7 @@ var {
             };
 
             this._getSessionAwareClient = function _getSessionAwareClient() {
-                return this._serverSession.client;
+                return sessionAwareClient;
             };
 
             this.getOptions = function getOptions() {
@@ -1040,8 +1042,6 @@ var {
             {
               createServerSession: function createServerSession(client) {
                   return {
-                      client: new SessionAwareClient(client),
-
                       injectSessionId: function injectSessionId(cmdObj) {
                           return cmdObj;
                       },

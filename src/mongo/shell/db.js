@@ -123,7 +123,7 @@ var DB;
         {
             const session = this.getSession();
 
-            const readPreference = session._serverSession.client.getReadPreference(session);
+            const readPreference = session._getSessionAwareClient().getReadPreference(session);
             if (readPreference !== null) {
                 obj = this._attachReadPreferenceToCommand(obj, readPreference);
 
@@ -1818,7 +1818,7 @@ var DB;
 
         {
             const session = this.getSession();
-            return session._serverSession.client.getWriteConcern(session);
+            return session._getSessionAwareClient().getWriteConcern(session);
         }
     };
 
