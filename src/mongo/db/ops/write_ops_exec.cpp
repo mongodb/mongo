@@ -96,6 +96,11 @@ MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
+// The withLock fail points are for testing interruptability of these operations, so they will not
+// themselves check for interrupt.
+MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchInsert);
+MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchUpdate);
+MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchRemove);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -379,6 +384,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
         assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
+
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
     };
 
     try {
@@ -604,6 +612,9 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         collection.reset();  // unlock.
         makeCollection(opCtx, ns);
     }
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangWithLockDuringBatchUpdate, opCtx, "hangWithLockDuringBatchUpdate");
 
     auto& curOp = *CurOp::get(opCtx);
 
@@ -840,6 +851,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     }
 
     assertCanWrite_inlock(opCtx, ns);
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
     auto exec = uassertStatusOK(
         getExecutorDelete(opCtx, &curOp.debug(), collection.getCollection(), &parsedDelete));

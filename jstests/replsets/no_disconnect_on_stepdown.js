@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/check_log.js");
+    load("jstests/libs/curop_helpers.js");
 
     const rst = new ReplSetTest(
         {nodes: [{setParameter: {closeConnectionsOnStepdown: false}}, {rsConfig: {priority: 0}}]});
@@ -25,7 +25,12 @@
     // Legacy writes will still disconnect, so don't use them.
     primaryDataConn.forceWriteMode('commands');
 
-    assert.commandWorked(coll.insert([{_id: 'deleteme'}, {_id: 'updateme'}, {_id: 'findme'}]));
+    assert.commandWorked(coll.insert([
+        {_id: 'update0', updateme: true},
+        {_id: 'update1', updateme: true},
+        {_id: 'remove0', removeme: true},
+        {_id: 'remove1', removeme: true}
+    ]));
     rst.awaitReplication();
 
     jsTestLog("Stepping down with no command in progress.  Should not disconnect.");
@@ -40,16 +45,19 @@
 
     function runStepDownTest({description, failpoint, operation, errorCode}) {
         jsTestLog(`Trying ${description} on a stepping-down primary`);
-        assert.commandWorked(
-            primaryAdmin.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
+        assert.commandWorked(primaryAdmin.adminCommand({
+            configureFailPoint: failpoint,
+            mode: "alwaysOn",
+            data: {shouldContinueOnInterrupt: true}
+        }));
 
-        errorCode = errorCode || ErrorCodes.PrimarySteppedDown;
+        errorCode = errorCode || ErrorCodes.InterruptedDueToStepDown;
         const writeCommand = `db.getMongo().forceWriteMode("commands");
                               assert.commandFailedWithCode(${operation}, ${errorCode});
                               assert.commandWorked(db.adminCommand({ping:1}));`;
 
         const waitForShell = startParallelShell(writeCommand, primary.port);
-        checkLog.contains(primary, failpoint + " fail point enabled");
+        waitForCurOpByFilter(primaryAdmin, {"msg": failpoint});
         assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
         assert.commandWorked(
@@ -65,27 +73,29 @@
         assert.commandWorked(primaryAdmin.adminCommand({replSetFreeze: 0}));
         rst.getPrimary();
     }
+
+    // Reduce the max batch size so the insert is reliably interrupted.
+    assert.commandWorked(
+        primaryAdmin.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
+    // Make updates and removes yield more often.
+    assert.commandWorked(
+        primaryAdmin.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 3}));
+
     runStepDownTest({
         description: "insert",
-        failpoint: "hangDuringBatchInsert",
-        operation: "db['" + collname + "'].insert({id:0})"
+        failpoint: "hangWithLockDuringBatchInsert",
+        operation: "db['" + collname + "'].insert([{_id:0}, {_id:1}, {_id:2}])"
     });
+
     runStepDownTest({
         description: "update",
-        failpoint: "hangDuringBatchUpdate",
-        operation: "db['" + collname + "'].update({_id: 'updateme'}, {'$set': {x: 1}})"
+        failpoint: "hangWithLockDuringBatchUpdate",
+        operation: "db['" + collname + "'].update({updateme: true}, {'$set': {x: 1}})"
     });
     runStepDownTest({
         description: "remove",
-        failpoint: "hangDuringBatchRemove",
-        operation: "db['" + collname + "'].remove({_id: 'deleteme'}, {'$set': {x: 1}})"
-    });
-    runStepDownTest({
-        description: "linearizable read",
-        failpoint: "hangBeforeLinearizableReadConcern",
-        operation: "db.runCommand({find: '" + collname +
-            "', filter: {'_id': 'findme'}, readConcern: {level: 'linearizable'}})",
-        errorCode: ErrorCodes.NotMaster
+        failpoint: "hangWithLockDuringBatchRemove",
+        operation: "db['" + collname + "'].remove({removeme: true})"
     });
     rst.stopSet();
 })();
