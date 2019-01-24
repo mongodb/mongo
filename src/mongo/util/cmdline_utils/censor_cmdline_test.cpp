@@ -140,8 +140,6 @@ TEST(VectorCensorTests, SomeStuffCensoredSingleHyphen) {
 TEST(BSONObjCensorTests, Strings) {
     BSONObj obj = BSON("firstarg"
                        << "not a password"
-                       << "security.kmip.clientCertificatePassword"
-                       << "this password should be censored"
                        << "middlearg"
                        << "also not a password"
                        << "processManagement.windowsService.servicePassword"
@@ -151,8 +149,6 @@ TEST(BSONObjCensorTests, Strings) {
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
-                       << "security.kmip.clientCertificatePassword"
-                       << "<password>"
                        << "middlearg"
                        << "also not a password"
                        << "processManagement.windowsService.servicePassword"
@@ -167,9 +163,6 @@ TEST(BSONObjCensorTests, Strings) {
 TEST(BSONObjCensorTests, Arrays) {
     BSONObj obj = BSON("firstarg"
                        << "not a password"
-                       << "security.kmip.clientCertificatePassword"
-                       << BSON_ARRAY("first censored password"
-                                     << "next censored password")
                        << "middlearg"
                        << "also not a password"
                        << "processManagement.windowsService.servicePassword"
@@ -180,9 +173,6 @@ TEST(BSONObjCensorTests, Arrays) {
 
     BSONObj res = BSON("firstarg"
                        << "not a password"
-                       << "security.kmip.clientCertificatePassword"
-                       << BSON_ARRAY("<password>"
-                                     << "<password>")
                        << "middlearg"
                        << "also not a password"
                        << "processManagement.windowsService.servicePassword"
@@ -190,33 +180,6 @@ TEST(BSONObjCensorTests, Arrays) {
                                      << "<password>")
                        << "lastarg"
                        << false);
-
-    cmdline_utils::censorBSONObj(&obj);
-    ASSERT_BSONOBJ_EQ(res, obj);
-}
-
-TEST(BSONObjCensorTests, SubObjects) {
-    BSONObj obj = BSON("firstarg"
-                       << "not a password"
-                       << "security"
-                       << BSON("kmip" << BSON("clientCertificatePassword"
-                                              << BSON_ARRAY("first censored password"
-                                                            << "next censored password")
-                                              << "clientCertificatePassword"
-                                              << "should be censored too"))
-                       << "lastarg"
-                       << false);
-
-    BSONObj res =
-        BSON("firstarg"
-             << "not a password"
-             << "security"
-             << BSON("kmip" << BSON("clientCertificatePassword" << BSON_ARRAY("<password>"
-                                                                              << "<password>")
-                                                                << "clientCertificatePassword"
-                                                                << "<password>"))
-             << "lastarg"
-             << false);
 
     cmdline_utils::censorBSONObj(&obj);
     ASSERT_BSONOBJ_EQ(res, obj);
