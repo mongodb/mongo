@@ -417,7 +417,7 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         auto collection = autoColl.getCollection();
         ASSERT_TRUE(collection) << "Cannot create index on empty collection " << nss
-                                << " because collection " << nss.ns() << " does not exist.";
+                                << " because collection " << nss << " does not exist.";
 
         auto indexInfoObj = BSON(
             "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
@@ -442,7 +442,7 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         auto collection = autoColl.getCollection();
         ASSERT_TRUE(collection) << "Cannot insert document " << doc << " into collection " << nss
-                                << " because collection " << nss.ns() << " does not exist.";
+                                << " because collection " << nss << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
         OpDebug* const opDebug = nullptr;

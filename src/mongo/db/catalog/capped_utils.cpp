@@ -63,7 +63,7 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while truncating collection: "
-                                    << collectionName.ns());
+                                    << collectionName);
     }
 
     Database* db = autoDb.getDb();
@@ -77,14 +77,12 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
 
     if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
         return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot truncate a system collection: "
-                                    << collectionName.ns());
+                      str::stream() << "Cannot truncate a system collection: " << collectionName);
     }
 
     if (collectionName.isVirtualized()) {
         return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot truncate a virtual collection: "
-                                    << collectionName.ns());
+                      str::stream() << "Cannot truncate a virtual collection: " << collectionName);
     }
 
     if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
@@ -92,7 +90,7 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
         collectionName.isOplog()) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Cannot truncate a live oplog while replicating: "
-                                    << collectionName.ns());
+                                    << collectionName);
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
@@ -124,24 +122,22 @@ void mongo::cloneCollectionAsCapped(OperationContext* opCtx,
     Collection* fromCollection = db->getCollection(opCtx, fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "cloneCollectionAsCapped not supported for views: "
-                              << fromNss.ns(),
+                str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
                 !db->getViewCatalog()->lookup(opCtx, fromNss.ns()));
 
         uasserted(ErrorCodes::NamespaceNotFound,
-                  str::stream() << "source collection " << fromNss.ns() << " does not exist");
+                  str::stream() << "source collection " << fromNss << " does not exist");
     }
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "source collection " << fromNss.ns()
+            str::stream() << "source collection " << fromNss
                           << " is currently in a drop-pending state.",
             !fromNss.isDropPendingNamespace());
 
     uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "cloneCollectionAsCapped failed - destination collection "
-                          << toNss.ns()
+            str::stream() << "cloneCollectionAsCapped failed - destination collection " << toNss
                           << " already exists. source collection: "
-                          << fromNss.ns(),
+                          << fromNss,
             !db->getCollection(opCtx, toNss));
 
     // create new collection
@@ -257,7 +253,7 @@ void mongo::convertToCapped(OperationContext* opCtx,
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
 
     uassert(ErrorCodes::NotMaster,
-            str::stream() << "Not primary while converting " << collectionName.ns()
+            str::stream() << "Not primary while converting " << collectionName
                           << " to a capped collection",
             !userInitiatedWritesAndNotPrimary);
 
@@ -273,7 +269,7 @@ void mongo::convertToCapped(OperationContext* opCtx,
     uassertStatusOKWithContext(tmpNameResult,
                                str::stream()
                                    << "Cannot generate temporary collection namespace to convert "
-                                   << collectionName.ns()
+                                   << collectionName
                                    << " to a capped collection");
 
     const auto& longTmpName = tmpNameResult.getValue();

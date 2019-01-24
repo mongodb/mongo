@@ -167,7 +167,7 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
                 db->createCollection(_opCtx.get(), _nss.ns()),
                 AssertionException,
                 ErrorCodes::DatabaseDropPending,
-                (StringBuilder() << "Cannot create collection " << _nss.ns()
+                (StringBuilder() << "Cannot create collection " << _nss
                                  << " - database is in the process of being dropped.")
                     .stringData());
         });
@@ -550,7 +550,7 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
                 db->createCollection(_opCtx.get(), _nss.ns(), options),
                 AssertionException,
                 50001,
-                (StringBuilder() << "autoIndexId:false is not allowed for collection " << _nss.ns()
+                (StringBuilder() << "autoIndexId:false is not allowed for collection " << _nss
                                  << " because it can be replicated")
                     .stringData());
         });

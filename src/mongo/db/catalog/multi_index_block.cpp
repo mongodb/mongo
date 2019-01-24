@@ -114,7 +114,7 @@ MultiIndexBlock::~MultiIndexBlock() {
                 _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                     _opCtx,
                     BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
-                                                            << _collection->ns().ns())));
+                                                            << _collection->ns())));
             }
             wunit.commit();
             return;
@@ -170,7 +170,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
                               << ". Cannot initialize index builder: "
-                              << _collection->ns().ns()
+                              << _collection->ns()
                               << "("
                               << *_collection->uuid()
                               << "): "
@@ -578,7 +578,7 @@ Status MultiIndexBlock::drainBackgroundWrites() {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
                               << ". Cannot complete drain phase: "
-                              << _collection->ns().ns()
+                              << _collection->ns()
                               << "("
                               << *_collection->uuid()
                               << ")"};
@@ -609,7 +609,7 @@ Status MultiIndexBlock::checkConstraints() {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
                               << ". Cannot complete constraint checking: "
-                              << _collection->ns().ns()
+                              << _collection->ns()
                               << "("
                               << *_collection->uuid()
                               << ")"};
@@ -646,7 +646,7 @@ Status MultiIndexBlock::commit(stdx::function<void(const BSONObj& spec)> onCreat
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
                               << ". Cannot commit index builder: "
-                              << _collection->ns().ns()
+                              << _collection->ns()
                               << "("
                               << *_collection->uuid()
                               << ")"};

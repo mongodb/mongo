@@ -326,7 +326,7 @@ StatusWith<BSONObj> validateIndexSpec(
                                       << "' ("
                                       << ns
                                       << ") doesn't match the namespace '"
-                                      << expectedNamespace.ns()
+                                      << expectedNamespace
                                       << "'"};
             }
 

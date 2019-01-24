@@ -318,8 +318,7 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
 
     if (ns().isSystem() && !ns().isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
-                str::stream() << "Document validators not allowed on system collection "
-                              << ns().ns()
+                str::stream() << "Document validators not allowed on system collection " << ns()
                               << (_uuid ? " with UUID " + _uuid->toString() : "")};
     }
 
@@ -391,7 +390,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
             return Status(ErrorCodes::InternalError,
                           str::stream()
                               << "Collection::insertDocument got document without _id for ns:"
-                              << _ns.ns());
+                              << _ns);
         }
 
         auto status = checkValidation(opCtx, it->doc);
@@ -1264,11 +1263,10 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             opCtx, _indexCatalog.get(), &indexNsResultsMap, &keysPerIndex, level, results, output);
 
         if (!results->valid) {
-            log(LogComponent::kIndex) << "validating collection " << ns().toString() << " failed"
-                                      << uuidString << endl;
+            log(LogComponent::kIndex) << "validating collection " << ns() << " failed"
+                                      << uuidString;
         } else {
-            log(LogComponent::kIndex) << "validated collection " << ns().toString() << uuidString
-                                      << endl;
+            log(LogComponent::kIndex) << "validated collection " << ns() << uuidString;
         }
     } catch (DBException& e) {
         if (ErrorCodes::isInterruption(e.code())) {

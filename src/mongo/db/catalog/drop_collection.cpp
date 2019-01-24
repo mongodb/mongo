@@ -87,7 +87,7 @@ Status dropCollection(OperationContext* opCtx,
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Not primary while dropping collection "
-                                        << collectionName.ns());
+                                        << collectionName);
         }
 
         WriteUnitOfWork wunit(opCtx);

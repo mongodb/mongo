@@ -87,15 +87,15 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
             str::stream() << "Cannot generate a temporary collection name for the target "
-                          << targetNs.ns()
+                          << targetNs
                           << " ("
                           << targetUUID
                           << ") so that the source"
-                          << sourceNs.ns()
+                          << sourceNs
                           << " ("
                           << sourceUUID
                           << ") could be renamed to "
-                          << targetNs.ns());
+                          << targetNs);
     }
     const auto& tmpName = tmpNameResult.getValue();
     const bool stayTemp = true;
@@ -107,9 +107,9 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
 
         wunit.commit();
 
-        log() << "Successfully renamed the target " << targetNs.ns() << " (" << targetUUID
-              << ") to " << tmpName << " so that the source " << sourceNs.ns() << " (" << sourceUUID
-              << ") could be renamed to " << targetNs.ns();
+        log() << "Successfully renamed the target " << targetNs << " (" << targetUUID << ") to "
+              << tmpName << " so that the source " << sourceNs << " (" << sourceUUID
+              << ") could be renamed to " << targetNs;
 
         return Status::OK();
     });
@@ -150,9 +150,8 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while renaming collection " << source.ns()
-                                    << " to "
-                                    << target.ns());
+                      str::stream() << "Not primary while renaming collection " << source << " to "
+                                    << target);
     }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -164,7 +163,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     if (!sourceColl) {
         if (sourceDB && sourceDB->getViewCatalog()->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
-                          str::stream() << "cannot rename view: " << source.ns());
+                          str::stream() << "cannot rename view: " << source);
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
 
@@ -238,7 +237,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
         }
     } else if (targetDB->getViewCatalog()->lookup(opCtx, target.ns())) {
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "a view already exists with that name: " << target.ns());
+                      str::stream() << "a view already exists with that name: " << target);
     }
 
     // When reapplying oplog entries (such as in the case of initial sync) we need
@@ -377,9 +376,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
         targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.renameCollection");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
-            str::stream() << "Cannot generate temporary collection name to rename " << source.ns()
+            str::stream() << "Cannot generate temporary collection name to rename " << source
                           << " to "
-                          << target.ns());
+                          << target);
     }
     const auto& tmpName = tmpNameResult.getValue();
 

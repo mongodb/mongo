@@ -237,7 +237,7 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
 
     unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
     if (rs.get() == nullptr) {
-        severe() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
+        severe() << "Record store did not exist. Collection: " << nss << " UUID: "
                  << (uuid ? uuid->toString() : "none");  // if cce exists, so should this
         fassertFailedNoTrace(50936);
     }
@@ -518,8 +518,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
     massert(40461,
-            str::stream() << "cannot drop collection " << fullns.ns() << " (" << uuidString
-                          << ") when "
+            str::stream() << "cannot drop collection " << fullns << " (" << uuidString << ") when "
                           << numIndexesInProgress
                           << " index builds in progress.",
             numIndexesInProgress == 0);
@@ -750,8 +749,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) {
     massert(17399,
-            str::stream() << "Cannot create collection " << nss.ns()
-                          << " - collection already exists.",
+            str::stream() << "Cannot create collection " << nss << " - collection already exists.",
             getCollection(opCtx, nss) == nullptr);
     uassertNamespaceNotIndex(nss.ns(), "createCollection");
 
@@ -761,7 +759,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
 
     // This check only applies for actual collections, not indexes or other types of ns.
     uassert(17381,
-            str::stream() << "fully qualified namespace " << nss.ns() << " is too long "
+            str::stream() << "fully qualified namespace " << nss << " is too long "
                           << "(max is "
                           << NamespaceString::MaxNsCollectionLen
                           << " bytes)",
@@ -770,7 +768,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     uassert(17316, "cannot create a blank collection", nss.coll() > 0);
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
     uassert(ErrorCodes::DatabaseDropPending,
-            str::stream() << "Cannot create collection " << nss.ns()
+            str::stream() << "Cannot create collection " << nss
                           << " - database is in the process of being dropped.",
             !_dropPending);
 }
@@ -816,7 +814,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     bool generatedUUID = false;
     if (!optionsWithUUID.uuid) {
         if (!canAcceptWrites) {
-            std::string msg = str::stream() << "Attempted to create a new collection " << nss.ns()
+            std::string msg = str::stream() << "Attempted to create a new collection " << nss
                                             << " without a UUID";
             severe() << msg;
             uasserted(ErrorCodes::InvalidOptions, msg);
@@ -871,8 +869,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
             } else {
                 // autoIndexId: false is only allowed on unreplicated collections.
                 uassert(50001,
-                        str::stream() << "autoIndexId:false is not allowed for collection "
-                                      << nss.ns()
+                        str::stream() << "autoIndexId:false is not allowed for collection " << nss
                                       << " because it can be replicated",
                         !nss.isReplicated());
             }
@@ -1008,17 +1005,17 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     LOG(1) << "create collection " << fullns << ' ' << collectionOptions.toBSON();
 
     if (!NamespaceString::validCollectionComponent(fullns.ns()))
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << fullns.ns());
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << fullns);
 
     Collection* collection = getCollection(opCtx, fullns);
 
     if (collection)
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "a collection '" << fullns.ns() << "' already exists");
+                      str::stream() << "a collection '" << fullns << "' already exists");
 
     if (getViewCatalog()->lookup(opCtx, fullns.ns()))
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "a view '" << fullns.ns() << "' already exists");
+                      str::stream() << "a view '" << fullns << "' already exists");
 
     // Validate the collation, if there is one.
     std::unique_ptr<CollatorInterface> collator;
@@ -1091,7 +1088,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     } else {
         invariant(
             createCollection(opCtx, fullns.ns(), collectionOptions, createDefaultIndexes, idIndex),
-            str::stream() << "Collection creation failed after validating options: " << fullns.ns()
+            str::stream() << "Collection creation failed after validating options: " << fullns
                           << ". Options: "
                           << collectionOptions.toBSON());
     }

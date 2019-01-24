@@ -104,7 +104,7 @@ Status createCollection(OperationContext* opCtx,
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while creating collection " << nss.ns());
+                          str::stream() << "Not primary while creating collection " << nss);
         }
 
         if (collectionOptions.isView()) {
@@ -211,7 +211,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                             str::stream() << "Cannot generate temporary "
                                              "collection namespace for applyOps "
                                              "create command: collection: "
-                                          << newCollName.ns()));
+                                          << newCollName));
                     }
                     const auto& tmpName = tmpNameResult.getValue();
                     // It is ok to log this because this doesn't happen very frequently.
@@ -235,9 +235,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // name, just rename it to 'newCollName'.
                 if (catalog.lookupCollectionByUUID(uuid)) {
                     uassert(40655,
-                            str::stream() << "Invalid name " << redact(newCollName.ns())
-                                          << " for UUID "
-                                          << uuid.toString(),
+                            str::stream() << "Invalid name " << newCollName << " for UUID " << uuid,
                             currentName.db() == newCollName.db());
                     Status status =
                         db->renameCollection(opCtx, currentName.ns(), newCollName.ns(), stayTemp);
