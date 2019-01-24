@@ -1886,10 +1886,12 @@ public:
         NamespaceString nss("unittests.timestampMultiIndexBuilds");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
-
-        const LogicalTime insertTimestamp = _clock->reserveTicks(1);
+        std::vector<std::string> origIdents;
         {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+            const LogicalTime insertTimestamp = _clock->reserveTicks(1);
+
             WriteUnitOfWork wuow(_opCtx);
             insertDocument(autoColl.getCollection(),
                            InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
@@ -1897,11 +1899,11 @@ public:
                                            presentTerm));
             wuow.commit();
             ASSERT_EQ(1, itCount(autoColl.getCollection()));
-        }
 
-        // Save the pre-state idents so we can capture the specific ident related to index
-        // creation.
-        std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
+            // Save the pre-state idents so we can capture the specific ident related to index
+            // creation.
+            origIdents = kvCatalog->getAllIdents(_opCtx);
+        }
 
         DBDirectClient client(_opCtx);
         {
@@ -1931,6 +1933,8 @@ public:
 
         const auto indexBComplete =
             Timestamp(indexAComplete.getSecs(), indexAComplete.getInc() + 1);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_S);
 
         // The idents are created and persisted with the "ready: false" write. There should be two
         // new index idents visible at this time.
@@ -1967,10 +1971,11 @@ public:
         NamespaceString nss("unittests.timestampMultiIndexBuildsDuringRename");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
-
-        const LogicalTime insertTimestamp = _clock->reserveTicks(1);
         {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+            const LogicalTime insertTimestamp = _clock->reserveTicks(1);
+
             WriteUnitOfWork wuow(_opCtx);
             insertDocument(autoColl.getCollection(),
                            InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
@@ -1993,6 +1998,8 @@ public:
             indexes.push_back(&index2);
             client.createIndexes(nss.ns(), indexes);
         }
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
 
         NamespaceString renamedNss("unittestsRename.timestampMultiIndexBuildsDuringRename");
         reset(renamedNss);

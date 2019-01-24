@@ -35,6 +35,7 @@
 
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_manager.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
@@ -93,9 +95,25 @@ protected:
     }
 
     void addIndex(const IndexSpec& spec) {
-        DBDirectClient client(&_opCtx);
-        client.createIndex(ns(), spec);
-        client.getLastError();
+        BSONObjBuilder builder(spec.toBSON());
+        builder.append("v", int(IndexDescriptor::kLatestIndexVersion));
+        builder.append("ns", ns());
+        auto specObj = builder.obj();
+
+        MultiIndexBlock indexer(&_opCtx, _collection);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            uassertStatusOK(indexer.init(specObj));
+            wunit.commit();
+        }
+        uassertStatusOK(indexer.insertAllDocumentsInCollection());
+        uassertStatusOK(indexer.drainBackgroundWrites());
+        uassertStatusOK(indexer.checkConstraints());
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            uassertStatusOK(indexer.commit());
+            wunit.commit();
+        }
     }
 
     void insert(const char* s) {

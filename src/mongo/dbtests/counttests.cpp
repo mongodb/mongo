@@ -31,12 +31,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/thread.h"
 
 namespace CountTests {
 
@@ -50,16 +51,24 @@ public:
 
         {
             WriteUnitOfWork wunit(&_opCtx);
+
             _collection = _database->getCollection(&_opCtx, ns());
             if (_collection) {
                 _database->dropCollection(&_opCtx, ns()).transitional_ignore();
             }
             _collection = _database->createCollection(&_opCtx, ns());
+
+            IndexCatalog* indexCatalog = _collection->getIndexCatalog();
+            auto indexSpec =
+                BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "ns" << ns()
+                         << "key"
+                         << BSON("a" << 1)
+                         << "name"
+                         << "a_1");
+            uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(&_opCtx, indexSpec));
+
             wunit.commit();
         }
-
-        DBDirectClient client(&_opCtx);
-        client.createIndex(ns(), IndexSpec().addKey("a").unique(false));
     }
 
     ~Base() {
