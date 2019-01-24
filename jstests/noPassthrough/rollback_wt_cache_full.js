@@ -21,11 +21,15 @@
         wiredTigerCacheSizeGB: 0.5,
     };
     const rst = new ReplSetTest({
-        nodes: [nodeOptions, nodeOptions, {arbiter: true}],
+        nodes: 3,
+        nodeOptions: nodeOptions,
         useBridge: true,
     });
-    const nodes = rst.startSet();
-    rst.initiate();
+
+    rst.startSet();
+    let config = rst.getReplSetConfig();
+    config.members[2].priority = 0;
+    rst.initiate(config);
 
     // Prior to 4.0, rollback imposed a 300 MB limit on the total size of documents to refetch from
     // the sync source. Therefore, we select values for numDocs and minDocSizeMB, while accounting

@@ -1,5 +1,4 @@
 /**
- * DEPRECATED (SERVER-35002): RollbackTest is deprecated. Please use RollbackTestDeluxe instead.
  *
  * Wrapper around ReplSetTest for testing rollback behavior. It allows the caller to easily
  * transition between stages of a rollback without having to manually operate on the replset.
@@ -24,12 +23,13 @@ load("jstests/replsets/libs/two_phase_drops.js");
 load("jstests/hooks/validate_collections.js");
 
 /**
- * DEPRECATED (SERVER-35002): RollbackTest is deprecated. Please use RollbackTestDeluxe instead.
  *
  * This fixture allows the user to optionally pass in a custom ReplSetTest
  * to be used for the test. The underlying replica set must meet the following
  * requirements:
- *      1. It must have exactly three nodes: a primary, a secondary and an arbiter.
+ *      1. It must have exactly three nodes: A primary and two secondaries. One of the secondaries
+ *         must be configured with priority: 0 so that it won't be elected primary. Throughout
+ *         this file, this secondary will be referred to as the tiebreaker node.
  *      2. It must be running with mongobridge.
  *
  * If the caller does not provide their own replica set, a standard three-node
@@ -59,12 +59,13 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
     const SIGKILL = 9;
     const SIGTERM = 15;
-    const kNumDataBearingNodes = 2;
+    const kNumDataBearingNodes = 3;
+    const kElectableNodes = 2;
 
     let rst;
     let curPrimary;
     let curSecondary;
-    let arbiter;
+    let tiebreakerNode;
 
     let curState = State.kSteadyStateOps;
     let lastRBID;
@@ -91,11 +92,20 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // Extract the other two nodes and wait for them to be ready.
         let secondaries = replSet.getSecondaries();
-        arbiter = replSet.getArbiter();
-        curSecondary = (secondaries[0] === arbiter) ? secondaries[1] : secondaries[0];
+        let config = replSet.getReplSetConfigFromNode();
+
+        // Make sure the primary is not a priority: 0 node.
+        assert.neq(0, config.members[0].priority);
+        assert.eq(config.members[0].host, curPrimary.host);
+
+        // Make sure that of the two secondaries, one is a priority: 0 node and the other is not.
+        assert.neq(config.members[1].priority, config.members[2].priority);
+
+        curSecondary = (config.members[1].priority !== 0) ? secondaries[0] : secondaries[1];
+        tiebreakerNode = (config.members[2].priority === 0) ? secondaries[1] : secondaries[0];
 
         waitForState(curSecondary, ReplSetTest.State.SECONDARY);
-        waitForState(arbiter, ReplSetTest.State.ARBITER);
+        waitForState(tiebreakerNode, ReplSetTest.State.SECONDARY);
 
         rst = replSet;
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
@@ -104,6 +114,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
     /**
      * Return an instance of ReplSetTest initialized with a standard
      * three-node replica set running with the latest version.
+     *
+     * Note: One of the secondaries will have a priority of 0.
      */
     function performStandardSetup() {
         let nodeOptions = {};
@@ -119,17 +131,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
         let replSet = new ReplSetTest({name, nodes: 3, useBridge: true, nodeOptions: nodeOptions});
         replSet.startSet();
 
-        const nodes = replSet.nodeList();
-        replSet.initiate({
-            _id: name,
-            members: [
-                {_id: 0, host: nodes[0]},
-                {_id: 1, host: nodes[1]},
-                {_id: 2, host: nodes[2], arbiterOnly: true}
-            ]
-        });
+        let config = replSet.getReplSetConfig();
+        config.members[2].priority = 0;
+        replSet.initiate(config);
 
-        assert.eq(replSet.nodes.length - replSet.getArbiters().length,
+        assert.eq(replSet.nodes.length,
                   kNumDataBearingNodes,
                   "Mismatch between number of data bearing nodes and test configuration.");
 
@@ -188,11 +194,14 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // Ensure the secondary is connected. It may already have been connected from a previous
         // stage.
         log(`Ensuring the secondary ${curSecondary.host} is connected to the other nodes`);
-        curSecondary.reconnect([curPrimary, arbiter]);
+        curSecondary.reconnect([curPrimary, tiebreakerNode]);
+
+        // Ensure that the tiebreaker node is connected to the primary.
+        curPrimary.reconnect([tiebreakerNode]);
 
         // If we shut down the primary before the secondary begins rolling back against it, then
-        // the secondary may get elected and not actually roll back. In that case we do not
-        // check the RBID and just await replication.
+        // the secondary may get elected and not actually roll back. In that case we do not check
+        // the RBID and just await replication.
         if (!TestData.rollbackShutdowns) {
             log(`Waiting for rollback to complete on ${curSecondary.host}`, true);
             let rbid = -1;
@@ -234,8 +243,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
     };
 
     /**
-     * Transition to the first stage of rollback testing, where we isolate the current primary so
-     * its operations will eventually be rolled back.
+     * Transition to the first stage of rollback testing, where we isolate the current primary and
+     * stop replication on the tiebreaker node. This ensures that subsequent operations on the
+     * primary will eventually be rolled back.
      */
     this.transitionToRollbackOperations = function() {
         // Ensure previous operations are replicated. The current secondary will be used as the sync
@@ -246,10 +256,22 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         transitionIfAllowed(State.kRollbackOps);
 
-        // Disconnect the current primary from the secondary so operations on it will eventually be
-        // rolled back. But do not disconnect it from the arbiter so it can stay as the primary.
+        // Disconnect the secondary from the tiebreaker node before we disconnect the secondary from
+        // the primary to ensure that the secondary will be ineligible to win an election after it
+        // loses contact with the primary.
+        log(`Isolating the secondary ${curSecondary.host} from the tiebreaker 
+            ${tiebreakerNode.host}`);
+        curSecondary.disconnect([tiebreakerNode]);
+
+        // Disconnect the current primary, the rollback node, from the secondary so operations on
+        // it will eventually be rolled back.
+        // We do not disconnect the primary from the tiebreaker node so that it remains primary.
         log(`Isolating the primary ${curPrimary.host} from the secondary ${curSecondary.host}`);
         curPrimary.disconnect([curSecondary]);
+
+        // Stop replication on the tiebreaker node so that writes made on the primary will not be
+        // committed and the tiebreaker will vote for either node.
+        stopServerReplication(tiebreakerNode);
 
         return curPrimary;
     };
@@ -269,7 +291,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
             {thisDocument: 'is inserted to ensure rollback is not skipped'}));
 
         log(`Isolating the primary ${curPrimary.host} so it will step down`);
-        curPrimary.disconnect([curSecondary, arbiter]);
+        // We should have already disconnected the primary from the secondary during the first stage
+        // of rollback testing.
+        curPrimary.disconnect([tiebreakerNode]);
 
         log(`Waiting for the primary ${curPrimary.host} to step down`);
         try {
@@ -283,8 +307,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         waitForState(curPrimary, ReplSetTest.State.SECONDARY);
 
-        log(`Reconnecting the secondary ${curSecondary.host} to the arbiter so it can be elected`);
-        curSecondary.reconnect([arbiter]);
+        log(`Reconnecting the secondary ${curSecondary.host} to the tiebreaker node so it can be 
+            elected`);
+        curSecondary.reconnect([tiebreakerNode]);
 
         log(`Waiting for the new primary ${curSecondary.host} to be elected`);
         assert.soonNoExcept(() => {
@@ -306,6 +331,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
 
+        restartServerReplication(tiebreakerNode);
+
+        // The current primary, which is the old secondary, will later become the sync source.
         return curPrimary;
     };
 
@@ -322,7 +350,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         transitionIfAllowed(State.kSyncSourceOpsDuringRollback);
 
         log(`Reconnecting the secondary ${curSecondary.host} so it'll go into rollback`);
-        curSecondary.reconnect([curPrimary, arbiter]);
+        // Reconnect the rollback node to the current primary, which is the node we want to sync
+        // from. If we reconnect to both the current primary and the tiebreaker node, the rollback
+        // node may choose the tiebreaker.
+        curSecondary.reconnect([curPrimary]);
 
         return curPrimary;
     };
@@ -352,8 +383,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
             return;
         }
 
-        if (nodeId >= kNumDataBearingNodes) {
-            log(`Not restarting node ${nodeId} because this replica set is too small.`);
+        if (nodeId >= kElectableNodes) {
+            log(`Not restarting node ${nodeId} because this replica set is too small or because
+                we don't want to restart the tiebreaker node.`);
             return;
         }
 
@@ -374,7 +406,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         rst.start(nodeId, {}, true /* restart */);
 
         // Ensure that the primary is ready to take operations before continuing. If both nodes are
-        // connected to the arbiter, the primary may switch.
+        // connected to the tiebreaker node, the primary may switch.
         curPrimary = rst.getPrimary();
         curSecondary = rst.getSecondary();
         assert.neq(curPrimary, curSecondary);

@@ -15,18 +15,7 @@
 
     const rollbackTest = new RollbackTest(testName);
 
-    // Reduce the frequency of heartbeats so that they are unlikely to be included in the
-    // count for the 'failCommand' failpoint.
-    // TODO SERVER-35004: Remove this reconfig.
-    jsTestLog("Increasing heartbeat interval to 30 seconds and election timeout to 60 seconds.");
-
     const replSet = rollbackTest.getTestFixture();
-    const conf = replSet.getReplSetConfigFromNode();
-
-    conf.settings.heartbeatIntervalMillis = 30 * 1000;
-    conf.settings.electionTimeoutMillis = 60 * 1000;
-    conf.version = conf.version + 1;
-    reconfig(replSet, conf, true);
 
     replSet.awaitReplication();
 

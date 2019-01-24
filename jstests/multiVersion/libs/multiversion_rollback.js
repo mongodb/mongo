@@ -105,16 +105,19 @@ function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     let higherVersion = MongoRunner.getBinVersionFor(sortedVersions[1]);
 
     jsTestLog(`[${testName}] Starting up first two nodes with version: ${higherVersion}`);
-    var initialNodes = {n1: {binVersion: higherVersion}, a: {binVersion: higherVersion}};
+    var initialNodes = {n1: {binVersion: higherVersion}, n2: {binVersion: higherVersion}};
 
-    // Start up a two-node cluster first.
+    // Start up a two-node cluster first. This cluster contains two data bearing nodes, but the
+    // second node will be priority: 0 to ensure that it will never become primary. This, in
+    // addition to stopping/restarting server replication should make the node exhibit similar
+    // behavior to an arbiter.
     var rst = new ReplSetTest({name: testName, nodes: initialNodes, useBridge: true});
     rst.startSet();
     rst.initiate();
 
     // Wait for both nodes to be up.
     waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY);
-    waitForState(rst.nodes[1], ReplSetTest.State.ARBITER);
+    waitForState(rst.nodes[1], ReplSetTest.State.SECONDARY);
 
     const initialPrimary = rst.getPrimary();
 
@@ -128,24 +131,29 @@ function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     rst.add({binVersion: lowerVersion});
     rst.reInitiate();
 
+    let config = rst.getReplSetConfigFromNode();
+    config.members[1].priority = 0;
+    reconfig(rst, config, true);
+
     jsTestLog(
         `[${testName} - ${rst.nodes[2].host}] Waiting for the newest node to become a secondary.`);
     rst.awaitSecondaryNodes();
 
     let primary = rst.nodes[0];
     let secondary = rst.nodes[2];
-    let arbiter = rst.nodes[1];
+    let tiebreakerNode = rst.nodes[1];
 
     // Make sure we still have the right node as the primary.
     assert.eq(rst.getPrimary(), primary);
 
     // Also make sure the other two nodes are in their expected states.
-    assert.eq(ReplSetTest.State.ARBITER, arbiter.adminCommand({replSetGetStatus: true}).myState);
+    assert.eq(ReplSetTest.State.SECONDARY,
+              tiebreakerNode.adminCommand({replSetGetStatus: true}).myState);
     assert.eq(ReplSetTest.State.SECONDARY,
               secondary.adminCommand({replSetGetStatus: true}).myState);
 
     jsTestLog(`[${testName}] Cluster now running with versions: {primary: ${higherVersion},
-            secondary: ${lowerVersion}, arbiter: ${higherVersion}}.`);
+            secondary: ${lowerVersion}, tiebreakerNode: ${higherVersion}}.`);
 
     // Some test cases require that the primary (future rollback node) is running the lower
     // version, which at this point is always on the secondary, so we elect that node instead.
@@ -161,7 +169,7 @@ function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
         primary = newPrimary;
 
         jsTestLog(`[${testName}] Cluster now running with versions: {primary: ${lowerVersion},
-            secondary: ${higherVersion}, arbiter: ${higherVersion}}.`);
+            secondary: ${higherVersion}, tiebreakerNode: ${higherVersion}}.`);
     }
 
     return rst;
