@@ -74,9 +74,11 @@ public:
     };
 
     /**
-     * Produces the initial chunks that need to be written for a collection which is being
-     * newly-sharded. The function performs some basic validation of the input parameters, but there
-     * is no checking whether the collection contains any data or not.
+     * Produces the initial chunks that need to be written for an *empty* collection which is being
+     * sharded based on a set of 'splitPoints' and 'numContiguousChunksPerShard'.
+     *
+     * NOTE: The function performs some basic validation of the input parameters, but there is no
+     * checking whether the collection contains any data or not.
      *
      * Chunks are assigned to a shard in a round-robin fashion, numContiguousChunksPerShard (k)
      * chunks at a time. For example, the first k chunks are assigned to the first available shard,
@@ -98,9 +100,16 @@ public:
         const int numContiguousChunksPerShard = 1);
 
     /**
-     * Produces the initial chunks that need to be written for a collection which is being
-     * newly-sharded based on the given tags. Chunks that do not correspond to any pre-defined
-     * zones are assigned to available shards in a round-robin fashion.
+     * Produces the initial chunks that need to be written for an *empty* collection which is being
+     * sharded based on the given 'tags'.
+     *
+     * NOTE: The function performs some basic validation of the input parameters, but there is no
+     * checking whether the collection contains any data or not.
+     *
+     * The contents of 'tags' will be used to create chunks, which correspond to these zones and
+     * chunks will be assigned to shards from 'tagToShards'. If there are any holes in between the
+     * zones (zones are not contiguous), these holes will be assigned to 'shardIdsForGaps' in
+     * round-robin fashion.
      */
     static ShardCollectionConfig generateShardCollectionInitialZonedChunks(
         const NamespaceString& nss,
@@ -108,8 +117,7 @@ public:
         const Timestamp& validAfter,
         const std::vector<TagsType>& tags,
         const StringMap<std::vector<ShardId>>& tagToShards,
-        const std::vector<ShardId>& allShardIds,
-        const bool isEmpty);
+        const std::vector<ShardId>& shardIdsForGaps);
 
     /**
      * Creates the first chunks for a newly sharded collection.

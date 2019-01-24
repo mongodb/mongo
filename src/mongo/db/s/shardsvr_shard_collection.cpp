@@ -266,7 +266,7 @@ void createCollectionOrValidateExisting(OperationContext* opCtx,
         BSONObj res;
         auto success = localClient.runCommand("admin", checkShardingIndexCmd.obj(), res);
         uassert(ErrorCodes::OperationFailed, res["errmsg"].str(), success);
-    } else if (localClient.count(nss.ns()) != 0) {
+    } else if (!localClient.findOne(nss.ns(), Query()).isEmpty()) {
         // 4. if no useful index, and collection is non-empty, fail
         uasserted(ErrorCodes::InvalidOptions,
                   "Please create an index that starts with the proposed shard key before "
@@ -665,8 +665,13 @@ public:
                 const auto shardRegistry = grid->shardRegistry();
                 shardRegistry->reload(opCtx);
 
-                DBDirectClient localClient(opCtx);
-                bool isEmpty = (localClient.count(nss.ns()) == 0);
+                const bool isEmpty = [&] {
+                    // Use find with predicate instead of count in order to ensure that the count
+                    // command doesn't just consult the cached metadata, which may not always be
+                    // correct
+                    DBDirectClient localClient(opCtx);
+                    return localClient.findOne(nss.ns(), Query()).isEmpty();
+                }();
 
                 std::vector<ShardId> shardIds;
                 shardRegistry->getAllShardIds(opCtx, &shardIds);
