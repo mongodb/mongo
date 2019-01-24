@@ -465,6 +465,10 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                 }
                 break;
             }
+            case OplogEntry::CommandType::kCommitTransaction:
+            case OplogEntry::CommandType::kAbortTransaction: {
+                break;
+            }
             case OplogEntry::CommandType::kApplyOps:
             default:
                 // Every possible command type should be handled above.
