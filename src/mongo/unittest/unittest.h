@@ -306,6 +306,16 @@ public:
 
     void run();
 
+    /**
+     * Called on the test object before running the test.
+     */
+    virtual void setUp() {}
+
+    /**
+     * Called on the test object after running the test.
+     */
+    virtual void tearDown() {}
+
 protected:
     /**
      * Registration agent for adding tests to suites, used by TEST macro.
@@ -362,16 +372,6 @@ protected:
      * Prints the captured log lines.
      */
     void printCapturedLogLines() const;
-
-    /**
-     * Called on the test object before running the test.
-     */
-    virtual void setUp();
-
-    /**
-     * Called on the test object after running the test.
-     */
-    virtual void tearDown();
 
 private:
     /**
