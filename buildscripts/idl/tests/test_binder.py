@@ -1696,6 +1696,17 @@ class TestBinder(testcase.IDLTestcase):
                 deprecated_name: bling
         """))
 
+        # Default without data.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: startup
+                description: bar
+                cpp_class: baz
+                default: blong
+            """))
+
     def test_server_parameter_negative(self):
         # type: () -> None
         """Negative server parameter test cases."""
@@ -1720,17 +1731,6 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_class: baz
                     cpp_varname: bling
             """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
-
-        # Default without data.
-        self.assert_bind_fail(
-            textwrap.dedent("""
-            server_parameters:
-                foo:
-                    set_at: startup
-                    description: bar
-                    cpp_class: baz
-                    default: blong
-            """), idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR)
 
     def test_config_option_positive(self):
         # type: () -> None

@@ -1896,14 +1896,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self.write_empty_line()
 
         if not cls.override_set:
-            with self._block('Status %s::set(const BSONElement& newValueElement) try {' %
-                             (cls.name), '}'):
-                self._writer.write_line('return setFromString(newValueElement.String());')
-            with self._block('catch (const AssertionException& ex) {', '}'):
-                value = '###' if param.redact else '" << newValueElement << "'
-                self._writer.write_line(
-                    'return {ErrorCodes::BadValue, str::stream() << "Invalid value \'' + value +
-                    '\' for setParameter \'" << name() << "\': " << ex.what()};')
+            with self._block('Status %s::set(const BSONElement& newValueElement) {' % (cls.name),
+                             '}'):
+                self._writer.write_line('std::string strval;')
+                with self._predicate('!newValueElement.coerce(&strval)'):
+                    value = '' if param.redact else '" << newValueElement << " '
+                    self._writer.write_line(
+                        'return {ErrorCodes::BadValue, str::stream() << "Invalid value ' + value +
+                        'for setParameter \'" << name() << "\'"};')
+                self._writer.write_line('return setFromString(strval);')
             self.write_empty_line()
 
     def _gen_server_parameter_with_storage(self, param):

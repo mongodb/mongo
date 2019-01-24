@@ -898,11 +898,6 @@ def _bind_server_parameter_class(ctxt, ast_param, param):
     cls = param.cpp_class
 
     if param.default is not None:
-        if cls.data is None:
-            ctxt.add_server_parameter_required_attr(param, 'data', 'specialized',
-                                                    dependant='default')
-            return None
-
         if not param.default.is_constexpr:
             ctxt.add_server_parameter_invalid_attr(param, 'default.is_constexpr=false',
                                                    'specialized')
