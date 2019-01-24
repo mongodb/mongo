@@ -97,6 +97,8 @@ selector:
     - jstests/sharding/views.js
     # SERVER-20392: Reenable when backported to 3.4 and released as last-stable.
     - jstests/sharding/shard_existing_coll_chunk_count.js
+    # $graphLookup is new in 3.4
+    - jstests/sharding/graph_lookup.js
 
 executor:
   js_test:

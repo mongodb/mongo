@@ -36,7 +36,8 @@
 
 namespace mongo {
 
-class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod {
+class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongod,
+                                        public SplittableDocumentSource {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
@@ -69,6 +70,14 @@ public:
 
     bool needsPrimaryShard() const final {
         return true;
+    }
+
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
+        return this;
     }
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
