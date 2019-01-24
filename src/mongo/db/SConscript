@@ -438,20 +438,32 @@ env.CppUnitTest(
 env.Library(
     target="mongodandmongos",
     source=[
+        "initialize_server_security_state.cpp",
+    ],
+    LIBDEPS=[
+        "serverinit",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/client/authentication",
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/security_key",
+        "$BUILD_DIR/mongo/rpc/metadata",
+        "$BUILD_DIR/mongo/rpc/rpc",
+        "$BUILD_DIR/mongo/util/net/ssl_manager",
+        "auth/authorization_manager_global",
+        "serverinit",
+    ],
+)
+
+env.Library(
+    target="serverinit",
+    source=[
         "initialize_server_global_state.cpp",
         "server_options_init.cpp",
     ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "$BUILD_DIR/mongo/rpc/metadata",
+    LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",
-        "auth/authorization_manager_global",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/security_key",
     ],
 )
 

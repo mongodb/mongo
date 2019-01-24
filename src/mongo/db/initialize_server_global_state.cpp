@@ -41,17 +41,12 @@
 
 #ifndef _WIN32
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <syslog.h>
 #endif
 
 #include "mongo/base/init.h"
-#include "mongo/client/authenticate.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/security_key.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/logger/console_appender.h"
@@ -66,7 +61,6 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -387,35 +381,6 @@ bool initializeServerGlobalState(ServiceContext* service) {
             return false;
         }
     }
-
-    int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
-    if (!serverGlobalParams.keyFile.empty() &&
-        clusterAuthMode != ServerGlobalParams::ClusterAuthMode_x509) {
-        if (!setUpSecurityKey(serverGlobalParams.keyFile)) {
-            // error message printed in setUpPrivateKey
-            return false;
-        }
-    }
-
-    // Auto-enable auth unless we are in mixed auth/no-auth or clusterAuthMode was not provided.
-    // clusterAuthMode defaults to "keyFile" if a --keyFile parameter is provided.
-    if (clusterAuthMode != ServerGlobalParams::ClusterAuthMode_undefined &&
-        !serverGlobalParams.transitionToAuth) {
-        AuthorizationManager::get(service)->setAuthEnabled(true);
-    }
-
-#ifdef MONGO_CONFIG_SSL
-    if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
-        clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
-        auth::setInternalUserAuthParams(
-            BSON(saslCommandMechanismFieldName
-                 << "MONGODB-X509"
-                 << saslCommandUserDBFieldName
-                 << "$external"
-                 << saslCommandUserFieldName
-                 << getSSLManager()->getSSLConfiguration().clientSubjectName.toString()));
-    }
-#endif
 
     return true;
 }

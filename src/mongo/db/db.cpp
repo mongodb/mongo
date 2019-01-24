@@ -79,6 +79,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
+#include "mongo/db/initialize_server_security_state.h"
 #include "mongo/db/initialize_snmp.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
@@ -1052,6 +1053,9 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
     cmdline_utils::censorArgvArray(argc, argv);
 
     if (!initializeServerGlobalState(service))
+        quickExit(EXIT_FAILURE);
+
+    if (!initializeServerSecurityGlobalState(service))
         quickExit(EXIT_FAILURE);
 
     // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
