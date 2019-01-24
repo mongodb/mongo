@@ -53,6 +53,8 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/random.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -105,6 +107,21 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
                               "authentication. The current configuration does not allow "
                               "x.509 cluster authentication, check the --clusterAuthMode flag");
             }
+            auto& clientMetadata =
+                ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
+            if (clientMetadata) {
+                auto clientMetadataDoc = clientMetadata->getDocument();
+                auto driverName = clientMetadataDoc.getObjectField("driver"_sd)
+                                      .getField("name"_sd)
+                                      .checkAndGetStringData();
+                if (!clientMetadata->getApplicationName().empty() ||
+                    (driverName != "MongoDB Internal Client" &&
+                     driverName != "NetworkInterfaceTL")) {
+                    warning() << "Client isn't a mongod or mongos, but is connecting with a "
+                                 "certificate with cluster membership";
+                }
+            }
+
             authorizationSession->grantInternalAuthorization();
         }
         // Handle normal client authentication, only applies to client-server connections
