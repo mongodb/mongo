@@ -303,7 +303,7 @@ Status KVStorageEngine::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     if (dataModified) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->onModification(str::stream() << "Collection " << collectionName.ns() << " recovered: "
+            ->onModification(str::stream() << "Collection " << collectionName << " recovered: "
                                            << status.reason());
     }
     wuow.commit();
