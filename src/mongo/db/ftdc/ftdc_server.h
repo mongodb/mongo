@@ -135,4 +135,9 @@ Status onUpdateFTDCFileSize(const std::int32_t value);
 Status onUpdateFTDCSamplesPerChunk(const std::int32_t value);
 Status onUpdateFTDCPerInterimUpdate(const std::int32_t value);
 
+/**
+ * Server Parameter accessors
+ */
+boost::filesystem::path getFTDCDirectoryPathParameter();
+
 }  // namespace mongo

@@ -42,11 +42,13 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_server_gen.h"
 #include "mongo/db/ftdc/ftdc_system_stats.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 
@@ -62,9 +64,41 @@ FTDCController* getGlobalFTDCController() {
     return getFTDCController(getGlobalServiceContext()).get();
 }
 
+/**
+ * Expose diagnosticDataCollectionDirectoryPath set parameter to specify the MongoD and MongoS FTDC
+ * path.
+ */
+synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
+
 }  // namespace
 
 FTDCStartupParams ftdcStartupParams;
+
+void DiagnosticDataCollectionDirectoryPathServerParameter::append(OperationContext* opCtx,
+                                                                  BSONObjBuilder& b,
+                                                                  const std::string& name) {
+    b.append(name, ftdcDirectoryPathParameter->generic_string());
+}
+
+Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(const std::string& str) {
+    if (hasGlobalServiceContext()) {
+        FTDCController* controller = FTDCController::get(getGlobalServiceContext());
+        if (controller) {
+            Status s = controller->setDirectory(str);
+            if (!s.isOK()) {
+                return s;
+            }
+        }
+    }
+
+    ftdcDirectoryPathParameter = str;
+
+    return Status::OK();
+}
+
+boost::filesystem::path getFTDCDirectoryPathParameter() {
+    return ftdcDirectoryPathParameter.get();
+}
 
 Status onUpdateFTDCEnabled(const bool value) {
     auto controller = getGlobalFTDCController();
@@ -176,6 +210,8 @@ void startFTDC(boost::filesystem::path& path,
         ftdcStartupParams.maxSamplesPerArchiveMetricChunk.load();
     config.maxSamplesPerInterimMetricChunk =
         ftdcStartupParams.maxSamplesPerInterimMetricChunk.load();
+
+    ftdcDirectoryPathParameter = path;
 
     auto controller = stdx::make_unique<FTDCController>(path, config);
 

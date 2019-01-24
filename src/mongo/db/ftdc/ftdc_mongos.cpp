@@ -36,7 +36,6 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/db/ftdc/controller.h"
-#include "mongo/db/ftdc/ftdc_mongos_gen.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/thread.h"
@@ -44,36 +43,6 @@
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
-
-namespace {
-
-/**
- * Expose diagnosticDataCollectionDirectoryPath set parameter to specify the MongoS FTDC path.
- */
-synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
-}  // namespace
-
-void DiagnosticDataCollectionDirectoryPathServerParameter::append(OperationContext* opCtx,
-                                                                  BSONObjBuilder& b,
-                                                                  const std::string& name) {
-    b.append(name, ftdcDirectoryPathParameter->generic_string());
-}
-
-Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(const std::string& str) {
-    if (hasGlobalServiceContext()) {
-        FTDCController* controller = FTDCController::get(getGlobalServiceContext());
-        if (controller) {
-            Status s = controller->setDirectory(str);
-            if (!s.isOK()) {
-                return s;
-            }
-        }
-    }
-
-    ftdcDirectoryPathParameter = str;
-
-    return Status::OK();
-}
 
 void registerMongoSCollectors(FTDCController* controller) {
     // PoolStats
@@ -89,7 +58,7 @@ void startMongoSFTDC() {
 
     // Only attempt to enable FTDC if we have a path to log files to.
     FTDCStartMode startMode = FTDCStartMode::kStart;
-    auto directory = ftdcDirectoryPathParameter.get();
+    auto directory = getFTDCDirectoryPathParameter();
 
     if (directory.empty()) {
         if (serverGlobalParams.logpath.empty()) {
@@ -100,11 +69,9 @@ void startMongoSFTDC() {
             directory = boost::filesystem::absolute(
                 FTDCUtil::getMongoSPath(serverGlobalParams.logpath), serverGlobalParams.cwd);
 
-            // Update the server parameter with the computed path.
             // Note: If the computed FTDC directory conflicts with an existing file, then FTDC will
             // warn about the conflict, and not startup. It will not terminate MongoS in this
             // situation.
-            ftdcDirectoryPathParameter = directory;
         }
     }
 

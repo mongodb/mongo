@@ -81,7 +81,6 @@ env.Library(
 env.Library(
     target='ftdc_mongos',
     source=[
-        env.Idlc('ftdc_mongos.idl')[0],
         'ftdc_mongos.cpp',
     ],
     LIBDEPS_PRIVATE=[

@@ -81,3 +81,9 @@ server_parameters:
     on_update: "onUpdateFTDCPerInterimUpdate"
     validator:
         gte: 2
+
+  diagnosticDataCollectionDirectoryPath:
+    description: "Specify the directory for the diagnostic data directory."
+    set_at: [startup, runtime]
+    cpp_class: DiagnosticDataCollectionDirectoryPathServerParameter
+
