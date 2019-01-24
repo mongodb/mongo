@@ -137,6 +137,15 @@ public:
                typename std::enable_if_t<!std::is_same<Alien, T>::value, TagType> = makeTag())
         : StatusWith(static_cast<T>(std::forward<Alien>(alien))) {}
 
+    template <typename Alien>
+    StatusWith(StatusWith<Alien> alien,
+               typename std::enable_if_t<std::is_convertible<Alien, T>::value, TagType> = makeTag(),
+               typename std::enable_if_t<!std::is_same<Alien, T>::value, TagType> = makeTag())
+        : _status(std::move(alien.getStatus())) {
+        if (alien.isOK())
+            this->_t = std::move(alien.getValue());
+    }
+
     const T& getValue() const {
         dassert(isOK());
         return *_t;

@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +30,12 @@
 
 #pragma once
 
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -54,13 +59,14 @@ class CollectionBulkLoaderMock : public CollectionBulkLoader {
     MONGO_DISALLOW_COPYING(CollectionBulkLoaderMock);
 
 public:
-    CollectionBulkLoaderMock(CollectionMockStats* collStats) : stats(collStats){};
+    explicit CollectionBulkLoaderMock(std::shared_ptr<CollectionMockStats> collStats)
+        : stats(std::move(collStats)){};
     virtual ~CollectionBulkLoaderMock() = default;
-    virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
+    Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
-    virtual Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                   const std::vector<BSONObj>::const_iterator end) override;
-    virtual Status commit() override;
+    Status insertDocuments(const std::vector<BSONObj>::const_iterator begin,
+                           const std::vector<BSONObj>::const_iterator end) override;
+    Status commit() override;
 
     std::string toString() const override {
         return toBSON().toString();
@@ -69,15 +75,15 @@ public:
         return BSONObj();
     };
 
-    CollectionMockStats* stats;
+    std::shared_ptr<CollectionMockStats> stats;
 
     // Override functions.
-    stdx::function<Status(const std::vector<BSONObj>::const_iterator begin,
-                          const std::vector<BSONObj>::const_iterator end)>
+    std::function<Status(std::vector<BSONObj>::const_iterator,
+                         std::vector<BSONObj>::const_iterator)>
         insertDocsFn = [](const std::vector<BSONObj>::const_iterator,
                           const std::vector<BSONObj>::const_iterator) { return Status::OK(); };
-    stdx::function<Status()> abortFn = []() { return Status::OK(); };
-    stdx::function<Status()> commitFn = []() { return Status::OK(); };
+    std::function<Status()> abortFn = []() { return Status::OK(); };
+    std::function<Status()> commitFn = []() { return Status::OK(); };
 };
 
 class StorageInterfaceMock : public StorageInterface {
@@ -86,48 +92,40 @@ class StorageInterfaceMock : public StorageInterface {
 public:
     // Used for testing.
 
-    using CreateCollectionForBulkFn =
-        stdx::function<StatusWith<std::unique_ptr<CollectionBulkLoader>>(
-            const NamespaceString& nss,
-            const CollectionOptions& options,
-            const BSONObj idIndexSpec,
-            const std::vector<BSONObj>& secondaryIndexSpecs)>;
-    using InsertDocumentFn = stdx::function<Status(OperationContext* opCtx,
-                                                   const NamespaceStringOrUUID& nsOrUUID,
-                                                   const TimestampedBSONObj& doc,
-                                                   long long term)>;
-    using InsertDocumentsFn = stdx::function<Status(OperationContext* opCtx,
-                                                    const NamespaceStringOrUUID& nsOrUUID,
-                                                    const std::vector<InsertStatement>& docs)>;
-    using DropUserDatabasesFn = stdx::function<Status(OperationContext* opCtx)>;
-    using CreateOplogFn =
-        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
-    using CreateCollectionFn = stdx::function<Status(
-        OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options)>;
+    using CreateCollectionForBulkFn = std::function<StatusWith<
+        std::unique_ptr<CollectionBulkLoader>>(
+        const NamespaceString&, const CollectionOptions&, BSONObj, const std::vector<BSONObj>&)>;
+    using InsertDocumentFn = std::function<Status(
+        OperationContext*, const NamespaceStringOrUUID&, const TimestampedBSONObj&, long long)>;
+    using InsertDocumentsFn = std::function<Status(
+        OperationContext*, const NamespaceStringOrUUID&, const std::vector<InsertStatement>&)>;
+    using DropUserDatabasesFn = std::function<Status(OperationContext*)>;
+    using CreateOplogFn = std::function<Status(OperationContext*, const NamespaceString&)>;
+    using CreateCollectionFn =
+        std::function<Status(OperationContext*, const NamespaceString&, const CollectionOptions&)>;
     using TruncateCollectionFn =
-        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
-    using DropCollectionFn =
-        stdx::function<Status(OperationContext* opCtx, const NamespaceString& nss)>;
+        std::function<Status(OperationContext*, const NamespaceString& nss)>;
+    using DropCollectionFn = std::function<Status(OperationContext*, const NamespaceString& nss)>;
     using FindDocumentsFn =
-        stdx::function<StatusWith<std::vector<BSONObj>>(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        boost::optional<StringData> indexName,
-                                                        ScanDirection scanDirection,
-                                                        const BSONObj& startKey,
-                                                        BoundInclusion boundInclusion,
-                                                        std::size_t limit)>;
+        std::function<StatusWith<std::vector<BSONObj>>(OperationContext*,
+                                                       const NamespaceString&,
+                                                       boost::optional<StringData>,
+                                                       ScanDirection,
+                                                       const BSONObj&,
+                                                       BoundInclusion,
+                                                       std::size_t)>;
     using DeleteDocumentsFn =
-        stdx::function<StatusWith<std::vector<BSONObj>>(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        boost::optional<StringData> indexName,
-                                                        ScanDirection scanDirection,
-                                                        const BSONObj& startKey,
-                                                        BoundInclusion boundInclusion,
-                                                        std::size_t limit)>;
-    using IsAdminDbValidFn = stdx::function<Status(OperationContext* opCtx)>;
-    using GetCollectionUUIDFn = stdx::function<StatusWith<OptionalCollectionUUID>(
-        OperationContext* opCtx, const NamespaceString& nss)>;
-    using UpgradeNonReplicatedUniqueIndexesFn = stdx::function<Status(OperationContext* opCtx)>;
+        std::function<StatusWith<std::vector<BSONObj>>(OperationContext*,
+                                                       const NamespaceString&,
+                                                       boost::optional<StringData>,
+                                                       ScanDirection,
+                                                       const BSONObj&,
+                                                       BoundInclusion,
+                                                       std::size_t)>;
+    using IsAdminDbValidFn = std::function<Status(OperationContext*)>;
+    using GetCollectionUUIDFn = std::function<StatusWith<OptionalCollectionUUID>(
+        OperationContext*, const NamespaceString&)>;
+    using UpgradeNonReplicatedUniqueIndexesFn = std::function<Status(OperationContext*)>;
 
     StorageInterfaceMock() = default;
 

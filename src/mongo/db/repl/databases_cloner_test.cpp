@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -66,7 +65,7 @@ using namespace unittest;
 using Responses = std::vector<std::pair<std::string, BSONObj>>;
 
 struct CollectionCloneInfo {
-    CollectionMockStats stats;
+    std::shared_ptr<CollectionMockStats> stats = std::make_shared<CollectionMockStats>();
     CollectionBulkLoaderMock* loader = nullptr;
     Status status{ErrorCodes::NotYetInitialized, ""};
 };
@@ -176,18 +175,20 @@ protected:
             [this](const NamespaceString& nss,
                    const CollectionOptions& options,
                    const BSONObj idIndexSpec,
-                   const std::vector<BSONObj>& secondaryIndexSpecs) {
+                   const std::vector<BSONObj>& secondaryIndexSpecs)
+            -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
                 // Get collection info from map.
                 const auto collInfo = &_collections[nss];
-                if (collInfo->stats.initCalled) {
+                if (collInfo->stats->initCalled) {
                     log() << "reusing collection during test which may cause problems, ns:" << nss;
                 }
-                (collInfo->loader = new CollectionBulkLoaderMock(&collInfo->stats))
-                    ->init(secondaryIndexSpecs)
-                    .transitional_ignore();
+                auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
+                auto status = localLoader->init(secondaryIndexSpecs);
+                if (!status.isOK())
+                    return status;
+                collInfo->loader = localLoader.get();
 
-                return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
-                    std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
+                return std::move(localLoader);
             };
 
         _dbWorkThreadPool.startup();

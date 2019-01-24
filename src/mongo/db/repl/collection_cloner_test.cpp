@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -235,8 +234,8 @@ protected:
 
     CollectionOptions options;
     std::unique_ptr<CollectionCloner> collectionCloner;
-    CollectionMockStats collectionStats;  // Used by the _loader.
-    CollectionBulkLoaderMock* _loader;    // Owned by CollectionCloner.
+    std::shared_ptr<CollectionMockStats> collectionStats;  // Used by the _loader.
+    CollectionBulkLoaderMock* _loader;                     // Owned by CollectionCloner.
     bool _clientCreated = false;
     FailableMockDBClientConnection* _client;  // owned by the CollectionCloner once created.
     std::unique_ptr<MockRemoteDBServer> _server;
@@ -246,28 +245,31 @@ void CollectionClonerTest::setUp() {
     BaseClonerTest::setUp();
     options = getCollectionOptions();
     collectionCloner.reset(nullptr);
-    collectionCloner = stdx::make_unique<CollectionCloner>(&getExecutor(),
-                                                           dbWorkThreadPool.get(),
-                                                           target,
-                                                           getStartupNss(),
-                                                           options,
-                                                           setStatusCallback(),
-                                                           storageInterface.get(),
-                                                           defaultBatchSize);
-    collectionStats = CollectionMockStats();
+    collectionCloner = std::make_unique<CollectionCloner>(&getExecutor(),
+                                                          dbWorkThreadPool.get(),
+                                                          target,
+                                                          getStartupNss(),
+                                                          options,
+                                                          setStatusCallback(),
+                                                          storageInterface.get(),
+                                                          defaultBatchSize);
+    collectionStats = std::make_shared<CollectionMockStats>();
     storageInterface->createCollectionForBulkFn =
         [this](const NamespaceString& nss,
                const CollectionOptions& options,
                const BSONObj idIndexSpec,
-               const std::vector<BSONObj>& nonIdIndexSpecs) {
-            (_loader = new CollectionBulkLoaderMock(&collectionStats))
-                ->init(nonIdIndexSpecs)
-                .transitional_ignore();
+               const std::vector<BSONObj>& nonIdIndexSpecs)
+        -> StatusWith<std::unique_ptr<CollectionBulkLoaderMock>> {
+            auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collectionStats);
+            Status result = localLoader->init(nonIdIndexSpecs);
+            if (!result.isOK())
+                return result;
 
-            return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
-                std::unique_ptr<CollectionBulkLoader>(_loader));
+            _loader = localLoader.get();
+
+            return std::move(localLoader);
         };
-    _server = stdx::make_unique<MockRemoteDBServer>(target.toString());
+    _server = std::make_unique<MockRemoteDBServer>(target.toString());
     _server->assignCollectionUuid(nss.ns(), *options.uuid);
     _client = new FailableMockDBClientConnection(_server.get(), getNet());
     collectionCloner->setCreateClientFn_forTest([this]() {
@@ -564,12 +566,14 @@ TEST_F(CollectionClonerNoAutoIndexTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
                                                          const BSONObj idIndexSpec,
                                                          const std::vector<BSONObj>& theIndexSpecs)
         -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
-            CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&collectionStats);
+            auto loader = std::make_unique<CollectionBulkLoaderMock>(collectionStats);
             collNss = theNss;
             collOptions = theOptions;
             collIndexSpecs = theIndexSpecs;
-            loader->init(theIndexSpecs).transitional_ignore();
-            return std::unique_ptr<CollectionBulkLoader>(loader);
+            const auto status = loader->init(theIndexSpecs);
+            if (!status.isOK())
+                return status;
+            return std::move(loader);
         };
 
     const BSONObj doc = BSON("_id" << 1);
@@ -587,12 +591,12 @@ TEST_F(CollectionClonerNoAutoIndexTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
 
     _client->waitForPausedQuery();
     ASSERT_TRUE(collectionCloner->isActive());
-    ASSERT_TRUE(collectionStats.initCalled);
+    ASSERT_TRUE(collectionStats->initCalled);
 
     pauser.resume();
     collectionCloner->join();
-    ASSERT_EQUALS(1, collectionStats.insertCount);
-    ASSERT_TRUE(collectionStats.commitCalled);
+    ASSERT_EQUALS(1, collectionStats->insertCount);
+    ASSERT_TRUE(collectionStats->commitCalled);
 
     ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());
@@ -789,21 +793,21 @@ TEST_F(CollectionClonerTest, BeginCollection) {
     MockClientPauser pauser(_client);
     ASSERT_OK(collectionCloner->startup());
 
-    CollectionMockStats stats;
-    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
+    auto stats = std::make_shared<CollectionMockStats>();
+    auto loader = std::make_unique<CollectionBulkLoaderMock>(stats);
     NamespaceString collNss;
     CollectionOptions collOptions;
     std::vector<BSONObj> collIndexSpecs;
-    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
-                                                      const CollectionOptions& theOptions,
-                                                      const BSONObj idIndexSpec,
-                                                      const std::vector<BSONObj>& theIndexSpecs)
-        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
-            collNss = theNss;
-            collOptions = theOptions;
-            collIndexSpecs = theIndexSpecs;
-            return std::unique_ptr<CollectionBulkLoader>(loader);
-        };
+    storageInterface->createCollectionForBulkFn =
+        [&](const NamespaceString& theNss,
+            const CollectionOptions& theOptions,
+            const BSONObj idIndexSpec,
+            const std::vector<BSONObj>& theIndexSpecs) -> std::unique_ptr<CollectionBulkLoader> {
+        collNss = theNss;
+        collOptions = theOptions;
+        collIndexSpecs = theIndexSpecs;
+        return std::move(loader);
+    };
 
     // Split listIndexes response into 2 batches: first batch contains idIndexSpec and
     // second batch contains specs
@@ -848,18 +852,18 @@ TEST_F(CollectionClonerTest, FindFetcherScheduleFailed) {
 
     // Shut down executor while in beginCollection callback.
     // This will cause the fetcher to fail to schedule the find command.
-    CollectionMockStats stats;
-    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
+    auto stats = std::make_shared<CollectionMockStats>();
+    auto loader = std::make_unique<CollectionBulkLoaderMock>(stats);
     bool collectionCreated = false;
-    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
-                                                      const CollectionOptions& theOptions,
-                                                      const BSONObj idIndexSpec,
-                                                      const std::vector<BSONObj>& theIndexSpecs)
-        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
-            collectionCreated = true;
-            getExecutor().shutdown();
-            return std::unique_ptr<CollectionBulkLoader>(loader);
-        };
+    storageInterface->createCollectionForBulkFn =
+        [&](const NamespaceString& theNss,
+            const CollectionOptions& theOptions,
+            const BSONObj idIndexSpec,
+            const std::vector<BSONObj>& theIndexSpecs) -> std::unique_ptr<CollectionBulkLoader> {
+        collectionCreated = true;
+        getExecutor().shutdown();
+        return std::move(loader);
+    };
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -880,17 +884,17 @@ TEST_F(CollectionClonerTest, QueryAfterCreateCollection) {
     MockClientPauser pauser(_client);
     ASSERT_OK(collectionCloner->startup());
 
-    CollectionMockStats stats;
-    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
+    auto stats = std::make_shared<CollectionMockStats>();
+    auto loader = std::make_unique<CollectionBulkLoaderMock>(stats);
     bool collectionCreated = false;
-    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
-                                                      const CollectionOptions& theOptions,
-                                                      const BSONObj idIndexSpec,
-                                                      const std::vector<BSONObj>& theIndexSpecs)
-        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
-            collectionCreated = true;
-            return std::unique_ptr<CollectionBulkLoader>(loader);
-        };
+    storageInterface->createCollectionForBulkFn =
+        [&](const NamespaceString& theNss,
+            const CollectionOptions& theOptions,
+            const BSONObj idIndexSpec,
+            const std::vector<BSONObj>& theIndexSpecs) -> std::unique_ptr<CollectionBulkLoader> {
+        collectionCreated = true;
+        return std::move(loader);
+    };
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
@@ -1005,7 +1009,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
 
     _client->waitForPausedQuery();
     ASSERT_TRUE(collectionCloner->isActive());
-    ASSERT_TRUE(collectionStats.initCalled);
+    ASSERT_TRUE(collectionStats->initCalled);
 
     ASSERT(_loader != nullptr);
     _loader->insertDocsFn = [](const std::vector<BSONObj>::const_iterator begin,
@@ -1017,7 +1021,7 @@ TEST_F(CollectionClonerTest, InsertDocumentsFailed) {
 
     collectionCloner->join();
     ASSERT_FALSE(collectionCloner->isActive());
-    ASSERT_EQUALS(0, collectionStats.insertCount);
+    ASSERT_EQUALS(0, collectionStats->insertCount);
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus().code());
 }
@@ -1038,10 +1042,10 @@ TEST_F(CollectionClonerTest, InsertDocumentsSingleBatch) {
     collectionCloner->join();
     // TODO: record the documents during insert and compare them
     //       -- maybe better done using a real storage engine, like ephemeral for test.
-    ASSERT_EQUALS(2, collectionStats.insertCount);
+    ASSERT_EQUALS(2, collectionStats->insertCount);
     auto stats = collectionCloner->getStats();
     ASSERT_EQUALS(1u, stats.receivedBatches);
-    ASSERT_TRUE(collectionStats.commitCalled);
+    ASSERT_TRUE(collectionStats->commitCalled);
 
     ASSERT_OK(getStatus());
     ASSERT_FALSE(collectionCloner->isActive());
@@ -1065,8 +1069,8 @@ TEST_F(CollectionClonerTest, InsertDocumentsMultipleBatches) {
     collectionCloner->join();
     // TODO: record the documents during insert and compare them
     //       -- maybe better done using a real storage engine, like ephemeral for test.
-    ASSERT_EQUALS(3, collectionStats.insertCount);
-    ASSERT_TRUE(collectionStats.commitCalled);
+    ASSERT_EQUALS(3, collectionStats->insertCount);
+    ASSERT_TRUE(collectionStats->commitCalled);
     auto stats = collectionCloner->getStats();
     ASSERT_EQUALS(2u, stats.receivedBatches);
 
@@ -1107,7 +1111,7 @@ TEST_F(CollectionClonerTest, CollectionClonerCannotBeRestartedAfterPreviousFailu
 
     // Second cloning attempt - run to completion.
     unittest::log() << "Starting second collection cloning attempt - startup() should fail";
-    collectionStats = CollectionMockStats();
+    *collectionStats = CollectionMockStats();
     setStatus(getDetectableErrorStatus());
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, collectionCloner->startup());
@@ -1185,7 +1189,7 @@ TEST_F(CollectionClonerTest,
 
     _client->waitForPausedQuery();
     ASSERT_TRUE(collectionCloner->isActive());
-    ASSERT_TRUE(collectionStats.initCalled);
+    ASSERT_TRUE(collectionStats->initCalled);
 
     // At this point, the CollectionCloner is waiting for the query to complete.
     // We want to return the first batch of documents for the collection from the network so that
@@ -1264,7 +1268,7 @@ protected:
         ASSERT_TRUE(collectionCloner->isActive());
 
         _client->waitForPausedQuery();
-        ASSERT_TRUE(collectionStats.initCalled);
+        ASSERT_TRUE(collectionStats->initCalled);
         pauser.resumeAndWaitForResumedQuery();
     }
 
@@ -1337,23 +1341,23 @@ TEST_F(CollectionClonerRenamedBeforeStartTest, FirstRemoteCommandWithRenamedColl
 }
 
 TEST_F(CollectionClonerRenamedBeforeStartTest, BeginCollectionWithUUID) {
-    CollectionMockStats stats;
-    CollectionBulkLoaderMock* loader = new CollectionBulkLoaderMock(&stats);
+    auto stats = std::make_shared<CollectionMockStats>();
+    auto loader = std::make_unique<CollectionBulkLoaderMock>(stats);
     NamespaceString collNss;
     CollectionOptions collOptions;
     BSONObj collIdIndexSpec;
     std::vector<BSONObj> collSecondaryIndexSpecs;
-    storageInterface->createCollectionForBulkFn = [&](const NamespaceString& theNss,
-                                                      const CollectionOptions& theOptions,
-                                                      const BSONObj idIndexSpec,
-                                                      const std::vector<BSONObj>& nonIdIndexSpecs)
-        -> StatusWith<std::unique_ptr<CollectionBulkLoader>> {
-            collNss = theNss;
-            collOptions = theOptions;
-            collIdIndexSpec = idIndexSpec;
-            collSecondaryIndexSpecs = nonIdIndexSpecs;
-            return std::unique_ptr<CollectionBulkLoader>(loader);
-        };
+    storageInterface->createCollectionForBulkFn =
+        [&](const NamespaceString& theNss,
+            const CollectionOptions& theOptions,
+            const BSONObj idIndexSpec,
+            const std::vector<BSONObj>& nonIdIndexSpecs) -> std::unique_ptr<CollectionBulkLoader> {
+        collNss = theNss;
+        collOptions = theOptions;
+        collIdIndexSpec = idIndexSpec;
+        collSecondaryIndexSpecs = nonIdIndexSpecs;
+        return std::move(loader);
+    };
 
     // Pause the client so the cloner stops in the fetcher.
     MockClientPauser pauser(_client);
