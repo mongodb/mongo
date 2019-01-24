@@ -251,4 +251,12 @@ std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& nsOr
     return stream << nsOrUUID.toString();
 }
 
+StringBuilder& operator<<(StringBuilder& builder, const NamespaceString& nss) {
+    return builder << nss.toString();
+}
+
+StringBuilder& operator<<(StringBuilder& builder, const NamespaceStringOrUUID& nsOrUUID) {
+    return builder << nsOrUUID.toString();
+}
+
 }  // namespace mongo
