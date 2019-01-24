@@ -35,6 +35,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
 
@@ -60,6 +61,8 @@ public:
     static const BSONField<BSONObj> min;
     static const BSONField<BSONObj> max;
 
+    TagsType() = default;
+    TagsType(NamespaceString nss, std::string tag, ChunkRange range);
 
     /**
      * Constructs a new DatabaseType object from BSON. Validates that all required fields are

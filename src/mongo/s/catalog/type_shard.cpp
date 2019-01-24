@@ -51,6 +51,9 @@ const BSONField<long long> ShardType::maxSizeMB("maxSize");
 const BSONField<BSONArray> ShardType::tags("tags");
 const BSONField<ShardType::ShardState> ShardType::state("state");
 
+ShardType::ShardType(std::string name, std::string host, std::vector<std::string> tags)
+    : _name(std::move(name)), _host(std::move(host)), _tags(std::move(tags)) {}
+
 StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
     ShardType shard;
 

@@ -281,8 +281,7 @@ public:
                 timeStamp(),
                 tags,
                 makeTagToShards(numShards),
-                makeShardIds(numShards),
-                true);
+                makeShardIds(numShards));
         const std::vector<ChunkType> expectedChunks =
             makeChunks(expectedChunkRanges, expectedShardIds);
         assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
@@ -432,7 +431,7 @@ TEST_F(GenerateShardCollectionInitialZonedChunksTest, ZoneNotAssociatedWithAnySh
 
     ASSERT_THROWS_CODE(
         InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
-            nss(), shardKeyPattern(), timeStamp(), tags, tagToShards, makeShardIds(1), true),
+            nss(), shardKeyPattern(), timeStamp(), tags, tagToShards, makeShardIds(1)),
         AssertionException,
         50973);
 }

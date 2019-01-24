@@ -41,6 +41,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -370,6 +371,69 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectSetShardVersion(shardHost, shard, kNamespace, boost::none);
 
     future.timed_get(kFutureTimeout);
+}
+
+using CreateFirstChunksTest = ShardCollectionTest;
+
+TEST_F(CreateFirstChunksTest, DistributeInitialChunksWithoutTagsIgnoredForNonEmptyCollection) {
+    const ShardKeyPattern kShardKeyPattern{BSON("x" << 1)};
+    const std::vector<ShardType> kShards{ShardType("shard0", "rs0/shard0:123"),
+                                         ShardType("shard1", "rs1/shard1:123"),
+                                         ShardType("shard2", "rs2/shard2:123")};
+
+    const auto connStr = assertGet(ConnectionString::parse(kShards[1].getHost()));
+
+    std::unique_ptr<RemoteCommandTargeterMock> targeter(
+        stdx::make_unique<RemoteCommandTargeterMock>());
+    targeter->setConnectionStringReturnValue(connStr);
+    targeter->setFindHostReturnValue(connStr.getServers()[0]);
+    targeterFactory()->addTargeterToReturn(connStr, std::move(targeter));
+
+    ASSERT_OK(setupShards(kShards));
+    shardRegistry()->reload(operationContext());
+
+    auto future = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+        return InitialSplitPolicy::createFirstChunks(opCtx.get(),
+                                                     kNamespace,
+                                                     kShardKeyPattern,
+                                                     ShardId("shard1"),
+                                                     {},
+                                                     {},
+                                                     true,
+                                                     false /* isEmpty */);
+    });
+
+    expectSplitVector(connStr.getServers()[0], kShardKeyPattern, BSON_ARRAY(BSON("x" << 0)));
+
+    const auto& firstChunks = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(2U, firstChunks.chunks.size());
+    ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
+    ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[1].getShard());
+}
+
+TEST_F(CreateFirstChunksTest, DistributeInitialChunksWithTagsIgnoredForNonEmptyCollection) {
+    const ShardKeyPattern kShardKeyPattern{BSON("x" << 1)};
+    const std::vector<ShardType> kShards{ShardType("shard0", "rs0/shard0:123", {"TestZone"}),
+                                         ShardType("shard1", "rs1/shard1:123", {"TestZone"}),
+                                         ShardType("shard2", "rs2/shard2:123")};
+    ASSERT_OK(setupShards(kShards));
+    shardRegistry()->reload(operationContext());
+
+    const auto firstChunks = InitialSplitPolicy::createFirstChunks(
+        operationContext(),
+        kNamespace,
+        kShardKeyPattern,
+        ShardId("shard1"),
+        {},
+        {TagsType(kNamespace, "TestZone", ChunkRange(BSON("x" << MinKey), BSON("x" << 0)))},
+        true,
+        false /* isEmpty */);
+
+    ASSERT_EQ(1U, firstChunks.chunks.size());
+    ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
 }
 
 }  // namespace
