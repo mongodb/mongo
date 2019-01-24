@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class DocumentSourceGraphLookUp final : public DocumentSource {
+class DocumentSourceGraphLookUp final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
@@ -71,6 +71,14 @@ public:
         _startWith->addDependencies(deps);
         return SEE_NEXT;
     };
+
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+
+    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+        return {this};
+    }
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
         collections->push_back(_from);
