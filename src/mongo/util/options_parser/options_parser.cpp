@@ -630,7 +630,12 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
 
         for (YAML::const_iterator it = YAMLNode.begin(); it != YAMLNode.end(); ++it) {
             auto elementKey = it->first.Scalar();
-            const auto& elementVal = it->second;
+            // Because the object returned by dereferencing the `YAMLNode` iterator is an emphemeral
+            // proxy value, the objects within it do not get lifetime extension when referred by
+            // reference. By making `elementVal` hold a copy of the element, we avoid a bug, found
+            // by ASAN, where `elementVal` will be an invalid reference immediately after its
+            // creation.
+            const auto elementVal = it->second;
 
             if (elementVal.IsMap()) {
                 auto swExpansion = runYAMLExpansion(
