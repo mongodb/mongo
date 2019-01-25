@@ -193,29 +193,39 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     auto out = make_intrusive<DocumentStorage>();
 
-    // Make a copy of the buffer.
-    // It is very important that the positions of each field are the same after cloning.
-    const size_t bufferBytes = allocatedBytes();
-    out->_buffer = new char[bufferBytes];
-    out->_bufferEnd = out->_buffer + (_bufferEnd - _buffer);
-    if (bufferBytes > 0) {
+    if (_buffer) {
+        // Make a copy of the buffer with the fields.
+        // It is very important that the positions of each field are the same after cloning.
+        const size_t bufferBytes = allocatedBytes();
+        out->_buffer = new char[bufferBytes];
+        out->_bufferEnd = out->_buffer + (_bufferEnd - _buffer);
         memcpy(out->_buffer, _buffer, bufferBytes);
+
+        out->_hashTabMask = _hashTabMask;
+        out->_usedBytes = _usedBytes;
+        out->_numFields = _numFields;
+
+        dassert(out->allocatedBytes() == bufferBytes);
+
+        // Tell values that they have been memcpyed (updates ref counts)
+        for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
+            it->val.memcpyed();
+        }
+    } else {
+        // If we don't have a buffer, these fields should still be in their initial state.
+        dassert(out->_hashTabMask == _hashTabMask);
+        dassert(out->_usedBytes == _usedBytes);
+        dassert(out->_numFields == _numFields);
     }
 
-    // Copy remaining fields
-    out->_usedBytes = _usedBytes;
-    out->_numFields = _numFields;
-    out->_hashTabMask = _hashTabMask;
-    out->_metaFields = _metaFields;
-    out->_textScore = _textScore;
-    out->_randVal = _randVal;
-    out->_sortKey = _sortKey.getOwned();
-    out->_geoNearDistance = _geoNearDistance;
-    out->_geoNearPoint = _geoNearPoint.getOwned();
-
-    // Tell values that they have been memcpyed (updates ref counts)
-    for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
-        it->val.memcpyed();
+    // Copy metadata
+    if (_metaFields.any()) {
+        out->_metaFields = _metaFields;
+        out->_textScore = _textScore;
+        out->_randVal = _randVal;
+        out->_sortKey = _sortKey.getOwned();
+        out->_geoNearDistance = _geoNearDistance;
+        out->_geoNearPoint = _geoNearPoint.getOwned();
     }
 
     return out;

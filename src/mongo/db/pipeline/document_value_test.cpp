@@ -111,6 +111,14 @@ TEST(DocumentConstruction, FromEmptyDocumentClone) {
     // Prior to SERVER-26462, cloning an empty document would cause a segmentation fault.
     Document documentClone = document.clone();
     ASSERT_DOCUMENT_EQ(document, documentClone);
+
+    // Prior to SERVER-39209 this would make ASAN complain.
+    Document documentClone2 = documentClone.clone();
+    ASSERT_DOCUMENT_EQ(document, documentClone2);
+
+    // For good measure, try a third clone
+    Document documentClone3 = documentClone2.clone();
+    ASSERT_DOCUMENT_EQ(document, documentClone3);
 }
 
 /**
