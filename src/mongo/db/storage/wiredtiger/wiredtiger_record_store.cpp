@@ -1638,20 +1638,27 @@ boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
     if (!_isOplog)
         return boost::none;
 
-    if (_isOplog) {
-        WiredTigerRecoveryUnit::get(opCtx)->setIsOplogReader();
+    auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
+    wtRu->setIsOplogReader();
+
+    RecordId searchFor = startingPosition;
+    auto visibilityTs = wtRu->getOplogVisibilityTs();
+    if (visibilityTs && searchFor.repr() > *visibilityTs) {
+        searchFor = RecordId(*visibilityTs);
     }
 
     WiredTigerCursor cursor(_uri, _tableId, true, opCtx);
     WT_CURSOR* c = cursor.get();
 
     int cmp;
-    setKey(c, startingPosition);
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search_near(c, &cmp); });
+    setKey(c, searchFor);
+    int ret = c->search_near(c, &cmp);
     if (ret == 0 && cmp > 0)
         ret = c->prev(c);  // landed one higher than startingPosition
     if (ret == WT_NOTFOUND)
         return RecordId();  // nothing <= startingPosition
+    // It's illegal for oplog documents to be in a prepare state.
+    invariant(ret != WT_PREPARE_CONFLICT);
     invariantWTOK(ret);
 
     return getKey(c);
@@ -1857,6 +1864,9 @@ WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContex
                                                                  const WiredTigerRecordStore& rs,
                                                                  bool forward)
     : _rs(rs), _opCtx(opCtx), _forward(forward) {
+    if (_rs._isOplog) {
+        _oplogVisibleTs = WiredTigerRecoveryUnit::get(opCtx)->getOplogVisibilityTs();
+    }
     _cursor.emplace(rs.getURI(), rs.tableId(), true, opCtx);
 }
 
@@ -1889,6 +1899,11 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         id = getKey(c);
     }
 
+    if (_oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
+        _eof = true;
+        return {};
+    }
+
     if (_forward && _lastReturnedId >= id) {
         log() << "WTCursor::next -- c->next_key ( " << id
               << ") was not greater than _lastReturnedId (" << _lastReturnedId
@@ -1906,6 +1921,11 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
+    if (_oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
+        _eof = true;
+        return {};
+    }
+
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
     setKey(c, id);
@@ -1931,6 +1951,7 @@ void WiredTigerRecordStoreCursorBase::save() {
     try {
         if (_cursor)
             _cursor->reset();
+        _oplogVisibleTs = boost::none;
     } catch (const WriteConflictException&) {
         // Ignore since this is only called when we are about to kill our transaction
         // anyway.
@@ -1944,7 +1965,9 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
 
 bool WiredTigerRecordStoreCursorBase::restore() {
     if (_rs._isOplog && _forward) {
-        WiredTigerRecoveryUnit::get(_opCtx)->setIsOplogReader();
+        auto wtRu = WiredTigerRecoveryUnit::get(_opCtx);
+        wtRu->setIsOplogReader();
+        _oplogVisibleTs = wtRu->getOplogVisibilityTs();
     }
 
     if (!_cursor)

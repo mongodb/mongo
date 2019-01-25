@@ -183,6 +183,8 @@ public:
     }
     void assertInActiveTxn() const;
 
+    boost::optional<int64_t> getOplogVisibilityTs();
+
     static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
         return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
     }
@@ -298,6 +300,7 @@ private:
     Timestamp _readAtTimestamp;
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
+    boost::optional<int64_t> _oplogVisibleTs = boost::none;
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
 };

@@ -331,6 +331,15 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
     fassertFailed(28575);
 }
 
+boost::optional<int64_t> WiredTigerRecoveryUnit::getOplogVisibilityTs() {
+    if (!_isOplogReader) {
+        return boost::none;
+    }
+
+    getSession();
+    return _oplogVisibleTs;
+}
+
 WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
     if (!_isActive()) {
         _txnOpen();
@@ -418,6 +427,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _prepareTimestamp = Timestamp();
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
+    _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
 }
 
@@ -495,15 +505,10 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     switch (_timestampReadSource) {
         case ReadSource::kUnset:
         case ReadSource::kNoTimestamp: {
-            WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared);
-
             if (_isOplogReader) {
-                auto status =
-                    txnOpen.setTimestamp(Timestamp(_oplogManager->getOplogReadTimestamp()),
-                                         WiredTigerBeginTxnBlock::RoundToOldest::kRound);
-                fassert(50771, status);
+                _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
             }
-            txnOpen.done();
+            WiredTigerBeginTxnBlock(session, _ignorePrepared).done();
             break;
         }
         case ReadSource::kMajorityCommitted: {
