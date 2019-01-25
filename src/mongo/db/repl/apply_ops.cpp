@@ -455,6 +455,8 @@ Status applyApplyOpsOplogEntry(OperationContext* opCtx,
 }
 
 Status applyRecoveredPrepareTransaction(OperationContext* opCtx, const OplogEntry& entry) {
+    // Snapshot transactions never conflict with the PBWM lock.
+    invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
     UnreplicatedWritesBlock uwb(opCtx);
     return _applyPrepareTransaction(opCtx, entry, OplogApplication::Mode::kRecovering);
 }

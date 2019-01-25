@@ -869,6 +869,9 @@ void TransactionParticipant::refreshLocksForPreparedTransaction(OperationContext
     _txnResourceStash->release(opCtx);
     _txnResourceStash = boost::none;
 
+    // Snapshot transactions don't conflict with PBWM lock on both primary and secondary.
+    invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
+
     // Transfer the txn resource back from the operation context to the stash.
     auto stashStyle =
         yieldLocks ? TxnResources::StashStyle::kSecondary : TxnResources::StashStyle::kPrimary;

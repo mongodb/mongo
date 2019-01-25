@@ -308,6 +308,9 @@ void ReplicationRecoveryImpl::_reconstructPreparedTransactions(OperationContext*
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();
 
+            // Snapshot transaction can never conflict with the PBWM lock.
+            newOpCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+
             // Checks out the session, applies the operations and prepares the transactions.
             uassertStatusOK(applyRecoveredPrepareTransaction(newOpCtx.get(), prepareOplogEntry));
         }

@@ -257,6 +257,7 @@ protected:
 
     std::unique_ptr<MongoDOperationContextSession> checkOutSession(
         boost::optional<bool> startNewTxn = true) {
+        opCtx()->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, startNewTxn);
