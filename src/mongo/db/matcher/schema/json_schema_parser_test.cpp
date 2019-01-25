@@ -2087,5 +2087,115 @@ TEST(JSONSchemaParserTest, TopLevelEnumWithZeroObjectsTranslatesCorrectly) {
     ASSERT_SERIALIZES_TO(optimizedResult, fromjson("{$alwaysFalse: 1}"));
 }
 
+TEST(JSONSchemaParserTest, EncryptTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {foo: {encrypt: {}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
+        {
+            $or: [
+                {$nor: [{foo: {$exists: true}}]},
+                {$and: [
+                       {foo: {$_internalSchemaBinDataSubType: 6}},
+                       {foo: {$_internalSchemaType: [5]}}
+                       ]
+                    }
+                ]
+            }
+        })"));
+}
+
+TEST(JSONSchemaParserTest, TopLevelEncryptTranslatesCorrectly) {
+    BSONObj schema = fromjson("{encrypt: {}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    ASSERT_SERIALIZES_TO(optimizedResult, BSON(AlwaysFalseMatchExpression::kName << 1));
+}
+
+TEST(JSONSchemaParserTest, NestedEncryptTranslatesCorrectly) {
+    BSONObj schema =
+        fromjson("{properties: {a: {type: 'object', properties: {b: {encrypt: {}}}}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
+        {
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {$and: [
+                        {a: {$_internalSchemaObjectMatch: {$or: [
+                                        {$nor: [{b: {$exists: true}}]},
+                                        {$and: [
+                                                {b: {$_internalSchemaBinDataSubType: 6}},
+                                                {b: {$_internalSchemaType: [5]}}
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {a: {$_internalSchemaType: [3]}}
+                    ]
+                }
+            ]
+        })"));
+}
+
+TEST(JSONSchemaParserTest, NestedEncryptInArrayTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {a: {type: 'array', items: {encrypt: {}}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
+        {
+            $or: [
+                {$nor: [{a: {$exists: true}}]},
+                {
+                $and: [
+                    {
+                        a: {
+                            $_internalSchemaAllElemMatchFromIndex: [
+                                0,
+                                {$and: [
+                                    {i: {$_internalSchemaBinDataSubType: 6}},
+                                    {i: {$_internalSchemaType: [5]}}]
+                                }
+                            ]
+                        }
+                    },
+                    {a: {$_internalSchemaType: [4]}}
+                ]
+                }
+            ]
+        })"));
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBothEncryptAndTypeArePresent) {
+    BSONObj schema = fromjson("{encrypt: {}, type: 'object'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBothEncryptAndBSONTypeArePresent) {
+    BSONObj schema = fromjson("{encrypt: {}, bsonType: 'binData'}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfEncryptValueIsNotObject) {
+    BSONObj schema = fromjson("{properties: {foo: {encrypt: 12}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfEncryptValueIsNotEmptyObject) {
+    BSONObj schema = fromjson("{properties: {foo: {encrypt: {foo: 12}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+
 }  // namespace
 }  // namespace mongo

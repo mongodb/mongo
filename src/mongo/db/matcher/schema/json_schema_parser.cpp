@@ -100,6 +100,7 @@ constexpr StringData kSchemaUniqueItemsKeyword = "uniqueItems"_sd;
 
 // MongoDB-specific (non-standard) JSON Schema keyword constants.
 constexpr StringData kSchemaBsonTypeKeyword = "bsonType"_sd;
+constexpr StringData kSchemaEncryptKeyword = "encrypt"_sd;
 
 // Explicitly unsupported JSON Schema keywords.
 const std::set<StringData> unsupportedKeywords{
@@ -1329,6 +1330,30 @@ Status translateScalarKeywords(StringMap<BSONElement>& keywordMap,
 }
 
 /**
+ * Parses JSON Schema encrypt keyword in 'keywordMap' and adds it to 'andExpr'. Returns a
+ * non-OK status if an error occurs during parsing.
+ */
+Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
+                                   StringData path,
+                                   InternalSchemaTypeExpression* typeExpr,
+                                   AndMatchExpression* andExpr) {
+    if (auto encryptElt = keywordMap[kSchemaEncryptKeyword]) {
+        if (encryptElt.type() != BSONType::Object) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "$jsonSchema keyword '" << kSchemaEncryptKeyword
+                                  << "' must be an object "};
+        } else if (!encryptElt.embeddedObject().isEmpty()) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "$jsonSchema keyword '" << kSchemaEncryptKeyword
+                                  << "' must be an empty object "};
+        }
+        andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
+    }
+
+    return Status::OK();
+}
+
+/**
  * Validates that the following metadata keywords have the correct type:
  *  - description
  *  - title
@@ -1363,6 +1388,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
         {std::string(kSchemaBsonTypeKeyword), {}},
         {std::string(kSchemaDependenciesKeyword), {}},
         {std::string(kSchemaDescriptionKeyword), {}},
+        {std::string(kSchemaEncryptKeyword), {}},
         {std::string(kSchemaEnumKeyword), {}},
         {std::string(kSchemaExclusiveMaximumKeyword), {}},
         {std::string(kSchemaExclusiveMinimumKeyword), {}},
@@ -1418,6 +1444,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
 
     auto typeElem = keywordMap[kSchemaTypeKeyword];
     auto bsonTypeElem = keywordMap[kSchemaBsonTypeKeyword];
+    auto encryptElem = keywordMap[kSchemaEncryptKeyword];
     if (typeElem && bsonTypeElem) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Cannot specify both $jsonSchema keywords '"
@@ -1425,6 +1452,22 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
                                     << "' and '"
                                     << kSchemaBsonTypeKeyword
                                     << "'");
+    } else if (typeElem && encryptElem) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "$jsonSchema keyword '" << kSchemaEncryptKeyword
+                                    << "' cannot be used in conjunction with '"
+                                    << kSchemaTypeKeyword
+                                    << "', '"
+                                    << kSchemaEncryptKeyword
+                                    << "' implies type 'bsonType::BinData'");
+    } else if (bsonTypeElem && encryptElem) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "$jsonSchema keyword '" << kSchemaEncryptKeyword
+                                    << "' cannot be used in conjunction with '"
+                                    << kSchemaBsonTypeKeyword
+                                    << "', '"
+                                    << kSchemaEncryptKeyword
+                                    << "' implies type 'bsonType::BinData'");
     }
 
     std::unique_ptr<InternalSchemaTypeExpression> typeExpr;
@@ -1442,6 +1485,11 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
             return parseBsonTypeResult.getStatus();
         }
         typeExpr = std::move(parseBsonTypeResult.getValue());
+    } else if (encryptElem) {
+        // The presence of the encrypt keyword implies the restriction that the field must be
+        // of type BinData.
+        typeExpr = stdx::make_unique<InternalSchemaTypeExpression>(
+            path, MatcherTypeSet(BSONType::BinData));
     }
 
     auto andExpr = stdx::make_unique<AndMatchExpression>();
@@ -1454,6 +1502,12 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
 
     translationStatus = translateArrayKeywords(
         keywordMap, path, ignoreUnknownKeywords, typeExpr.get(), andExpr.get());
+    if (!translationStatus.isOK()) {
+        return translationStatus;
+    }
+
+    translationStatus =
+        translateEncryptionKeywords(keywordMap, path, typeExpr.get(), andExpr.get());
     if (!translationStatus.isOK()) {
         return translationStatus;
     }

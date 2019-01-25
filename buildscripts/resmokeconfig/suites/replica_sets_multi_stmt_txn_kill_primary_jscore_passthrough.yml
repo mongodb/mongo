@@ -118,6 +118,7 @@ selector:
   - jstests/core/json_schema/additional_properties.js
   - jstests/core/json_schema/bsontype.js
   - jstests/core/json_schema/dependencies.js
+  - jstests/core/json_schema/encrypt.js
   - jstests/core/json_schema/items.js
   - jstests/core/json_schema/logical_keywords.js
   - jstests/core/json_schema/min_max_items.js
