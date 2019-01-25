@@ -302,12 +302,14 @@ void ReplicationRecoveryImpl::_reconstructPreparedTransactions(OperationContext*
 
         {
             // Make a new opCtx so that we can set the lsid when applying the prepare transaction
-            // oplog entry. After going out of scope, the former opCtx will be restored.
-            AlternativeOpCtx aoc(opCtx);
-            const auto newOpCtx = aoc.getOperationContext();
+            // oplog entry.
+            auto newClient =
+                opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
+            AlternativeClientRegion acr(newClient);
+            const auto newOpCtx = cc().makeOperationContext();
 
             // Checks out the session, applies the operations and prepares the transactions.
-            uassertStatusOK(applyRecoveredPrepareTransaction(newOpCtx, prepareOplogEntry));
+            uassertStatusOK(applyRecoveredPrepareTransaction(newOpCtx.get(), prepareOplogEntry));
         }
     }
 }
