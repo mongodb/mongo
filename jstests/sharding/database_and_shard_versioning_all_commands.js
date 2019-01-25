@@ -412,7 +412,9 @@
         shutdown: {skip: "does not forward command to primary shard"},
         split: {skip: "does not forward command to primary shard"},
         splitVector: {skip: "does not forward command to primary shard"},
+        startRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
         startSession: {skip: "executes locally on mongos (not sent to any remote node)"},
+        stopRecordingTraffic: {skip: "executes locally on mongos (not sent to any remote node)"},
         update: {
             skipProfilerCheck: true,
             sendsDbVersion: false,

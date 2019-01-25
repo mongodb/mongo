@@ -349,6 +349,7 @@ mongod = env.Program(
         'db/introspect',
         'db/keys_collection_client_direct',
         'db/kill_sessions_local',
+        'db/traffic_recorder',
         'db/logical_session_cache_factory_mongod',
         'db/logical_time_metadata_hook',
         'db/matcher/expressions_mongod_only',
@@ -451,6 +452,23 @@ if env.TargetOSIs('windows'):
     env.Alias('generated-sources', generatedServerManifest)
     env.Depends("s/server.res", generatedServerManifest)
 
+
+mongotrafficreader = env.Program(
+    target="mongotrafficreader",
+    source=[
+        "db/traffic_reader_main.cpp"
+    ],
+    LIBDEPS=[
+        'base',
+        'db/traffic_reader',
+        'rpc/protocol',
+        'util/signal_handlers'
+    ],
+)
+
+if not hygienic:
+    env.Install('#/', mongotrafficreader)
+
 # mongos
 mongos = env.Program(
     target='mongos',
@@ -533,6 +551,7 @@ if not has_option('noshell') and usemozjs:
                     'db/query/command_request_response',
                     'db/query/query_request',
                     'db/server_options_core',
+                    'db/traffic_reader',
                     'linenoise_utf8',
                     'rpc/protocol',
                     'scripting/scripting',

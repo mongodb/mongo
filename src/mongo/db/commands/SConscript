@@ -141,6 +141,7 @@ env.Library(
         "mr_common.cpp",
         "reap_logical_session_cache_now.cpp",
         "refresh_sessions_command_internal.cpp",
+        "traffic_recording_cmds.cpp",
         "user_management_commands_common.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -159,6 +160,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/isself',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
+        '$BUILD_DIR/mongo/db/traffic_recorder',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/s/sharding_legacy_api',

@@ -514,7 +514,9 @@
             expectFailure: true,
         },
         stageDebug: {skip: isAnInternalCommand},
+        startRecordingTraffic: {skip: isUnrelated},
         startSession: {skip: isAnInternalCommand},
+        stopRecordingTraffic: {skip: isUnrelated},
         top: {skip: "tested in views/views_stats.js"},
         touch: {
             command: {touch: "view", data: true},

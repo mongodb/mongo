@@ -115,6 +115,7 @@
 "storageDetails",
 "top",
 "touch",
+"trafficRecord",
 "unlock",
 "useUUID",
 "update",

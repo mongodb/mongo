@@ -5972,7 +5972,29 @@ var authCommandsLib = {
                       {killCursors: "$cmd.aggregate", cursors: [response.cursor.id]}));
               }
           }
-        }
+        },
+        {
+          testname: "startRecordingTraffic",
+          command: {startRecordingTraffic: 1, filename: "notARealPath"},
+          testcases: [
+              {runOnDb: adminDbName, roles: roles_hostManager},
+          ],
+          teardown: (db, response) => {
+              if (response.ok) {
+                  assert.commandWorked(db.runCommand({stopRecordingTraffic: 1}));
+              }
+          }
+        },
+        {
+          testname: "stopRecordingTraffic",
+          command: {stopRecordingTraffic: 1},
+          testcases: [
+              {runOnDb: adminDbName, roles: roles_hostManager},
+          ],
+          setup: function(db) {
+              db.runCommand({startRecordingTraffic: 1, filename: "notARealPath"});
+          }
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

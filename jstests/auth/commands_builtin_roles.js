@@ -143,7 +143,13 @@ function checkForNonExistentRoles() {
     }
 }
 
-var opts = {auth: "", enableExperimentalStorageDetailsCmd: ""};
+const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles/");
+mkdir(dbPath);
+var opts = {
+    auth: "",
+    enableExperimentalStorageDetailsCmd: "",
+    setParameter: "trafficRecordingDirectory=" + dbPath
+};
 var impls = {createUsers: createUsers, runOneTest: runOneTest};
 
 checkForNonExistentRoles();
@@ -159,7 +165,11 @@ conn = new ShardingTest({
     shards: 2,
     mongos: 1,
     keyFile: "jstests/libs/key1",
-    other: {shardOptions: opts, shardAsReplicaSet: false}
+    other: {
+        shardOptions: opts,
+        shardAsReplicaSet: false,
+        mongosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}
+    }
 });
 authCommandsLib.runTests(conn, impls);
 conn.stop();

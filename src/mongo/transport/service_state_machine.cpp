@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/traffic_recorder.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/memory.h"
@@ -423,6 +424,9 @@ void ServiceStateMachine::_sinkCallback(Status status) {
 void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     invariant(!_inMessage.empty());
 
+    TrafficRecorder::get(_serviceContext)
+        .observe(_sessionHandle, _serviceContext->getPreciseClockSource()->now(), _inMessage);
+
     auto& compressorMgr = MessageCompressorManager::forSession(_session());
 
     _compressorId = boost::none;
@@ -472,6 +476,10 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
             uassertStatusOK(swm.getStatus());
             toSink = swm.getValue();
         }
+
+        TrafficRecorder::get(_serviceContext)
+            .observe(_sessionHandle, _serviceContext->getPreciseClockSource()->now(), toSink);
+
         _sinkMessage(std::move(guard), std::move(toSink));
 
     } else {
