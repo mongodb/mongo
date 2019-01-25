@@ -142,6 +142,7 @@ selector:
   - jstests/core/uniqueness.js
   - jstests/core/unset2.js
   - jstests/core/update_addToSet.js
+  - jstests/core/update_array_offset_positional.js
   - jstests/core/update_arrayFilters.js
   - jstests/core/update_find_and_modify_id.js
   - jstests/core/update_modifier_pop.js
