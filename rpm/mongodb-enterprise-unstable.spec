@@ -250,6 +250,7 @@ fi
 
 %{_bindir}/bsondump
 %{_bindir}/install_compass
+%{_bindir}/mongocryptd
 %{_bindir}/mongodecrypt
 %{_bindir}/mongoldap
 %{_bindir}/mongodump
