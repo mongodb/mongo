@@ -43,7 +43,6 @@
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine_gen.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
@@ -756,7 +755,7 @@ bool KVStorageEngine::supportsReadConcernMajority() const {
 }
 
 bool KVStorageEngine::supportsPendingDrops() const {
-    return enableKVPendingDrops && supportsRecoverToStableTimestamp();
+    return supportsReadConcernMajority();
 }
 
 void KVStorageEngine::clearDropPendingState() {
