@@ -36,8 +36,9 @@ namespace mongo {
 class OperationContext;
 
 /**
-* Return an error status if the wrong mongod version was used for these datafiles. The boolean
-* represents whether there are non-local databases.
-*/
+ * Return an error status if the wrong mongod version was used for these datafiles. The boolean
+ * represents whether there are non-local databases.
+ */
 StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx);
-}
+
+}  // namespace mongo

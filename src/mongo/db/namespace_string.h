@@ -96,6 +96,9 @@ public:
     // Namespace for storing the persisted state of transaction coordinators.
     static const NamespaceString kTransactionCoordinatorsNamespace;
 
+    // Namespace for replica set configuration settings.
+    static const NamespaceString kSystemReplSetNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -42,12 +42,16 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -152,7 +156,6 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
 }
 
 const NamespaceString startupLogCollectionName("local.startup_log");
-const NamespaceString kSystemReplSetCollection("local.system.replset");
 
 /**
  * Returns 'true' if this server has a configuration document in local.system.replset.
@@ -160,7 +163,8 @@ const NamespaceString kSystemReplSetCollection("local.system.replset");
 bool hasReplSetConfigDoc(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     BSONObj config;
-    return Helpers::getSingleton(opCtx, kSystemReplSetCollection.ns().c_str(), config);
+    return Helpers::getSingleton(
+        opCtx, NamespaceString::kSystemReplSetNamespace.ns().c_str(), config);
 }
 
 /**
@@ -232,6 +236,34 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
     }
 }
 
+/**
+ * Sets the appropriate flag on the service context decorable 'replSetMemberInStandaloneMode' to
+ * 'true' if this is a replica set node running in standalone mode, otherwise 'false'.
+ */
+void setReplSetMemberInStandaloneMode(OperationContext* opCtx) {
+    const repl::ReplSettings& replSettings =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings();
+
+    if (replSettings.usingReplSets()) {
+        // Not in standalone mode.
+        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
+        return;
+    }
+
+    Lock::DBLock dbLock(opCtx, NamespaceString::kSystemReplSetNamespace.db(), MODE_X);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    databaseHolder->openDb(opCtx, NamespaceString::kSystemReplSetNamespace.db());
+
+    AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kSystemReplSetNamespace);
+    Collection* collection = autoCollection.getCollection();
+    if (collection && collection->numRecords(opCtx) > 0) {
+        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
+        return;
+    }
+
+    setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
+}
+
 }  // namespace
 
 /**
@@ -248,6 +280,10 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // Rebuilding indexes must be done before a database can be opened, except when using repair,
     // which rebuilds all indexes when it is done.
     if (!storageGlobalParams.readOnly && !storageGlobalParams.repair) {
+        // Determine whether this is a replica set node running in standalone mode. If we're in
+        // repair mode, we cannot set the flag yet as it needs to open a database and look through a
+        // collection. Rebuild the necessary indexes after setting the flag.
+        setReplSetMemberInStandaloneMode(opCtx);
         rebuildIndexes(opCtx, storageEngine);
     }
 
@@ -263,9 +299,26 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             quickExit(EXIT_ABRUPT);
         }
 
+        // Ensure that the local database is repaired first, if it exists, so that we can open it
+        // before any other database to be able to determine if this is a replica set node running
+        // in standalone mode before rebuilding any indexes.
+        auto dbNamesIt = std::find(dbNames.begin(), dbNames.end(), NamespaceString::kLocalDb);
+        if (dbNamesIt != dbNames.end()) {
+            std::swap(dbNames.front(), *dbNamesIt);
+            invariant(dbNames.front() == NamespaceString::kLocalDb);
+        }
+
+        stdx::function<void(const std::string& dbName)> onRecordStoreRepair =
+            [opCtx](const std::string& dbName) {
+                if (dbName == NamespaceString::kLocalDb) {
+                    setReplSetMemberInStandaloneMode(opCtx);
+                }
+            };
+
         for (const auto& dbName : dbNames) {
             LOG(1) << "    Repairing database: " << dbName;
-            fassertNoTrace(18506, repairDatabase(opCtx, storageEngine, dbName));
+            fassertNoTrace(18506,
+                           repairDatabase(opCtx, storageEngine, dbName, onRecordStoreRepair));
         }
 
         // All collections must have UUIDs before restoring the FCV document to a version that
@@ -304,13 +357,13 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
     if (!storageGlobalParams.readOnly) {
         // We open the "local" database before calling hasReplSetConfigDoc() to ensure the in-memory
-        // catalog entries for the 'kSystemReplSetCollection' collection have been populated if the
+        // catalog entries for the 'kSystemReplSetNamespace' collection have been populated if the
         // collection exists. If the "local" database didn't exist at this point yet, then it will
         // be created. If the mongod is running in a read-only mode, then it is fine to not open the
         // "local" database and populate the catalog entries because we won't attempt to drop the
         // temporary collections anyway.
-        Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
-        databaseHolder->openDb(opCtx, kSystemReplSetCollection.db());
+        Lock::DBLock dbLock(opCtx, NamespaceString::kSystemReplSetNamespace.db(), MODE_X);
+        databaseHolder->openDb(opCtx, NamespaceString::kSystemReplSetNamespace.db());
     }
 
     if (storageGlobalParams.repair) {

@@ -74,6 +74,15 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
  * Repairs a database using a storage engine-specific, best-effort process.
  * Some data may be lost or modified in the process but the output will
  * be structurally valid on successful return.
+ *
+ * Calls 'onRecordStoreRepair' after repairing all the collection record stores for each database
+ * before rebuilding the appropriate indexes.
+ *
+ * It is expected that the local database will be repaired first when running in repair mode.
  */
-Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName);
-}
+Status repairDatabase(OperationContext* opCtx,
+                      StorageEngine* engine,
+                      const std::string& dbName,
+                      stdx::function<void(const std::string& dbName)> onRecordStoreRepair);
+
+}  // namespace mongo

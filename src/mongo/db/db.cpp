@@ -95,6 +95,7 @@
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
@@ -112,6 +113,7 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
@@ -193,7 +195,6 @@ using std::endl;
 namespace {
 
 const NamespaceString startupLogCollectionName("local.startup_log");
-const NamespaceString kSystemReplSetCollection("local.system.replset");
 
 #ifdef _WIN32
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -240,21 +241,6 @@ void logStartup(OperationContext* opCtx) {
     OpDebug* const nullOpDebug = nullptr;
     uassertStatusOK(collection->insertDocument(opCtx, InsertStatement(o), nullOpDebug, false));
     wunit.commit();
-}
-
-/**
- * Checks if this server was started without --replset but has a config in local.system.replset
- * (meaning that this is probably a replica set member started in stand-alone mode).
- *
- * @returns the number of documents in local.system.replset or 0 if this was started with
- *          --replset.
- */
-unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
-    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets()) {
-        DBDirectClient c(opCtx);
-        return c.count(kSystemReplSetCollection.ns());
-    }
-    return 0;
 }
 
 void initWireSpec() {
@@ -581,12 +567,10 @@ ExitCode _initAndListen(int listenPort) {
         }
 
         repl::ReplicationCoordinator::get(startupOpCtx.get())->startup(startupOpCtx.get());
-        const unsigned long long missingRepl =
-            checkIfReplMissingFromCommandLine(startupOpCtx.get());
-        if (missingRepl) {
+        if (getReplSetMemberInStandaloneMode(serviceContext)) {
             log() << startupWarningsLog;
-            log() << "** WARNING: mongod started without --replSet yet " << missingRepl
-                  << " documents are present in local.system.replset." << startupWarningsLog;
+            log() << "** WARNING: mongod started without --replSet yet document(s) are present in "
+                  << NamespaceString::kSystemReplSetNamespace << "." << startupWarningsLog;
             log() << "**          Database contents may appear inconsistent with the oplog and may "
                      "appear to not contain"
                   << startupWarningsLog;
